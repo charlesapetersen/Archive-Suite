@@ -94,7 +94,7 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
         field.click()
         app.typeKey("a", modifierFlags: .command)
         app.typeText(name.isEmpty ? XCUIKeyboardKey.delete.rawValue : name)
-        XCTAssertFalse(window.buttons["Set"].exists || window.buttons["Clear"].exists,
+        XCTAssertFalse(window.buttons["an.detail.authors.set"].exists || window.buttons["an.detail.authors.clear"].exists,
                        "the authors field applies as edited: no Set or Clear button (W40.fix-suite-no-set-clear)")
         app.typeKey(.tab, modifierFlags: [])   // leaving the field applies it
     }

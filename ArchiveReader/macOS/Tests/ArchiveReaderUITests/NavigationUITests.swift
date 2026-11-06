@@ -593,8 +593,11 @@ final class NavigationUITests: FixtureUITestCase {
         let field = app.textFields["ar.tagEditor.sentWith"]
         XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")
         field.click()
-        XCTAssertFalse(app.buttons["Set"].exists || app.buttons["Clear"].exists,
-                       "the sheet applies its fields as typed: no Set or Clear button (W40.fix-suite-no-set-clear)")
+        // Scoped to the sheet: the filter bar behind it has its own Clear, which resets a filter.
+        let sheet = app.sheets.firstMatch
+        XCTAssertFalse(sheet.buttons["Set"].exists || sheet.buttons["Clear"].exists
+                       || sheet.buttons["Add"].exists || sheet.buttons["Clear Uncertain"].exists,
+                       "the sheet applies its fields as typed: no Set, Clear or Add button (W40.fix-suite-no-set-clear)")
         field.typeText("1958-03-12\r")
         XCTAssertTrue(waitForTags(on: name, containing: ["842", "Sent With 1958-03-12"]),
                       "Return should write the Sent-With date and keep the document's own date")

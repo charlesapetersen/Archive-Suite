@@ -31,8 +31,10 @@ struct TagEditorView: View {
                 // Typed text sticks, as in the list's tag field: Done adds a subject still in the field and applies
                 // a date still being typed. While a tag is being typed, Return belongs to the field, which adds it
                 // and keeps the keyboard.
-                Button("Done") { addSubject(); commitDateFields(); dismiss() }
-                    .keyboardShortcut(subjectDraft.isEmpty ? .defaultAction : nil)
+                // A date field's Return applies that field and leaves the sheet open; an entry that is not a
+                // date keeps the sheet open, its red hint showing, rather than closing on a value never written.
+                Button("Done") { addSubject(); commitDateFields(); if invalidFields.isEmpty { dismiss() } }
+                    .keyboardShortcut(subjectDraft.isEmpty && focusedField == nil ? .defaultAction : nil)
                     .accessibilityIdentifier("ar.tagEditor.done")
             }
             .padding()
@@ -181,7 +183,9 @@ struct TagEditorView: View {
     private func dateField(_ field: DateField, placeholder: String, width: CGFloat) -> some View {
         // Only typing goes through this setter, so a reseed never counts as an edit.
         TextField(placeholder, text: Binding(get: { dateDrafts[field] ?? "" },
-                                             set: { dateDrafts[field] = $0; editedFields.insert(field) }))
+                                             set: { text in
+                                                 guard text != (dateDrafts[field] ?? "") else { return }
+                                                 dateDrafts[field] = text; editedFields.insert(field) }))
             .textFieldStyle(.roundedBorder).frame(width: width)
             .focused($focusedField, equals: field)
             .onSubmit { commit(field) }
@@ -203,7 +207,7 @@ struct TagEditorView: View {
 
     /// The edit a field's text makes: `nil` for text that is not a valid value (kept, never written), else
     /// the op, an emptied field clearing its facet.
-    private func dateOp(_ field: DateField, _ text: String) -> TagEditOp? {
+    static func dateOp(_ field: DateField, _ text: String) -> TagEditOp? {
         let t = text.trimmingCharacters(in: .whitespaces)
         switch field {
         case .year:
@@ -221,15 +225,35 @@ struct TagEditorView: View {
         }
     }
 
+    /// What a typed-in field writes when it is applied, or `nil` for nothing. `shared` is the field's text when
+    /// the sheet seeded it (`DateFacets`): the value every file shares, or `.some(nil)` when the files differ.
+    static func edit(_ field: DateField, typed text: String, shared: String??) -> TagEditOp? {
+        guard let op = dateOp(field, text) else { return nil }
+        let typed = text.trimmingCharacters(in: .whitespaces)
+        switch shared {
+        // Unchanged from the value all the files share: nothing to write.
+        case .some(.some(let seeded)) where typed == seeded: return nil
+        // A mixed field emptied again is left alone: an empty mixed field means "keep each file's own", never
+        // "clear them all" (a cleared year also drops a decade-only file's decade).
+        case .some(.none) where typed.isEmpty: return nil
+        default: return op
+        }
+    }
+
     /// Apply a field that was typed in. Leaving one untouched writes nothing, so tabbing past a group's mixed
-    /// value never overwrites it.
+    /// value never overwrites it; an invalid entry stays marked as typed, its hint showing.
     private func commit(_ field: DateField) {
-        guard editedFields.contains(field), let op = dateOp(field, dateDrafts[field] ?? "") else { return }
+        let text = dateDrafts[field] ?? ""
+        guard editedFields.contains(field), Self.dateOp(field, text) != nil else { return }
         editedFields.remove(field)
-        // Unchanged from a value all the files share: nothing to write. A mixed field always writes once typed in.
-        if let seeded = seededText[field] ?? nil,
-           (dateDrafts[field] ?? "").trimmingCharacters(in: .whitespaces) == seeded { return }
-        apply(op)
+        // Never seeded counts as mixed, the case that writes least.
+        let shared: String??
+        if let i = seededText.index(forKey: field) { shared = seededText[i].value } else { shared = .some(nil) }
+        if let op = Self.edit(field, typed: text, shared: shared) { apply(op) }
+    }
+
+    private var invalidFields: [DateField] {
+        [.year, .day, .sentWith].filter { editedFields.contains($0) && Self.dateOp($0, dateDrafts[$0] ?? "") == nil }
     }
 
     private func commitDateFields() { for f in [DateField.year, .day, .sentWith] { commit(f) } }
@@ -243,7 +267,7 @@ struct TagEditorView: View {
     }
 
     private func invalidHint(_ field: DateField) -> Text? {
-        guard editedFields.contains(field), dateOp(field, dateDrafts[field] ?? "") == nil else { return nil }
+        guard editedFields.contains(field), Self.dateOp(field, dateDrafts[field] ?? "") == nil else { return nil }
         let message: String
         switch field {
         case .year: message = "Use a year from 100 to 9999"

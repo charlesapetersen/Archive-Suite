@@ -763,12 +763,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 
 ### N-21 · Authors, typed by hand
 
-- **Promise:** a note and an extract can each have authors set by hand, one per line, with Set and Clear,
-  without Zotero. Authors are saved to front-matter only and are searchable.
+- **Promise:** a note and an extract can each have authors set by hand, one per line, applied on leaving the
+  field and cleared by emptying it, without Zotero. Authors are saved to front-matter only and are searchable.
 - **Promised in:** `CLAUDE.md` §Core Directive; `00-overview.md` §3.1, D7; `09-gap-closure.md` B8;
   `SUITE_TODO_DONE.md` `W9.b8`.
-- **Reached by:** inspector Authors field ("One author per line") with Set / Clear
-  (`Views/NoteMetadataInspector.swift:180-200`), shown for both kinds. `commitAuthors` (`:497`) →
+- **Reached by:** inspector Authors field ("One author per line"), applied on leaving it, with no Set or Clear
+  (`Views/NoteMetadataInspector.swift`, `authorsSection`), shown for both kinds. `applyAuthors` →
   `NotesNavigationModel.setAuthors` (`Core/NotesNavigationModel.swift:234`) → `NotesModel.setAuthors`
   (`Core/NotesModel.swift:965`), which trims, drops blanks and keeps order and duplicates → `mutateItem`
   (no subject projection) → index upsert.
@@ -780,6 +780,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 W40.fix-notes-delete-undo — a delete now goes to the store's `Trash/`, shown in the sidebar, with
     Put Back and Edit ▸ Undo (`NotesGUITests.testG21_DeleteUndoAndTrashPutBack`); Empty Trash goes on to the Finder's Trash.
+  - 2026-11-06 W40.fix-suite-no-set-clear — the Set and Clear buttons are gone: the field applies on leaving it, to
+    the item it was typed for, and clears when emptied; the UITest types, tabs out and empties the field.
 - **Notes:** the W9.e2 result is `W9.e2-notes`: the new `NotesE2NoteLifecycleTests` sets authors on a note and an
   extract, checks the front matter, finds them by keyword search and clears them. Its red was a test bug, fixed by
   adding the ids `an.detail.authors.set`/`.clear`. Checkpoint `e59e3bd`. Code confirms "front matter only":

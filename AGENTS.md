@@ -136,6 +136,16 @@ plan's `## WORK QUEUE` (`ops/autonomous/next-queue-item.sh` walks only that).
 - **Processor's phone↔Mac Live‑Capture protocol** and its append‑only `ProviderModels` enums — see
   `ArchiveProcessor/AGENTS.md`.
 
+## UI conventions (all three apps)
+
+- **No Set, Clear or Add button beside a field (owner, 2026-11-05, notes-1 row 25).** A field applies on Return
+  or on leaving it, and an emptied field clears its value; a tag field adds on Return. A field left untouched
+  writes nothing, so tabbing past a group's mixed value never overwrites it, and an invalid entry stays in the
+  field with a hint and is never written. A two-state flag is a checkbox, not a Mark/Clear pair. The pattern:
+  the Reader's Edit Info sheet (`TagEditorView`) and Notes' inspector (`NoteMetadataInspector`). Not covered:
+  a sheet's or form's own confirm (OK, Add Model, Save ▸ a segment), and a command that resets a whole
+  filter or list (Clear All Filters, Clear History).
+
 ## Verification
 
 Build‑verify the app(s) you touched before merging to `main`:
