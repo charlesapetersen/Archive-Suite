@@ -21,9 +21,8 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             XCTAssertTrue(inside["an.detail.date.field"].exists, "the date is in the inspector")
             XCTAssertTrue(inside["an.detail.locations"].exists, "the locations are in the inspector")
             XCTAssertFalse(inside["an.detail.tags.input"].exists, "the tags are not in the inspector")
-            let scroll = mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch
-            XCTAssertTrue(scroll.exists, "the inspector's fields scroll")
-            print("[inspector] metadata scroll is a \(scroll.elementType.rawValue) at \(scroll.frame)")
+            let scroll = mainWindow.descendants(matching: .any)["an.inspector"].firstMatch
+            print("[inspector] the inspector is a \(scroll.elementType.rawValue) at \(scroll.frame)")
             XCTAssertTrue(mainWindow.descendants(matching: .any)["an.tagbar"].exists, "the tag bar is under the note")
             XCTAssertFalse(mainWindow.buttons["an.detail.metadataToggle"].exists, "the Details strip is gone")
             let readingRemove = "an.locations.remove.\(Self.folderReading)"
@@ -120,26 +119,39 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
                           "a date typed in the list saves at the precision typed")
             shot("list-date-edited")
 
+            // Edit Tags from the row's menu first: at the window's minimum width the list is narrow and the Tags
+            // column is scrolled out of view, and the menu's edit scrolls it in (a double-click needs it on screen).
             let tagsCell = mainWindow.descendants(matching: .any)["an.cell.tags.\(id)"]
-            XCTAssertTrue(tagsCell.waitForExistence(timeout: 5), "the list shows the Tags column")
-            tagsCell.doubleClick()
             let tagsField = mainWindow.descendants(matching: .any)["an.cell.tags.edit.\(id)"]
-            XCTAssertTrue(tagsField.waitForExistence(timeout: 5), "a double-click on Tags opens its field in the cell")
-            app.typeText("list tag\r")
-            XCTAssertTrue(saved { $0.contains("List Tag") }, "a tag typed in the list is added")
-            XCTAssertTrue(pollUntil(timeout: 5) { !tagsField.exists }, "Return closes the cell's tags field")
-
-            tagsCell.rightClick()
+            mainWindow.descendants(matching: .any)["an.cell.title.\(id)"].rightClick()
             let editTags = app.menuItems["Edit Tags"]
             XCTAssertTrue(editTags.waitForExistence(timeout: 5), "the row's menu offers Edit Tags")
             editTags.click()
-            XCTAssertTrue(tagsField.waitForExistence(timeout: 5))
+            if !tagsField.waitForExistence(timeout: 5) {
+                shot("list-tags-not-open")
+                let status = mainWindow.descendants(matching: .any)["an.sidebar.status"]
+                XCTFail("Edit Tags opens the tags field in the cell; status \(status.exists ? status.label : "none"), "
+                        + "focus \(app.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch.debugDescription)")
+                return
+            }
+            XCTAssertTrue(before.lowercased().contains("silicon valley") && before.lowercased().contains("intel"),
+                          "the fixture note starts with two tags")
+            app.typeText("list tag\r")
+            XCTAssertTrue(saved { $0.contains("List Tag") }, "a tag typed in the list is added")
+            let afterAdd = markdown().lowercased()
+            XCTAssertTrue(afterAdd.contains("silicon valley") && afterAdd.contains("intel"),
+                          "typing in the cell adds to the note's tags, never replaces them")
+            XCTAssertTrue(pollUntil(timeout: 5) { !tagsField.exists }, "Return closes the cell's tags field")
+            shot("list-tags-edited")
+
+            tagsCell.doubleClick()   // on screen now
+            XCTAssertTrue(tagsField.waitForExistence(timeout: 5), "a double-click on Tags opens its field in the cell")
             app.typeKey("a", modifierFlags: .command)
             app.typeKey(.delete, modifierFlags: [])
             app.typeKey(.return, modifierFlags: [])
             XCTAssertTrue(saved { !$0.contains("List Tag") }, "removing the tokens in the list removes the tags")
 
-            dateCell.rightClick()
+            tagsCell.rightClick()   // the Date column may be scrolled out of view now; the menu scrolls it in
             let editDate = app.menuItems["Edit Date"]
             XCTAssertTrue(editDate.waitForExistence(timeout: 5), "the row's menu offers Edit Date")
             editDate.click()

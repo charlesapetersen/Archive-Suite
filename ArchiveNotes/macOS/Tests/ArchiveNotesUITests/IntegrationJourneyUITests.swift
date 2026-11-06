@@ -50,7 +50,7 @@ final class IntegrationJourneyUITests: NotesFixtureUITestCase {
             let input = app.textFields["an.zotero.note.link"]
             let attach = app.buttons["an.zotero.note.attach"]
             XCTAssertTrue(input.waitForExistence(timeout: 10))
-            mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
+            mainWindow.descendants(matching: .any)["an.inspector"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
             input.click()
             input.typeText(link)
             XCTAssertEqual(input.value as? String, link, "focus is on \(keyboardFocusDescription())")

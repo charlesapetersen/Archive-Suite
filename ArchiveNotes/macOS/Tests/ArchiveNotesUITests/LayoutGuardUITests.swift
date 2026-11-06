@@ -186,7 +186,7 @@ final class LayoutGuardUITests: NotesFixtureUITestCase {
     /// Scroll the inspector until `control` is inside it: Locations sits below the fields, under the fold in a short
     /// window.
     private func revealInInspector(_ control: XCUIElement, in window: XCUIElement) {
-        let scroll = window.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch
+        let scroll = window.descendants(matching: .any)["an.inspector"].firstMatch
         guard scroll.exists else { return }
         for _ in 0..<10 where !(control.frame.minY >= scroll.frame.minY && control.frame.maxY <= scroll.frame.maxY) {
             scroll.scroll(byDeltaX: 0, deltaY: control.frame.maxY > scroll.frame.maxY ? -60 : 60)

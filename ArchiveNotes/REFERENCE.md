@@ -300,11 +300,14 @@ macOS/Sources/ArchiveNotes/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
                                    Notes + Extracts windows (W6-S1); list/divider/detail in one AnyLayout,
                                    side by side or stacked (list above note, an.layoutMode/an.listHeight 160 pt up;
-                                   the list gives way so the note keeps 480 pt; W48); @AppStorage panel widths + tree
+                                   the list gives way so the note keeps 320 pt; W48); @AppStorage panel widths + tree
                                    toggle, NotesWindowAccessor window-size persistence; owns a per-window
                                    NotesNavigationModel (@StateObject seeded from window kind); item pane =
-                                   kind Picker + NotesTableView, detail = selected-item header + bounded
-                                   metadata inspector + NoteEditorPane; settled empty-library, empty-folder,
+                                   kind Picker + NotesTableView, detail = selected-item header + NoteEditorPane +
+                                   NoteTagBar; NoteInspectorPanel at the window's right (an.inspector, outside the
+                                   panes' layout so it runs full height stacked; View ▸ Show/Hide Inspector ⌥⌘I,
+                                   toolbar an.inspector.toggle, an.showInspector/an.inspectorWidth 220–360 pt;
+                                   W40.notes-detail-layout) holds NoteMetadataInspector; settled empty-library, empty-folder,
                                    and no-match guidance over the list (W9.d8)
                                    (W6-S3); .task bootstraps the store. Toolbar kind label + "New" menu (both
                                    kinds, own first; New from Template ▸ both kinds' templates; another kind
@@ -335,8 +338,8 @@ macOS/Sources/ArchiveNotes/
                                    kind/title/instances/date/quality/sources/tags; sources = distinct
                                    source notes for extracts (blank for notes, W7-S4); inline title rename
                                    via Return/double-click/context menu (identity-bound, rejected save restores
-                                   display); inline Quality menu (None/1–3, W9.d4); subjects edit in detail
-                                   (W9.b3). Adapts Reader AppKitTableView
+                                   display); inline Quality menu (None/1–3, W9.d4); Date and Tags cells edit in
+                                   place by double-click or Edit Date / Edit Tags (W40.notes-detail-layout). Adapts Reader AppKitTableView
                                    (no NSTokenField) (W6-S3). Drag source (NotesTableDataSource
                                    pasteboardWriterForRow, id-only) + accent-glyph replicant title styling (W6-S5)
     QualityControl.swift           Inspector facet buttons plus compact borderless list menu; both call
@@ -347,7 +350,7 @@ macOS/Sources/ArchiveNotes/
                                    clear · Save-as-Smart-Folder / Clear All (W6-S4, W40.fix-notes-filter-bar)
     NameEntrySheet.swift           The one "give it a name" sheet (folders, templates, smart folders):
                                    focused field, Return/Escape, no blank names (W40.fix-notes-visual-polish)
-    LocationsInspector.swift       Detail-pane "Locations" — every folder the selected item is in, each
+    LocationsInspector.swift       Inspector "Locations" — every folder the selected item is in, each
                                    a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
     DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's date fields: `parse` reads
                                    one typed date at the precision typed (1960s, 1968, March 1968,
@@ -357,7 +360,9 @@ macOS/Sources/ArchiveNotes/
                                    the month cannot have is dropped (W23.l4). An empty date or a whole
                                    day is typed in the item's display calendar (when Settings allows)
                                    and converted to the ISO day (W24.cal1-validator)
-    NoteTagsInspector.swift        Detail add/remove subjects through ArchiveCore's SubjectEntryField
+    NoteTagBar.swift               The tag bar under the editor (an.tagbar, W40.notes-detail-layout): tags as
+                                   tokens with a remove ×, wrapping to 3 lines then scrolling (FlowLayout);
+                                   `edits` turns the list's Tags cell into adds/removes. Add/remove subjects through ArchiveCore's SubjectEntryField
                                    (W40.fix-notes-tag-entry): autocompletes from other notes' tags,
                                    Return/comma add and keep the keyboard, Tab takes the suggestion, no
                                    Add button; edits queue and save in order. Retries the exact failed
@@ -366,7 +371,11 @@ macOS/Sources/ArchiveNotes/
                                    NoteStore's pending-subjects journal, so the user repeats the edit and
                                    it still removes the old subjects. Nothing retries automatically
     NoteTitleTextField.swift       AppKit inline-title field: Return/Escape/blank semantics and
-                                   identity-guarded failed-save restoration (W9.b3)
+                                   identity-guarded failed-save restoration (W9.b3); also the list's Date
+                                   cell (commitsEmpty: an emptied date clears; DateFieldEntry.listEdit)
+    NoteTagsCellField.swift        The list's Tags cell while edited in place (double-click / Edit Tags):
+                                   a token field over the cell with TagEntry autocompletion; Return or
+                                   leaving saves to the item it began on, Escape writes nothing
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
                                    Open / Reveal / Copy Link (W9.b9) / New from Template / Set Quality +
                                    confirmed whole-item Delete

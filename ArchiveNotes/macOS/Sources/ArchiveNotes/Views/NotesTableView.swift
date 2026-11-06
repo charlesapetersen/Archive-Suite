@@ -471,7 +471,9 @@ struct NotesTableView: NSViewRepresentable {
                 let id = currentSnapshotIDs[tableView.clickedRow]
                 switch tableView.tableColumns[tableView.clickedColumn].identifier.rawValue {
                 case "date": beginDateEdit(id); return
-                case "tags": beginTagsEdit(id); return
+                // On the next turn: laid over the cell during the table's own click handling, the field lost the
+                // keyboard again as the double-click finished (VM run 2).
+                case "tags": DispatchQueue.main.async { [weak self] in self?.beginTagsEdit(id) }; return
                 default: break
                 }
             }
@@ -542,15 +544,27 @@ struct NotesTableView: NSViewRepresentable {
         }
 
         func beginDateEdit(_ id: UUID) {
-            guard let field = cell(column: "date", item: id)?.textField as? NoteTitleTextField else { NSSound.beep(); return }
+            guard let field = cell(column: "date", item: id)?.textField as? NoteTitleTextField else {
+                cannotEdit("The Date column is hidden. Show it from the list's header menu to edit the date here.")
+                return
+            }
             field.beginRename()
+        }
+
+        /// Says in the status line why a cell edit did not start, rather than only beeping.
+        private func cannotEdit(_ message: String) {
+            NSSound.beep()
+            parent.model.model.statusMessage = message
         }
 
         /// Lays a tags field over the item's Tags cell and gives it the keyboard; it saves the edited tags as adds and
         /// removes (`NoteTagBar.edits`), one at a time, to the item it began on.
         func beginTagsEdit(_ id: UUID) {
-            guard editingTags == nil, let item = displayedByID[id],
-                  let cell = cell(column: "tags", item: id) else { NSSound.beep(); return }
+            guard editingTags == nil else { return cannotEdit("Finish editing the other row's tags first.") }
+            guard let item = displayedByID[id] else { return cannotEdit("That item is no longer listed.") }
+            guard let cell = cell(column: "tags", item: id) else {
+                return cannotEdit("The Tags column is hidden. Show it from the list's header menu to edit tags here.")
+            }
             let model = parent.model.model
             let field = NoteTagsCellField(
                 tags: item.managedTags,
@@ -587,7 +601,13 @@ struct NotesTableView: NSViewRepresentable {
                 cell.textField?.isHidden = false
                 editingTags = nil
                 editingTagsItemID = nil
-                NSSound.beep()
+                cannotEdit("The tags could not be edited in the list; use the tag bar under the note.")
+                return
+            }
+            // The caret after the tags, nothing selected: taking the keyboard selects every token, and the first key
+            // typed then replaced the note's tags (VM run 5's screenshot).
+            if let editor = field.currentEditor() {
+                editor.selectedRange = NSRange(location: (editor.string as NSString).length, length: 0)
             }
         }
     }

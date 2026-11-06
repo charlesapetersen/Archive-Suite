@@ -174,7 +174,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `00-overview.md` D2, D4, D9, §7, §9, §17 (A11); `SMOKE_TEST.md` steps L, O; `SUITE_TODO_DONE.md`
   `W19.q4`, `W19.date`, `W9.b3`, `W9.c5`.
 - **Reached by:**
-  - **Subjects:** the inspector tag field (`Views/NoteTagsInspector.swift:70-73`) calls `NotesModel.addTag` or
+  - **Subjects:** the tag bar's field under the note, or the list's Tags cell (`Views/NoteTagBar.swift`,
+    `Views/NoteTagsCellField.swift`; W40.notes-detail-layout), calls `NotesModel.addTag` or
     `removeTag` (`Core/NotesModel.swift:855`, `:863`). Both run through `mutateItem` (`:1266`), which saves with
     `projectSubjectTags` (`:870`). That calls `NotesTagProjector.project` (`Core/NotesTagProjector.swift:75`).
   - **Quality:** the inspector (`Views/NoteMetadataInspector.swift:415`), the inline list menu
@@ -659,19 +660,19 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 
 ### N-17 · Subjects (tags)
 
-- **Promise:** subjects are added and removed in the inspector; the Finder mirror follows, and a failed mirror
+- **Promise:** subjects are added and removed in the tag bar under the note (or the list's Tags cell); the Finder mirror follows, and a failed mirror
   write is retried with the same change, even after relaunch.
-- **Promised in:** `CLAUDE.md` Impl Map `NoteTagsInspector` (W9.b3); `00-overview.md` §3.1, §3.2 (tags are
+- **Promised in:** `CLAUDE.md` Impl Map `NoteTagBar` (W9.b3); `00-overview.md` §3.1, §3.2 (tags are
   whole-note only); `09-gap-closure.md` B3; `SUITE_TODO_DONE.md` `W9.b3`.
-- **Reached by:** select an item, then in the detail inspector's Tags section type into "Add tag…" (ArchiveCore's
+- **Reached by:** select an item, then in the tag bar under the note (W40.notes-detail-layout) type into "Add tag…" (ArchiveCore's
   `SubjectEntryField`, `an.detail.tags.input`; it autocompletes from other notes' tags) and press Return or a
   comma, or Tab on a suggestion; there is no Add button (W40.fix-notes-tag-entry). Or press a tag's minus button.
-  `enqueue`/`drain` (`Views/NoteTagsInspector.swift`) save the edits in order and call
+  `enqueue`/`drain` (`Views/NoteTagBar.swift`) save the edits in order and call
   `NotesModel.addTag` / `removeTag` (`Core/NotesModel.swift:855`, `:863`) → `mutateItem(projectSubjects: true)`
   (`:1266`) → `NoteStore.withEntry` (`Store/NoteStore.swift:174`), which writes the pending-subjects journal
   before the YAML (`:180-191`) and projects via `projectSubjectTags` → `NotesTagProjector.project`
   (`Core/NotesModel.swift:870-881`). A failed projection shows "Couldn't finish saving tags." with Retry
-  (`Views/NoteTagsInspector.swift`), which replays the same delta. The section sits in
+  (`Views/NoteTagBar.swift`), which replays the same delta. The section sits in
   `NoteMetadataInspector` (`Views/NoteMetadataInspector.swift:70`), placed by `Views/NotesBrowserView.swift:357`.
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG17_InlineRenameAndInspectorTagsPersist` (two tags
   added by Return in a row, one by autocomplete and Tab, one removed, through the inspector; Finder tags read back
@@ -685,7 +686,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-11-05 W40.fix-notes-tag-entry — owner session notes-1 row 26 ("Tags don't autocomplete. Pressing return
     should add them"): the field is now the Reader's shared one; testG17 green in the VM. Status left for notes-2.
 - **Notes:** **Drift:** the in-app Retry is per-session view state (`@State failedEdits` in
-  `NoteTagsInspector.swift`), so it is gone after a relaunch. What survives a relaunch is the
+  `NoteTagBar.swift`), so it is gone after a relaunch. What survives a relaunch is the
   pending-subjects journal beside the `.md` (`NoteStore.swift:180-206`): the user has to make the same edit
   again, and that edit then still removes the old subjects. Nothing retries automatically. The W9.e2 result
   names `NotesGUITests.testG17_…` (projection read back via `tagNamesKey`). No UITest drives the Retry button.
@@ -937,7 +938,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   → `handleItemDrop` (`:146`) → `NotesNavigationModel.replicate` (`Core/NotesNavigationModel.swift:406`) or
   `move` (`:431`, source = the current folder scope). Row menu ▸ Add to Folder / Move to Folder
   (`Views/NotesContextMenu.swift:119-126`) calls the same two methods. Locations: `LocationsInspector`
-  (`Views/LocationsInspector.swift:13`, placed at `Views/NotesBrowserView.swift:349`) → `nav.locations(of:)`.
+  (`Views/LocationsInspector.swift:13`, placed in the inspector by `Views/NoteMetadataInspector.swift`) → `nav.locations(of:)`.
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG7_ReplicateItemIntoFolderAddsMembership` (row menu
   Add to Folder); `.testW9_TableDragOptionReplicatesAndPlainMoves` (⌥-drag and plain drag);
   `ArchiveNotesTests/NotesReplicationTests.locationsListsAllFoldersSorted`.

@@ -368,7 +368,7 @@ class NotesFixtureUITestCase: XCTestCase {
         return condition()
     }
 
-    /// Scroll `an.detail.metadataScroll` (the inspector's scroll area, W40.notes-detail-layout) until `element` lies
+    /// Scroll the inspector (`an.inspector`, whose one child is its scroll area; W40.notes-detail-layout) until `element` lies
     /// wholly inside its visible area (W35.vm-mem-fu1).
     /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
     /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").
@@ -377,7 +377,7 @@ class NotesFixtureUITestCase: XCTestCase {
     /// (W40.fix-notes-extract-authors-clear). Pass `window` for a window other than the note window.
     func revealInMetadataScroll(_ element: XCUIElement, in window: XCUIElement? = nil,
                                 file: StaticString = #filePath, line: UInt = #line) {
-        let scroll = (window ?? mainWindow).descendants(matching: .any)["an.detail.metadataScroll"].firstMatch
+        let scroll = (window ?? mainWindow).descendants(matching: .any)["an.inspector"].firstMatch
         guard scroll.exists else { return }
         for _ in 0..<10 {
             let clip = scroll.frame, frame = element.frame
@@ -1606,6 +1606,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         selectItem(uuid: Self.idReader)
         let ideasRemove = noteWin.descendants(matching: .any)["an.locations.remove.\(Self.folderIdeas)"]
         XCTAssertTrue(ideasRemove.waitForExistence(timeout: 10), "the Ideas membership remove control should exist")
+        _ = LayoutGuard.waitUntilSettled(noteWin, minimum: 1)   // sections above Locations load after the selection
         revealInMetadataScroll(ideasRemove, in: noteWin)   // Locations sits low in the inspector
         _ = pollUntil(timeout: 8) { app.activate(); return ideasRemove.isHittable }
         XCTAssertTrue(ideasRemove.isHittable, "the Ideas remove control should be hittable")
@@ -1615,10 +1616,12 @@ final class NotesGUITests: NotesFixtureUITestCase {
             return !memberships.contains([Self.folderIdeas, Self.idReader])
                 && memberships.contains([Self.folderReading, Self.idReader])
                 && itemDirs().contains(Self.idReader)
-        }, "removing one home must keep the cited source live in Reading")
+        }, "removing one home must keep the cited source live in Reading; memberships "
+           + "\(String(describing: organizationMemberships())), clicked at \(ideasRemove.frame)")
 
         let readingRemove = noteWin.descendants(matching: .any)["an.locations.remove.\(Self.folderReading)"]
         XCTAssertTrue(readingRemove.waitForExistence(timeout: 10), "the remaining Reading remove control should exist")
+        _ = LayoutGuard.waitUntilSettled(noteWin, minimum: 1)
         revealInMetadataScroll(readingRemove, in: noteWin)
         _ = pollUntil(timeout: 8) { app.activate(); return readingRemove.isHittable }
         XCTAssertTrue(readingRemove.isHittable, "the Reading remove control should be hittable")
@@ -1899,7 +1902,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let input = app.textFields["an.zotero.note.link"]
             let attach = app.buttons["an.zotero.note.attach"]
             XCTAssertTrue(input.waitForExistence(timeout: 5))
-            mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
+            mainWindow.descendants(matching: .any)["an.inspector"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
             let editorBefore = editor.value as? String
             input.click()
             input.typeText(link)
@@ -1933,7 +1936,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(banner.waitForNonExistence(timeout: 8))
             XCTAssertTrue(chip.waitForExistence(timeout: 8), "the persisted chip must survive selection changes")
 
-            mainWindow.descendants(matching: .any)["an.detail.metadataScroll"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
+            mainWindow.descendants(matching: .any)["an.inspector"].firstMatch.scroll(byDeltaX: 0, deltaY: -600)
             input.click()
             input.typeText("zotero://select/library/items/FAIL1234")
             XCTAssertEqual(input.value as? String, "zotero://select/library/items/FAIL1234")

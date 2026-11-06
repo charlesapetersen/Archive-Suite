@@ -287,7 +287,9 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             for folder in [Self.folderIdeas, Self.folderReading] {
                 let remove = mainWindow.descendants(matching: .any)["an.locations.remove.\(folder)"]
                 XCTAssertTrue(remove.waitForExistence(timeout: 10), "the \(folder) remove control should exist")
-                revealInMetadataScroll(remove)   // Locations sits low in the inspector (W40.notes-detail-layout)
+                // Locations sits low in the inspector, under sections that load after the selection (W40.notes-detail-layout).
+                _ = LayoutGuard.waitUntilSettled(mainWindow, minimum: 1)
+                revealInMetadataScroll(remove)
                 _ = pollUntil(timeout: 8) { self.app.activate(); return remove.isHittable }
                 remove.click()
                 if folder == Self.folderIdeas {

@@ -615,14 +615,19 @@ private struct DetailPane: View {
 /// selection in the same pass as the editor; with nothing or several items selected it says so, as the header does.
 private struct NoteInspectorPanel: View {
     @ObservedObject var nav: NotesNavigationModel
+    /// With a mouse, macOS shows always-on ("legacy") scroll bars, and the scroll bar sat over the right edge of the
+    /// fields, where the Locations rows' remove buttons are: a click there hit the scroll bar (VM run 4).
+    @State private var scrollerStyle = NSScroller.preferredScrollerStyle
 
     var body: some View {
         VStack(spacing: 0) {
             if nav.paneMode == .notes, let summary = nav.detailSummary {
+                // No identifier of its own: as the panel's one child, the scroll area takes the panel's `an.inspector`.
                 ScrollView {
                     NoteMetadataInspector(nav: nav, item: summary)
+                        .padding(.trailing, scrollerStyle == .legacy
+                                 ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0)
                 }
-                .accessibilityIdentifier("an.detail.metadataScroll")
             } else {
                 Text(placeholder)
                     .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -632,6 +637,9 @@ private struct NoteInspectorPanel: View {
             }
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .onReceive(NotificationCenter.default.publisher(for: NSScroller.preferredScrollerStyleDidChangeNotification)) { _ in
+            scrollerStyle = NSScroller.preferredScrollerStyle
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Inspector")
         .accessibilityIdentifier("an.inspector")
