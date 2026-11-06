@@ -53,6 +53,7 @@ TAG, ENT = "tagging-place", "entity3k-place"
 
 
 def prompt_tagging(d):
+    """The app's tagging prompt as this item ships it (TagGenerator, date_tagging.PROMPT: test_ent_place_rule)."""
     return P.with_rules(EPA.prompt_new(d), {"author_location": TAGGING_PLACE})
 
 
@@ -184,7 +185,52 @@ def report(s):
 
 READING = """## Reading
 
-(written after the run)
+- **The tagging prompt: the rule stops it inventing places, and ships.** Documents where it names a place and the
+  truth has none fall from 18 to 1 of 138; documents with a wrong place from 32 to 16. On the full string, precision
+  0.62 to 0.76 and recall 0.76 to 0.74, F1 +0.06 (interval -0.01 to +0.14, a tie by itself); by the city alone
+  0.83 to 0.91, +0.08 (+0.02 to +0.14), a measured gain and above the rerun floor (+0.03 on 40). Of the 23 documents
+  whose place changed, 17 were emptied where the truth has none, 1 emptied where it has one ("Stanford, California",
+  never written as a place), and 5 respelled ("Washington, D.C." and "Washington, District of Columbia" both ways,
+  "Oxford, England"). The sender and recipient do not move (-0.01 and 0.00, inside the floor).
+- **Dates hold.** The year, month, day and date_uncertain the same call returns differ on 3 of the 138 documents,
+  all three an estimated year (date_uncertain true both times), where the new prompt's own rerun differs on 2 of 40
+  and the old prompt's on 1 of 40. Against the owner's Finder date tags on the 82: year right 74 before and 76 after;
+  months and Date Uncertain identical.
+- **The dedicated entity prompt: no gain, left unchanged.** It already filled a place where none is written on only
+  2 documents, because its rule asks for the quote of each name; with the rule, 1. Its place F1 moves -0.04 (interval
+  -0.11 to +0.02) and by city -0.01, a tie leaning worse: of its 3 emptied places 2 are places the truth keeps
+  ("New York, New York" read from a letterhead's "YORK", and "At Sea"). So ENTITY_PROMPT keeps its line, and the
+  rule's wording stays here (ENTITY_PLACE) for the entity feature's own prompt to start from.
+- **Tagging against the dedicated prompt, both with the rule:** place by city a tie (0.91 each, +0.00); full string
+  -0.07 (interval -0.18 to +0.02), the tagging call's respellings against the dedicated prompt's normalised names.
+
+What it means for the app: TagGenerator.generateTags' author_location now asks for a written place only, null when
+the document writes none, never one inferred from an institution's name, the collection or the nearby documents
+(mirrored in date_tagging.PROMPT and prompts.md). The sidecar field's shape is unchanged. Phase 4 decides the place
+rule with the entity feature; this is the evidence it reads. The owner's caveat that a letterhead is not always where
+a letter was sent from has no text rule and is not tested here.
+
+## Measurement card
+
+- **Truth:** W46.fix-ent-truth's 138 correspondence documents (model truth: GPT 5.6 Luna and Claude Sonnet 5 drafts,
+  Sonnet rulings) with the owner's answers on 21 documents and the sending-place rule (`ent_truth.load_truth()`,
+  W46.ent-truth-owner-fold). The rule empties the place on 26 documents the owner did not answer, by the class and
+  quote the truth's drafters gave, which the owner has not checked one by one. Dates on the 82 against the owner's
+  own Finder tags. No Gemini drafted or ruled.
+- **Selection:** as W46.ent-score-paid (82 of the date-tagging sample's correspondence documents plus 56 chosen by
+  ABBYY text cues, not by any route tested here). The rule's wording was written once, from the owner's definition,
+  and not tuned on these replies; but the definition came from the owner's answers on 12 of these documents, and the
+  prompt's rule and the truth's rule say the same thing, so the gain measures how well the model follows the
+  definition, not a held-out accuracy.
+- **Comparison:** each arm against its own baseline differs in the one place line: the same Vision text, first
+  3,000 characters, context block, model, temperature 0, token cap and gateway (tagging-new and entity3k's cached
+  replies, prompt-checked).
+- **Noise:** n 138 (82 for the owner's dates, 40 per rerun floor); paired document bootstrap, 2,000 draws, 95%
+  intervals. Rerun floors on 40: full-string place -0.05, -0.02 and -0.03; by city 0.00, +0.03 and +0.03; dates 1-2
+  of 40 documents, all estimated years.
+- **Scope:** one model (Gemini 3.7 Flash), text only, correspondence documents only. It does not settle another
+  model's reading of the rule (the app's other routes), non-correspondence documents, or whether a letterhead place
+  is where a letter was sent from.
 """.splitlines()
 
 

@@ -62,8 +62,16 @@ V1_RULES = {
 }
 
 
+# The place line as this item shipped it; W46.ent-place-rule-paid added the written-place rule to it in TagGenerator,
+# so prompt_new puts it back to stay the prompt its cached replies answered.
+AUTHOR_LOCATION_BEFORE = ('- "author_location": where it was written or sent from (the letterhead\'s or the '
+                          'dateline\'s city), as "City, State" with the state written out (e.g. "Chicago, Illinois") '
+                          'or "City, Country", or null')
+
+
 def prompt_new(d):
-    return DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"]))
+    return P.with_rules(DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"])),
+                        {"author_location": AUTHOR_LOCATION_BEFORE})
 
 
 def prompt_v1(d):

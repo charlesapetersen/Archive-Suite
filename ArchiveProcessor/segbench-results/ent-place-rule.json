@@ -1,0 +1,585 @@
+{
+ "docs": 138,
+ "answered": {
+  "tagging-new": 138,
+  "tagging-new-rerun": 40,
+  "entity3k": 138,
+  "tagging-place": 138,
+  "tagging-place-rerun": 40,
+  "entity3k-place": 138,
+  "entity3k-place-rerun": 40
+ },
+ "unparsed": {
+  "tagging-new": 0,
+  "tagging-new-rerun": 0,
+  "entity3k": 0,
+  "tagging-place": 0,
+  "tagging-place-rerun": 0,
+  "entity3k-place": 0,
+  "entity3k-place-rerun": 0
+ },
+ "scores": {
+  "tagging-new": {
+   "sender": {
+    "precision": 0.9213483146067416,
+    "recall": 0.6074074074074074,
+    "f1": 0.7321428571428571,
+    "tp": 82,
+    "fp": 7,
+    "fn": 53,
+    "wrong_when_filled_docs": 7,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.864516129032258,
+    "recall": 0.783625730994152,
+    "f1": 0.8220858895705522,
+    "tp": 134,
+    "fp": 21,
+    "fn": 37,
+    "wrong_when_filled_docs": 21,
+    "filled_when_empty": 1,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.6190476190476191,
+    "recall": 0.7647058823529411,
+    "f1": 0.6842105263157895,
+    "tp": 52,
+    "fp": 32,
+    "fn": 16,
+    "wrong_when_filled_docs": 32,
+    "filled_when_empty": 18,
+    "truth_nonempty": 68,
+    "docs": 138
+   },
+   "city": {
+    "tp": 63,
+    "fp": 21,
+    "fn": 5,
+    "f1": 0.8289473684210527,
+    "precision": 0.75
+   },
+   "n": 138
+  },
+  "tagging-new-rerun": {
+   "sender": {
+    "precision": 0.9583333333333334,
+    "recall": 0.6216216216216216,
+    "f1": 0.7540983606557377,
+    "tp": 23,
+    "fp": 1,
+    "fn": 14,
+    "wrong_when_filled_docs": 1,
+    "filled_when_empty": 0,
+    "truth_nonempty": 38,
+    "docs": 40
+   },
+   "recipient": {
+    "precision": 0.95,
+    "recall": 0.8507462686567164,
+    "f1": 0.8976377952755905,
+    "tp": 57,
+    "fp": 3,
+    "fn": 10,
+    "wrong_when_filled_docs": 3,
+    "filled_when_empty": 1,
+    "truth_nonempty": 37,
+    "docs": 40
+   },
+   "sending_place": {
+    "precision": 0.45454545454545453,
+    "recall": 0.625,
+    "f1": 0.5263157894736842,
+    "tp": 10,
+    "fp": 12,
+    "fn": 6,
+    "wrong_when_filled_docs": 12,
+    "filled_when_empty": 6,
+    "truth_nonempty": 16,
+    "docs": 40
+   },
+   "city": {
+    "tp": 16,
+    "fp": 6,
+    "fn": 0,
+    "f1": 0.8421052631578947,
+    "precision": 0.7272727272727273
+   },
+   "n": 40
+  },
+  "entity3k": {
+   "sender": {
+    "precision": 0.7410714285714286,
+    "recall": 0.6148148148148148,
+    "f1": 0.6720647773279352,
+    "tp": 83,
+    "fp": 29,
+    "fn": 52,
+    "wrong_when_filled_docs": 29,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.8902439024390244,
+    "recall": 0.8538011695906432,
+    "f1": 0.8716417910447761,
+    "tp": 146,
+    "fp": 18,
+    "fn": 25,
+    "wrong_when_filled_docs": 17,
+    "filled_when_empty": 1,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.855072463768116,
+    "recall": 0.8676470588235294,
+    "f1": 0.8613138686131386,
+    "tp": 59,
+    "fp": 10,
+    "fn": 9,
+    "wrong_when_filled_docs": 10,
+    "filled_when_empty": 2,
+    "truth_nonempty": 68,
+    "docs": 138
+   },
+   "city": {
+    "tp": 63,
+    "fp": 6,
+    "fn": 5,
+    "f1": 0.9197080291970803,
+    "precision": 0.9130434782608695
+   },
+   "n": 138
+  },
+  "tagging-place": {
+   "sender": {
+    "precision": 0.9010989010989011,
+    "recall": 0.6074074074074074,
+    "f1": 0.7256637168141592,
+    "tp": 82,
+    "fp": 9,
+    "fn": 53,
+    "wrong_when_filled_docs": 9,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.864516129032258,
+    "recall": 0.783625730994152,
+    "f1": 0.8220858895705522,
+    "tp": 134,
+    "fp": 21,
+    "fn": 37,
+    "wrong_when_filled_docs": 21,
+    "filled_when_empty": 1,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.7575757575757576,
+    "recall": 0.7352941176470589,
+    "f1": 0.746268656716418,
+    "tp": 50,
+    "fp": 16,
+    "fn": 18,
+    "wrong_when_filled_docs": 16,
+    "filled_when_empty": 1,
+    "truth_nonempty": 68,
+    "docs": 138
+   },
+   "city": {
+    "tp": 61,
+    "fp": 5,
+    "fn": 7,
+    "f1": 0.9104477611940298,
+    "precision": 0.9242424242424242
+   },
+   "n": 138
+  },
+  "tagging-place-rerun": {
+   "sender": {
+    "precision": 0.9583333333333334,
+    "recall": 0.6216216216216216,
+    "f1": 0.7540983606557377,
+    "tp": 23,
+    "fp": 1,
+    "fn": 14,
+    "wrong_when_filled_docs": 1,
+    "filled_when_empty": 0,
+    "truth_nonempty": 38,
+    "docs": 40
+   },
+   "recipient": {
+    "precision": 0.95,
+    "recall": 0.8507462686567164,
+    "f1": 0.8976377952755905,
+    "tp": 57,
+    "fp": 3,
+    "fn": 10,
+    "wrong_when_filled_docs": 3,
+    "filled_when_empty": 1,
+    "truth_nonempty": 37,
+    "docs": 40
+   },
+   "sending_place": {
+    "precision": 0.625,
+    "recall": 0.625,
+    "f1": 0.625,
+    "tp": 10,
+    "fp": 6,
+    "fn": 6,
+    "wrong_when_filled_docs": 6,
+    "filled_when_empty": 0,
+    "truth_nonempty": 16,
+    "docs": 40
+   },
+   "city": {
+    "tp": 16,
+    "fp": 0,
+    "fn": 0,
+    "f1": 1.0,
+    "precision": 1.0
+   },
+   "n": 40
+  },
+  "entity3k-place": {
+   "sender": {
+    "precision": 0.7589285714285714,
+    "recall": 0.6296296296296297,
+    "f1": 0.688259109311741,
+    "tp": 85,
+    "fp": 27,
+    "fn": 50,
+    "wrong_when_filled_docs": 27,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.8963414634146342,
+    "recall": 0.8596491228070176,
+    "f1": 0.8776119402985074,
+    "tp": 147,
+    "fp": 17,
+    "fn": 24,
+    "wrong_when_filled_docs": 16,
+    "filled_when_empty": 1,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.8333333333333334,
+    "recall": 0.8088235294117647,
+    "f1": 0.8208955223880597,
+    "tp": 55,
+    "fp": 11,
+    "fn": 13,
+    "wrong_when_filled_docs": 11,
+    "filled_when_empty": 1,
+    "truth_nonempty": 68,
+    "docs": 138
+   },
+   "city": {
+    "tp": 61,
+    "fp": 5,
+    "fn": 7,
+    "f1": 0.9104477611940298,
+    "precision": 0.9242424242424242
+   },
+   "n": 138
+  },
+  "entity3k-place-rerun": {
+   "sender": {
+    "precision": 0.8,
+    "recall": 0.6486486486486487,
+    "f1": 0.7164179104477612,
+    "tp": 24,
+    "fp": 6,
+    "fn": 13,
+    "wrong_when_filled_docs": 6,
+    "filled_when_empty": 0,
+    "truth_nonempty": 38,
+    "docs": 40
+   },
+   "recipient": {
+    "precision": 0.9824561403508771,
+    "recall": 0.835820895522388,
+    "f1": 0.9032258064516129,
+    "tp": 56,
+    "fp": 1,
+    "fn": 11,
+    "wrong_when_filled_docs": 1,
+    "filled_when_empty": 0,
+    "truth_nonempty": 37,
+    "docs": 40
+   },
+   "sending_place": {
+    "precision": 0.8125,
+    "recall": 0.8125,
+    "f1": 0.8125,
+    "tp": 13,
+    "fp": 3,
+    "fn": 3,
+    "wrong_when_filled_docs": 3,
+    "filled_when_empty": 0,
+    "truth_nonempty": 16,
+    "docs": 40
+   },
+   "city": {
+    "tp": 16,
+    "fp": 0,
+    "fn": 0,
+    "f1": 1.0,
+    "precision": 1.0
+   },
+   "n": 40
+  }
+ },
+ "paired": {
+  "tagging: the rule added": {
+   "a": "tagging-new",
+   "b": "tagging-place",
+   "sender": {
+    "n": 138,
+    "diff": -0.0064791403286977856,
+    "lo": -0.016606468219371506,
+    "hi": 0.0
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.0,
+    "lo": -0.016997167138810165,
+    "hi": 0.018181818181818077
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": 0.062058130400628464,
+    "lo": -0.014872216351610512,
+    "hi": 0.1398601398601398
+   },
+   "city": {
+    "n": 138,
+    "diff": 0.08150039277297716,
+    "lo": 0.0248958727754639,
+    "hi": 0.14382566585956413
+   }
+  },
+  "entity: the rule added": {
+   "a": "entity3k",
+   "b": "entity3k-place",
+   "sender": {
+    "n": 138,
+    "diff": 0.0161943319838056,
+    "lo": -0.011568890879235738,
+    "hi": 0.04612576738012286
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.005970149253731294,
+    "lo": -0.014623297192104534,
+    "hi": 0.02710120068610633
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": -0.040418346225078894,
+    "lo": -0.10645302897278319,
+    "hi": 0.01904358865848499
+   },
+   "city": {
+    "n": 138,
+    "diff": -0.009260268003050465,
+    "lo": -0.0376838235294118,
+    "hi": 0.014663461538461542
+   }
+  },
+  "tagging with the rule against entity with it": {
+   "a": "entity3k-place",
+   "b": "tagging-place",
+   "sender": {
+    "n": 138,
+    "diff": 0.037404607502418474,
+    "lo": -0.0024887800897592793,
+    "hi": 0.0765217391304347
+   },
+   "recipient": {
+    "n": 138,
+    "diff": -0.055526050727955245,
+    "lo": -0.13208480565371028,
+    "hi": 0.001086450411299067
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": -0.07462686567164178,
+    "lo": -0.17518248175182483,
+    "hi": 0.019178082191780854
+   },
+   "city": {
+    "n": 138,
+    "diff": 0.0,
+    "lo": -0.023345153664302565,
+    "hi": 0.02392617067335079
+   }
+  },
+  "rerun floor: tagging-new again": {
+   "a": "tagging-new",
+   "b": "tagging-new-rerun",
+   "sender": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "recipient": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "sending_place": {
+    "n": 40,
+    "diff": -0.052631578947368474,
+    "lo": -0.24026696329254726,
+    "hi": 0.1333333333333333
+   },
+   "city": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": -0.08791208791208782,
+    "hi": 0.09377289377289377
+   }
+  },
+  "rerun floor: tagging-place again": {
+   "a": "tagging-place",
+   "b": "tagging-place-rerun",
+   "sender": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "recipient": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "sending_place": {
+    "n": 40,
+    "diff": -0.020161290322580627,
+    "lo": -0.19047619047619047,
+    "hi": 0.125925925925926
+   },
+   "city": {
+    "n": 40,
+    "diff": 0.032258064516129004,
+    "lo": 0.0,
+    "hi": 0.11111111111111116
+   }
+  },
+  "rerun floor: entity3k-place again": {
+   "a": "entity3k-place",
+   "b": "entity3k-place-rerun",
+   "sender": {
+    "n": 40,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "recipient": {
+    "n": 40,
+    "diff": 0.014336917562724039,
+    "lo": 0.0,
+    "hi": 0.052308802308802305
+   },
+   "sending_place": {
+    "n": 40,
+    "diff": -0.02620967741935487,
+    "lo": -0.217741935483871,
+    "hi": 0.1578947368421053
+   },
+   "city": {
+    "n": 40,
+    "diff": 0.032258064516129004,
+    "lo": 0.0,
+    "hi": 0.11111111111111116
+   }
+  }
+ },
+ "place_moves": {
+  "tagging": {
+   "emptied, truth has none": 17,
+   "emptied, truth has one": 1,
+   "filled, truth has none": 0,
+   "other change": 5
+  },
+  "entity": {
+   "emptied, truth has none": 1,
+   "emptied, truth has one": 2,
+   "filled, truth has none": 0,
+   "other change": 7
+  }
+ },
+ "dates_changed": {
+  "tagging-new vs tagging-place": {
+   "n": 138,
+   "any": 3,
+   "year": 3,
+   "month": 0,
+   "day": 0,
+   "uncertain": 0
+  },
+  "tagging-new vs its rerun": {
+   "n": 40,
+   "any": 1,
+   "year": 1,
+   "month": 0,
+   "day": 0,
+   "uncertain": 0
+  },
+  "tagging-place vs its rerun": {
+   "n": 40,
+   "any": 2,
+   "year": 2,
+   "month": 0,
+   "day": 0,
+   "uncertain": 0
+  }
+ },
+ "dates_owner": {
+  "tagging-new": {
+   "n": 82,
+   "year_right": 74,
+   "month_truth": 57,
+   "month_right": 55,
+   "month_untagged": 25,
+   "month_given_untagged": 21,
+   "du_agree": 76
+  },
+  "tagging-place": {
+   "n": 82,
+   "year_right": 76,
+   "month_truth": 57,
+   "month_right": 55,
+   "month_untagged": 25,
+   "month_given_untagged": 21,
+   "du_agree": 76
+  }
+ },
+ "calls": {
+  "n": 356,
+  "ok": 356,
+  "spent": 1.0094,
+  "note": "the gateway's own figure $1.0094 on 356 of 356 calls, 1.00 times the estimate on them"
+ },
+ "rules": {
+  "tagging": "- \"author_location\": where it was written or sent from (the letterhead's or the dateline's city), as \"City, State\" with the state written out (e.g. \"Chicago, Illinois\") or \"City, Country\", or null. Only a place the document writes (a dateline, a letterhead or an address): null when it writes none, never a place inferred from an institution's name, the collection or the nearby documents",
+  "entity": "- \"sending_place\": where it was sent from (the letterhead's or the dateline's city), as \"City, State\" or \"City, Country\". Only a place the document writes (a dateline, a letterhead or an address): an empty list when it writes none, never a place inferred from an institution's name, the collection or other documents."
+ }
+}
