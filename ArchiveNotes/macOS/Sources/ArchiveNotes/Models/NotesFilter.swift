@@ -14,7 +14,7 @@ enum TagCombine: String, Codable, Sendable {
 enum KindFilter: String, Codable, Sendable {
     case notes
     case extracts
-    case both
+    case all
 }
 
 /// A single filter specification used for both live UI filtering and persisted smart-folder queries.
@@ -25,7 +25,7 @@ struct NotesFilter: Codable, Equatable, Sendable {
     var searchText: String = ""
     var tags: [String] = []
     var tagCombine: TagCombine = .all
-    var kind: KindFilter = .both
+    var kind: KindFilter = .all
     var qualities: Set<Int> = []
     /// Inclusive lower bound for sort-date filtering (Int matching DocumentTags.sortDate convention).
     var dateFrom: Int? = nil
@@ -51,7 +51,7 @@ struct NotesFilter: Codable, Equatable, Sendable {
     var isEmpty: Bool {
         searchText.trimmingCharacters(in: .whitespaces).isEmpty
             && tags.isEmpty
-            && kind == .both
+            && kind == .all
             && qualities.isEmpty
             && dateFrom == nil
             && dateTo == nil
@@ -80,7 +80,7 @@ struct NotesFilter: Codable, Equatable, Sendable {
         }
         // Kind.
         switch kind {
-        case .both:     break
+        case .all:     break
         case .notes:    if item.kind != .note    { return false }
         case .extracts: if item.kind != .extract { return false }
         }
@@ -121,7 +121,7 @@ extension NotesFilter {
             searchText:  try c.decodeIfPresent(String.self,      forKey: .searchText)  ?? "",
             tags:        try c.decodeIfPresent([String].self,    forKey: .tags)        ?? [],
             tagCombine:  try c.decodeIfPresent(TagCombine.self,  forKey: .tagCombine)  ?? .all,
-            kind:        try c.decodeIfPresent(KindFilter.self,  forKey: .kind)        ?? .both,
+            kind:        try c.decodeIfPresent(KindFilter.self,  forKey: .kind)        ?? .all,
             qualities:   try c.decodeIfPresent(Set<Int>.self,    forKey: .qualities)   ?? [],
             dateFrom:    try c.decodeIfPresent(Int.self,         forKey: .dateFrom),
             dateTo:      try c.decodeIfPresent(Int.self,         forKey: .dateTo),
@@ -137,7 +137,7 @@ extension NotesFilter {
     /// Round-up predicates intersect, matching the live scope; an impossible pair stays empty on save.
     static func effective(base: NotesFilter, user: NotesFilter) -> NotesFilter {
         var r = NotesFilter()
-        r.kind = user.kind != .both ? user.kind : base.kind
+        r.kind = user.kind != .all ? user.kind : base.kind
         r.qualities = user.qualities.isEmpty ? base.qualities : user.qualities
         r.tags = Array(Set(base.tags).union(user.tags)).sorted()
         r.tagCombine = user.tags.isEmpty ? base.tagCombine : user.tagCombine

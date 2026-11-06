@@ -178,7 +178,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             let text = "Freeform words pasted from elsewhere."
-            XCTAssertTrue(setKind(to: "Both", in: mainWindow), "should show both kinds in the Note window")
+            XCTAssertTrue(setKind(to: "All", in: mainWindow), "should show both kinds in the Note window")
             selectItem(uuid: Self.idExtract)
             XCTAssertTrue(pollUntil(timeout: 12) { self.editorText(in: self.mainWindow).contains("Moore says") },
                           "the extract should load")
@@ -258,7 +258,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
     func testS3_RenamedThenDeletedSourceUpdatesTheChipAndTheJump() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
-            XCTAssertTrue(setKind(to: "Both", in: mainWindow), "should show both kinds in the Note window")
+            XCTAssertTrue(setKind(to: "All", in: mainWindow), "should show both kinds in the Note window")
 
             // Rename the source note through the list's inline rename (G17's gesture).
             let cell = selectItem(uuid: Self.idReader)
@@ -431,7 +431,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
     /// Show both kinds in the Note window, select the fixture extract and jump to its source: the Note window
     /// then holds the source note.
     private func jumpFromTheFixtureExtract() throws {
-        XCTAssertTrue(setKind(to: "Both", in: mainWindow), "should show both kinds in the Note window")
+        XCTAssertTrue(setKind(to: "All", in: mainWindow), "should show both kinds in the Note window")
         selectItem(uuid: Self.idExtract)
         XCTAssertTrue(pollUntil(timeout: 12) { self.editorText(in: self.mainWindow).contains("Moore says") },
                       "the extract should load")
@@ -442,7 +442,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(1))   // the scroll outcome posts a turn later
     }
 
-    // MARK: - S4: each window features its kind; Both unions them
+    // MARK: - S4: each window features its kind; All unions them
 
     /// The Note window lists notes and not extracts, the Extracts window extracts and not notes, and Both in
     /// the Note window lists the two together. (Launch pins each window's remembered filter to its default,
@@ -463,10 +463,10 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             XCTAssertFalse(notes.contains { listed($0, in: extractWin) }, "the Extracts window should list no note")
 
             frontWindow(named: "Archive Notes")
-            XCTAssertTrue(setKind(to: "Both", in: mainWindow), "should switch the Note window to Both")
+            XCTAssertTrue(setKind(to: "All", in: mainWindow), "should switch the Note window to All")
             XCTAssertTrue(pollUntil(timeout: 15) {
                 (notes + [Self.idExtract]).allSatisfy { listed($0, in: self.mainWindow) }
-            }, "Both should list the notes and the extract together")
+            }, "All should list the notes and the extract together")
             RunLoop.current.run(until: Date().addingTimeInterval(2))   // a late propagation would show by now
             XCTAssertFalse(notes.contains { listed($0, in: extractWin) },
                            "the Note window's choice must not change the Extracts window's list")
@@ -474,11 +474,11 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             closeWindow(extractWin)
 
             // The choice is remembered per window: relaunched without the harness's kind pins, the Note window
-            // comes back on Both and the Extracts window on its untouched default.
+            // comes back on All and the Extracts window on its untouched default.
             relaunchWithOneWindow(keepingKindPins: false)
             XCTAssertTrue(pollUntil(timeout: 15) {
                 (notes + [Self.idExtract]).allSatisfy { listed($0, in: self.mainWindow) }
-            }, "the Note window should remember Both across a relaunch")
+            }, "the Note window should remember All across a relaunch")
             let extractWinAgain = try openExtractsWindow()
             XCTAssertTrue(pollUntil(timeout: 15) { listed(Self.idExtract, in: extractWinAgain) },
                           "the Extracts window should still list the extract")
@@ -583,7 +583,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             _ = pollUntil(timeout: 4) { self.app.activate(); return el.isHittable }
             if el.isHittable { el.click(); return true }
         }
-        let index = ["Notes": 0, "Extracts": 1, "Both": 2][segment] ?? 2
+        let index = ["All": 0, "Notes": 1, "Extracts": 2][segment] ?? 0
         control.coordinate(withNormalizedOffset: CGVector(dx: (Double(index) + 0.5) / 3.0, dy: 0.5)).tap()
         return true
     }

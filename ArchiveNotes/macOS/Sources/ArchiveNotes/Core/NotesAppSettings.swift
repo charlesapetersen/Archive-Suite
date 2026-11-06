@@ -72,10 +72,13 @@ struct NotesLayoutSettings: Equatable, Sendable {
 
     static let defaultTreeWidth = 220.0,  treeWidthMin = 160.0,  treeWidthMax = 400.0
     static let defaultDetailWidth = 360.0, detailWidthMin = 260.0, detailWidthMax = 700.0
-    /// The stacked list keeps its filter bar (three rows when narrow), header and a few rows: at 140 pt the bar
-    /// spilled up under the toolbar in the VM's visual tour. The default shows about seven rows in a 900 pt window
-    /// (at 240 pt it showed four or five, the filter bar taking most of it); the note keeps well over its floor.
-    static let defaultListHeight = 300.0, listHeightMin = 220.0, listHeightMax = 440.0
+    /// The stacked list keeps its filter bar (three rows), header and a row: at 140 pt, before the list was clipped
+    /// to its share, the bar spilled up under the toolbar in the VM's visual tour. The default shows about seven rows
+    /// in a 900 pt window (at 240 pt it showed four or five, the filter bar taking most of it). The divider was
+    /// 220–440 pt, and the owner wanted it to drag further both ways (notes-1, row 45): the floor is now the bar, the
+    /// header and a row, and the ceiling is only a guard on a stored value, so going down the note's own floor
+    /// (`stackedDetailMinHeight`, cut in `stackedListRange`) is what stops the divider.
+    static let defaultListHeight = 300.0, listHeightMin = 160.0, listHeightMax = 1600.0
     /// The list pane's floor: its fixed filter controls need 527 pt in the VM; 540 keeps its minimum proposal
     /// in step with what it draws. The panes' layouts quote it instead of measuring the pane (see `StackedPanesLayout`).
     static let listMinWidth = 540.0

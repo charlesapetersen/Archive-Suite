@@ -73,10 +73,17 @@ final class InlineImageAttachment: NSTextAttachment {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Not supported") }
 
+    /// The largest an inline image is drawn. A pasted image keeps room to be read; a source block's page thumbnail
+    /// only has to say which page it is, so it is drawn at about a third of the preview popover's 400 × 500
+    /// (owner, notes-1 row 19: "they're currently as big as the preview").
+    static let maxImageSize = CGSize(width: 400, height: 300)
+    static let maxSourceThumbnailSize = CGSize(width: 140, height: 180)
+
     /// Constrain thumbnail to a max display size while preserving aspect ratio.
     private func constrainedSize(_ original: NSSize) -> NSSize {
-        let maxWidth: CGFloat = 400
-        let maxHeight: CGFloat = 300
+        let limit = SourceBlockPaster.isThumbnailAsset(relativePath) ? Self.maxSourceThumbnailSize : Self.maxImageSize
+        let maxWidth = limit.width
+        let maxHeight = limit.height
         guard original.width > 0, original.height > 0 else {
             return CGSize(width: 64, height: 64)
         }

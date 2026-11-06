@@ -229,8 +229,8 @@ class NotesFixtureUITestCase: XCTestCase {
             "-ANUITestStorePath", Self.fixturePath,
         ] + zoteroLaunchArguments + [
             // Each window's kind filter persists in the app's defaults, which the per-test fixture restore
-            // does not reach: G10/G13 leave the Note window on "Both", and W9D9 then saved its smart folder
-            // as kind .both and counted the extract too (W35.vm-mem-fu1). Pin both windows' defaults.
+            // does not reach: G10/G13 leave the Note window on "All", and W9D9 then saved its smart folder
+            // as kind .all and counted the extract too (W35.vm-mem-fu1). Pin both windows' defaults.
             "-an.noteWindow.kindFilter", "notes",
             "-an.extractWindow.kindFilter", "extracts",
         ]
@@ -1671,16 +1671,16 @@ final class NotesGUITests: NotesFixtureUITestCase {
         let ed = win.textViews["an.editor.text"]
 
         // Show BOTH kinds so the extract is selectable in the (note-featuring) window. The kind control is
-        // a SwiftUI segmented Picker (`an.filter.kind`, segments Notes/Extracts/Both); drive the "Both"
-        // segment as an element, falling back to a coordinate tap on the rightmost third if the segments
-        // aren't individually exposed. "Both" is unique to this control (the tag-combine picker is All/Any).
-        XCTAssertTrue(setKind(to: "Both", in: win), "should switch the kind filter to Both")
+        // a SwiftUI segmented Picker (`an.filter.kind`, segments All/Notes/Extracts); drive the "All"
+        // segment as an element, falling back to a coordinate tap on the leftmost third if the segments
+        // aren't individually exposed. The lookup is scoped to the control, so other "All" labels don't match.
+        XCTAssertTrue(setKind(to: "All", in: win), "should switch the kind filter to All")
 
         // The extract row now appears; select it → the editor loads the extract body + renders the
         // note-passage chip (which carries the Jump-to-Source button).
         let extractCell = win.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
         XCTAssertTrue(extractCell.waitForExistence(timeout: 20),
-                      "the extract row should appear once Both kinds are shown")
+                      "the extract row should appear once All is shown")
         _ = pollUntil(timeout: 10) { app.activate(); return extractCell.isHittable }
         if extractCell.isHittable { extractCell.click() }
         else { extractCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
@@ -1708,9 +1708,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
     // MARK: - G10 helper
 
-    /// Switch the kind segmented control (`an.filter.kind`) to the named segment ("Notes"/"Extracts"/
-    /// "Both"), scoped to `win`. Tries the segment as a button / radio button / any labeled descendant,
-    /// then a coordinate tap positioned by segment index (Notes=0, Extracts=1, Both=2 of 3) as a fallback
+    /// Switch the kind segmented control (`an.filter.kind`) to the named segment ("All"/"Notes"/
+    /// "Extracts"), scoped to `win`. Tries the segment as a button / radio button / any labeled descendant,
+    /// then a coordinate tap positioned by segment index (All=0, Notes=1, Extracts=2 of 3) as a fallback
     /// for when the segments aren't individually queryable. Returns false only if the control is absent.
     @discardableResult
     private func setKind(to segment: String, in win: XCUIElement) -> Bool {
@@ -1723,7 +1723,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             if el.isHittable { el.click(); return true }
         }
         // Coordinate fallback: tap the center of the segment's slot (index/2, 3 segments).
-        let index = ["Notes": 0, "Extracts": 1, "Both": 2][segment] ?? 2
+        let index = ["All": 0, "Notes": 1, "Extracts": 2][segment] ?? 0
         let dx = (Double(index) + 0.5) / 3.0
         control.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).tap()
         return true
@@ -2310,10 +2310,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         // Note window: show BOTH kinds so the extract row is listed here too, then assert its title cell
         // exists (the row IS there) while its sources cell does not (that column is hidden).
-        XCTAssertTrue(setKind(to: "Both", in: noteWin), "should switch the Note window's kind filter to Both")
+        XCTAssertTrue(setKind(to: "All", in: noteWin), "should switch the Note window's kind filter to All")
         let noteTitleCell = noteWin.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
         XCTAssertTrue(noteTitleCell.waitForExistence(timeout: 20),
-                      "the extract row should be listed in the Note window once Both kinds are shown")
+                      "the extract row should be listed in the Note window once All is shown")
         let noteSourcesCell = noteWin.descendants(matching: .any)["an.cell.sources.\(Self.idExtract)"]
         XCTAssertFalse(noteSourcesCell.waitForExistence(timeout: 3),
                        "the Note window hides the sources column, so that row should have no sources cell")
@@ -2520,7 +2520,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        + "nothing to import — it reported: \(copyOutcome)")
 
         // --- 3. Paste it into the EXTRACT — `handlePassagePaste` declines unless an extract is loaded. ---
-        setKind(to: "Both", in: app.windows["Archive Notes"])
+        setKind(to: "All", in: app.windows["Archive Notes"])
         selectItem(uuid: Self.idExtract)
         XCTAssertTrue(pollUntil(timeout: 12) { ((editor.value as? String) ?? "").contains("Moore says") },
                       "selecting the extract should load its body into the editor")

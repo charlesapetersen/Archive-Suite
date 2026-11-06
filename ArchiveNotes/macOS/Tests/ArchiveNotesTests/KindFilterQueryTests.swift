@@ -3,7 +3,7 @@ import Foundation
 @testable import ArchiveNotes
 
 // W7-S4 — extract-viewer featuring. Two pure, window-server-free concerns:
-//   1. the `NotesFilter` KIND predicate over `ItemSummary` (`.notes` / `.extracts` / `.both`), the
+//   1. the `NotesFilter` KIND predicate over `ItemSummary` (`.notes` / `.extracts` / `.all`), the
 //      basis of each window featuring its kind (the in-memory equivalent of the plan's `WHERE kind IN`);
 //   2. the distinct-SOURCE-NOTE count that feeds the extract-only "Sources" column — derived from an
 //      item's `.notePassage` block anchors, projected through the index (`NoteIndexRow`) and rendered
@@ -50,9 +50,9 @@ import Foundation
         #expect(!f.matches(summary(kind: .note), folderItemIDs: nil))
     }
 
-    @Test("kind .both admits every kind")
+    @Test("kind .all admits every kind")
     func kindBoth() {
-        let f = NotesFilter(kind: .both)
+        let f = NotesFilter(kind: .all)
         #expect(f.matches(summary(kind: .note), folderItemIDs: nil))
         #expect(f.matches(summary(kind: .extract), folderItemIDs: nil))
     }

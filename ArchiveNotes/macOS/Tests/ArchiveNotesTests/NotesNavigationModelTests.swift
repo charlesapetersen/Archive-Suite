@@ -47,7 +47,7 @@ struct NotesNavigationModelTests {
         nav.kindFilter = .extracts
         #expect(nav.displayed.map(\.title) == ["e1"])
 
-        nav.kindFilter = .both
+        nav.kindFilter = .all
         #expect(nav.displayed.count == 3)
     }
 
@@ -57,11 +57,11 @@ struct NotesNavigationModelTests {
         model.replaceItems([sum("n", kind: .note), sum("e", kind: .extract)])
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
         let before = nav.displayedGeneration
-        nav.kindFilter = .both
+        nav.kindFilter = .all
         #expect(nav.displayedGeneration > before)
         // Setting the same value again is a no-op (didSet guards on change).
         let steady = nav.displayedGeneration
-        nav.kindFilter = .both
+        nav.kindFilter = .all
         #expect(nav.displayedGeneration == steady)
     }
 
@@ -129,7 +129,7 @@ struct NotesNavigationModelTests {
         let e = sum("e", kind: .extract)
         model.replaceItems([sum("n", kind: .note), e])
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
-        nav.kindFilter = .both      // show both kinds so the extract is visible + selectable
+        nav.kindFilter = .all      // show both kinds so the extract is visible + selectable
         nav.select(e.id)
         #expect(nav.selectedSummary?.title == "e")
         // Switch to notes-only → the extract is no longer visible, so its selection is dropped.
@@ -154,7 +154,7 @@ struct NotesNavigationModelTests {
         model.replaceItems(notes + extracts)
 
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
-        nav.kindFilter = .both
+        nav.kindFilter = .all
         nav.kindFilter = .extracts
         await nav.waitForPendingRecompute()
 
@@ -187,8 +187,8 @@ struct NotesNavigationModelTests {
         defer { Task { await cleanup(root, index) } }
         let nav = NotesNavigationModel(model: model, defaultKind: .note)
         #expect(nav.filter.kind == .notes)
-        nav.kindFilter = .both
-        #expect(nav.filter.kind == .both)
+        nav.kindFilter = .all
+        #expect(nav.filter.kind == .all)
         nav.filter.kind = .extracts
         #expect(nav.kindFilter == .extracts)
     }
@@ -392,7 +392,7 @@ struct NotesNavigationModelTests {
         nav.filter.roundup = true
         #expect(nav.hasUserFilters)
         nav.clearUserFilters()
-        nav.kindFilter = .both                                    // kind is never a clearable filter
+        nav.kindFilter = .all                                    // kind is never a clearable filter
         #expect(!nav.hasUserFilters)
         nav.searchText = "   "
         #expect(!nav.hasUserFilters)
@@ -412,7 +412,7 @@ struct NotesNavigationModelTests {
             .flatMap { try? JSONDecoder().decode(NotesFilter.self, from: Data($0.utf8)) }
         #expect(decoded?.qualities == [3])
         #expect(decoded?.searchText == "brown")   // live keyword folded into the durable query
-        #expect(decoded?.kind == .notes)          // window kind (user wins over base .both)
+        #expect(decoded?.kind == .notes)          // window kind (user wins over base .all)
     }
 
     // MARK: - W6-S4 helpers

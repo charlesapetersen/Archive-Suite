@@ -55,7 +55,7 @@ final class TransientStateUITests: NotesFixtureUITestCase {
                 kindFilter(in: window, to: "Extracts")
             }
             TransientCheck.check("filter back to all kinds", in: app, test: self) {
-                kindFilter(in: window, to: "Both")
+                kindFilter(in: window, to: "All")
             }
             TransientCheck.check("open the smart-folder sheet", in: app, test: self) {
                 window.buttons["an.filter.save"].click()

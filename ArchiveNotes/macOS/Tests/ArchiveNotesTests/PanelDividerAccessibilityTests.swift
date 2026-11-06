@@ -62,7 +62,7 @@ final class PanelDividerAccessibilityTests: XCTestCase {
 
         // A short window cuts the range below the remembered height: VoiceOver hears the drawn one, and steps from it.
         height = 440
-        divider.range = NotesLayoutSettings.stackedListRange(paneHeight: 900)   // 220...413
+        divider.range = NotesLayoutSettings.stackedListRange(paneHeight: 900)   // 160...413
         XCTAssertEqual(divider.accessibilityValue() as? Double, 413)
         XCTAssertTrue(divider.accessibilityPerformDecrement())
         XCTAssertEqual(height, 403)

@@ -53,9 +53,9 @@ struct NotesFilterBar: View {
     private var topRow: some View {
         HStack(spacing: 8) {
             Picker("Kind", selection: $nav.kindFilter) {
+                Text("All").tag(KindFilter.all)
                 Text("Notes").tag(KindFilter.notes)
                 Text("Extracts").tag(KindFilter.extracts)
-                Text("Both").tag(KindFilter.both)
             }
             .pickerStyle(.segmented)
             .labelsHidden()

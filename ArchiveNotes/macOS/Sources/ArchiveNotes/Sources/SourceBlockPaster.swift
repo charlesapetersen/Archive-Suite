@@ -149,4 +149,11 @@ struct SourceBlockPaster {
         let name = page.map { "p\($0)-thumb.png" } ?? "doc-thumb.png"
         return try? assetStore.addAsset(data, preferredName: name)
     }
+
+    /// Whether `relativePath` is a thumbnail `importThumbnail` wrote: `assets/p<N>-thumb.png` or
+    /// `assets/doc-thumb.png`, with the `-<n>` an asset store appends to a taken name. The editor draws these
+    /// smaller than other images (`InlineImageAttachment.maxSourceThumbnailSize`).
+    static func isThumbnailAsset(_ relativePath: String) -> Bool {
+        relativePath.wholeMatch(of: /assets\/(p[0-9]+|doc)-thumb(-[0-9]+)?\.png/) != nil
+    }
 }

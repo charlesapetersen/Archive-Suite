@@ -11,7 +11,7 @@ final class NotesFilterTests: XCTestCase {
         XCTAssertEqual(filter.searchText, "")
         XCTAssertEqual(filter.tags, [])
         XCTAssertEqual(filter.tagCombine, .all)
-        XCTAssertEqual(filter.kind, .both)
+        XCTAssertEqual(filter.kind, .all)
         XCTAssertTrue(filter.qualities.isEmpty)
         XCTAssertNil(filter.dateFrom)
         XCTAssertNil(filter.dateTo)
@@ -115,7 +115,7 @@ final class NotesFilterTests: XCTestCase {
     func testKindFilterRawValues() {
         XCTAssertEqual(KindFilter.notes.rawValue, "notes")
         XCTAssertEqual(KindFilter.extracts.rawValue, "extracts")
-        XCTAssertEqual(KindFilter.both.rawValue, "both")
+        XCTAssertEqual(KindFilter.all.rawValue, "all")
     }
 
     // MARK: - matches(_:folderItemIDs:)
@@ -205,7 +205,7 @@ final class NotesFilterTests: XCTestCase {
     func testEffectiveUserWinsElseBase() {
         var base = NotesFilter(); base.kind = .extracts; base.qualities = [3]; base.searchText = "base"
         base.dateFrom = 19000000; base.folderId = UUID()
-        var user = NotesFilter(); user.kind = .both; user.searchText = ""   // both/blank → inherit base
+        var user = NotesFilter(); user.kind = .all; user.searchText = ""   // all/blank → inherit base
         var eff = NotesFilter.effective(base: base, user: user)
         XCTAssertEqual(eff.kind, .extracts)
         XCTAssertEqual(eff.qualities, [3])
@@ -235,7 +235,7 @@ final class NotesFilterTests: XCTestCase {
         let json = #"{"tags":["History"]}"#.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(NotesFilter.self, from: json)
         XCTAssertEqual(decoded.tags, ["History"])
-        XCTAssertEqual(decoded.kind, .both)         // defaulted
+        XCTAssertEqual(decoded.kind, .all)         // defaulted
         XCTAssertEqual(decoded.tagCombine, .all)    // defaulted
         XCTAssertEqual(decoded.searchText, "")
         XCTAssertNil(decoded.dateFrom)
