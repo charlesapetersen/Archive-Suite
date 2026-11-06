@@ -410,7 +410,8 @@ final class ViewerUITests: FixtureUITestCase {
         let docWindow = app.windows.containing(.any, identifier: "ar.doc.imageSource").firstMatch
         let isWhite: (Int, Int, Int) -> Bool = { r, g, b in r > 248 && g > 248 && b > 248 }
         let isTan: (Int, Int, Int) -> Bool = { r, g, b in abs(r - 180) < 30 && abs(g - 160) < 30 && abs(b - 140) < 30 }
-        let zoomOut = app.buttons["Zoom Out Left"].firstMatch
+        let zoomOut = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                       "ar.doc.imageZoomOut", "Zoom Out Image")).firstMatch
         XCTAssertTrue(zoomOut.waitForExistence(timeout: 5))
         pdfSide.click()                                  // start on the PDF, fitted: the source and the pane's
         pressKey("0", modifiers: [.command, .option])   // zoom both persist, so a failed run can leave either

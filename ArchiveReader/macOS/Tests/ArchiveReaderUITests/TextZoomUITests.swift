@@ -28,25 +28,7 @@ final class TextZoomUITests: XCTestCase {
     }
 
     func testZoomKeysResizeTheExtractedTextOfASinglePagePDF() throws {
-        let corpus = try buildCorpus()
-        let app = XCUIApplication.archiveUITestApp()   // never a bare init — see UITestLaunch
-        app.launchArguments += ["-ARUITestRootPath", corpus.path,
-                                "-ARUITestLibraryIndexPath", scratch.appendingPathComponent("lib.sqlite3").path]
-        app.launch()
-        app.activate()
-        self.app = app
-
-        let table = app.tables["ar.table"]
-        XCTAssertTrue(table.waitForExistence(timeout: 30), "the main window should come up")
-        let row = table.tableRows.element(boundBy: 0)
-        XCTAssertTrue(row.waitForExistence(timeout: 30), "the one-file corpus should list its file")
-        row.click()
-        app.typeKey("o", modifierFlags: .command)   // Open Document
-
-        let text = app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
-                                                        sentinel, sentinel)).firstMatch
-        XCTAssertTrue(text.waitForExistence(timeout: 20),
-                      "the document window's text pane should show the page's extracted text")
+        let (app, text) = try openSinglePageDocument()
 
         app.typeKey(.rightArrow, modifierFlags: [.command, .option])   // Document ▸ Focus Text Page
         app.typeKey("0", modifierFlags: .command)                      // a size another run left behind
@@ -78,6 +60,78 @@ final class TextZoomUITests: XCTestCase {
         settle()
         XCTAssertEqual(text.frame.height, base, accuracy: 1, "⌘0 should return it to the default size")
         captureScreenshot("w40textzoom-3-after-cmd0")
+    }
+
+    /// W40.fix-reader-doc-toolbar, reader-1 rows 10 and 11: the toolbar's second pair of magnifying glasses
+    /// (the text pane's zoom) and its Fit arrows appeared to do nothing. The text pair now shows text-size
+    /// glyphs and sizes a one-page PDF's text; the per-pane Fit buttons are gone, and Reset Zoom, which did
+    /// what both did, is disabled while there is nothing to reset, so no live control has no visible effect.
+    func testToolbarZoomButtonsActAndResetZoomIsLiveOnlyWhenItCanAct() throws {
+        let (app, text) = try openSinglePageDocument()
+        let toolbarButton: (String, String) -> XCUIElement = { id, label in
+            app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@", id, label)).firstMatch
+        }
+        let larger = toolbarButton("ar.doc.textZoomIn", "Larger Text")
+        let smaller = toolbarButton("ar.doc.textZoomOut", "Smaller Text")
+        let imageIn = toolbarButton("ar.doc.imageZoomIn", "Zoom In Image")
+        let reset = toolbarButton("ar.doc.resetZoom", "Reset Zoom")
+        for (button, name) in [(larger, "Larger Text"), (smaller, "Smaller Text"), (imageIn, "Zoom In Image"),
+                               (reset, "Reset Zoom")] {
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "the document toolbar should carry \(name)")
+        }
+        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Fit '")).count, 0,
+                       "the per-pane Fit buttons are gone from the toolbar")
+
+        if reset.isEnabled { reset.click(); settle() }   // a zoom another run left behind
+        XCTAssertFalse(reset.isEnabled, "with both pages fitted and the text at its normal size, Reset Zoom is disabled")
+        let base = text.frame.height
+        captureScreenshot("w40doctoolbar-1-default")
+
+        larger.click()
+        settle()
+        XCTAssertGreaterThan(text.frame.height, base, "Larger Text should enlarge a one-page PDF's text")
+        XCTAssertTrue(reset.isEnabled, "once the text is resized, Reset Zoom has something to do")
+        captureScreenshot("w40doctoolbar-2-larger-text")
+        smaller.click(); smaller.click()
+        settle()
+        XCTAssertLessThan(text.frame.height, base, "Smaller Text should shrink it below the normal size")
+
+        reset.click()
+        settle()
+        XCTAssertEqual(text.frame.height, base, accuracy: 1, "Reset Zoom returns the text to its normal size")
+        XCTAssertFalse(reset.isEnabled, "and is disabled again")
+
+        imageIn.click()
+        settle()
+        XCTAssertTrue(reset.isEnabled, "zooming the image page also gives Reset Zoom something to do")
+        captureScreenshot("w40doctoolbar-3-image-zoomed")
+        app.typeKey("0", modifierFlags: [.command, .option])   // ⌥⌘0, Reset Zoom's shortcut
+        settle()
+        XCTAssertFalse(reset.isEnabled, "⌥⌘0 fits the image page again")
+    }
+
+    /// Launch on this suite's one-file corpus and open its document; returns the app and the text pane's text.
+    private func openSinglePageDocument() throws -> (XCUIApplication, XCUIElement) {
+        let corpus = try buildCorpus()
+        let app = XCUIApplication.archiveUITestApp()   // never a bare init — see UITestLaunch
+        app.launchArguments += ["-ARUITestRootPath", corpus.path,
+                                "-ARUITestLibraryIndexPath", scratch.appendingPathComponent("lib.sqlite3").path]
+        app.launch()
+        app.activate()
+        self.app = app
+
+        let table = app.tables["ar.table"]
+        XCTAssertTrue(table.waitForExistence(timeout: 30), "the main window should come up")
+        let row = table.tableRows.element(boundBy: 0)
+        XCTAssertTrue(row.waitForExistence(timeout: 30), "the one-file corpus should list its file")
+        row.click()
+        app.typeKey("o", modifierFlags: .command)   // Open Document
+
+        let text = app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
+                                                        sentinel, sentinel)).firstMatch
+        XCTAssertTrue(text.waitForExistence(timeout: 20),
+                      "the document window's text pane should show the page's extracted text")
+        return (app, text)
     }
 
     // MARK: - Corpus

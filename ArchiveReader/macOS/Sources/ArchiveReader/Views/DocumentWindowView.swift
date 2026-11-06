@@ -204,21 +204,26 @@ struct DocumentWindowView: View {
 
             Divider()
 
-            Button { model.leftController.zoomOut() } label: { Label("Zoom Out Left", systemImage: "minus.magnifyingglass") }
-                .help("Zoom out the image page")
-            Button { model.leftController.zoomIn() } label: { Label("Zoom In Left", systemImage: "plus.magnifyingglass") }
-                .help("Zoom in the image page")
-            Button { model.leftController.fit() } label: { Label("Fit Left", systemImage: "arrow.up.left.and.arrow.down.right") }
-                .help("Fit the image page to its pane")
+            // W40.fix-reader-doc-toolbar: the owner could not tell the two zoom pairs apart (both were
+            // magnifying glasses) and saw the text pair and the per-pane Fit arrows do nothing — the text pair
+            // never reached a one-page PDF's text before W40.fix-reader-text-zoom, and Fit has no visible effect
+            // on a page already fitted. The text pair now shows text-size glyphs, and the two Fit buttons are
+            // gone: Reset Zoom did what both did, and ⌘0 still fits the focused pane alone.
+            Button { model.leftController.zoomOut() } label: { Label("Zoom Out Image", systemImage: "minus.magnifyingglass") }
+                .help("Zoom out the image page, on the left")
+                .accessibilityIdentifier("ar.doc.imageZoomOut")
+            Button { model.leftController.zoomIn() } label: { Label("Zoom In Image", systemImage: "plus.magnifyingglass") }
+                .help("Zoom in the image page, on the left")
+                .accessibilityIdentifier("ar.doc.imageZoomIn")
 
             Divider()
 
-            Button { model.zoomTextOut() } label: { Label("Zoom Out Right", systemImage: "minus.magnifyingglass") }
-                .help("Zoom out the OCR text page")
-            Button { model.zoomTextIn() } label: { Label("Zoom In Right", systemImage: "plus.magnifyingglass") }
-                .help("Zoom in the OCR text page")
-            Button { model.fitText() } label: { Label("Fit Right", systemImage: "arrow.up.left.and.arrow.down.right") }
-                .help("Fit the OCR text page to its pane, or reset the text size")
+            Button { model.zoomTextOut() } label: { Label("Smaller Text", systemImage: "textformat.size.smaller") }
+                .help("Make the OCR text on the right smaller")
+                .accessibilityIdentifier("ar.doc.textZoomOut")
+            Button { model.zoomTextIn() } label: { Label("Larger Text", systemImage: "textformat.size.larger") }
+                .help("Make the OCR text on the right larger")
+                .accessibilityIdentifier("ar.doc.textZoomIn")
 
             Divider()
 
@@ -228,11 +233,19 @@ struct DocumentWindowView: View {
                 .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌥⌘C)")
             Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
                 .help("Search for text in this document (⌘F)")
-            Button { fraction = defaultFraction; model.leftController.fit(); model.fitText() } label: {
-                Label("Reset Layout", systemImage: "rectangle.split.2x1")
+            // The tooltip sits on a wrapper, like the image switch's: a disabled button's own is not shown.
+            HStack(spacing: 0) {
+                Button { fraction = defaultFraction; model.resetZoom() } label: {
+                    Label("Reset Zoom", systemImage: "arrow.counterclockwise")
+                }
+                .keyboardShortcut("0", modifiers: [.command, .option])
+                .disabled(model.zoomIsDefault)
+                .accessibilityIdentifier("ar.doc.resetZoom")
             }
-            .keyboardShortcut("0", modifiers: [.command, .option])
-            .help("Reset the split and zoom to defaults (⌥⌘0)")
+            .contentShape(Rectangle())
+            .help(model.zoomIsDefault
+                  ? "Both pages already fit their panes, with the text at its normal size"
+                  : "Fit both pages to their panes and the text to its normal size (⌥⌘0; ⌘0 fits the focused page alone)")
         }
     }
 

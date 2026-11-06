@@ -55,6 +55,19 @@ final class DocumentTextZoomTests: XCTestCase {
         XCTAssertEqual(model.textScale, 1, "Fit Page (⌘0) resets the text size")
     }
 
+    /// W40.fix-reader-doc-toolbar: Reset Zoom is disabled while it has nothing to do, and resets the text.
+    func testResetZoomIsLiveOnlyWhileTheTextIsResized() throws {
+        let model = load([try scratchPDF(pages: ["A single-page scan with a text layer"])])
+        XCTAssertTrue(model.zoomIsDefault, "a freshly opened document is fitted, at the normal text size")
+        model.zoomTextIn()
+        XCTAssertFalse(model.zoomIsDefault, "larger text gives Reset Zoom something to do")
+        model.resetZoom()
+        XCTAssertEqual(model.textScale, 1)
+        XCTAssertTrue(model.zoomIsDefault)
+        model.zoomTextOut()
+        XCTAssertFalse(model.zoomIsDefault, "smaller text counts too")
+    }
+
     func testTextSizeIsClamped() throws {
         let model = load([try scratchPDF(pages: ["Text"])])
         model.focusPane(.right)

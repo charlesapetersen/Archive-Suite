@@ -87,6 +87,7 @@ final class DocumentViewerModel: ObservableObject {
             controller.zoomFocused = { [weak self] zoomIn in
                 if zoomIn { self?.zoomFocusedIn() } else { self?.zoomFocusedOut() }
             }
+            controller.zoomChanged = { [weak self] in self?.objectWillChange.send() }
         }
     }
 
@@ -165,6 +166,15 @@ final class DocumentViewerModel: ObservableObject {
     func zoomTextIn()  { hasTextPage ? rightController.zoomIn()  : setTextScale(textScale * 1.25) }
     func zoomTextOut() { hasTextPage ? rightController.zoomOut() : setTextScale(textScale / 1.25) }
     func fitText()     { hasTextPage ? rightController.fit()     : setTextScale(1) }
+
+    /// Both pages fitted and the text at its normal size: Reset Zoom has nothing to do, so the toolbar shows
+    /// it disabled. W40.fix-reader-doc-toolbar: per-pane Fit buttons, live but with no visible effect on a
+    /// page already fitted, read to the owner as controls that did nothing.
+    var zoomIsDefault: Bool {
+        leftController.isFitted && (hasTextPage ? rightController.isFitted : textScale == 1)
+    }
+
+    func resetZoom() { leftController.fit(); fitText() }
 
     private func setTextScale(_ s: CGFloat) {
         textScale = Self.clampedTextScale(s)

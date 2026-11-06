@@ -33,6 +33,12 @@ final class PDFPaneController {
     /// A zoom key reaching this pane (`true` = in), forwarded to the viewer so it zooms the FOCUSED pane —
     /// which may be the extracted-text pane, not a PDFView at all. Set by `DocumentViewerModel`.
     var zoomFocused: ((Bool) -> Void)?
+    /// Called after the zoom is recorded or reset, so the viewer can republish what depends on it (whether
+    /// Reset Zoom has anything to do). Set by `DocumentViewerModel`.
+    var zoomChanged: (() -> Void)?
+
+    /// True while the pane fits its page, i.e. no explicit zoom is held.
+    var isFitted: Bool { savedScale == nil }
 
     init(key: String, persists: Bool = true) {
         self.key = key
@@ -52,6 +58,7 @@ final class PDFPaneController {
         if persists { AppSettings.setViewerZoom(key, 0) }
         isApplying = true; v.autoScales = true; isApplying = false
         scrollToTop()
+        zoomChanged?()
     }
 
     private var currentScale: CGFloat { pdfView?.scaleFactor ?? savedScale ?? 1 }
@@ -73,6 +80,7 @@ final class PDFPaneController {
         v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
         #endif
         scrollToTop()
+        zoomChanged?()
     }
 
     /// Apply the saved zoom to a freshly-built view + pin the top. Bracketed by `isApplying` so the
