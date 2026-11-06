@@ -1047,12 +1047,16 @@ def agreed_line(r, asked):
     return out
 
 
-def write_sheet(items, keyed, docs, rows=None, turns=None):
-    out = os.path.join(CACHE, "sheet")
+def write_sheet(items, keyed, docs, rows=None, turns=None, out=None, agreed=None, intro=None,
+                store="w47-item-fields-sheet", appendable=("random",), seed=SEED):
+    """The sheet's index.html and key.json in `out` (CACHE/sheet). agreed(doc_id, asked) gives the not-asked line
+    (agreed_line on the truth row by default); appendable, the parts a rebuild may add as new ids (changed_questions);
+    store, the browser storage key the answers are kept under, one per sheet."""
+    out = out or os.path.join(CACHE, "sheet")
     if os.path.exists(os.path.join(out, "answers.json")):
         print(f"{out} is answered: sheet and key left as they are", file=sys.stderr)
         return False
-    bad = changed_questions(os.path.join(out, "key.json"), keyed)
+    bad = changed_questions(os.path.join(out, "key.json"), keyed, appendable)
     if bad:
         sys.exit(f"{len(bad)} questions would change or go ({', '.join(bad[:5])}): answers saved in a browser are kept "
                  "by id, so the sheet is not rewritten")
@@ -1078,23 +1082,24 @@ def write_sheet(items, keyed, docs, rows=None, turns=None):
         its = [dict(x, options=[dict(o, boxes=[[pi, turn_box(b, turned.get(pi, 0))] for pi, b in o["boxes"]])
                                 for o in x["options"]]) for x in items[doc_id]]
         asked = {x["field"] for x in items[doc_id]}
+        line = agreed(doc_id, asked) if agreed else agreed_line(truth[doc_id], asked) if doc_id in truth else []
         data.append({"doc": doc_id, "label": f"{d['collection']} · {len(d['pages'])} page(s)", "imgs": imgs,
-                     "turned": len(turned), "agreed": agreed_line(truth[doc_id], asked) if doc_id in truth else [],
-                     "items": its})
+                     "turned": len(turned), "agreed": line, "items": its})
     page = (SHEET_HTML.replace("__N__", str(sum(len(v) for v in items.values()))).replace("__DOCS__", str(len(items)))
-            .replace("__MINUTES__", f"{minutes(items):.0f}").replace("__NAMES__", script_json(FIELD_NAMES))
+            .replace("__MINUTES__", f"{minutes(items):.0f}").replace("__INTRO__", intro or SHEET_INTRO)
+            .replace("__STORE__", store).replace("__NAMES__", script_json(FIELD_NAMES))
             .replace("__DATA__", script_json(data)))   # the data last, so nothing in it is taken for a placeholder
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as fh:
         fh.write(page)
-    json.dump({"seed": SEED, "items": keyed}, open(os.path.join(out, "key.json"), "w"), indent=1, ensure_ascii=False)
+    json.dump({"seed": seed, "items": keyed}, open(os.path.join(out, "key.json"), "w"), indent=1, ensure_ascii=False)
     return True
 
 
 ASKED = ("doc", "part", "field", "options")   # what a question is; other key fields are notes for the scoring
 
 
-def changed_questions(path, keyed):
-    """Ids whose question the new key changes or drops, and new ids that are not random controls: [] when every
+def changed_questions(path, keyed, appendable=("random",)):
+    """Ids whose question the new key changes or drops, and new ids whose part is not appendable: [] when every
     answer saved under the old key still answers the same question (the random controls are appended)."""
     if not os.path.exists(path):
         return []
@@ -1102,7 +1107,7 @@ def changed_questions(path, keyed):
         old = json.load(fh)["items"]
     new = json.loads(json.dumps(keyed))
     bad = [n for n, k in old.items() if n not in new or any(new[n].get(x) != k.get(x) for x in ASKED)]
-    return bad + [n for n, k in new.items() if n not in old and k["part"] != "random"]
+    return bad + [n for n, k in new.items() if n not in old and k["part"] not in appendable]
 
 
 def script_json(v):
@@ -1120,6 +1125,17 @@ FIELD_NAMES = {"kind": "what kind of document this is", "title": "title or headl
                "recipient_place": "where the addressee is", "sender": "sender (who wrote or signed it)",
                "recipient": "recipient (who it is addressed to)", "sending_place": "where it was sent from"}
 
+SHEET_INTRO = """Each question shows
+one or more readings of a field; which source each came from is not shown. Pick the one the pages show.
+Keys: <b>1</b>-<b>5</b> pick that reading · <b>0</b> none of them (type it; empty = the field is empty) ·
+<b>9</b> can't tell · <b>n/p</b> next/previous · <b>z</b> zoom. A reading offered alone: <b>1</b> right, <b>0</b> wrong
+(offered as <i>(empty)</i>, <b>1</b> means the pages show no such thing, <b>0</b> that they do: type it).
+The grey line lists the fields not asked on that document (both readers agreed, or Gemini ruled), with what goes
+into the truth; the notes box under each document is for one that is wrong, or anything the fields miss. Pages
+photographed sideways or upside down are shown turned upright where a check found them; "turn page" turns any
+other, with its boxes. Pink boxes mark where the readings were found in the text (from Apple Vision's line positions; they can be off, and
+a reading with no box was not found)."""
+
 SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W47 item-field check</title>
 <style>
 body{font:14px -apple-system,sans-serif;margin:0;background:#fff;color:#111;color-scheme:light}
@@ -1134,19 +1150,10 @@ header{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;paddin
 .turn{font-size:12px;margin:0 0 4px}.agreed{color:#555;font-size:13px;margin:4px 0}.notes textarea{width:100%;height:5em;font:14px -apple-system,sans-serif}
 .k{color:#888;font-size:12px;font-family:-apple-system,sans-serif}.typed{color:#a40}.where{color:#a40;font-size:12px}
 </style>
-<header><b>Item-field check</b> — __N__ questions on __DOCS__ documents, about __MINUTES__ minutes. Each question shows
-one or more readings of a field; which source each came from is not shown. Pick the one the pages show.
-Keys: <b>1</b>-<b>5</b> pick that reading · <b>0</b> none of them (type it; empty = the field is empty) ·
-<b>9</b> can't tell · <b>n/p</b> next/previous · <b>z</b> zoom. A reading offered alone: <b>1</b> right, <b>0</b> wrong
-(offered as <i>(empty)</i>, <b>1</b> means the pages show no such thing, <b>0</b> that they do: type it).
-The grey line lists the fields not asked on that document (both readers agreed, or Gemini ruled), with what goes
-into the truth; the notes box under each document is for one that is wrong, or anything the fields miss. Pages
-photographed sideways or upside down are shown turned upright where a check found them; "turn page" turns any
-other, with its boxes. Pink boxes mark where the readings were found in the text (from Apple Vision's line positions; they can be off, and
-a reading with no box was not found). Answers stay in this browser;
+<header><b>Item-field check</b> — __N__ questions on __DOCS__ documents, about __MINUTES__ minutes. __INTRO__ Answers stay in this browser;
 <button onclick="exportAnswers()">Export answers</button><span id="prog"></span></header><div id="root"></div>
 <script>
-const DATA=__DATA__;const NAMES=__NAMES__;const KEY='w47-item-fields-sheet';const NOTE='_notes/';
+const DATA=__DATA__;const NAMES=__NAMES__;const KEY='__STORE__';const NOTE='_notes/';
 let A=JSON.parse(localStorage.getItem(KEY)||'{}');const items=[];
 function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(A));prog()}
