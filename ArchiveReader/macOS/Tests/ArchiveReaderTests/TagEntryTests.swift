@@ -1,5 +1,6 @@
 import XCTest
 import AppKit
+import ArchiveCore
 @testable import ArchiveReader
 
 /// W40.fix-reader-tag-entry: the keys the tag-entry fields share around an autocompletion.

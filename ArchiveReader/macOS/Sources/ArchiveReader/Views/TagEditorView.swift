@@ -68,7 +68,7 @@ struct TagEditorView: View {
                 ForEach(s.subjectsOnSome, id: \.self) { chip($0, partial: true) }
             }
             HStack {
-                SubjectEntryField(draft: $subjectDraft, placeholder: "Add tag…",
+                SubjectEntryField(draft: $subjectDraft, placeholder: "Add tag…", identifier: "ar.tagEditor.addSubject",
                                   suggestions: { let onAll = Set(s.subjectsOnAll); return model.allSubjects.filter { !onAll.contains($0) } },
                                   onAdd: { apply(.addSubject($0)) })
                 Button("Add", action: addSubject)

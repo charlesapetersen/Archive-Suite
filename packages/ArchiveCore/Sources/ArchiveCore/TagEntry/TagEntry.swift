@@ -1,21 +1,23 @@
 import AppKit
 
-/// How the Reader's tag-entry token fields treat an autocompletion (W40.fix-reader-tag-entry; owner session
-/// reader-1, rows 28, 29 and 36). The list's inline tag field, the Edit Info sheet's subject field and the tag
-/// filter share it, so the three behave alike: a space keeps what was typed, and Tab or → takes the suggestion.
-/// The list's field and the sheet fill a suggestion in only where it keeps the typed case (`filledInIndex`); the
-/// filter fills in the first, as a filter names a subject that exists.
+/// How the suite's tag-entry token fields treat an autocompletion (W40.fix-reader-tag-entry; owner session
+/// reader-1, rows 28, 29 and 36). The Reader's inline list tag field, its Edit Info subject field and its tag
+/// filter share it, and so does Notes' tag field through `SubjectEntryField` (W40.fix-notes-tag-entry), so they
+/// behave alike: a space keeps what was typed, and Tab or → takes the suggestion.
+/// The Reader's list field and sheet fill a suggestion in only where it keeps the typed case (`filledInIndex`); the
+/// filter fills in the first, as a filter names a subject that exists, and so does Notes (`SubjectEntryField`'s
+/// `fillsInAnyCase`).
 /// Tab and → need nothing here: with a suggestion showing, the token field itself turns it into a token on Tab
 /// (and moves on to the next control) and → moves the caret past it.
 @MainActor
-enum TagEntry {
+public enum TagEntry {
     /// Existing subjects that complete `substring`: a case-insensitive prefix match, with an exact match left out.
     ///
     /// Only leading whitespace is dropped. Trailing whitespace is part of what was typed: when it was trimmed,
     /// "Civ " still matched "Civil War", the field put the suggestion back over the space, and a space could not
     /// be typed until the rest of the suggestion was taken. Subjects are often two words, so the space stays a
     /// space and the completion ends there unless a subject really starts "Civ ".
-    static func completions(for substring: String, in subjects: [String], limit: Int = 20) -> [String] {
+    public static func completions(for substring: String, in subjects: [String], limit: Int = 20) -> [String] {
         let s = typedPrefix(substring)
         guard !s.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         return Array(subjects.lazy.filter {
@@ -29,7 +31,7 @@ enum TagEntry {
     /// text, so a case-insensitive one turned "w40d8 m" into "W40d8 M" and a case variant could not be typed (the
     /// sheet's case warning, R-27, never showed). Case is kept as typed; Tab or → takes a filled-in completion, and
     /// ↓ picks one from the list.
-    static func filledInIndex(for substring: String, in completions: [String]) -> Int {
+    public static func filledInIndex(for substring: String, in completions: [String]) -> Int {
         let s = typedPrefix(substring)
         return completions.firstIndex { $0.hasPrefix(s) } ?? -1
     }
@@ -41,7 +43,7 @@ enum TagEntry {
     /// The text after the tokens, which Return or a comma would make a tag. A token is one attachment character
     /// in the field editor's string. Without `includingSuggestion`, a selected inline completion is left out:
     /// what the person typed, not what the field suggests.
-    static func pendingText(in textView: NSTextView, includingSuggestion: Bool = true) -> String {
+    public static func pendingText(in textView: NSTextView, includingSuggestion: Bool = true) -> String {
         var text = textView.string as NSString
         let selected = textView.selectedRange()
         if !includingSuggestion, selected.location != NSNotFound, selected.length > 0, NSMaxRange(selected) <= text.length {

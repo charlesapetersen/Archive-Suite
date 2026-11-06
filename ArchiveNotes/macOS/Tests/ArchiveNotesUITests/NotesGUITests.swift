@@ -1989,15 +1989,33 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(input.waitForExistence(timeout: 5))
             revealInMetadataScroll(input)
             input.click()
+            // W40.fix-notes-tag-entry (owner session notes-1 row 26): Return adds the tag and keeps the keyboard,
+            // so a second one is typed straight after; there is no Add button.
+            XCTAssertFalse(mainWindow.buttons["an.detail.tags.add"].exists, "the tag field has no Add button")
             input.typeText("ui subject")
-            mainWindow.buttons["an.detail.tags.add"].click()
+            app.typeKey(.return, modifierFlags: [])
             let noteURL = URL(fileURLWithPath: itemsDir).appendingPathComponent(id)
                 .appendingPathComponent("Metadata Test Note.md")
+            func finderTags() -> [String] { (try? noteURL.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? [] }
             XCTAssertTrue(pollUntil(timeout: 10) {
-                let tags = (try? noteURL.resourceValues(forKeys: [.tagNamesKey]).tagNames) ?? []
-                return tags.contains("Ui Subject")
+                finderTags().contains("Ui Subject")
                     && (self.rawMarkdown(inItemDir: id) ?? "").contains("Ui Subject")
-            })
+            }, "Return should add the typed tag")
+            app.typeText("second subject")
+            app.typeKey(.return, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 10) { finderTags().contains("Second Subject") },
+                          "the field should keep the keyboard after Return, so the next tag needs no click")
+            // Autocomplete: "silicon valley" is on another fixture note; Tab takes the suggestion.
+            for ch in "Sil" { app.typeText(String(ch)); Thread.sleep(forTimeInterval: 0.15) }
+            Thread.sleep(forTimeInterval: 1.0)
+            let completionShot = mainWindow.screenshot()
+            let completionPath = FileManager.default.temporaryDirectory.appendingPathComponent("notes-tag-completion.png")
+            try completionShot.pngRepresentation.write(to: completionPath)
+            print("[shot] notes-tag-completion: wrote \(completionPath.path)")
+            app.typeKey(.tab, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 10) { finderTags().contains("Silicon Valley") },
+                          "the tag field should autocomplete from other notes' tags, and Tab take the suggestion; tags \(finderTags())")
+            XCTAssertFalse(finderTags().contains("Sil"), "Tab should take the whole suggestion")
             let remove = mainWindow.buttons["an.detail.tags.remove.Ui Subject"]
             XCTAssertTrue(remove.waitForExistence(timeout: 5))
             let shot = mainWindow.screenshot()
