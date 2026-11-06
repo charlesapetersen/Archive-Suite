@@ -126,7 +126,12 @@ def not_asked(t, asked, ent, tag):
         out.append([f, IR.shown(f, v) + (" (you checked it on the first sheet)" if t["owner"].get(f) else "")])
     if ent and ent.get("is_correspondence"):
         for f in ET.FIELDS:
-            out.append([f, "; ".join(n["name"] for n in ET.ent_names(ent.get(f))) or "none given"])
+            v = "; ".join(n["name"] for n in ET.ent_names(ent.get(f))) or "none given"
+            if f in ent.get("owner_checked", []):
+                v += " (you checked it on the first sheet)"
+            elif f in ent.get("unscored", []):
+                v += " (left open on the first sheet)"
+            out.append([f, v])
     if tag:
         out.append([DATE_NAME, f"{tag[0]}" + (f"-{tag[1]:02d}" if tag[1] else "")])
     return out
