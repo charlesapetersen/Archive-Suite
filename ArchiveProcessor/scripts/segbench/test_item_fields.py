@@ -86,12 +86,17 @@ class Match(unittest.TestCase):
         self.assertTrue(I.kind_match("telegram", "letter", "ed2"))
         self.assertFalse(I.kind_match("telegram", "letter", "exact"))
         self.assertTrue(I.kind_match("clipping", "newspaper article", "ed2"))
+        # a bare "article" is right on any periodical piece at the loose level, never exactly (FLD-2)
+        self.assertTrue(I.kind_match("article", "magazine article", "ed2"))
+        self.assertTrue(I.kind_match("article", "clipping", "ed2"))
+        self.assertFalse(I.kind_match("article", "report", "ed2"))
+        self.assertFalse(I.kind_match("article", "magazine article", "exact"))
 
     def test_app_kind(self):
         self.assertEqual(I.app_kind("Newspaper clipping"), "newspaper article")
         self.assertEqual(I.app_kind("memorandum"), "memo")
         self.assertEqual(I.app_kind("newsletter article"), "newsletter")   # "newsletter" holds "letter"
-        self.assertEqual(I.app_kind("article"), "clipping")
+        self.assertEqual(I.app_kind("article"), "article")
         self.assertEqual(I.app_kind("brochure"), "other")
         self.assertIsNone(I.app_kind(None))
 

@@ -198,5 +198,15 @@ Luna drafting, Gemini ruling, W46's ruling for correspondence kind; the app's ca
 sheet (`W47.item-fields-owner-ok`) comes first; `W47.item-fields-retruth-score` then scores every route and its
 verdict replaces the 10-30 one.
 
+Scored 2026-11-05 (`W47.item-fields-retruth-score`, `segbench-results/item-fields-score.md`), with the owner's sheet
+and notes folded in: no field clears the fill rule (Wilson lower bound 0.85, point 0.90, 40 with a true value) for
+any route, mostly by owner-checked n (14-21 with a true value; kind 38), so "too close", not "leave empty". The
+truth's own error from the random controls is 1 of 17. The image prompt (Gemini 3.7 on the page images) is the only
+Gemini route that gives a title; the app's call is below the bar on publication date, against the printed date and
+the owner's tags. `W47.item-fields-more-checks` draws the image prompt's filled values for the owner to reach the
+floor, and `W47.item-fields-build` waits on it. The owner's notes ask for inference (a name from a first name or
+initials, a paper from its initials) as a user-set level, title case for display, and the letterhead kept apart from
+the sending place.
+
 Cost: `W47.ct-read-paid` under $0.50; a full read of the corpus's 4,500 markers about $2–4 on the gateway, priced
 from `W47.ct-read`'s figures before it runs. The $3 rule applies to each item.

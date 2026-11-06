@@ -1,0 +1,1971 @@
+{
+ "by_part": {
+  "app-gemini-3.8-flash|base|byline": [
+   23,
+   32
+  ],
+  "app-gemini-3.8-flash|base|kind": [
+   120,
+   131
+  ],
+  "app-gemini-3.8-flash|base|publication": [
+   23,
+   33
+  ],
+  "app-gemini-3.8-flash|base|publication_date": [
+   17,
+   53
+  ],
+  "app-gemini-3.8-flash|base|recipient_place": [
+   23,
+   33
+  ],
+  "app-gemini-3.8-flash|base|title": [
+   0,
+   0
+  ],
+  "app-qwen3-vl-8b|base|byline": [
+   22,
+   26
+  ],
+  "app-qwen3-vl-8b|base|kind": [
+   117,
+   143
+  ],
+  "app-qwen3-vl-8b|base|publication": [
+   12,
+   25
+  ],
+  "app-qwen3-vl-8b|base|publication_date": [
+   4,
+   57
+  ],
+  "app-qwen3-vl-8b|base|recipient_place": [
+   20,
+   35
+  ],
+  "app-qwen3-vl-8b|base|title": [
+   0,
+   0
+  ],
+  "app-qwen3.5-4b|base|byline": [
+   22,
+   29
+  ],
+  "app-qwen3.5-4b|base|kind": [
+   119,
+   143
+  ],
+  "app-qwen3.5-4b|base|publication": [
+   11,
+   32
+  ],
+  "app-qwen3.5-4b|base|publication_date": [
+   0,
+   57
+  ],
+  "app-qwen3.5-4b|base|recipient_place": [
+   19,
+   39
+  ],
+  "app-qwen3.5-4b|base|title": [
+   0,
+   0
+  ],
+  "app-qwen3.6-27b|base|byline": [
+   25,
+   27
+  ],
+  "app-qwen3.6-27b|base|kind": [
+   127,
+   143
+  ],
+  "app-qwen3.6-27b|base|publication": [
+   19,
+   35
+  ],
+  "app-qwen3.6-27b|base|publication_date": [
+   15,
+   57
+  ],
+  "app-qwen3.6-27b|base|recipient_place": [
+   26,
+   46
+  ],
+  "app-qwen3.6-27b|base|title": [
+   0,
+   0
+  ],
+  "draft-gemini|base|byline": [
+   41,
+   41
+  ],
+  "draft-gemini|base|kind": [
+   194,
+   198
+  ],
+  "draft-gemini|base|publication": [
+   34,
+   37
+  ],
+  "draft-gemini|base|publication_date": [
+   38,
+   38
+  ],
+  "draft-gemini|base|recipient_place": [
+   54,
+   54
+  ],
+  "draft-gemini|base|title": [
+   78,
+   82
+  ],
+  "draft-gemini|clippings|byline": [
+   37,
+   37
+  ],
+  "draft-gemini|clippings|kind": [
+   49,
+   51
+  ],
+  "draft-gemini|clippings|publication": [
+   45,
+   47
+  ],
+  "draft-gemini|clippings|publication_date": [
+   46,
+   48
+  ],
+  "draft-gemini|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "draft-gemini|clippings|title": [
+   45,
+   47
+  ],
+  "draft-gemini|handwritten|kind": [
+   19,
+   19
+  ],
+  "draft-gemini|handwritten|publication": [
+   0,
+   0
+  ],
+  "draft-gemini|handwritten|recipient_place": [
+   2,
+   2
+  ],
+  "draft-gemini|handwritten|title": [
+   1,
+   1
+  ],
+  "draft-luna|base|byline": [
+   37,
+   39
+  ],
+  "draft-luna|base|kind": [
+   194,
+   198
+  ],
+  "draft-luna|base|publication": [
+   35,
+   38
+  ],
+  "draft-luna|base|publication_date": [
+   33,
+   33
+  ],
+  "draft-luna|base|recipient_place": [
+   54,
+   55
+  ],
+  "draft-luna|base|title": [
+   81,
+   87
+  ],
+  "draft-luna|clippings|byline": [
+   36,
+   36
+  ],
+  "draft-luna|clippings|kind": [
+   48,
+   51
+  ],
+  "draft-luna|clippings|publication": [
+   46,
+   48
+  ],
+  "draft-luna|clippings|publication_date": [
+   44,
+   45
+  ],
+  "draft-luna|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "draft-luna|clippings|title": [
+   42,
+   45
+  ],
+  "draft-luna|handwritten|kind": [
+   19,
+   19
+  ],
+  "draft-luna|handwritten|publication": [
+   0,
+   0
+  ],
+  "draft-luna|handwritten|recipient_place": [
+   3,
+   4
+  ],
+  "draft-luna|handwritten|title": [
+   2,
+   2
+  ],
+  "extractor|base|byline": [
+   24,
+   37
+  ],
+  "extractor|base|kind": [
+   161,
+   212
+  ],
+  "extractor|base|publication": [
+   10,
+   37
+  ],
+  "extractor|base|publication_date": [
+   12,
+   19
+  ],
+  "extractor|base|recipient_place": [
+   42,
+   103
+  ],
+  "extractor|base|title": [
+   47,
+   103
+  ],
+  "tagging|base|byline": [
+   28,
+   33
+  ],
+  "tagging|base|kind": [
+   185,
+   198
+  ],
+  "tagging|base|publication": [
+   31,
+   41
+  ],
+  "tagging|base|publication_date": [
+   28,
+   62
+  ],
+  "tagging|base|recipient_place": [
+   51,
+   69
+  ],
+  "tagging|base|title": [
+   0,
+   0
+  ],
+  "tagging|clippings|byline": [
+   32,
+   34
+  ],
+  "tagging|clippings|kind": [
+   44,
+   51
+  ],
+  "tagging|clippings|publication": [
+   31,
+   35
+  ],
+  "tagging|clippings|publication_date": [
+   30,
+   56
+  ],
+  "tagging|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "tagging|clippings|title": [
+   0,
+   0
+  ],
+  "tagging|handwritten|kind": [
+   19,
+   19
+  ],
+  "tagging|handwritten|publication": [
+   0,
+   0
+  ],
+  "tagging|handwritten|recipient_place": [
+   2,
+   4
+  ],
+  "tagging|handwritten|title": [
+   0,
+   0
+  ]
+ },
+ "counts": {
+  "answered": 147,
+  "documents": 299,
+  "kind_changed": 15,
+  "note_answers": {
+   "app call gave a recipient": 25,
+   "app call gave a sender": 19,
+   "app call gave a year": 32,
+   "app year matches the tag": 29,
+   "entity truth has a recipient": 20,
+   "entity truth has a sender": 19,
+   "in the entity truth": 24,
+   "notes": 32,
+   "owner date tag": 32
+  },
+  "note_drops": 11,
+  "note_sets": 13,
+  "note_themes": {
+   "clipping or newspaper article": 8,
+   "entity or date asked": 32,
+   "inference": 14,
+   "kinds outside the list": 3,
+   "letterhead or sending place": 4,
+   "more fields": 9,
+   "several pieces in one document": 3,
+   "title case": 4
+  },
+  "notes": 63,
+  "owner_changed": {
+   "byline": 2,
+   "kind": 15,
+   "publication": 9,
+   "publication_date": 5,
+   "recipient_place": 3,
+   "title": 12
+  },
+  "owner_checked": {
+   "byline": 15,
+   "kind": 39,
+   "publication": 24,
+   "publication_date": 18,
+   "recipient_place": 19,
+   "title": 23
+  },
+  "owner_n": {
+   "byline": [
+    15,
+    15
+   ],
+   "kind": [
+    38,
+    38
+   ],
+   "publication": [
+    24,
+    21
+   ],
+   "publication_date": [
+    18,
+    17
+   ],
+   "recipient_place": [
+    18,
+    15
+   ],
+   "title": [
+    23,
+    20
+   ]
+  },
+  "owner_tags_printed": 110,
+  "printed": 126,
+  "questions": 174,
+  "replies": {
+   "app-gemini-3.8-flash": 147,
+   "app-qwen3-vl-8b": 147,
+   "app-qwen3.5-4b": 147,
+   "app-qwen3.6-27b": 147,
+   "draft-gemini": 299,
+   "draft-luna": 299,
+   "extractor": 218,
+   "tagging": 299
+  },
+  "sideways_docs": 5
+ },
+ "paired": {
+  "drafted": {
+   "byline": {
+    "both": 30,
+    "neither": 11,
+    "only 3.7": 7,
+    "only 3.8": 1
+   },
+   "kind": {
+    "both": 116,
+    "neither": 9,
+    "only 3.7": 2,
+    "only 3.8": 4
+   },
+   "publication": {
+    "both": 119,
+    "neither": 9,
+    "only 3.7": 7,
+    "only 3.8": 3
+   },
+   "publication_date": {
+    "both": 15,
+    "neither": 31,
+    "only 3.7": 5,
+    "only 3.8": 2
+   },
+   "recipient_place": {
+    "both": 55,
+    "neither": 7,
+    "only 3.7": 7,
+    "only 3.8": 7
+   },
+   "title": {
+    "both": 61,
+    "neither": 69
+   }
+  },
+  "owner": {
+   "byline": {
+    "both": 2,
+    "neither": 3
+   },
+   "kind": {
+    "both": 12,
+    "neither": 5,
+    "only 3.8": 2
+   },
+   "publication": {
+    "both": 6,
+    "neither": 1,
+    "only 3.7": 2
+   },
+   "publication_date": {
+    "both": 3,
+    "neither": 3,
+    "only 3.7": 1
+   },
+   "recipient_place": {
+    "both": 3,
+    "neither": 3,
+    "only 3.8": 1
+   },
+   "title": {
+    "neither": 9
+   }
+  }
+ },
+ "rule": {
+  "floor": 40,
+  "lower": 0.85,
+  "point": 0.9
+ },
+ "scores": {
+  "app-gemini-3.8-flash|drafted|byline": {
+   "docs": 49,
+   "ed2": 23,
+   "exact": 23,
+   "fill_rate": 0.6530612244897959,
+   "filled_when_empty": 3,
+   "null_when_truth": 9,
+   "precision_ed2": 0.71875,
+   "pred_filled": 32,
+   "recall_ed2": 0.6052631578947368,
+   "truth_filled": 38,
+   "wrong_when_filled": 9
+  },
+  "app-gemini-3.8-flash|drafted|kind": {
+   "docs": 131,
+   "ed2": 120,
+   "exact": 111,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.916030534351145,
+   "pred_filled": 131,
+   "recall_ed2": 0.916030534351145,
+   "truth_filled": 131,
+   "wrong_when_filled": 11
+  },
+  "app-gemini-3.8-flash|drafted|publication": {
+   "docs": 138,
+   "ed2": 23,
+   "exact": 23,
+   "fill_rate": 0.2391304347826087,
+   "filled_when_empty": 8,
+   "null_when_truth": 6,
+   "precision_ed2": 0.696969696969697,
+   "pred_filled": 33,
+   "recall_ed2": 0.7419354838709677,
+   "truth_filled": 31,
+   "wrong_when_filled": 10
+  },
+  "app-gemini-3.8-flash|drafted|publication_date": {
+   "docs": 53,
+   "ed2": 17,
+   "exact": 14,
+   "fill_rate": 1.0,
+   "filled_when_empty": 23,
+   "null_when_truth": 0,
+   "precision_ed2": 0.32075471698113206,
+   "pred_filled": 53,
+   "recall_ed2": 0.5666666666666667,
+   "truth_filled": 30,
+   "wrong_when_filled": 36
+  },
+  "app-gemini-3.8-flash|drafted|recipient_place": {
+   "docs": 76,
+   "ed2": 23,
+   "exact": 16,
+   "fill_rate": 0.4342105263157895,
+   "filled_when_empty": 8,
+   "null_when_truth": 4,
+   "precision_ed2": 0.696969696969697,
+   "pred_filled": 33,
+   "recall_ed2": 0.7931034482758621,
+   "truth_filled": 29,
+   "wrong_when_filled": 10
+  },
+  "app-gemini-3.8-flash|drafted|title": {
+   "docs": 130,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 69,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 69,
+   "wrong_when_filled": 0
+  },
+  "app-gemini-3.8-flash|owner|byline": {
+   "docs": 5,
+   "ed2": 2,
+   "exact": 2,
+   "fill_rate": 0.6,
+   "filled_when_empty": 0,
+   "null_when_truth": 2,
+   "precision_ed2": 0.6666666666666666,
+   "pred_filled": 3,
+   "recall_ed2": 0.4,
+   "truth_filled": 5,
+   "wrong_when_filled": 1
+  },
+  "app-gemini-3.8-flash|owner|kind": {
+   "docs": 19,
+   "ed2": 14,
+   "exact": 12,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.7368421052631579,
+   "pred_filled": 19,
+   "recall_ed2": 0.7368421052631579,
+   "truth_filled": 19,
+   "wrong_when_filled": 5
+  },
+  "app-gemini-3.8-flash|owner|publication": {
+   "docs": 9,
+   "ed2": 4,
+   "exact": 4,
+   "fill_rate": 0.5555555555555556,
+   "filled_when_empty": 0,
+   "null_when_truth": 2,
+   "precision_ed2": 0.8,
+   "pred_filled": 5,
+   "recall_ed2": 0.5714285714285714,
+   "truth_filled": 7,
+   "wrong_when_filled": 1
+  },
+  "app-gemini-3.8-flash|owner|publication_date": {
+   "docs": 7,
+   "ed2": 3,
+   "exact": 3,
+   "fill_rate": 1.0,
+   "filled_when_empty": 1,
+   "null_when_truth": 0,
+   "precision_ed2": 0.42857142857142855,
+   "pred_filled": 7,
+   "recall_ed2": 0.5,
+   "truth_filled": 6,
+   "wrong_when_filled": 4
+  },
+  "app-gemini-3.8-flash|owner|recipient_place": {
+   "docs": 7,
+   "ed2": 4,
+   "exact": 2,
+   "fill_rate": 0.8571428571428571,
+   "filled_when_empty": 1,
+   "null_when_truth": 1,
+   "precision_ed2": 0.6666666666666666,
+   "pred_filled": 6,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 6,
+   "wrong_when_filled": 2
+  },
+  "app-gemini-3.8-flash|owner|title": {
+   "docs": 9,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 9,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 9,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3-vl-8b|drafted|byline": {
+   "docs": 55,
+   "ed2": 22,
+   "exact": 21,
+   "fill_rate": 0.4727272727272727,
+   "filled_when_empty": 2,
+   "null_when_truth": 19,
+   "precision_ed2": 0.8461538461538461,
+   "pred_filled": 26,
+   "recall_ed2": 0.5116279069767442,
+   "truth_filled": 43,
+   "wrong_when_filled": 4
+  },
+  "app-qwen3-vl-8b|drafted|kind": {
+   "docs": 143,
+   "ed2": 117,
+   "exact": 106,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8181818181818182,
+   "pred_filled": 143,
+   "recall_ed2": 0.8181818181818182,
+   "truth_filled": 143,
+   "wrong_when_filled": 26
+  },
+  "app-qwen3-vl-8b|drafted|publication": {
+   "docs": 139,
+   "ed2": 12,
+   "exact": 12,
+   "fill_rate": 0.17985611510791366,
+   "filled_when_empty": 6,
+   "null_when_truth": 13,
+   "precision_ed2": 0.48,
+   "pred_filled": 25,
+   "recall_ed2": 0.375,
+   "truth_filled": 32,
+   "wrong_when_filled": 13
+  },
+  "app-qwen3-vl-8b|drafted|publication_date": {
+   "docs": 57,
+   "ed2": 4,
+   "exact": 3,
+   "fill_rate": 1.0,
+   "filled_when_empty": 24,
+   "null_when_truth": 0,
+   "precision_ed2": 0.07017543859649122,
+   "pred_filled": 57,
+   "recall_ed2": 0.12121212121212122,
+   "truth_filled": 33,
+   "wrong_when_filled": 53
+  },
+  "app-qwen3-vl-8b|drafted|recipient_place": {
+   "docs": 78,
+   "ed2": 20,
+   "exact": 18,
+   "fill_rate": 0.44871794871794873,
+   "filled_when_empty": 12,
+   "null_when_truth": 7,
+   "precision_ed2": 0.5714285714285714,
+   "pred_filled": 35,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 30,
+   "wrong_when_filled": 15
+  },
+  "app-qwen3-vl-8b|drafted|title": {
+   "docs": 141,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 77,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 77,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3-vl-8b|owner|byline": {
+   "docs": 11,
+   "ed2": 7,
+   "exact": 7,
+   "fill_rate": 0.6363636363636364,
+   "filled_when_empty": 0,
+   "null_when_truth": 4,
+   "precision_ed2": 1.0,
+   "pred_filled": 7,
+   "recall_ed2": 0.6363636363636364,
+   "truth_filled": 11,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3-vl-8b|owner|kind": {
+   "docs": 25,
+   "ed2": 19,
+   "exact": 15,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.76,
+   "pred_filled": 25,
+   "recall_ed2": 0.76,
+   "truth_filled": 25,
+   "wrong_when_filled": 6
+  },
+  "app-qwen3-vl-8b|owner|publication": {
+   "docs": 15,
+   "ed2": 5,
+   "exact": 5,
+   "fill_rate": 0.6666666666666666,
+   "filled_when_empty": 0,
+   "null_when_truth": 3,
+   "precision_ed2": 0.5,
+   "pred_filled": 10,
+   "recall_ed2": 0.38461538461538464,
+   "truth_filled": 13,
+   "wrong_when_filled": 5
+  },
+  "app-qwen3-vl-8b|owner|publication_date": {
+   "docs": 12,
+   "ed2": 3,
+   "exact": 3,
+   "fill_rate": 1.0,
+   "filled_when_empty": 1,
+   "null_when_truth": 0,
+   "precision_ed2": 0.25,
+   "pred_filled": 12,
+   "recall_ed2": 0.2727272727272727,
+   "truth_filled": 11,
+   "wrong_when_filled": 9
+  },
+  "app-qwen3-vl-8b|owner|recipient_place": {
+   "docs": 13,
+   "ed2": 9,
+   "exact": 8,
+   "fill_rate": 0.9230769230769231,
+   "filled_when_empty": 1,
+   "null_when_truth": 1,
+   "precision_ed2": 0.75,
+   "pred_filled": 12,
+   "recall_ed2": 0.75,
+   "truth_filled": 12,
+   "wrong_when_filled": 3
+  },
+  "app-qwen3-vl-8b|owner|title": {
+   "docs": 9,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 9,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 9,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3.5-4b|drafted|byline": {
+   "docs": 55,
+   "ed2": 22,
+   "exact": 20,
+   "fill_rate": 0.5272727272727272,
+   "filled_when_empty": 3,
+   "null_when_truth": 17,
+   "precision_ed2": 0.7586206896551724,
+   "pred_filled": 29,
+   "recall_ed2": 0.5116279069767442,
+   "truth_filled": 43,
+   "wrong_when_filled": 7
+  },
+  "app-qwen3.5-4b|drafted|kind": {
+   "docs": 143,
+   "ed2": 119,
+   "exact": 109,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8321678321678322,
+   "pred_filled": 143,
+   "recall_ed2": 0.8321678321678322,
+   "truth_filled": 143,
+   "wrong_when_filled": 24
+  },
+  "app-qwen3.5-4b|drafted|publication": {
+   "docs": 139,
+   "ed2": 11,
+   "exact": 11,
+   "fill_rate": 0.2302158273381295,
+   "filled_when_empty": 11,
+   "null_when_truth": 11,
+   "precision_ed2": 0.34375,
+   "pred_filled": 32,
+   "recall_ed2": 0.34375,
+   "truth_filled": 32,
+   "wrong_when_filled": 21
+  },
+  "app-qwen3.5-4b|drafted|publication_date": {
+   "docs": 57,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 1.0,
+   "filled_when_empty": 24,
+   "null_when_truth": 0,
+   "precision_ed2": 0.0,
+   "pred_filled": 57,
+   "recall_ed2": 0.0,
+   "truth_filled": 33,
+   "wrong_when_filled": 57
+  },
+  "app-qwen3.5-4b|drafted|recipient_place": {
+   "docs": 78,
+   "ed2": 19,
+   "exact": 18,
+   "fill_rate": 0.5,
+   "filled_when_empty": 18,
+   "null_when_truth": 9,
+   "precision_ed2": 0.48717948717948717,
+   "pred_filled": 39,
+   "recall_ed2": 0.6333333333333333,
+   "truth_filled": 30,
+   "wrong_when_filled": 20
+  },
+  "app-qwen3.5-4b|drafted|title": {
+   "docs": 141,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 77,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 77,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3.5-4b|owner|byline": {
+   "docs": 11,
+   "ed2": 7,
+   "exact": 7,
+   "fill_rate": 0.7272727272727273,
+   "filled_when_empty": 0,
+   "null_when_truth": 3,
+   "precision_ed2": 0.875,
+   "pred_filled": 8,
+   "recall_ed2": 0.6363636363636364,
+   "truth_filled": 11,
+   "wrong_when_filled": 1
+  },
+  "app-qwen3.5-4b|owner|kind": {
+   "docs": 25,
+   "ed2": 20,
+   "exact": 16,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8,
+   "pred_filled": 25,
+   "recall_ed2": 0.8,
+   "truth_filled": 25,
+   "wrong_when_filled": 5
+  },
+  "app-qwen3.5-4b|owner|publication": {
+   "docs": 15,
+   "ed2": 5,
+   "exact": 5,
+   "fill_rate": 0.8,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 0.4166666666666667,
+   "pred_filled": 12,
+   "recall_ed2": 0.38461538461538464,
+   "truth_filled": 13,
+   "wrong_when_filled": 7
+  },
+  "app-qwen3.5-4b|owner|publication_date": {
+   "docs": 12,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 1.0,
+   "filled_when_empty": 1,
+   "null_when_truth": 0,
+   "precision_ed2": 0.0,
+   "pred_filled": 12,
+   "recall_ed2": 0.0,
+   "truth_filled": 11,
+   "wrong_when_filled": 12
+  },
+  "app-qwen3.5-4b|owner|recipient_place": {
+   "docs": 13,
+   "ed2": 8,
+   "exact": 8,
+   "fill_rate": 0.7692307692307693,
+   "filled_when_empty": 1,
+   "null_when_truth": 3,
+   "precision_ed2": 0.8,
+   "pred_filled": 10,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 12,
+   "wrong_when_filled": 2
+  },
+  "app-qwen3.5-4b|owner|title": {
+   "docs": 9,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 9,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 9,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3.6-27b|drafted|byline": {
+   "docs": 55,
+   "ed2": 25,
+   "exact": 24,
+   "fill_rate": 0.4909090909090909,
+   "filled_when_empty": 0,
+   "null_when_truth": 16,
+   "precision_ed2": 0.9259259259259259,
+   "pred_filled": 27,
+   "recall_ed2": 0.5813953488372093,
+   "truth_filled": 43,
+   "wrong_when_filled": 2
+  },
+  "app-qwen3.6-27b|drafted|kind": {
+   "docs": 143,
+   "ed2": 127,
+   "exact": 117,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8881118881118881,
+   "pred_filled": 143,
+   "recall_ed2": 0.8881118881118881,
+   "truth_filled": 143,
+   "wrong_when_filled": 16
+  },
+  "app-qwen3.6-27b|drafted|publication": {
+   "docs": 139,
+   "ed2": 19,
+   "exact": 19,
+   "fill_rate": 0.2517985611510791,
+   "filled_when_empty": 11,
+   "null_when_truth": 8,
+   "precision_ed2": 0.5428571428571428,
+   "pred_filled": 35,
+   "recall_ed2": 0.59375,
+   "truth_filled": 32,
+   "wrong_when_filled": 16
+  },
+  "app-qwen3.6-27b|drafted|publication_date": {
+   "docs": 57,
+   "ed2": 15,
+   "exact": 12,
+   "fill_rate": 1.0,
+   "filled_when_empty": 24,
+   "null_when_truth": 0,
+   "precision_ed2": 0.2631578947368421,
+   "pred_filled": 57,
+   "recall_ed2": 0.45454545454545453,
+   "truth_filled": 33,
+   "wrong_when_filled": 42
+  },
+  "app-qwen3.6-27b|drafted|recipient_place": {
+   "docs": 78,
+   "ed2": 26,
+   "exact": 24,
+   "fill_rate": 0.5897435897435898,
+   "filled_when_empty": 18,
+   "null_when_truth": 2,
+   "precision_ed2": 0.5652173913043478,
+   "pred_filled": 46,
+   "recall_ed2": 0.8666666666666667,
+   "truth_filled": 30,
+   "wrong_when_filled": 20
+  },
+  "app-qwen3.6-27b|drafted|title": {
+   "docs": 141,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 77,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 77,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3.6-27b|owner|byline": {
+   "docs": 11,
+   "ed2": 8,
+   "exact": 8,
+   "fill_rate": 0.7272727272727273,
+   "filled_when_empty": 0,
+   "null_when_truth": 3,
+   "precision_ed2": 1.0,
+   "pred_filled": 8,
+   "recall_ed2": 0.7272727272727273,
+   "truth_filled": 11,
+   "wrong_when_filled": 0
+  },
+  "app-qwen3.6-27b|owner|kind": {
+   "docs": 25,
+   "ed2": 21,
+   "exact": 18,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.84,
+   "pred_filled": 25,
+   "recall_ed2": 0.84,
+   "truth_filled": 25,
+   "wrong_when_filled": 4
+  },
+  "app-qwen3.6-27b|owner|publication": {
+   "docs": 15,
+   "ed2": 8,
+   "exact": 8,
+   "fill_rate": 0.8666666666666667,
+   "filled_when_empty": 1,
+   "null_when_truth": 1,
+   "precision_ed2": 0.6153846153846154,
+   "pred_filled": 13,
+   "recall_ed2": 0.6153846153846154,
+   "truth_filled": 13,
+   "wrong_when_filled": 5
+  },
+  "app-qwen3.6-27b|owner|publication_date": {
+   "docs": 12,
+   "ed2": 7,
+   "exact": 7,
+   "fill_rate": 1.0,
+   "filled_when_empty": 1,
+   "null_when_truth": 0,
+   "precision_ed2": 0.5833333333333334,
+   "pred_filled": 12,
+   "recall_ed2": 0.6363636363636364,
+   "truth_filled": 11,
+   "wrong_when_filled": 5
+  },
+  "app-qwen3.6-27b|owner|recipient_place": {
+   "docs": 13,
+   "ed2": 11,
+   "exact": 10,
+   "fill_rate": 0.9230769230769231,
+   "filled_when_empty": 1,
+   "null_when_truth": 1,
+   "precision_ed2": 0.9166666666666666,
+   "pred_filled": 12,
+   "recall_ed2": 0.9166666666666666,
+   "truth_filled": 12,
+   "wrong_when_filled": 1
+  },
+  "app-qwen3.6-27b|owner|title": {
+   "docs": 9,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 9,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 9,
+   "wrong_when_filled": 0
+  },
+  "draft-gemini|drafted|byline": {
+   "docs": 110,
+   "ed2": 78,
+   "exact": 78,
+   "fill_rate": 0.7090909090909091,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 1.0,
+   "pred_filled": 78,
+   "recall_ed2": 0.9873417721518988,
+   "truth_filled": 79,
+   "wrong_when_filled": 0
+  },
+  "draft-gemini|drafted|kind": {
+   "docs": 268,
+   "ed2": 262,
+   "exact": 255,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.9776119402985075,
+   "pred_filled": 268,
+   "recall_ed2": 0.9776119402985075,
+   "truth_filled": 268,
+   "wrong_when_filled": 6
+  },
+  "draft-gemini|drafted|publication": {
+   "docs": 281,
+   "ed2": 79,
+   "exact": 79,
+   "fill_rate": 0.298932384341637,
+   "filled_when_empty": 0,
+   "null_when_truth": 4,
+   "precision_ed2": 0.9404761904761905,
+   "pred_filled": 84,
+   "recall_ed2": 0.8977272727272727,
+   "truth_filled": 88,
+   "wrong_when_filled": 5
+  },
+  "draft-gemini|drafted|publication_date": {
+   "docs": 118,
+   "ed2": 84,
+   "exact": 84,
+   "fill_rate": 0.7288135593220338,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 0.9767441860465116,
+   "pred_filled": 86,
+   "recall_ed2": 0.9655172413793104,
+   "truth_filled": 87,
+   "wrong_when_filled": 2
+  },
+  "draft-gemini|drafted|recipient_place": {
+   "docs": 142,
+   "ed2": 57,
+   "exact": 55,
+   "fill_rate": 0.4014084507042254,
+   "filled_when_empty": 0,
+   "null_when_truth": 2,
+   "precision_ed2": 1.0,
+   "pred_filled": 57,
+   "recall_ed2": 0.9661016949152542,
+   "truth_filled": 59,
+   "wrong_when_filled": 0
+  },
+  "draft-gemini|drafted|title": {
+   "docs": 261,
+   "ed2": 124,
+   "exact": 124,
+   "fill_rate": 0.49808429118773945,
+   "filled_when_empty": 0,
+   "null_when_truth": 5,
+   "precision_ed2": 0.9538461538461539,
+   "pred_filled": 130,
+   "recall_ed2": 0.9185185185185185,
+   "truth_filled": 135,
+   "wrong_when_filled": 6
+  },
+  "draft-gemini|owner|byline": {
+   "docs": 15,
+   "ed2": 14,
+   "exact": 14,
+   "fill_rate": 0.9333333333333333,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 1.0,
+   "pred_filled": 14,
+   "recall_ed2": 0.9333333333333333,
+   "truth_filled": 15,
+   "wrong_when_filled": 0
+  },
+  "draft-gemini|owner|kind": {
+   "docs": 38,
+   "ed2": 32,
+   "exact": 26,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8421052631578947,
+   "pred_filled": 38,
+   "recall_ed2": 0.8421052631578947,
+   "truth_filled": 38,
+   "wrong_when_filled": 6
+  },
+  "draft-gemini|owner|publication": {
+   "docs": 24,
+   "ed2": 12,
+   "exact": 12,
+   "fill_rate": 0.7083333333333334,
+   "filled_when_empty": 0,
+   "null_when_truth": 4,
+   "precision_ed2": 0.7058823529411765,
+   "pred_filled": 17,
+   "recall_ed2": 0.5714285714285714,
+   "truth_filled": 21,
+   "wrong_when_filled": 5
+  },
+  "draft-gemini|owner|publication_date": {
+   "docs": 18,
+   "ed2": 14,
+   "exact": 14,
+   "fill_rate": 0.8888888888888888,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 0.875,
+   "pred_filled": 16,
+   "recall_ed2": 0.8235294117647058,
+   "truth_filled": 17,
+   "wrong_when_filled": 2
+  },
+  "draft-gemini|owner|recipient_place": {
+   "docs": 18,
+   "ed2": 13,
+   "exact": 11,
+   "fill_rate": 0.7222222222222222,
+   "filled_when_empty": 0,
+   "null_when_truth": 2,
+   "precision_ed2": 1.0,
+   "pred_filled": 13,
+   "recall_ed2": 0.8666666666666667,
+   "truth_filled": 15,
+   "wrong_when_filled": 0
+  },
+  "draft-gemini|owner|title": {
+   "docs": 23,
+   "ed2": 9,
+   "exact": 9,
+   "fill_rate": 0.6521739130434783,
+   "filled_when_empty": 0,
+   "null_when_truth": 5,
+   "precision_ed2": 0.6,
+   "pred_filled": 15,
+   "recall_ed2": 0.45,
+   "truth_filled": 20,
+   "wrong_when_filled": 6
+  },
+  "draft-luna|drafted|byline": {
+   "docs": 110,
+   "ed2": 73,
+   "exact": 72,
+   "fill_rate": 0.6818181818181818,
+   "filled_when_empty": 0,
+   "null_when_truth": 4,
+   "precision_ed2": 0.9733333333333334,
+   "pred_filled": 75,
+   "recall_ed2": 0.9240506329113924,
+   "truth_filled": 79,
+   "wrong_when_filled": 2
+  },
+  "draft-luna|drafted|kind": {
+   "docs": 268,
+   "ed2": 261,
+   "exact": 258,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.9738805970149254,
+   "pred_filled": 268,
+   "recall_ed2": 0.9738805970149254,
+   "truth_filled": 268,
+   "wrong_when_filled": 7
+  },
+  "draft-luna|drafted|publication": {
+   "docs": 281,
+   "ed2": 81,
+   "exact": 81,
+   "fill_rate": 0.30604982206405695,
+   "filled_when_empty": 1,
+   "null_when_truth": 3,
+   "precision_ed2": 0.9418604651162791,
+   "pred_filled": 86,
+   "recall_ed2": 0.9204545454545454,
+   "truth_filled": 88,
+   "wrong_when_filled": 5
+  },
+  "draft-luna|drafted|publication_date": {
+   "docs": 118,
+   "ed2": 77,
+   "exact": 77,
+   "fill_rate": 0.6610169491525424,
+   "filled_when_empty": 0,
+   "null_when_truth": 9,
+   "precision_ed2": 0.9871794871794872,
+   "pred_filled": 78,
+   "recall_ed2": 0.8850574712643678,
+   "truth_filled": 87,
+   "wrong_when_filled": 1
+  },
+  "draft-luna|drafted|recipient_place": {
+   "docs": 142,
+   "ed2": 58,
+   "exact": 54,
+   "fill_rate": 0.4225352112676056,
+   "filled_when_empty": 2,
+   "null_when_truth": 1,
+   "precision_ed2": 0.9666666666666667,
+   "pred_filled": 60,
+   "recall_ed2": 0.9830508474576272,
+   "truth_filled": 59,
+   "wrong_when_filled": 2
+  },
+  "draft-luna|drafted|title": {
+   "docs": 261,
+   "ed2": 125,
+   "exact": 123,
+   "fill_rate": 0.5134099616858238,
+   "filled_when_empty": 1,
+   "null_when_truth": 2,
+   "precision_ed2": 0.9328358208955224,
+   "pred_filled": 134,
+   "recall_ed2": 0.9259259259259259,
+   "truth_filled": 135,
+   "wrong_when_filled": 9
+  },
+  "draft-luna|owner|byline": {
+   "docs": 15,
+   "ed2": 9,
+   "exact": 9,
+   "fill_rate": 0.7333333333333333,
+   "filled_when_empty": 0,
+   "null_when_truth": 4,
+   "precision_ed2": 0.8181818181818182,
+   "pred_filled": 11,
+   "recall_ed2": 0.6,
+   "truth_filled": 15,
+   "wrong_when_filled": 2
+  },
+  "draft-luna|owner|kind": {
+   "docs": 38,
+   "ed2": 31,
+   "exact": 29,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8157894736842105,
+   "pred_filled": 38,
+   "recall_ed2": 0.8157894736842105,
+   "truth_filled": 38,
+   "wrong_when_filled": 7
+  },
+  "draft-luna|owner|publication": {
+   "docs": 24,
+   "ed2": 14,
+   "exact": 14,
+   "fill_rate": 0.7916666666666666,
+   "filled_when_empty": 1,
+   "null_when_truth": 3,
+   "precision_ed2": 0.7368421052631579,
+   "pred_filled": 19,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 21,
+   "wrong_when_filled": 5
+  },
+  "draft-luna|owner|publication_date": {
+   "docs": 18,
+   "ed2": 7,
+   "exact": 7,
+   "fill_rate": 0.4444444444444444,
+   "filled_when_empty": 0,
+   "null_when_truth": 9,
+   "precision_ed2": 0.875,
+   "pred_filled": 8,
+   "recall_ed2": 0.4117647058823529,
+   "truth_filled": 17,
+   "wrong_when_filled": 1
+  },
+  "draft-luna|owner|recipient_place": {
+   "docs": 18,
+   "ed2": 14,
+   "exact": 11,
+   "fill_rate": 0.8888888888888888,
+   "filled_when_empty": 2,
+   "null_when_truth": 1,
+   "precision_ed2": 0.875,
+   "pred_filled": 16,
+   "recall_ed2": 0.9333333333333333,
+   "truth_filled": 15,
+   "wrong_when_filled": 2
+  },
+  "draft-luna|owner|title": {
+   "docs": 23,
+   "ed2": 10,
+   "exact": 10,
+   "fill_rate": 0.8260869565217391,
+   "filled_when_empty": 1,
+   "null_when_truth": 2,
+   "precision_ed2": 0.5263157894736842,
+   "pred_filled": 19,
+   "recall_ed2": 0.5,
+   "truth_filled": 20,
+   "wrong_when_filled": 9
+  },
+  "extractor|drafted|byline": {
+   "docs": 63,
+   "ed2": 24,
+   "exact": 23,
+   "fill_rate": 0.5873015873015873,
+   "filled_when_empty": 5,
+   "null_when_truth": 13,
+   "precision_ed2": 0.6486486486486487,
+   "pred_filled": 37,
+   "recall_ed2": 0.5333333333333333,
+   "truth_filled": 45,
+   "wrong_when_filled": 13
+  },
+  "extractor|drafted|kind": {
+   "docs": 212,
+   "ed2": 161,
+   "exact": 149,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.7594339622641509,
+   "pred_filled": 212,
+   "recall_ed2": 0.7594339622641509,
+   "truth_filled": 212,
+   "wrong_when_filled": 51
+  },
+  "extractor|drafted|publication": {
+   "docs": 206,
+   "ed2": 10,
+   "exact": 10,
+   "fill_rate": 0.1796116504854369,
+   "filled_when_empty": 15,
+   "null_when_truth": 17,
+   "precision_ed2": 0.2702702702702703,
+   "pred_filled": 37,
+   "recall_ed2": 0.2564102564102564,
+   "truth_filled": 39,
+   "wrong_when_filled": 27
+  },
+  "extractor|drafted|publication_date": {
+   "docs": 65,
+   "ed2": 12,
+   "exact": 12,
+   "fill_rate": 0.2923076923076923,
+   "filled_when_empty": 5,
+   "null_when_truth": 28,
+   "precision_ed2": 0.631578947368421,
+   "pred_filled": 19,
+   "recall_ed2": 0.2857142857142857,
+   "truth_filled": 42,
+   "wrong_when_filled": 7
+  },
+  "extractor|drafted|recipient_place": {
+   "docs": 131,
+   "ed2": 42,
+   "exact": 38,
+   "fill_rate": 0.7862595419847328,
+   "filled_when_empty": 50,
+   "null_when_truth": 4,
+   "precision_ed2": 0.4077669902912621,
+   "pred_filled": 103,
+   "recall_ed2": 0.7368421052631579,
+   "truth_filled": 57,
+   "wrong_when_filled": 61
+  },
+  "extractor|drafted|title": {
+   "docs": 208,
+   "ed2": 47,
+   "exact": 43,
+   "fill_rate": 0.4951923076923077,
+   "filled_when_empty": 20,
+   "null_when_truth": 13,
+   "precision_ed2": 0.4563106796116505,
+   "pred_filled": 103,
+   "recall_ed2": 0.4895833333333333,
+   "truth_filled": 96,
+   "wrong_when_filled": 56
+  },
+  "extractor|owner|byline": {
+   "docs": 10,
+   "ed2": 6,
+   "exact": 6,
+   "fill_rate": 0.7,
+   "filled_when_empty": 0,
+   "null_when_truth": 3,
+   "precision_ed2": 0.8571428571428571,
+   "pred_filled": 7,
+   "recall_ed2": 0.6,
+   "truth_filled": 10,
+   "wrong_when_filled": 1
+  },
+  "extractor|owner|kind": {
+   "docs": 29,
+   "ed2": 19,
+   "exact": 16,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.6551724137931034,
+   "pred_filled": 29,
+   "recall_ed2": 0.6551724137931034,
+   "truth_filled": 29,
+   "wrong_when_filled": 10
+  },
+  "extractor|owner|publication": {
+   "docs": 15,
+   "ed2": 3,
+   "exact": 3,
+   "fill_rate": 0.7333333333333333,
+   "filled_when_empty": 1,
+   "null_when_truth": 3,
+   "precision_ed2": 0.2727272727272727,
+   "pred_filled": 11,
+   "recall_ed2": 0.23076923076923078,
+   "truth_filled": 13,
+   "wrong_when_filled": 8
+  },
+  "extractor|owner|publication_date": {
+   "docs": 12,
+   "ed2": 5,
+   "exact": 5,
+   "fill_rate": 0.5833333333333334,
+   "filled_when_empty": 1,
+   "null_when_truth": 5,
+   "precision_ed2": 0.7142857142857143,
+   "pred_filled": 7,
+   "recall_ed2": 0.45454545454545453,
+   "truth_filled": 11,
+   "wrong_when_filled": 2
+  },
+  "extractor|owner|recipient_place": {
+   "docs": 13,
+   "ed2": 7,
+   "exact": 6,
+   "fill_rate": 0.9230769230769231,
+   "filled_when_empty": 1,
+   "null_when_truth": 1,
+   "precision_ed2": 0.5833333333333334,
+   "pred_filled": 12,
+   "recall_ed2": 0.5833333333333334,
+   "truth_filled": 12,
+   "wrong_when_filled": 5
+  },
+  "extractor|owner|title": {
+   "docs": 13,
+   "ed2": 1,
+   "exact": 1,
+   "fill_rate": 0.8461538461538461,
+   "filled_when_empty": 1,
+   "null_when_truth": 2,
+   "precision_ed2": 0.09090909090909091,
+   "pred_filled": 11,
+   "recall_ed2": 0.08333333333333333,
+   "truth_filled": 12,
+   "wrong_when_filled": 10
+  },
+  "tagging|drafted|byline": {
+   "docs": 110,
+   "ed2": 60,
+   "exact": 60,
+   "fill_rate": 0.6090909090909091,
+   "filled_when_empty": 1,
+   "null_when_truth": 13,
+   "precision_ed2": 0.8955223880597015,
+   "pred_filled": 67,
+   "recall_ed2": 0.759493670886076,
+   "truth_filled": 79,
+   "wrong_when_filled": 7
+  },
+  "tagging|drafted|kind": {
+   "docs": 268,
+   "ed2": 248,
+   "exact": 228,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.9253731343283582,
+   "pred_filled": 268,
+   "recall_ed2": 0.9253731343283582,
+   "truth_filled": 268,
+   "wrong_when_filled": 20
+  },
+  "tagging|drafted|publication": {
+   "docs": 281,
+   "ed2": 62,
+   "exact": 61,
+   "fill_rate": 0.2704626334519573,
+   "filled_when_empty": 9,
+   "null_when_truth": 21,
+   "precision_ed2": 0.8157894736842105,
+   "pred_filled": 76,
+   "recall_ed2": 0.7045454545454546,
+   "truth_filled": 88,
+   "wrong_when_filled": 14
+  },
+  "tagging|drafted|publication_date": {
+   "docs": 118,
+   "ed2": 58,
+   "exact": 55,
+   "fill_rate": 1.0,
+   "filled_when_empty": 31,
+   "null_when_truth": 0,
+   "precision_ed2": 0.4915254237288136,
+   "pred_filled": 118,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 87,
+   "wrong_when_filled": 60
+  },
+  "tagging|drafted|recipient_place": {
+   "docs": 142,
+   "ed2": 54,
+   "exact": 36,
+   "fill_rate": 0.5211267605633803,
+   "filled_when_empty": 19,
+   "null_when_truth": 4,
+   "precision_ed2": 0.7297297297297297,
+   "pred_filled": 74,
+   "recall_ed2": 0.9152542372881356,
+   "truth_filled": 59,
+   "wrong_when_filled": 20
+  },
+  "tagging|drafted|title": {
+   "docs": 261,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 135,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 135,
+   "wrong_when_filled": 0
+  },
+  "tagging|owner|byline": {
+   "docs": 15,
+   "ed2": 10,
+   "exact": 10,
+   "fill_rate": 0.6666666666666666,
+   "filled_when_empty": 0,
+   "null_when_truth": 5,
+   "precision_ed2": 1.0,
+   "pred_filled": 10,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 15,
+   "wrong_when_filled": 0
+  },
+  "tagging|owner|kind": {
+   "docs": 38,
+   "ed2": 29,
+   "exact": 22,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.7631578947368421,
+   "pred_filled": 38,
+   "recall_ed2": 0.7631578947368421,
+   "truth_filled": 38,
+   "wrong_when_filled": 9
+  },
+  "tagging|owner|publication": {
+   "docs": 24,
+   "ed2": 15,
+   "exact": 15,
+   "fill_rate": 0.75,
+   "filled_when_empty": 0,
+   "null_when_truth": 3,
+   "precision_ed2": 0.8333333333333334,
+   "pred_filled": 18,
+   "recall_ed2": 0.7142857142857143,
+   "truth_filled": 21,
+   "wrong_when_filled": 3
+  },
+  "tagging|owner|publication_date": {
+   "docs": 18,
+   "ed2": 11,
+   "exact": 11,
+   "fill_rate": 1.0,
+   "filled_when_empty": 1,
+   "null_when_truth": 0,
+   "precision_ed2": 0.6111111111111112,
+   "pred_filled": 18,
+   "recall_ed2": 0.6470588235294118,
+   "truth_filled": 17,
+   "wrong_when_filled": 7
+  },
+  "tagging|owner|recipient_place": {
+   "docs": 18,
+   "ed2": 11,
+   "exact": 6,
+   "fill_rate": 0.7222222222222222,
+   "filled_when_empty": 1,
+   "null_when_truth": 3,
+   "precision_ed2": 0.8461538461538461,
+   "pred_filled": 13,
+   "recall_ed2": 0.7333333333333333,
+   "truth_filled": 15,
+   "wrong_when_filled": 2
+  },
+  "tagging|owner|title": {
+   "docs": 23,
+   "ed2": 0,
+   "exact": 0,
+   "fill_rate": 0.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 20,
+   "precision_ed2": null,
+   "pred_filled": 0,
+   "recall_ed2": 0.0,
+   "truth_filled": 20,
+   "wrong_when_filled": 0
+  }
+ },
+ "sheet": {
+  "disputes": {
+   "byline": {
+    "answered": 6,
+    "asked": 9,
+    "judge right": 5,
+    "owner gemini": 5,
+    "owner luna": 1,
+    "self-ruled": 6,
+    "self-ruled right": 5
+   },
+   "kind": {
+    "answered": 19,
+    "asked": 20,
+    "judge right": 10,
+    "owner gemini": 8,
+    "owner luna": 11,
+    "self-ruled": 11,
+    "self-ruled right": 5
+   },
+   "publication": {
+    "answered": 12,
+    "asked": 12,
+    "judge right": 6,
+    "owner gemini": 4,
+    "owner luna": 7,
+    "owner neither": 1,
+    "self-ruled": 7,
+    "self-ruled right": 3
+   },
+   "publication_date": {
+    "answered": 8,
+    "asked": 8,
+    "judge right": 6,
+    "owner gemini": 6,
+    "owner luna": 1,
+    "owner neither": 1,
+    "self-ruled": 8,
+    "self-ruled right": 6
+   },
+   "recipient_place": {
+    "answered": 11,
+    "asked": 12,
+    "judge right": 8,
+    "owner gemini": 7,
+    "owner luna": 4,
+    "self-ruled": 6,
+    "self-ruled right": 5
+   },
+   "title": {
+    "answered": 18,
+    "asked": 20,
+    "judge right": 8,
+    "owner gemini": 9,
+    "owner luna": 8,
+    "owner neither": 1,
+    "self-ruled": 14,
+    "self-ruled right": 6
+   }
+  },
+  "entity": {
+   "answered": 17,
+   "luna's reading": 14,
+   "open": 6,
+   "recipient: luna's reading": 2,
+   "recipient: owner says none is given": 1,
+   "recipient: truth upheld": 2,
+   "sender: luna's reading": 1,
+   "sender: truth upheld": 1,
+   "sending_place: luna's reading": 11,
+   "sending_place: owner says none is given": 9,
+   "truth upheld": 3
+  },
+  "g38_controls": [
+   0,
+   29
+  ],
+  "kind_crossings": {
+   "answered": 11,
+   "of": 16,
+   "truth_exact": 5,
+   "truth_loose": 7
+  }
+ },
+ "sideways": {
+  "app-gemini-3.8-flash": [
+   1,
+   2
+  ],
+  "app-qwen3-vl-8b": [
+   1,
+   3
+  ],
+  "app-qwen3.5-4b": [
+   1,
+   3
+  ],
+  "app-qwen3.6-27b": [
+   1,
+   2
+  ],
+  "draft-gemini": [
+   5,
+   5
+  ],
+  "draft-luna": [
+   5,
+   5
+  ],
+  "extractor": [
+   2,
+   8
+  ],
+  "tagging": [
+   4,
+   6
+  ]
+ },
+ "tags": {
+  "app-gemini-3.8-flash": {
+   "docs": 48,
+   "filled": 48,
+   "right": 26
+  },
+  "app-qwen3-vl-8b": {
+   "docs": 48,
+   "filled": 48,
+   "right": 14
+  },
+  "app-qwen3.5-4b": {
+   "docs": 48,
+   "filled": 48,
+   "right": 12
+  },
+  "app-qwen3.6-27b": {
+   "docs": 48,
+   "filled": 48,
+   "right": 22
+  },
+  "draft-gemini": {
+   "docs": 109,
+   "filled": 85,
+   "right": 73
+  },
+  "draft-luna": {
+   "docs": 109,
+   "filled": 76,
+   "right": 64
+  },
+  "extractor": {
+   "docs": 57,
+   "filled": 17,
+   "right": 13
+  },
+  "tagging": {
+   "docs": 109,
+   "filled": 109,
+   "right": 67
+  }
+ },
+ "truth_error": {
+  "answered": 17,
+  "by_filled": {
+   "empty": [
+    1,
+    7
+   ],
+   "with a value": [
+    0,
+    10
+   ]
+  },
+  "by_part": {
+   "base": [
+    1,
+    6
+   ],
+   "clippings": [
+    0,
+    6
+   ],
+   "handwritten": [
+    0,
+    5
+   ]
+  },
+  "open": 3,
+  "share": 0.058823529411764705,
+  "weighted": 0.03615196078431373,
+  "wilson": [
+   0.01046013064516424,
+   0.269825452035628
+  ],
+  "wrong": 1,
+  "wrong_fields": [
+   "base publication_date"
+  ]
+ },
+ "verdicts": {
+  "app-gemini-3.8-flash|byline": "too close (n 5)",
+  "app-gemini-3.8-flash|kind": "too close (n 19)",
+  "app-gemini-3.8-flash|publication": "too close (n 7)",
+  "app-gemini-3.8-flash|publication_date": "below the bar",
+  "app-gemini-3.8-flash|recipient_place": "too close (n 6)",
+  "app-gemini-3.8-flash|title": "never filled",
+  "app-qwen3-vl-8b|byline": "too close",
+  "app-qwen3-vl-8b|kind": "too close",
+  "app-qwen3-vl-8b|publication": "too close (n 32)",
+  "app-qwen3-vl-8b|publication_date": "below the bar",
+  "app-qwen3-vl-8b|recipient_place": "too close (n 30)",
+  "app-qwen3-vl-8b|title": "never filled",
+  "app-qwen3.5-4b|byline": "too close",
+  "app-qwen3.5-4b|kind": "too close",
+  "app-qwen3.5-4b|publication": "below the bar",
+  "app-qwen3.5-4b|publication_date": "below the bar",
+  "app-qwen3.5-4b|recipient_place": "too close (n 30)",
+  "app-qwen3.5-4b|title": "never filled",
+  "app-qwen3.6-27b|byline": "too close",
+  "app-qwen3.6-27b|kind": "too close",
+  "app-qwen3.6-27b|publication": "too close (n 32)",
+  "app-qwen3.6-27b|publication_date": "below the bar",
+  "app-qwen3.6-27b|recipient_place": "too close (n 30)",
+  "app-qwen3.6-27b|title": "never filled",
+  "draft-gemini|byline": "too close (n 15)",
+  "draft-gemini|kind": "too close (n 38)",
+  "draft-gemini|publication": "too close (n 21)",
+  "draft-gemini|publication_date": "too close (n 17)",
+  "draft-gemini|recipient_place": "too close (n 15)",
+  "draft-gemini|title": "too close (n 20)",
+  "draft-luna|byline": "too close (n 15)",
+  "draft-luna|kind": "too close (n 38)",
+  "draft-luna|publication": "too close (n 21)",
+  "draft-luna|publication_date": "too close (n 17)",
+  "draft-luna|recipient_place": "too close (n 15)",
+  "draft-luna|title": "too close (n 20)",
+  "extractor|byline": "too close",
+  "extractor|kind": "too close",
+  "extractor|publication": "below the bar",
+  "extractor|publication_date": "too close",
+  "extractor|recipient_place": "below the bar",
+  "extractor|title": "below the bar",
+  "tagging|byline": "too close (n 15)",
+  "tagging|kind": "too close (n 38)",
+  "tagging|publication": "too close (n 21)",
+  "tagging|publication_date": "below the bar",
+  "tagging|recipient_place": "too close (n 15)",
+  "tagging|title": "never filled"
+ }
+}

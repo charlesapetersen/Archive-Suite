@@ -228,11 +228,22 @@ def date_match(pred, truth, level):
     return all(pred[i] == truth[i] for i in range(n))
 
 
+# The app's bare "article" says a printed piece without saying which kind of periodical (FLD-2, measurement audit
+# 2026-10-30). It used to map to "clipping" and so to newspaperArticle, which marked it wrong on every magazine or
+# journal piece. It is its own kind now: never right at the exact level, right at the loose level on any of these.
+ARTICLE = "article"
+ARTICLE_KINDS = {"newspaper article", "magazine article", "journal article", "newsletter", "clipping"}
+
+
 def kind_match(pred, truth, level):
-    """exact: the fine kind; ed2 (the loose level): the same Zotero item type."""
+    """exact: the fine kind; ed2 (the loose level): the same Zotero item type ("article": any printed article)."""
     if not pred or not truth:
         return False
-    return pred == truth if level == "exact" else ZOTERO.get(pred) == ZOTERO.get(truth)
+    if level == "exact":
+        return pred == truth
+    if ARTICLE in (pred, truth):
+        return (truth if pred == ARTICLE else pred) in ARTICLE_KINDS
+    return ZOTERO.get(pred) == ZOTERO.get(truth)
 
 
 def field_match(field, pred, truth, level):
@@ -276,7 +287,7 @@ def app_kind(fmt):
     table = [("telegram", "telegram"), ("memo", "memo"), ("newsletter", "newsletter"), ("letter", "letter"),
              ("newspaper", "newspaper article"), ("magazine", "magazine article"), ("journal", "journal article"),
              ("clipping", "clipping"), ("report", "report"), ("speech", "speech"), ("press release", "press release"),
-             ("photo", "photograph"), ("article", "clipping")]
+             ("photo", "photograph"), ("article", ARTICLE)]
     for cue, k in table:
         if cue in f:
             return k

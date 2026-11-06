@@ -14478,3 +14478,30 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 - [x] **`W46.mixed-route-paid` — Gemini on mixed pages, whole and by region [S]** · §Document processing review — W46 (owner, 2026-10-20) · RETIRED 2026-11-05 by the owner in the walkthrough, not run, $0 (lane: segbench) (uses: light,paid) (blocked-on: W46.mixed-route, W46.gateway-models-ok, W46.mixed-route-paid-owner-ok) — The gateway arm of W46.mixed-route, about $1.70. detail: execution-plans/processing-review/10-gap-audit.md §5 item 25 — **Measurement review pass 10 (2026-11-05, P10-3, `execution-plans/processing-review/measure-reviews/2026-11-05-2.md`):** Gemini 3.7 Flash drafted 20 of the 35 mark texts W46.mixed-route scores verbatim (Qwen3-VL 8B 4, the owner edited 11), so a Gemini marks arm would be scored mostly on its own text, the reason W46.marks-detect-paid was retired; its region and body arms have no truth on these pages (the body cost of region routing is W46.ocr-regions' and W46.layout-photo's, on the 96). Waits on the owner's call, `W46.mixed-route-paid-owner-ok`: retire it (recommended), or keep it with its marks arm scored only on the 11 owner-edited texts, labelled too few to rank.
   Retired: W46.mixed-route-paid-owner-ok answered: retire. 3.7 drafted 20 of the 35 mark texts (P10-3), and the region and body arms have no truth on these pages; W46.mixed-route's Sherlock readers decide the route.
   <!-- /W46.mixed-route-paid -->
+- [x] **W47.item-fields-retruth-score — fold the item-field sheet, score every route, the verdict [S]** · §Archival containers — W47 (lane: segbench) (uses: light) — SHIPPED 2026-11-05. Owner, 2026-10-30 (measurement audit FLD-1/2/6/7/8); measurement review pass 10, P10-1.
+  Result: `ArchiveProcessor/scripts/segbench/item_fields_score.py` (tests `test_item_fields_score.py`, 13) →
+  `ArchiveProcessor/segbench-results/item-fields-score.md`/`.json`. Offline, $0. The fold: 147 of 174 questions
+  answered; all 63 notes read before scoring and turned into `item-fields-retruth/sheet/note-fixes.json` (13 values
+  set, 11 fields dropped as unsettled: two pieces in one document, a name only inference gives, a value the owner
+  questions); a kind the owner moved across the correspondence line leaves the newly allowed printed-piece fields
+  unknown unless a note gives them, and an "ignore" dispute counts once his kind brings its field in scope. The
+  truth's error from the random controls: 1 of 17 wrong (0.06 [0.01, 0.27], 0.04 weighted; the one an agreed-empty
+  report date a note supplied), 3 open; Gemini 3.8's false credit 0 of 29. The judge (Gemini 3.7) was upheld on 43
+  of 74 answered disputes, its self-rulings on 30 of 52. Kind mapping fixed first (FLD-2): the app's bare "article"
+  is its own kind, right at the Zotero level on any periodical piece, never exactly (`item_fields.kind_match`).
+  Verdict: no field clears the rule (Wilson lower bound 0.85, point 0.90, 40 with a true value) for any route;
+  owner-checked n is 14-21 with a true value (kind 38), so the Gemini and Luna rows are "too close (n)", and a
+  drafter-family row is "below the bar" only when its agreement with the drafted truth is too (its owner-checked
+  pairs lean to the hard cases). Image prompt (Gemini 3.7 on the page images, the test moved from
+  W47.item-fields-build) owner-checked: kind 0.84, title 0.60, byline 14/14, publication 0.71, publication date
+  0.88, recipient place 13/13; the app's call on Vision text never gives a title and is below the bar on
+  publication date (0.61 against the owner's year/month tags, FLD-6; the image prompt 0.86 there). Five documents
+  with sideways pages scored apart. Entity controls: the owner upheld 3 of 17 of Sonnet's W46.fix-ent-truth
+  self-rulings, sending place 0 of 11 → filed W46.ent-truth-owner-fold. Filed W47.item-fields-more-checks (a random
+  draw of the image prompt's filled values for the owner, to reach the floor) and put W47.item-fields-build behind
+  it. Notes asking whether the date, sender or recipient were read (32) are answered one by one in the cache's
+  `item-fields-retruth/note-answers.md` from the entity truth, the owner's date tags and the app's call. Bench
+  cache: kept `item-fields-retruth/` whole (truth-owner.jsonl, note-fixes.json and note-answers.md are new; the
+  next item scores from them); nothing rebuildable made. The OCR bench page is not touched: item fields are not an
+  OCR or segmentation result.
+  <!-- /W47.item-fields-retruth-score -->
