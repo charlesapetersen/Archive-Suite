@@ -334,6 +334,23 @@ fallback that still narrows the search (the line, or how far through the page it
 A box never reveals which reading is the current truth. The pattern is W46's blind sheet
 (`ArchiveProcessor/scripts/segbench/ocr_truth_bias.py`, commit 938bdccf).
 
+**Every owner sheet has notes, shows what it does not ask, and shows pages upright (owner, 2026-11-05).** Any sheet
+the owner answers (truth checks, rulings, label or field disputes) has three things, built in before it is offered:
+- **A notes box per item** (a photo, a page, a document), optional, saved in the answers file beside the answers under
+  its own key (`_notes` or `_notes/<id>`). Typing in it never triggers the sheet's answer keys. The fold carries each
+  note on its truth row, and the session that scores reads the notes first, since a note can correct what was not
+  asked or say an item should be dropped.
+- **The fields it does not ask**, listed on each item with the value going into the truth (agreed by the readers, or
+  ruled by a reader), so the owner can correct one in the notes. The header says that unasked fields go in as listed.
+- **Pages and photos upright.** Matching a JPEG to its PDF page's orientation does not make it upright. Check each
+  image with `segbench/ocr_orient.swift` (Apple Vision at all four turns), turn only clear wins, check close calls
+  by eye, and give every image a "turn" button that turns its boxes with it. The sheet says which pages it turned.
+  The pattern is `item_fields_retruth.py`'s sheet (a51cc0ef), with `ct_truth.py`'s notes (9c5d42d9).
+
+It was written after the label sheet (W47.ct-truth-jpeg) showed 36 photos turned and left the owner asking whether
+fields it did not ask were checked at all; once it had a notes box, he left notes on 127 photos. The item-field sheet had the
+same three gaps until it was fixed the same day.
+
 **ArchiveOCRBench stays current (owner, 2026-10-15).** `ArchiveOCRBench/` is the readable record of what the
 bench has measured. A change that commits a measured OCR or segmentation result updates it in the same commit.
 That covers a new or rerun panel, a new route or model, a measured price, speed or memory figure, a segmentation
