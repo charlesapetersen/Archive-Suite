@@ -673,7 +673,8 @@ final class ViewerUITests: FixtureUITestCase {
     /// unit test has. `DocumentFindTests` covers the model half (`supportsFind`, and find inert without it).
     ///
     /// Three states, because no one of them means anything alone:
-    ///  1. From the LIST — disabled. There is no viewer at all; the floor.
+    ///  1. From the LIST — Find Next / Previous disabled: there is no viewer at all, the floor. Find… is
+    ///     enabled there since W40.fix-suite-shortcuts, as Search OCR Text.
     ///  2. In the DOCUMENT WINDOW — enabled. The control that matters: a `supportsFind` wired wrong (or a
     ///     gate that reads false everywhere) would kill find in the one place it works, and every other
     ///     assertion here would still pass.
@@ -686,8 +687,12 @@ final class ViewerUITests: FixtureUITestCase {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)
 
-        // (1) The floor: no viewer published, nothing to find in.
-        for title in findItems {
+        // (1) The floor: no viewer published, nothing to step through. Find… itself is live here since
+        // W40.fix-suite-shortcuts: in the navigation window it goes to Search OCR Text, as ⌥⌘F does.
+        XCTAssertTrue(documentMenuItem("Find…").isEnabled,
+                      "from the list, Find… searches the library (W40.fix-suite-shortcuts)")
+        closeMenu()
+        for title in ["Find Next", "Find Previous"] {
             XCTAssertFalse(documentMenuItem(title).isEnabled,
                            "precondition: from the list alone, \(title) has no viewer")
             closeMenu()
