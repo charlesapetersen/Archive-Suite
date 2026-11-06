@@ -128,9 +128,12 @@ final class NavigationUITests: FixtureUITestCase {
         let all = tagCount()
         XCTAssertGreaterThan(all, 0, "Tag cloud should show tags when open")
 
-        let control = app.descendants(matching: .any)["ar.tagCloud.minCount"]
-        XCTAssertTrue(control.waitForExistence(timeout: 3), "the minimum-count control should be in the panel")
-        let stepper = control.elementType == .stepper ? control : control.steppers.firstMatch
+        // The panel's `ar.tagCloud` identifier covers its children, so the stepper is found by its label.
+        let stepper = app.steppers["Minimum files per tag"]
+        if !stepper.waitForExistence(timeout: 3) {
+            print("[tagcloud-tree] \(app.windows.firstMatch.debugDescription)")
+        }
+        XCTAssertTrue(stepper.exists, "the minimum-count control should be in the panel")
         let increment = stepper.incrementArrows.firstMatch
         XCTAssertTrue(increment.waitForExistence(timeout: 3), "the control should have an increment arrow")
 

@@ -329,19 +329,18 @@ struct NavigationWindowView: View {
                 Spacer()
                 Text(cloud.count == allTags.count ? "\(cloud.count)" : "\(cloud.count) of \(allTags.count)")
                     .foregroundStyle(.primary).font(.caption)
-                    .accessibilityIdentifier("ar.tagCloud.count")
             }
             .padding([.horizontal, .top], 10)
-            // Hides the tags used on fewer than N of the visible files; remembered between launches.
+            // Hides the tags used on fewer than N of the visible files; remembered between launches. The panel's
+            // `ar.tagCloud` identifier covers it, so UI tests find it by its label.
             Stepper(value: $tagCloudMinCount, in: 1...999) {
                 Text(tagCloudMinCount == 1 ? "Showing every tag" : "On at least \(tagCloudMinCount) files")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
             }
             .controlSize(.small)
             .help("Hide the tags used on fewer files than this")
             .accessibilityLabel("Minimum files per tag")
             .accessibilityValue("\(tagCloudMinCount)")
-            .accessibilityIdentifier("ar.tagCloud.minCount")
             .padding(.horizontal, 10).padding(.vertical, 6)
             Divider()
             if cloud.isEmpty {
