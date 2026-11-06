@@ -93,6 +93,7 @@ CONTROLS = 20     # unanimous fields put on the sheet unmarked: half with a valu
 
 FIELDS = ["repository", "place", "collection_title", "collection_number", "accession", "series", "container",
           "folder", "folder_title"]
+FIELDS_FIRST = FIELDS   # the first build's nine; the revision's are FIELDS_REV
 LABELS = {"repository": "Repository", "place": "Place", "collection_title": "Collection title",
           "collection_number": "Collection number", "accession": "Accession", "series": "Series",
           "container": "Container (box, carton…)", "folder": "Folder number", "folder_title": "Folder title",
@@ -114,6 +115,75 @@ PROMPT = (
     " \"folder\": the folder number, e.g. \"8\",\n"
     " \"folder_title\": the folder's title, e.g. \"Reports 1959-1960\",\n"
     " \"label_box\": [x1, y1, x2, y2] the label's region on a 0-1000 scale, or null}")
+
+# --- the revision (W47.ct-truth-revise, from the owner's sheet notes of 2026-11-05) ------------------------------
+# `ct_truth.py --rev <command>` runs render, lines, collect, gateway and the rest on rev2/ with these fields and this
+# prompt; without --rev every command is the first build's, unchanged, so its sheet and fold stay reproducible.
+
+REV = os.path.join(POOL, "rev2")
+REV_RESULTS = os.path.join(HERE, "..", "..", "segbench-results", "ct-truth-revised.md")
+NOTE_RULINGS = os.path.join(REV, "note-rulings.json")   # the owner's notes, transcribed per field (private)
+OWNER_ANSWERS = os.path.join(POOL, "answers-owner-20261105.json")
+REV_CAP = 2.00   # the item's whole gateway spend, the upright check and the readers together; under the $7 rule
+FIELDS_REV = ["repository", "place", "collection_title", "collection_subtitle", "collection_number", "accession",
+              "series", "series_title", "container", "box_title", "folder", "folder_title", "date", "other"]
+LABELS.update({"collection_subtitle": "Collection subtitle", "series_title": "Series title",
+               "box_title": "Box title", "date": "Date or time period", "other": "Other identifying marks",
+               "_turn": "Which way up is this photo now?"})
+NEW_FIELDS = [f for f in FIELDS_REV if f not in FIELDS]
+# The photos the owner took out (his notes, 2026-11-05): early photos taken a different way, and the exceptions.
+DROPPED = {**{k: "early photo, taken a different way" for k in (
+    "a3abdc5d5a8c", "825962d17684", "576eaf2d9cd9", "47bba9e86c7a", "55e90dfd2101", "6b6d21a17459",
+    "325e0792e894", "49ccbdf39b1f")},
+    "60502414e3e2": "request slip", "b99aad847c3e": "volume spine", "337fb83b2842": "volume spine",
+    "791a6ebe670b": "a loose folder standing for its box", "42fda0c32ccd": "temporary box",
+    "8fd31a6cac1f": "\"No Folder\" sheet", "dc8d80b17987": "\"No Folder\" sheet",
+    "f1573d9c08ba": "\"don't train on this\"", "96ef09b20998": "\"don't train on this\"",
+    "3a0193ec9415": "\"don't train on this\""}
+
+PROMPT_REV = (
+    "This photo was taken in an archive reading room. It may show a box label, a folder label or tab, a divider "
+    "sheet, or a page of a document. Read what is written on the label, if there is one, into these fields. Copy "
+    "only what is written: never infer or fill in anything, such as a repository or a place the label does not "
+    "name. Use null for anything not written there. Rules:\n"
+    "- series: only when the label says \"Series\" (e.g. \"Series III\"); the series' name goes in series_title. "
+    "Without the word \"Series\", put that text under other.\n"
+    "- accession: only when the label says \"Accession\" or \"ACCN\"; an unlabelled number goes under other.\n"
+    "- container: the container type and its own number only: \"Box 34\" for \"Box 34 of 201\", \"Box #186\" or "
+    "\"Box 34/201\".\n"
+    "- A folder marked with two numbers such as \"5-9\" or \"8.5\" is box 5 folder 9, or box 8 folder 5: "
+    "container \"Box 5\", folder \"9\".\n"
+    "- folder_title: only on a folder; never read a folder title off a box label. A box label's own title is "
+    "box_title.\n"
+    "- A title cut off by the edge of the photo or hidden ends with \"...\".\n"
+    "Reply with JSON only:\n"
+    "{\"kind\": one of \"box label\", \"folder label\", \"divider or other\", \"document page\",\n"
+    " \"repository\": the archive or library, e.g. \"Hoover Institution Archives\",\n"
+    " \"place\": the city or state of the repository, if written,\n"
+    " \"collection_title\": e.g. \"Irving Kristol Papers, 1946-2001\",\n"
+    " \"collection_subtitle\": a further line naming a part of the collection, e.g. a record group's office,\n"
+    " \"collection_number\": a call or collection number, e.g. \"Mss 1036\", \"SC0122\", \"RG 165\",\n"
+    " \"accession\": an accession number, e.g. \"91006-10.V\",\n"
+    " \"series\": e.g. \"Series II\",\n"
+    " \"series_title\": the series' name, e.g. \"Correspondence\",\n"
+    " \"container\": e.g. \"Box 17\", \"Carton 9\",\n"
+    " \"box_title\": the title a box label gives the box's contents, e.g. \"Correspondence with Specific "
+    "Individuals\",\n"
+    " \"folder\": the folder number, e.g. \"8\",\n"
+    " \"folder_title\": the folder's title, e.g. \"Reports 1959-1960\",\n"
+    " \"date\": the date or time period written for this box or folder, e.g. \"1950-1980\", \"3/5/57\",\n"
+    " \"other\": any other identifying mark, e.g. a shelf or location mark \"40-E-5\" or an unlabelled number "
+    "\"84-044\"; several joined with \"; \",\n"
+    " \"label_box\": [x1, y1, x2, y2] the label's region on a 0-1000 scale, or null}")
+
+
+def use_revision():
+    """Point the shared steps at rev2/: its sample, pages, lines, drafts, ledger and sheet, the revised fields and
+    prompt. The gateway readers' cap is what the upright check left of REV_CAP."""
+    global POOL, PAGES, LINES, SHEET, SAMPLE, FIELDS, PROMPT, MAX_TOKENS, GATEWAY_CAP, RESULTS
+    POOL, PAGES, LINES, SHEET = REV, os.path.join(REV, "pages"), os.path.join(REV, "lines"), os.path.join(REV, "sheet")
+    SAMPLE, FIELDS, PROMPT, MAX_TOKENS, RESULTS = os.path.join(REV, "sample.jsonl"), FIELDS_REV, PROMPT_REV, 640, REV_RESULTS
+    GATEWAY_CAP = REV_CAP - upright_spent()
 
 
 # --- sampling ---------------------------------------------------------------------------------------------------
@@ -416,6 +486,167 @@ def cmd_gateway(a):
           f"({G.billed_note(led)}); not ok: {bad[:10]}")
 
 
+# --- the revision's upright step ----------------------------------------------------------------------------------
+# The first build turned each JPEG to match its PDF (orient_like_pdf), and the owner's sheet showed 36 photos turned:
+# those PDFs are not upright either. Apple Vision's text scores (ocr_orient.swift, all four turns) gave no clear win on
+# any of the 218 labels (2026-11-05: handwriting and short labels, and it reads upside-down text too), so the turn is
+# Gemini's pick among the four turns shown together, measured against the owner's notes: the photos he called turned
+# must move, the direction he gave must match, and the photos he did not flag should stay. Where the pick and his notes
+# disagree, the second sheet asks him which way up.
+
+BUILD1_PAGES, BUILD1_SAMPLE = PAGES, SAMPLE
+UPRIGHT = os.path.join(REV, "upright.jsonl")
+UPRIGHT_LEDGER = os.path.join(REV, "upright-calls.jsonl")
+UPRIGHT_SIDE = 512
+UPRIGHT_PROMPT = ("These four images are the same photo from an archive reading room (a box label, a folder label, "
+                  "a divider or a document page), each turned a different way. Which image shows it the right way "
+                  "up, so that its main writing reads normally, left to right? Reply with the image's number only: "
+                  "1, 2, 3 or 4.")
+TURN_OPTIONS = ["the right way up", "needs a quarter turn clockwise", "upside down",
+                "needs a quarter turn anticlockwise"]   # the sheet's answers: index * 90 is the further turn, clockwise
+
+
+def upright_spent():
+    import gateway_gemini as G
+    return sum(G.charge(json.loads(x)) for x in open(UPRIGHT_LEDGER, encoding="utf-8")) \
+        if os.path.exists(UPRIGHT_LEDGER) else 0.0
+
+
+def owner_turn_flags():
+    """{photo: the further anticlockwise turn the owner's note implies (90, 180, 270), or 'turned' when it gives no
+    direction}, from the 2026-11-05 notes. "Rotated to the left" is upright after a quarter turn clockwise (270)."""
+    answers = json.load(open(OWNER_ANSWERS, encoding="utf-8"))
+    out = {}
+    for mid, v in answers.items():
+        t = (((v or {}).get(NOTES) or {}).get("text") or "").lower()
+        if "upside down" in t:
+            out[mid] = 180
+        elif "rotated to the left" in t:
+            out[mid] = 270
+        elif "rotated to the right" in t:
+            out[mid] = 90
+        elif re.search(r"\brotated\b|sideways", t):
+            out[mid] = "turned"
+    return out
+
+
+def kept_rows():
+    return [r for r in (json.loads(l) for l in open(BUILD1_SAMPLE, encoding="utf-8")) if r["id"] not in DROPPED]
+
+
+def cmd_upright(a):
+    """Gemini's pick of the upright turn for every photo kept, then rev2/sample.jsonl with the turns combined. Real
+    money, in rev2/upright-calls.jsonl before a reply is used; REV_CAP stops the run."""
+    import base64
+    import io
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from PIL import Image
+    import gateway_gemini as G
+    os.makedirs(REV, exist_ok=True)
+    done = {json.loads(l)["id"] for l in open(UPRIGHT, encoding="utf-8")} if os.path.exists(UPRIGHT) else set()
+    todo = [r["id"] for r in kept_rows() if r["id"] not in done][: a.limit or None]
+    worst = (4 * 1200 * G.PRICE[0] + 2048 * G.PRICE[1]) / 1e6
+    lock = threading.Lock()
+    print(f"upright: {len(todo)} photos to ask", flush=True)
+
+    def one(mid):
+        with lock:
+            if upright_spent() + worst > REV_CAP:
+                return mid, "cap"
+        order = [0, 90, 180, 270]
+        random.Random(f"{SEED}/{mid}").shuffle(order)
+        content = []
+        with Image.open(os.path.join(BUILD1_PAGES, mid + ".jpg")) as im:
+            im = im.convert("RGB")
+            im.thumbnail((UPRIGHT_SIDE, UPRIGHT_SIDE))
+            for k, deg in enumerate(order, 1):
+                buf = io.BytesIO()
+                im.rotate(deg, expand=True).save(buf, "JPEG", quality=85)
+                content += [{"type": "text", "text": f"Image {k}:"},
+                            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,"
+                                                                       + base64.b64encode(buf.getvalue()).decode()}}]
+        content.append({"type": "text", "text": UPRIGHT_PROMPT})
+        body = {"model": G.MODEL, "temperature": 0, "max_tokens": 2048, "reasoning_effort": "low",
+                "messages": [{"role": "user", "content": content}]}
+        t = time.time()
+        for attempt in range(3):
+            r = G.request("/chat/completions", body)
+            if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                time.sleep(10 * (attempt + 1))
+                continue
+            break
+        got = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        usage = got.get("usage") or {}
+        rec = G.with_gateway_cost({"id": mid, "http": r.status_code, "t": t, "usage": usage,
+                                   "cost": round(G.cost(usage), 6)}, r)
+        with lock:
+            with open(UPRIGHT_LEDGER, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(rec) + "\n")
+        reply = ((got.get("choices") or [{}])[0].get("message") or {}).get("content") if r.status_code == 200 else None
+        m = re.search(r"\b([1-4])\b", reply or "")
+        if not m:
+            return mid, f"http {r.status_code}: {str(reply)[:80]}"
+        with lock:
+            with open(UPRIGHT, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"id": mid, "order": order, "reply": reply.strip()[:40],
+                                     "pick": order[int(m.group(1)) - 1]}) + "\n")
+        return mid, "ok"
+
+    with ThreadPoolExecutor(4) as ex:
+        res = list(ex.map(one, todo))
+    bad = [x for x in res if x[1] != "ok"]
+    print(f"{len(res) - len(bad)}/{len(res)} answered; ${upright_spent():.4f} spent on the upright check; "
+          f"not ok: {bad[:10]}")
+    write_rev_sample()
+
+
+def upright_picks():
+    return {r["id"]: r["pick"] for r in (json.loads(l) for l in open(UPRIGHT, encoding="utf-8"))} \
+        if os.path.exists(UPRIGHT) else {}
+
+
+def write_rev_sample():
+    """rev2/sample.jsonl: the kept photos, each `turn` now the PDF match and Gemini's further turn together."""
+    picks = upright_picks()
+    with open(os.path.join(REV, "sample.jsonl"), "w", encoding="utf-8") as fh:
+        for r in kept_rows():
+            extra = picks.get(r["id"])
+            fh.write(json.dumps(dict(r, turn_pdf=r["turn"], upright=extra, turn=(r["turn"] + (extra or 0)) % 360),
+                                ensure_ascii=False) + "\n")
+
+
+def upright_check():
+    """The pick measured against the owner's notes: counts, and the photos whose pick and notes disagree (with the
+    direction the owner gave, if any), which the second sheet asks about."""
+    picks, flags = upright_picks(), owner_turn_flags()
+    kept = [r["id"] for r in kept_rows()]
+    c = collections.Counter(asked=len(picks), kept=len(kept))
+    disagree = {}
+    for mid in kept:
+        p, f = picks.get(mid), flags.get(mid)
+        if p is None:
+            c["no pick"] += 1
+            disagree[mid] = "no pick"
+            continue
+        if f is None:
+            c["not flagged"] += 1
+            c["not flagged, left as it was"] += p == 0
+            if p:
+                disagree[mid] = "turned, the owner did not flag it"
+        else:
+            c["flagged"] += 1
+            c["flagged, turned"] += p != 0
+            if f != "turned":
+                c["flagged with a direction"] += 1
+                c["flagged with a direction, matched"] += p == f
+            if p == 0:
+                disagree[mid] = "left as it was, the owner flagged it"
+            elif f != "turned" and p != f:
+                disagree[mid] = "turned another way than the owner said"
+    return c, disagree
+
+
 def clean(v):
     if v is None:
         return None
@@ -482,6 +713,8 @@ def norm(field, v):
             return f"box {bare.group(1)}"
     if field == "folder":
         s = re.sub(r"\b(folder|fol|fld|fd|f)\b\.?\s*(no\.?|#)?", "", s)
+    if field == "series" and "series_title" in FIELDS:   # the revision: "Series III" and "III" are one series
+        s = re.sub(r"^\s*series\b\.?\s*", "", s)
     s = s.replace("&", "and")
     return re.sub(r"[^a-z0-9]", "", s) or None
 
@@ -651,12 +884,26 @@ def sheet_items(rows):
     return out
 
 
+SHEET1_HEADER = """<b>Container labels.</b> Three readers do not all agree on most of the fields below; a few are fields
+where they did agree, mixed in as a check. Each pink box is where the field is written (it can be off; it does not
+say which reading is right). Pick what the label says, type it under "other", or say it is not on the label.
+The grey line on each photo lists the fields all three readers agreed on; they are not asked and go into the truth
+as written. Use the photo's notes box when one of them is wrong, or when the label carries something no field
+caught (a second series line, a date range, a subseries). Fields nobody read are not listed."""
+
+
+def sheet_html(items, key, header, settled, dl):
+    return (SHEET_HTML.replace("__DATA__", json.dumps(items, ensure_ascii=False))
+            .replace("__KINDS__", json.dumps(KINDS)).replace("__LABELS__", json.dumps(LABELS))
+            .replace("__NOTES__", json.dumps(NOTES)).replace("__SETTLED__", json.dumps(settled))
+            .replace("__KEY__", json.dumps(key)).replace("__DLNAME__", json.dumps(dl)).replace("__HEADER__", header))
+
+
 def write_sheet(rows):
     os.makedirs(SHEET, exist_ok=True)
     with open(os.path.join(SHEET, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(SHEET_HTML.replace("__DATA__", json.dumps(sheet_items(rows), ensure_ascii=False))
-                 .replace("__KINDS__", json.dumps(KINDS)).replace("__LABELS__", json.dumps(LABELS))
-                 .replace("__NOTES__", json.dumps(NOTES)))
+        fh.write(sheet_html(sheet_items(rows), key="w47-ct-truth-jpeg", header=SHEET1_HEADER,
+                            settled="Not asked, all three agree", dl="W47-ct-truth-jpeg-answers.json"))
 
 
 def cmd_sheet(a):
@@ -705,6 +952,8 @@ def fold(rows, answers):
 
 
 def cmd_fold(a):
+    if FIELDS is FIELDS_REV:
+        return cmd_fold_rev(a)
     rows = [json.loads(l) for l in open(os.path.join(POOL, "draft-truth.jsonl"), encoding="utf-8")]
     truth, missing = fold(rows, json.load(open(a.answers, encoding="utf-8")))
     with open(os.path.join(POOL, "truth.jsonl"), "w", encoding="utf-8") as fh:
@@ -713,6 +962,315 @@ def cmd_fold(a):
     print(f"{len(truth)} photos in the truth, {sum(t['complete'] for t in truth)} complete; "
           f"{missing} disputed fields unanswered; {sum(len(t['ruled']) for t in truth)} fields owner-ruled; "
           f"controls overturned: {sum(len(t['controls_overturned']) for t in truth)} of {CONTROLS}")
+
+
+# --- the revised truth ----------------------------------------------------------------------------------------------
+# Per photo and field, the first source that has it: the owner's ruling on the first sheet, a value his notes give,
+# his rules (a box label carries no folder title), then the three readers' unanimous reading on the revised prompt.
+# The first build's unruled agreed values are not carried: the prompt changed under them, so the readers read again.
+# What is left is open and goes on the second sheet, with CONTROLS unanimous reader fields mixed in unmarked, and a
+# which-way-up question wherever the upright pick and the owner's notes disagree.
+
+OWNER = ("sheet", "note", "rule", "sheet2")   # the sources that are the owner's, so a drafter may be scored on them
+
+
+def canon(field, v):
+    """The truth's spelling of a container: the type and its own number ("Box 34", from "Box 34 of 201", "BOX #34",
+    "Box 34/201" or a bare "34"). Other fields are kept as written; the scoring compares them case-folded."""
+    if field != "container" or v is None:
+        return v
+    m = CONTAINER.search(v)
+    if m:
+        kind = {"vol": "volume"}.get(m.group(1).lower(), re.sub(r"\s+", " ", m.group(1).lower()))
+        return f"{kind.capitalize()} {m.group(2).upper() if m.group(2)[-1:].isalpha() else m.group(2)}"
+    bare = re.fullmatch(r"\s*(?:no\.?|#)?\s*(\d+[a-z]?)\s*", v, re.I)
+    return f"Box {bare.group(1)}" if bare else v
+
+
+def jsonl(path):
+    return [json.loads(l) for l in open(path, encoding="utf-8")] if os.path.exists(path) else []
+
+
+def revise_rows():
+    rows = build(sample())
+    old = {t["id"]: t for t in jsonl(os.path.join(CACHE, "pool-jpeg", "truth.jsonl"))}
+    first = {t["id"]: t for t in jsonl(os.path.join(CACHE, "pool-jpeg", "draft-truth.jsonl"))}
+    notes = json.load(open(NOTE_RULINGS, encoding="utf-8"))
+    _, turn_q = upright_check()
+    order = ["kind"] + FIELDS
+    st = collections.Counter()
+    out = []
+    for r in rows:
+        n, o = notes.get(r["id"], {}), old.get(r["id"], {})
+        fields, src = {}, {}
+
+        def put(f, v, how):
+            if f in order and f not in fields and f not in n.get("unsure", []):
+                fields[f], src[f] = canon(f, v), how
+        for f in o.get("ruled", []):
+            put(f, o["fields"].get(f), "sheet")
+        for f, v in n.get("fields", {}).items():
+            if f not in n.get("confirm", []):
+                put(f, v, "note")
+        ok = all(r["parsed"])
+        if ok:
+            for f, v in r["agreed"].items():
+                put(f, v, "readers")
+        if fields.get("kind") == "box label" and src.get("folder_title") != "note":
+            if src.get("folder_title") == "sheet" and fields["folder_title"] is not None:
+                st["sheet rulings of a folder title on a box label, overridden by the rule"] += 1
+            fields.pop("folder_title", None)
+            src.pop("folder_title", None)
+            put("folder_title", None, "rule")
+        open_ = []
+        disputed = {d["field"]: d for d in r["disputed"]} if ok else {}
+        lines, boxes = lines_of(r["id"]), [((draft_of(r["id"], k) or {}).get("parsed") or {}).get("label_box")
+                                           for k in READERS]
+        for f in order:
+            if f in fields or f in n.get("unsure", []):
+                continue
+            readings = disputed[f]["readings"] if f in disputed else []
+            if f in n.get("confirm", []):
+                v = n["fields"][f]
+                readings = [v] + [x for x in readings if not agree(f, x, v)]
+                if not disputed.get(f) and ok and r["agreed"].get(f) is not None and not agree(f, r["agreed"][f], v):
+                    readings.append(r["agreed"][f])
+            box, how = field_place(f, readings, lines, boxes)
+            open_.append({"field": f, "readings": readings, "box": box, "placed": how})
+        if not ok:
+            st["a reader's reply did not parse"] += 1
+        f1 = first.get(r["id"], {})
+        for f, v in (f1.get("agreed") or {}).items():
+            if f in FIELDS_REV or f == "kind":
+                if src.get(f) == "readers" and f not in o.get("ruled", []):
+                    st["first build agreed, unruled, unanimous again"] += 1
+                    st["first build agreed, unruled, same value again"] += agree("x" if f == "kind" else f,
+                                                                                fields[f], v)
+                elif f not in o.get("ruled", []):
+                    st["first build agreed, unruled, now open or the owner's"] += 1
+        out.append({"id": r["id"], "path": r["path"], "colour": r["colour"], "stratum": r["repository"],
+                    "turn": r["turn"], "upright": r.get("upright"), "turn_question": turn_q.get(r["id"]),
+                    "fields": fields, "src": src, "open": open_, "controls": [],
+                    "cut_off": n.get("cut_off", []), "unsure": n.get("unsure", []), "notes": o.get("notes"),
+                    "drafters": list(READERS), "first_build_notes": bool(o.get("notes"))})
+    # the controls: unanimous reader fields, half with a value and half agreed empty, drawn with the seed
+    cands = sorted((x["id"], f) for x in out for f, s in x["src"].items() if s == "readers" and f != "kind"
+                   and x["fields"][f] is not None)
+    empty = sorted((x["id"], f) for x in out for f, s in x["src"].items() if s == "readers" and f != "kind"
+                   and x["fields"][f] is None)
+    rng = random.Random(SEED + 1)
+    by = {x["id"]: x for x in out}
+    for mid, f in rng.sample(cands, min(CONTROLS - CONTROLS // 2, len(cands))) + \
+            rng.sample(empty, min(CONTROLS // 2, len(empty))):
+        x, v = by[mid], by[mid]["fields"][f]
+        boxes = [((draft_of(mid, k) or {}).get("parsed") or {}).get("label_box") for k in READERS]
+        box, how = field_place(f, [v] if v else [], lines_of(mid), boxes)
+        x["controls"].append({"field": f, "readings": [v] if v else [], "box": box, "placed": how})
+    return out, st
+
+
+def asked_rev(x):
+    order = ["kind"] + FIELDS
+    return sorted(x["open"] + x["controls"], key=lambda d: order.index(d["field"]))
+
+
+def sheet2_items(rows):
+    out = []
+    for x in rows:
+        ask = asked_rev(x)
+        if not ask and not x["turn_question"]:
+            continue
+        on = {d["field"] for d in ask}
+        fields = []
+        if x["turn_question"]:
+            fields.append({"field": "_turn", "label": LABELS["_turn"], "readings": [], "box": None,
+                           "placed": "turn", "options": TURN_OPTIONS})
+        fields += [{"field": d["field"], "label": LABELS[d["field"]], "readings": d["readings"], "box": d["box"],
+                    "placed": d["placed"]} for d in ask]
+        out.append({"id": x["id"], "n": len(out) + 1, "img": os.path.relpath(image_of(x["id"]), SHEET),
+                    "colour": "box (Red)" if x["colour"] == "Red" else "folder (Purple)",
+                    "agreed": {f: v for f, v in x["fields"].items() if v and f not in on}, "fields": fields})
+    return out
+
+
+SHEET2_HEADER = """<b>Container labels, second round.</b> Your answers and notes from the first sheet are in: the
+field list now has a box title, a series title, a collection subtitle, a date or time period and other identifying
+marks; Series and Accession only when the label says so; the box number alone; nothing inferred; and the photos you
+took out are gone. The photos were turned upright again and three readers read them again. What is left is below:
+fields the readers do not all agree on, values you typed in a note that are worth checking letter by letter, and a
+few fields where they did agree, mixed in as a check. Where a photo asks which way up it is, the turning step and your
+notes disagreed. Each pink box is roughly where the field is written; it does not say which reading is right. The grey
+line lists what is already settled (your answers, your notes, or all three readers)."""
+
+
+def cmd_revise(a):
+    """The revised truth (rev2/truth.jsonl: settled fields only), the second sheet and segbench-results/ct-truth-revised.md."""
+    rows, st = revise_rows()
+    with open(os.path.join(REV, "draft-truth.jsonl"), "w", encoding="utf-8") as fh:
+        for x in rows:
+            fh.write(json.dumps(x, ensure_ascii=False) + "\n")
+    write_rev_truth(rows)
+    write_sheet2(rows)
+    write_rev_results(rows, st)
+    print(f"{REV_RESULTS}; sheet {os.path.join(SHEET, 'index.html')}")
+
+
+def write_sheet2(rows):
+    os.makedirs(SHEET, exist_ok=True)
+    with open(os.path.join(SHEET, "index.html"), "w", encoding="utf-8") as fh:
+        fh.write(sheet_html(sheet2_items(rows), key="w47-ct-truth-revise", header=SHEET2_HEADER,
+                            settled="Already settled", dl="W47-ct-truth-revise-answers.json"))
+
+
+def write_rev_truth(rows):
+    with open(os.path.join(REV, "truth.jsonl"), "w", encoding="utf-8") as fh:
+        for x in rows:
+            ruled = [f for f, s in x["src"].items() if s in OWNER]
+            fh.write(json.dumps({"id": x["id"], "path": x["path"], "colour": x["colour"], "stratum": x["stratum"],
+                                 "fields": x["fields"], "src": x["src"], "ruled": ruled,
+                                 "open": [d["field"] for d in x["open"]], "unsure": x["unsure"],
+                                 "cut_off": x["cut_off"], "drafters": x["drafters"], "notes": x["notes"],
+                                 "turn_question": x["turn_question"], "reread": x.get("reread", False),
+                                 "complete": not x["open"] and len(x["fields"]) + len(x["unsure"]) == len(FIELDS) + 1},
+                                ensure_ascii=False) + "\n")
+
+
+def cmd_fold_rev(a):
+    """The second sheet's answers into rev2/truth.jsonl: an open field or control answered becomes the owner's
+    (`sheet2`); an answered which-way-up question that turns the photo further marks it `reread` (its reader
+    readings were made on the wrong turn, so its reader-settled fields are open again until the readers rerun)."""
+    rows = jsonl(os.path.join(REV, "draft-truth.jsonl"))
+    answers = json.load(open(a.answers, encoding="utf-8"))
+    c = collections.Counter()
+    for x in rows:
+        ans = answers.get(x["id"]) or {}
+        t = (ans.get("_turn") or {}).get("pick")
+        if t in TURN_OPTIONS and TURN_OPTIONS.index(t):
+            x["reread"] = True
+            c["photos to reread"] += 1
+            for f in [f for f, s in x["src"].items() if s == "readers"]:
+                x["fields"].pop(f)
+                x["src"].pop(f)
+                x["open"].append({"field": f, "readings": [], "box": None, "placed": "none"})
+        keep = []
+        for d in x["open"] + x["controls"]:
+            got = ans.get(d["field"]) or {}
+            pick = got.get("pick")
+            if not pick:
+                keep += [d] if d in x["open"] else []
+                c["open, unanswered"] += d in x["open"]
+                continue
+            v = None if pick == "not on the label" else clean(got.get("text")) if pick == "other" else pick
+            if d in x["controls"]:
+                c["controls answered"] += 1
+                c["controls overturned"] += not agree("x" if d["field"] == "kind" else d["field"], v,
+                                                      x["fields"].get(d["field"]))
+            x["fields"][d["field"]], x["src"][d["field"]] = canon(d["field"], v), "sheet2"
+            c["fields ruled"] += 1
+        x["open"] = keep
+        note = clean((ans.get(NOTES) or {}).get("text"))
+        if note:
+            x["notes2"] = note
+            c["notes"] += 1
+    with open(os.path.join(REV, "draft-truth.jsonl"), "w", encoding="utf-8") as fh:
+        for x in rows:
+            fh.write(json.dumps(x, ensure_ascii=False) + "\n")
+    write_rev_truth(rows)
+    print(dict(c))
+
+
+def write_rev_results(rows, st):
+    import gateway_gemini as G
+    uc, turn_q = upright_check()
+    items = sheet2_items(rows)
+    srcs = collections.Counter(s for x in rows for s in x["src"].values())
+    n_ctl = sum(len(x["controls"]) for x in rows)
+    drop = collections.Counter(DROPPED.values())
+    led = gateway_ledger()
+    walls = {k: [w for w in ((draft_of(x["id"], k) or {}).get("wall_s") for x in rows) if w] for k in READERS}
+    L = ["# Container labels: the truth revised from the owner's sheet notes (W47.ct-truth-revise)", "",
+         f"Written by `scripts/segbench/ct_truth.py --rev revise`. The owner answered the first sheet "
+         f"(`ct-truth.md`) on 2026-11-05 and left notes on 127 photos. Those notes changed the field list and the "
+         f"reading rules, took photos out and showed that 36 were shown turned; this build carries all of it. Label "
+         f"values stay in the cache: this page gives counts only.", "",
+         "## What changed", "",
+         f"- **Fields.** {len(FIELDS_REV)} fields, up from {len(FIELDS_FIRST)}: added "
+         + ", ".join(LABELS[f].lower() for f in NEW_FIELDS) + ". The owner records these on many labels.",
+         "- **Rules** (in the prompt and in the truth): nothing inferred; Series and Accession only when the label "
+         "says so (\"ACCN\" counts), otherwise the text is an other identifying mark; the container is the box "
+         "number alone; a folder mark like \"5-9\" or \"8.5\" is box 5 folder 9, box 8 folder 5; no folder title "
+         "is read off a box label; a cut-off title is flagged. The scoring compares values case-folded, so title "
+         "case is not part of the truth; title case and the user's standard names for repositories and "
+         "collections are Processor features (W47.ct-normalise).",
+         f"- **Photos taken out:** {len(DROPPED)} ("
+         + ", ".join(f"{v} {k}" for k, v in sorted(drop.items(), key=lambda kv: -kv[1])) + f"), leaving "
+         f"{len(rows)}: {sum(x['colour'] == 'Red' for x in rows)} box (Red), "
+         f"{sum(x['colour'] == 'Purple' for x in rows)} folder (Purple).", "",
+         "## Upright", "",
+         "The first build turned each JPEG to match its PDF, and those PDFs are not always upright. Apple Vision's "
+         "text scores at the four turns (`ocr_orient.swift`) gave no clear win on any of the 218 photos: the labels "
+         "are short or handwritten, and Vision reads upside-down text too. So the turn is Gemini 3.7 Flash's pick "
+         "among the four turns shown side by side (in an order shuffled per photo), measured against the owner's "
+         "notes.", "",
+         "| | photos | as the notes say |", "|---|---|---|",
+         f"| the owner called it turned | {uc['flagged']} | {uc['flagged, turned']} turned |",
+         f"| ... and gave the direction | {uc['flagged with a direction']} | "
+         f"{uc['flagged with a direction, matched']} turned that way |",
+         f"| the owner did not flag it | {uc['not flagged']} | {uc['not flagged, left as it was']} left as they were |",
+         "",
+         f"The {len(turn_q)} photos where the pick and the notes disagree ("
+         + ", ".join(f"{v} {k}" for k, v in collections.Counter(turn_q.values()).most_common())
+         + ") are asked on the second sheet; the readers read them at the pick's turn, and a photo the owner turns "
+         "further is reread (its reader-settled fields go back to open at the fold). An unflagged photo the pick "
+         "turned may also be one the owner saw turned and did not note, so the second row is a floor on the "
+         "pick's agreement, not an error count.", "",
+         "## Where each settled field came from", "",
+         "| source | fields |", "|---|---|"]
+    for s, label in (("sheet", "the owner's ruling on the first sheet"), ("note", "a value the owner's notes give"),
+                     ("rule", "the owner's rules (no folder title on a box label)"),
+                     ("readers", "the three readers, unanimous on the revised prompt")):
+        L.append(f"| {label} | {srcs[s]} |")
+    L += ["", f"Fields left out of scoring because the owner could not read them: "
+          f"{sum(len(x['unsure']) for x in rows)}. Titles the owner marked cut off: "
+          f"{sum(len(x['cut_off']) for x in rows)}."]
+    for k, v in sorted(st.items()):
+        L.append(f"- {k}: {v}")
+    L += ["", "## Open, per field (the second sheet)", "",
+          "| field | open on box photos | open on folder photos | settled by the readers |", "|---|---|---|---|"]
+    for f in ["kind"] + FIELDS:
+        o = collections.Counter(x["colour"] for x in rows for d in x["open"] if d["field"] == f)
+        rd = sum(x["src"].get(f) == "readers" for x in rows)
+        L.append(f"| {LABELS[f]} | {o['Red']} | {o['Purple']} | {rd} |")
+    asked_n = sum(len(i["fields"]) for i in items)
+    L += ["", f"The second sheet asks {asked_n} questions on {len(items)} photos: "
+          f"{sum(len(x['open']) for x in rows)} open fields, {n_ctl} controls (unanimous reader fields, unmarked) "
+          f"and {len(turn_q)} which-way-up questions. It is `pool-jpeg/rev2/sheet/index.html` in the cache "
+          f"(private: corpus images); `ct_truth.py --rev fold ANSWERS.json` folds it into `rev2/truth.jsonl`.", "",
+          "## Cost", "",
+          f"Upright check: {len(jsonl(UPRIGHT_LEDGER))} calls, ${upright_spent():.2f}. Readers on the gateway: "
+          f"{len(led)} calls, ${sum(G.charge(r) for r in led):.2f} ({G.billed_note(led)}). Item total "
+          f"${upright_spent() + sum(G.charge(r) for r in led):.2f} of its ${REV_CAP:.2f} cap, real money on the "
+          f"Stanford gateway. "
+          + " ".join(f"{NAMES[k]}: {sum(w) / 60:.0f} min on this Mac, $0." for k, w in walls.items()
+                     if w and k != GATEWAY), "",
+          "## Measurement card", "",
+          "- **Truth:** the owner's rulings on the first sheet and the values his notes give, his reading rules, "
+          "and, for the rest, the three readers' unanimous reading on the revised prompt (agreement, not truth, "
+          f"checked by {n_ctl} controls on the second sheet). The readers are the truth's drafters: W47.ct-read "
+          "scores any of them only on the owner's fields (`ruled`), and reports the rest as agreement (FLD-9). "
+          "The note values were transcribed from his notes by this session, field by field; long typed titles go "
+          "back to him on the second sheet to check.",
+          "- **Selection:** the first build's stratified draw by repository from the Finder tags, less the photos "
+          "the owner took out. The pairing cut's lean stands: 54 photos (43 of the 120 Red) were left out at "
+          f"correlation under {MIN_CORR}, and the ones checked were true pairs whose PDF was cropped or deskewed, "
+          "so the set leans to little-changed PDFs. They were not recovered here; W47.ct-read reports the lean "
+          "beside every figure.",
+          "- **Comparison:** the same upright JPEG, prompt and settings for all three readers.",
+          "- **Noise:** one pass at temperature 0; no rerun floor.",
+          "- **Scope:** a truth under construction. Settles which fields W47.ct-read can score now; says nothing "
+          "about which reader is right.", ""]
+    with open(REV_RESULTS, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(L))
 
 
 def pdf_comparison(rows):
@@ -882,30 +1440,24 @@ border-bottom:1px solid #ccc;z-index:9}.doc{border-bottom:2px solid #888;padding
 .q{margin:8px 0 14px}.q label{display:block;margin-left:12px}.agreed{color:#555;font-size:13px}.nobox{color:#a05;font-size:13px}
 .notes textarea{width:100%;max-width:560px;height:4.5em;font:14px -apple-system,sans-serif}
 </style>
-<header><b>Container labels.</b> Three readers do not all agree on most of the fields below; a few are fields
-where they did agree, mixed in as a check. Each pink box is where the field is written (it can be off; it does not
-say which reading is right). Pick what the label says, type it under "other", or say it is not on the label.
-The grey line on each photo lists the fields all three readers agreed on; they are not asked and go into the truth
-as written. Use the photo's notes box when one of them is wrong, or when the label carries something no field
-caught (a second series line, a date range, a subseries). Fields nobody read are not listed.
+<header>__HEADER__
 Answers save in this browser; <button id="dl">download answers</button>
 <span id="prog"></span></header>
 <div id="root"></div>
 <script>
-const DATA=__DATA__;const KINDS=__KINDS__;const LABELS=__LABELS__;const NOTES=__NOTES__;const KEY='w47-ct-truth-jpeg';const ans=JSON.parse(localStorage.getItem(KEY)||'{}'); // gitleaks:allow (a storage key name, not a secret)
+const DATA=__DATA__;const KINDS=__KINDS__;const LABELS=__LABELS__;const NOTES=__NOTES__;const SETTLED=__SETTLED__;const KEY=__KEY__;const ans=JSON.parse(localStorage.getItem(KEY)||'{}'); // gitleaks:allow (a storage key name, not a secret)
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const total=DATA.reduce((n,d)=>n+d.fields.length,0);
 function prog(){let n=0;for(const d of DATA)for(const f of d.fields)if(ans[d.id]?.[f.field]?.pick)n++;
  document.getElementById('prog').textContent=n+' of '+total+' fields answered'}
 let h='';DATA.forEach(d=>{h+=`<div class="doc"><div class="frame"><img src="${esc(d.img)}">`;
- d.fields.forEach((f,i)=>{if(f.box&&f.field!=='kind')h+=`<div class="box" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%;width:${100*f.box[2]}%;height:${100*f.box[3]}%"></div><div class="tag" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%">${i+1}</div>`});
+ d.fields.forEach((f,i)=>{if(f.box&&f.field!=='kind'&&!f.options)h+=`<div class="box" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%;width:${100*f.box[2]}%;height:${100*f.box[3]}%"></div><div class="tag" style="left:${100*f.box[0]}%;top:${100*f.box[1]}%">${i+1}</div>`});
  h+=`</div><div><b>${d.n}. Photo ${d.id}</b>, tagged ${esc(d.colour)}`;
- const ag=Object.entries(d.agreed);h+=`<div class="agreed">Not asked, all three agree: ${ag.length?ag.map(([k,v])=>esc(LABELS[k]||k)+' = '+esc(v)).join('; '):'nothing beyond the fields below'}</div>`;
+ const ag=Object.entries(d.agreed);h+=`<div class="agreed">${esc(SETTLED)}: ${ag.length?ag.map(([k,v])=>esc(LABELS[k]||k)+' = '+esc(v)).join('; '):'nothing beyond the fields below'}</div>`;
  d.fields.forEach((f,i)=>{const nm=d.id+'/'+f.field;const cur=ans[d.id]?.[f.field]||{};
   h+=`<div class="q"><b>${i+1}. ${esc(f.label)}</b>`;
-  if(f.field!=='kind'&&f.placed==='label')h+=` <span class="nobox">(box ${i+1} is the whole label: no reading was found on a line)</span>`;
   if(f.field!=='kind'&&f.placed==='none')h+=` <span class="nobox">(no box: no reading was found on the photo; look over the whole label)</span>`;
-  const opts=f.field==='kind'?KINDS:[...f.readings.filter(r=>r!==null),'other','not on the label'];
+  const opts=f.options?f.options:f.field==='kind'?KINDS:[...f.readings.filter(r=>r!==null),'other','not on the label'];
   for(const o of opts)h+=`<label><input type="radio" name="${esc(nm)}" value="${esc(o)}" ${cur.pick===o?'checked':''}> ${o==='other'?'other:':esc(o)}${o==='other'?` <input data-t="${esc(nm)}" value="${esc(cur.text)}" size="40">`:''}</label>`;
   h+='</div>'});
   h+=`<div class="q notes"><b>Notes on this photo</b> (optional)<br><textarea data-n="${esc(d.id)}">${esc(ans[d.id]?.[NOTES]?.text)}</textarea></div>`;
@@ -915,7 +1467,7 @@ const set=(nm,k,v)=>{const [id,f]=nm.split('/');ans[id]=ans[id]||{};ans[id][f]={
 document.querySelectorAll('input[type=radio]').forEach(e=>e.onchange=()=>set(e.name,'pick',e.value));
 document.querySelectorAll('[data-t]').forEach(e=>e.oninput=()=>set(e.dataset.t,'text',e.value));
 document.querySelectorAll('[data-n]').forEach(e=>e.oninput=()=>set(e.dataset.n+'/'+NOTES,'text',e.value));prog();
-document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(ans,null,1)],{type:'application/json'}));a.download='W47-ct-truth-jpeg-answers.json';a.click()};
+document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(ans,null,1)],{type:'application/json'}));a.download=__DLNAME__;a.click()};
 </script>"""
 
 
@@ -1047,9 +1599,13 @@ def cmd_owner_tree(a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--rev", action="store_true", help="the revision: rev2/, the revised fields and prompt")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sample").set_defaults(fn=cmd_sample)
-    for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("sheet", cmd_sheet), ("trees", cmd_trees),
+    u = sub.add_parser("upright")
+    u.add_argument("--limit", type=int)
+    u.set_defaults(fn=cmd_upright)
+    for name, fn in (("render", cmd_render), ("lines", cmd_lines), ("compare", cmd_compare), ("revise", cmd_revise), ("sheet", cmd_sheet), ("trees", cmd_trees),
                      ("owner-tree", cmd_owner_tree)):
         sub.add_parser(name).set_defaults(fn=fn)
     g = sub.add_parser("gateway")
@@ -1063,6 +1619,8 @@ def main():
     f.add_argument("answers")
     f.set_defaults(fn=cmd_fold)
     a = ap.parse_args()
+    if a.rev:
+        use_revision()
     a.fn(a)
 
 
