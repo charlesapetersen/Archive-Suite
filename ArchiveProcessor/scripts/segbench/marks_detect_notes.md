@@ -26,7 +26,8 @@ of 35 marks at NES 0.8 and Apple Vision 13; through this detector's boxes, 6 at 
 
 So no detector measured here is a marks layer. Public training data does not transfer to these pages at a usable
 recall. The comparison that decides the route is a whole-page reader (W46.mixed-route), which needs no detector;
-a fine-tune on our own pages (W46.marks-detect-own) waits on it and runs only if whole-page readers miss marks.
+a fine-tune on our own pages (W46.marks-detect-own) was to run only if whole-page readers missed marks, and was
+retired on 2026-11-05: W46.mixed-route found no ranked reader's whole page behind the owner's box beyond noise.
 
 ## Arms not run here
 
