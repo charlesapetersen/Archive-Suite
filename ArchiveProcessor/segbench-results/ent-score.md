@@ -165,7 +165,7 @@ A reply's name is counted here when some word of three or more letters in it is 
 
 Judge agreement over the doubtful names: {'agree': 23, 'disagree': 9}; disagreements (Claude / Luna): {'ocr_garble / knowledge_right': 1, 'knowledge_right / ocr_garble': 2, 'invention / knowledge_wrong': 1, 'knowledge_right / wrong_role': 2, 'ocr_garble / invention': 1, 'wrong_role / ocr_garble': 1, 'invention / wrong_role': 1}.
 
-Spend: $0.43 estimated over 70 gateway calls at ceiling prices.
+Spend: $0.43 estimated over 70 gateway calls at ceiling prices; the gateway reported no cost of its own for these calls.
 
 ## Reading
 

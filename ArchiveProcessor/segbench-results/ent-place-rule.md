@@ -11,17 +11,17 @@ Answered / unparsed: tagging-new 138/0, tagging-new-rerun 40/0, entity3k 138/0, 
 
 ## Scores
 
-ed2 on the full string, P / R / F1, and the place by its city (F1). "Filled, no place" is the documents where the route names a place and the truth has none; "wrong" the documents with a wrong name filled.
+ed2 on the full string, P / R / F1, and the place by its city (F1). "Filled, no place" is the documents where the route names a place and the truth has none; "wrong" the documents with a wrong name filled, which counts those as well, so it is split into the invented places (the "filled, no place" column) and the places wrong where the truth has one.
 
-| arm | n | sender F1 | recipient F1 | place P / R / F1 | place by city | filled, no place | place wrong |
-|---|---|---|---|---|---|---|---|
-| tagging-new | 138 | 0.73 | 0.82 | 0.62 / 0.76 / 0.68 | 0.83 | 18 | 32 |
-| tagging-new-rerun | 40 | 0.75 | 0.90 | 0.45 / 0.62 / 0.53 | 0.84 | 6 | 12 |
-| entity3k | 138 | 0.67 | 0.87 | 0.86 / 0.87 / 0.86 | 0.92 | 2 | 10 |
-| tagging-place | 138 | 0.73 | 0.82 | 0.76 / 0.74 / 0.75 | 0.91 | 1 | 16 |
-| tagging-place-rerun | 40 | 0.75 | 0.90 | 0.62 / 0.62 / 0.62 | 1.00 | 0 | 6 |
-| entity3k-place | 138 | 0.69 | 0.88 | 0.83 / 0.81 / 0.82 | 0.91 | 1 | 11 |
-| entity3k-place-rerun | 40 | 0.72 | 0.90 | 0.81 / 0.81 / 0.81 | 1.00 | 0 | 3 |
+| arm | n | sender F1 | recipient F1 | place P / R / F1 | place by city | filled, no place | place wrong (all) | wrong where a place is written |
+|---|---|---|---|---|---|---|---|---|
+| tagging-new | 138 | 0.73 | 0.82 | 0.62 / 0.76 / 0.68 | 0.83 | 18 | 32 | 14 |
+| tagging-new-rerun | 40 | 0.75 | 0.90 | 0.45 / 0.62 / 0.53 | 0.84 | 6 | 12 | 6 |
+| entity3k | 138 | 0.67 | 0.87 | 0.86 / 0.87 / 0.86 | 0.92 | 2 | 10 | 8 |
+| tagging-place | 138 | 0.73 | 0.82 | 0.76 / 0.74 / 0.75 | 0.91 | 1 | 16 | 15 |
+| tagging-place-rerun | 40 | 0.75 | 0.90 | 0.62 / 0.62 / 0.62 | 1.00 | 0 | 6 | 6 |
+| entity3k-place | 138 | 0.69 | 0.88 | 0.83 / 0.81 / 0.82 | 0.91 | 1 | 11 | 10 |
+| entity3k-place-rerun | 40 | 0.72 | 0.90 | 0.81 / 0.81 / 0.81 | 1.00 | 0 | 3 | 3 |
 
 ## Paired differences in ed2 F1, b minus a (95% bootstrap interval)
 
@@ -33,6 +33,13 @@ ed2 on the full string, P / R / F1, and the place by its city (F1). "Filled, no 
 | rerun floor: tagging-new again | tagging-new → tagging-new-rerun | 40 | +0.00 [+0.00, +0.00] | +0.00 [+0.00, +0.00] | -0.05 [-0.24, +0.13] | +0.00 [-0.09, +0.09] |
 | rerun floor: tagging-place again | tagging-place → tagging-place-rerun | 40 | +0.00 [+0.00, +0.00] | +0.00 [+0.00, +0.00] | -0.02 [-0.19, +0.13] | +0.03 [+0.00, +0.11] |
 | rerun floor: entity3k-place again | entity3k-place → entity3k-place-rerun | 40 | +0.00 [+0.00, +0.00] | +0.01 [+0.00, +0.05] | -0.03 [-0.22, +0.16] | +0.03 [+0.00, +0.11] |
+
+The rule's arms again without the 26 documents whose place the truth's rule emptied (measurement review pass 11, P11-3): on those the prompt's rule and the truth's rule agree by construction.
+
+| comparison | a → b | n | sending place | place by city |
+|---|---|---|---|---|
+| tagging: the rule added | tagging-new → tagging-place | 112 | +0.00 [-0.07, +0.07] | +0.01 [-0.04, +0.05] |
+| entity: the rule added | entity3k → entity3k-place | 112 | -0.05 [-0.11, +0.01] | -0.02 [-0.04, +0.00] |
 
 What the rule changed in the place, document by document:
 
@@ -62,13 +69,19 @@ Spend: $1.01 estimated over 356 gateway calls (356 answered). the gateway's own 
 
 ## Reading
 
-- **The tagging prompt: the rule stops it inventing places, and ships.** Documents where it names a place and the
-  truth has none fall from 18 to 1 of 138; documents with a wrong place from 32 to 16. On the full string, precision
-  0.62 to 0.76 and recall 0.76 to 0.74, F1 +0.06 (interval -0.01 to +0.14, a tie by itself); by the city alone
-  0.83 to 0.91, +0.08 (+0.02 to +0.14), a measured gain and above the rerun floor (+0.03 on 40). Of the 23 documents
-  whose place changed, 17 were emptied where the truth has none, 1 emptied where it has one ("Stanford, California",
-  never written as a place), and 5 respelled ("Washington, D.C." and "Washington, District of Columbia" both ways,
-  "Oxford, England"). The sender and recipient do not move (-0.01 and 0.00, inside the floor).
+- **The tagging prompt: the model follows the owner's definition, and the line ships.** Documents where it names a
+  place and the truth has none fall from 18 to 1 of 138. The places wrong where the truth has one do not fall (14 to
+  15; right 52 to 50): the 32 to 16 "wrong" in the table counts each invented place as wrong as well. On the full
+  string, precision 0.62 to 0.76 and recall 0.76 to 0.74, F1 +0.06 (interval -0.01 to +0.14, a tie by itself); by
+  the city alone 0.83 to 0.91, +0.08 (+0.02 to +0.14), above the rerun floor (+0.03 on 40). That gain rests on the 26
+  documents whose place the truth's rule emptied, where the prompt's rule and the truth's rule agree by construction:
+  on the other 112, by city +0.01 (-0.04 to +0.05) and full string +0.00 (-0.07 to +0.07), a tie. So it measures the
+  model following the definition it was given, not an accuracy gain; shipping the line before Phase 4 is a cheap
+  prompt change with no production data. Of the 23 documents whose place changed, 17 were emptied where the truth
+  has none, 1 emptied where it has one ("Stanford, California", a place the truth's drafters read in an image, which
+  the text heuristic cannot class, so it counts against the rule arm), and 5 respelled ("Washington, D.C." and
+  "Washington, District of Columbia" both ways, "Oxford, England"). The sender and recipient do not move (-0.01 and
+  0.00, inside the floor).
 - **Dates hold.** The year, month, day and date_uncertain the same call returns differ on 3 of the 138 documents,
   all three an estimated year (date_uncertain true both times), where the new prompt's own rerun differs on 2 of 40
   and the old prompt's on 1 of 40. Against the owner's Finder date tags on the 82: year right 74 before and 76 after;
@@ -92,13 +105,15 @@ a letter was sent from has no text rule and is not tested here.
 - **Truth:** W46.fix-ent-truth's 138 correspondence documents (model truth: GPT 5.6 Luna and Claude Sonnet 5 drafts,
   Sonnet rulings) with the owner's answers on 21 documents and the sending-place rule (`ent_truth.load_truth()`,
   W46.ent-truth-owner-fold). The rule empties the place on 26 documents the owner did not answer, by the class and
-  quote the truth's drafters gave, which the owner has not checked one by one. Dates on the 82 against the owner's
-  own Finder tags. No Gemini drafted or ruled.
+  quote the truth's drafters gave, which the owner has not checked one by one; the kept heading-or-address class
+  (51 of the 68 places the truth keeps) rests on 3 owner rulings, one of them against it (W46.place-rule-sheet and
+  W46.place-rule-fold check both classes). Dates on the 82 against the owner's own Finder tags. No Gemini drafted
+  or ruled.
 - **Selection:** as W46.ent-score-paid (82 of the date-tagging sample's correspondence documents plus 56 chosen by
   ABBYY text cues, not by any route tested here). The rule's wording was written once, from the owner's definition,
   and not tuned on these replies; but the definition came from the owner's answers on 12 of these documents, and the
   prompt's rule and the truth's rule say the same thing, so the gain measures how well the model follows the
-  definition, not a held-out accuracy.
+  definition, not a held-out accuracy (on the 112 documents the rule did not empty it is a tie).
 - **Comparison:** each arm against its own baseline differs in the one place line: the same Vision text, first
   3,000 characters, context block, model, temperature 0, token cap and gateway (tagging-new and entity3k's cached
   replies, prompt-checked).
@@ -106,5 +121,6 @@ a letter was sent from has no text rule and is not tested here.
   intervals. Rerun floors on 40: full-string place -0.05, -0.02 and -0.03; by city 0.00, +0.03 and +0.03; dates 1-2
   of 40 documents, all estimated years.
 - **Scope:** one model (Gemini 3.7 Flash), text only, correspondence documents only. It does not settle another
-  model's reading of the rule (the app's other routes), non-correspondence documents, or whether a letterhead place
-  is where a letter was sent from.
+  model's reading of the rule (the app's other routes), non-correspondence documents (the tagging prompt runs on all,
+  so its dates there are untested), whether "an address" pulls in a recipient's inside address (the places wrong
+  where one is written did not fall), or whether a letterhead place is where a letter was sent from.

@@ -231,6 +231,8 @@ def cmd_report(_a):
                                                            for x in d.values()))}
     kinds = collections.Counter(ET.place_kind(e, text[r["id"]]) for r in T["built"] for e in r["sending_place"])
     s["place_kinds"] = {k: kinds.get(k, 0) for k in ET.PLACE_KINDS}
+    kept = collections.Counter(ET.place_kind(e, text[r["id"]]) for r in T["owner+rule"] for e in r["sending_place"])
+    s["kept_place_kinds"] = {k: kept.get(k, 0) for k in ET.PLACE_KINDS}
     for k, rows in T.items():
         s["truth_places"][k] = {"documents with a place": sum(bool(r["sending_place"]) for r in rows),
                                 "named places": sum(e["class"] == "named" for r in rows for e in r["sending_place"]),
@@ -297,14 +299,24 @@ def report(s):
         L.append(f"| {k} | {v} | {up} / {em} |" if a else f"| {k} | {v} | – |")
     tot = sum(s["place_kinds"].values())
     hd = s["place_kinds"]["heading or address"] + s["place_kinds"]["line above a date"]
+    ak_inf = ak.get("inferred", {}).get("none given", 0)
+    ak_inst = ak.get("institution name", {}).get("none given", 0)
+    ak_hd = sum(ak.get("heading or address", {}).values())
+    ak_hd_up = sum(v for k, v in ak.get("heading or address", {}).items() if k.startswith("upheld"))
+    hd_kept = s["kept_place_kinds"]["heading or address"]
+    owner_rule_named = sum(s["kept_place_kinds"].values())
     L += ["", f"So of the {tot} places, {s['place_kinds']['dateline']} sit on a line with a date; {hd} sit in a "
           "heading or address block (a letterhead or a typed address; that many is the most a letterhead place "
           f"can stand for the sending place in this truth); {s['place_kinds']['read in an image']} were read in an "
           f"image only; and {s['place_kinds']['inferred'] + s['place_kinds']['institution name']} are not written "
           "as a place at all (inferred from the collection or content, or a town taken from an institution's name).",
           "", "## The rule", "",
-          "Every place the owner emptied was one not written in the document, and the two he upheld are written "
-          "(one in a letterhead address); his note on a third says the place is not given in the text. So the "
+          f"The owner emptied all {ak_inf} inferred places he was asked and the {ak_inst} taken from an "
+          f"institution's name; of the {ak_hd} heading-or-address places asked, he upheld {ak_hd_up} (one in a "
+          f"letterhead address) and emptied {ak_hd - ak_hd_up}, his note saying the place is not given in the text. So "
+          "the emptied class (inferred places) is supported by his answers, and the kept heading-or-address class, "
+          f"which holds {hd_kept} of the {owner_rule_named} places the truth now keeps, rests on {ak_hd} rulings, 1 "
+          "of them against it (W46.place-rule-sheet checks it). The "
           "sending place is a place the document writes, in a dateline, a letterhead or an address, and never one "
           "inferred from the collection, the content or an institution's name (`ent_truth.place_rule`). A letterhead "
           "place stays: the owner upheld one, and his note that a letterhead is not always where a letter was sent "
@@ -348,11 +360,20 @@ def report(s):
           "## Measurement card", "",
           "- **Truth.** W46.fix-ent-truth (GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating), with the "
           "owner's answers on the 23 fields his sheet asked (all of them fields Sonnet ruled for its own reader) and "
-          "six confirming notes. The rest of the set has no owner check; the 20 asked were chosen as Sonnet's "
-          "self-rulings, so they say how far to trust those, not the agreed rows. No scored route drafted the truth.",
+          "six confirming notes. The rest of the set has no owner check; the 20 documents asked (23 fields) were "
+          "chosen as Sonnet's self-rulings, so they say how far to trust those, not the agreed rows. Sonnet ruled "
+          "for its own reader on sender 17, recipient 18 and sending place 33 fields of the 138; the sheet asked 5, "
+          "6 and 12, so 12, 12 and 21 self-rulings were never asked (the rule has since emptied 14 of those places; "
+          "8 senders and 4 recipients stay filled where the readers named different people). The owner overturned 3 "
+          "of the 7 asked sender and recipient rulings he settled (Wilson about 0.16 to 0.75), which suggests about "
+          "2-3% of those fields are wrong in the truth: small beside the gaps the entity reports give, but a truth "
+          "error the scores do not carry (counts from measurement review pass 11, P11-5). No scored route drafted "
+          "the truth.",
           "- **Selection.** The 138 correspondence documents and the reports' own subsets (the 82 with cached "
-          "tagging replies); nothing chosen by a scored route or by ABBYY text here. The sheet's entity controls "
-          "were drawn by the adjudicator's side, not by a route.",
+          "tagging replies); nothing chosen by a scored route. The set itself was chosen by ABBYY text: its 56 "
+          "additions came from the agreed, year-tagged pool with ABBYY text, as the date-tagging sample's letters "
+          "did (`ent-truth.md`), so undated documents and documents without ABBYY text are not in it. The sheet's entity controls were drawn by the "
+          "adjudicator's side, not by a route.",
           "- **Comparison.** Each route's cached replies exactly as its report scored them; only the truth changes. "
           "ent-score's tagging replies read ABBYY text (scored before the owner's 2026-10-30 rule; no new ABBYY arm "
           "is run here); the Gemini 3.7 arms read Apple Vision text.",
@@ -361,9 +382,10 @@ def report(s):
           "- **Scope.** The rule rests on 12 owner rulings on places and on `place_kind`, a text heuristic that "
           "cannot tell a letterhead from a typed address or check a place against the image; its dateline count is "
           "low because the OCR often puts the date on its own line. Whether a letterhead place should count when "
-          "nothing else names the place is the owner's caveat and is not tested. The app's tagging prompt and the "
-          "dedicated entity prompt still say \"the letterhead's or the dateline's city\" without forbidding an "
-          "inferred place; W46.ent-place-rule-prompt measures adding that before the app changes.", ""]
+          "nothing else names the place is the owner's caveat and is not tested; the kept heading-or-address class "
+          "is checked by the owner on 3 places (W46.place-rule-sheet and W46.place-rule-fold check it on more). "
+          "The app's tagging prompt carries the rule since 4374254d (W46.ent-place-rule-paid, `ent-place-rule.md`); "
+          "the dedicated entity prompt with the rule tied and was left unchanged.", ""]
     return "\n".join(L)
 
 

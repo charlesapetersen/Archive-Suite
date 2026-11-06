@@ -512,6 +512,41 @@
    }
   }
  },
+ "paired_rule_kept": {
+  "tagging: the rule added": {
+   "a": "tagging-new",
+   "b": "tagging-place",
+   "full": {
+    "n": 112,
+    "diff": 0.0036782603991993845,
+    "lo": -0.06876553438276711,
+    "hi": 0.0739791247024354
+   },
+   "city": {
+    "n": 112,
+    "diff": 0.010818412938821798,
+    "lo": -0.036484245439469376,
+    "hi": 0.053787268331990434
+   }
+  },
+  "entity: the rule added": {
+   "a": "entity3k",
+   "b": "entity3k-place",
+   "full": {
+    "n": 112,
+    "diff": -0.04700640490114183,
+    "lo": -0.11054691632286051,
+    "hi": 0.012587412587412583
+   },
+   "city": {
+    "n": 112,
+    "diff": -0.016040100250626632,
+    "lo": -0.04170582706766912,
+    "hi": 0.0
+   }
+  }
+ },
+ "rule_dropped": 26,
  "place_moves": {
   "tagging": {
    "emptied, truth has none": 17,

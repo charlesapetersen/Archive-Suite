@@ -37,7 +37,7 @@ Two readers drafted every document blind (A: GPT 5.6 Luna, B: Claude Sonnet 5, b
 
 Disputed fields and flags (documents): hand 54, sending_place 49, recipient 35, role_addressed 27, sender 26, signed 7, dateline 5, is_correspondence 4.
 
-Spend: $4.76 estimated over 412 gateway calls (drafts $2.35, adjudication $2.41), at ceiling prices (Luna $0.20 / $1.20, Sonnet 5 $3 / $15 a million tokens); the gateway returns no cost.
+Spend: $4.76 estimated over 412 gateway calls (drafts $2.35, adjudication $2.41), at ceiling prices (Luna $0.20 / $1.20, Sonnet 5 $3 / $15 a million tokens); the gateway reported no cost of its own for these calls.
 
 ## Each reader against the truth (the scorer's self-check)
 

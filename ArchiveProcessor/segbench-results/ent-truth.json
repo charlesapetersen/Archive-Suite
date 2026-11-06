@@ -331,6 +331,15 @@
  },
  "spend_usd": 4.7597,
  "calls": 412,
+ "billed": {
+  "calls": 412,
+  "estimate": 4.759738,
+  "gateway_calls": 0,
+  "gateway": null,
+  "gateway_over_estimate": null,
+  "charged": 4.759738
+ },
+ "billed_note": "the gateway reported no cost of its own for these calls",
  "spend_by_stage": {
   "draft": 2.3509,
   "adjudicate": 2.4088

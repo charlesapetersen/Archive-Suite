@@ -3136,6 +3136,14 @@
    "unscored (note)": 3
   }
  },
+ "kept_place_kinds": {
+  "dateline": 5,
+  "line above a date": 2,
+  "heading or address": 51,
+  "read in an image": 10,
+  "institution name": 0,
+  "inferred": 0
+ },
  "rule_dropped_documents": 26,
  "sources": {
   "gemini-3.8-flash tagging reply, ABBYY (82)": "ent-score",
