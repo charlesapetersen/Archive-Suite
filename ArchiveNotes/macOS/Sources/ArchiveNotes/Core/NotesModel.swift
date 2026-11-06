@@ -78,9 +78,10 @@ final class NotesModel: ObservableObject {
 
     // MARK: Current scope (drives the item list in W6-S3/S4)
 
-    /// The active filter scope: `nil` = All Notes (no scope). A normal folder scopes by `folderId`;
-    /// a smart folder applies its decoded `NotesFilter`.
-    @Published private(set) var scope: NotesFilter?
+    /// The active filter scope: `nil` = All Notes (no scope). A normal folder scopes by a folder rule
+    /// (`NotesAdvancedSearch.folderScope`); a smart folder applies its decoded rules, and an Advanced Search
+    /// run without saving is a scope too (`runAdvancedSearch`, neither folder selected).
+    @Published private(set) var scope: NotesAdvancedSearch?
     /// Highlighted normal folder (nil when All Notes / a smart folder is selected).
     @Published private(set) var selectedFolderId: UUID?
     /// Highlighted smart folder (nil when All Notes / a normal folder is selected).
@@ -594,6 +595,29 @@ final class NotesModel: ObservableObject {
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
         guard let index = await openIndexForQuery() else { return [] }
         return await index.search(query)
+    }
+
+    /// The items an Advanced Search text rule's FTS5 expression matches (W40.notes-advanced-search), through
+    /// the same `openIndexForQuery()` as `search(_:)`.
+    func search(expression: String) async -> [UUID] {
+        guard !expression.isEmpty else { return [] }
+        guard let index = await openIndexForQuery() else { return [] }
+        return await index.search(expression: expression)
+    }
+
+    /// The index's answers for every text rule of `search`, by rule id.
+    func textHits(for search: NotesAdvancedSearch) async -> [UUID: Set<UUID>] {
+        var hits: [UUID: Set<UUID>] = [:]
+        for rule in search.textRules {
+            guard let expression = rule.ftsExpression else { continue }
+            hits[rule.id] = Set(await self.search(expression: expression))
+        }
+        return hits
+    }
+
+    /// The items in each folder `search` names, or any folder below it.
+    func folderItems(for search: NotesAdvancedSearch) -> [UUID: Set<UUID>] {
+        Dictionary(uniqueKeysWithValues: search.folderIDs.map { ($0, organization.subtreeItemIDs(of: $0)) })
     }
 
     // MARK: Templates (W6-S6 — §3.7, §6, §16.4)
@@ -1511,7 +1535,7 @@ final class NotesModel: ObservableObject {
 
     private struct SmartCountQuery: Sendable {
         let id: UUID
-        let filter: NotesFilter
+        let search: NotesAdvancedSearch
     }
 
     /// Reuse the durable predicate used by smart-folder navigation. Capture value snapshots on the
@@ -1524,10 +1548,11 @@ final class NotesModel: ObservableObject {
         smartCountApply?.cancel()
         smartFolderCounts = [:]
 
+        // A smart folder with text rules has no count: its rules need index queries, which a count of every
+        // folder on each change would multiply (as the Reader's sidebar).
         let queries: [SmartCountQuery] = smartFolders.compactMap { node in
-            guard let json = node.queryJSON, let data = json.data(using: .utf8),
-                  let filter = try? JSONDecoder().decode(NotesFilter.self, from: data) else { return nil }
-            return SmartCountQuery(id: node.id, filter: filter)
+            guard let search = Self.decodeSmartQuery(node.queryJSON), !search.hasTextRules else { return nil }
+            return SmartCountQuery(id: node.id, search: search)
         }
         guard !queries.isEmpty else { return }
         let items = allItems
@@ -1548,7 +1573,7 @@ final class NotesModel: ObservableObject {
                 itemsByFolder[membership.folderId, default: []].insert(membership.itemId)
             }
             var scopeItems: [UUID: Set<UUID>] = [:]
-            for root in Set(queries.compactMap(\.filter.folderId)) {
+            for root in Set(queries.flatMap(\.search.folderIDs)) {
                 var visited: Set<UUID> = []
                 var stack = [root]
                 var ids: Set<UUID> = []
@@ -1560,13 +1585,13 @@ final class NotesModel: ObservableObject {
                 }
                 scopeItems[root] = ids
             }
+            let context = NotesRuleContext(folderItems: scopeItems)
             var counts = Dictionary(uniqueKeysWithValues: queries.map { ($0.id, 0) })
             for (index, item) in items.enumerated() {
                 if index.isMultiple(of: 256), Task.isCancelled { return nil }
                 for query in queries {
                     if Task.isCancelled { return nil }
-                    let folderItemIDs = query.filter.folderId.flatMap { scopeItems[$0] }
-                    if query.filter.matches(item, folderItemIDs: folderItemIDs) {
+                    if query.search.matches(item, context) {
                         counts[query.id, default: 0] += 1
                     }
                 }
@@ -1595,7 +1620,7 @@ final class NotesModel: ObservableObject {
         guard selectedFolderId != id || selectedSmartId != nil else { return }
         selectedFolderId = id
         selectedSmartId = nil
-        scope = NotesFilter(folderId: id)
+        scope = .folderScope(id)
     }
 
     /// Clear the scope — the "All Notes" pseudo-row.
@@ -1611,16 +1636,38 @@ final class NotesModel: ObservableObject {
     /// `NavigationModel.swift:417-422`).
     func applySmartScope(_ id: UUID) {
         guard let f = organization.folders.first(where: { $0.id == id }), f.kind == .smart else { return }
-        guard let json = f.queryJSON, let data = json.data(using: .utf8),
-              let filter = try? JSONDecoder().decode(NotesFilter.self, from: data) else {
+        guard let search = Self.decodeSmartQuery(f.queryJSON) else {
             statusMessage = "This smart folder's saved query is unreadable."
             setAllNotesScope()
             return
         }
         selectedSmartId = id
         selectedFolderId = nil
-        scope = filter
+        scope = search
     }
+
+    /// A smart folder's saved rules, or nil when there are none or they cannot be read.
+    static func decodeSmartQuery(_ json: String?) -> NotesAdvancedSearch? {
+        guard let data = json?.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(NotesAdvancedSearch.self, from: data)
+    }
+
+    /// The saved rules of smart folder `id`, for Edit Smart Folder….
+    func smartQuery(_ id: UUID) -> NotesAdvancedSearch? {
+        guard let f = organization.folders.first(where: { $0.id == id }), f.kind == .smart else { return nil }
+        return Self.decodeSmartQuery(f.queryJSON)
+    }
+
+    /// Run an Advanced Search without saving it: it becomes the shared scope, with no folder selected in the
+    /// sidebar, until a folder or All Notes is chosen (W40.notes-advanced-search).
+    func runAdvancedSearch(_ search: NotesAdvancedSearch) {
+        selectedFolderId = nil
+        selectedSmartId = nil
+        scope = search
+    }
+
+    /// The scope is an Advanced Search run without saving (no folder or smart folder selected).
+    var scopeIsUnsavedSearch: Bool { scope != nil && selectedFolderId == nil && selectedSmartId == nil }
 
     // MARK: Mutations (routed through OrganizationStore — atomic DB + organization.json writes)
 
@@ -1640,11 +1687,11 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "create the folder"); return nil }
     }
 
-    /// Create a root-level **smart** folder whose saved `NotesFilter` is persisted as `queryJSON`
-    /// (§16.3) — the "Save as Smart Folder" action from the filter bar (W6-S4). Name trimmed, empty
-    /// rejected, sibling-deduped. Returns the new folder id.
+    /// Create a root-level **smart** folder whose rules (`NotesAdvancedSearch`) are persisted as `queryJSON`
+    /// (§16.3) — "Save as Smart Folder" from the filter bar (W6-S4) or the Advanced Search form. Name trimmed,
+    /// empty rejected, sibling-deduped. Returns the new folder id.
     @discardableResult
-    func createSmartFolder(name rawName: String, query: NotesFilter) async -> UUID? {
+    func createSmartFolder(name rawName: String, query: NotesAdvancedSearch) async -> UUID? {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { statusMessage = "A smart folder needs a name."; return nil }
         let unique = uniqueSiblingName(name, parent: nil, excluding: nil)
@@ -1659,6 +1706,20 @@ final class NotesModel: ObservableObject {
             adoptMirrorFailure()
             return created.id
         } catch { report(error, "create the smart folder"); return nil }
+    }
+
+    /// Replace smart folder `id`'s rules (Edit Smart Folder…). When it is the open scope, the list follows.
+    func updateSmartFolder(_ id: UUID, query: NotesAdvancedSearch) async {
+        guard let data = try? JSONEncoder().encode(query),
+              let json = String(data: data, encoding: .utf8) else {
+            statusMessage = "Couldn't encode the smart folder's query."; return
+        }
+        do {
+            try await organization.updateSmartQuery(id, queryJSON: json)
+            rebuild()
+            adoptMirrorFailure()
+            if selectedSmartId == id { scope = query }
+        } catch { report(error, "save the smart folder") }
     }
 
     /// Rename a folder. Whitespace-trimmed; empty rejected; deduped against siblings (excluding self).

@@ -200,34 +200,6 @@ final class NotesFilterTests: XCTestCase {
         XCTAssertFalse(f.matches(item("Peace times", kind: .note, quality: 3), folderItemIDs: nil))
     }
 
-    // MARK: - effective(base:user:)
-
-    func testEffectiveUserWinsElseBase() {
-        var base = NotesFilter(); base.kind = .extracts; base.qualities = [3]; base.searchText = "base"
-        base.dateFrom = 19000000; base.folderId = UUID()
-        var user = NotesFilter(); user.kind = .all; user.searchText = ""   // all/blank → inherit base
-        var eff = NotesFilter.effective(base: base, user: user)
-        XCTAssertEqual(eff.kind, .extracts)
-        XCTAssertEqual(eff.qualities, [3])
-        XCTAssertEqual(eff.searchText, "base")
-        XCTAssertEqual(eff.dateFrom, 19000000)
-        XCTAssertEqual(eff.folderId, base.folderId)
-
-        user.kind = .notes; user.qualities = [1]; user.searchText = "user"; user.dateFrom = 20000000
-        eff = NotesFilter.effective(base: base, user: user)
-        XCTAssertEqual(eff.kind, .notes)            // user wins
-        XCTAssertEqual(eff.qualities, [1])
-        XCTAssertEqual(eff.searchText, "user")
-        XCTAssertEqual(eff.dateFrom, 20000000)
-    }
-
-    func testEffectiveTagsUnion() {
-        var base = NotesFilter(); base.tags = ["A", "B"]
-        var user = NotesFilter(); user.tags = ["B", "C"]
-        let eff = NotesFilter.effective(base: base, user: user)
-        XCTAssertEqual(Set(eff.tags), ["A", "B", "C"])
-    }
-
     // MARK: - Tolerant decode (older/partial smart-folder JSON)
 
     func testTolerantDecodePartialJSON() throws {

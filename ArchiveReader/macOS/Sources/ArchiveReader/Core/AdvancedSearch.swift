@@ -3,6 +3,9 @@ import ArchiveCore
 
 // MARK: - Advanced Search (W40.reader-advanced-search)
 //
+// `RuleCombine`, `RuleOperator`, `DateRoleChoice` and the text and date parsing are ArchiveCore's
+// (`Search/AdvancedSearchRules.swift`), shared with Notes' Advanced Search (W40.notes-advanced-search).
+//
 // Finder-style rules: "all" or "any of the following rules", each row a field, an operator and a value, and a
 // row may be a group with its own all/any. This is what a smart folder stores. Pure and UI-free: the text rules
 // are answered by the content index (`ftsExpression`), whose hits the caller passes in as `RuleContext`; every
@@ -11,11 +14,6 @@ import ArchiveCore
 // A rule with no value yet (an empty text box, no tags picked) is inactive and is skipped, so the starter rows
 // change nothing until they are filled in. "has none of these tags" exists here only: the filter bar keeps its
 // no-NOT rule (owner, 2026-11-04).
-
-/// How a list of rules combines.
-enum RuleCombine: String, Codable, Sendable, CaseIterable {
-    case all, any
-}
 
 enum RuleField: String, Codable, Sendable, CaseIterable {
     /// OCR text, file name and classification: the columns the Find box searches.
@@ -58,29 +56,6 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
         case .date: return [.between, .after, .before, .undated]
         case .needsAttention, .ambiguousDate, .flagged: return [.is, .isNot]
         case .group: return [.is]
-        }
-    }
-}
-
-enum RuleOperator: String, Codable, Sendable {
-    case allWords, phrase, anyWords, noWords
-    case contains, doesNotContain, beginsWith, endsWith
-    case hasAll, hasAny, hasNone
-    case `is`, isNot
-    /// Dates: `between` uses `text` … `text2`; `after` and `before` are inclusive of the value typed, which is a
-    /// year, a year-month or a full date.
-    case between, after, before, undated
-}
-
-/// Which of a document's two dates a date rule looks at (W37.dual-date).
-enum DateRoleChoice: String, Codable, Sendable, CaseIterable {
-    case either, own, sentWith
-
-    var roles: [DateRole] {
-        switch self {
-        case .either: return DateRole.allCases
-        case .own: return [.own]
-        case .sentWith: return [.sentWith]
         }
     }
 }
@@ -148,23 +123,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
 
     /// A date rule's inclusive key bounds (`DocumentTags.sortDateKey` space), or nil while a value it needs is
     /// missing or unreadable. A year runs from its first to its last day, a month likewise.
-    var dateBounds: DateRangeFilter? {
-        let from = AdvancedSearch.dateKeys(text), to = AdvancedSearch.dateKeys(text2)
-        switch op {
-        case .after: return from.map { DateRangeFilter(lower: $0.lower, upper: nil) }
-        case .before: return from.map { DateRangeFilter(lower: nil, upper: $0.upper) }
-        case .between:
-            switch (from, to) {
-            case let (f?, t?): return DateRangeFilter(lower: f.lower, upper: t.upper)
-            case let (f?, nil) where text2.trimmingCharacters(in: .whitespaces).isEmpty:
-                return DateRangeFilter(lower: f.lower, upper: nil)
-            case let (nil, t?) where text.trimmingCharacters(in: .whitespaces).isEmpty:
-                return DateRangeFilter(lower: nil, upper: t.upper)
-            default: return nil
-            }
-        default: return nil
-        }
-    }
+    var dateBounds: DateRangeFilter? { AdvancedSearchText.dateBounds(op: op, from: text, to: text2) }
 
     /// The FTS5 expression whose hits a text rule needs, or nil for other rules. For `noWords` it is the files
     /// to leave out (any of the words).
@@ -273,11 +232,8 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
             }
             return state == positive
         case .date:
-            let keys = file.tags.dateKeysByRole
-            let roles = rule.dateRole.roles
-            if rule.op == .undated { return !roles.contains { keys[$0] != nil } }
-            guard let bounds = rule.dateBounds else { return nil }
-            return roles.contains { keys[$0].map(bounds.contains) ?? false }
+            return AdvancedSearchText.dateMatches(op: rule.op, bounds: rule.dateBounds, role: rule.dateRole,
+                                                  keys: file.tags.dateKeysByRole)
         case .folder:
             let dir = rule.text.hasSuffix("/") ? String(rule.text.dropLast()) : rule.text
             return (file.path == dir || file.path.hasPrefix(dir + "/")) == positive
@@ -288,56 +244,15 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
         }
     }
 
-    // MARK: Text → FTS5
+    // MARK: Text and dates (shared with Notes: ArchiveCore `AdvancedSearchText`)
 
-    /// The words of a text box: split on white space, outer quotes dropped. A token with no letter or digit
-    /// ("-", "&") is no word: the index holds no such token, so it could only ever match nothing.
-    static func words(_ text: String) -> [String] {
-        text.split(whereSeparator: { $0.isWhitespace })
-            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "\"\u{201c}\u{201d}")) }
-            .filter { $0.contains { $0.isLetter || $0.isNumber } }
-    }
+    static func words(_ text: String) -> [String] { AdvancedSearchText.words(text) }
 
-    /// A safe FTS5 expression for one text rule; no typed text can be FTS5 syntax. Each word is quoted, its own
-    /// quotes doubled; a word typed with a trailing `*` matches as a prefix. `column` restricts it to one column.
     static func ftsExpression(op: RuleOperator, text: String, column: String?) -> String? {
-        let ws = words(text)
-        guard !ws.isEmpty else { return nil }
-        func quoted(_ w: String) -> String {
-            let prefix = w.hasSuffix("*")
-            let bare = prefix ? String(w.dropLast()) : w
-            return "\"" + bare.replacingOccurrences(of: "\"", with: "\"\"") + "\"" + (prefix ? "*" : "")
-        }
-        let body: String
-        switch op {
-        case .phrase:
-            let phrase = ws.map { $0.hasSuffix("*") ? String($0.dropLast()) : $0 }.joined(separator: " ")
-            body = "\"" + phrase.replacingOccurrences(of: "\"", with: "\"\"") + "\""
-        case .anyWords, .noWords: body = ws.map(quoted).joined(separator: " OR ")
-        default: body = ws.map(quoted).joined(separator: " ")
-        }
-        guard let column else { return ws.count == 1 || op == .phrase ? body : "(\(body))" }
-        return "\(column) : (\(body))"
+        AdvancedSearchText.ftsExpression(op: op, text: text, column: column)
     }
 
-    // MARK: Dates
-
-    /// The inclusive key range a typed date covers: "1981", "1981-06", "1981-06-30" or "1950s". Single-digit
-    /// months and days are accepted ("1981-6-3"). nil when it is not a date.
-    static func dateKeys(_ text: String) -> (lower: Int, upper: Int)? {
-        let s = text.trimmingCharacters(in: .whitespaces)
-        guard !s.isEmpty else { return nil }
-        let padded = s.split(separator: "-", omittingEmptySubsequences: false).enumerated()
-            .map { i, p in i > 0 && p.count == 1 ? "0" + p : String(p) }.joined(separator: "-")
-        guard let d = ArchiveDate.parse(wireValue: padded) else { return nil }
-        let key = d.sortKey
-        switch d.precision {
-        case .decade: return (key, (d.year + 9) * 10_000 + 1231)
-        case .year: return (key, d.year * 10_000 + 1231)
-        case .month: return (key, d.year * 10_000 + d.month! * 100 + 31)
-        case .day: return (key, key)
-        }
-    }
+    static func dateKeys(_ text: String) -> (lower: Int, upper: Int)? { AdvancedSearchText.dateKeys(text) }
 }
 
 // MARK: - From the filter bar

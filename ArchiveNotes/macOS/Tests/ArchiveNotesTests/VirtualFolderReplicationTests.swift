@@ -149,9 +149,10 @@ struct VirtualFolderReplicationTests {
         let (store, index, root) = try await makeTempEnv()
         defer { Task { await cleanup(root, index) } }
 
-        var query = NotesFilter()
-        query.searchText = "invoice"
-        query.tags = ["finance"]
+        var filter = NotesFilter()
+        filter.searchText = "invoice"
+        filter.tags = ["finance"]
+        let query = NotesAdvancedSearch(filter: filter, keyword: "")
         let encoded = String(decoding: try JSONEncoder().encode(query), as: UTF8.self)
 
         let smart = try await store.createFolder(name: "Invoices", kind: .smart, queryJSON: encoded)
@@ -162,7 +163,7 @@ struct VirtualFolderReplicationTests {
         #expect(store.memberships.filter { $0.folderId == smart.id }.isEmpty)
 
         // The saved query decodes back to the same filter.
-        let decoded = try JSONDecoder().decode(NotesFilter.self, from: Data(smart.queryJSON!.utf8))
+        let decoded = try JSONDecoder().decode(NotesAdvancedSearch.self, from: Data(smart.queryJSON!.utf8))
         #expect(decoded == query)
     }
 

@@ -85,8 +85,8 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
             saveSmartFolder(named: "E2 Intel")
             clearFilters()
 
-            // A keyword-based one: the live keyword is folded in as a durable TITLE substring on save
-            // (`NotesNavigationModel.currentUserFilter`), so use a word from a title.
+            // A keyword-based one: the live keyword is saved as the full-text rule it is
+            // (`NotesAdvancedSearch(filter:keyword:)`, W40.notes-advanced-search).
             let search = mainWindow.textFields["an.filter.search"]
             search.click()
             search.typeText("Lovelace")

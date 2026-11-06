@@ -57,6 +57,7 @@ struct NotesFolderTreeView: View {
         .onChange(of: model.selectedFolderId) { _, _ in syncSelectionFromModel() }
         .onChange(of: model.selectedSmartId) { _, _ in syncSelectionFromModel() }
         .onChange(of: nav.paneMode) { _, _ in syncSelectionFromModel() }
+        .onChange(of: model.scopeIsUnsavedSearch) { _, _ in syncSelectionFromModel() }
         // Rename
         .sheet(isPresented: boolBinding($renameID)) {
             let id = renameID
@@ -104,6 +105,10 @@ struct NotesFolderTreeView: View {
                         count: model.smartFolderCounts[node.id], showZero: true)
                         .tag(Self.smartPrefix + node.id.uuidString)
                         .accessibilityIdentifier("an.sidebar.smart")
+                        .contextMenu {
+                            Button("Edit Smart Folder\u{2026}") { nav.editSmartFolder(node.id) }
+                            Button("Rename\u{2026}") { renameText = node.name; renameID = node.id }
+                        }
                 }
             }
         }
@@ -484,6 +489,8 @@ struct NotesFolderTreeView: View {
     private func applySelection(_ new: String?) {
         if new == Self.templatesTag { nav.showingTemplates = true; return }
         if new == Self.trashTag { nav.showingTrash = true; return }
+        // An unsaved Advanced Search selects no row; the sync to nil must not undo it (W40.notes-advanced-search).
+        if new == nil, model.scopeIsUnsavedSearch { return }
         nav.showingTemplates = false   // any folder/smart/All-Notes selection leaves templates or Trash mode
         guard let new, new != Self.allNotesTag else { model.setAllNotesScope(); return }
         if new.hasPrefix(Self.smartPrefix) {
@@ -496,11 +503,12 @@ struct NotesFolderTreeView: View {
     }
 
     private func syncSelectionFromModel() {
-        let want: String
+        let want: String?
         if nav.showingTemplates { want = Self.templatesTag }
         else if nav.showingTrash { want = Self.trashTag }
         else if let s = model.selectedSmartId { want = Self.smartPrefix + s.uuidString }
         else if let f = model.selectedFolderId { want = f.uuidString }
+        else if model.scopeIsUnsavedSearch { want = nil }
         else { want = Self.allNotesTag }
         if selection != want { selection = want }
     }

@@ -10,7 +10,7 @@ struct VFolder: Sendable, Equatable, Identifiable, Codable {
     var sortOrder: Int
     enum Kind: String, Sendable, Codable { case normal, smart }
     var kind: Kind
-    /// Encoded `NotesFilter` for smart folders (§16.3); nil for normal folders.
+    /// Encoded `NotesAdvancedSearch` rules for smart folders (§16.3); nil for normal folders.
     var queryJSON: String?
 }
 
@@ -386,6 +386,20 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         #if DEBUG
         if let hook = folderGraphAfterIndexHookForTesting { await hook(id) }
         #endif
+        folders[i] = updated
+        exportOrganization()
+    }
+
+    /// Replace a smart folder's saved rules (`queryJSON`); a normal or system folder is left alone.
+    func updateSmartQuery(_ id: UUID, queryJSON: String) async throws {
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
+        try refuseWhileReadOnly()
+        try refuseSystemFolder(id)
+        guard let i = folders.firstIndex(where: { $0.id == id }), folders[i].kind == .smart else { return }
+        var updated = folders[i]
+        updated.queryJSON = queryJSON
+        try await index.updateFolder(updated)
         folders[i] = updated
         exportOrganization()
     }

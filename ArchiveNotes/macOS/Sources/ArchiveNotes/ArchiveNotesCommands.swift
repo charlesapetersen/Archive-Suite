@@ -153,6 +153,34 @@ enum NewItemFlow {
     }
 }
 
+/// Edit ▸ Advanced Search… (⇧⌥⌘F, as in the Reader; W40.notes-advanced-search): the focused window's form.
+struct AdvancedSearchCommands: Commands {
+    @FocusedValue(\.advancedSearchAction) private var advancedSearch
+
+    var body: some Commands {
+        CommandGroup(after: .textEditing) {
+            Button("Advanced Search\u{2026}") { advancedSearch?.open() }
+                .keyboardShortcut("f", modifiers: [.command, .option, .shift])
+                .disabled(advancedSearch == nil)
+        }
+    }
+}
+
+struct AdvancedSearchAction {
+    let open: @MainActor () -> Void
+}
+
+struct AdvancedSearchActionKey: FocusedValueKey {
+    typealias Value = AdvancedSearchAction
+}
+
+extension FocusedValues {
+    var advancedSearchAction: AdvancedSearchAction? {
+        get { self[AdvancedSearchActionKey.self] }
+        set { self[AdvancedSearchActionKey.self] = newValue }
+    }
+}
+
 /// View menu: side by side, or the list above the note (W48.notes-stacked-layout), and Show/Hide Inspector
 /// (⌥⌘I, W40.notes-detail-layout; ⌘I is Italic here). Both windows follow the one remembered choice;
 /// `NotesBrowserView` reads the same keys.

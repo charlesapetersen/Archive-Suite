@@ -1,4 +1,5 @@
-// NotesFilter.swift — shared filter type for live filtering + smart-folder persistence
+// NotesFilter.swift — the filter bar's state (smart folders store `NotesAdvancedSearch` rules since
+// W40.notes-advanced-search; `NotesAdvancedSearch(filter:keyword:)` turns this into them)
 // Canonical definition: 00-overview.md §16.3 (Interface Contract)
 
 import Foundation
@@ -17,9 +18,7 @@ enum KindFilter: String, Codable, Sendable {
     case all
 }
 
-/// A single filter specification used for both live UI filtering and persisted smart-folder queries.
-///
-/// Smart folders store an encoded `NotesFilter` in `folders.query_json` (W2/W6).
+/// The per-window filter bar's state. A smart folder stores rules instead (`NotesAdvancedSearch`).
 /// All fields have sensible defaults so an empty `NotesFilter()` matches everything.
 struct NotesFilter: Codable, Equatable, Sendable {
     var searchText: String = ""
@@ -35,8 +34,6 @@ struct NotesFilter: Codable, Equatable, Sendable {
     var folderId: UUID? = nil
     /// nil = any; true = round-up notes; false = other items.
     var roundup: Bool? = nil
-    /// Persist an empty intersection when a smart scope and live round-up facet conflict.
-    var matchesNothing: Bool = false
 
     /// The bounds as Core's either-role range predicate (`DateRangeFilter`).
     var dateRange: DateRangeFilter { DateRangeFilter(lower: dateFrom, upper: dateTo) }
@@ -57,7 +54,6 @@ struct NotesFilter: Codable, Equatable, Sendable {
             && dateTo == nil
             && folderId == nil
             && roundup == nil
-            && !matchesNothing
     }
 
     /// Whether this filter narrows anything (the inverse of `isEmpty`).
@@ -68,11 +64,9 @@ struct NotesFilter: Codable, Equatable, Sendable {
     /// **graph membership** test, not a path prefix: the caller resolves `folderId` → the subtree's
     /// item ids (`OrganizationStore.subtreeItemIDs`) once per recompute and passes it as `folderItemIDs`.
     ///
-    /// Pure + `Sendable`-safe (no store access) so it is reused verbatim for both live filtering and a
-    /// persisted smart-folder query. `searchText` is a **title substring** here — the durable keyword
-    /// predicate; live keyword search runs through FTS in the navigation model instead (06-viewers §4).
+    /// Pure + `Sendable`-safe (no store access). `searchText` is a **title substring** here; live keyword
+    /// search runs through FTS in the navigation model instead (06-viewers §4).
     func matches(_ item: ItemSummary, folderItemIDs: Set<UUID>?) -> Bool {
-        if matchesNothing { return false }
         if let roundup, item.roundup != roundup { return false }
         // Folder scope — membership in the folder's subtree (graph, not path prefix).
         if folderId != nil {
@@ -126,29 +120,7 @@ extension NotesFilter {
             dateFrom:    try c.decodeIfPresent(Int.self,         forKey: .dateFrom),
             dateTo:      try c.decodeIfPresent(Int.self,         forKey: .dateTo),
             folderId:    try c.decodeIfPresent(UUID.self,        forKey: .folderId),
-            roundup:     try c.decodeIfPresent(Bool.self,        forKey: .roundup),
-            matchesNothing: try c.decodeIfPresent(Bool.self,     forKey: .matchesNothing) ?? false
+            roundup:     try c.decodeIfPresent(Bool.self,        forKey: .roundup)
         )
-    }
-
-    /// Fold a per-window `user` filter onto a `base` scope (a smart folder / folder selection) for
-    /// "Save as Smart Folder". Per-facet: user wins when set, else inherit base; tags = union.
-    /// Mirrors `LibraryFilter.effective(base:user:)` (`Core/LibraryFilter.swift:98-110`).
-    /// Round-up predicates intersect, matching the live scope; an impossible pair stays empty on save.
-    static func effective(base: NotesFilter, user: NotesFilter) -> NotesFilter {
-        var r = NotesFilter()
-        r.kind = user.kind != .all ? user.kind : base.kind
-        r.qualities = user.qualities.isEmpty ? base.qualities : user.qualities
-        r.tags = Array(Set(base.tags).union(user.tags)).sorted()
-        r.tagCombine = user.tags.isEmpty ? base.tagCombine : user.tagCombine
-        let us = user.searchText.trimmingCharacters(in: .whitespaces)
-        r.searchText = us.isEmpty ? base.searchText : user.searchText
-        r.dateFrom = user.dateFrom ?? base.dateFrom
-        r.dateTo = user.dateTo ?? base.dateTo
-        r.folderId = user.folderId ?? base.folderId
-        r.roundup = user.roundup ?? base.roundup
-        r.matchesNothing = base.matchesNothing || user.matchesNothing
-            || (base.roundup != nil && user.roundup != nil && base.roundup != user.roundup)
-        return r
     }
 }

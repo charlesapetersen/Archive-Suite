@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCore
 
 /// The Advanced Search form (W40.reader-advanced-search): Finder-style rule rows under "Match all/any of the
 /// following rules", each a field, an operator and a value, with + and − at the end of the row and a group button

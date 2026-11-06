@@ -35,20 +35,21 @@ struct RoundupTests {
         #expect(summary.roundup)
         #expect(await index.search("RoundupSearchMarker") == [item.id])
 
-        let query = NotesFilter(searchText: "RoundupSearchMarker", roundup: true)
+        let query = NotesAdvancedSearch(filter: NotesFilter(searchText: "RoundupSearchMarker", roundup: true),
+                                        keyword: "")
         let folderID = try #require(await model.createSmartFolder(name: "Round-ups", query: query))
         let folder = try #require(organization.folders.first { $0.id == folderID })
         let encoded = try #require(folder.queryJSON?.data(using: .utf8))
-        let decoded = try JSONDecoder().decode(NotesFilter.self, from: encoded)
-        #expect(decoded.matches(summary, folderItemIDs: nil))
-        #expect(NotesFilter.effective(base: decoded, user: NotesFilter()).roundup == true)
-        let conflict = NotesFilter.effective(base: decoded, user: NotesFilter(roundup: false))
-        #expect(!conflict.matches(summary, folderItemIDs: nil))
+        let decoded = try JSONDecoder().decode(NotesAdvancedSearch.self, from: encoded)
+        #expect(decoded.matches(summary, NotesRuleContext()))
+        // A round-up smart folder narrowed by "other items" in the filter bar matches nothing, saved or not.
+        let conflict = decoded.narrowed(by: NotesAdvancedSearch(filter: NotesFilter(roundup: false), keyword: ""))
+        #expect(!conflict.matches(summary, NotesRuleContext()))
         var nonRoundup = summary; nonRoundup.roundup = false
-        #expect(!conflict.matches(nonRoundup, folderItemIDs: nil))
-        let restoredConflict = try JSONDecoder().decode(NotesFilter.self, from: JSONEncoder().encode(conflict))
-        #expect(!restoredConflict.matches(summary, folderItemIDs: nil))
-        #expect(!restoredConflict.matches(nonRoundup, folderItemIDs: nil))
+        #expect(!conflict.matches(nonRoundup, NotesRuleContext()))
+        let restoredConflict = try JSONDecoder().decode(NotesAdvancedSearch.self, from: JSONEncoder().encode(conflict))
+        #expect(!restoredConflict.matches(summary, NotesRuleContext()))
+        #expect(!restoredConflict.matches(nonRoundup, NotesRuleContext()))
         #expect(try JSONDecoder().decode(NotesFilter.self, from: Data("{}".utf8)).roundup == nil)
 
         await index.close()
@@ -57,7 +58,7 @@ struct RoundupTests {
         #expect(try await index.allFolders().contains { $0.id == folderID })
         #expect(await model.setRoundup(false, for: item.id))
         let ordinary = try #require(await index.summary(for: item.id))
-        #expect(!decoded.matches(ordinary, folderItemIDs: nil))
+        #expect(!decoded.matches(ordinary, NotesRuleContext()))
         #expect(NotesFilter(roundup: false).matches(ordinary, folderItemIDs: nil))
         #expect(try await store.load(item.id).date == nil)
         var extract = item

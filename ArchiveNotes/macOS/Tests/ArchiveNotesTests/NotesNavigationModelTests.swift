@@ -268,7 +268,8 @@ struct NotesNavigationModelTests {
         try await model.organization.addMembership(item: inside.id, folder: folder.id)
         try await model.organization.addMembership(item: extract.id, folder: folder.id)
 
-        let query = NotesFilter(searchText: "budget", kind: .notes, folderId: folder.id)
+        let query = NotesAdvancedSearch(filter: NotesFilter(searchText: "budget", kind: .notes, folderId: folder.id),
+                                        keyword: "")
         let json = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
         let smart = try await model.organization.createFolder(
             name: "Project budgets", kind: .smart, queryJSON: json)
@@ -408,11 +409,12 @@ struct NotesNavigationModelTests {
         await nav.saveAsSmartFolder(named: "My Search")
         let smart = model.organization.folders.first { $0.kind == .smart && $0.name == "My Search" }
         #expect(smart != nil)
-        let decoded = smart?.queryJSON
-            .flatMap { try? JSONDecoder().decode(NotesFilter.self, from: Data($0.utf8)) }
-        #expect(decoded?.qualities == [3])
-        #expect(decoded?.searchText == "brown")   // live keyword folded into the durable query
-        #expect(decoded?.kind == .notes)          // window kind (user wins over base .all)
+        let decoded = try #require(smart?.queryJSON
+            .flatMap { try? JSONDecoder().decode(NotesAdvancedSearch.self, from: Data($0.utf8)) })
+        #expect(decoded.rules.contains { $0.field == .quality && $0.qualities == [3] })
+        // The search box is kept as the full-text rule it is (every column, last word a prefix), not a title.
+        #expect(decoded.rules.contains { $0.field == .text && $0.op == .allWords && $0.text == "brown*" })
+        #expect(decoded.rules.contains { $0.field == .kind && $0.kind == .note })   // the window's kind
     }
 
     // MARK: - W6-S4 helpers

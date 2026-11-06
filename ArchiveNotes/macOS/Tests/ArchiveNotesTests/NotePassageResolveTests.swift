@@ -236,17 +236,19 @@ struct NotePassageResolveTests {
     @Test func scopeHidesATargetOutsideTheFolderSubtree() {
         let target = summary(sourceID, title: "The source note")
         let folder = UUID()
-        #expect(!NotePassageResolve.scopeHides(target, scope: nil, scopeItemIDs: nil))       // All Notes
-        #expect(!NotePassageResolve.scopeHides(target, scope: NotesFilter(folderId: folder),
-                                               scopeItemIDs: [sourceID]))
-        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(folderId: folder), scopeItemIDs: []))
-        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(folderId: folder), scopeItemIDs: nil))
+        let scope = NotesAdvancedSearch.folderScope(folder)
+        #expect(!NotePassageResolve.scopeHides(target, scope: nil, context: NotesRuleContext()))   // All Notes
+        #expect(!NotePassageResolve.scopeHides(target, scope: scope,
+                                               context: NotesRuleContext(folderItems: [folder: [sourceID]])))
+        #expect(NotePassageResolve.scopeHides(target, scope: scope, context: NotesRuleContext(folderItems: [folder: []])))
+        #expect(NotePassageResolve.scopeHides(target, scope: scope, context: NotesRuleContext()))
     }
 
     @Test func scopeHidesATargetASmartFolderQueryExcludes() {
         let target = summary(sourceID, title: "The source note", kind: .note)
-        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(kind: .extracts), scopeItemIDs: nil))
-        #expect(!NotePassageResolve.scopeHides(target, scope: NotesFilter(searchText: "source"), scopeItemIDs: nil))
-        #expect(NotePassageResolve.scopeHides(target, scope: NotesFilter(searchText: "unrelated"), scopeItemIDs: nil))
+        func smart(_ f: NotesFilter) -> NotesAdvancedSearch { NotesAdvancedSearch(filter: f, keyword: "") }
+        #expect(NotePassageResolve.scopeHides(target, scope: smart(NotesFilter(kind: .extracts)), context: .init()))
+        #expect(!NotePassageResolve.scopeHides(target, scope: smart(NotesFilter(searchText: "source")), context: .init()))
+        #expect(NotePassageResolve.scopeHides(target, scope: smart(NotesFilter(searchText: "unrelated")), context: .init()))
     }
 }

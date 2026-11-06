@@ -5,7 +5,7 @@ import AppKit
 /// surfaces the kind segmented control, a keyword search field (drives FTS — bm25 relevance,
 /// as-you-type), quality (★1–★3) toggles, a tag filter with chips (every tag must match), a year date
 /// range with its own clear button, and Save-as-Smart-Folder / Clear All. Matching any tag rather than
-/// all of them belongs to Advanced Search (`W40.notes-advanced-search`), not this bar (owner, notes-1
+/// all of them belongs to Advanced Search (`NotesAdvancedSearchSheet`, Advanced…), not this bar (owner, notes-1
 /// row 37, as ruled for the Reader on 2026-11-04). The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
 ///
@@ -20,6 +20,7 @@ struct NotesFilterBar: View {
 
     var body: some View {
         VStack(spacing: 6) {
+            if nav.model.scopeIsUnsavedSearch { advancedScopeRow }
             topRow
             facetRow
             HStack {
@@ -63,6 +64,10 @@ struct NotesFilterBar: View {
             .accessibilityIdentifier("an.filter.kind")
 
             keywordField
+
+            Button("Advanced\u{2026}") { nav.openAdvancedSearch() }
+                .help("Advanced Search: rules for text, title, authors, tags, kind, quality, dates and folders (⇧⌥⌘F)")
+                .accessibilityIdentifier("an.filter.advanced")
 
             Text("\(nav.displayed.count)")
                 .font(.callout.monospacedDigit())
@@ -110,6 +115,23 @@ struct NotesFilterBar: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)))
         .frame(minWidth: 160)
+    }
+
+    /// Shown while the list is an Advanced Search run without saving, so it can be edited or left
+    /// (W40.notes-advanced-search).
+    private var advancedScopeRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
+            Text("Advanced Search").font(.callout)
+            Button("Edit\u{2026}") { nav.openAdvancedSearch() }
+                .accessibilityIdentifier("an.filter.advancedEdit")
+            Button("Show All Notes") { nav.model.setAllNotesScope() }
+                .accessibilityIdentifier("an.filter.advancedDone")
+            Spacer(minLength: 0)
+        }
+        .controlSize(.small)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("an.filter.advancedScope")
     }
 
     // MARK: Row 2 — quality · tags · date range

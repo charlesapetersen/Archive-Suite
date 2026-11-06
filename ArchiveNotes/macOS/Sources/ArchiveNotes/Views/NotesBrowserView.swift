@@ -115,6 +115,10 @@ struct NotesBrowserView: View {
         .toolbar { toolbar }
         .focusedSceneValue(\.newItemAction, NewItemAction(perform: { newItem(kind: $0, from: .folderDefault) },
                                                            newTemplate: { showNewTemplate() }))
+        .focusedSceneValue(\.advancedSearchAction, AdvancedSearchAction(open: { openAdvancedSearch() }))
+        .sheet(item: $nav.advancedSearchRequest) { request in
+            NotesAdvancedSearchSheet(nav: nav, request: request)
+        }
         // File ▸ New Template… with no window open opened this one for it; the Extracts window leaves it alone.
         .onReceive(model.$pendingNewTemplate) { pending in
             guard pending, nav.windowKind == .note else { return }
@@ -318,6 +322,9 @@ struct NotesBrowserView: View {
     }
 
     /// The templates manager, with its New Template sheet open (W40.fix-notes-templates).
+    /// Edit ▸ Advanced Search… and the filter bar's Advanced… button (W40.notes-advanced-search).
+    private func openAdvancedSearch() { nav.openAdvancedSearch() }
+
     private func showNewTemplate() {
         nav.showingTemplates = true
         nav.newTemplateRequested = true

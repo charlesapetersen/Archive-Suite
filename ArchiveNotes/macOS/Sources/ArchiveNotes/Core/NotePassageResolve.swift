@@ -116,11 +116,11 @@ enum NotePassageResolve {
 
     /// Whether the shared folder/smart-folder `scope` keeps `target` out of every window's list, so a
     /// jump that only clears the window's user filters would load the note without highlighting its
-    /// row (W40.fix-notes-jump-pending-template). `scopeItemIDs` is the scope folder's subtree
-    /// membership, as `NotesNavigationModel.recompute` passes it; `nil` scope is All Notes.
-    static func scopeHides(_ target: ItemSummary, scope: NotesFilter?, scopeItemIDs: Set<UUID>?) -> Bool {
+    /// row (W40.fix-notes-jump-pending-template). `context` holds the scope folders' subtree
+    /// membership and text-rule answers, as `NotesNavigationModel.recompute` passes them; `nil` scope is All Notes.
+    static func scopeHides(_ target: ItemSummary, scope: NotesAdvancedSearch?, context: NotesRuleContext) -> Bool {
         guard let scope else { return false }
-        return !scope.matches(target, folderItemIDs: scopeItemIDs)
+        return !scope.matches(target, context)
     }
 }
 

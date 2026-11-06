@@ -169,7 +169,7 @@ struct NotesModelTests {
         let folder = try #require(await model.createFolder(name: "F", under: nil))
         model.setFolderScope(folder)
         #expect(model.selectedFolderId == folder)
-        #expect(model.scope?.folderId == folder)
+        #expect(model.scope?.plainFolderScope == folder)
 
         model.setFolderScope(OrganizationStore.allNotesFolderId)   // All-Notes root clears scope
         #expect(model.scope == nil)
@@ -180,9 +180,10 @@ struct NotesModelTests {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }
 
-        var query = NotesFilter()
-        query.searchText = "silicon valley"
-        query.tags = ["meritocracy"]
+        var filter = NotesFilter()
+        filter.searchText = "silicon valley"
+        filter.tags = ["meritocracy"]
+        let query = NotesAdvancedSearch(filter: filter, keyword: "")
         let json = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
         let smart = try await model.organization.createFolder(
             name: "SV", parent: nil, kind: .smart, queryJSON: json)
@@ -190,8 +191,9 @@ struct NotesModelTests {
 
         model.applySmartScope(smart.id)
         #expect(model.selectedSmartId == smart.id)
-        #expect(model.scope?.searchText == "silicon valley")
-        #expect(model.scope?.tags == ["meritocracy"])
+        #expect(model.scope == query)
+        #expect(model.scope?.rules.contains { $0.field == .title && $0.text == "silicon valley" } == true)
+        #expect(model.scope?.rules.contains { $0.field == .tags && $0.tagList == ["meritocracy"] } == true)
     }
 
     @Test func applySmartScopeUnreadableDegradesToAllNotes() async throws {

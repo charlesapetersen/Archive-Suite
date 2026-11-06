@@ -349,7 +349,12 @@ actor NotesIndex {
     /// Column weights (FTS5 column order: title, tags, authors, body): title=10, tags=6,
     /// authors=4, body=1 — prose-tuned per §16.5.
     func search(_ query: String, limit: Int? = nil) -> [UUID] {
-        let match = ftsMatchExpression(query)
+        search(expression: ftsMatchExpression(query), limit: limit)
+    }
+
+    /// Full-text search with a ready FTS5 expression, in bm25 order: an Advanced Search text rule's, which
+    /// `AdvancedSearchText.ftsExpression` builds so no typed text is FTS5 syntax (W40.notes-advanced-search).
+    func search(expression match: String, limit: Int? = nil) -> [UUID] {
         guard !match.isEmpty else { return [] }
         let sql = limit == nil
             ? "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 4.0, 1.0);"

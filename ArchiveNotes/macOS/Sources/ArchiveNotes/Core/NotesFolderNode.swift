@@ -10,7 +10,7 @@ struct NotesFolderNode: Identifiable, Hashable, Sendable {
     let id: UUID                 // VFolder.id — NOT a path (the key difference from Reader)
     var name: String
     var kind: VFolder.Kind
-    var queryJSON: String?       // smart-folder encoded NotesFilter (nil for normal folders)
+    var queryJSON: String?       // smart-folder encoded NotesAdvancedSearch (nil for normal folders)
     var itemCount: Int           // DISTINCT items in this subtree (a replicant is counted once)
     var children: [NotesFolderNode]
     var childrenOrNil: [NotesFolderNode]? { children.isEmpty ? nil : children }

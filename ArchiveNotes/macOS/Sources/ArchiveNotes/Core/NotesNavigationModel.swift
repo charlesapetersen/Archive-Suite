@@ -157,7 +157,23 @@ final class NotesNavigationModel: ObservableObject {
     /// Mirror of `model.scope` (the shared folder/smart-folder selection). Kept in sync from the
     /// publisher's DELIVERED value rather than read back from `model.scope`, because `@Published`
     /// emits in `willSet` — reading `model.scope` inside the sink would see the STALE prior value.
-    private var scope: NotesFilter?
+    private var scope: NotesAdvancedSearch?
+    /// The index's answers for the scope's text rules (smart folder or unsaved Advanced Search), by rule id.
+    private var scopeTextHits: [UUID: Set<UUID>] = [:]
+    private var scopeTextGeneration = 0
+
+    /// The Advanced Search form this window shows, or nil (W40.notes-advanced-search).
+    @Published var advancedSearchRequest: AdvancedSearchRequest?
+
+    struct AdvancedSearchRequest: Identifiable, Equatable {
+        let id = UUID()
+        var search: NotesAdvancedSearch
+        /// The smart folder being edited, or nil for a new search.
+        var editingId: UUID?
+        var editingName: String = ""
+
+        static func == (a: Self, b: Self) -> Bool { a.id == b.id }
+    }
 
     /// Where per-window kind featuring is persisted (W7-S4). `nil` ⟹ don't touch `UserDefaults` (tests);
     /// the real app injects `.standard` via `NotesBrowserView`.
@@ -178,14 +194,20 @@ final class NotesNavigationModel: ObservableObject {
         self.filter = NotesFilter(kind: restoredKind ?? windowDefaultKind)
         // Recompute whenever the shared item source changes (index load / refresh).
         model.$allItems
-            .sink { [weak self] items in self?.recompute(items: items) }
+            .sink { [weak self] items in
+                self?.recompute(items: items)
+                // An edit can change what a scope's text rules match; keep the old answers until the new arrive.
+                if self?.scope?.hasTextRules == true { self?.refreshScopeTextHits(clearing: false) }
+            }
             .store(in: &cancellables)
         // Mirror the shared folder/smart-folder scope from the DELIVERED value (fresh; `@Published`
         // emits in willSet, so reading model.scope back here would be stale), then recompute.
         model.$scope
             .sink { [weak self] newScope in
                 guard let self else { return }
+                let textChanged = newScope?.textRules != self.scope?.textRules
                 self.scope = newScope
+                if textChanged { self.refreshScopeTextHits(clearing: true) }
                 self.recompute()
             }
             .store(in: &cancellables)
@@ -336,8 +358,8 @@ final class NotesNavigationModel: ObservableObject {
     func revealForOpen(_ id: UUID) -> Bool {
         if !displayed.contains(where: { $0.id == id }) { clearUserFilters() }
         guard let scope = model.scope, let target = model.allItems.first(where: { $0.id == id }) else { return false }
-        let scopeItemIDs = scope.folderId.map { model.organization.subtreeItemIDs(of: $0) }
-        guard NotePassageResolve.scopeHides(target, scope: scope, scopeItemIDs: scopeItemIDs) else { return false }
+        let context = NotesRuleContext(textHits: scopeTextHits, folderItems: model.folderItems(for: scope))
+        guard NotePassageResolve.scopeHides(target, scope: scope, context: context) else { return false }
         model.setAllNotesScope()
         model.statusMessage = NotePassageResolve.scopeWidenedStatus
         return true
@@ -351,11 +373,92 @@ final class NotesNavigationModel: ObservableObject {
         return f
     }
 
-    /// Persist the current effective filter (shared scope folded with this window's user filter) as a
-    /// root-level smart folder (06-viewers §4, "Save as Smart Folder").
+    /// Persist what the list shows (the shared scope narrowed by this window's filter bar and search box) as
+    /// a root-level smart folder (06-viewers §4, "Save as Smart Folder"). The search box is kept as the text
+    /// rule it is, so the smart folder finds what the list shows rather than a title substring.
     func saveAsSmartFolder(named name: String) async {
-        let effective = NotesFilter.effective(base: scope ?? NotesFilter(), user: currentUserFilter)
-        await model.createSmartFolder(name: name, query: effective)
+        await model.createSmartFolder(name: name, query: effectiveSearch)
+    }
+
+    /// The shared scope narrowed by this window's filter bar and search box: what the list shows, as rules.
+    var effectiveSearch: NotesAdvancedSearch {
+        (scope ?? NotesAdvancedSearch()).narrowed(by: NotesAdvancedSearch(filter: filter, keyword: searchText))
+    }
+
+    // MARK: Advanced Search (W40.notes-advanced-search)
+
+    /// Open the form on what the list shows, less the window's kind control (which stays on the window), or on
+    /// the starter rows when nothing narrows the list.
+    func openAdvancedSearch() {
+        var shown = (scope ?? NotesAdvancedSearch())
+            .narrowed(by: NotesAdvancedSearch(filter: filter, keyword: searchText, includingKind: false))
+        if !shown.isActive { shown = .starter }
+        advancedSearchRequest = AdvancedSearchRequest(search: shown)
+    }
+
+    /// Open the form on smart folder `id`'s rules, to save them in place.
+    func editSmartFolder(_ id: UUID) {
+        guard let search = model.smartQuery(id),
+              let name = model.organization.folders.first(where: { $0.id == id })?.name else {
+            model.statusMessage = "This smart folder's saved query is unreadable."
+            return
+        }
+        advancedSearchRequest = AdvancedSearchRequest(search: search.isActive ? search : .starter,
+                                                      editingId: id, editingName: name)
+    }
+
+    /// Show the form's rules as the list: the shared scope becomes them, and this window's filter bar and search
+    /// box are cleared (the form opened with them folded in), its kind control kept.
+    func runAdvancedSearch(_ search: NotesAdvancedSearch) {
+        clearUserFilters()
+        paneMode = .notes
+        model.runAdvancedSearch(search)
+    }
+
+    /// Save the form's rules as a new smart folder and open it.
+    func saveAdvancedSearch(_ search: NotesAdvancedSearch, name: String) async {
+        guard let id = await model.createSmartFolder(name: name, query: search) else { return }
+        clearUserFilters()
+        paneMode = .notes
+        model.applySmartScope(id)
+    }
+
+    func updateSmartFolder(_ id: UUID, search: NotesAdvancedSearch) async {
+        await model.updateSmartFolder(id, query: search)
+    }
+
+    /// How many items `search` matches in this window (the form's live count): its rules and the window's kind
+    /// control, which Search leaves in place; the rest of the filter bar is cleared by Search, so it is not applied.
+    func countMatches(_ search: NotesAdvancedSearch) async -> Int {
+        let hits = await model.textHits(for: search)
+        let context = NotesRuleContext(textHits: hits, folderItems: model.folderItems(for: search))
+        let kind = NotesFilter(kind: filter.kind)
+        return model.allItems.reduce(0) {
+            $0 + (search.matches($1, context) && kind.matches($1, folderItemIDs: nil) ? 1 : 0)
+        }
+    }
+
+    /// Re-run the scope's text rules through the index, then recompute. `clearing` drops the old answers first
+    /// (a new scope); an edit keeps them until the new ones arrive.
+    private func refreshScopeTextHits(clearing: Bool) {
+        scopeTextGeneration &+= 1
+        let generation = scopeTextGeneration
+        if clearing { scopeTextHits = [:] }
+        guard let scope, scope.hasTextRules else { return }
+        scopeTextTask = Task { [weak self] in
+            guard let self else { return }
+            let hits = await self.model.textHits(for: scope)
+            guard generation == self.scopeTextGeneration else { return }
+            self.scopeTextHits = hits
+            self.recompute()
+        }
+    }
+    private var scopeTextTask: Task<Void, Never>?
+
+    /// Await the scope's text-rule answers and the recompute they start (tests).
+    func waitForScopeTextHits() async {
+        await scopeTextTask?.value
+        await waitForPendingRecompute()
     }
 
     // MARK: Replication + delete-last-instance guard (W6-S5, Tier-2 — 06-viewers §5)
@@ -630,8 +733,11 @@ final class NotesNavigationModel: ObservableObject {
 
     private struct RecomputeSnapshot: Sendable {
         let source: [ItemSummary]
-        let scope: NotesFilter?
-        let scopeItemIDs: Set<UUID>?
+        let scope: NotesAdvancedSearch?
+        let scopeContext: NotesRuleContext
+        /// The scope's text rules have not all been answered yet: the list is empty until they are, rather
+        /// than briefly showing what the rules would leave out.
+        let scopePending: Bool
         let filter: NotesFilter
         let filterItemIDs: Set<UUID>?
         let ftsIDs: Set<UUID>?
@@ -652,12 +758,14 @@ final class NotesNavigationModel: ObservableObject {
     }
 
     private func makeRecomputeSnapshot(_ source: [ItemSummary]) -> RecomputeSnapshot {
-        let scopeItemIDs = scope?.folderId.map { model.organization.subtreeItemIDs(of: $0) }
+        let scopeContext = NotesRuleContext(textHits: scopeTextHits,
+                                            folderItems: scope.map { model.folderItems(for: $0) } ?? [:])
         let filterItemIDs = filter.folderId.map { model.organization.subtreeItemIDs(of: $0) }
         return RecomputeSnapshot(
             source: source,
             scope: scope,
-            scopeItemIDs: scopeItemIDs,
+            scopeContext: scopeContext,
+            scopePending: scope.map { s in s.textRules.contains { scopeTextHits[$0.id] == nil } } ?? false,
             filter: filter,
             filterItemIDs: filterItemIDs,
             ftsIDs: ftsIDs,
@@ -673,9 +781,9 @@ final class NotesNavigationModel: ObservableObject {
     ) -> RecomputeResult? {
         var base: [ItemSummary] = []
         base.reserveCapacity(snapshot.source.count)
-        for (index, item) in snapshot.source.enumerated() {
+        for (index, item) in (snapshot.scopePending ? [] : snapshot.source).enumerated() {
             if index.isMultiple(of: 256), cancellation.isCancelled { return nil }
-            if let scope = snapshot.scope, !scope.matches(item, folderItemIDs: snapshot.scopeItemIDs) { continue }
+            if let scope = snapshot.scope, !scope.matches(item, snapshot.scopeContext) { continue }
             if !snapshot.filter.matches(item, folderItemIDs: snapshot.filterItemIDs) { continue }
             if let ftsIDs = snapshot.ftsIDs, !ftsIDs.contains(item.id) { continue }
             base.append(item)
