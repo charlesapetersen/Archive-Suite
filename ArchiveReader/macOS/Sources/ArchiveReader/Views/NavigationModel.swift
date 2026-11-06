@@ -239,6 +239,10 @@ final class NavigationModel: ObservableObject {
                 }
             } }
             .store(in: &cancellables)
+        // A quit straight after a scroll still saves the place (W40.fix-reader-restore-scroll).
+        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.topRowWrite?.perform() } }
+            .store(in: &cancellables)
         // Republish when flags change so the table's flag column refreshes.
         flags.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
@@ -541,9 +545,15 @@ final class NavigationModel: ObservableObject {
     /// The row a relaunch is putting back at the top. Kept while the list is still arriving — a smart
     /// folder's text search and a cold scan both change the rows after the first ones show, and the
     /// table keeps its offset, not its row — so each recompute scrolls back to it. Dropped once the user
-    /// scrolls or clicks, or when the row leaves the list.
+    /// scrolls or clicks, when the row leaves the list, or when the folder, filter or sort changes.
     private var pendingTopRow: ArchiveFile.ID?
+    /// The folder, filter and sort the place belongs to; a change to any of them is the user's.
+    private var pendingTopRowView: ListView?
+    private struct ListView: Equatable { var scopeID: UUID?; var filter: LibraryFilter; var sort: [ARSortDescriptor] }
+    private var currentListView: ListView { ListView(scopeID: scope?.id, filter: filter, sort: sort) }
     private var lastNotedTopRow: ArchiveFile.ID?
+    /// Scrolling passes many rows a second; the place is written once it stops.
+    private var topRowWrite: DispatchWorkItem?
 
     private func restoreSelectionIfNeeded() {
         // On the list, not the library: a restored filter may still be hiding every row (a "needs
@@ -558,6 +568,7 @@ final class NavigationModel: ObservableObject {
         // Return to the rows that were on screen; failing that, at least show the selection.
         if let top = defaults.string(forKey: Self.topRowKey).flatMap(URL.init(string:)), shown.contains(top) {
             pendingTopRow = top
+            pendingTopRowView = currentListView
             lastNotedTopRow = top
             requestScroll(to: top, atTop: true)
         } else if let first = displayed.first(where: { present.contains($0.id) }) {
@@ -568,7 +579,7 @@ final class NavigationModel: ObservableObject {
     /// Keep the relaunch's place while rows are still arriving (see `pendingTopRow`).
     private func reapplyPendingTopRow() {
         guard let top = pendingTopRow else { return }
-        if displayed.contains(where: { $0.id == top }) {
+        if pendingTopRowView == currentListView, displayed.contains(where: { $0.id == top }) {
             requestScroll(to: top, atTop: true)
         } else {
             pendingTopRow = nil
@@ -580,7 +591,12 @@ final class NavigationModel: ObservableObject {
     func noteTopVisibleRow(_ id: ArchiveFile.ID) {
         guard didRestoreSelection, pendingTopRow == nil, id != lastNotedTopRow else { return }
         lastNotedTopRow = id
-        defaults.set(id.absoluteString, forKey: Self.topRowKey)
+        topRowWrite?.cancel()
+        let write = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.defaults.set(id.absoluteString, forKey: Self.topRowKey) }
+        }
+        topRowWrite = write
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: write)
     }
 
     /// The user scrolled or clicked in the list: their place wins over the one being restored.

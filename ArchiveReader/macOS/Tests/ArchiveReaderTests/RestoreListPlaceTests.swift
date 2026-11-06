@@ -30,6 +30,12 @@ final class RestoreListPlaceTests: XCTestCase {
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
     }
 
+    /// The place is written once scrolling stops (0.3 s), not for every row passed.
+    private func noteAndWait(_ model: NavigationModel, _ id: ArchiveFile.ID) {
+        model.noteTopVisibleRow(id)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+    }
+
     func testARelaunchPutsTheLastTopRowBackAtTheTop() throws {
         let root = try scratchRoot(files: 6)
         let defaults = fixtureDefaults(pinnedTo: root)
@@ -37,7 +43,7 @@ final class RestoreListPlaceTests: XCTestCase {
         let first = NavigationModel(defaults: defaults)
         settle(first)
         let row = try XCTUnwrap(first.displayed.dropFirst(3).first, "precondition: the rows are listed").id
-        first.noteTopVisibleRow(row)
+        noteAndWait(first, row)
         XCTAssertEqual(defaults.string(forKey: "lastTopRowFileURL"), row.absoluteString,
                        "the top row has to persist, or the relaunch has nothing to return to")
 
@@ -57,16 +63,16 @@ final class RestoreListPlaceTests: XCTestCase {
         let seed = NavigationModel(defaults: defaults)
         settle(seed)
         let saved = seed.displayed[4].id
-        seed.noteTopVisibleRow(saved)
+        noteAndWait(seed, saved)
 
         let model = NavigationModel(defaults: defaults)
         model.noteTopVisibleRow(model.library.files[0].id)   // before the resume: ignored
         settle(model)
-        model.noteTopVisibleRow(model.displayed[0].id)       // while the place is being restored: ignored
+        noteAndWait(model, model.displayed[0].id)            // while the place is being restored: ignored
         XCTAssertEqual(defaults.string(forKey: "lastTopRowFileURL"), saved.absoluteString)
 
         model.userMovedInList()                              // the user scrolls: their place is saved
-        model.noteTopVisibleRow(model.displayed[1].id)
+        noteAndWait(model, model.displayed[1].id)
         XCTAssertEqual(defaults.string(forKey: "lastTopRowFileURL"), model.displayed[1].id.absoluteString)
     }
 
@@ -78,7 +84,7 @@ final class RestoreListPlaceTests: XCTestCase {
         let seed = NavigationModel(defaults: defaults)
         settle(seed)
         let saved = seed.displayed[2].id
-        seed.noteTopVisibleRow(saved)
+        noteAndWait(seed, saved)
 
         let model = NavigationModel(defaults: defaults)
         settle(model)
@@ -91,6 +97,25 @@ final class RestoreListPlaceTests: XCTestCase {
         request = model.scrollRequest
         model.recompute()
         XCTAssertEqual(model.scrollRequest, request, "after the user moves, a recompute must not pull the list back")
+    }
+
+    /// Choosing another folder, filter or sort while the place is still being restored is the user's move:
+    /// the list must not jump to the old row because it happens to be listed there too.
+    func testAFilterChangeDropsThePlaceBeingRestored() throws {
+        let root = try scratchRoot(files: 6)
+        let defaults = fixtureDefaults(pinnedTo: root)
+        let seed = NavigationModel(defaults: defaults)
+        settle(seed)
+        noteAndWait(seed, seed.displayed[3].id)
+
+        let model = NavigationModel(defaults: defaults)
+        settle(model)
+        XCTAssertTrue(model.scrollTargetAtTop, "precondition: the place is being restored")
+        let request = model.scrollRequest
+        model.filter.searchText = "doc"   // still lists every row, the saved one included
+        model.recompute()
+        XCTAssertEqual(model.displayed.count, 6)
+        XCTAssertEqual(model.scrollRequest, request, "a changed filter must not pull the list back to the old row")
     }
 
     /// With no saved top row (or one no longer listed), the restored selection is at least scrolled into view.
