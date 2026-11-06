@@ -49,6 +49,7 @@ struct NavigationWindowView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 560)
+        .overlay(alignment: .top) { TitleBarBackdrop() }   // W40.fix-reader-titlebar-gradient
         .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
         .animation(.easeInOut(duration: 0.2), value: showingSidebar)
         .animation(.easeInOut(duration: 0.2), value: showingTagCloud)
@@ -819,6 +820,26 @@ struct NavigationWindowView: View {
         let sel = model.documentSelection()
         guard !sel.filePaths.isEmpty else { return }
         openWindow(id: WindowID.document, value: sel)
+    }
+}
+
+/// One even background behind the window title (W40.fix-reader-titlebar-gradient; reader-1 row 34). On macOS 27 the
+/// title bar is see-through and the sidebar list runs up under it, so the title sat half on the sidebar's material and
+/// half on the window's background, with a gradient where they met. This fills the window's top safe-area inset (the
+/// title bar) with the window background, over the content and under the title, traffic lights and toolbar. On macOS 26,
+/// whose bar is opaque, nothing shows. Checked in the VM by `TitleBarUITests`, with the macOS 27 shape simulated (a
+/// full-size, transparent title bar with the sidebar coloured under it): split without this, even with it.
+private struct TitleBarBackdrop: View {
+    var body: some View {
+        // The reader respects the safe area, so its proxy reports the inset (one that ignores it reports none); the colour is
+        // then drawn that far above the content, over the title bar.
+        GeometryReader { g in
+            Color(nsColor: .windowBackgroundColor)
+                .frame(width: g.size.width, height: g.safeAreaInsets.top)
+                .offset(y: -g.safeAreaInsets.top)
+        }
+        .allowsHitTesting(false)   // the title bar still drags the window
+        .accessibilityHidden(true)
     }
 }
 
