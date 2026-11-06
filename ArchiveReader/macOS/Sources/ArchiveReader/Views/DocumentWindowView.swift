@@ -93,7 +93,7 @@ struct DocumentWindowView: View {
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
                     } else if let text = model.embeddedText {
-                        ExtractedTextPane(text: text, scale: model.textScale)
+                        ExtractedTextPane(text: text, scale: model.textScale, find: model.extractedTextFind)
                             .overlay(focusBorder(.right))
                         .accessibilityIdentifier("ar.doc.textPane")
                     } else {

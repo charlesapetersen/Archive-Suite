@@ -24,7 +24,14 @@ final class PDFPaneController {
     private(set) var pendingViewport: Viewport?
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
     private var findQuery = ""         // active find query to highlight on this pane ("" = none)
-    private var findCurrentIndex: Int? // which match on THIS pane is the current selection; nil = highlight-only
+    private(set) var findCurrentIndex: Int? // which match on THIS pane is the current selection; nil = highlight-only
+    /// The page whose text layer find reads when the shown page is a stand-in for it — the PDF's image page
+    /// behind its JPEG original, which has no text of its own. nil = find reads the shown page.
+    private var findSource: PDFPage?
+    /// Draws the stand-in's find boxes over its page. An overlay rather than annotations: a `PDFPage` copy
+    /// shares its annotations with the original, and removing one from the copy leaves it on the original
+    /// (measured), so boxes would pile up on the model's JPEG page.
+    let standInOverlay = StandInFindOverlay()
     /// Edit ▸ Copy (⌘C) as this pane's `copy:` answers it — the viewer's verbatim copy from whichever pane
     /// holds the selection, and whether there is one to copy. Set by `DocumentViewerModel`; nil leaves
     /// PDFKit's own `copy:` in place. See `ReaderPDFView.copy(_:)`.
@@ -96,9 +103,12 @@ final class PDFPaneController {
         #if DEBUG
         v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
         #endif
-        if let viewport = pendingViewport, savedScale != nil { restore(viewport) } else { scrollToTop() }
+        let restoring = pendingViewport != nil && savedScale != nil
+        if let viewport = pendingViewport, restoring { restore(viewport) } else { scrollToTop() }
         pendingViewport = nil
-        applyFind()   // re-highlight matches (+ re-select the current one) on the freshly-built view
+        // Re-highlight matches (+ re-select the current one) on the freshly-built view. The PDF / JPEG
+        // switch keeps the region the reader was looking at, so it does not scroll to the hit.
+        applyFind(scroll: !restoring)
     }
 
     /// Show a COPY of `page` in a throwaway one-page document (a PDFPage can belong to only one document —
@@ -106,6 +116,10 @@ final class PDFPaneController {
     /// saved zoom is measured against (the PDF's image page for the left pane); nil means `page` itself.
     func show(_ page: PDFPage?, reference: PDFPage?, in view: PDFView) {
         view.clearSelection()
+        findSource = (page != nil && reference != nil && page !== reference) ? reference : nil
+        standInOverlay.update(rects: [], current: nil)
+        // Before the document, so PDFKit asks it for the page's overlay as it lays the page out.
+        view.pageOverlayViewProvider = findSource == nil ? nil : standInOverlay
         if let page, let copy = page.copy() as? PDFPage {
             let doc = PDFDocument()
             doc.insert(copy, at: 0)
@@ -267,11 +281,18 @@ final class PDFPaneController {
     /// Highlight every match of the stored query on this pane's page and, when this pane owns the current
     /// match, select + scroll to it (otherwise just clear the transient selection). An empty query clears
     /// all find highlighting. Read-only — never mutates the document.
-    func applyFind() {
+    func applyFind(scroll: Bool = true) {
         guard let v = pdfView else { return }
+        standInOverlay.update(rects: [], current: nil)
         guard !findQuery.isEmpty, let doc = v.document else {
             v.highlightedSelections = nil
             v.clearSelection()
+            return
+        }
+        if let source = findSource, let shown = doc.page(at: 0) {
+            v.highlightedSelections = nil
+            v.clearSelection()
+            highlightStandIn(shown, from: source, in: v, scroll: scroll)
             return
         }
         let matches = doc.findString(findQuery, withOptions: [.caseInsensitive])
@@ -279,7 +300,10 @@ final class PDFPaneController {
         v.highlightedSelections = matches.isEmpty ? nil : matches
         if let i = findCurrentIndex, matches.indices.contains(i) {
             v.setCurrentSelection(matches[i], animate: true)
-            v.scrollSelectionToVisible(nil)
+            if scroll {
+                v.scrollSelectionToVisible(nil)
+                if let page = doc.page(at: 0) { scrollAgain(to: matches[i].bounds(for: page), on: page, in: v) }
+            }
         } else {
             v.clearSelection()
         }
@@ -289,8 +313,98 @@ final class PDFPaneController {
     func clearFind() {
         findQuery = ""
         findCurrentIndex = nil
+        standInOverlay.update(rects: [], current: nil)
         pdfView?.highlightedSelections = nil
         pdfView?.clearSelection()
+    }
+
+    /// The JPEG original has no text layer, so its hits are found on the PDF image page it stands in for
+    /// and drawn at the same place on the JPEG: each match's box as fractions of the displayed image page,
+    /// then back onto the JPEG page (both are the same photograph, so the fractions agree). The boxes are
+    /// drawn by the pane's overlay, so no page is marked; the current hit is scrolled to.
+    /// W40.fix-reader-find-both-panes.
+    private func highlightStandIn(_ shown: PDFPage, from source: PDFPage, in v: PDFView, scroll: Bool) {
+        let rects = Self.standInMatchRects(query: findQuery, source: source, shown: shown, box: v.displayBox)
+        let current = findCurrentIndex.flatMap { rects.indices.contains($0) ? $0 : nil }
+        standInOverlay.update(rects: rects, current: current)
+        if scroll, let current { v.go(to: rects[current], on: shown); scrollAgain(to: rects[current], on: shown, in: v) }
+    }
+
+    /// Scroll to the current hit once more on the next runloop. A freshly built pane (a hit on another
+    /// pair or document) pins its top in `scrollToTop`, whose deferred half lands after this call and
+    /// would otherwise scroll the hit back out of sight; this is queued after it, so it wins.
+    private func scrollAgain(to rect: CGRect, on page: PDFPage, in v: PDFView) {
+        DispatchQueue.main.async { [weak v] in
+            guard let v, v.document?.page(at: 0) === page else { return }
+            v.go(to: rect, on: page)
+        }
+    }
+
+    /// The boxes, in `shown`'s page space, of `query`'s matches on `source`, in match order. Read-only:
+    /// `source` is searched through a copy, so neither page's document is touched.
+    static func standInMatchRects(query: String, source: PDFPage, shown: PDFPage, box: PDFDisplayBox) -> [CGRect] {
+        guard !query.isEmpty, let copy = source.copy() as? PDFPage else { return [] }
+        let doc = PDFDocument()
+        doc.insert(copy, at: 0)
+        return doc.findString(query, withOptions: [.caseInsensitive]).compactMap { match in
+            let r = match.bounds(for: copy)
+            guard !r.isEmpty else { return nil }
+            let a = pagePoint(fromDisplayed: displayedFraction(of: CGPoint(x: r.minX, y: r.minY), on: copy, box: box),
+                              on: shown, box: box)
+            let b = pagePoint(fromDisplayed: displayedFraction(of: CGPoint(x: r.maxX, y: r.maxY), on: copy, box: box),
+                              on: shown, box: box)
+            return CGRect(x: min(a.x, b.x), y: min(a.y, b.y), width: abs(a.x - b.x), height: abs(a.y - b.y))
+        }
+    }
+}
+
+/// The find boxes over a stand-in page (the JPEG original), in that page's space: every hit in the match
+/// yellow, the current one in the find colour. PDFKit lays the overlay view over the page and keeps it there
+/// through zoom and scroll; it takes no clicks. Nothing here touches a page. W40.fix-reader-find-both-panes.
+@MainActor
+final class StandInFindOverlay: NSObject, @preconcurrency PDFPageOverlayViewProvider {
+    private(set) var rects: [CGRect] = []
+    private(set) var current: Int?
+    private var views: [StandInFindOverlayView] = []
+
+    func update(rects: [CGRect], current: Int?) {
+        guard rects != self.rects || current != self.current else { return }
+        self.rects = rects
+        self.current = current
+        for view in views { view.needsDisplay = true }
+    }
+
+    func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> NSView? {
+        let overlay = StandInFindOverlayView(provider: self, page: page, pdfView: view)
+        views.removeAll { $0.superview == nil }
+        views.append(overlay)
+        return overlay
+    }
+}
+
+final class StandInFindOverlayView: NSView {
+    private weak var provider: StandInFindOverlay?
+    private weak var page: PDFPage?
+    private weak var pdfView: PDFView?
+
+    init(provider: StandInFindOverlay, page: PDFPage, pdfView: PDFView) {
+        self.provider = provider
+        self.page = page
+        self.pdfView = pdfView
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let provider, let page, let pdfView else { return }
+        for (k, rect) in provider.rects.enumerated() {
+            (k == provider.current ? NSColor.findHighlightColor.withAlphaComponent(0.6)
+                                   : NSColor.systemYellow.withAlphaComponent(0.5)).setFill()
+            convert(pdfView.convert(rect, from: page), from: pdfView).fill(using: .sourceOver)
+        }
     }
 }
 

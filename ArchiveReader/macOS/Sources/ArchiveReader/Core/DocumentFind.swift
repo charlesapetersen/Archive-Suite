@@ -1,20 +1,26 @@
 import PDFKit
 
-/// One matched occurrence of the find query, located by document (index into the viewer's open
-/// selection), by which image/OCR-text **page pair** of that document it sits in
-/// (`DocumentPagePairs`), by which pane of that pair (left = the pair's image page, right = its OCR
-/// text page), and by its ordinal among that pane's matches. Every page of an interleaved multi-page
-/// PDF is addressable this way, so a match is never dropped for being "past page 2".
+/// One find hit, located by document (index into the viewer's open selection), by which image/OCR-text
+/// **page pair** of that document it sits in (`DocumentPagePairs`), and by its ordinal among that pair's
+/// hits. A hit covers BOTH panes of the pair (W40.fix-reader-find-both-panes): the image page's text layer
+/// and the OCR text page carry the same words, so their k-th matches are taken as the same occurrence and
+/// Find selects both at once. `left` / `right` are that pane's match ordinal, or nil when the pane has
+/// fewer matches than the pair has hits (an image page with no text layer has none). Every page of an
+/// interleaved multi-page PDF is addressable this way, so a match is never dropped for being "past page 2".
 struct FindMatchLocation: Equatable, Sendable {
     var doc: Int
     var pair: Int    // which image/text page pair within that document (page 2·pair / 2·pair+1)
-    var pane: DocumentViewerModel.Pane
-    var index: Int   // 0-based ordinal within that (doc, pair, pane)
+    var index: Int   // 0-based ordinal of the hit within that (doc, pair)
+    var left: Int?   // the image page's match ordinal for this hit, if it has one
+    var right: Int?  // the OCR text page's match ordinal for this hit, if it has one
+
+    /// Whether `pane` shows this hit.
+    func holds(_ pane: DocumentViewerModel.Pane) -> Bool { (pane == .left ? left : right) != nil }
 }
 
-/// Pure, view-free navigation over all find matches across the viewer's open documents. Holds the
-/// ordered match list (reading order: document ascending, then page pair ascending, then left/image
-/// pane before right/text pane) and a wrap-around cursor. All the fiddly logic — ordering, wrap-around,
+/// Pure, view-free navigation over all find hits across the viewer's open documents. Holds the ordered
+/// hit list (reading order: document ascending, then page pair ascending, then position on the page) and
+/// a wrap-around cursor. All the fiddly logic — pairing the two panes' matches, ordering, wrap-around,
 /// empty/one-match edge cases, the 1-based "N of M" position — lives here so it can be unit-tested
 /// without a live `PDFView`. The model applies `current` to PDFKit; this type never touches a view.
 struct FindNavigator: Equatable, Sendable {
@@ -26,13 +32,17 @@ struct FindNavigator: Equatable, Sendable {
         cursor = nil
     }
 
-    /// Build the flat match list from per-`(doc, pair, pane)` counts, kept in the caller's order (which
-    /// is reading order). Zero-count entries contribute nothing. The cursor starts on the first match.
-    init(perPane: [(doc: Int, pair: Int, pane: DocumentViewerModel.Pane, count: Int)]) {
+    /// Build the hit list from each pane's match count per `(doc, pair)`, kept in the caller's order
+    /// (which is reading order). A pair has as many hits as its busier pane has matches, the k-th hit
+    /// being each pane's k-th match, so stepping moves both panes together. Pairs with no match
+    /// contribute nothing. The cursor starts on the first hit.
+    init(perPair: [(doc: Int, pair: Int, left: Int, right: Int)]) {
         var locs: [FindMatchLocation] = []
-        for entry in perPane where entry.count > 0 {
-            for k in 0..<entry.count {
-                locs.append(FindMatchLocation(doc: entry.doc, pair: entry.pair, pane: entry.pane, index: k))
+        for entry in perPair {
+            for k in 0..<max(entry.left, entry.right, 0) {
+                locs.append(FindMatchLocation(doc: entry.doc, pair: entry.pair, index: k,
+                                              left: k < entry.left ? k : nil,
+                                              right: k < entry.right ? k : nil))
             }
         }
         locations = locs
@@ -90,5 +100,19 @@ enum DocumentFindScanner {
             if DocumentPagePairs.isImagePage(pageIndex) { counts[pair].left += 1 } else { counts[pair].right += 1 }
         }
         return counts
+    }
+
+    /// The ranges of `query` in `text`, case-insensitive, in order — the extracted-text pane's matches,
+    /// which are the image page's own text layer, so their k-th is the image pane's k-th.
+    static func ranges(of query: String, in text: String) -> [Range<String.Index>] {
+        guard !query.isEmpty else { return [] }
+        var found: [Range<String.Index>] = []
+        var from = text.startIndex
+        while from < text.endIndex,
+              let r = text.range(of: query, options: [.caseInsensitive], range: from..<text.endIndex) {
+            found.append(r)
+            from = r.upperBound > r.lowerBound ? r.upperBound : text.index(after: r.lowerBound)
+        }
+        return found
     }
 }

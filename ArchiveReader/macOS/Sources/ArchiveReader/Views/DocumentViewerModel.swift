@@ -33,7 +33,9 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var findTotal = 0         // total matches across ALL open documents
 
     private var findNavigator = FindNavigator()
-    private var lastFoundQuery: String?  // the query the navigator was last built for (avoids rescanning)
+    /// The query the navigator was last built for (avoids rescanning). Published because the extracted-text
+    /// pane's highlight reads it (`extractedTextFind`), and a new search can leave the counts unchanged.
+    @Published private var lastFoundQuery: String?
 
     let leftController: PDFPaneController     // the current pair's image page (PDF page 2·pair)
     let rightController: PDFPaneController   // the current pair's OCR text page (PDF page 2·pair + 1)
@@ -319,17 +321,16 @@ final class DocumentViewerModel: ObservableObject {
             applyCurrentMatch()
             return
         }
-        var perPane: [(doc: Int, pair: Int, pane: Pane, count: Int)] = []
+        var perPair: [(doc: Int, pair: Int, left: Int, right: Int)] = []
         for i in urls.indices {
             // Reuse the already-loaded document for the current index; open the rest read-only.
             let doc = (i == index) ? current : PDFDocument(url: urls[i])
             guard let doc else { continue }
             for (p, counts) in DocumentFindScanner.pairMatchCounts(in: doc, query: query).enumerated() {
-                perPane.append((doc: i, pair: p, pane: .left, count: counts.left))
-                perPane.append((doc: i, pair: p, pane: .right, count: counts.right))
+                perPair.append((doc: i, pair: p, left: counts.left, right: counts.right))
             }
         }
-        findNavigator = FindNavigator(perPane: perPane)
+        findNavigator = FindNavigator(perPair: perPair)
         refreshFindPublished()
         applyCurrentMatch()
     }
@@ -396,9 +397,10 @@ final class DocumentViewerModel: ObservableObject {
             rightController.applyFind()
             return
         }
-        // The current match owns exactly one pane; the other highlights its matches but holds no selection.
-        leftController.setFindTarget(query: findQuery, currentIndex: loc.pane == .left ? loc.index : nil)
-        rightController.setFindTarget(query: findQuery, currentIndex: loc.pane == .right ? loc.index : nil)
+        // The current hit is selected in BOTH panes of its pair, each pane at its own match for it
+        // (W40.fix-reader-find-both-panes); a pane without one just highlights its matches.
+        leftController.setFindTarget(query: findQuery, currentIndex: loc.left)
+        rightController.setFindTarget(query: findQuery, currentIndex: loc.right)
         if loc.doc != index {
             index = loc.doc     // → loadCurrent() (pair 0) + pane rebuild → applyToView() re-applies it
             setPair(loc.pair)
@@ -408,9 +410,19 @@ final class DocumentViewerModel: ObservableObject {
             leftController.applyFind()
             rightController.applyFind()
         }
-        // Move the focus border (not keyboard focus — the find field keeps that). Set last: `setPair`
-        // pulls focus off a text pane that doesn't exist, and the match's own pane always does.
-        focusedPane = loc.pane
+        // Move the focus border (not keyboard focus — the find field keeps that) only when the focused
+        // pane does not show the hit, preferring the text page. Set last: `setPair` pulls focus off a
+        // text pane that doesn't exist, and a pane holding the hit always does.
+        if !loc.holds(focusedPane) { focusedPane = loc.right != nil ? .right : .left }
+    }
+
+    /// What the extracted-text pane highlights: the searched query, and which of its matches is the
+    /// current hit (the image pane's own ordinal, since that pane shows the image page's text layer).
+    /// `nil` while no query has been searched.
+    var extractedTextFind: (query: String, current: Int?)? {
+        guard let query = lastFoundQuery, !query.isEmpty else { return nil }
+        let loc = findNavigator.current
+        return (query, loc?.doc == index && loc?.pair == pair ? loc?.left : nil)
     }
 
     // MARK: Page-level durable links (W23.m4)

@@ -2,6 +2,7 @@ import XCTest
 import PDFKit
 import AppKit
 import CoreText
+import SwiftUI
 @testable import ArchiveReader
 
 /// In-viewer find: the pure match-navigation model (`FindNavigator`) and the PDFKit match counter
@@ -23,75 +24,90 @@ final class DocumentFindTests: XCTestCase {
         XCTAssertNil(nav.previous())
     }
 
-    func testEmptyPerPaneCountsProduceEmptyNavigator() {
-        let nav = FindNavigator(perPane: [(0, 0, .left, 0), (0, 0, .right, 0)])
+    func testEmptyPerPairCountsProduceEmptyNavigator() {
+        let nav = FindNavigator(perPair: [(0, 0, 0, 0), (0, 1, 0, 0)])
         XCTAssertEqual(nav.total, 0)
         XCTAssertNil(nav.ordinal)
         XCTAssertNil(nav.current)
     }
 
-    func testBuildOrdersByDocThenLeftBeforeRightAndSkipsZeroCounts() {
-        // doc 0: 2 left + 1 right; doc 1: 0 left (skipped) + 3 right.
-        let nav = FindNavigator(perPane: [
-            (0, 0, .left, 2), (0, 0, .right, 1),
-            (1, 0, .left, 0), (1, 0, .right, 3),
-        ])
-        XCTAssertEqual(nav.total, 6)
-        XCTAssertEqual(nav.ordinal, 1)                       // starts on the first match
-        XCTAssertEqual(nav.current, Loc(doc: 0, pair: 0, pane: .left, index: 0))
+    /// W40.fix-reader-find-both-panes: a hit is the k-th match of EACH pane of its pair, not a match of
+    /// one pane, so the two panes step together; the busier pane sets the pair's hit count, and the
+    /// other pane's missing ordinals are nil.
+    func testBuildPairsThePanesMatchesIntoHits() {
+        // doc 0: 2 image + 3 text matches → 3 hits; doc 1: none (skipped); doc 2: text only (no text layer).
+        let nav = FindNavigator(perPair: [(0, 0, 2, 3), (1, 0, 0, 0), (2, 0, 0, 1)])
+        XCTAssertEqual(nav.total, 4)
+        XCTAssertEqual(nav.ordinal, 1)                       // starts on the first hit
         XCTAssertEqual(nav.locations, [
-            Loc(doc: 0, pair: 0, pane: .left,  index: 0),
-            Loc(doc: 0, pair: 0, pane: .left,  index: 1),
-            Loc(doc: 0, pair: 0, pane: .right, index: 0),
-            Loc(doc: 1, pair: 0, pane: .right, index: 0),    // doc-1 left skipped (zero count)
-            Loc(doc: 1, pair: 0, pane: .right, index: 1),
-            Loc(doc: 1, pair: 0, pane: .right, index: 2),
+            Loc(doc: 0, pair: 0, index: 0, left: 0,   right: 0),
+            Loc(doc: 0, pair: 0, index: 1, left: 1,   right: 1),
+            Loc(doc: 0, pair: 0, index: 2, left: nil, right: 2),
+            Loc(doc: 2, pair: 0, index: 0, left: nil, right: 0),
         ])
+        XCTAssertTrue(nav.locations[0].holds(.left) && nav.locations[0].holds(.right))
+        XCTAssertFalse(nav.locations[2].holds(.left))
     }
 
-    /// W23.m2: pairs order between doc and pane — a match on a LATER pair of the same document is a
+    /// W23.m2: pairs order between doc and hit — a match on a LATER pair of the same document is a
     /// distinct, addressable location, not a duplicate of the first pair's.
     func testBuildKeepsPairOrderWithinADocument() {
-        let nav = FindNavigator(perPane: [
-            (0, 0, .left, 1), (0, 0, .right, 1),
-            (0, 1, .left, 1), (0, 1, .right, 2),
-            (0, 2, .left, 1), (0, 2, .right, 0),
-        ])
-        XCTAssertEqual(nav.total, 6)
+        let nav = FindNavigator(perPair: [(0, 0, 1, 1), (0, 1, 1, 2), (0, 2, 1, 0)])
+        XCTAssertEqual(nav.total, 4)
         XCTAssertEqual(nav.locations, [
-            Loc(doc: 0, pair: 0, pane: .left,  index: 0),
-            Loc(doc: 0, pair: 0, pane: .right, index: 0),
-            Loc(doc: 0, pair: 1, pane: .left,  index: 0),
-            Loc(doc: 0, pair: 1, pane: .right, index: 0),
-            Loc(doc: 0, pair: 1, pane: .right, index: 1),
-            Loc(doc: 0, pair: 2, pane: .left,  index: 0),
+            Loc(doc: 0, pair: 0, index: 0, left: 0,   right: 0),
+            Loc(doc: 0, pair: 1, index: 0, left: 0,   right: 0),
+            Loc(doc: 0, pair: 1, index: 1, left: nil, right: 1),
+            Loc(doc: 0, pair: 2, index: 0, left: 0,   right: nil),
         ])
     }
 
     func testNextAdvancesThroughEveryMatchThenWraps() {
-        var nav = FindNavigator(perPane: [(0, 0, .left, 2), (1, 0, .right, 1)])   // 3 matches
+        var nav = FindNavigator(perPair: [(0, 0, 2, 0), (1, 0, 0, 1)])   // 3 hits
         XCTAssertEqual(nav.ordinal, 1)
-        XCTAssertEqual(nav.next(), Loc(doc: 0, pair: 0, pane: .left, index: 1)); XCTAssertEqual(nav.ordinal, 2)
-        XCTAssertEqual(nav.next(), Loc(doc: 1, pair: 0, pane: .right, index: 0)); XCTAssertEqual(nav.ordinal, 3)
-        XCTAssertEqual(nav.next(), Loc(doc: 0, pair: 0, pane: .left, index: 0)); XCTAssertEqual(nav.ordinal, 1)  // wrap
+        XCTAssertEqual(nav.next(), Loc(doc: 0, pair: 0, index: 1, left: 1, right: nil)); XCTAssertEqual(nav.ordinal, 2)
+        XCTAssertEqual(nav.next(), Loc(doc: 1, pair: 0, index: 0, left: nil, right: 0)); XCTAssertEqual(nav.ordinal, 3)
+        XCTAssertEqual(nav.next(), Loc(doc: 0, pair: 0, index: 0, left: 0, right: nil)); XCTAssertEqual(nav.ordinal, 1)  // wrap
     }
 
     func testPreviousFromFirstWrapsToLast() {
-        var nav = FindNavigator(perPane: [(0, 0, .left, 1), (0, 0, .right, 1), (2, 0, .left, 1)])   // 3 matches
+        var nav = FindNavigator(perPair: [(0, 0, 1, 2), (2, 0, 1, 0)])   // 3 hits
         XCTAssertEqual(nav.ordinal, 1)
-        XCTAssertEqual(nav.previous(), Loc(doc: 2, pair: 0, pane: .left, index: 0))   // wrap back to the last
+        XCTAssertEqual(nav.previous(), Loc(doc: 2, pair: 0, index: 0, left: 0, right: nil))   // wrap back to the last
         XCTAssertEqual(nav.ordinal, 3)
-        XCTAssertEqual(nav.previous(), Loc(doc: 0, pair: 0, pane: .right, index: 0))
+        XCTAssertEqual(nav.previous(), Loc(doc: 0, pair: 0, index: 1, left: nil, right: 1))
         XCTAssertEqual(nav.ordinal, 2)
     }
 
     func testSingleMatchWrapsToItself() {
-        var nav = FindNavigator(perPane: [(4, 0, .right, 1)])
+        var nav = FindNavigator(perPair: [(4, 0, 0, 1)])
+        let only = Loc(doc: 4, pair: 0, index: 0, left: nil, right: 0)
         XCTAssertEqual(nav.total, 1)
-        XCTAssertEqual(nav.current, Loc(doc: 4, pair: 0, pane: .right, index: 0))
-        XCTAssertEqual(nav.next(), Loc(doc: 4, pair: 0, pane: .right, index: 0))
-        XCTAssertEqual(nav.previous(), Loc(doc: 4, pair: 0, pane: .right, index: 0))
+        XCTAssertEqual(nav.current, only)
+        XCTAssertEqual(nav.next(), only)
+        XCTAssertEqual(nav.previous(), only)
         XCTAssertEqual(nav.ordinal, 1)
+    }
+
+    // MARK: the extracted-text pane's matches (W40.fix-reader-find-both-panes)
+
+    func testRangesFindEveryCaseInsensitiveMatchInOrder() {
+        let text = "Alpha bravo ALPHA alphalpha"
+        let found = DocumentFindScanner.ranges(of: "alpha", in: text).map { String(text[$0]) }
+        XCTAssertEqual(found, ["Alpha", "ALPHA", "alpha"], "non-overlapping, like PDFKit's find")
+        XCTAssertTrue(DocumentFindScanner.ranges(of: "", in: text).isEmpty)
+        XCTAssertTrue(DocumentFindScanner.ranges(of: "zulu", in: text).isEmpty)
+    }
+
+    func testExtractedTextHighlightsEveryMatchAndMarksTheCurrentHit() {
+        let text = "zulu one zulu two"
+        let lit = ExtractedTextPane.highlighted(text, find: (query: "ZULU", current: 1))
+        let backgrounds = lit.runs.compactMap { run in run.backgroundColor.map { (String(lit[run.range].characters), $0) } }
+        XCTAssertEqual(backgrounds.map(\.0), ["zulu", "zulu"], "both matches are highlighted")
+        XCTAssertNotEqual(backgrounds[0].1, backgrounds[1].1, "the current hit stands out from the others")
+        XCTAssertEqual(backgrounds[1].1, Color(nsColor: .findHighlightColor))
+        XCTAssertTrue(ExtractedTextPane.highlighted(text, find: nil).runs.allSatisfy { $0.backgroundColor == nil },
+                      "no search, no highlight")
     }
 
     // MARK: DocumentPagePairs — the interleaved image/OCR-text page-pair arithmetic (W23.m2)
@@ -195,12 +211,13 @@ final class DocumentFindTests: XCTestCase {
         XCTAssertTrue(TestPDFBuilder.write(pages: ["Alpha alpha image", "Alpha OCR text"], to: url),
                       "precondition: scratch PDF written")
 
-        // Control: the same document and query in a find-capable viewer — 3 matches.
+        // Control: the same document and query in a find-capable viewer — 2 hits (the image page's two
+        // matches, the first shared with the text page's one).
         let window = DocumentViewerModel(persists: false)
         window.load(DocumentSelection(filePaths: [url.path]))
         window.findQuery = "alpha"
         window.performFind()
-        XCTAssertEqual(window.findTotal, 3, "precondition: the query really does match this document")
+        XCTAssertEqual(window.findTotal, 2, "precondition: the query really does match this document")
         XCTAssertEqual(window.findOrdinal, 1)
 
         let preview = DocumentViewerModel(persists: false, supportsFind: false)

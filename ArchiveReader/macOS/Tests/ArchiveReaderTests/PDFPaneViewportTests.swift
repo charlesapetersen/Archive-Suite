@@ -174,6 +174,85 @@ final class PDFPaneViewportTests: XCTestCase {
         XCTAssertEqual(controller.pdfView?.scaleFactor ?? 0, pdfScale, accuracy: 0.001)
     }
 
+    // MARK: find on the JPEG original (W40.fix-reader-find-both-panes)
+
+    /// The JPEG has no text layer, so its hits come from the PDF image page it stands in for, drawn at the
+    /// same place on the photograph: a 400-point page shown as a 2000-pixel JPEG puts each box at five
+    /// times the coordinates (rotated with the page when both are turned).
+    func testStandInBoxesLandAtTheSamePlaceOnTheJPEG() throws {
+        for rotation in [0, 90] {
+            let doc = TestPDFBuilder.textPDF(pages: ["zulu here\nand zulu there"])
+            let source = try XCTUnwrap(doc.page(at: 0))
+            let own = doc.findString("zulu", withOptions: [.caseInsensitive]).map { $0.bounds(for: source) }
+            source.rotation = rotation
+            let jpeg = try makeImagePage(width: 2000, height: 2000)
+            jpeg.rotation = rotation
+            let rects = PDFPaneController.standInMatchRects(query: "ZULU", source: source, shown: jpeg, box: .mediaBox)
+            XCTAssertEqual(rects.count, 2, "rotation \(rotation)")
+            XCTAssertEqual(own.count, 2, "precondition")
+            for (rect, r) in zip(rects, own) {
+                XCTAssertEqual(rect.minX, r.minX * 5, accuracy: 0.5, "rotation \(rotation)")
+                XCTAssertEqual(rect.minY, r.minY * 5, accuracy: 0.5, "rotation \(rotation)")
+                XCTAssertEqual(rect.width, r.width * 5, accuracy: 0.5, "rotation \(rotation)")
+                XCTAssertEqual(rect.height, r.height * 5, accuracy: 0.5, "rotation \(rotation)")
+            }
+        }
+    }
+
+    /// Showing the JPEG with find on draws one box per hit over the page — pixels, read back from the
+    /// view — and marks no page; ending find removes them. Showing the PDF page uses PDFKit's own highlight.
+    func testFindOnTheJPEGDrawsBoxesOverThePageOnly() throws {
+        let doc = TestPDFBuilder.textPDF(pages: ["zulu here\nand zulu there"])
+        let source = try XCTUnwrap(doc.page(at: 0))
+        let jpeg = try makeImagePage(width: 2000, height: 2000)
+        let controller = PDFPaneController(key: "left", persists: false)
+        let view = makeView()
+        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = view
+        controller.pdfView = view
+        controller.setFindTarget(query: "zulu", currentIndex: 1)
+        controller.show(jpeg, reference: source, in: view)
+        settle()
+        XCTAssertEqual(controller.standInOverlay.rects.count, 2, "one box per hit")
+        XCTAssertEqual(controller.standInOverlay.current, 1)
+        XCTAssertTrue(source.annotations.isEmpty && jpeg.annotations.isEmpty, "no page is marked")
+        let shown = try XCTUnwrap(view.document?.page(at: 0))
+        XCTAssertTrue(shown.annotations.isEmpty)
+        let lit = try yellowishPixels(in: view)
+        XCTAssertGreaterThan(lit, 20, "the boxes are drawn over the grey photograph")
+        controller.applyFind()
+        XCTAssertEqual(controller.standInOverlay.rects.count, 2, "re-applying replaces the boxes rather than adding more")
+        controller.clearFind()
+        XCTAssertTrue(controller.standInOverlay.rects.isEmpty, "ending find removes them")
+        settle()
+        XCTAssertEqual(try yellowishPixels(in: view), 0, "and they are gone from the screen")
+
+        let pdfView = makeView()
+        controller.pdfView = pdfView
+        controller.setFindTarget(query: "zulu", currentIndex: 0)
+        controller.show(source, reference: source, in: pdfView)
+        XCTAssertEqual(pdfView.highlightedSelections?.count, 2, "the PDF page highlights through its own text")
+        XCTAssertTrue(pdfView.document?.page(at: 0)?.annotations.isEmpty ?? false, "no boxes on a page with text")
+        XCTAssertEqual(pdfView.currentSelection?.string?.lowercased(), "zulu", "the current hit is selected")
+    }
+
+    /// Pixels of `view` where red and green clearly outweigh blue — the find boxes over a grey page.
+    private func yellowishPixels(in view: NSView) throws -> Int {
+        view.layoutSubtreeIfNeeded()
+        let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        var count = 0
+        for x in stride(from: 0, to: rep.pixelsWide, by: 2) {
+            for y in stride(from: 0, to: rep.pixelsHigh, by: 2) {
+                guard let c = rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                if c.redComponent - c.blueComponent > 0.15, c.greenComponent - c.blueComponent > 0.05 { count += 1 }
+            }
+        }
+        return count
+    }
+
     private func makeView() -> PDFView {
         let view = ReaderPDFView(frame: CGRect(x: 0, y: 0, width: 300, height: 320))
         view.displayMode = .singlePage

@@ -205,6 +205,51 @@ final class DocumentViewerPagePairTests: XCTestCase {
         XCTAssertEqual(model.findStatusText, "1 of 1")
     }
 
+    /// W40.fix-reader-find-both-panes (owner, reader-1 row 12): with a text layer on the image page, one
+    /// hit is selected in BOTH panes at once, and Find Next moves both to their next match together.
+    func testFindSelectsTheHitInBothPanesAndStepsThemTogether() throws {
+        let url = try scratchDir().appendingPathComponent("both.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["zulu image zulu", "Extracted text.\nzulu text zulu zulu"], to: url))
+        let model = load([url])
+        model.findQuery = "zulu"
+        model.performFind()
+
+        XCTAssertEqual(model.findTotal, 3, "a hit counts once, not once per pane")
+        XCTAssertEqual(model.leftController.findCurrentIndex, 0)
+        XCTAssertEqual(model.rightController.findCurrentIndex, 0)
+        XCTAssertEqual(model.focusedPane, .left, "the focused pane holds the hit, so focus stays put")
+        model.findNext()
+        XCTAssertEqual([model.leftController.findCurrentIndex, model.rightController.findCurrentIndex], [1, 1])
+        model.findNext()
+        XCTAssertNil(model.leftController.findCurrentIndex, "the image page has only two matches")
+        XCTAssertEqual(model.rightController.findCurrentIndex, 2)
+        XCTAssertEqual(model.focusedPane, .right, "focus moves to the pane that shows the hit")
+        model.findNext()
+        XCTAssertEqual([model.leftController.findCurrentIndex, model.rightController.findCurrentIndex], [0, 0],
+                       "wraps back to the first hit")
+        XCTAssertEqual(model.findStatusText, "1 of 3")
+    }
+
+    /// A single-page PDF whose page carries text shows that text in the extracted-text pane, which
+    /// highlights the same hit as the image pane beside it.
+    func testExtractedTextPaneFollowsTheImagePanesHit() throws {
+        let url = try scratchDir().appendingPathComponent("single.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["zulu one zulu two"], to: url))
+        let model = load([url])
+        XCTAssertNotNil(model.embeddedText, "precondition: the right pane is the extracted text")
+        XCTAssertNil(model.extractedTextFind, "nothing searched yet")
+        model.findQuery = "zulu"
+        model.performFind()
+        XCTAssertEqual(model.findTotal, 2)
+        XCTAssertEqual(model.extractedTextFind?.query, "zulu")
+        XCTAssertEqual(model.extractedTextFind?.current, 0)
+        model.findNext()
+        XCTAssertEqual(model.extractedTextFind?.current, 1)
+        XCTAssertEqual(model.leftController.findCurrentIndex, 1)
+        model.endFind()
+        XCTAssertNil(model.extractedTextFind, "Done clears the highlight")
+    }
+
     func testFindWalksMatchesAcrossPairsAndDocumentsInReadingOrder() throws {
         // doc A: "zulu" on page 0 (pair 0 image) and page 3 (pair 1 text). doc B: page 1 (pair 0 text).
         let a = try scratchDir().appendingPathComponent("walk-a.pdf")
