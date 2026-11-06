@@ -143,6 +143,54 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
         }
     }
 
+    /// A drag the way a hand does it (W40.fix-notes-folder-drag): no long press before it moves, then a
+    /// pause over the middle of the target. The long-press drags above start the row's own drag; a quick one
+    /// started the List's reorder drag instead, which can only reorder, so nesting failed for the owner.
+    func testE2_QuickFolderDragOntoMiddleNests() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            XCTAssertEqual(ideasAboveReading(), false, "fixture: Ideas starts below Reading")
+            folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
+                .press(forDuration: 0.05,
+                       thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+                       withVelocity: .slow, thenHoldForDuration: 1.0)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                self.folderRecord(id: Self.folderReading.lowercased())?.parent == Self.folderIdeas.lowercased()
+            }, "a quick drag of Reading onto the middle of Ideas should nest Reading in Ideas")
+        }
+    }
+
+    /// A note held over each part of a folder row lands in the row the drop highlight is on
+    /// (W40.fix-notes-folder-drag): the top edge, the middle and the bottom edge of Ideas all file into Ideas.
+    func testE2_NoteDropOnAnyPartOfAFolderRowFilesIntoIt() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            folderRow(named: "Reading").click()
+            for dy in [0.08, 0.5, 0.92] {
+                let row = selectItem(uuid: Self.idPlain)
+                row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                    .press(forDuration: 0.05,
+                           thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: dy)),
+                           withVelocity: .slow, thenHoldForDuration: 1.5)
+                XCTAssertTrue(pollUntil(timeout: 10) {
+                    (self.organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idPlain])
+                }, "a note dropped at \(dy) of the Ideas row should file into Ideas")
+                // Back to Reading for the next position, through the row menu so no drag is involved.
+                folderRow(named: "Ideas").click()
+                let moved = selectItem(uuid: Self.idPlain)
+                moved.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                    .press(forDuration: 0.05,
+                           thenDragTo: folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+                           withVelocity: .slow, thenHoldForDuration: 0.5)
+                XCTAssertTrue(pollUntil(timeout: 10) {
+                    let m = self.organizationMemberships() ?? []
+                    return !m.contains([Self.folderIdeas, Self.idPlain]) && m.contains([Self.folderReading, Self.idPlain])
+                }, "the note should move back to Reading")
+                folderRow(named: "Reading").click()
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     /// Whether Ideas sorts above Reading, both still at the top level; nil if either is missing.

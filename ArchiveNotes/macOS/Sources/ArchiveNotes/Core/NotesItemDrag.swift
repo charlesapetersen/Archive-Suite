@@ -47,6 +47,38 @@ enum NotesItemDrag {
         isFolder ? .move : operation(optionHeld: optionHeld)
     }
 
+    /// What a drag in flight carries, as a folder row needs to know it while the pointer is still moving
+    /// (W40.fix-notes-folder-drag). The item providers only load asynchronously, at the drop, so the row
+    /// reads the drag pasteboard, which answers at once: note rows from the table, one folder, or
+    /// something from outside the app.
+    enum DragKind: Equatable { case items, folder(UUID), other }
+
+    static func dragKind(on pasteboard: NSPasteboard) -> DragKind {
+        let types = pasteboard.types ?? []
+        if types.contains(pasteboardType) { return .items }
+        let folderType = NSPasteboard.PasteboardType(folderTypeIdentifier)
+        let text = types.contains(folderType)
+            ? pasteboard.data(forType: folderType).flatMap { String(data: $0, encoding: .utf8) }
+            : pasteboard.string(forType: .string)
+        if let text, let id = UUID(uuidString: text.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            return .folder(id)
+        }
+        return .other
+    }
+
+    /// Where on a folder row a drop lands: beside it (`before` / `after`, a reorder) or `into` it. A folder
+    /// on the top or bottom quarter of the row goes beside it (W9.e2-fu1); everything else, and anything
+    /// over a row not yet measured, goes into it. The row's highlight and its drop both come from here.
+    enum DropZone: Equatable { case before, into, after }
+
+    static func dropZone(y: CGFloat, rowHeight: CGFloat, isFolder: Bool) -> DropZone {
+        guard isFolder, rowHeight > 0 else { return .into }
+        let band = rowHeight / 4
+        if y <= band { return .before }
+        if y >= rowHeight - band { return .after }
+        return .into
+    }
+
     @MainActor
     static func folderProvider(_ id: UUID) -> NSItemProvider {
         let provider = NSItemProvider(object: id.uuidString as NSString)
