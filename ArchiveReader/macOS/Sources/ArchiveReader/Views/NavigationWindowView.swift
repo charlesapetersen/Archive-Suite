@@ -86,6 +86,7 @@ struct NavigationWindowView: View {
                 openSelection()   // "Open" → jump to the full document window
             }
         }
+        .previewImagePrefetch(model: model)   // W40.fix-reader-preview-image-speed
         .navigationTitle("Archive Reader")
         .focusedSceneObject(model)
         .focusedSceneObject(publishedPreviewViewer)   // W26.previewzoom — the preview sheet's viewer

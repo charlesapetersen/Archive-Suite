@@ -1820,6 +1820,19 @@ final class NavigationModel: ObservableObject {
         DocumentSelection(filePaths: selectedFiles.map(\.path))
     }
 
+    /// The files whose image pages the preview is likely to show next, most likely first: the selection's
+    /// first two files (Space opens on the first, → steps to the second), and with the preview up, the rows
+    /// above and below a single selection, where ↑/↓ go (W40.fix-reader-preview-image-speed).
+    func previewPrefetchPaths(neighbours: Bool) -> [String] {
+        let files = selectedFiles
+        guard let first = files.first else { return [] }
+        var paths = files.prefix(2).map(\.path)
+        guard neighbours, files.count == 1, let i = displayed.firstIndex(where: { $0.id == first.id }) else { return paths }
+        if i + 1 < displayed.count { paths.append(displayed[i + 1].path) }
+        if i > 0 { paths.append(displayed[i - 1].path) }
+        return paths
+    }
+
     /// Move the selection one row up/down the *currently displayed* list (single-select), for browsing
     /// via the preview's ↑/↓. Anchors on the current selection's position in `displayed`.
     func moveSelectionInList(_ delta: Int) {

@@ -30,6 +30,8 @@ struct PreviewSheet: View {
     /// item in the Document menu. Without the flag, `Find…`/`Find Next`/`Find Previous` look live here and
     /// do nothing (`W26.previewzoom-fu1`). ⌘O opens the full viewer, which does have find.
     @StateObject private var model = DocumentViewerModel(persists: false, supportsFind: false)
+    /// The image pages drawn ahead of time, so the image arrives with the text (W40.fix-reader-preview-image-speed).
+    @ObservedObject private var prefetcher = PreviewImagePrefetcher.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -101,6 +103,15 @@ struct PreviewSheet: View {
         .padding(10)
     }
 
+    /// The prerendered bitmap of the image page shown, or a request still waiting for one.
+    private var imagePlaceholder: PlaceholderRequest? {
+        guard let path = model.currentFilePath else { return nil }
+        let pageIndex = DocumentPagePairs.imagePageIndex(pair: model.pair)
+        _ = prefetcher.generation   // re-read when a bitmap lands
+        return PlaceholderRequest(key: PlaceholderRequest.key(path: path, pageIndex: pageIndex),
+                                  image: prefetcher.image(path: path, pageIndex: pageIndex)?.image)
+    }
+
     @ViewBuilder private var content: some View {
         if model.current == nil {
             ContentUnavailableView(model.loadError ?? "No document", systemImage: "doc.questionmark")
@@ -110,8 +121,12 @@ struct PreviewSheet: View {
                 // `.id(pageIdentity)` — a fresh PDFView per displayed pair/document (DV-3). Needed for the
                 // image pane in particular: `updateNSView`'s reuse check compares page text, which is nil
                 // on every image page, so without this the pane keeps showing the previous scan.
-                PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane")
-                    .id(model.pageIdentity)
+                // The file's path is in the identity too: browsing with ↑/↓ reloads the model on pair 0 of
+                // document 0 each time, so `pageIdentity` alone repeats, and a placeholder for the new file
+                // must never land on a view still showing the old one.
+                PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane",
+                            placeholder: imagePlaceholder)
+                    .id("\(model.currentFilePath ?? "")#\(model.pageIdentity)")
                     .frame(maxWidth: .infinity)
                 Divider()
                 if model.hasTextPage {

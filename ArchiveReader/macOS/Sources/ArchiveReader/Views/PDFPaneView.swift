@@ -32,6 +32,9 @@ final class PDFPaneController {
     /// shares its annotations with the original, and removing one from the copy leaves it on the original
     /// (measured), so boxes would pile up on the model's JPEG page.
     let standInOverlay = StandInFindOverlay()
+    /// Shows the preview's prerendered bitmap over the image page until PDFKit's own render lands
+    /// (W40.fix-reader-preview-image-speed). Installed only on a pane shown with `showsPlaceholder`.
+    let placeholderOverlay = PlaceholderPageOverlay()
     /// Edit ▸ Copy (⌘C) as this pane's `copy:` answers it — the viewer's verbatim copy from whichever pane
     /// holds the selection, and whether there is one to copy. Set by `DocumentViewerModel`; nil leaves
     /// PDFKit's own `copy:` in place. See `ReaderPDFView.copy(_:)`.
@@ -114,12 +117,16 @@ final class PDFPaneController {
     /// Show a COPY of `page` in a throwaway one-page document (a PDFPage can belong to only one document —
     /// copying avoids detaching it from the source), then restore the zoom. `reference` is the page the
     /// saved zoom is measured against (the PDF's image page for the left pane); nil means `page` itself.
-    func show(_ page: PDFPage?, reference: PDFPage?, in view: PDFView) {
+    func show(_ page: PDFPage?, reference: PDFPage?, placeholder: PlaceholderRequest? = nil, in view: PDFView) {
         view.clearSelection()
         findSource = (page != nil && reference != nil && page !== reference) ? reference : nil
         standInOverlay.update(rects: [], current: nil)
-        // Before the document, so PDFKit asks it for the page's overlay as it lays the page out.
-        view.pageOverlayViewProvider = findSource == nil ? nil : standInOverlay
+        placeholderOverlay.reset(key: findSource == nil ? placeholder?.key : nil,
+                                 image: findSource == nil ? placeholder?.image : nil)
+        // Before the document, so PDFKit asks it for the page's overlay as it lays the page out. The
+        // placeholder's provider goes in even before its bitmap is ready, so a late one can still be shown.
+        view.pageOverlayViewProvider = findSource != nil ? standInOverlay
+            : placeholder != nil ? placeholderOverlay : nil
         if let page, let copy = page.copy() as? PDFPage {
             let doc = PDFDocument()
             doc.insert(copy, at: 0)
@@ -229,6 +236,13 @@ final class PDFPaneController {
 
     private static func quarterTurns(_ page: PDFPage) -> Int { ((page.rotation / 90) % 4 + 4) % 4 }
 
+    /// A text selection is drawn under page overlays, so the placeholder steps aside for good once one
+    /// appears (a drag-select, Select All). Clearing the selection does not bring it back.
+    func selectionChanged() {
+        guard placeholderOverlay.isShowing else { return }
+        if let s = pdfView?.currentSelection?.string, !s.isEmpty { placeholderOverlay.retire() }
+    }
+
     /// Give this pane keyboard focus (so ↑/↓ scroll it and text selection lands here).
     func focus() { pdfView?.window?.makeFirstResponder(pdfView) }
 
@@ -284,6 +298,7 @@ final class PDFPaneController {
     func applyFind(scroll: Bool = true) {
         guard let v = pdfView else { return }
         standInOverlay.update(rects: [], current: nil)
+        if !findQuery.isEmpty { placeholderOverlay.retire() }   // PDFKit draws find highlights under overlays
         guard !findQuery.isEmpty, let doc = v.document else {
             v.highlightedSelections = nil
             v.clearSelection()
@@ -412,6 +427,15 @@ final class StandInFindOverlayView: NSView {
     }
 }
 
+/// The placeholder a pane is asked to show: `key` names the file and page it is a picture of, and `image`
+/// is nil until the prerender lands.
+struct PlaceholderRequest {
+    var key: String
+    var image: CGImage?
+
+    static func key(path: String, pageIndex: Int) -> String { "\(path)#\(pageIndex)" }
+}
+
 /// Displays a single PDF page (read-only, selectable) in its own PDFView. The parent gives each page a
 /// fresh view (via `.id`), because reusing one PDFView and swapping its document leaves text selection
 /// wedged after cycling (DV-3). Zoom is restored from the controller so it still persists (DV-2).
@@ -422,13 +446,20 @@ struct PDFPaneView: NSViewRepresentable {
     /// The page the pane's zoom is measured against, when `page` may be a differently sized stand-in for it
     /// (the left pane's JPEG original stands in for the PDF's image page). nil = `page` itself.
     var reference: PDFPage? = nil
+    /// Show a prerendered bitmap over the page until PDFKit's own render lands (the preview's image pane).
+    /// nil = no placeholder; a request with no image yet still lets a late bitmap be shown.
+    var placeholder: PlaceholderRequest? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
     @MainActor final class Coordinator: NSObject {
         let controller: PDFPaneController
         init(controller: PDFPaneController) { self.controller = controller }
-        @objc func scaleChanged(_ note: Notification) { controller.recordScale() }
+        @objc func scaleChanged(_ note: Notification) {
+            controller.placeholderOverlay.redraw()   // its resolution check is made per draw
+            controller.recordScale()
+        }
+        @objc func selectionChanged(_ note: Notification) { controller.selectionChanged() }
     }
 
     func makeNSView(context: Context) -> PDFView {
@@ -445,6 +476,9 @@ struct PDFPaneView: NSViewRepresentable {
         NotificationCenter.default.addObserver(context.coordinator,
                                                selector: #selector(Coordinator.scaleChanged(_:)),
                                                name: .PDFViewScaleChanged, object: view)
+        NotificationCenter.default.addObserver(context.coordinator,
+                                               selector: #selector(Coordinator.selectionChanged(_:)),
+                                               name: .PDFViewSelectionChanged, object: view)
         loadPage(into: view)
         #if DEBUG
         view.setAccessibilityValue(String(format: "%.4f", view.scaleFactor))
@@ -454,15 +488,21 @@ struct PDFPaneView: NSViewRepresentable {
 
     func updateNSView(_ view: PDFView, context: Context) {
         controller.pdfView = view
-        if view.document?.page(at: 0)?.string != page?.string { loadPage(into: view) }   // safety net for any reuse
+        if view.document?.page(at: 0)?.string != page?.string {
+            loadPage(into: view)   // safety net for any reuse
+        } else if let placeholder, let image = placeholder.image {
+            // The bitmap landed after the page was shown; the overlay takes it only for the page it shows.
+            controller.placeholderOverlay.supply(image, key: placeholder.key)
+        }
     }
 
     static func dismantleNSView(_ nsView: PDFView, coordinator: Coordinator) {
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewScaleChanged, object: nsView)
+        NotificationCenter.default.removeObserver(coordinator, name: .PDFViewSelectionChanged, object: nsView)
     }
 
     private func loadPage(into view: PDFView) {
-        controller.show(page, reference: reference, in: view)
+        controller.show(page, reference: reference, placeholder: placeholder, in: view)
     }
 }
 
