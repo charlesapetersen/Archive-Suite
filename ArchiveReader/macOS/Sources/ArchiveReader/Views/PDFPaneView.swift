@@ -14,7 +14,14 @@ final class PDFPaneController {
     weak var pdfView: PDFView?
     let key: String                    // "left" / "right" — persistence + default carry-over
     private let persists: Bool         // false → fit-to-pane default, no UserDefaults writes (preview mode)
-    private var savedScale: CGFloat?   // nil = fit-to-pane; else an explicit scale factor
+    private var savedScale: CGFloat?   // nil = fit-to-pane; else an explicit scale factor, in reference-page units
+    /// The shown page's scale factor per unit of `savedScale`: 1 for a PDF page, and the PDF image page's width
+    /// over the JPEG's for a JPEG original, whose page is sized in pixels rather than the PDF's points. Keeping
+    /// the zoom in the PDF page's units is what makes the PDF / JPEG switch keep the on-screen size
+    /// (W40.fix-reader-jpeg-keep-view), and leaves the persisted zoom meaning the same for either image.
+    private var scaleUnit: CGFloat = 1
+    /// The region on screen when the PDF / JPEG switch was used, reapplied to the other image's fresh view.
+    private(set) var pendingViewport: Viewport?
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
     private var findQuery = ""         // active find query to highlight on this pane ("" = none)
     private var findCurrentIndex: Int? // which match on THIS pane is the current selection; nil = highlight-only
@@ -41,6 +48,7 @@ final class PDFPaneController {
     func fit() {
         guard let v = pdfView else { return }
         savedScale = nil
+        pendingViewport = nil
         if persists { AppSettings.setViewerZoom(key, 0) }
         isApplying = true; v.autoScales = true; isApplying = false
         scrollToTop()
@@ -59,7 +67,7 @@ final class PDFPaneController {
     /// changes (`isApplying`) and the auto-fit recomputes (`autoScales`).
     func recordScale() {
         guard let v = pdfView, !isApplying, v.autoScales == false else { return }
-        savedScale = v.scaleFactor
+        savedScale = v.scaleFactor / scaleUnit
         if persists { AppSettings.setViewerZoom(key, Double(v.scaleFactor)) }
         #if DEBUG
         v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
@@ -72,14 +80,118 @@ final class PDFPaneController {
     func applyToView() {
         guard let v = pdfView else { return }
         isApplying = true
-        if let s = savedScale { v.autoScales = false; v.scaleFactor = s } else { v.autoScales = true }
+        if let s = savedScale { v.autoScales = false; v.scaleFactor = s * scaleUnit } else { v.autoScales = true }
         isApplying = false
         #if DEBUG
         v.setAccessibilityValue(String(format: "%.4f", v.scaleFactor))
         #endif
-        scrollToTop()
+        if let viewport = pendingViewport, savedScale != nil { restore(viewport) } else { scrollToTop() }
+        pendingViewport = nil
         applyFind()   // re-highlight matches (+ re-select the current one) on the freshly-built view
     }
+
+    /// Show a COPY of `page` in a throwaway one-page document (a PDFPage can belong to only one document —
+    /// copying avoids detaching it from the source), then restore the zoom. `reference` is the page the
+    /// saved zoom is measured against (the PDF's image page for the left pane); nil means `page` itself.
+    func show(_ page: PDFPage?, reference: PDFPage?, in view: PDFView) {
+        view.clearSelection()
+        if let page, let copy = page.copy() as? PDFPage {
+            let doc = PDFDocument()
+            doc.insert(copy, at: 0)
+            view.document = doc
+        } else {
+            view.document = nil
+        }
+        scaleUnit = Self.scaleUnit(showing: page, reference: reference, box: view.displayBox)
+        // The zoom limits move with the unit too, so a JPEG measured in pixels can reach the same sizes.
+        view.minScaleFactor = Self.defaultScaleRange.lowerBound * scaleUnit
+        view.maxScaleFactor = Self.defaultScaleRange.upperBound * scaleUnit
+        view.layoutDocumentView()
+        applyToView()   // restore the persisted/current zoom + pin the page top (or the switched-from region)
+    }
+
+    /// Note the region on screen, as fractions of the shown page, so the next page shown in this pane opens
+    /// on the same place: called just before the PDF / JPEG switch swaps the image. Fit-to-pane shows the
+    /// whole page, so there is nothing to carry and the new image simply opens fitted.
+    func captureViewport() {
+        pendingViewport = nil
+        guard let v = pdfView, savedScale != nil, !v.autoScales, let page = v.document?.page(at: 0),
+              v.bounds.width > 0, v.bounds.height > 0 else { return }
+        let centre = v.convert(CGPoint(x: v.bounds.midX, y: v.bounds.midY), to: page)
+        pendingViewport = Viewport(centre: Self.displayedFraction(of: centre, on: page, box: v.displayBox),
+                                   size: v.bounds.size)
+    }
+
+    /// Put the noted centre back in the middle of the pane at the new page's zoom. `go(to:)` places its point
+    /// at the top-left, so step back half a pane; repeated on the next runloop like `scrollToTop`.
+    private func restore(_ viewport: Viewport) {
+        guard let v = pdfView, let page = v.document?.page(at: 0) else { return }
+        let shown = Self.displayedSize(page, box: v.displayBox)
+        let scale = v.scaleFactor
+        guard shown.width > 0, shown.height > 0, scale > 0 else { scrollToTop(); return }
+        let topLeft = CGPoint(x: min(max(viewport.centre.x - viewport.size.width / 2 / (shown.width * scale), 0), 1),
+                              y: min(max(viewport.centre.y - viewport.size.height / 2 / (shown.height * scale), 0), 1))
+        let point = Self.pagePoint(fromDisplayed: topLeft, on: page, box: v.displayBox)
+        v.layoutDocumentView()
+        v.go(to: PDFDestination(page: page, at: point))
+        DispatchQueue.main.async { [weak v] in
+            guard let v, v.document?.page(at: 0) === page else { return }
+            v.go(to: PDFDestination(page: page, at: point))
+        }
+    }
+
+    /// A pane's visible region: its centre as fractions of the page as displayed (x from the left, y from the
+    /// top, rotation applied), and the pane's size in view points.
+    struct Viewport: Equatable {
+        var centre: CGPoint
+        var size: CGSize
+    }
+
+    /// PDFKit's own zoom limits, read once from a fresh view.
+    static let defaultScaleRange: ClosedRange<CGFloat> = {
+        let v = PDFView()
+        return v.minScaleFactor...max(v.minScaleFactor, v.maxScaleFactor)
+    }()
+
+    static func scaleUnit(showing page: PDFPage?, reference: PDFPage?, box: PDFDisplayBox) -> CGFloat {
+        guard let page, let reference, page !== reference else { return 1 }
+        let shown = displayedSize(page, box: box).width, ref = displayedSize(reference, box: box).width
+        return shown > 0 && ref > 0 ? ref / shown : 1
+    }
+
+    static func displayedSize(_ page: PDFPage, box: PDFDisplayBox) -> CGSize {
+        let size = page.bounds(for: box).size
+        return quarterTurns(page) % 2 == 0 ? size : CGSize(width: size.height, height: size.width)
+    }
+
+    /// A page-space point (origin bottom-left, y up, unrotated) as fractions of the page as displayed.
+    /// `/Rotate` turns the page clockwise for display.
+    static func displayedFraction(of point: CGPoint, on page: PDFPage, box: PDFDisplayBox) -> CGPoint {
+        let b = page.bounds(for: box)
+        guard b.width > 0, b.height > 0 else { return .zero }
+        let x = min(max((point.x - b.minX) / b.width, 0), 1), y = min(max((point.y - b.minY) / b.height, 0), 1)
+        switch quarterTurns(page) {
+        case 1: return CGPoint(x: y, y: x)
+        case 2: return CGPoint(x: 1 - x, y: y)
+        case 3: return CGPoint(x: 1 - y, y: 1 - x)
+        default: return CGPoint(x: x, y: 1 - y)
+        }
+    }
+
+    /// The inverse of `displayedFraction`.
+    static func pagePoint(fromDisplayed f: CGPoint, on page: PDFPage, box: PDFDisplayBox) -> CGPoint {
+        let b = page.bounds(for: box)
+        let x: CGFloat, y: CGFloat
+        switch quarterTurns(page) {
+        case 1: (x, y) = (f.y, f.x)
+        case 2: (x, y) = (1 - f.x, f.y)
+        case 3: (x, y) = (1 - f.y, 1 - f.x)
+        default: (x, y) = (f.x, 1 - f.y)
+        }
+        return CGPoint(x: b.minX + x * b.width, y: b.minY + y * b.height)
+    }
+
+    private static func quarterTurns(_ page: PDFPage) -> Int { ((page.rotation / 90) % 4 + 4) % 4 }
 
     /// Give this pane keyboard focus (so ↑/↓ scroll it and text selection lands here).
     func focus() { pdfView?.window?.makeFirstResponder(pdfView) }
@@ -166,6 +278,9 @@ struct PDFPaneView: NSViewRepresentable {
     let page: PDFPage?
     let controller: PDFPaneController
     var id: String = ""
+    /// The page the pane's zoom is measured against, when `page` may be a differently sized stand-in for it
+    /// (the left pane's JPEG original stands in for the PDF's image page). nil = `page` itself.
+    var reference: PDFPage? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
@@ -205,19 +320,8 @@ struct PDFPaneView: NSViewRepresentable {
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewScaleChanged, object: nsView)
     }
 
-    /// Show a COPY of the page in a throwaway one-page document (a PDFPage can belong to only one
-    /// document — copying avoids detaching it from the source), then restore the controller's zoom.
     private func loadPage(into view: PDFView) {
-        view.clearSelection()
-        if let page, let copy = page.copy() as? PDFPage {
-            let doc = PDFDocument()
-            doc.insert(copy, at: 0)
-            view.document = doc
-        } else {
-            view.document = nil
-        }
-        view.layoutDocumentView()
-        controller.applyToView()   // restore the persisted/current zoom + pin the page top
+        controller.show(page, reference: reference, in: view)
     }
 }
 

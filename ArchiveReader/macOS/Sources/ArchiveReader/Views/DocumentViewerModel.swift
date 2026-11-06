@@ -225,6 +225,7 @@ final class DocumentViewerModel: ObservableObject {
 
     func toggleImageSource() {
         guard hasJPEGPartner else { return }
+        leftController.captureViewport()   // the other image opens on the same region (W40.fix-reader-jpeg-keep-view)
         imageSource = imageSource == .pdf ? .jpeg : .pdf
         guard persistsImageSource,
               let target = archiveLinkTarget,
@@ -245,6 +246,10 @@ final class DocumentViewerModel: ObservableObject {
     /// and a new *image* page — so without the pair in the identity the left pane would keep showing the
     /// previous scan.
     var pageIdentity: String { "\(index)#\(pair)" }
+    /// The image pane's identity also covers the PDF / JPEG switch, so the swap always builds a fresh view
+    /// that takes the carried zoom and region, rather than leaning on `updateNSView`'s text comparison
+    /// (an image page and a JPEG both have no text, so it cannot tell them apart).
+    var imagePaneIdentity: String { "\(pageIdentity)#\(imageSource.rawValue)" }
 
     /// The text extracted from the current pair's image page, when that pair has no OCR text page (a
     /// single-page PDF with selectable text, or an odd trailing scan). `nil` when a text page exists or

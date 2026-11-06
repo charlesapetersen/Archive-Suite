@@ -81,8 +81,9 @@ struct DocumentWindowView: View {
                     // selection after the document is swapped). Zoom persists via the controller. The
                     // identity covers the page PAIR, not just the file, so stepping within an interleaved
                     // multi-page document rebuilds the panes too.
-                    PDFPaneView(page: model.displayedImagePage, controller: model.leftController, id: "ar.doc.imagePane")
-                        .id(model.pageIdentity)
+                    PDFPaneView(page: model.displayedImagePage, controller: model.leftController,
+                                id: "ar.doc.imagePane", reference: model.imagePage)
+                        .id(model.imagePaneIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
                     splitterHandle(total: total)          // drag gesture lives ONLY here
