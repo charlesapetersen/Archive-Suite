@@ -315,7 +315,9 @@ macOS/Sources/ArchiveNotes/
     TemplatesManagerView.swift     Per-window templates manager (shown in the item pane in templates mode):
                                    list all templates + New/Duplicate/Rename/Delete via NotesModel (W6-S6);
                                    selecting a template opens its body in the detail editor, which
-                                   autosaves it (W9.d3)
+                                   autosaves it (W9.d3). A name is edited in its row (Return, double-click,
+                                   Rename…); File ▸ New Template… opens its New sheet through
+                                   nav.newTemplateRequested (W40.fix-notes-templates)
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (recursive ForEach / per-level
                                    DisclosureGroup + two-way @State selection sync, Smart Folders / Folders
                                    sections, All Notes pseudo-row, context-menu create/rename/delete) (W6-S2).

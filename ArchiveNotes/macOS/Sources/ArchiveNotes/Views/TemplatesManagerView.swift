@@ -39,7 +39,6 @@ struct TemplatesManagerView: View {
                                 .focused($renameFocused)
                                 .onSubmit { commitRename() }
                                 .onExitCommand { cancelRename() }
-                                .accessibilityIdentifier("an.template.rename")
                         } else {
                             Text(t.name.isEmpty ? "Untitled" : t.name).lineLimit(1)
                         }

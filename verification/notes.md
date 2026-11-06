@@ -982,7 +982,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Promised in:** `00-overview.md` §3.7, §16.4; `CLAUDE.md` Impl Map `Template`, `TemplatesManagerView`,
   `NotesFolderTreeView`; `09-gap-closure.md` D3; `SUITE_TODO_DONE.md` `W9.d3`.
 - **Reached by:** the sidebar Templates row (`Views/NotesFolderTreeView.swift:115`) or folder menu ▸ Template ▸
-  Manage… (`:352`) opens `TemplatesManagerView`. In it: New (`Views/TemplatesManagerView.swift:50-52`) →
+  Manage… (`:352`) opens `TemplatesManagerView`; File ▸ New Template… opens it with its New sheet
+  (`NewItemCommands`, W40.fix-notes-templates). A name is renamed in its row (Return, double-click or Rename…). In it: New (`Views/TemplatesManagerView.swift:50-52`) →
   `NotesModel.createTemplate` (`Core/NotesModel.swift:581`); Duplicate (`:91-95`, `:106-111`) →
   `duplicateTemplate` (`:636`); Rename… (`:60`, `:98`) → `renameTemplate` (`:650`); Delete (`:65-69`) →
   `deleteTemplate` (`:673`). The body editor is `TemplateBodyEditorPane` (`Views/NoteEditorPane.swift:494`; it

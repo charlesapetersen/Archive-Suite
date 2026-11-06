@@ -41,7 +41,8 @@ final class TemplatesUITests: NotesFixtureUITestCase {
             // Return on the selected row.
             row.click()
             app.typeKey(.return, modifierFlags: [])
-            let field = mainWindow.textFields["an.template.rename"]
+            // The row's identifier reaches its children, so the field is found by its placeholder.
+            let field = mainWindow.textFields.matching(NSPredicate(format: "placeholderValue == %@", "Template name")).firstMatch
             XCTAssertTrue(field.waitForExistence(timeout: 5),
                           "Return should start a rename in the row: \(mainWindow.debugDescription)")
             app.typeKey("a", modifierFlags: .command)
