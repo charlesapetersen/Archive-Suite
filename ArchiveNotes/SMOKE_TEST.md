@@ -65,7 +65,8 @@ step.
       (`W9.b8`); check that each persists to front-matter.
 - [ ] **M. Replication + delete-last-instance guard** — replicate a note into a second folder
       (membership, not a copy); removing a replicant is quiet; removing the **last** instance prompts a
-      modal (fresh re-check at confirm) → Trash (recoverable).
+      modal (fresh re-check at confirm) → the sidebar's Trash; Edit ▸ Undo, or Trash ▸ Put Back, returns it
+      to its folders.
 - [ ] **N. Options (⌘,)** — the Settings window shows the Zotero section (enable / clipboard-detect /
       citation style / advanced host+port) and the Dates section ("Show dates in other calendars",
       `W24.cal1-toggle`), @AppStorage-bound. Host+port take effect only after a relaunch; the rest apply

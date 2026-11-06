@@ -100,7 +100,21 @@ final class NotesNavigationModel: ObservableObject {
 
     /// Per-window view mode: when true the item pane shows the templates manager instead of the note
     /// list (the sidebar "Templates" row / a folder's "Template ▸ Manage…" toggles it). W6-S6.
-    @Published var showingTemplates = false
+    var showingTemplates: Bool {
+        get { paneMode == .templates }
+        set { paneMode = newValue ? .templates : .notes }
+    }
+
+    /// Per-window view mode: when true the item pane shows the notes in the store's Trash, with Put
+    /// Back and Empty Trash (the sidebar "Trash" row; W40.fix-notes-delete-undo). Setting
+    /// `showingTemplates = false` (any folder or All Notes selection) leaves it too.
+    var showingTrash: Bool {
+        get { paneMode == .trash }
+        set { paneMode = newValue ? .trash : .notes }
+    }
+
+    enum PaneMode: Equatable { case notes, templates, trash }
+    @Published var paneMode: PaneMode = .notes
 
     /// A pending single-item **delete-last-instance** confirmation (§3.6, W6-S5). Non-nil ⟹ the view
     /// MUST present the mandatory modal before anything is deleted; `nil` = nothing pending. (The
@@ -394,46 +408,57 @@ final class NotesNavigationModel: ObservableObject {
     /// "zero memberships **now**", and the trash below is a suspension point on a reentrant actor — so
     /// the hard-delete window opens before the fresh verdict, drains any add/move already in flight,
     /// and stays open until the note is gone. Later adds and moves are refused throughout that window.
-    func confirmDeletion(_ pending: PendingDeletion) async {
+    ///
+    /// Returns `true` when the note reached the Trash, so the view can offer Edit ▸ Undo (a Put Back)
+    /// for exactly the deletes that happened (W40.fix-notes-delete-undo).
+    @discardableResult
+    func confirmDeletion(_ pending: PendingDeletion) async -> Bool {
         let ids = [pending.itemId]
         model.organization.beginHardDelete(ids)
         defer { model.organization.endHardDelete(ids) }
         if pending.allInstances {
-            do { try await model.organization.removeAllMembershipsForConfirmedDelete(item: pending.itemId) }
+            // After the drain, so a placement still being written is in the record Put Back reads.
+            let former: [UUID]
+            do {
+                try await model.organization.drainMembershipWritesForConfirmedDelete(item: pending.itemId)
+                former = model.organization.foldersContaining(item: pending.itemId)
+                try await model.organization.removeAllMembershipsForConfirmedDelete(item: pending.itemId)
+            }
             catch {
                 model.statusMessage = "Couldn't remove the note from its folders. The note is still on disk."
                 model.rebuild(); recompute(); model.adoptMirrorFailure()
-                return
+                return false
             }
-            await model.trashItems(ids)
+            let survived = await model.trashItems(ids, formerFolders: [pending.itemId: former])
             recompute()
             model.adoptMirrorFailure()
-            return
+            return survived.isEmpty
         }
-        guard let folderId = pending.folderId else { return }
+        guard let folderId = pending.folderId else { return false }
         do {
             try await model.organization.drainMembershipWritesForConfirmedDelete(item: pending.itemId)
             switch try await model.organization.removeConfirmedLastMembership(
                 item: pending.itemId, folder: folderId) {
             case .unlinkedNotLast:
                 // A replica appeared between the modal and this confirm — just unlink; do NOT delete.
-                model.rebuild(); recompute(); model.adoptMirrorFailure(); return
+                model.rebuild(); recompute(); model.adoptMirrorFailure(); return false
             case .notPresent:
                 // A STALE alert: the other window already moved or removed this membership, so nothing
                 // was removed here and the note may still be filed elsewhere. Keep it (W23.h3).
-                model.rebuild(); recompute(); return
+                model.rebuild(); recompute(); return false
             case .deletedLastInstance:
                 break                                   // genuinely the last — fall through to the trash
             }
-        } catch { model.statusMessage = "Couldn't remove the note from the folder."; return }
+        } catch { model.statusMessage = "Couldn't remove the note from the folder."; return false }
         model.organization.beginHardDelete([pending.itemId])
         defer { model.organization.endHardDelete([pending.itemId]) }
-        await model.trashItems([pending.itemId])
+        let survived = await model.trashItems([pending.itemId], formerFolders: [pending.itemId: [folderId]])
         recompute()
         // The membership removal committed; say so if it never reached organization.json (W23.m10).
-        // The trash decision itself is unchanged — the note is in the macOS Trash (recoverable) and
+        // The trash decision itself is unchanged — the note is in the store's Trash (Put Back) and
         // the graph is consistent in SQLite; making the *durable mirror* transactional is W23.m13.
         model.adoptMirrorFailure()
+        return survived.isEmpty
     }
 
     /// Dismiss the confirmation without deleting anything (the default / Cancel path).

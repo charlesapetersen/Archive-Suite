@@ -75,7 +75,9 @@ REFERENCE.md §Implementation Map.
   unreadable `additional_dates` entries are written back verbatim (`NotesFrontMatterTests` fuzz). `MarkdownBridge`
   round-trips are idempotent and never drop text (unsupported styling degrades, text survives); a hard parse
   failure stays raw with a banner, never a lossy styled view (W9.d7). `NoteStore` writes atomically; delete is a
-  coordinated move to Trash, and a file-presenter refusal preserves the note (W9.d12c). Metadata/Zotero writes
+  coordinated move into the store's own `Trash/` with a record of the note's folders, and a file-presenter refusal
+  preserves the note (W9.d12c); the sidebar's Trash row and Edit ▸ Undo put it back, and only Empty Trash sends it on
+  to the Finder's Trash (W40.fix-notes-delete-undo). Metadata/Zotero writes
   (Auto-fill confirm, note-ref saves) go through NotesModel's atomic transactions, which preserve a concurrent
   body/title/tag edit (W9.b1, W9.b3). A failed subject edit is retried as the exact delta, never silently dropped;
   the pending-subjects journal keeps Finder-tag removal ownership across a relaunch; nothing retries

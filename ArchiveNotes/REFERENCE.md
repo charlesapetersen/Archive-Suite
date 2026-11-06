@@ -118,7 +118,7 @@ macOS/Sources/ArchiveNotes/
                                    route the extract through openItem for select+raise (W14.4 b/c);
                                    search(_:) FTS façade + createSmartFolder
                                    (W6-S4); NoteStore-backed delete path — strandedByDeletingFolder
-                                   (fresh read), trashItems (recoverable Trash; drops an index row only once
+                                   (fresh read), trashItems (to the store's Trash/, Put Back + Undo — W40.fix-notes-delete-undo; drops an index row only once
                                    NoteStore.itemExists says the note is gone, returns the survivors — W23.m12;
                                    holds OrganizationStore's hard-delete window for the whole call, so no
                                    replicate/move can follow a note into the Trash — W23.h3-fu),

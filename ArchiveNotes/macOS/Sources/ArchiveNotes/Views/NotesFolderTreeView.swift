@@ -41,6 +41,7 @@ struct NotesFolderTreeView: View {
 
     private static let allNotesTag = "\u{0}ALL"
     private static let templatesTag = "\u{0}TEMPLATES"
+    private static let trashTag = "\u{0}TRASH"
     private static let smartPrefix = "SS:"
 
     var body: some View {
@@ -55,7 +56,7 @@ struct NotesFolderTreeView: View {
         .onChange(of: selection) { _, new in applySelection(new) }
         .onChange(of: model.selectedFolderId) { _, _ in syncSelectionFromModel() }
         .onChange(of: model.selectedSmartId) { _, _ in syncSelectionFromModel() }
-        .onChange(of: nav.showingTemplates) { _, _ in syncSelectionFromModel() }
+        .onChange(of: nav.paneMode) { _, _ in syncSelectionFromModel() }
         // Rename
         .sheet(isPresented: boolBinding($renameID)) {
             let id = renameID
@@ -122,6 +123,9 @@ struct NotesFolderTreeView: View {
             row(name: "Templates", systemImage: "square.on.square", count: model.templates.count)
                 .tag(Self.templatesTag)
                 .accessibilityIdentifier("an.sidebar.templates")
+            row(name: "Trash", systemImage: "trash", count: model.trashedNotes.count)
+                .tag(Self.trashTag)
+                .accessibilityIdentifier("an.sidebar.trash")
         }
     }
 
@@ -133,7 +137,7 @@ struct NotesFolderTreeView: View {
     }
 
     /// The delete dialog's message. §5 wording for the batched sole-instance case; the reassuring
-    /// non-destructive message otherwise. (Deletion is to the Trash — recoverable — despite "permanently".)
+    /// non-destructive message otherwise. The notes go to the sidebar's Trash, where Put Back finds them.
     private var deleteMessage: String {
         guard !deleteStranded.isEmpty else {
             return "The folder is removed; its notes stay in the library (they live in other folders or under All Notes)."
@@ -143,7 +147,8 @@ struct NotesFolderTreeView: View {
         let list = titles.count > 8 ? "\(shown), …" : shown
         let n = deleteStranded.count
         let noun = n == 1 ? "1 note that exists" : "\(n) notes that exist"
-        return "Deleting this folder will permanently delete \(noun) nowhere else: \(list)."
+        return "Deleting this folder will move to the Trash \(noun) nowhere else: \(list). "
+            + "Put Back in the Trash returns them under All Notes."
     }
 
     /// Handle a table→folder drop: plain = MOVE (from the current scope), ⌥ = REPLICATE. Reads the
@@ -478,7 +483,8 @@ struct NotesFolderTreeView: View {
 
     private func applySelection(_ new: String?) {
         if new == Self.templatesTag { nav.showingTemplates = true; return }
-        nav.showingTemplates = false   // any folder/smart/All-Notes selection leaves templates mode
+        if new == Self.trashTag { nav.showingTrash = true; return }
+        nav.showingTemplates = false   // any folder/smart/All-Notes selection leaves templates or Trash mode
         guard let new, new != Self.allNotesTag else { model.setAllNotesScope(); return }
         if new.hasPrefix(Self.smartPrefix) {
             if let id = UUID(uuidString: String(new.dropFirst(Self.smartPrefix.count))) {
@@ -492,6 +498,7 @@ struct NotesFolderTreeView: View {
     private func syncSelectionFromModel() {
         let want: String
         if nav.showingTemplates { want = Self.templatesTag }
+        else if nav.showingTrash { want = Self.trashTag }
         else if let s = model.selectedSmartId { want = Self.smartPrefix + s.uuidString }
         else if let f = model.selectedFolderId { want = f.uuidString }
         else { want = Self.allNotesTag }

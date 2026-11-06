@@ -35,13 +35,23 @@ struct ItemTransaction: Sendable {
     var subjectProjectionError: String? = nil
 }
 
+/// A note waiting in the store's Trash (W40.fix-notes-delete-undo).
+struct TrashedNote: Sendable, Identifiable, Equatable {
+    let id: UUID
+    let title: String
+    let kind: Item.Kind
+    let deletedAt: Date
+    /// The folders that held it when it was deleted; Put Back files it there again where they exist.
+    let formerFolderIds: [UUID]
+}
+
 /// The single persistence layer for Archive Notes' UUID-folder store.
 ///
 /// Every note lives in `<root>/items/<uuid>/<Title>.md` with an optional `assets/` subfolder.
 /// All filesystem mutation is confined to this actor (Swift 6 safe). The resolved `root` URL
 /// must already have its security scope started by `RootFolderStore` before use.
 ///
-/// **Delete contract:** `delete` moves the item dir to Trash (recoverable). The
+/// **Delete contract:** `delete` moves the item dir to the store's `Trash/` (recoverable, Put Back). The
 /// delete-last-membership guard (00-overview section 3.6) is enforced by the caller (W6 UI),
 /// not here -- this is the low-level primitive that assumes the guard already passed.
 actor NoteStore {
@@ -208,13 +218,30 @@ actor NoteStore {
         }
     }
 
-    /// Move the item directory to the Trash (recoverable). Never `removeItem`.
+    /// Move the item directory to the store's own Trash (`<root>/Trash/<uuid>/`), recording the
+    /// folders it was filed in, so Notes can list it and put it back (W40.fix-notes-delete-undo).
+    /// Never `removeItem`.
     ///
-    /// Throws `StoreError.notFound` when the directory is **already** absent, and whatever
-    /// `trashItem` raised when the disk refused (full/read-only volume, no permission, a locked
-    /// entry) — two outcomes a caller must not conflate, because only the second one leaves the note
-    /// on disk. Ask `itemExists` rather than classifying the error (W23.m12).
-    func delete(_ id: UUID) throws { try deleteEntry(id, in: itemDir(id)) }
+    /// Throws `StoreError.notFound` when the directory is **already** absent, and whatever the move
+    /// raised when the disk refused (full/read-only volume, no permission, a locked entry) — two
+    /// outcomes a caller must not conflate, because only the second one leaves the note on disk. Ask
+    /// `itemExists` rather than classifying the error (W23.m12).
+    func delete(_ id: UUID, formerFolders: [UUID] = []) throws {
+        let dir = itemDir(id)
+        guard FileManager.default.fileExists(atPath: dir.path) else { throw StoreError.notFound(id) }
+        let fm = FileManager.default
+        try fm.createDirectory(at: trashDir(), withIntermediateDirectories: true)
+        let destination = trashedItemDir(id)
+        // A second copy of the same id already in the Trash (only by hand or a sync tool: the moves are
+        // atomic renames) goes on to the Finder's Trash, still recoverable there, so the move below
+        // never has to choose between two copies.
+        if fm.fileExists(atPath: destination.path) { try deleteEntry(id, in: destination) }
+        try coordinatedMove(dir, to: destination, deleting: true)
+        let record = TrashRecord(deletedAt: Date(), folderIds: formerFolders)
+        // The note is already safe in the Trash; a lost record only costs its folder placements.
+        try? JSONEncoder().encode(record).write(to: destination.appendingPathComponent(Self.trashRecordName),
+                                                options: [.atomic])
+    }
 
     /// Is this item's directory still on disk? Read-only ground truth, for a caller that has to
     /// decide whether a failed `delete` left the note behind (W23.m12): the note's index row may only
@@ -379,6 +406,112 @@ actor NoteStore {
         allItemRefs().compactMap { ref in
             (try? load(ref.id)).map { ItemSummary(item: $0, mtime: ref.mtime) }
         }
+    }
+
+    // MARK: - Trash (W40.fix-notes-delete-undo)
+    //
+    // A deleted note waits in `<root>/Trash/<uuid>/`, beside `items/`, with a small record of when it
+    // was deleted and which folders held it. Put Back moves it home; Empty Trash sends it on to the
+    // Finder's Trash, so even an emptied note stays recoverable there.
+
+    private static let trashRecordName = ".archivenotes-trash.json"
+
+    private struct TrashRecord: Codable {
+        let deletedAt: Date
+        let folderIds: [UUID]
+    }
+
+    func trashDir() -> URL { root.appendingPathComponent("Trash", isDirectory: true) }
+
+    func trashedItemDir(_ id: UUID) -> URL {
+        trashDir().appendingPathComponent(id.uuidString.lowercased(), isDirectory: true)
+    }
+
+    /// Every note in the Trash, newest deletion first.
+    func trashedNotes() -> [TrashedNote] {
+        guard let dirs = try? FileManager.default.contentsOfDirectory(
+            at: trashDir(), includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var result: [TrashedNote] = []
+        for dir in dirs {
+            guard let id = UUID(uuidString: dir.lastPathComponent) else { continue }
+            // An entry whose note no longer parses is still listed, so it can be put back or emptied.
+            let item = try? loadEntry(id, in: dir)
+            let record = trashRecord(in: dir)
+            let fallbackDate = (try? FileManager.default.attributesOfItem(atPath: dir.path)[.modificationDate]
+                as? Date) ?? Date.distantPast
+            result.append(TrashedNote(id: id, title: item?.title ?? "Unreadable note", kind: item?.kind ?? .note,
+                                      deletedAt: record?.deletedAt ?? fallbackDate,
+                                      formerFolderIds: record?.folderIds ?? []))
+        }
+        return result.sorted { $0.deletedAt > $1.deletedAt }
+    }
+
+    /// Move a trashed note back to `items/` and return the folders it was filed in. Refuses (and
+    /// moves nothing) when a note of that id is already home, so a put-back never overwrites a note.
+    /// A home folder with no note in it (an asset write that landed after the delete recreated
+    /// `items/<uuid>/assets/`) is not a note: it goes to the Finder's Trash first, so it cannot block
+    /// the put-back for good.
+    func putBack(_ id: UUID) throws -> [UUID] {
+        let source = trashedItemDir(id)
+        guard FileManager.default.fileExists(atPath: source.path) else { throw StoreError.notFound(id) }
+        let destination = itemDir(id)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            guard !Self.holdsNote(destination) else {
+                throw StoreError.writeFailed("A note with this id is already in the library")
+            }
+            try deleteEntry(id, in: destination)
+        }
+        let folders = trashRecord(in: source)?.folderIds ?? []
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try coordinatedMove(source, to: destination, deleting: false)
+        try? FileManager.default.removeItem(at: destination.appendingPathComponent(Self.trashRecordName))
+        return folders
+    }
+
+    /// Send a trashed note on to the Finder's Trash (still recoverable there). Never `removeItem`.
+    func emptyFromTrash(_ id: UUID) throws { try deleteEntry(id, in: trashedItemDir(id)) }
+
+    /// Does this directory hold a note's `.md`, at any depth? Conservative: anything unreadable counts
+    /// as a note, so a stray is only ever cleared when it provably holds none.
+    private static func holdsNote(_ dir: URL) -> Bool {
+        final class Flag: @unchecked Sendable { var failed = false }
+        let flag = Flag()
+        guard let walker = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: nil,
+                                                          errorHandler: { _, _ in flag.failed = true; return false })
+        else { return true }
+        for case let url as URL in walker where url.pathExtension.lowercased() == "md" { return true }
+        return flag.failed
+    }
+
+    func isTrashed(_ id: UUID) -> Bool { FileManager.default.fileExists(atPath: trashedItemDir(id).path) }
+
+    private func trashRecord(in dir: URL) -> TrashRecord? {
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent(Self.trashRecordName)) else { return nil }
+        return try? JSONDecoder().decode(TrashRecord.self, from: data)
+    }
+
+    /// A coordinated directory move. A delete coordinates the source `.forDeleting`, as `deleteEntry`
+    /// does, so a presenter that refuses the deletion still keeps the note where it is (W9.d12c); a
+    /// put-back coordinates `.forMoving`. Presenters are told of the move either way.
+    private func coordinatedMove(_ source: URL, to destination: URL, deleting: Bool) throws {
+        var coordinationError: NSError?
+        var moveError: Error?
+        let coordinator = NSFileCoordinator(filePresenter: nil)
+        coordinator.coordinate(
+            writingItemAt: source, options: deleting ? .forDeleting : .forMoving,
+            writingItemAt: destination, options: .forReplacing,
+            error: &coordinationError
+        ) { from, to in
+            coordinator.item(at: from, willMoveTo: to)
+            do {
+                try FileManager.default.moveItem(at: from, to: to)
+                coordinator.item(at: from, didMoveTo: to)
+            } catch { moveError = error }
+        }
+        if let coordinationError { throw coordinationError }
+        if let moveError { throw moveError }
     }
 
     // MARK: - CRUD (templates — same primitives, stored under Templates/)

@@ -36,6 +36,7 @@ struct NotesBrowserView: View {
     @State private var selectedTemplateID: UUID?
     @EnvironmentObject private var flushRegistry: EditorFlushRegistry
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.undoManager) private var undoManager
 
     init(kind: ItemKindShell, model: NotesModel) {
         self._model = ObservedObject(wrappedValue: model)
@@ -116,7 +117,18 @@ struct NotesBrowserView: View {
                presenting: nav.pendingDeletion) { pending in
             // Capture `pending` from the presentation value: SwiftUI clears the binding (→
             // pendingDeletion = nil) the instant a button is tapped, before this async Task runs.
-            Button("Delete Note", role: .destructive) { Task { await nav.confirmDeletion(pending) } }
+            Button("Delete Note", role: .destructive) {
+                Task {
+                    // Edit ▸ Undo puts the note back, only once it is really in the Trash
+                    // (W40.fix-notes-delete-undo). The window's manager, which the note table answers to.
+                    guard await nav.confirmDeletion(pending), let undo = window?.undoManager ?? undoManager else { return }
+                    let id = pending.itemId
+                    undo.registerUndo(withTarget: model) { model in
+                        Task { @MainActor in await model.putBack([id]) }
+                    }
+                    undo.setActionName("Delete Note")
+                }
+            }
                 .accessibilityIdentifier("an.dialog.deleteLastInstance.confirm")
             Button("Cancel", role: .cancel) { }
                 .accessibilityIdentifier("an.dialog.deleteLastInstance.cancel")
@@ -248,7 +260,8 @@ struct NotesBrowserView: View {
     /// reported here and the other kind's window is opened from here, so neither leaves the template
     /// being edited. Outside templates mode the mounted `NoteEditorPane` handles every request.
     private func handleOpenWhileShowingTemplates(_ req: NotesModel.OpenRequest?) {
-        guard nav.showingTemplates, let req else { return }
+        // The Trash shows no note editor either, so it takes the same path (W40.fix-notes-delete-undo).
+        guard nav.paneMode != .notes, let req else { return }
         let action = NotePassageResolve.openAction(forItemID: req.id, block: req.block,
                                                    among: model.allItems, windowKind: nav.windowKind)
         if NotePassageResolve.leavesTemplatesMode(for: action) {
@@ -377,6 +390,8 @@ private struct ItemListPane: View {
         Group {
             if nav.showingTemplates {
                 TemplatesManagerView(model: model, nav: nav, selected: $selectedTemplateID)
+            } else if nav.showingTrash {
+                NotesTrashView(model: model, nav: nav)
             } else {
                 VStack(spacing: 0) {
                     NotesFilterBar(nav: nav)
@@ -487,6 +502,10 @@ private struct DetailPane: View {
                     Divider()
                     TemplateBodyEditorPane(model: nav.model, templateID: selectedTemplateID)
                 }
+            } else if nav.showingTrash {
+                Text("Select deleted notes and choose Put Back to return them to their folders.")
+                    .font(.callout).foregroundStyle(.primary).multilineTextAlignment(.center)
+                    .padding().frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 noteDetail
             }

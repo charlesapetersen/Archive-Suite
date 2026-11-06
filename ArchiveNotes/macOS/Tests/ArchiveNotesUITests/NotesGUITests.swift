@@ -2218,6 +2218,64 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        "confirmed Delete should remove every folder placement")
     }
 
+    /// W40.fix-notes-delete-undo (notes-1 rows 34, 40) — Edit ▸ Undo brings a deleted note back with
+    /// its folder placement, and a second delete can be found in the sidebar's Trash and put back.
+    func testG21_DeleteUndoAndTrashPutBack() throws {
+        try withFixture { try runG21_DeleteUndoAndTrashPutBack() }
+    }
+
+    private func runG21_DeleteUndoAndTrashPutBack() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+        let id = Self.idPlain
+        let readingPair = [Self.folderReading, id]
+        XCTAssertTrue((organizationMemberships() ?? []).contains(readingPair), "fixture note should start in Reading")
+        let trashDir = Self.fixturePath + "/Trash/" + id.lowercased()
+
+        func deleteNote() {
+            let row = selectItem(uuid: id)
+            _ = pollUntil(timeout: 8) { app.activate(); return row.isHittable }
+            row.rightClick()
+            let delete = app.menuItems["Delete…"]
+            if delete.waitForExistence(timeout: 4) { delete.click() }
+            let confirm = app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
+            XCTAssertTrue(confirm.waitForExistence(timeout: 8), "Delete… should request confirmation")
+            confirm.click()
+            XCTAssertTrue(pollUntil(timeout: 15) { !itemDirs().contains(id) }, "the note should leave items/")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: trashDir), "it should wait in the store's Trash")
+        }
+
+        // --- Undo leg ---
+        deleteNote()
+        app.activate()
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        let undo = edit.menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Undo'")).firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5), "Edit ▸ Undo should be in the menu")
+        XCTAssertTrue(undo.isEnabled, "Edit ▸ Undo should be enabled after a delete (title: \(undo.title))")
+        undo.click()
+        XCTAssertTrue(pollUntil(timeout: 15) { itemDirs().contains(id) }, "Undo should bring the note back to items/")
+        XCTAssertTrue(pollUntil(timeout: 8) { (organizationMemberships() ?? []).contains(readingPair) },
+                      "Undo should file the note in Reading again")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: trashDir), "nothing should be left in the Trash")
+
+        // --- Trash view leg ---
+        deleteNote()
+        let trashRow = app.descendants(matching: .any)["an.sidebar.trash"].firstMatch
+        XCTAssertTrue(trashRow.waitForExistence(timeout: 8), "the sidebar should show a Trash row")
+        trashRow.click()
+        let deleted = app.descendants(matching: .any)["an.trash.row"].firstMatch
+        XCTAssertTrue(deleted.waitForExistence(timeout: 8), "the Trash should list the deleted note")
+        deleted.click()
+        let putBack = app.descendants(matching: .any)["an.trash.putBack"].firstMatch
+        XCTAssertTrue(pollUntil(timeout: 5) { putBack.isEnabled }, "Put Back should be live with a note selected")
+        putBack.click()
+        XCTAssertTrue(pollUntil(timeout: 15) { itemDirs().contains(id) }, "Put Back should bring the note home")
+        XCTAssertTrue(pollUntil(timeout: 8) { (organizationMemberships() ?? []).contains(readingPair) },
+                      "Put Back should file the note in Reading again")
+        XCTAssertTrue(app.descendants(matching: .any)["an.trash.empty"].firstMatch.waitForExistence(timeout: 8),
+                      "the Trash should then be empty")
+    }
+
     // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
     //
     // Each of these shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour

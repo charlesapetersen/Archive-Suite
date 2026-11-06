@@ -57,6 +57,10 @@ final class NotesModel: ObservableObject {
     /// template" (06-viewers §6). Kept out of `allItems` so templates never appear in the note list.
     @Published private(set) var templates: [Template] = []
 
+    /// The notes waiting in the store's Trash, newest deletion first (W40.fix-notes-delete-undo).
+    /// Loaded on bootstrap and after every delete, put-back and empty.
+    @Published private(set) var trashedNotes: [TrashedNote] = []
+
     // MARK: Deterministic index-ready signal (§3.4 — XCUITest polls this before FTS/relevance asserts)
 
     /// `true` once the initial on-disk index build has settled (app path). A pure injected test store
@@ -152,7 +156,7 @@ final class NotesModel: ObservableObject {
     /// `nil` for a pure injected store.
     private let indexer: NotesIndexer?
     /// The only file-deleting layer (W2, §16.1). Built in `bootstrap()` on the app path; injectable for
-    /// tests. `delete(_:)` moves an item dir to the macOS Trash (recoverable) — never `removeItem`.
+    /// tests. `delete(_:)` moves an item dir to the store's `Trash/` (Put Back) — never `removeItem`.
     private var noteStore: NoteStore?
     private var didBootstrap = false
 
@@ -356,6 +360,7 @@ final class NotesModel: ObservableObject {
         rebuild()
         await reloadItems()          // fast first paint from whatever is already indexed
         await reloadTemplates()
+        await reloadTrash()
         await buildIndexFromDisk()   // (re)build the disposable index from disk, then flip ready (§3.4)
     }
 
@@ -1757,7 +1762,7 @@ final class NotesModel: ObservableObject {
     var hardDeleteWindowHookForTesting: (@MainActor () async -> Void)?
     #endif
 
-    /// Move the given items' folders to the macOS Trash (recoverable — `NoteStore.delete` never
+    /// Move the given items' folders to the store's Trash (Put Back — `NoteStore.delete` never
     /// `removeItem`s) and drop the index rows of the ones that are **actually gone**. The caller must
     /// have already removed the items' memberships (0 remaining) — the §3.6 guard passed. Reloads the
     /// shared item list + rebuilds the tree. Returns the ids that SURVIVED (still on disk), so a
@@ -1777,7 +1782,7 @@ final class NotesModel: ObservableObject {
     /// rather than only at the callers means a future third caller inherits it; the refcount is what
     /// lets a caller nest a wider window around this one.
     @discardableResult
-    func trashItems(_ ids: [UUID]) async -> [UUID] {
+    func trashItems(_ ids: [UUID], formerFolders: [UUID: [UUID]] = [:]) async -> [UUID] {
         guard !ids.isEmpty else { return [] }
         organization.beginHardDelete(ids)
         defer { organization.endHardDelete(ids) }
@@ -1790,7 +1795,7 @@ final class NotesModel: ObservableObject {
         var survived: [UUID] = []         // the disk refused ⟹ still on disk, so keep them findable
         if let noteStore {
             for id in ids {
-                do { try await noteStore.delete(id); removed.append(id) }
+                do { try await noteStore.delete(id, formerFolders: formerFolders[id] ?? []); removed.append(id) }
                 catch {
                     NSLog("NotesModel: could not move note \(id) to Trash: \(error)")
                     // Ask the disk instead of classifying the error: `delete` also throws when the
@@ -1817,6 +1822,7 @@ final class NotesModel: ObservableObject {
             }
         }
         await reloadItems()
+        await reloadTrash()
         rebuild()
         // Last, so neither `reloadItems` nor `rebuild` can outrun it. A survivor outranks a stale
         // index because the note is still there to be found; `adoptMirrorFailure()` still wins in the
@@ -1831,6 +1837,96 @@ final class NotesModel: ObservableObject {
                 + "but the note list couldn't be updated — it will catch up on the next launch."
         }
         return survived
+    }
+
+    // MARK: Trash (W40.fix-notes-delete-undo)
+
+    func reloadTrash() async {
+        guard let noteStore else { return }
+        trashedNotes = await noteStore.trashedNotes()
+    }
+
+    /// Put trashed notes back in the library — the Trash view's Put Back and Edit ▸ Undo after a
+    /// delete. Each note goes home to `items/`, is indexed again, and is filed in the folders that
+    /// held it that still exist; one whose folders are all gone is under All Notes. Returns the ids
+    /// that came back.
+    @discardableResult
+    func putBack(_ ids: [UUID]) async -> [UUID] {
+        guard let noteStore, !ids.isEmpty else { return [] }
+        // Without the folder graph a note would come home unfiled and, with no index, unlisted.
+        guard !refuseWhileFoldersReadOnly("put the note back") else { return [] }
+        var restored: [UUID] = []
+        var refused = 0
+        var lostFolders = false
+        var unfiled = 0
+        for id in ids {
+            let folders: [UUID]
+            do { folders = try await noteStore.putBack(id) }
+            catch NoteStore.StoreError.notFound {
+                // Already put back (the Trash view, another window) or emptied — a stale Undo. Nothing
+                // is lost and nothing is still in the Trash, so it is not reported as a refusal.
+                continue
+            }
+            catch {
+                NSLog("NotesModel: could not put note \(id) back: \(error)")
+                refused += 1
+                continue
+            }
+            restored.append(id)
+            trashedNoteIDs.remove(id)
+            if let index, let item = try? await noteStore.load(id) {
+                let mtime = (try? await noteStore.mdURL(for: id)).flatMap {
+                    (try? FileManager.default.attributesOfItem(atPath: $0.path)[.modificationDate] as? Date)?
+                        .timeIntervalSinceReferenceDate
+                } ?? Date().timeIntervalSinceReferenceDate
+                do { try await index.upsertBatch([NoteIndexRow(item: item, mtime: mtime)]) }
+                catch { NSLog("NotesModel: put note \(id) back but could not index it: \(error)") }
+            }
+            let existing = Set(organization.folders.filter { $0.kind == .normal }.map(\.id))
+            for folder in folders {
+                guard existing.contains(folder) else { lostFolders = true; continue }
+                do { try await organization.addMembership(item: id, folder: folder) }
+                catch {
+                    NSLog("NotesModel: put note \(id) back but could not file it in \(folder): \(error)")
+                    unfiled += 1
+                }
+            }
+        }
+        await reloadItems()
+        await reloadTrash()
+        rebuild()
+        adoptMirrorFailure()
+        if refused > 0 {
+            statusMessage = "Couldn't put \(refused) note\(refused == 1 ? "" : "s") back — "
+                + "\(refused == 1 ? "it is" : "they are") still in the Trash."
+        } else if unfiled > 0 {
+            statusMessage = "Put the note back, but couldn't file it in \(unfiled) of its folders — "
+                + "it is under All Notes."
+        } else if lostFolders {
+            statusMessage = "Put back under All Notes: a folder that held the note no longer exists."
+        }
+        return restored
+    }
+
+    /// Empty the given trashed notes (all of them when `ids` is nil) into the Finder's Trash, where
+    /// they can still be recovered by hand. Returns the ids that stayed because the disk refused.
+    @discardableResult
+    func emptyTrash(_ ids: [UUID]? = nil) async -> [UUID] {
+        guard let noteStore else { return [] }
+        let targets = ids ?? trashedNotes.map(\.id)
+        var kept: [UUID] = []
+        for id in targets {
+            do { try await noteStore.emptyFromTrash(id) }
+            catch {
+                NSLog("NotesModel: could not empty note \(id) from the Trash: \(error)")
+                if await noteStore.isTrashed(id) { kept.append(id) }
+            }
+        }
+        await reloadTrash()
+        if !kept.isEmpty {
+            statusMessage = "Couldn't empty \(kept.count) note\(kept.count == 1 ? "" : "s") from the Trash."
+        }
+        return kept
     }
 
     // MARK: Pure helpers (unit-tested)

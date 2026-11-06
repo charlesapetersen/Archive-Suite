@@ -773,6 +773,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-05 W40.fix-notes-delete-undo — a delete now goes to the store's `Trash/`, shown in the sidebar, with
+    Put Back and Edit ▸ Undo (`NotesGUITests.testG21_DeleteUndoAndTrashPutBack`); Empty Trash goes on to the Finder's Trash.
 - **Notes:** the W9.e2 result is `W9.e2-notes`: the new `NotesE2NoteLifecycleTests` sets authors on a note and an
   extract, checks the front matter, finds them by keyword search and clears them. Its red was a test bug, fixed by
   adding the ids `an.detail.authors.set`/`.clear`. Checkpoint `e59e3bd`. Code confirms "front matter only":
