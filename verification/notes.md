@@ -993,11 +993,14 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   Template (`Views/NotesBrowserView.swift:113-123`, `newItem(from:)` `:196`), or row menu ▸ New from Template
   (`Views/NotesContextMenu.swift:49-75`). Both reach `NotesModel.newItem` (`Core/NotesModel.swift:701`).
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testTemplateNewFromTemplateCreatesNoteWithTemplateBody`;
-  `.testTemplateBodyEditPersistsAndReloads`; `ArchiveNotesTests/NotesModelTemplateTests.newFromTemplate`.
+  `.testTemplateBodyEditPersistsAndReloads`; `ArchiveNotesTests/NotesModelTemplateTests.newFromTemplate`;
+  `ArchiveNotesUITests/TemplatesUITests` (File ▸ New Template…, rename in the row).
 - **Runtime evidence:** none
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-05 W40.fix-notes-templates — notes-1 rows 35, 41, 42: File ▸ New Template… added, and a template is
+    renamed in its row (Return, double-click, Rename…; the Rename sheet is gone). VM green; status left for notes-2.
 - **Notes:** the W9.e2 result is `W9.e2-zotero`: `testTemplateBodyEditPersistsAndReloads` and the new
   `testTemplateNewFromTemplateCreatesNoteWithTemplateBody`, 5/5 run (which found the N-11 index bug).
   `newItem` sets the new item's kind to the window's (or the row's) kind, not the template's
