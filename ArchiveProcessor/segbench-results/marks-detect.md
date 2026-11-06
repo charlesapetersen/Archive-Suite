@@ -73,7 +73,10 @@ of 35 marks at NES 0.8 and Apple Vision 13; through this detector's boxes, 6 at 
 So no detector measured here is a marks layer. Public training data does not transfer to these pages at a usable
 recall. The comparison that decides the route is a whole-page reader (W46.mixed-route), which needs no detector;
 a fine-tune on our own pages (W46.marks-detect-own) was to run only if whole-page readers missed marks, and was
-retired on 2026-11-05: W46.mixed-route found no ranked reader's whole page behind the owner's box beyond noise.
+retired on 2026-11-05 on a misread of that condition: W46.mixed-route found no ranked reader's whole page behind the
+owner's box beyond noise, but the run condition was whether a whole-page reader misses marks a layer needs, and it
+does: given the mark's own box as well, LightOnOCR-3 4B and GLM-OCR each read 8 more of the 35 (W46.marks-two-pass,
+`mixed-route.md`, "Two passes"; measurement review pass 11, P11-1). Whether it reopens is the owner's call.
 
 ## Arms not run here
 

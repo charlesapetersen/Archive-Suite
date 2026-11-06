@@ -1,16 +1,28 @@
 ## What this says
 
-**Whole page is as good as reading the mark's region for every reader ranked on all 35, and a detector makes the
-region route far worse.** Apple Vision given the whole page gets 14 of the 35 marks, against 13 from the owner's own
-box; LightOnOCR-3 4B gets 16 against 17; GLM-OCR 13 against 18. The Vision and LightOnOCR gaps are one mark. GLM-OCR's
-is five (3 marks only whole, 8 only from the box; exact sign test on the 11 discordant marks p = 0.23), inside
-intervals about 30 points wide, so it leans to the box but is not shown; on the A-core GLM-OCR's whole page reads none
-of the 5 marks. The readers do not get the *same* marks the two ways (LightOnOCR: 9 both ways, 7 only whole, 8 only
-from the box), so a route that read both would carry more, but that is a two-reader cascade and is not ranked here.
-And the owner's box is the region route's ceiling: through YOLO11m's boxes every reader falls to 2-6 of 35
-(W46.marks-detect), GLM-OCR to 3-5. So on today's detectors **region routing does not beat the whole page for
-marks, and the whole page needs no detector**. A fine-tuned detector (W46.marks-detect-own) could at best bring a
-reader up to its owner's-box figure, which no ranked reader's whole page trails beyond noise.
+**Whole page instead of the mark's region is not shown worse for any reader ranked on all 35, and a detector makes
+the region route far worse.** Apple Vision given the whole page gets 14 of the 35 marks, against 13 from the owner's
+own box; LightOnOCR-3 4B gets 16 against 17; GLM-OCR 13 against 18. The Vision and LightOnOCR gaps are one mark.
+GLM-OCR's is five (3 marks only whole, 8 only from the box; exact sign test on the 11 discordant marks p = 0.23),
+inside intervals about 30 points wide, so it leans to the box but is not shown; on the A-core GLM-OCR's whole page
+reads none of the 5 marks against 3 of 5 from the box. Through YOLO11m's boxes alone every reader falls to 2-6 of 35
+(W46.marks-detect), so on today's detector **region routing in place of the whole page loses marks**.
+
+**But a whole-page reader does miss marks a region pass reads (W46.marks-two-pass).** The readers do not get the
+*same* marks the two ways (LightOnOCR: 9 both ways, 7 only whole, 8 only from the box), and a detector would serve as
+a region pass added to the whole page, the text layer carrying both readings, so its ceiling is the union, not the box
+alone: given the owner's box as well, Vision reads 17, LightOnOCR-3 4B 24 and GLM-OCR 21 of 35, against 14, 16 and 13
+whole page. Those gains are not doubled text buying matches by chance: the same reader's crop of a different mark on
+the same page reads a missed mark 0-1 times in 33-53 tries (the Two passes table), so LightOnOCR's 8 (sign test
+p = 0.016) and GLM-OCR's 8 (p = 0.008) stand, and Vision's 3 (p = 0.25) does not. By core the gain is mostly B-core:
+on the A-core's 5 marks the union adds nothing for Vision (4 and 4), one for LightOnOCR (3 to 4) and three for GLM-OCR
+(0 to 3). Today's detector reaches little of it: whole page plus a YOLO11m box adds 0-3 marks per
+reader at either floor, none significant (p >= 0.5), and its own floor is about one mark. These are the owner's
+boxes, so a trained detector would get less than the union. A second sense in which the layer needs a box: the form
+that works is an invisible run at the mark's box (below), and only Vision's whole-page reply carries coordinates (13
+of its 14 whole-page reads are read again from the lines meeting the mark's box); LightOnOCR's, GLM-OCR's and
+Qwen3.6-27B's replies are plain text, so a mark they read whole page cannot be placed without a box. A fine-tuned
+detector (W46.marks-detect-own) would be judged against the union, not against the owner's-box figure alone.
 
 **Qwen3.6-27B reads the most marks whole page, but it cannot be ranked on these pages (MRK-1).** Whole page it gets
 26 of 35 (mean NES 0.86) against 19 from the owner's box (18 both ways, 8 only whole, 1 only from the box). But 30 of
@@ -75,5 +87,9 @@ stretch, a mark's run.
 - **Scope.** Marks only: these pages have no body-text truth, so the body cost of region routing on mixed pages is
   W46.ocr-regions' and W46.layout-photo's result on the 96, not this one. Not settled here: Qwen3.6-27B's rank on marks
   (it chose 30 of the 35), Gemini (W46.mixed-route-paid, retired by the owner 2026-11-05), results by handwriting band
-  (W46.mixed-route-bands), and whether a two-reader cascade is worth its cost. The layer check is PDFKit and the
-  Spotlight importer on scratch PDFs, not the Processor's own writer.
+  (W46.mixed-route-bands), and whether a two-reader cascade is worth its cost. The two-pass union is taken on the
+  owner's boxes, so it is a ceiling for a detector used beside the whole page, not a detector's figure: whether a
+  trained one reaches it (W46.marks-detect-own, put to the owner 2026-11-05) and what the second pass costs in time
+  are not measured, and its gains sit mostly on the B-core (Qwen3.6-27B's pre-flag chose those pages, which does not
+  bias the other three readers but makes them pages rich in marks). The layer check is PDFKit and the Spotlight
+  importer on scratch PDFs, not the Processor's own writer.

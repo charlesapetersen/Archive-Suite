@@ -1005,6 +1005,9 @@ def mixed_route():
         if "read" not in w or b is None:
             continue
         row = f'{name} {w["read"]} of {w["n"]} given the whole page, {b["read"]} from the owner\'s box'
+        u = d.get("two_pass", {}).get(f"{key}/oracle")   # W46.marks-two-pass: either reading, the two-pass ceiling
+        if u:
+            row += f', {u["union"]} from either'
         if key in MIXED_PREFLAGGED and "by_core" in w:   # MRK-1: it chose the B-core, so not ranked on all 35
             wa, ba = w["by_core"]["A-core"], b["by_core"]["A-core"]
             row += (f' (not ranked: it pre-flagged the pages of {w["by_core"]["B-core"]["n"]} of them; on the other '

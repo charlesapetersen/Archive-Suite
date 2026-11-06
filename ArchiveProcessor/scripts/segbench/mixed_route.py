@@ -4,6 +4,7 @@
   <lab venv>/bin/python mixed_route.py pages                         # the 32 pages, sized for the whole-page readers
   heavy-run.py run -- <lab venv>/bin/python mixed_route.py whole vision   # Apple Vision (segbench-ocr) on each page
   heavy-run.py run -- <lab venv>/bin/python mixed_route.py whole lighton  # LightOnOCR-3 4B 8-bit (mlx-vlm), whole page
+  heavy-run.py run -- <lab venv>/bin/python mixed_route.py whole lighton-rerun  # the same again: the read-to-read floor
   heavy-run.py run -- <lab venv>/bin/python mixed_route.py lines     # per-line ink signals on Vision's line boxes
   <lab venv>/bin/python mixed_route.py pack                          # the Sherlock pack (GLM-OCR, Qwen3.6-27B)
   <lab venv>/bin/python mixed_route.py report                        # segbench-results/mixed-route.{json,md}
@@ -93,7 +94,8 @@ def whole_vision():
     print(f"vision: {time.time() - t0:.1f} s for {len(ids)} pages")
 
 
-def whole_lighton():
+def whole_lighton(name="lighton"):
+    """name="lighton-rerun" reads the 32 pages again into their own folder: the read-to-read floor (W46.marks-two-pass)."""
     import os
     import ocr_mac_local as L  # first: it calls model_store.use() before huggingface_hub is imported
     import mlx.core as mx
@@ -101,11 +103,11 @@ def whole_lighton():
     from mlx_vlm.prompt_utils import apply_chat_template
     spec = L.HW["lightonocr-3-4b-mlx8"]
     os.environ["HF_HUB_OFFLINE"] = "1"
-    out = WORK / "whole" / "lighton"
+    out = WORK / "whole" / name
     out.mkdir(parents=True, exist_ok=True)
     ids, _, _ = page_ids()
     todo = [p for p in ids if not (out / f"{p}.json").exists()]
-    print(f"lighton: {len(todo)} pages to read", flush=True)
+    print(f"{name}: {len(todo)} pages to read", flush=True)
     if not todo:
         return
     mx.set_cache_limit(256 * 2**20)
@@ -122,7 +124,7 @@ def whole_lighton():
         (out / f"{p}.json").write_text(json.dumps(dict(
             text="".join(text).strip(), wall_s=round(time.time() - start, 2),
             finish="length" if last is not None and last.generation_tokens >= cap else "stop")))
-        print(f"lighton: {p} {time.time() - start:.0f} s", flush=True)
+        print(f"{name}: {p} {time.time() - start:.0f} s", flush=True)
 
 
 PACK = "mixed-route-20261105"
@@ -419,6 +421,122 @@ def score_region(todo, text):
     return out
 
 
+# ---------------------------------------------------------------- two passes: whole page plus a region pass
+
+def sign_p(b, c):
+    """Exact two-sided sign test on b against c discordant marks."""
+    from math import comb
+    n = b + c
+    if n == 0:
+        return 1.0
+    k = min(b, c)
+    return min(1.0, 2 * sum(comb(n, i) for i in range(k + 1)) / 2 ** n)
+
+
+COORDS = r"bbox|<loc_?\d|<\|box|<\|ref|\[\s*\d+(\.\d+)?\s*,\s*\d+(\.\d+)?\s*,\s*\d+(\.\d+)?\s*,\s*\d+(\.\d+)?\s*\]"
+
+
+def two_pass(todo, text, whole, region, core):
+    """W46.marks-two-pass (pass 11 P11-1). A detector would add a region pass beside the whole page, and the text
+    layer can carry both readings, so its ceiling is the union: a mark is read when either reading reads it. A union
+    cannot lose a mark, so the gains are set against an irrelevant second reading: the same reader's crop of a
+    DIFFERENT mark on the same page (in the same arm), which tests what doubled text buys by chance. A missed mark
+    counts as a floor gain when any such crop reads it at NES >= 0.8; a mark alone on its page has no same-page crop
+    and gets none, so the other pages' crops are given as a rate too. The sign test pairs the real gain against the
+    floor gain on each mark the whole page missed."""
+    out = {}
+    pages = {}
+    for pid, i, _ in todo:
+        pages.setdefault(pid, []).append(f"{pid}#{i}")
+    plans = R.plan()
+    for key, rows in region.items():
+        reader, arm = key.split("/")
+        w = whole.get(reader, {})
+        if "rows" not in w:
+            continue
+        wn = {r["mark"]: r["nes"] for r in w["rows"]}
+        crop = {r["mark"]: r["nes"] for r in rows}
+        hyp = {}
+        for mid in crop:
+            box = plans[arm][mid]
+            if reader in CLUSTER_ROUTES:
+                hyp[mid] = cluster_crop(reader, arm, mid) or ""
+            else:
+                hyp[mid] = "" if box is None else (R.reading(reader, mid.split("#")[0], box) or "")
+        missed = [m for m in wn if wn[m] < R.READ]
+        gain = {m: crop[m] >= R.READ for m in missed}
+        same_pairs = same_hits = far_pairs = far_hits = 0
+        floor = {}
+        for m in missed:
+            pid = m.split("#")[0]
+            hits = [R.nes(text[m], hyp[o]) >= R.READ for o in pages[pid] if o != m and hyp[o].strip()]
+            same_pairs += len(hits)
+            same_hits += sum(hits)
+            floor[m] = any(hits)
+            far = [R.nes(text[m], hyp[o]) >= R.READ for o in crop if o.split("#")[0] != pid and hyp[o].strip()]
+            far_pairs += len(far)
+            far_hits += sum(far)
+        b = sum(gain[m] and not floor[m] for m in missed)
+        c = sum(floor[m] and not gain[m] for m in missed)
+        by_core = {}
+        for g in CORES:
+            ms = [m for m in wn if core[m.split("#")[0]] == g]
+            by_core[g] = dict(n=len(ms), whole=sum(wn[m] >= R.READ for m in ms),
+                              union=sum(wn[m] >= R.READ or crop[m] >= R.READ for m in ms),
+                              floor=sum(floor.get(m, False) for m in ms))
+        out[key] = dict(n=len(wn), whole=len(wn) - len(missed), region=sum(v >= R.READ for v in crop.values()),
+                        union=sum(wn[m] >= R.READ or crop[m] >= R.READ for m in wn), gains=sum(gain.values()),
+                        floor_gains=sum(floor.values()),
+                        no_partner=sum(len(pages[m.split("#")[0]]) == 1 for m in missed), missed=len(missed),
+                        same_pairs=same_pairs, same_hits=same_hits, far_pairs=far_pairs, far_hits=far_hits,
+                        sign_p=round(sign_p(b, c), 4), by_core=by_core)
+    return out
+
+
+def rerun_floor(todo, text, core):
+    """LightOnOCR-3 4B read the 32 pages twice, whole page, at temperature 0: the second reading as the union's
+    partner is the read-to-read floor under the box's gains."""
+    d1, d2 = WORK / "whole" / "lighton", WORK / "whole" / "lighton-rerun"
+    ids, _, _ = page_ids()
+    if not all((d2 / f"{p}.json").exists() for p in ids):
+        return None
+    t1 = {p: json.loads((d1 / f"{p}.json").read_text())["text"] for p in ids}
+    t2 = {p: json.loads((d2 / f"{p}.json").read_text())["text"] for p in ids}
+    a = {f"{p}#{i}": mark_in_page(text[f"{p}#{i}"], t1[p])[0] >= R.READ for p, i, _ in todo}
+    b = {f"{p}#{i}": mark_in_page(text[f"{p}#{i}"], t2[p])[0] >= R.READ for p, i, _ in todo}
+    walls = sorted(json.loads((d2 / f"{p}.json").read_text())["wall_s"] for p in ids)
+    return dict(pages=len(ids), identical_pages=sum(t1[p] == t2[p] for p in ids),
+                read_first=sum(a.values()), read_second=sum(b.values()),
+                first_only=sum(a[m] and not b[m] for m in a), second_only=sum(b[m] and not a[m] for m in a),
+                union=sum(a[m] or b[m] for m in a), median_s=walls[len(walls) // 2],
+                by_core={g: sum((a[m] or b[m]) for m in a if core[m.split("#")[0]] == g) for g in CORES})
+
+
+def placement(todo, text, whole):
+    """Which whole-page replies can be placed in the layer without a box. Vision returns a box per line; a mark it
+    read whole page is placed when the lines meeting the mark's own box (LINES: Vision at the same settings on the
+    same copy) read it. The VLM replies are searched for any coordinate syntax."""
+    import re
+    ids, _, _ = page_ids()
+    oracle = R.plan()["oracle"]
+    out = {}
+    if "rows" in whole.get("vision", {}):
+        lines_ = {p: json.loads((LINES / f"{p}.json").read_text())["lines"] for p in ids}
+        same = sum(R.norm(" ".join(ln["text"] for ln in lines_[p])) == R.norm(whole_text("vision", p)) for p in ids)
+        reads = [r for r in whole["vision"]["rows"] if r["nes"] >= R.READ]
+        placed = sum(mark_in_page(text[r["mark"]], " ".join(
+            ln["text"] for ln in lines_[r["page"]] if inside(ln["box"], oracle[r["mark"]]) > 0))[0] >= R.READ
+                     for r in reads)
+        out["vision"] = dict(read=len(reads), placed=placed, pages_same_text=same, pages=len(ids))
+    for reader in ("lighton", "glm", "qwen27"):
+        got = [whole_text(reader, p) for p in ids]
+        if "rows" not in whole.get(reader, {}) or any(g is None for g in got):
+            continue
+        out[reader] = dict(read=sum(r["nes"] >= R.READ for r in whole[reader]["rows"]), placed=0, replies=len(got),
+                           with_coordinates=sum(bool(re.search(COORDS, g)) for g in got))
+    return out
+
+
 def summary(rows, core):
     read = lambda rs: sum(r["nes"] >= R.READ for r in rs) / len(rs) if rs else None
     mean = lambda rs: sum(r["nes"] for r in rs) / len(rs) if rs else None
@@ -472,6 +590,9 @@ def report():
         res["paired"][reader] = dict(whole_only=sum(a and not b for a, b in both),
                                      crop_only=sum(b and not a for a, b in both),
                                      both=sum(a and b for a, b in both), neither=sum(not a and not b for a, b in both))
+    res["two_pass"] = two_pass(todo, text, whole, region, core)
+    res["rerun"] = rerun_floor(todo, text, core)
+    res["placement"] = placement(todo, text, whole)
     lf = WORK / "lines.json"
     if lf.exists():
         res["lines"] = score_lines(json.loads(lf.read_text()))
@@ -551,6 +672,48 @@ def markdown(res, n):
               "| Reader | Both | Whole page only | Box only | Neither |", "|---|---:|---:|---:|---:|"]
         for reader, p in res["paired"].items():
             L.append(f"| {REGION[reader]}{flag(reader)} | {p['both']} | {p['whole_only']} | {p['crop_only']} | {p['neither']} |")
+    if res.get("two_pass"):
+        L += ["", "## Two passes: the whole page plus a region pass (W46.marks-two-pass)", "",
+              "A detector would add a region pass beside the whole page, and the text layer can carry both readings, "
+              "so its ceiling is the union: a mark is read when either reading reads it. A union cannot lose a mark, "
+              "so each gain is set against an irrelevant second reading: the same reader's crop of a different mark on "
+              "the same page, from the same boxes (a crop that read nothing is left out). *Floor* counts the marks the "
+              "whole page missed that such a crop reads at 0.8; the sign test (exact, two-sided) pairs each missed "
+              "mark's real gain against its floor gain. A mark alone on its page has no same-page crop; the other "
+              "pages' crops are given as a rate.", "",
+              "| Reader | Second pass | Whole page | Region alone | Union | Gains | Floor | Sign test p | "
+              "Same-page crops that read the mark | Other pages' crops | A-core: whole, union | B-core: whole, union |",
+              "|---|---|---:|---:|---:|---:|---:|---:|---|---|---|---|"]
+        for key, t in res["two_pass"].items():
+            reader, arm = key.split("/")
+            a, b = t["by_core"]["A-core"], t["by_core"]["B-core"]
+            L.append(f"| {REGION[reader]}{flag(reader)} | {R.ARM_NAMES[arm]} | {t['whole']} | {t['region']} | "
+                     f"{t['union']} | +{t['gains']} | {t['floor_gains']} | {t['sign_p']:.3g} | "
+                     f"{t['same_hits']} of {t['same_pairs']} | {t['far_hits']} of {t['far_pairs']} | "
+                     f"{a['whole']}, {a['union']} of {a['n']} | {b['whole']}, {b['union']} of {b['n']} |")
+        rr = res.get("rerun")
+        if rr:
+            L += ["", f"Read-to-read floor: LightOnOCR-3 4B read the {rr['pages']} pages whole a second time at the same "
+                  f"settings (temperature 0). {rr['identical_pages']} of {rr['pages']} replies are identical; it reads "
+                  f"{rr['read_first']} and {rr['read_second']} marks, {rr['first_only']} only the first time and "
+                  f"{rr['second_only']} only the second, so the whole page read twice gives {rr['union']} of 35 "
+                  f"(A-core {rr['by_core']['A-core']}, B-core {rr['by_core']['B-core']}), against the owner's box's "
+                  f"{res['two_pass']['lighton/oracle']['union']} as the second reading. Median {rr['median_s']} s a page."]
+        pl = res.get("placement")
+        if pl:
+            v = pl.get("vision")
+            L += ["", "Placing a whole-page reading in the layer: the working form is an invisible run at the mark's box, "
+                  "so a mark read whole page needs coordinates."]
+            if v:
+                L.append(f"Apple Vision returns a box with each line: of its {v['read']} whole-page reads, {v['placed']} "
+                         "are read again from the lines meeting the mark's own box, so they can be placed without a "
+                         f"detector (its line file and whole-page text agree on {v['pages_same_text']} of {v['pages']} "
+                         "pages).")
+            vl = [f"{WHOLE[r].split(',')[0]} ({p['read']} reads; {p['with_coordinates']} of {p['replies']} replies "
+                  "with any coordinate)" for r, p in pl.items() if r != "vision"]
+            if vl:
+                L.append("The VLM replies are plain text with no coordinates: " + "; ".join(vl) + ". A mark they read "
+                         "whole page cannot be placed on the page without a box from somewhere else.")
     rows = [(f"{WHOLE[r]}", r, s) for r, s in res["whole"].items() if "by_core" in s]
     rows += [(f"{REGION[k.split('/')[0]]}, owner's box", k.split("/")[0], s) for k, s in res["region"].items()
              if k.endswith("/oracle")]
@@ -621,6 +784,8 @@ def main(argv):
         whole_vision()
     elif argv == ["whole", "lighton"]:
         whole_lighton()
+    elif argv == ["whole", "lighton-rerun"]:
+        whole_lighton("lighton-rerun")
     elif argv == ["lines"]:
         lines()
     elif argv == ["pack"]:
