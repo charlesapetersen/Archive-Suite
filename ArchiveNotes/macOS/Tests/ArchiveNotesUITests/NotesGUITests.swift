@@ -2339,6 +2339,12 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let dateLines = before.split(separator: "\n").filter { $0.hasPrefix("date") }
             let toggle = mainWindow.descendants(matching: .any)["an.detail.roundup"].firstMatch
             XCTAssertTrue(toggle.waitForExistence(timeout: 10))
+            // The toggle says what it does where it is turned on (W40.fix-notes-small-fixes, notes-1 row 24).
+            let explanation = mainWindow.descendants(matching: .any)["an.detail.roundup.explanation"].firstMatch
+            XCTAssertTrue(explanation.waitForExistence(timeout: 5), "the Round-up toggle should explain itself")
+            let said = [explanation.label, explanation.value as? String ?? ""].joined(separator: " ")
+            XCTAssertTrue(said.contains("Round-up menu") && said.contains("note's date"),
+                          "the explanation should name the filter and the date offer: \(said)")
             toggle.click()
             XCTAssertTrue(pollUntil(timeout: 10) {
                 self.rawMarkdown(inItemDir: Self.idReader)?.contains("roundup: true") == true

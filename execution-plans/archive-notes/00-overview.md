@@ -527,7 +527,7 @@ struct NotesFilter: Codable, Equatable {   // BOTH live filtering AND smart-fold
   var searchText: String = ""
   var tags: [String] = []
   var tagCombine: TagCombine = .all         // .all | .any
-  var kind: KindFilter = .both              // .notes | .extracts | .both
+  var kind: KindFilter = .all               // .all | .notes | .extracts
   var qualities: Set<Int> = []              // empty = any
   var dateFrom: SortDate? = nil
   var dateTo: SortDate? = nil

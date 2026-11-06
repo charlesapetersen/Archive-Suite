@@ -100,18 +100,32 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             XCTAssertEqual(divider.label, "Item list height")
 
             drag(divider, by: -300)
-            XCTAssertEqual(height(divider), 220, accuracy: 0.5, "the list height should clamp at its minimum")
-            drag(divider, by: 60)
-            XCTAssertEqual(height(divider), 280, accuracy: 6, "dragging down should grow the list")
+            XCTAssertEqual(height(divider), 160, accuracy: 0.5, "the list height should clamp at its minimum")
+            // At its floor the list still shows its whole filter bar and a row (W40.fix-notes-small-fixes: the floor
+            // went from 220 to 160 so the divider drags further up).
             let list = mainWindow.tables.firstMatch
+            let listTop = divider.frame.minY - 160
+            let kind = mainWindow.descendants(matching: .any)["an.filter.kind"].firstMatch
+            let roundup = mainWindow.descendants(matching: .any)["an.filter.roundup"].firstMatch
+            let firstRow = list.tableRows.firstMatch
+            print("[small-fixes] at the floor: list top \(listTop), kind \(kind.frame), round-up \(roundup.frame), "
+                  + "table \(list.frame), first row \(firstRow.frame), divider \(divider.frame)")
+            XCTAssertGreaterThanOrEqual(kind.frame.minY, listTop - 0.5, "the filter bar's top row should be inside the list")
+            XCTAssertTrue(roundup.isHittable, "the filter bar's last row should still be shown")
+            XCTAssertLessThanOrEqual(firstRow.frame.maxY, divider.frame.minY + 0.5, "a whole row should show under the bar")
+            XCTAssertGreaterThanOrEqual(firstRow.frame.minY, roundup.frame.maxY, "the row should be below the bar")
+            drag(divider, by: 60)
+            XCTAssertEqual(height(divider), 220, accuracy: 6, "dragging down should grow the list")
             XCTAssertEqual(list.frame.maxY, divider.frame.minY, accuracy: 4, "the list should end at the divider")
-            // Down as far as it goes: at most 440, and less when the window is too short to keep the note's
-            // floor below it (the VM's is); the note keeps a usable editor either way.
-            drag(divider, by: 400)
+            // Down as far as it goes: only the note's 480 pt floor below it stops the list (there is no fixed
+            // maximum since W40.fix-notes-small-fixes); the note keeps a usable editor.
+            drag(divider, by: mainWindow.frame.maxY - divider.frame.midY - 12)   // to the window's bottom edge
             let top = height(divider)
-            print("[w48] list height at the bottom of the drag: \(top) in a \(mainWindow.frame.height) pt window")
-            XCTAssertLessThanOrEqual(top, 440.5, "the list height should clamp at its maximum")
+            let noteBelow = mainWindow.frame.maxY - divider.frame.maxY
+            print("[w48] list height at the bottom of the drag: \(top) in a \(mainWindow.frame.height) pt window, "
+                  + "\(noteBelow) pt below the divider")
             XCTAssertGreaterThan(top, 280, "dragging down should grow the list up to what fits")
+            XCTAssertEqual(noteBelow, 480, accuracy: 30, "the list should stop only where the note keeps its floor")
             drag(divider, by: 200)
             XCTAssertEqual(height(divider), top, accuracy: 0.5, "past its limit the list should stay where it stopped")
             let shownEditor = mainWindow.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch

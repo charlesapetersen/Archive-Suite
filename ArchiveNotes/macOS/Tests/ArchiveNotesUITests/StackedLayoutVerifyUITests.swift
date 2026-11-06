@@ -42,7 +42,7 @@ final class StackedLayoutVerifyUITests: NotesFixtureUITestCase {
             XCTAssertTrue(divider.waitForExistence(timeout: 5), "the Extracts window should show the stacked divider")
             XCTAssertEqual(divider.label, "Item list height")
             drag(divider, by: -400)
-            XCTAssertEqual(height(divider), 220, accuracy: 0.5, "the Extracts list should clamp at its minimum")
+            XCTAssertEqual(height(divider), 160, accuracy: 0.5, "the Extracts list should clamp at its minimum")
             XCTAssertTrue(extractEditor.exists, "the extract stays open while its divider moves")
             print("[w48v] Extracts divider \(height(divider)); note window divider "
                   + "\(height(mainWindow.descendants(matching: .any)["an.divider.list"]))")
@@ -66,16 +66,17 @@ final class StackedLayoutVerifyUITests: NotesFixtureUITestCase {
             let tall = mainWindow.frame.height
             let divider = mainWindow.descendants(matching: .any)["an.divider.list"]
 
-            drag(divider, by: 600)
+            drag(divider, by: mainWindow.frame.maxY - divider.frame.midY - 12)   // to the window's bottom edge
             let bottom = height(divider)
             drag(divider, by: 300)
             XCTAssertEqual(height(divider), bottom, accuracy: 0.5, "past its bottom limit the divider should not move")
-            XCTAssertLessThanOrEqual(bottom, 440.5, "the list should clamp at 440 pt")
-            drag(divider, by: -600)
-            XCTAssertEqual(height(divider), 220, accuracy: 0.5, "the list should clamp at 220 pt")
+            XCTAssertEqual(mainWindow.frame.maxY - divider.frame.maxY, 480, accuracy: 30,
+                           "the list should stop where the note keeps its floor")
+            drag(divider, by: -900)
+            XCTAssertEqual(height(divider), 160, accuracy: 0.5, "the list should clamp at 160 pt")
             drag(divider, by: -300)
-            XCTAssertEqual(height(divider), 220, accuracy: 0.5, "past its top limit the divider should not move")
-            drag(divider, by: 600)
+            XCTAssertEqual(height(divider), 160, accuracy: 0.5, "past its top limit the divider should not move")
+            drag(divider, by: mainWindow.frame.maxY - divider.frame.midY - 12)   // to the window's bottom edge
             XCTAssertEqual(height(divider), bottom, accuracy: 0.5, "the bottom limit is the same each time")
             print("[w48v] window \(tall) pt tall: list \(bottom) at the bottom of the drag")
 
@@ -87,7 +88,7 @@ final class StackedLayoutVerifyUITests: NotesFixtureUITestCase {
             let shownEditor = mainWindow.scrollViews.containing(.textView, identifier: "an.editor.text").firstMatch
             print("[w48v] window \(short) pt tall: list \(squeezed), editor \(shownEditor.frame.height)")
             XCTAssertLessThan(short, tall, "the window should have got shorter")
-            XCTAssertGreaterThanOrEqual(squeezed, 219.5, "the list never goes below its floor")
+            XCTAssertGreaterThanOrEqual(squeezed, 159.5, "the list never goes below its floor")
             XCTAssertGreaterThan(shownEditor.frame.height, 100, "in the shortest window the note keeps a usable editor")
             XCTAssertLessThanOrEqual(mainWindow.tables.firstMatch.frame.minY, divider.frame.minY,
                                      "the list stays above the divider")
@@ -114,7 +115,7 @@ final class StackedLayoutVerifyUITests: NotesFixtureUITestCase {
             drag(divider, by: -400)
             drag(divider, by: 37)
             let kept = height(divider)
-            XCTAssertGreaterThan(kept, 225, "the drag should have moved the list off its floor")
+            XCTAssertGreaterThan(kept, 165, "the drag should have moved the list off its 160 pt floor")
             _ = openExtracts()
 
             relaunch()

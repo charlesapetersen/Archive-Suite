@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 38 · works 9 · broken 1 · unreachable 0 · fixed-pending-recheck 4` (works: N-07, N-14, N-34, N-41, N-45, N-49, N-50, N-51, N-52; broken: N-11; fixed-pending-recheck: N-12, N-16, N-26, N-44). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag; N-44 by W40.fix-notes-zotero-fetch.
+- **Count:** `unproven 36 · works 7 · broken 1 · unreachable 0 · fixed-pending-recheck 8` (works: N-14, N-34, N-41, N-45, N-49, N-51, N-52; broken: N-11; fixed-pending-recheck: N-07, N-12, N-16, N-22, N-26, N-35, N-44, N-50). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag; N-44 by W40.fix-notes-zotero-fetch; N-07, N-22, N-35, N-50 by W40.fix-notes-small-fixes.
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -286,12 +286,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   real kind control in the running app and relaunches it without the harness's kind pins, so the real
   `persistingKindTo: .standard` path restores the remembered choice.
 - **Runtime evidence:** 2026-11-04 · the completing commit of `W40.notes-w7-gui-checks` · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): at launch the Note window lists the three notes and not the extract, the Extracts window the extract and no note; Both in the Note window lists all four and the Extracts window's list stays as it was; relaunched without the pins, the Note window comes back on Both and the Extracts window on Extracts. VM runs 3, 5 and 7 (twice).
-- **Status:** `works`
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for each window's kind, Both and the remembered choice across a relaunch; `works`. Not
     driven: the built-in defaults on a store that never chose (`NotesNavigationModelTests` only), since the
     harness pins the kinds at every first launch.
+  - 2026-11-05 W40.fix-notes-small-fixes — `works` → `fixed-pending-recheck` (owner session notes-1, row 36): the kind control reads All, Notes, Extracts (it was Notes, Extracts, Both; `KindFilter.both` is now `.all`, stored as `all`). The UITests that drove "Both" drive "All".
 - **Notes:** the folder scope (`NotesModel.selectedFolderId`) lives on the shared model, not per window. See the
   N-11 note. The promise draft records no W9.e2 result.
 
@@ -414,17 +415,18 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   divider, then the note, and Tab still reaches the note from the list.
 - **Promised in:** `SUITE_TODO.md` `W48.notes-stacked-layout`.
 - **Reached by:** `PanelDivider(axis: .vertical)` (`Views/PanelDivider.swift`) over `an.listHeight`, clamped
-  220–440 pt by `NotesLayoutSettings.clampedListHeight` (`Core/NotesAppSettings.swift`), and further by
+  160–1600 pt by `NotesLayoutSettings.clampedListHeight` (220–440 until W40.fix-notes-small-fixes) (`Core/NotesAppSettings.swift`), and further by
   `stackedListRange(paneHeight:)` so the note below keeps 480 pt; the remembered height is kept for a taller window.
 - **Real-path test:** `ArchiveNotesTests/PanelDividerAccessibilityTests.testStackedDividerIsAHorizontalSplitterOverTheListHeight`
   and `NotesAppSettingsTests.listHeightClampsLikeTheWidths` (unit). `ArchiveNotesUITests/StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch`
   and `.testStackedOrderIsListThenNoteAndFocusCrossesTheDivider` (VM); `StackedLayoutVerifyUITests.testDividerGivesWayToAShorterWindowAndComesBack`
   (VM, the re-check's own).
 - **Runtime evidence:** VM at `655effca`: the list stopped at 220 pt and at 440 pt (990 pt window) and did not move past either; cut to the 759 pt minimum the list gave way to 220 pt with a 146 pt editor, and came back to 440 pt when the window grew again; the Extracts window's divider clamps the same; order table, divider, editor; Tab 18 presses stacked, 22 side by side. [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
-- **Status:** `works`
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-29 W48.notes-stacked-layout — row written, `unproven`.
   - 2026-10-30 W48.notes-stacked-layout-verify — `works`. Increment and decrement are proven by the unit test only (XCUITest has no splitter action); [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
+  - 2026-11-05 W40.fix-notes-small-fixes — `works` → `fixed-pending-recheck` (owner session notes-1, row 45: "I should be able to drag the divider more up and down"): the list's floor is 160 pt (was 220) and the fixed 440 pt maximum is gone, so going down only the note's 480 pt floor stops it.
 
 ### N-51 · The layout choice is remembered
 
@@ -800,9 +802,10 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `roundup: true` without touching the date; the filter picker narrows the list);
   `ArchiveNotesTests/RoundupTests.toggleAndSavedQuery`; `.sourceYears`.
 - **Runtime evidence:** none
-- **Status:** `unproven`
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-05 W40.fix-notes-small-fixes — `unproven` → `fixed-pending-recheck` (owner session notes-1, row 24: "It's not clear what 'Round-up note' does"): the toggle has a line under it and a tooltip saying what a round-up note is, that the filter bar's Round-up menu finds it, and that Notes offers the linked PDFs' shared year as its date (`NoteMetadataInspector.roundupExplanation`); `testW9_RoundupInspectorAndFilter` checks the line.
 - **Notes:** the W9.e2 result named none. The year offer reads each linked PDF's Finder tags read-only, under
   roots that are already granted. Any missing, undated, non-PDF or ungranted source suppresses the offer
   (`RoundupYearSuggestion.swift:12-40`). No UITest drives the "Use YYYY" button.
@@ -1162,10 +1165,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2PasteTests.testE2_PastedPageLinkShowsARenderedThumbnail`;
   `ArchiveNotesTests/SourceBlockThumbnailRendererTests.rendersInkyPageToPNG` and `.skipsRenamedCandidate`.
 - **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): the block pasted from the real Reader stored `assets/p3-thumb.png`, and the thumbnail drew the page. 2 of 2 VM runs.
-- **Status:** `unproven`
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — thumbnail drawn for a link pasted from the real Reader; stays `unproven`: that paste carried Reader's own thumbnail payload, so the link-only render was not isolated.
+  - 2026-11-05 W40.fix-notes-small-fixes — `unproven` → `fixed-pending-recheck` (owner session notes-1, row 19: "they're currently as big as the preview"): a page thumbnail (`p<N>-thumb` / `doc-thumb`, `SourceBlockPaster.isThumbnailAsset`) is drawn at most 140 × 180 pt, against 400 × 300 for other inline images and the 400 × 500 preview popover (`InlineImageAttachment.maxSourceThumbnailSize`; `SourceThumbnailSizeTests`).
 - **Notes:** in `W9.e2-paste`, `testE2_PastedPageLinkShowsARenderedThumbnail` failed first: a fresh chip showed
   "Missing" until the note was reloaded. It was fixed in the same item (`showInlineImagesOnceWritten`) and then
   passed. A thumbnail embedded in a Reader UTI payload skips the renderer. It is size-capped at 5 MB of base64

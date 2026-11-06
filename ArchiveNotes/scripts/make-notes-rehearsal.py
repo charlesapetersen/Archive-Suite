@@ -459,7 +459,7 @@ class Builder:
                 normal.append(fid)
 
         def smart(name, **flt):
-            q_ = {"searchText": "", "tags": [], "tagCombine": "all", "kind": "both", "qualities": [],
+            q_ = {"searchText": "", "tags": [], "tagCombine": "all", "kind": "all", "qualities": [],
                   "matchesNothing": False}
             q_.update(flt)
             folders.append({"id": self.uid(f"smart-{name}"), "kind": "smart", "name": name,

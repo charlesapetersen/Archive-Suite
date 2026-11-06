@@ -299,7 +299,7 @@ macOS/Sources/ArchiveNotes/
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
                                    Notes + Extracts windows (W6-S1); list/divider/detail in one AnyLayout,
-                                   side by side or stacked (list above note, an.layoutMode/an.listHeight;
+                                   side by side or stacked (list above note, an.layoutMode/an.listHeight 160 pt up;
                                    the list gives way so the note keeps 480 pt; W48); @AppStorage panel widths + tree
                                    toggle, NotesWindowAccessor window-size persistence; owns a per-window
                                    NotesNavigationModel (@StateObject seeded from window kind); item pane =
