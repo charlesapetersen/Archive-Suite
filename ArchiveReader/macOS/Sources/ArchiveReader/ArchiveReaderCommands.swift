@@ -191,6 +191,8 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("l", modifiers: .command).disabled(nav == nil)
             Button("Search OCR Text") { nav?.requestFocusSearch() }
                 .keyboardShortcut("f", modifiers: [.command, .option]).disabled(nav == nil)
+            Button("Advanced Search…") { nav?.openAdvancedSearch() }
+                .keyboardShortcut("f", modifiers: [.command, .option, .shift]).disabled(nav == nil)
         }
 
         // Document (document window). ↑/↓ ALONE scroll the focused page (handled by the PDF view, not

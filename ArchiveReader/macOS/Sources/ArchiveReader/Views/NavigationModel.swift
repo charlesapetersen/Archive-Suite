@@ -17,6 +17,13 @@ struct FolderNode: Identifiable, Hashable, Sendable {
 
 /// View model for the navigation window: owns the library + root store, the filter/sort/selection
 /// state, and the (safe) actions. All tag mutations go through `TagWriter`.
+/// The Advanced Search form's subject: `editing` is the smart folder being edited, nil for a new search.
+struct AdvancedSearchRequest: Identifiable {
+    let id = UUID()
+    var editing: SavedSearch?
+    var search: AdvancedSearch
+}
+
 @MainActor
 final class NavigationModel: ObservableObject {
     let library: ArchiveLibrary
@@ -76,6 +83,8 @@ final class NavigationModel: ObservableObject {
     @Published var showingPreview = false
     @Published var showingSaveDialog = false
     @Published var renamingSearch: SavedSearch?     // non-nil while renaming a smart folder
+    /// The Advanced Search form, while it is open: a new search, or a smart folder being edited.
+    @Published var advancedSearchRequest: AdvancedSearchRequest?
     @Published private(set) var focusSearchRequest = 0      // C5: menu → focus OCR search
     @Published private(set) var focusTagFilterRequest = 0   // C5: menu → focus tag filter
     func requestFocusSearch()    { focusSearchRequest &+= 1 }
@@ -380,6 +389,64 @@ final class NavigationModel: ObservableObject {
         recompute()
     }
 
+    /// Open the Advanced Search form on what the list shows now (the scope, the filter bar and Find, as rules),
+    /// or on the starter rows when nothing is in effect.
+    func openAdvancedSearch() {
+        let current = effectiveSearch
+        advancedSearchRequest = AdvancedSearchRequest(editing: nil, search: current.isActive ? current : .starter)
+    }
+
+    /// A folder rule's value as the form shows it: its path under the archive root, or the folder's own name.
+    func relativeFolderName(_ path: String) -> String {
+        guard let root = rootStore.discoveredPathPrefix.map({ $0.hasSuffix("/") ? String($0.dropLast()) : $0 }),
+              path.hasPrefix(root + "/") else { return URL(fileURLWithPath: path).lastPathComponent }
+        return String(path.dropFirst(root.count + 1))
+    }
+
+    /// Pick a folder for a folder rule, starting in the archive. Only the path is kept; nothing is opened or
+    /// written. nil when cancelled.
+    func chooseFolderForRule(startingAt current: String) -> String? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose"
+        panel.message = "Choose a folder in the archive."
+        if !current.isEmpty { panel.directoryURL = URL(fileURLWithPath: current) }
+        else if let root = rootStore.root { panel.directoryURL = root }
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        return url.standardizedFileURL.path
+    }
+
+    /// Edit Smart Folder: the form, filled in with the folder's rules.
+    func editSmartFolder(_ search: SavedSearch) {
+        advancedSearchRequest = AdvancedSearchRequest(editing: search, search: search.search)
+    }
+
+    /// How many files `search` matches over the whole library (excluded folders left out), for the form's count.
+    /// Its text rules run through the index first.
+    func countMatches(_ search: AdvancedSearch) async -> Int {
+        let rules = search.droppingFolders(outside: rootStore.discoveredPathPrefix).search
+        let hits = await textHits(for: rules)
+        var context = ruleContext(for: rules)
+        context.textHits = hits
+        var files = library.files
+        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
+            files = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
+        }
+        return files.reduce(0) { $0 + (rules.matches($1, context) ? 1 : 0) }
+    }
+
+    /// Each active text rule's index answer, by rule id.
+    private func textHits(for search: AdvancedSearch) async -> [UUID: Set<String>] {
+        var hits: [UUID: Set<String>] = [:]
+        for rule in search.textRules {
+            guard let expression = rule.ftsExpression else { continue }
+            hits[rule.id] = Set(await indexer.search(expression: expression))
+        }
+        return hits
+    }
+
     /// Run an Advanced Search without saving it: it becomes the base scope, like an unsaved smart folder.
     func runAdvancedSearch(_ search: AdvancedSearch) {
         applyScope(SavedSearch(name: "Advanced Search", search: search), saved: false)
@@ -438,17 +505,12 @@ final class NavigationModel: ObservableObject {
     /// Run the base scope's text rules through the index, one query each, into `baseTextHits`. The previous
     /// answers stay until the new ones arrive, so a refresh after an index pass does not flash the whole list.
     private func runBaseFullTextSearch() {
-        let rules = scopeRules?.textRules ?? []
         baseFtsGeneration += 1
         let generation = baseFtsGeneration
-        guard !rules.isEmpty else { return }
+        guard let rules = scopeRules, rules.hasTextRules else { return }
         Task { [weak self] in
             guard let self else { return }
-            var hits: [UUID: Set<String>] = [:]
-            for rule in rules {
-                guard let expression = rule.ftsExpression else { continue }
-                hits[rule.id] = Set(await self.indexer.search(expression: expression))
-            }
+            let hits = await self.textHits(for: rules)
             guard generation == self.baseFtsGeneration else { return }
             self.baseTextHits = hits
             self.recompute()

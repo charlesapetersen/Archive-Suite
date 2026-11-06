@@ -68,6 +68,7 @@ struct NavigationWindowView: View {
             SimilarTagsSheet(model: model, size: SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: contentSize))
         }
         .sheet(isPresented: $model.showingSaveDialog) { SaveSearchSheet(model: model) }
+        .sheet(item: $model.advancedSearchRequest) { request in AdvancedSearchSheet(model: model, request: request) }
         .alert("Rename Smart Folder", isPresented: Binding(
             get: { model.renamingSearch != nil },
             set: { if !$0 { model.renamingSearch = nil } })) {
@@ -530,6 +531,10 @@ struct NavigationWindowView: View {
                     .help("Clear full-text search")
                     .accessibilityIdentifier("ar.filter.ocrClear")
                 }
+                Button("Advanced…") { model.openAdvancedSearch() }
+                    .fixedSize()
+                    .help("Advanced Search: combine rules on text, tags, dates, folders and more (⇧⌥⌘F)")
+                    .accessibilityIdentifier("ar.filter.advanced")
             }
             Spacer(minLength: 0)
         }
@@ -665,6 +670,7 @@ struct NavigationWindowView: View {
                     }
                 }
                 Divider()
+                Button("Advanced Search…") { model.openAdvancedSearch() }
                 Button("Save Current Search…") { model.showingSaveDialog = true }
             } label: { Label("Saved", systemImage: "bookmark") }
                 .help("Apply, save, or delete a saved search (smart folder)")

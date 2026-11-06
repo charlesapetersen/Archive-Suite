@@ -33,6 +33,8 @@ struct SidebarView: View {
                         .tag(SidebarView.smartPrefix + s.id.uuidString)
                         .accessibilityIdentifier("ar.sidebar.smart")
                         .contextMenu {
+                            Button("Edit Smart Folder…") { model.editSmartFolder(s) }
+                                .accessibilityIdentifier("ar.sidebar.smart.edit")
                             Button("Rename…") { model.renamingSearch = s }
                             Button("Delete", role: .destructive) { model.savedSearches.delete(s.id) }
                         }
