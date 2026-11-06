@@ -24,7 +24,9 @@ whole-page reader (W46.mixed-route) and to a detector trained on our own pages.
   app's settings; LightOnOCR with its card's empty prompt, temperature 0, 512 tokens (no reply reached it).
 - **Noise.** n = 35 marks on 17 pages; page bootstrap, 2,000 resamples, seed 46. The intervals are about ±20
   points, so the two readers tie on the oracle boxes; only the gap between oracle and detector boxes is clear.
-  No rerun floor: both readers are deterministic at these settings.
+  No rerun floor. Vision's determinism is measured: two runs on these pages gave identical text (measurement review
+  pass 10). LightOnOCR's at temperature 0 is asserted, not measured.
 - **Scope.** Reading crops, not marks in a page reading. The rough truth boxes include neighbouring print on some
   marks (one RG165 box contains three others), which costs both readers alike. Not settled: whether a whole-page
-  reader transcribes the marks (W46.mixed-route), and Gemini on the crops (W46.marks-detect-paid).
+  reader transcribes the marks (W46.mixed-route), and Gemini on the crops, which is not
+  measured (W46.marks-detect-paid was retired unrun by the owner on 2026-11-05).

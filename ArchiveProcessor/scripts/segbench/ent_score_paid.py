@@ -706,7 +706,10 @@ the sending place, and the 8,000-character window is not worth its tokens for th
 - **Comparison:** the same Vision text of the same JPEG originals (3 wrong pairs read from the PDF page image
   instead), the same model, temperature 0 and gateway settings in every arm; tagging and entity3k see the same
   3,000 characters. The 3.8 reply on ABBYY differs in text source and model version together, and is reported only
-  as that pair.
+  as that pair. On a document of 3,000 characters or fewer the entity8k request is the entity3k request, so the
+  gateway's response cache answered it (88 of the 138 entity8k calls came back in under 1.5 s, on 3 November):
+  those pairs are equal by construction, not measured agreement, and the entity8k-against-entity3k gap rests on the
+  longer documents.
 - **Noise:** n 138 (82, 40 for the floor); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floor
   (entity8k repeated, one changed newline to pass the gateway's cache): recipient 0.00; sender +0.04 (0.000 to
   +0.115), city -0.03 (-0.111 to 0.000) and full-string place -0.16 (-0.338 to 0.000) are each one-signed: a drift

@@ -103,6 +103,16 @@ class Ledger(unittest.TestCase):
         send.assert_not_called()
         self.assertAlmostEqual(S.spent(), 2 * (1000 * .75 + 100 * 3.75) / 1e6)
 
+    def test_resend_skips_the_gateway_cache(self):
+        _, first = self.run_call(Response('{"pages": []}'))
+        self.assertNotIn("cache", first.call_args[0][1])
+        out, second = self.run_call(Response(reply([1, 2, 3])))
+        self.assertEqual(out, "ok")
+        sent = second.call_args[0][1]
+        self.assertEqual(sent["cache"], {"no-cache": True})
+        self.assertEqual({k: v for k, v in sent.items() if k != "cache"}, body()[0])
+        self.assertEqual(len({r["request_sha256"] for r in S.records()}), 1)   # the key is the uncached request's
+
     def test_transport_error_keeps_the_reservation(self):
         with mock.patch.object(S.LG, "request", return_value=body()), \
                 mock.patch.object(S.GW, "request", side_effect=OSError("reset")):

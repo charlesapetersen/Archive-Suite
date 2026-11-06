@@ -177,11 +177,14 @@ def call(arm, col, a, b):
                "span": [nums[0], nums[-1]], "attempt": n + 1, "model": body["model"],
                "max_tokens": body["max_tokens"], "request_sha256": key, "t": time.time()}
         append(rec)
+    # A re-send of a failed unit skips the gateway's (LiteLLM) response cache, which would otherwise hand back the
+    # failed reply byte for byte, as ocr_rerun_noise.py found. The request Google sees, and its key, are unchanged.
+    send = {**body, "cache": {"no-cache": True}} if n else body
     r = None
     for wait in (0, 20, 60, 120):
         time.sleep(wait)
         try:
-            r = GW.request("/chat/completions", body, timeout=900 if whole else 300)
+            r = GW.request("/chat/completions", send, timeout=900 if whole else 300)
         except Exception as e:  # transport ended: usage unknown, the reservation stays charged
             with _lock:
                 append({**rec, "event": "unknown", "error": type(e).__name__, "wall_s": round(time.time() - rec["t"], 1)})

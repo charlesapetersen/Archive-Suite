@@ -104,8 +104,12 @@ By page kind, Gemini's own order (first read) scores:
 
 1. **Gemini's order changes no default.**
    - On the owner's pages it ties the free no-detector arms: Vision's line order and the app's line column sort,
-     on both reads.
-   - It is below PP-DocLayoutV3's own order on both reads, by 0.013-0.019.
+     on both reads. The tie is over the lines each arm places: on Gemini's 66 valid pages, tau is computed over 69%
+     of the truth lines for Gemini against 86% for Vision's line order on the same pages (the table's 86% kept is
+     over all 96 and counts lines kept, not lines placed).
+   - It is below PP-DocLayoutV3's own order on both reads, by 0.013-0.019. The two reads themselves differ by
+     +0.011 [−0.009, +0.037] (first minus second), so the gap holds on each read but is about the size of the
+     read-to-read shift.
    - It keeps 86% of the lines against their 100%, so its word accuracy is 9-12 points lower.
    - The app's region sort on DocLayout-YOLO is the one free arm it beats, and only on the first read.
    - On public print it is below PP-DocLayoutV3. On newspapers it is far below every free region arm.
@@ -128,8 +132,11 @@ By page kind, Gemini's own order (first read) scores:
   - L9's volunteer transcriptions, partial on some pages.
   - The owner's adjudicated text on the 96 (`ocr-truth.md`). Claude Opus 5.5 and Gemini 3.8 Flash drafted it, and
     the owner checked it.
-  - Gemini 3.8 drafted the 96's truth text, but not its order or boxes. The arm here is 3.7, asked only for
-    blocks, and no text it wrote is scored.
+  - The 96's word order is the drafters' too. The truth is `ocr_truth.merge` of the two drafts, each prompted for
+    "natural reading order", with the owner ruling only where they differed. So the order tau is scored against is
+    largely Gemini 3.8's and Claude's shared order, and Gemini 3.7 is scored against a relative's order. That bias
+    can only favour the Gemini arm; it still only ties and trails, so the verdict holds. The arm here is 3.7, asked
+    only for blocks, and no text it wrote is scored.
 - **Selection.**
   - The pages are the ones W46.layout-order and W46.layout-order-marks used, unchanged.
   - The 96 carry their Vision filter: every page Vision read as under 20 words was replaced at the draw

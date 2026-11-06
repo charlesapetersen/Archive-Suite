@@ -41,9 +41,11 @@ less Gemini images -12.3 to -1.9.
    That is the direction of A04 and of the teacher here, and the opposite sign from the owner's development boxes,
    where text alone cost Gemini 3.7 2.7 points (a tie; `seg-window-gateway.md`). One run per arm and no rerun floor
    for Gemini on this set, so it is a lean in A04's direction, not a measured loss.
-2. **Gemini leads the open models here.** 0.882 against the 2B's
-   0.846 with the same input (paired -7.6 to 0.0, at the edge of a tie) and 6.7 and 5.0 points over the teacher with and
-   without images. Gemini makes the same kind of error as the others: every one is a false split, and no arm merges.
+2. **Gemini leads the teacher with images and ties the trained students.** 0.882 against the 2B's 0.846 with the
+   same input (paired -7.6 to 0.0) and the 4B's (-7.4 to +0.9): both intervals reach zero, so they are ties, on one
+   run each and with no Gemini rerun floor (no Gemini segmentation rerun exists anywhere). Only the teacher gaps
+   exclude zero: 6.7 points with images (-12.3 to -1.9) and 5.0 without (-10.7 to -0.3, whose end lies inside the
+   1.6-point open-model rerun floor). Gemini makes the same kind of error as the others: every one is a false split, and no arm merges.
 3. **Against A04.** On these documents the teacher's text arm scores 0.848 and Gemini 3.7's 0.898; over the whole
    stream the teacher's scored 0.809. If Gemini keeps a like lead over the whole stream it would sit near A04's
    0.863 for Gemini 3.1 Flash-Lite, so nothing here says our page order or harness departs from A04's. That is an

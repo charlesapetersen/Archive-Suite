@@ -127,3 +127,30 @@ The bag-of-words F1 is 60.6% in every L9 row, because the words are the same and
 - L9's truth is partial on some pages, so word accuracy is low in every row. Only the differences between rows
   measure order.
 - Multi-column region results rest on the 5 English pages that pass the guard.
+
+## Measurement card
+
+Written by hand (measurement review pass 10, P10-9); `layout_order.py` does not write this file's prose. The same
+free arms, paired against Gemini with page-bootstrap intervals, are in `layout-order-paid.md`.
+
+- **Truth.**
+  - The benchmark's PAGE/ALTO line order (Jha, MIT), the published truth; the benchmark-lines table reproduces the
+    paper's figures, which checks the scorer.
+  - L9: NewsBench's volunteer transcriptions, partial on some pages, so only the differences between rows measure
+    order.
+  - No model drafted either truth, so no scored arm is a drafter or a relative of one. No owner check: both are
+    public sets.
+- **Selection.** Every scored page of the benchmark (40) and all 15 NewsBench pages; none chosen by a tested route
+  or by ABBYY text.
+- **Comparison.** Within a table every arm orders the same boxes (the benchmark's lines, DocLayout-YOLO's regions,
+  or the same Vision lines in DocLayout-YOLO's body regions on L9) with the same guard and scorer, so only the
+  ordering stage differs. The native orders (kraken blla, PP-DocLayoutV3) bring their own boxes and are marked so.
+  Both OCR sets: this note is the public half; the owner's pages are `W46.layout-order-marks` (the 96 and the 30
+  annotated pages) and `layout-order-paid.md`'s owner table.
+- **Noise.** n is small: 15 multi-column pages (5 valid on DocLayout-YOLO's regions), 25 single-column, 15 L9. No
+  intervals are given here and no rerun was made; every ordering stage is deterministic geometry on fixed boxes.
+  Differences of a few hundredths on 5 to 15 pages are not separable; `layout-order-paid.md` carries the paired
+  intervals for these arms.
+- **Scope.** Order with detection held fixed, on public print, manuscripts and newspapers. It does not settle the
+  owner's pages with marks (`W46.layout-order-marks`), a trained orderer (`W46.layout-order-train`), or where a mark
+  belongs in the stream.

@@ -13,15 +13,16 @@ dragged in PDFKit. Only Apple Vision read a page, nothing left the Mac and no mo
   passes **80.3% of line drags against 47.2% for the raw image, +33.1 points** (paired 95% interval +25.6 to +40.7),
   and removes no word. Split by the measured median line angle: **+5.7 on pages skewed 1° to 3°** (+2.7 to +9.4),
   the range of the 96's skewed pages, where W46.place-geom measured +6.8 (+3.4 to +14.2); **+57.8 on pages skewed 3°
-  or more** (+47.8 to +67.4), which the 96 hardly has (raw passes 27% there); and **+0.1 on level pages** (−1.1 to
-  +1.2), as on the 96 (+0.6). By folder: Skew +56.6, Warping +3.7 (+0.1 to +7.6). The same holds with drags
+  or more** (+47.8 to +67.4), which the 96 hardly has (raw passes 27% there); and **−0.1 on level pages** (−1.5 to
+  +1.2; 2,440 against 2,444 of 3,483 lines), as on the 96 (+0.6). By folder: Skew +56.6, Warping +3.7 (+0.1 to +7.6). The same holds with drags
   overshooting by 0.35 of the word's height (+31.5 overall, +5.0 on mild skew). So the 1° trigger stands: below it
   deskew changes nothing; above it it passes more lines on 162 of the 229 skewed images and fewer on 20.
 - **Unlike on the 96, UVDoc selects best here, but it removes text.** UVDoc after the quad passes 88.1%, +7.9 over
   deskew (+3.1 to +12.9), most of it on warped pages that are level on average: +19.3 over deskew on level pages
   (+7.9 to +31.7), where deskew does nothing and the lines curve. On the 96 it lost to raw on every stratum (−8.6
   overall, curled pages included). It cuts 900 of the 15,067 truth lines (counted as failures above) and 443 Vision
-  words of the page itself on 128 of the 310 images, which the reading-copy rule forbids. On the 185 images it cuts
+  words of the page itself on 84 of the 310 images (128 lose something: a truth line, an own-sheet or a neighbour
+  word), which the reading-copy rule forbids. On the 185 images it cuts
   nothing from, it beats deskew by 17.0 (+11.8 to +22.0).
 - **Quad alone is no better than deskew** (−5.1, −11.5 to +1.0) and cuts 126 truth lines; it wins only on level
   pages (+11.3 over deskew, +0.6 to +22.7) and loses on curled ones (−10.9).
@@ -334,7 +335,9 @@ Each with the lab writer, Δ against deskew with the lab writer on the same page
     Vision line taking it (`match_lines`). 15,191 of Vision's 20,818 lines qualify, on 306 of the 310 images.
   - The words are Vision's own, so a line's expected selection is exactly what Vision read there and Find is 100% on
     every arm (not tabled). Lines Vision split or joined are left out of the truth; this tests selection of lines
-    Vision got right, not of all lines. Every arm lays the same Vision lines, so this favours no arm.
+    Vision got right, not of all lines. Every arm lays the same Vision lines, but the truth lines are those Vision
+    read as one line on the raw photograph, so the set leans toward the raw arm: the transforms' gains are
+    conservative.
   - Drags run from the midpoint of the first word's left quad edge to the midpoint of the last word's right edge.
     W46.place-geom dragged from ink-box edges at mid-height; on a page turned 10° an axis-aligned box's corner is
     not where the word starts, so the quad edge is the user's drag here (`test_place_geom_real5.py`).
@@ -348,9 +351,12 @@ Each with the lab writer, Δ against deskew with the lab writer on the same page
   Vision reading per photograph (macOS 27.2, the app's settings), frozen as the panel freezes pages (2,400 px, JPEG
   90). Both OCR sets: the owner's 96 half is W46.place-geom (58 placement-truth pages); this is the public half. The
   895-page public set has no photographed geometry to test.
-- **Noise.** n = 310 images of 155 pages, 15,067 lines. Intervals are paired bootstrap over images (2,000 draws); the
-  two folders' copies of a page are drawn as separate images, so the intervals are somewhat narrow for 155 pages. A
-  fresh rerun reproduced every count (`rows-rerun.jsonl`), so the rerun floor is 0 and the image sample is the noise.
+- **Noise.** n = 310 images of 155 pages, 15,067 lines. Intervals are paired bootstrap over images (2,000 draws), with
+  the two folders' copies of a page drawn as separate images. Page-clustered intervals (both copies of a page drawn
+  together) were measured by measurement review pass 10 and are not wider: overall +27.3 to +38.6, mild +2.8 to
+  +9.1, steep +47.8 to +67.6, level −1.6 to +1.1 (the Skew and Warping copies offset each other). A fresh rerun
+  reproduced every count on 310 of 310 images, so the rerun floor is 0 and the image sample is the noise; its rows
+  file has since been deleted with the bench scratch, and `rerun.log` keeps the counts.
 - **Scope.** PDFKit only. Real5 is modern print, photographed warped and skewed on purpose, often far more than the
   owner's photographs (99 of the 155 Skew images are turned more than 5°, median 6.3°); it says what deskew does for
   other users' worse captures, not how often such captures occur. It does not settle whether a dewarped copy should

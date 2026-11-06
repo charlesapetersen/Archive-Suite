@@ -98,7 +98,7 @@ a fine-tune on our own pages (W46.marks-detect-own) waits on it and runs only if
 - **Comparison.** One image per page (the freeze's 2,400 px copies), class-agnostic one-to-one matching, each
   detector at its default settings: PP-DocLayoutV3 at score floor 0.5 and 1,024 px; the YOLO11m at 1,024 px and
   Ultralytics' floor 0.25, with the sweep beside it.
-- **Noise.** n = 45 boxes on 32 pages. Page bootstrap, 2,000 resamples, seed 46. With 45 boxes, a detector's pooled
+- **Noise.** n = 45 boxes on 20 of the 32 pages (12 pages carry none). Page bootstrap, 2,000 resamples, seed 46. With 45 boxes, a detector's pooled
   recall carries an interval of about ±14 points, so only large differences separate two detectors. No per-class
   ranking: no class has more than 17 boxes.
 - **Scope.** Detection only. This does not cover whether found marks can be read (a transcription arm), whether a

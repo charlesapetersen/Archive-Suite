@@ -77,3 +77,14 @@ Disputed / with a value from both readers agreed / both empty, out of the photos
 ## Cost
 
 Qwen3-VL 8B, 4-bit MLX: 240 photos, 9.7 s a photo on average, 39 min in all. Qwen3.5 4B, 4-bit MLX: 240 photos, 6.5 s a photo on average, 26 min in all. $0.
+
+## Measurement card
+
+This is the superseded first draft (W47.ct-truth, on the corpus PDFs), kept for comparison only; no figure here is
+a result. The current label truth and its card are `ct-truth.md` (W47.ct-truth-jpeg, on the JPEG originals).
+
+- **Truth.** None: two-reader agreement of Qwen3-VL 8B and Qwen3.5 4B, not checked by the owner; agreement is not
+  truth.
+- **Selection.** 240 marker photos stratified by repository (above), the draw `ct-truth.md` starts from (it refills the
+  markers it could not pair), read here from the corpus PDFs, which the 2026-10-22 rule no longer allows a model to see.
+- **Comparison, Noise, Scope.** Not applicable: superseded; see `ct-truth.md`.
