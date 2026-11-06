@@ -12,7 +12,6 @@ enum SettingsKey {
     static let viewerSplit = "viewerSplitFraction"
     static let subjectCombineAny = "subjectCombineAny"
     static let readFilterDefault = "readFilterDefault"
-    static let warnNearDuplicate = "warnNearDuplicateTags"
     static let hiddenColumns = "ar.hiddenColumns"    // [String] — column IDs the user has hidden
     // Document-viewer "last used becomes the default" layout (DV-1/DV-2): zoom per pane, window size.
     static let viewerLeftZoom = "viewerLeftZoom"     // scaleFactor; 0 = fit-to-pane
@@ -83,8 +82,6 @@ enum AppSettings {
     static func setHiddenColumns(_ hidden: Set<String>, in defaults: UserDefaults) {
         defaults.set(Array(hidden).sorted(), forKey: SettingsKey.hiddenColumns)
     }
-
-    static var warnNearDuplicateTags: Bool { bool(SettingsKey.warnNearDuplicate, true) }
 
     static var defaultReadFilter: ReadFilter {
         ReadFilter(rawValue: d.string(forKey: SettingsKey.readFilterDefault) ?? "") ?? .all

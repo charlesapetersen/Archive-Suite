@@ -48,7 +48,7 @@ enum TagWriter {
             var newTags = current.filter { token in
                 !removals.contains { shouldRemoveTag(token, matching: $0) }
             }
-            // Append additions not already present (case-insensitive for Read/Unread).
+            // Append additions not already present in any case (tags that differ only in case are one tag).
             for add in additions where !newTags.contains(where: { isSameTag($0, add) }) {
                 newTags.append(add)
             }
@@ -185,13 +185,15 @@ enum TagWriter {
     /// persisted cache, so it is not authority that `old` is still present. Re-check inside the same
     /// coordinated fresh-read transform that writes; if the token disappeared meanwhile, return a
     /// verified no-op instead of unconditionally adding `new` to the wrong selection set.
+    /// `old` is matched by tag identity, so every case of it goes; a case-only rename re-spells the tag,
+    /// and a file already carrying exactly `new` alone is left unwritten (W40.fix-tags-case-insensitive).
     static func renameToken(from old: String, to new: String, on url: URL,
                             expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
         try recorded(.rename, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             guard current.contains(where: { shouldRemoveTag($0, matching: old) }) else { return nil }
             var renamed = current.filter { !shouldRemoveTag($0, matching: old) }
             if !renamed.contains(where: { isSameTag($0, new) }) { renamed.append(new) }
-            if renamed == current { return nil }
+            if multisetEqual(renamed, current) { return nil }
             return (renamed, label)
         } }
     }

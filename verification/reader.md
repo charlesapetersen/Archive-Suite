@@ -568,21 +568,27 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-29 W40.fix-reader-sent-with-date — `dropped` (inline), per the owner's 2026-10-12 walkthrough ruling;
     `DateCell` deleted, Sent-With added to the ⌘I sheet.
 
-### R-27 · Warning on a subject that differs only by case
+### R-27 · Tags that differ only in case are one tag
 
-- **Promise:** when you add a subject that differs only by case from an existing one, the tag editor warns
-  you. This is an Options toggle, on by default.
-- **Promised in:** `CLAUDE.md` §Options, §Decisions (near-duplicate warning).
-- **Reached by:** the ⌘I sheet's Add-subject field (`Views/TagEditorView.swift:66-70`) and `RenameTagSheet`
-  both call `NavigationModel.nearDuplicateSubjects(of:)` (`Views/NavigationModel.swift:1357`), which checks
-  `AppSettings.warnNearDuplicateTags` (default true, `Core/AppSettings.swift:92`; toggle at `Views/OptionsView.swift:71`).
-- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (step 6a), the warning at its default; no test turns the option off.
+- **Promise:** tags that differ only in case are one tag: the filter, tag cloud, counts, rename, similar tags
+  and suggestions treat "Lincoln" and "lincoln" alike. A file keeps the spelling it has; a subject you add is
+  written in the spelling the library already uses (the ⌘I sheet says so), and a case-only rename re-spells
+  the tag on every file. (Until W40.fix-tags-case-insensitive this row was an Options-toggled warning.)
+- **Promised in:** `CLAUDE.md` §Decisions; `SPEC/tag-format.md` §Safety rule 4.
+- **Reached by:** ArchiveCore `Tags/TagIdentity.swift` (`tagKey`, `tagCounts`) and `isSameTag`/`shouldRemoveTag`;
+  `NavigationModel.spellingForNewTag`/`existingSpelling(differingFrom:)`, `LibraryFilter.hasSubject`,
+  `ArchiveFile.subjectKeys`, `TagWriter.renameToken`.
+- **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte`
+  (step 6c: a case variant typed in ⌘I names the existing spelling and writes nothing); unit:
+  `TagWriterTests` (case add/remove/undo/rename on scratch files), `LibrarySortFilterTests.testTagFilterMatchesEveryCaseOfATag`.
 - **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): typing a case variant of an existing subject into the ⌘I sheet showed the warning, with the option at its default.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: the Options toggle was not turned off.
-- **Notes:** the inline token editor (R-23) adds subjects with no warning.
+  - 2026-11-06 W40.fix-tags-case-insensitive — promise replaced (owner session reader-1, row 30): the warning and
+    its toggle are gone, case variants are one tag; the 2026-10-15 evidence is for the old promise.
+- **Notes:** the inline token editor (R-23) writes an added subject in the library's spelling too, with no note.
 
 ### R-28 · Rename a tag across the archive
 

@@ -478,7 +478,7 @@ final class NavigationModel: ObservableObject {
     /// Select every currently-displayed file that carries `tag` (from the tag cloud context menu).
     /// Matches on `subjects` — the same facet the tag filter uses — so it agrees with the cloud below.
     func selectFiles(withTag tag: String) {
-        selection = Set(displayed.filter { $0.subjects.contains(tag) }.map(\.id))
+        selection = Set(displayed.filter { $0.hasSubject(tag) }.map(\.id))
     }
 
     // MARK: Display calendars (W24.cal1-reader; app-side, never written to the corpus)
@@ -902,15 +902,19 @@ final class NavigationModel: ObservableObject {
     var allSubjects: [String] { allSubjectsCache }
 
     /// File-count per distinct subject across the WHOLE library (not just the displayed rows), for
-    /// the near-duplicate tag finder. Counts each subject once per file. Computed on demand (the
-    /// finder is opened rarely) — never on the render path.
+    /// the near-duplicate tag finder. Counts each tag once per file, case variants as one tag in the
+    /// spelling most files use (`tagCounts`). Computed on demand (the finder is opened rarely) — never
+    /// on the render path.
     var subjectFileCounts: [String: Int] {
-        var counts: [String: Int] = [:]
-        for f in library.files {
-            for t in Set(f.subjects) { counts[t, default: 0] += 1 }
-        }
-        return counts
+        Dictionary(uniqueKeysWithValues: tagCounts(library.files.lazy.map(\.subjects)).map { ($0.tag, $0.count) })
     }
+
+    /// The spelling the library already uses for `tag`, by tag identity, or nil when it has no such tag.
+    func librarySpelling(of tag: String) -> String? { subjectSpellingByKey[tagKey(tag)] }
+
+    /// The spelling a new tag is written in: tags that differ only in case are one tag, so a typed
+    /// "lincoln" is written "Lincoln" when the library has "Lincoln" (W40.fix-tags-case-insensitive).
+    func spellingForNewTag(_ tag: String) -> String { librarySpelling(of: tag) ?? tag }
 
     private func refreshSelectionCache() {
         let sel = selection
@@ -930,10 +934,13 @@ final class NavigationModel: ObservableObject {
         let visible = Set(displayed.map(\.id))
         if !selection.isSubset(of: visible) { selection.formIntersection(visible) }
     }
+    /// One entry per tag (case variants are one tag), in the spelling most files use.
     private func refreshSubjectsCache() {
-        allSubjectsCache = Array(Set(library.files.flatMap(\.subjects)))
+        allSubjectsCache = tagCounts(library.files.lazy.map(\.subjects)).map(\.tag)
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        subjectSpellingByKey = Dictionary(allSubjectsCache.map { (tagKey($0), $0) }, uniquingKeysWith: { a, _ in a })
     }
+    private var subjectSpellingByKey: [String: String] = [:]
 
     /// Tag cloud over the *currently displayed* rows: each **subject** tag with the number of visible
     /// files carrying it, alphabetical (the view scales font size by count via log). Counts each tag
@@ -944,13 +951,8 @@ final class NavigationModel: ObservableObject {
     private var _tagCloudCache: [(tag: String, count: Int)]?
     var tagCloud: [(tag: String, count: Int)] {
         if let cached = _tagCloudCache { return cached }
-        var counts: [String: Int] = [:]
-        for f in displayed {
-            for t in Set(f.subjects) where !DocumentTags.isDateFacetLike(t) {
-                counts[t, default: 0] += 1
-            }
-        }
-        let result = counts.map { (tag: $0.key, count: $0.value) }
+        // Case variants are one tag, shown in the spelling most of the visible files use.
+        let result = tagCounts(displayed.lazy.map(\.subjects), include: { !DocumentTags.isDateFacetLike($0) })
             .sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
         _tagCloudCache = result
         return result
@@ -962,7 +964,8 @@ final class NavigationModel: ObservableObject {
     nonisolated static func tagCloud(_ cloud: [(tag: String, count: Int)], minimumCount: Int,
                          keeping active: Set<String>) -> [(tag: String, count: Int)] {
         guard minimumCount > 1 else { return cloud }
-        return cloud.filter { $0.count >= minimumCount || active.contains($0.tag) }
+        let activeKeys = Set(active.map(tagKey))
+        return cloud.filter { $0.count >= minimumCount || activeKeys.contains(tagKey($0.tag)) }
     }
 
     // MARK: Folder tree (sidebar)
@@ -1513,6 +1516,7 @@ final class NavigationModel: ObservableObject {
     /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
     /// `paths` nil acts on the list's selection; the tag editor opened from the document window passes its file.
     func applyEdit(_ op: TagEditOp, paths: [String]? = nil) {
+        let op = inLibrarySpelling(op)
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
         let reverified = reverifyCacheRows(targets)
@@ -1556,7 +1560,13 @@ final class NavigationModel: ObservableObject {
 
     /// Number of files carrying `tag` (for the rename sheet's "affects N files").
     func affectedFileCount(forTag tag: String) -> Int {
-        library.files.filter { isInsideMainArchive($0.url) && $0.subjects.contains(tag) }.count
+        library.files.filter { isInsideMainArchive($0.url) && $0.hasSubject(tag) }.count
+    }
+
+    /// Whether some file carries `tag` in another spelling, so renaming it to itself still re-spells it:
+    /// the cloud shows the spelling most files use, and that is the one a rename most often unifies on.
+    func hasOtherSpellings(of tag: String) -> Bool {
+        library.files.contains { f in f.hasSubject(tag) && f.subjects.contains { $0 != tag && isSameTag($0, tag) } }
     }
 
     /// Open the rename-tag sheet from a menu — seed with the active tag filter, else the top visible tag.
@@ -1566,10 +1576,13 @@ final class NavigationModel: ObservableObject {
     }
 
     func renameTag(from oldTag: String, to newTag: String) {
-        let old = oldTag                                    // verbatim token identity — must match the
-        let new = newTag.trimmingCharacters(in: .whitespaces)  // sheet's affectedFileCount(forTag: oldTag)
-        guard !old.isEmpty, !new.isEmpty, new != old else { return }
-        let reverified = reverifyCacheRows(library.files.filter { $0.subjects.contains(old) })
+        let old = oldTag                                    // tag identity — must match the sheet's
+        let typed = newTag.trimmingCharacters(in: .whitespaces)  // affectedFileCount(forTag: oldTag)
+        // Renaming into another existing tag merges into it in its spelling; a case-only rename of the
+        // same tag is how its spelling is changed, so that keeps the case as typed.
+        let new = isSameTag(typed, old) ? typed : spellingForNewTag(typed)
+        guard !old.isEmpty, !new.isEmpty, new != old || hasOtherSpellings(of: old) else { return }
+        let reverified = reverifyCacheRows(library.files.filter { $0.hasSubject(old) })
         let affected = reverified.files
         guard !affected.isEmpty else {
             statusMessage = reverified.rejected > 0
@@ -1614,7 +1627,13 @@ final class NavigationModel: ObservableObject {
 
     func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {
         guard let file = reverifyCacheRow(file) else { return }
-        applyDelta(TagEditing.delta(for: op, given: file.tags), to: file)
+        applyDelta(TagEditing.delta(for: inLibrarySpelling(op), given: file.tags), to: file)
+    }
+
+    /// An added subject is written in the library's spelling of it (`spellingForNewTag`).
+    private func inLibrarySpelling(_ op: TagEditOp) -> TagEditOp {
+        guard case .addSubject(let s) = op else { return op }
+        return .addSubject(spellingForNewTag(s.trimmingCharacters(in: .whitespaces)))
     }
 
     /// Commit an inline subject-token edit. `base` is the token set the user STARTED editing from
@@ -1628,7 +1647,7 @@ final class NavigationModel: ObservableObject {
     @discardableResult
     func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) -> Bool {
         guard let file = reverifyCacheRow(file) else { return false }
-        return applyDelta(TagEditing.subjectDelta(from: base, to: edited), to: file)
+        return applyDelta(TagEditing.subjectDelta(from: base, to: edited.map(spellingForNewTag)), to: file)
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
@@ -1718,12 +1737,12 @@ final class NavigationModel: ObservableObject {
                                         .priority: NSAccessibilityPriorityLevel.high.rawValue])
     }
 
-    /// Existing corpus subjects that differ from `candidate` only by case — a likely typo/duplicate.
-    func nearDuplicateSubjects(of candidate: String) -> [String] {
-        guard AppSettings.warnNearDuplicateTags else { return [] }
+    /// The library's spelling of `candidate` when it is the same tag typed in another case, for the note
+    /// that it will be written in that spelling; nil when the tag is new or typed as it is spelt.
+    func existingSpelling(differingFrom candidate: String) -> String? {
         let c = candidate.trimmingCharacters(in: .whitespaces)
-        guard !c.isEmpty else { return [] }
-        return allSubjects.filter { $0 != c && $0.caseInsensitiveCompare(c) == .orderedSame }
+        guard !c.isEmpty, let s = librarySpelling(of: c), s != c else { return nil }
+        return s
     }
 
     // MARK: Copy links

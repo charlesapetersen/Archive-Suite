@@ -73,7 +73,9 @@ public final class TagVocabulary: @unchecked Sendable {
     private let lock = NSLock()
     private let saveQueue: DispatchQueue
 
-    private var names: Set<String> = []
+    /// One spelling per tag, keyed by `tagKey`: tags that differ only in case are one tag, so a suggestion
+    /// list never offers both "Taxes" and "taxes" (W40.fix-tags-case-insensitive).
+    private var names: [String: String] = [:]
     private var roots: [TagVocabularyRoot] = []
     private var savePending = false
 
@@ -95,7 +97,14 @@ public final class TagVocabulary: @unchecked Sendable {
     /// Every known subject name, ordered the way a suggestion list wants to show them.
     public func snapshot() -> [String] {
         lock.lock(); defer { lock.unlock() }
-        return names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return names.values.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    /// The spelling a new tag is written in: the one already known for it, when there is one, otherwise
+    /// `name` as typed. Tags that differ only in case are one tag (W40.fix-tags-case-insensitive).
+    public func spelling(of name: String) -> String {
+        lock.lock(); defer { lock.unlock() }
+        return names[tagKey(name)] ?? name
     }
 
     public var count: Int {
@@ -139,8 +148,11 @@ public final class TagVocabulary: @unchecked Sendable {
         for subject in subjects {
             let trimmed = subject.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { continue }
-            guard names.count < Self.maxNames || names.contains(trimmed) else { continue }
-            if names.insert(trimmed).inserted { grew = true }
+            let key = tagKey(trimmed)
+            guard names[key] == nil else { continue }
+            guard names.count < Self.maxNames else { continue }
+            names[key] = trimmed
+            grew = true
         }
         lock.unlock()
         if grew { scheduleSave() }
@@ -281,7 +293,7 @@ public final class TagVocabulary: @unchecked Sendable {
     private func encodedSnapshot() -> Data? {
         lock.lock()
         let payload = Payload(version: Self.currentVersion,
-                              names: names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending },
+                              names: names.values.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending },
                               roots: roots)
         lock.unlock()
         let encoder = JSONEncoder()
@@ -309,9 +321,11 @@ public final class TagVocabulary: @unchecked Sendable {
             loadFailure = "vocabulary file was not a readable v\(Self.currentVersion) payload"
             return
         }
-        names = Set(payload.names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .prefix(Self.maxNames))
+        names = [:]
+        for name in payload.names.lazy.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+            where !name.isEmpty && names.count < Self.maxNames {
+            if names[tagKey(name)] == nil { names[tagKey(name)] = name }
+        }
         roots = Array(payload.roots.suffix(Self.maxRoots))
     }
 

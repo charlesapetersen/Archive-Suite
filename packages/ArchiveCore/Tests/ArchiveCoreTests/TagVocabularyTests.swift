@@ -262,13 +262,16 @@ final class TagVocabularyTests: XCTestCase {
         XCTAssertEqual(s.snapshot(), ["taxes"])
     }
 
-    func testCaseVariantsAreKeptAsDistinctSpellings() {
+    func testCaseVariantsAreOneTagKeepingTheFirstSpelling() {
+        // Tags that differ only in case are one tag (W40.fix-tags-case-insensitive): the vocabulary keeps
+        // one spelling, the first it met, and a case variant is no growth.
         let s = store()
         s.add(rawTags: ["Taxes"])
-        XCTAssertTrue(s.add(rawTags: ["taxes"]))
-        // Parity with the Spotlight provider being replaced, which deduped exactly: neither spelling is
-        // known to be the operator's intent, so neither is silently discarded.
-        XCTAssertEqual(Set(s.snapshot()), ["Taxes", "taxes"])
+        XCTAssertFalse(s.add(rawTags: ["taxes", "TAXES"]))
+        XCTAssertEqual(s.snapshot(), ["Taxes"])
+        XCTAssertEqual(s.suggestions(prefix: "tax"), ["Taxes"])
+        s.flush()
+        XCTAssertEqual(TagVocabulary(fileURL: dir.appendingPathComponent("vocab.json")).snapshot(), ["Taxes"], "a reload keeps the one spelling")
     }
 
     func testNameCountIsCappedButKnownNamesStillReadBack() {

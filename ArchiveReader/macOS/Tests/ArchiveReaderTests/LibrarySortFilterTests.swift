@@ -60,6 +60,25 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertTrue(or.matches(both));   XCTAssertTrue(or.matches(one))
     }
 
+    /// Tags that differ only in case are one tag (W40.fix-tags-case-insensitive).
+    func testTagFilterMatchesEveryCaseOfATag() {
+        let upper = file("a", ["Lincoln", "Grant", "1862"])
+        let lower = file("b", ["lincoln", "1862"])
+        let neither = file("c", ["Lincolnshire", "1862"])
+        let and = LibraryFilter(subjects: ["LINCOLN", "grant"], subjectCombine: .all)
+        let or = LibraryFilter(subjects: ["LINCOLN", "grant"], subjectCombine: .any)
+        XCTAssertTrue(and.matches(upper)); XCTAssertFalse(and.matches(lower)); XCTAssertFalse(and.matches(neither))
+        XCTAssertTrue(or.matches(upper));  XCTAssertTrue(or.matches(lower));   XCTAssertFalse(or.matches(neither))
+
+        var f = LibraryFilter(subjects: ["lincoln"])
+        XCTAssertTrue(f.hasSubject("Lincoln"))
+        f.insertSubject("LINCOLN")
+        XCTAssertEqual(f.subjects, ["lincoln"], "a case variant is the tag already in the filter")
+        f.subjects.insert("Lincoln")
+        f.removeSubject("Lincoln")
+        XCTAssertTrue(f.subjects.isEmpty, "removing a tag takes every case of it")
+    }
+
     func testCombinedFilterMatchesWorkflowExample() {
         // "Cold War" + Unread + Q3 — the canonical triage query.
         let hit = file("a", ["Cold War", "Unread", "Q3", "1962"])

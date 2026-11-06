@@ -193,7 +193,9 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   tri-state; "Mark Read" never adds a read-state token to a marker/neither file (hard-coded).
 - **Facet classification is display/sort/filter only** — never drives a write.
 - **Full tag editing is first-class** (single + group), always via `TagWriter`; free-form subjects with
-  autocomplete + near-duplicate warning (`TagSimilarity`).
+  autocomplete + the similar-tags finder (`TagSimilarity`). Tags that differ only in case are ONE tag
+  everywhere (filter, cloud, counts, rename, suggestions); a file keeps its spelling, a new tag takes the
+  library's (SPEC rule 4, ArchiveCore `TagIdentity.swift`).
 - **Reading/grouping is user-driven manual multi-selection** — never auto-groups; segment awareness is opt-in
   and degrades silently.
 - **Full-text OCR search is in v1** via the app's content index (not Spotlight) + in-doc `⌘F`; bm25-ranked

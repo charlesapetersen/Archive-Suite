@@ -105,7 +105,7 @@ extension LibraryFilter {
         case .folder: f.pathPrefix = nil
         case .read: f.read = .all
         case let .quality(q): f.qualities.remove(q)
-        case let .tag(t): f.subjects.remove(t)
+        case let .tag(t): f.removeSubject(t)
         case .dates: f.dateFromYear = nil; f.dateToYear = nil
         case .name: f.searchText = ""
         case .needsAttention: f.needsAttentionOnly = false

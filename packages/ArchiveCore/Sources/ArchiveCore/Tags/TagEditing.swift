@@ -78,8 +78,9 @@ public enum TagEditing {
     /// set (`new`) produced by the inline token editor — a single `TagDelta` so one editing session is
     /// one write + one undo step. SUBJECTS ONLY: date/quality/read/color facets are edited by their own
     /// cells and never appear in `new`, so they are neither added nor removed here. Pure/testable.
+    /// Tags that differ only in case are one tag (`tagKey`), so re-typing one in another case changes nothing.
     public static func subjectDelta(from old: [String], to new: [String]) -> TagDelta {
-        func key(_ s: String) -> String { s.trimmingCharacters(in: .whitespaces) }
+        func key(_ s: String) -> String { tagKey(s.trimmingCharacters(in: .whitespaces)) }
         let newKeys = Set(new.map(key))
         var seen = Set(old.map(key))
         var added: [String] = []
@@ -87,7 +88,7 @@ public enum TagEditing {
             let k = key(t)
             guard !k.isEmpty, !seen.contains(k) else { continue }
             seen.insert(k)
-            added.append(k)
+            added.append(t.trimmingCharacters(in: .whitespaces))
         }
         let removed = old.filter { !newKeys.contains(key($0)) }
         return TagDelta(add: added, remove: removed)
@@ -121,11 +122,18 @@ public struct GroupTagSummary: Sendable, Equatable {
             commonReadState = nil; commonColor = nil
             return
         }
-        let subjectSets = files.map { Set($0.subjects) }
+        // By tag identity (`tagKey`): "Lincoln" on one file and "lincoln" on another are on both, shown
+        // in the first spelling met.
+        var spelling: [String: String] = [:]
+        for f in files { for s in f.subjects where spelling[tagKey(s)] == nil { spelling[tagKey(s)] = s } }
+        let subjectSets = files.map { Set($0.subjects.map(tagKey)) }
         let all = subjectSets.dropFirst().reduce(subjectSets[0]) { $0.intersection($1) }
         let union = subjectSets.reduce(into: Set<String>()) { $0.formUnion($1) }
-        subjectsOnAll = all.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        subjectsOnSome = union.subtracting(all).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        func shown(_ keys: Set<String>) -> [String] {
+            keys.compactMap { spelling[$0] }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        }
+        subjectsOnAll = shown(all)
+        subjectsOnSome = shown(union.subtracting(all))
 
         commonYear = Self.common(files.map(\.year))
         commonQuality = Self.common(files.map(\.quality))

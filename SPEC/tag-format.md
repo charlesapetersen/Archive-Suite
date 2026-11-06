@@ -79,7 +79,7 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Quality** *(the rating facet)* | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **The single importance/quality rating (W19, 2026-07-18) — MERGED with + supersedes the legacy Priority facet** (`Q3` = old `P10`). A human 0–3 rating; **`Q0`/unrated writes NO tag** (absence *is* 0 stars, so the wire only ever carries `Q1`/`Q2`/`Q3`). Human-set everywhere, **never LLM-emitted**: Notes (front-matter `quality`), Reader (edit), Processor's interactive tagging (Live Capture tag card + Process Files manual tagging), and the **phone companions** (per-page/segment — the old priority control now emits `Q`). Q-prefix can never collide with the digits-only Year test. |
 | **Priority** *(legacy → Quality)* | `P7`–`P10`, on pre-W19 files only | 0–1 | **RETIRED — merged into Quality (W19, 2026-07-18).** No longer written by any app or companion. **Read-only alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3` and `P7` as unrated, so pre-W19 phone-captured files still resolve without a corpus rewrite. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
-| **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`. |
+| **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`. |
 | **Color label** | `.labelNumberKey` + color-name token | 0–1 | **Red = 6 ⇒ box** photo; **Purple = 3 ⇒ folder** photo. Only these two are meaningful to the Suite. |
 
 **Two tokens for one date facet.** Year, Month, Day, Decade and Sent With are 0–1. When a file carries
@@ -222,9 +222,25 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    and an unreadable file are distinct (`TagReading`, `TagWriter.mutate` §3). Processor's
    `MacOSTagger.readTags` likewise returns `[]` only on a genuine read, and its copy-source path
    writes nothing when the source array is empty.
-4. **Exact whole-string, case-insensitive token matching.** Never substring — removing `Unread`
-   never touches a subject `"Read later"`; Read/Unread compare case-insensitively, all other tokens
-   exactly (`TagWriter.shouldRemove`/`isSameTag`; `DocumentTags.parse`).
+4. **Whole-string, case-insensitive token matching: tags that differ only in case are ONE tag**
+   (W40.fix-tags-case-insensitive, owner 2026-11-04). Never substring — removing `Unread` never touches
+   a subject `"Read later"`, removing `Lincoln` never touches `Lincolnshire`. Tokens compare by their
+   identity key, `tagKey` (full Unicode case folding, no locale; accents are not folded), **except a
+   facet-shaped token**, whose key is its exact spelling (`keepsExactCase`: a rating `Q1`–`Q3`/`P7`–`P10`,
+   a date facet incl. `Date Uncertain` and `Sent With …`, a marker colour name `Red`/`Purple`), so the
+   rating `Q2` and a fiscal-quarter subject `q2`, or the box marker `Red` and a subject `red`, stay two
+   tags and a facet edit never adds, skips or removes the other; `Read`/`Unread` fold as before. Add-dedup
+   (`isSameTag`: adding `lincoln` to a file carrying `Lincoln` writes nothing), removal and rename
+   (`shouldRemoveTag`: every case of the tag goes), and every grouping, count, filter and suggestion
+   (`tagCounts`, ArchiveCore `Tags/TagIdentity.swift`). The key is never written: **each file keeps the
+   spelling it has**, and a **new** tag is written in the spelling the library (Reader) or the tag
+   vocabulary (Processor) already uses for it (`NavigationModel.spellingForNewTag`/`TagVocabulary.spelling(of:)`), as
+   typed only when the tag is new. A case-only rename (`lincoln` → `Lincoln`) is how a tag's spelling is
+   changed; it re-spells every case of it. Undo and redo stay **exact** (the occurrence inverse restores
+   each spelling the file had), and so does the §8 verify. Facet parsing (`DocumentTags.parse`) is
+   unchanged: its own case rules (Month name, `Read`/`Unread`, exact-case `Sent With`) stand. Notes'
+   managed-tag projection (`NotesTagProjector`) still matches its own ledger exactly, by design: it
+   removes only the tokens it wrote, so folding could take a nearby user tag.
 5. **Lossless writes.** `new = (fresh − remove) + add`, every untouched token preserved verbatim; a
    no-op delta writes nothing (no mod-date churn). **Never** build the write array from any index or
    cache — not Spotlight's `kMDItemUserTags` (the Reader's discovery mechanism until `W26.walk2`), and

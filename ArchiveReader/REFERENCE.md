@@ -259,7 +259,7 @@ writes against the real corpus — always a copy.
 - **Intelligent copy** (`⌥⌘C`): collapse single newlines → space; blank line = paragraph break (keep);
   de-hyphenate line-end hyphens; works in whichever pane holds the selection. `⌘C` copies verbatim.
 - **Options panel (⌘,):** link format, copy-text cleaning, viewer split, nav defaults, list density,
-  near-duplicate warning (see **§Options** below).
+  (see **§Options** below).
 
 ## §Keyboard map (the menu bar is the single source of shortcuts — `ArchiveReaderCommands.swift`)
 
@@ -332,7 +332,6 @@ writes against the real corpus — always a copy.
   size are **not** toggles — the viewer persists the *last used* value as the next default (DV-1/DV-2).
 - **Navigation defaults:** default read-state filter (All / Unread / Read / No-read-state) · combine subject filters with ANY (off = ALL).
 - **File list:** list text size (10–20 pt; smaller = denser rows).
-- **Tag editing:** warn when a new subject differs only by case from an existing one (on).
 
 > PLAN's §Options listed controls that did **not** ship as toggles (viewer zoom/fit-mode & reset-per-
 > document, "skip OCR header", date-display format, default sort levels, Box/Folder column *as an Options
@@ -375,7 +374,8 @@ The decisions are in CLAUDE.md §Decisions (authoritative). Original text:
   file (hard-coded, not an Options toggle).
 - **Facet classification is display/sort/filter only** — never drives a write.
 - **Full tag editing is first-class** (single + group), always via `TagWriter`; free-form subjects with
-  autocomplete + near-duplicate warning (`TagSimilarity`) to curb fragmentation.
+  autocomplete + the similar-tags finder (`TagSimilarity`) to curb fragmentation; case variants are one
+  tag (SPEC rule 4), so a typed "lincoln" is written as the library's "Lincoln".
 - **Reading/grouping is user-driven manual multi-selection** — the app never auto-groups; segment
   awareness is opt-in convenience that degrades silently when the classification is absent.
 - **Full-text OCR search is in v1** via the app's content index (not Spotlight content indexing) + in-doc `⌘F`.

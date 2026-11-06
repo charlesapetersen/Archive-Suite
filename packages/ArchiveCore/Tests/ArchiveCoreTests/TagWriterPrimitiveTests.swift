@@ -122,6 +122,59 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertEqual(try readTags(url), ["Smithson"])
     }
 
+    // MARK: Tag identity — case-insensitive, spelling kept (W40.fix-tags-case-insensitive)
+
+    func testTagsThatDifferOnlyInCaseAreOneTag() {
+        XCTAssertTrue(isSameTag("Lincoln", "lincoln"))
+        XCTAssertTrue(isSameTag("LINCOLN", "Lincoln"))
+        XCTAssertTrue(isSameTag("Straße", "STRASSE"), "full case folding, not lowercasing")
+        XCTAssertTrue(isSameTag("Café", "Cafe\u{301}"), "canonically equivalent spellings stay one tag")
+        XCTAssertFalse(isSameTag("Lincoln", "Lincolnshire"))
+        XCTAssertFalse(isSameTag("Cafe", "Café"), "accents are not folded")
+        XCTAssertEqual(tagKey("Lincoln"), tagKey("lINCOLN"))
+        XCTAssertTrue(shouldRemoveTag("lincoln", matching: "Lincoln"))
+        XCTAssertFalse(shouldRemoveTag("lincoln papers", matching: "Lincoln"))
+        XCTAssertTrue(isSameTag("unread", "Unread"), "Read/Unread still match in any case")
+        XCTAssertTrue(shouldRemoveTag("READ", matching: "Read"))
+    }
+
+    /// A facet the parser reads by its exact spelling keeps its case as its identity: the rating `Q2` and a
+    /// fiscal-quarter subject `q2`, the box marker's `Red` and a subject `red`, are different tags, so a
+    /// rating or colour edit never adds, skips or removes the other one (Tier-2 review finding).
+    func testFacetShapedTokensKeepTheirExactCase() {
+        for (facet, subject) in [("Q2", "q2"), ("P9", "p9 "), ("Red", "red"), ("Purple", "PURPLE"),
+                                 ("03 March", "03 march"), ("Sent With 1958", "sent with 1958"),
+                                 ("Date Uncertain", "date uncertain"), ("1970s", "1970S")] {
+            XCTAssertFalse(isSameTag(facet, subject), "\(facet) / \(subject)")
+            XCTAssertFalse(shouldRemoveTag(subject, matching: facet), "\(facet) / \(subject)")
+            XCTAssertFalse(shouldRemoveTag(facet, matching: subject), "\(facet) / \(subject)")
+            XCTAssertNotEqual(tagKey(subject), tagKey(facet), "\(facet) / \(subject)")
+        }
+        XCTAssertTrue(keepsExactCase("Q2") && keepsExactCase("Red") && keepsExactCase("1958"))
+        XCTAssertFalse(keepsExactCase("Lincoln") || keepsExactCase("Red Scare") || keepsExactCase("Read"))
+        XCTAssertTrue(isSameTag("Red Scare", "red scare"), "a subject merely starting with a colour folds")
+    }
+
+    func testTagCountsGroupCaseVariantsInTheMostUsedSpelling() {
+        let files = [["Lincoln", "lincoln"], ["lincoln"], ["LINCOLN", "Grant"], ["Lincoln"], ["Lincoln"]]
+        let counts = Dictionary(uniqueKeysWithValues: tagCounts(files).map { ($0.tag, $0.count) })
+        XCTAssertEqual(counts, ["Lincoln": 5, "Grant": 1], "once per file, in the spelling most files use")
+        // A tie goes to the spelling that sorts first, whatever the file order.
+        XCTAssertEqual(tagCounts([["b"], ["B"]]).map(\.tag), ["B"])
+        XCTAssertEqual(tagCounts([["B"], ["b"]]).map(\.tag), ["B"])
+        XCTAssertEqual(tagCounts([["1958", "Lincoln"]], include: { $0 != "1958" }).map(\.tag), ["Lincoln"])
+    }
+
+    /// Through the write primitive, the remove-then-add the Reader's delta adapter makes: removing one
+    /// spelling takes every case of it and leaves the rest of the file verbatim.
+    func testRemovingATagTakesEveryCaseOfIt() throws {
+        let url = try makeFile("untag-case.pdf", tags: ["Lincoln", "lincoln", "Grant", "Lincolnshire"])
+        _ = try CoordinatedTagWriter.write(url) { current, label in
+            (current.filter { !shouldRemoveTag($0, matching: "LINCOLN") }, label)
+        }
+        XCTAssertEqual(try readTags(url), ["Grant", "Lincolnshire"])
+    }
+
     // MARK: §7 Label written only when changed; drift restored
 
     func testLabelPreservedWhenTransformDoesNotChangeIt() throws {

@@ -67,7 +67,7 @@ struct TagInputField: View {
     }
 
     private func commit(_ raw: String) {
-        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = provider.spelling(of: raw.trimmingCharacters(in: .whitespacesAndNewlines))
         input = ""
         guard !t.isEmpty, !tags.contains(where: { $0.caseInsensitiveCompare(t) == .orderedSame }) else { return }
         tags.append(t)

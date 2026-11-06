@@ -36,7 +36,9 @@ final class TriageJourneyUITests: FixtureUITestCase {
     private let groupTag = "W40d8 Group"
     private let renamedTag = "W40d8 Renamed"
     private let mergeKeep = "W40d8 Merge"
-    private let mergeVariant = "w40d8 merge"
+    private let mergeVariant = "W40d8 Merges"
+    /// Tags that differ only in case are one tag (W40.fix-tags-case-insensitive): typed, it takes the existing spelling.
+    private let caseVariant = "w40d8 merge"
 
     private var root: URL { URL(fileURLWithPath: Self.fixturePath, isDirectory: true) }
     private var baseline: [String: FileState] = [:]
@@ -209,7 +211,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
                        expect: Dictionary(uniqueKeysWithValues: group.map {
                            ($0.path, Delta(remove: [groupTag])) }))
 
-        // (6) Merge similar tags: two case variants on two files, merged from Find Similar Tags.
+        // (6) Merge similar tags: two near-spellings on two files, merged from Find Similar Tags.
         guard let (keepRow, keepFile) = firstRow(where: { _ in true }, preferColour: true),
               let (variantRow, variantFile) = firstRow(where: { $0.path != keepFile.path }, preferColour: true,
                                                        after: keepRow) else {
@@ -220,12 +222,17 @@ final class TriageJourneyUITests: FixtureUITestCase {
         addSubjectInEditor(mergeKeep)
         clickRow(variantRow)
         pressKey("i", modifiers: .command)
-        addSubjectInEditor(mergeVariant, expectCaseWarning: true)
-        before = check("6a two case variants added through ⌘I", from: before,
+        addSubjectInEditor(mergeVariant)
+        before = check("6a two near-spellings added through ⌘I", from: before,
                        expect: [keepFile.path: Delta(add: [mergeKeep]), variantFile.path: Delta(add: [mergeVariant])])
         mergeVariantIntoKeep()
         before = check("6b Find Similar Tags ▸ Merge", from: before,
                        expect: [variantFile.path: Delta(remove: [mergeVariant], add: [mergeKeep])])
+        // A case variant of a tag the file has is that tag: the sheet names the existing spelling, and nothing is written.
+        clickRow(variantRow)
+        pressKey("i", modifiers: .command)
+        addSubjectInEditor(caseVariant, expectExistingSpelling: true)
+        before = check("6c a case variant is the existing tag", from: before, expect: [:])
 
         // (7) A smart folder on the merged tag. Saving it writes nothing to any file.
         selectTagInCloud(mergeKeep)
@@ -336,18 +343,18 @@ final class TriageJourneyUITests: FixtureUITestCase {
         log("[d8] window width \(Int(before)) → \(Int(window.frame.width)) pt")
     }
 
-    private func addSubjectInEditor(_ subject: String, expectCaseWarning: Bool = false) {
+    private func addSubjectInEditor(_ subject: String, expectExistingSpelling: Bool = false) {
         let field = app.textFields["ar.tagEditor.addSubject"]
         XCTAssertTrue(field.waitForExistence(timeout: 5), "⌘I should present the tag editor")
         field.click()
         field.typeText(subject)
-        if expectCaseWarning {
-            let warning = app.staticTexts.matching(
+        if expectExistingSpelling {
+            let note = app.staticTexts.matching(
                 NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
-                            "differs only by case", "differs only by case")).firstMatch
-            let shown = warning.waitForExistence(timeout: 3)
-            XCTAssertTrue(shown, "adding a case variant should warn (R-27)")
-            log("[d8]   case-variant warning shown: \(shown ? "yes" : "NO")")
+                            "existing spelling", "existing spelling")).firstMatch
+            let shown = note.waitForExistence(timeout: 3)
+            XCTAssertTrue(shown, "a case variant should be named as the existing tag")
+            log("[d8]   existing-spelling note shown: \(shown ? "yes" : "NO")")
         }
         app.buttons["ar.tagEditor.addSubjectButton"].click()
         // The sheet writes on Add; give the write a moment before Done dismisses the sheet.

@@ -24,6 +24,10 @@ final class TagCloudThresholdTests: XCTestCase {
         XCTAssertEqual(tags(4, keeping: ["Budget"]), ["Budget", "Jerry Brown"])
     }
 
+    func testATagInTheFilterInAnotherCaseStays() {
+        XCTAssertEqual(tags(4, keeping: ["budget"]), ["Budget", "Jerry Brown"], "case variants are one tag")
+    }
+
     func testTheMinimumIsResetOnAFixtureUITestLaunch() {
         XCTAssertTrue(ReaderUITestDefaults.paneKeys.contains("ar.tagCloudMinCount"))
     }

@@ -471,7 +471,7 @@ private struct ManualSegTagCard: View {
     }
 
     private func commit(_ raw: String) {
-        let t = raw.trimmingCharacters(in: .whitespaces)
+        let t = SystemTagsProvider.shared.spelling(of: raw.trimmingCharacters(in: .whitespaces))
         input = ""; suggestions = []; highlighted = -1
         guard !t.isEmpty, !subjects.wrappedValue.contains(where: { $0.caseInsensitiveCompare(t) == .orderedSame }) else { return }
         subjects.wrappedValue.append(t)

@@ -70,17 +70,16 @@ struct TagEditorView: View {
             }
             HStack {
                 SubjectEntryField(draft: $subjectDraft, placeholder: "Add tag…", identifier: "ar.tagEditor.addSubject",
-                                  suggestions: { let onAll = Set(s.subjectsOnAll); return model.allSubjects.filter { !onAll.contains($0) } },
+                                  suggestions: { let onAll = Set(s.subjectsOnAll.map(tagKey)); return model.allSubjects.filter { !onAll.contains(tagKey($0)) } },
                                   onAdd: { apply(.addSubject($0)) })
                 Button("Add", action: addSubject)
                     .disabled(subjectDraft.trimmingCharacters(in: .whitespaces).isEmpty)
                     .accessibilityIdentifier("ar.tagEditor.addSubjectButton")
             }
-            let dups = model.nearDuplicateSubjects(of: subjectDraft)
-            if !dups.isEmpty {
-                Label("Existing tag differs only by case: \(dups.joined(separator: ", "))",
-                      systemImage: "exclamationmark.triangle")
-                    .font(.caption).foregroundStyle(.orange)
+            // Tags that differ only in case are one tag: say which spelling the new one is written in.
+            if let existing = model.existingSpelling(differingFrom: subjectDraft) {
+                Label("Added as “\(existing)”, the existing spelling of this tag.", systemImage: "info.circle")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             if !s.subjectsOnSome.isEmpty {
                 Text("Faded, dashed tags are on some, not all, selected files.").font(.caption).foregroundStyle(.secondary)

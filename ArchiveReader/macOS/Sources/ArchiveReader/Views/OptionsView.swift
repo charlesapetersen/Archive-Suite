@@ -14,7 +14,6 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.viewerSplit) private var viewerSplit: Double = 0.667
     @AppStorage(SettingsKey.subjectCombineAny) private var subjectCombineAny: Bool = false
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
-    @AppStorage(SettingsKey.warnNearDuplicate) private var warnNearDuplicate: Bool = true
     @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
     // Applied app-wide by `AppAppearance.follow()`, which watches this key (W48.appearance-reader).
@@ -77,9 +76,6 @@ struct OptionsView: View {
                    + "ISO 8601; choosing a calendar changes only how it is shown, never the file.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
-            Section("Tag editing") {
-                Toggle("Warn when a new tag differs only by case from an existing one", isOn: $warnNearDuplicate)
             }
             Section("Excluded folders") {
                 Text("Files in these folders are hidden from the library and not indexed for search.")

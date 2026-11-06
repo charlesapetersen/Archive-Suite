@@ -103,6 +103,56 @@ final class TagWriterTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), bytesBefore)
     }
 
+    // MARK: Tag identity — tags that differ only in case are one tag (W40.fix-tags-case-insensitive)
+
+    func testAddingACaseVariantOfAPresentTagWritesNothing() throws {
+        let url = try makeFile("case-add.pdf", tags: ["Lincoln", "1980", "Unread"])
+        let r = try TagWriter.apply(TagDelta(add: ["lincoln"]), to: url)
+        XCTAssertTrue(r.isNoOp)
+        XCTAssertEqual(try readTags(url), ["Lincoln", "1980", "Unread"], "the file keeps the spelling it has")
+    }
+
+    func testRemovingATagTakesEveryCaseAndItsUndoRestoresEachSpelling() throws {
+        let tags = ["Lincoln", "lincoln", "Lincolnshire", "Unread"]
+        let url = try makeFile("case-remove.pdf", tags: tags)
+        let bytesBefore = try Data(contentsOf: url)
+        let r = try TagWriter.apply(TagDelta(remove: ["LINCOLN"]), to: url)
+        XCTAssertEqual(Set(try readTags(url)), ["Lincolnshire", "Unread"], "never a longer tag sharing the prefix")
+        // The undo is exact: it puts back each spelling the file had, not the folded tag.
+        _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))
+        XCTAssertTrue(multisetEqual(try readTags(url), tags))
+        XCTAssertEqual(try Data(contentsOf: url), bytesBefore)
+    }
+
+    /// A rating keeps its exact case as its identity, so a rating edit never touches a fiscal-quarter subject
+    /// `q2`, and removing that subject never takes the rating (Tier-2 review finding).
+    func testARatingEditLeavesALowercaseQuarterSubject() throws {
+        let url = try makeFile("case-rating.pdf", tags: ["Q2", "q2", "Budget"])
+        let tags = DocumentTags.parse(raw: try readTags(url), labelNumber: nil)
+        _ = try TagWriter.apply(TagEditing.delta(for: .setQuality(3), given: tags), to: url)
+        XCTAssertEqual(Set(try readTags(url)), ["Q3", "q2", "Budget"])
+        _ = try TagWriter.apply(TagEditing.delta(for: .removeSubject("q2"), given: tags), to: url)
+        XCTAssertEqual(Set(try readTags(url)), ["Q3", "Budget"])
+
+        let bare = try makeFile("case-rating-add.pdf", tags: ["q2"])
+        _ = try TagWriter.apply(TagEditing.delta(for: .setQuality(2), given: DocumentTags.parse(raw: ["q2"], labelNumber: nil)), to: bare)
+        XCTAssertEqual(Set(try readTags(bare)), ["q2", "Q2"], "the rating is written beside the subject, not skipped")
+    }
+
+    func testCaseOnlyRenameRespellsEveryCaseOfTheTag() throws {
+        let url = try makeFile("case-rename.pdf", tags: ["lincoln", "LINCOLN", "1980"])
+        let r = try TagWriter.renameToken(from: "lincoln", to: "Lincoln", on: url)
+        XCTAssertFalse(r.isNoOp)
+        XCTAssertEqual(Set(try readTags(url)), ["Lincoln", "1980"])
+    }
+
+    func testRenameLeavesAFileAlreadySpeltThatWayUnwritten() throws {
+        let url = try makeFile("case-rename-noop.pdf", tags: ["Grant", "Lincoln", "1980"])
+        let r = try TagWriter.renameToken(from: "lincoln", to: "Lincoln", on: url)
+        XCTAssertTrue(r.isNoOp, "no write, so no reorder or mod-date churn")
+        XCTAssertEqual(try readTags(url), ["Grant", "Lincoln", "1980"])
+    }
+
     func testMarkReadIsNoOpOnFileWithoutReadState() throws {
         // Box/folder markers carry no Read/Unread token — default must NOT add one.
         let url = try makeFile("marker.pdf", tags: ["DP chapters"], label: 6)

@@ -37,7 +37,7 @@ import Foundation
 public struct TagDelta: Sendable, Equatable {
     /// Tokens to add (skipped if already present). Order preserved; appended after existing tokens.
     public var add: [String]
-    /// Tokens to remove (exact whole-string match; Read/Unread also match case-insensitively).
+    /// Tokens to remove (whole-string, case-insensitive match: `shouldRemoveTag`).
     public var remove: [String]
     /// Optional Finder color-label change. Keeps the color *token* and the label number consistent.
     public var color: ColorChange?
@@ -363,15 +363,18 @@ public enum CoordinatedTagWriter {
 
 // MARK: - Matching helpers (used by app-level adapters)
 
-/// Two tokens are "the same" for add-dedup: exact match, or case-insensitive for Read/Unread only.
+/// Two tokens are "the same" for add-dedup: whole-string, case-insensitive (`tagKey`), except a
+/// facet-shaped token, which matches only its exact spelling (`keepsExactCase`).
 public func isSameTag(_ a: String, _ b: String) -> Bool {
-    a == b || (isReadStateWord(b) && a.caseInsensitiveCompare(b) == .orderedSame)
+    a == b || tagKey(a) == tagKey(b)
 }
 
-/// A token should be removed if it exactly equals the target, or (for Read/Unread) matches it
-/// case-insensitively. Never substring — removing "Unread" never disturbs a subject "Read later".
+/// A token should be removed if it equals the target whole-string, case-insensitively (`tagKey`), so
+/// removing "Lincoln" also removes a file's "lincoln" (but removing the rating `Q2` never takes a
+/// subject `q2`: `keepsExactCase`). Never substring — removing "Unread" never
+/// disturbs a subject "Read later".
 public func shouldRemoveTag(_ token: String, matching target: String) -> Bool {
-    token == target || (isReadStateWord(target) && token.caseInsensitiveCompare(target) == .orderedSame)
+    isSameTag(token, target)
 }
 
 /// Whether a string is "Read" or "Unread" (case-insensitive).

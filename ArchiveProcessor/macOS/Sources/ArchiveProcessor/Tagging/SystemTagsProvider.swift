@@ -146,6 +146,11 @@ final class SystemTagsProvider: ObservableObject {
         ProcessorTagVocabulary.shared.suggestions(prefix: prefix, excluding: excluding, limit: limit)
     }
 
+    /// The spelling to write a typed tag in: the known one when the tag exists in another case.
+    func spelling(of tag: String) -> String {
+        ProcessorTagVocabulary.shared.spelling(of: tag)
+    }
+
     /// Register tags the operator types so they appear in later suggestions — now *durably*, across
     /// relaunches, which is much of the point of the change. Flushed synchronously: a tag someone just
     /// typed is the one thing here worth not losing to a crash.

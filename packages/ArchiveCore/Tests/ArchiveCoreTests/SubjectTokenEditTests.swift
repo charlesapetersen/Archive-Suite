@@ -55,4 +55,22 @@ final class SubjectTokenEditTests: XCTestCase {
         XCTAssertEqual(d.add, ["Taxes"])
         XCTAssertEqual(d.remove, [], "the untouched whitespace-padded subject must not be removed")
     }
+
+    // W40.fix-tags-case-insensitive: tags that differ only in case are one tag.
+
+    func testRetypingASubjectInAnotherCaseChangesNothing() {
+        XCTAssertTrue(TagEditing.subjectDelta(from: ["Lincoln"], to: ["lincoln"]).isEmpty)
+    }
+
+    func testCaseVariantsAddedTogetherAreOneTagInTheFirstSpelling() {
+        XCTAssertEqual(TagEditing.subjectDelta(from: [], to: ["Lincoln", "LINCOLN", " lincoln "]).add, ["Lincoln"])
+    }
+
+    func testGroupSummaryCountsCaseVariantsAsOneTag() {
+        let a = DocumentTags.parse(raw: ["Lincoln", "Grant"], labelNumber: nil)
+        let b = DocumentTags.parse(raw: ["lincoln"], labelNumber: nil)
+        let s = GroupTagSummary([a, b])
+        XCTAssertEqual(s.subjectsOnAll, ["Lincoln"], "on both files, in the first spelling met")
+        XCTAssertEqual(s.subjectsOnSome, ["Grant"])
+    }
 }

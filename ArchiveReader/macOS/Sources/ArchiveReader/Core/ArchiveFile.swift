@@ -37,6 +37,9 @@ struct ArchiveFile: Identifiable, Sendable {
     /// W40.fix-reader-date-ambiguity: date facets that carried two tags, worked out once per row so the
     /// filter and the list never re-classify every subject of every file.
     let dateAmbiguities: [DateAmbiguity]
+    /// The subjects' tag identities (`tagKey`), worked out once per row: tags that differ only in case are
+    /// one tag (W40.fix-tags-case-insensitive), and the filter tests every row against them.
+    let subjectKeys: Set<String>
 
     init(url: URL, name: String, fileType: String, tags: DocumentTags,
          contentModified: Date?, isDataless: Bool = false,
@@ -56,6 +59,7 @@ struct ArchiveFile: Identifiable, Sendable {
         self.isDataless = isDataless
         self.provenance = provenance
         self.dateAmbiguities = tags.dateAmbiguities
+        self.subjectKeys = Set(tags.subjects.map(tagKey))
     }
 
     /// Discovery and index reconstruction build URLs from filesystem representations; URL equality
@@ -84,6 +88,8 @@ struct ArchiveFile: Identifiable, Sendable {
     var readState: ReadState? { tags.readState }
     var quality: Int? { tags.quality }
     var subjects: [String] { tags.subjects }
+    /// Whether the file carries `tag` in any case (W40.fix-tags-case-insensitive).
+    func hasSubject(_ tag: String) -> Bool { subjectKeys.contains(tagKey(tag)) }
     var color: ArchiveColor? { tags.color }
 }
 

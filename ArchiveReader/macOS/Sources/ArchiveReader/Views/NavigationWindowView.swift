@@ -353,10 +353,10 @@ struct NavigationWindowView: View {
                 ScrollView {
                     FlowLayout(spacing: 8) {
                         ForEach(cloud, id: \.tag) { item in
-                            let active = model.filter.subjects.contains(item.tag)
+                            let active = model.filter.hasSubject(item.tag)
                             Button {
-                                if active { model.filter.subjects.remove(item.tag) }
-                                else { model.filter.subjects.insert(item.tag) }
+                                if active { model.filter.removeSubject(item.tag) }
+                                else { model.filter.insertSubject(item.tag) }
                             } label: {
                                 Text(item.tag)
                                     .font(.system(size: tagCloudFontSize(item.count, max: maxCount)))
@@ -369,8 +369,8 @@ struct NavigationWindowView: View {
                             .accessibilityIdentifier("ar.tagCloud.tag")
                             .contextMenu {
                                 Button(active ? "Remove from tag filter" : "Add to tag filter") {
-                                    if active { model.filter.subjects.remove(item.tag) }
-                                    else { model.filter.subjects.insert(item.tag) }
+                                    if active { model.filter.removeSubject(item.tag) }
+                                    else { model.filter.insertSubject(item.tag) }
                                 }
                                 Button("Filter to only this tag") { model.filter.subjects = [item.tag] }
                                 Button("Rename tag…") { model.renamingTag = item.tag }
@@ -603,7 +603,7 @@ struct NavigationWindowView: View {
     /// Existing tags offered for autocomplete — the library's distinct topical tags, minus any already
     /// chosen. (`allSubjects` is the deduped topical-tag set the model already maintains.)
     private var tagSuggestions: [String] {
-        model.allSubjects.filter { !model.filter.subjects.contains($0) && !DocumentTags.isDateFacetLike($0) }
+        model.allSubjects.filter { !model.filter.hasSubject($0) && !DocumentTags.isDateFacetLike($0) }
     }
     private var subjectFilterField: some View {
         HStack(spacing: 4) {

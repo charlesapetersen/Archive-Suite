@@ -51,6 +51,12 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         dateFromYear == nil && dateToYear == nil ? nil : DateRangeFilter(fromYear: dateFromYear, toYear: dateToYear)
     }
 
+    /// The tag filter by tag identity (W40.fix-tags-case-insensitive): tags that differ only in case are one
+    /// tag, so "Lincoln" is in a filter holding "lincoln", and adding or removing one takes every case of it.
+    func hasSubject(_ tag: String) -> Bool { subjects.contains { isSameTag($0, tag) } }
+    mutating func insertSubject(_ tag: String) { if !hasSubject(tag) { subjects.insert(tag) } }
+    mutating func removeSubject(_ tag: String) { subjects = subjects.filter { !isSameTag($0, tag) } }
+
     var isActive: Bool {
         !subjects.isEmpty || !qualities.isEmpty || read != .all || dateRange != nil
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
@@ -76,11 +82,11 @@ struct LibraryFilter: Sendable, Equatable, Codable {
             guard let q = file.quality, qualities.contains(q) else { return false }
         }
         // Subjects
+        // Subjects, by tag identity: "lincoln" in the filter matches a file's "Lincoln".
         if !subjects.isEmpty {
-            let fileSubjects = Set(file.subjects)
             switch subjectCombine {
-            case .all: if !subjects.isSubset(of: fileSubjects) { return false }
-            case .any: if subjects.isDisjoint(with: fileSubjects) { return false }
+            case .all: if !subjects.allSatisfy(file.hasSubject) { return false }
+            case .any: if !subjects.contains(where: file.hasSubject) { return false }
             }
         }
         if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }

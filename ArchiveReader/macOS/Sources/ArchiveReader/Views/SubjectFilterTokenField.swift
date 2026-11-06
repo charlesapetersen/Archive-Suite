@@ -89,7 +89,10 @@ struct SubjectFilterTokenField: NSViewRepresentable {
             let added = tokens.compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespaces) }
                               .filter { !$0.isEmpty }
             if !added.isEmpty {
-                DispatchQueue.main.async { [weak self] in self?.parent.subjects.formUnion(added) }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.parent.subjects = Self.union(self.parent.subjects, added)
+                }
             }
             return tokens
         }
@@ -113,7 +116,18 @@ struct SubjectFilterTokenField: NSViewRepresentable {
             let tokens = Set(((tf.objectValue as? [String]) ?? [])
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty })
-            if tokens != parent.subjects { parent.subjects = tokens }
+            let kept = parent.subjects.intersection(tokens)
+            let merged = Self.union(kept, tokens.subtracting(kept))
+            if merged != parent.subjects { parent.subjects = merged }
+        }
+
+        /// `subjects` plus each of `added` that is not already there in some case: tags that differ only in
+        /// case are one tag (W40.fix-tags-case-insensitive), so typing "lincoln" beside "Lincoln" adds nothing.
+        static func union(_ subjects: Set<String>, _ added: some Sequence<String>) -> Set<String> {
+            var out = subjects
+            var keys = Set(subjects.map(tagKey))
+            for t in added where keys.insert(tagKey(t)).inserted { out.insert(t) }
+            return out
         }
     }
 }
