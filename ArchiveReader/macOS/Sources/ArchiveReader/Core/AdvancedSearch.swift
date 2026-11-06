@@ -37,6 +37,17 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
 
     var isText: Bool { self == .text || self == .ocrText }
 
+    /// What a row's `text` holds for this field; a field change to another kind clears it, so OCR words never
+    /// become a folder path or a date.
+    var textKind: Int {
+        switch self {
+        case .text, .ocrText, .fileName: return 0
+        case .folder: return 1
+        case .date: return 2
+        default: return 3
+        }
+    }
+
     /// The operators a row for this field offers, the first being the default.
     var operators: [RuleOperator] {
         switch self {
@@ -237,7 +248,7 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
             return rule.op == .noWords ? !hits.contains(file.path) : hits.contains(file.path)
         case .fileName:
             let q = rule.text.trimmingCharacters(in: .whitespaces)
-            let opts: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+            let opts: String.CompareOptions = [.caseInsensitive]   // as the filter bar's name box
             switch rule.op {
             case .doesNotContain: return file.name.range(of: q, options: opts) == nil
             case .beginsWith: return file.name.range(of: q, options: opts.union(.anchored)) != nil
@@ -279,11 +290,12 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
 
     // MARK: Text → FTS5
 
-    /// The words of a text box: split on white space, outer quotes dropped.
+    /// The words of a text box: split on white space, outer quotes dropped. A token with no letter or digit
+    /// ("-", "&") is no word: the index holds no such token, so it could only ever match nothing.
     static func words(_ text: String) -> [String] {
         text.split(whereSeparator: { $0.isWhitespace })
             .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "\"\u{201c}\u{201d}")) }
-            .filter { !$0.isEmpty && $0 != "*" }
+            .filter { $0.contains { $0.isLetter || $0.isNumber } }
     }
 
     /// A safe FTS5 expression for one text rule; no typed text can be FTS5 syntax. Each word is quoted, its own

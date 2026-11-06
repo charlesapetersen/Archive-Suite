@@ -72,6 +72,10 @@ final class NavigationModel: ObservableObject {
     /// answered yet is absent and skipped. Separate from `ftsPaths` so a scoped OCR query never lights the user
     /// filter indicators.
     @Published private(set) var baseTextHits: [UUID: Set<String>] = [:]
+    /// The scope's positive text rules together (`AdvancedSearch.rankingExpression`): their bm25 order, used for
+    /// the relevance sort while Find is empty, and snippets for the top hits.
+    private var baseRank: [String: Int]?
+    @Published private(set) var baseSnippets: [String: String] = [:]
     private var baseFtsGeneration = 0
     // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
     /// While the tag editor is open its targets hold still: an edit that moves them out of the filter
@@ -261,6 +265,17 @@ final class NavigationModel: ObservableObject {
         flags.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
+        // A flag change moves rows in or out of a scope with a Flagged rule, and changes such folders' counts.
+        flags.objectWillChange
+            .receive(on: DispatchQueue.main)   // after the change commits
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.scopeRules?.uses(.flagged) == true { self.recompute() }
+                if self.savedSearches.searches.contains(where: { $0.search.uses(.flagged) }) {
+                    self.refreshSmartFolderCounts()
+                }
+            } }
+            .store(in: &cancellables)
         // Republish on library changes (phase / scope) so the results-area spinner is reactive.
         library.objectWillChange
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
@@ -350,7 +365,7 @@ final class NavigationModel: ObservableObject {
     /// What the list shows, as rules: the base scope (smart folder or Advanced Search) AND the filter bar AND
     /// the Find box, as `rowPredicate` applies them.
     var effectiveSearch: AdvancedSearch {
-        (scope?.search ?? AdvancedSearch()).narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery))
+        (scopeRules ?? AdvancedSearch()).narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery))
     }
 
     /// A human-readable default name for "save current filters as a smart folder", built from the
@@ -474,17 +489,22 @@ final class NavigationModel: ObservableObject {
         if dropped, announce {
             statusMessage = "A folder in this search isn't under the current archive root — that rule is left out."
         }
+        let rulesChanged = scope?.id != search.id || scope?.search != search.search
         scope = search
         scopeIsSaved = saved
+        guard rulesChanged else { return }   // a rename: the rows, their answers and the sort all stand
         scopeRules = rules
         baseTextHits = [:]
+        baseRank = nil; baseSnippets = [:]
+        if rules.rankingExpression != nil, sort.first?.field != .relevance { sort = [ARSortDescriptor(field: .relevance)] }
         runBaseFullTextSearch()
     }
 
     /// Leave the scope (smart folder or Advanced Search); the caller recomputes.
     private func exitScope() {
         scope = nil; scopeIsSaved = false; scopeRules = nil
-        baseFtsGeneration += 1; baseTextHits = [:]
+        baseFtsGeneration += 1; baseTextHits = [:]; baseRank = nil; baseSnippets = [:]
+        if ftsRank == nil, sort.first?.field == .relevance { sort = LibrarySort.default }
     }
 
     /// Reset user-applied filters to neutral (preserving the base scope). Both Clear sites call this.
@@ -498,7 +518,9 @@ final class NavigationModel: ObservableObject {
         ftsPaths = nil
         ftsRank = nil
         ftsSnippets = [:]
-        if sort.first?.field == .relevance { sort = LibrarySort.default }
+        if sort.first?.field == .relevance, baseRank == nil, scopeRules?.rankingExpression == nil {
+            sort = LibrarySort.default
+        }
         if doRecompute { recompute() }
     }
 
@@ -510,9 +532,22 @@ final class NavigationModel: ObservableObject {
         guard let rules = scopeRules, rules.hasTextRules else { return }
         Task { [weak self] in
             guard let self else { return }
-            let hits = await self.textHits(for: rules)
+            var ranked: ContentIndex.RankedSearch?
+            if let expression = rules.rankingExpression {
+                ranked = await self.indexer.searchRanked(expression: expression, snippetLimit: self.ftsSnippetLimit)
+            }
+            // One positive text rule is its own ranking expression: its hits are the ranked paths, not a second query.
+            let textRules = rules.textRules
+            let hits: [UUID: Set<String>]
+            if textRules.count == 1, textRules[0].op != .noWords, let ranked {
+                hits = [textRules[0].id: Set(ranked.paths)]
+            } else {
+                hits = await self.textHits(for: rules)
+            }
             guard generation == self.baseFtsGeneration else { return }
             self.baseTextHits = hits
+            self.baseRank = ranked.map { Dictionary($0.paths.enumerated().map { ($1, $0) }) { a, _ in a } }
+            self.baseSnippets = ranked?.snippets ?? [:]
             self.recompute()
         }
     }
@@ -726,9 +761,9 @@ final class NavigationModel: ObservableObject {
         base = base.filter(rowPredicate(scope: scope, filter: filter, ftsPaths: ftsPaths))
         let causes = base.isEmpty ? emptyCauses(in: universe) : []
         if causes != emptyListCauses { emptyListCauses = causes }
-        if let ftsRank, sort.first?.field == .relevance {
-            // bm25 relevance ordering: sort by the rank map (0 = best match).
-            displayed = base.sorted { (ftsRank[$0.path] ?? Int.max) < (ftsRank[$1.path] ?? Int.max) }
+        if let rank = ftsRank ?? baseRank, sort.first?.field == .relevance {
+            // bm25 relevance ordering: sort by the rank map (0 = best match); Find's, else the scope's.
+            displayed = base.sorted { (rank[$0.path] ?? Int.max) < (rank[$1.path] ?? Int.max) }
         } else {
             lastSortMarks = sortMarks()
             displayed = LibrarySort.sorted(base, by: sort, marks: lastSortMarks)
@@ -864,6 +899,9 @@ final class NavigationModel: ObservableObject {
             self.classifications = classifications
             self.needsAttentionCount = count
             self.recompute()
+            if self.savedSearches.searches.contains(where: { $0.search.uses(.needsAttention) }) {
+                self.refreshSmartFolderCounts()   // their counts waited for the statuses
+            }
         }
     }
 
@@ -953,8 +991,8 @@ final class NavigationModel: ObservableObject {
         // Auto-select relevance sort while a query is active; fall back when cleared.
         if !q.isEmpty && sort.first?.field != .relevance {
             sort = [ARSortDescriptor(field: .relevance)]
-        } else if q.isEmpty && sort.first?.field == .relevance {
-            sort = LibrarySort.default
+        } else if q.isEmpty && sort.first?.field == .relevance && scopeRules?.rankingExpression == nil {
+            sort = LibrarySort.default   // a scope with text rules keeps its own relevance order
         }
         Task { [weak self] in
             guard let self else { return }
@@ -980,7 +1018,12 @@ final class NavigationModel: ObservableObject {
     /// queued, and arrives with a later table reload), an empty-body doc, or the snippet carries no
     /// highlighted match. The list cell renders the returned runs as a dimmed second line under the name.
     func searchSnippet(for path: String) -> [SearchSnippet.Segment]? {
-        guard let hits = ftsPaths else { return nil }
+        guard let hits = ftsPaths else {
+            // No Find query: the scope's text rules give the top hits a snippet (no fill-in for the rest).
+            guard let raw = baseSnippets[path], !raw.isEmpty else { return nil }
+            let segments = SearchSnippet.segments(from: raw)
+            return SearchSnippet.hasMatch(segments) ? segments : nil
+        }
         guard let raw = ftsSnippets[path], !raw.isEmpty else {
             if hits.contains(path) { requestSnippet(for: path) }
             return nil
@@ -1286,8 +1329,10 @@ final class NavigationModel: ObservableObject {
         // left them out would overstate the folder.
         var counts: [UUID: Int] = [:]
         for s in savedSearches.searches where !s.search.hasTextRules {
-            let context = ruleContext(for: s.search)
-            counts[s.id] = files.reduce(0) { $0 + (s.search.matches($1, context) ? 1 : 0) }
+            // As the folder would show it: folder rules outside the current root left out.
+            let rules = s.search.droppingFolders(outside: rootStore.discoveredPathPrefix).search
+            let context = ruleContext(for: rules)
+            counts[s.id] = files.reduce(0) { $0 + (rules.matches($1, context) ? 1 : 0) }
         }
         smartFolderCounts = counts
     }

@@ -202,7 +202,11 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   (name/classification/body weights), auto-refreshed when an index pass completes, `.relevance` sort during a query.
 - **Smart folders are a scoped root** — a saved search enters a base scope; user filters layer on top (AND);
   Clear resets the user layer to the base set; a folder / All Files exits the scope; scope persists across
-  relaunch (`LibraryFilter.effective(base:user:)`).
+  relaunch. A smart folder IS an Advanced Search (`Core/AdvancedSearch.swift`, W40.reader-advanced-search): a
+  Finder-style rule tree (all/any, nested groups) whose text rules are FTS5 expressions; saving the filter bar
+  stores its state as rules narrowed onto the open folder (`NavigationModel.effectiveSearch`), so what is saved
+  is what the list shows. An Advanced Search run unsaved is the same scope. "Has none of these tags" exists only
+  there — the filter bar keeps its no-NOT rule (owner, 2026-11-04).
 - **v1 stays sandboxed to one granted root.** Whole-Mac search is an unbuilt feature with a real cost (new code:
   walk N roots, merge, define exclusions; `FileAccessProvider` was never written) — **not** an entitlement or
   config toggle (corrected 2026-08-07, `W26.docs`; history in REFERENCE.md).

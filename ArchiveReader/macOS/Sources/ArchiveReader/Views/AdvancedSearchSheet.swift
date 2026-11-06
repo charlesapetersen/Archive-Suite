@@ -39,6 +39,7 @@ struct AdvancedSearchSheet: View {
             ScrollView {
                 RuleListView(rules: $search.rules, model: model, depth: 0)
                     .padding(.vertical, 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(minHeight: 150, idealHeight: 260, maxHeight: 420)
             Text(countText)
@@ -77,8 +78,7 @@ struct AdvancedSearchSheet: View {
             }
         }
         .padding(18)
-        .frame(minWidth: 720, idealWidth: 760)
-        .accessibilityIdentifier("ar.advanced.sheet")
+        .frame(minWidth: 880, idealWidth: 900)
         .task(id: search) {
             // A short pause, so typing a word runs one count, not one per key.
             try? await Task.sleep(nanoseconds: 200_000_000)
@@ -121,7 +121,7 @@ private struct RuleListView: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach($rules) { $rule in
                 RuleRowView(rule: $rule, model: model, depth: depth,
-                            canRemove: rules.count > 1 || depth > 0,
+                            canRemove: rules.count > 1,
                             onAdd: { add(after: rule.id, group: $0) },
                             onRemove: { rules.removeAll { $0.id == rule.id } })
             }
@@ -173,7 +173,7 @@ private struct RuleRowView: View {
                 .labelsHidden().fixedSize()
                 .accessibilityIdentifier("ar.advanced.rule.op")
                 RuleValueView(rule: $rule, model: model)
-                Spacer(minLength: 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 rowButtons
             }
         }
@@ -182,6 +182,7 @@ private struct RuleRowView: View {
     /// Changing the field keeps the operator when the new field has it, else takes the field's first.
     private var fieldBinding: Binding<RuleField> {
         Binding(get: { rule.field }, set: { field in
+            if field.textKind != rule.field.textKind { rule.text = ""; rule.text2 = "" }
             rule.field = field
             if !field.operators.contains(rule.op) { rule.op = field.operators[0] }
         })
@@ -214,14 +215,14 @@ private struct RuleValueView: View {
         case .text, .ocrText, .fileName:
             TextField(rule.op == .phrase ? "phrase" : (rule.field == .fileName ? "text" : "words"), text: $rule.text)
                 .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 180, idealWidth: 280)
+                .frame(minWidth: 160, maxWidth: .infinity)
                 .help(rule.field == .fileName ? "Part of the file name"
                       : "Words separated by spaces; end a word with * to match its beginning (news* finds newspaper)")
                 .accessibilityIdentifier("ar.advanced.rule.text")
         case .tags:
             SubjectFilterTokenField(subjects: Binding(get: { Set(rule.tags) }, set: { rule.tags = $0.sorted() }),
                                     suggestions: model.allSubjects, placeholder: "tags")
-                .frame(minWidth: 180, idealWidth: 280)
+                .frame(minWidth: 160, maxWidth: .infinity)
                 .accessibilityIdentifier("ar.advanced.rule.tags")
         case .quality:
             HStack(spacing: 6) {
@@ -273,7 +274,7 @@ private struct RuleValueView: View {
             && AdvancedSearch.dateKeys(text.wrappedValue) == nil
         return TextField(prompt, text: text)
             .textFieldStyle(.roundedBorder)
-            .frame(width: 110)
+            .frame(width: 96)
             .foregroundStyle(bad ? Color.red : Color.primary)
             .help("A year (1981), a month (1981-06), a day (1981-06-30) or a decade (1980s)")
             .accessibilityIdentifier("ar.advanced.rule.date")

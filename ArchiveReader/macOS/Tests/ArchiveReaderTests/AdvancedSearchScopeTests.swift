@@ -53,6 +53,10 @@ final class AdvancedSearchScopeTests: XCTestCase {
         try await waitFor(["a.pdf"], "the text rules, answered by the index")
         XCTAssertFalse(model.scopeIsSaved)
         XCTAssertEqual(model.activeFilterChips.first?.facet, .smartFolder)
+        XCTAssertEqual(model.sort.first?.field, .relevance, "text rules sort by relevance")
+        let aPath = try XCTUnwrap(model.displayed.first?.path)
+        let snippet = try XCTUnwrap(model.searchSnippet(for: aPath), "the scope's text rules give a snippet")
+        XCTAssertEqual(snippet.filter(\.isMatch).map(\.text), ["budget"])
 
         // The filter bar narrows within it, and Clear goes back to it.
         model.filter.read = .read
@@ -60,6 +64,7 @@ final class AdvancedSearchScopeTests: XCTestCase {
         XCTAssertEqual(shown(), [])
         model.clearUserFilters()
         XCTAssertEqual(shown(), ["a.pdf"])
+        XCTAssertEqual(model.sort.first?.field, .relevance, "Clear keeps the scope's relevance order")
 
         // Saved with a filter-bar narrowing, then opened: the same rows.
         model.filter.subjects = ["press"]
@@ -70,6 +75,15 @@ final class AdvancedSearchScopeTests: XCTestCase {
         model.applyScope(saved)
         XCTAssertTrue(model.scopeIsSaved)
         try await waitFor(["a.pdf"], "the saved smart folder shows what was saved")
+
+        // A rename keeps the rows, their index answers and the user's sort.
+        model.sort = [ARSortDescriptor(field: .name)]
+        model.savedSearches.rename(saved.id, to: "Budget memo")
+        let renameDeadline = Date().addingTimeInterval(5)
+        while Date() < renameDeadline, model.scope?.name != "Budget memo" { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(model.scope?.name, "Budget memo")
+        XCTAssertEqual(shown(), ["a.pdf"], "no flash of the unfiltered list")
+        XCTAssertEqual(model.sort.first?.field, .name, "a rename leaves the sort alone")
 
         // Edit Smart Folder: any of — has none of Press, or is unread.
         var noPress = SearchRule(field: .tags, op: .hasNone); noPress.tags = ["Press"]
@@ -82,9 +96,17 @@ final class AdvancedSearchScopeTests: XCTestCase {
         }
         XCTAssertEqual(model.smartFolderCounts[saved.id], 3, "a folder with no text rule is counted")
 
+        // A Flagged rule follows a flag change at once.
+        model.updateSmartFolder(saved.id, search: AdvancedSearch(combine: .all, rules: [SearchRule(field: .flagged)]))
+        XCTAssertEqual(shown(), [])
+        let dPath = try XCTUnwrap(model.library.files.first { $0.name == "d.pdf" }?.path)
+        model.flags.setFlag(true, for: dPath)
+        try await waitFor(["d.pdf"], "flagging a file brings it into a Flagged folder")
+
         model.savedSearches.delete(saved.id)
         try await waitFor(["a.pdf", "b.pdf", "c.pdf", "d.pdf"], "deleting the open folder leaves it")
         XCTAssertNil(model.scope)
+        XCTAssertNotEqual(model.sort.first?.field, .relevance, "leaving a text scope leaves its relevance order")
 
         // An Advanced Search with nothing filled in leaves the scope rather than showing a chip for nothing.
         model.runAdvancedSearch(.starter)

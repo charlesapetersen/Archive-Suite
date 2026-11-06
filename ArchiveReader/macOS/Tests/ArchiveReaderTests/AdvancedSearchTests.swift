@@ -197,6 +197,8 @@ final class AdvancedSearchTests: XCTestCase {
                        #"("news"* "a""b")"#)
         XCTAssertEqual(AdvancedSearch.ftsExpression(op: .allWords, text: "NOT", column: nil), #""NOT""#)
         XCTAssertNil(AdvancedSearch.ftsExpression(op: .allWords, text: " \" * ", column: nil))
+        XCTAssertFalse(rule(.text) { $0.text = "- &" }.isActive, "punctuation alone is no word")
+        XCTAssertEqual(AdvancedSearch.ftsExpression(op: .allWords, text: "U.S. -", column: nil), #""U.S.""#)
     }
 
     func testTextRulesAgainstARealIndex() async throws {
