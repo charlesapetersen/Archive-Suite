@@ -12,6 +12,20 @@
     0.58,
     0.746
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 4,
+     "mean_nes": 0.88
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 10,
+     "mean_nes": 0.621
+    }
+   },
    "words_mean": 0.394,
    "null_read_mean": 0.0166,
    "null_marks_any": 8,
@@ -48,6 +62,20 @@
     0.327,
     0.756
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 3,
+     "mean_nes": 0.702
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 13,
+     "mean_nes": 0.559
+    }
+   },
    "words_mean": 0.408,
    "null_read_mean": 0.0166,
    "null_marks_any": 8,
@@ -75,10 +103,104 @@
    "length_capped": 0
   },
   "glm": {
-   "missing": 32
+   "n": 35,
+   "read": 13,
+   "read_ci": [
+    0.12,
+    0.553
+   ],
+   "mean_nes": 0.585,
+   "mean_ci": [
+    0.419,
+    0.694
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 0,
+     "mean_nes": 0.227
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 13,
+     "mean_nes": 0.645
+    }
+   },
+   "words_mean": 0.387,
+   "null_read_mean": 0.0157,
+   "null_marks_any": 7,
+   "read_also_elsewhere": 2,
+   "null_words_mean": 0.073,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 4
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 5
+    },
+    "other": {
+     "n": 2,
+     "read": 1
+    },
+    "stamp": {
+     "n": 9,
+     "read": 3
+    }
+   }
   },
   "qwen27": {
-   "missing": 32
+   "n": 35,
+   "read": 26,
+   "read_ci": [
+    0.583,
+    0.897
+   ],
+   "mean_nes": 0.857,
+   "mean_ci": [
+    0.794,
+    0.93
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 3,
+     "mean_nes": 0.852
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 23,
+     "mean_nes": 0.857
+    }
+   },
+   "words_mean": 0.694,
+   "null_read_mean": 0.0184,
+   "null_marks_any": 10,
+   "read_also_elsewhere": 5,
+   "null_words_mean": 0.082,
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 9
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 7
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 8
+    }
+   }
   }
  },
  "region": {
@@ -94,6 +216,20 @@
     0.496,
     0.734
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 3,
+     "mean_nes": 0.867
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 10,
+     "mean_nes": 0.548
+    }
+   },
    "by_class": {
     "annotation": {
      "n": 14,
@@ -125,6 +261,20 @@
     0.017,
     0.272
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.2
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 1,
+     "mean_nes": 0.106
+    }
+   },
    "by_class": {
     "annotation": {
      "n": 14,
@@ -156,6 +306,20 @@
     0.112,
     0.418
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.325
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 4,
+     "mean_nes": 0.219
+    }
+   },
    "by_class": {
     "annotation": {
      "n": 14,
@@ -187,6 +351,20 @@
     0.474,
     0.819
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 3,
+     "mean_nes": 0.75
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 14,
+     "mean_nes": 0.597
+    }
+   },
    "by_class": {
     "annotation": {
      "n": 14,
@@ -218,6 +396,20 @@
     0.021,
     0.342
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.2
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 3,
+     "mean_nes": 0.138
+    }
+   },
    "by_class": {
     "annotation": {
      "n": 14,
@@ -249,6 +441,20 @@
     0.108,
     0.48
    ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.325
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 5,
+     "mean_nes": 0.236
+    }
+   },
    "by_class": {
     "annotation": {
      "n": 14,
@@ -267,6 +473,276 @@
      "read": 0
     }
    }
+  },
+  "glm/oracle": {
+   "n": 35,
+   "read": 18,
+   "read_ci": [
+    0.37,
+    0.714
+   ],
+   "mean_nes": 0.674,
+   "mean_ci": [
+    0.579,
+    0.799
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 3,
+     "mean_nes": 0.816
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 15,
+     "mean_nes": 0.651
+    }
+   },
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 5
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 4
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 7
+    }
+   }
+  },
+  "glm/det25": {
+   "n": 35,
+   "read": 3,
+   "read_ci": [
+    0.0,
+    0.2
+   ],
+   "mean_nes": 0.132,
+   "mean_ci": [
+    0.018,
+    0.309
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.2
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 2,
+     "mean_nes": 0.121
+    }
+   },
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 2
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 1
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "glm/det05": {
+   "n": 35,
+   "read": 5,
+   "read_ci": [
+    0.04,
+    0.292
+   ],
+   "mean_nes": 0.248,
+   "mean_ci": [
+    0.116,
+    0.445
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.35
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 4,
+     "mean_nes": 0.232
+    }
+   },
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 3
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 1
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 1
+    }
+   }
+  },
+  "qwen27/oracle": {
+   "n": 35,
+   "read": 19,
+   "read_ci": [
+    0.367,
+    0.793
+   ],
+   "mean_nes": 0.763,
+   "mean_ci": [
+    0.665,
+    0.889
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 4,
+     "mean_nes": 0.917
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 15,
+     "mean_nes": 0.737
+    }
+   },
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 5
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 5
+    },
+    "other": {
+     "n": 2,
+     "read": 2
+    },
+    "stamp": {
+     "n": 9,
+     "read": 7
+    }
+   }
+  },
+  "qwen27/det25": {
+   "n": 35,
+   "read": 3,
+   "read_ci": [
+    0.0,
+    0.24
+   ],
+   "mean_nes": 0.143,
+   "mean_ci": [
+    0.02,
+    0.334
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.2
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 2,
+     "mean_nes": 0.134
+    }
+   },
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 1
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 2
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 0
+    }
+   }
+  },
+  "qwen27/det05": {
+   "n": 35,
+   "read": 6,
+   "read_ci": [
+    0.045,
+    0.37
+   ],
+   "mean_nes": 0.271,
+   "mean_ci": [
+    0.129,
+    0.49
+   ],
+   "by_core": {
+    "A-core": {
+     "n": 5,
+     "pages": 5,
+     "read": 1,
+     "mean_nes": 0.35
+    },
+    "B-core": {
+     "n": 30,
+     "pages": 12,
+     "read": 5,
+     "mean_nes": 0.258
+    }
+   },
+   "by_class": {
+    "annotation": {
+     "n": 14,
+     "read": 3
+    },
+    "marginal_note": {
+     "n": 10,
+     "read": 2
+    },
+    "other": {
+     "n": 2,
+     "read": 0
+    },
+    "stamp": {
+     "n": 9,
+     "read": 1
+    }
+   }
   }
  },
  "paired": {
@@ -281,6 +757,18 @@
    "crop_only": 8,
    "both": 9,
    "neither": 11
+  },
+  "glm": {
+   "whole_only": 3,
+   "crop_only": 8,
+   "both": 10,
+   "neither": 14
+  },
+  "qwen27": {
+   "whole_only": 8,
+   "crop_only": 1,
+   "both": 18,
+   "neither": 8
   }
  },
  "lines": {

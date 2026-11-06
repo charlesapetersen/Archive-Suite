@@ -8,14 +8,22 @@ The 35 owner-reviewed mark texts on the 32 detector-eligible pages of the owner'
 |---|---|---|---:|---|
 | Apple Vision, whole page (the app's settings) | 14 of 35 (24-56%) | 0.66 (0.58-0.75) | 39% | 1.7% a page; 8 marks on at least one, 1 of them among its reads |
 | LightOnOCR-3 4B 8-bit, whole page (mlx-vlm, Mac) | 16 of 35 (23-64%) | 0.58 (0.33-0.76) | 41% | 1.7% a page; 8 marks on at least one, 1 of them among its reads |
-| GLM-OCR, whole page (Sherlock) | not run yet (32 pages missing) | | | |
-| Qwen3.6-27B, whole page (Sherlock) | not run yet (32 pages missing) | | | |
+| GLM-OCR, whole page (Sherlock) | 13 of 35 (12-55%) | 0.58 (0.42-0.69) | 39% | 1.6% a page; 7 marks on at least one, 2 of them among its reads |
+| Qwen3.6-27B, whole page (Sherlock) ‡ | 26 of 35 (58-90%) | 0.86 (0.79-0.93) | 69% | 1.8% a page; 10 marks on at least one, 5 of them among its reads |
 | Apple Vision, the owner's box (oracle) | 13 of 35 (22-58%) | 0.59 (0.50-0.73) | | |
 | Apple Vision, YOLO11m box, floor 0.25 | 2 of 35 (0-16%) | 0.12 (0.02-0.27) | | |
 | Apple Vision, YOLO11m box, floor 0.05 | 5 of 35 (4-32%) | 0.23 (0.11-0.42) | | |
 | LightOnOCR-3 4B 8-bit, the owner's box (oracle) | 17 of 35 (30-74%) | 0.62 (0.47-0.82) | | |
 | LightOnOCR-3 4B 8-bit, YOLO11m box, floor 0.25 | 4 of 35 (0-29%) | 0.15 (0.02-0.34) | | |
 | LightOnOCR-3 4B 8-bit, YOLO11m box, floor 0.05 | 6 of 35 (4-39%) | 0.25 (0.11-0.48) | | |
+| GLM-OCR (Sherlock), the owner's box (oracle) | 18 of 35 (37-71%) | 0.67 (0.58-0.80) | | |
+| GLM-OCR (Sherlock), YOLO11m box, floor 0.25 | 3 of 35 (0-20%) | 0.13 (0.02-0.31) | | |
+| GLM-OCR (Sherlock), YOLO11m box, floor 0.05 | 5 of 35 (4-29%) | 0.25 (0.12-0.45) | | |
+| Qwen3.6-27B (Sherlock), the owner's box (oracle) ‡ | 19 of 35 (37-79%) | 0.76 (0.67-0.89) | | |
+| Qwen3.6-27B (Sherlock), YOLO11m box, floor 0.25 ‡ | 3 of 35 (0-24%) | 0.14 (0.02-0.33) | | |
+| Qwen3.6-27B (Sherlock), YOLO11m box, floor 0.05 ‡ | 6 of 35 (4-37%) | 0.27 (0.13-0.49) | | |
+
+‡ Not ranked on all 35 (MRK-1): the B-core pages were drawn from Qwen3.6-27B's own pre-flag, so its B-core figures are chosen by its own pre-flag, and it is ranked on the A-core alone, below, which is too few marks to rank.
 
 The same reader, whole page against the owner's box (marks read):
 
@@ -23,6 +31,21 @@ The same reader, whole page against the owner's box (marks read):
 |---|---:|---:|---:|---:|
 | Apple Vision | 10 | 4 | 3 | 18 |
 | LightOnOCR-3 4B 8-bit | 9 | 7 | 8 | 11 |
+| GLM-OCR (Sherlock) | 10 | 3 | 8 | 14 |
+| Qwen3.6-27B (Sherlock) ‡ | 18 | 8 | 1 | 8 |
+
+By core (MRK-1): the A-core, drawn independently of any reader (5 marks on 5 pages), and the B-core, drawn from Qwen3.6-27B's pre-flag bands (30 marks on 12 pages). Marks read, mean NES:
+
+| Route | A-core | B-core |
+|---|---|---|
+| Apple Vision, whole page (the app's settings) | 4 of 5, 0.88 | 10 of 30, 0.62 |
+| LightOnOCR-3 4B 8-bit, whole page (mlx-vlm, Mac) | 3 of 5, 0.70 | 13 of 30, 0.56 |
+| GLM-OCR, whole page (Sherlock) | 0 of 5, 0.23 | 13 of 30, 0.65 |
+| Qwen3.6-27B, whole page (Sherlock) | 3 of 5, 0.85 (too few to rank) | 23 of 30, 0.86 (chosen by its own pre-flag) |
+| Apple Vision, owner's box | 3 of 5, 0.87 | 10 of 30, 0.55 |
+| LightOnOCR-3 4B 8-bit, owner's box | 3 of 5, 0.75 | 14 of 30, 0.60 |
+| GLM-OCR (Sherlock), owner's box | 3 of 5, 0.82 | 15 of 30, 0.65 |
+| Qwen3.6-27B (Sherlock), owner's box | 4 of 5, 0.92 (too few to rank) | 15 of 30, 0.74 (chosen by its own pre-flag) |
 
 Read, by class:
 
@@ -30,8 +53,12 @@ Read, by class:
 |---|---:|---:|---:|---:|
 | Apple Vision, whole page (the app's settings) | 5 of 14 | 1 of 10 | 2 of 2 | 6 of 9 |
 | LightOnOCR-3 4B 8-bit, whole page (mlx-vlm, Mac) | 7 of 14 | 2 of 10 | 1 of 2 | 6 of 9 |
+| GLM-OCR, whole page (Sherlock) | 4 of 14 | 5 of 10 | 1 of 2 | 3 of 9 |
+| Qwen3.6-27B, whole page (Sherlock) | 9 of 14 | 7 of 10 | 2 of 2 | 8 of 9 |
 | Apple Vision, owner's box | 4 of 14 | 1 of 10 | 2 of 2 | 6 of 9 |
 | LightOnOCR-3 4B 8-bit, owner's box | 4 of 14 | 5 of 10 | 2 of 2 | 6 of 9 |
+| GLM-OCR (Sherlock), owner's box | 5 of 14 | 4 of 10 | 2 of 2 | 7 of 9 |
+| Qwen3.6-27B (Sherlock), owner's box | 5 of 14 | 5 of 10 | 2 of 2 | 7 of 9 |
 
 LightOnOCR-3 4B took a median 24.42 s a page on the M3 Pro (an engine session's timing, so an upper bound); 0 of 32 pages hit its 4,096-token cap.
 
@@ -55,20 +82,37 @@ The same 35 marks written into a scratch PDF of each page (the page image, Visio
 | a FreeText annotation over the box | 3 of 35 | 2 of 35 | 3 of 35 | 4 of 35 | 4 of 35 |
 | a text page after the image | 33 of 35 | 2 of 35 | 3 of 35 | 33 of 35 | 33 of 35 |
 
-## What this says (Mac arms; GLM-OCR and Qwen3.6-27B wait for Sherlock)
+## What this says
 
-**Whole page is as good as reading the mark's region, for both Mac readers.** Apple Vision given the whole page gets
-14 of the 35 marks, against 13 from the owner's own box; LightOnOCR-3 4B gets 16 against 17. Both gaps are one mark,
-inside intervals about 30 points wide, so they are ties. The readers do not get the *same* marks the two ways
-(LightOnOCR: 9 both ways, 7 only whole, 8 only from the box), so a route that read both would carry more, but that
-is a two-reader cascade and is not ranked here. Through a detector the region route is far worse (2-6 of 35 through
-YOLO11m), because detection is (W46.marks-detect). So on today's detectors **region routing does not beat the
-whole page for marks on the Mac, and the whole page needs no detector**: the case for W46.marks-detect-own rests on
-whether the cluster readers or Gemini miss marks that a region would catch.
+**Whole page is as good as reading the mark's region for every reader ranked on all 35, and a detector makes the
+region route far worse.** Apple Vision given the whole page gets 14 of the 35 marks, against 13 from the owner's own
+box; LightOnOCR-3 4B gets 16 against 17; GLM-OCR 13 against 18. The Vision and LightOnOCR gaps are one mark. GLM-OCR's
+is five (3 marks only whole, 8 only from the box; exact sign test on the 11 discordant marks p = 0.23), inside
+intervals about 30 points wide, so it leans to the box but is not shown; on the A-core GLM-OCR's whole page reads none
+of the 5 marks. The readers do not get the *same* marks the two ways (LightOnOCR: 9 both ways, 7 only whole, 8 only
+from the box), so a route that read both would carry more, but that is a two-reader cascade and is not ranked here.
+And the owner's box is the region route's ceiling: through YOLO11m's boxes every reader falls to 2-6 of 35
+(W46.marks-detect), GLM-OCR to 3-5. So on today's detectors **region routing does not beat the whole page for
+marks, and the whole page needs no detector**. A fine-tuned detector (W46.marks-detect-own) could at best bring a
+reader up to its owner's-box figure, which no ranked reader's whole page trails beyond noise.
+
+**Qwen3.6-27B reads the most marks whole page, but it cannot be ranked on these pages (MRK-1).** Whole page it gets
+26 of 35 (mean NES 0.86) against 19 from the owner's box (18 both ways, 8 only whole, 1 only from the box). But 30 of
+the 35 marks are on B-core pages, which were drawn from Qwen3.6-27B's own pre-flag, so those figures are chosen by
+its own pre-flag; on the A-core it reads 3 of 5 whole and 4 of 5 from the box, too few to rank. Its whole-page
+figure also leans most on chance: 5 of its 26 reads score 0.8 against some other page's text too (short marks and
+the recurring stamp; 1-2 for the other readers). Ranking it on marks needs marks it did not choose, which is
+W46.marks-detect's A-core rule and is not available here.
+
+GLM-OCR read the 86 requests in 12 s on one card at concurrency 16 (median 4.0 s a whole page under that load) and
+Qwen3.6-27B (FP8) in 41 s (13.1 s); both jobs, model load included, took 2 and 6 minutes, about 0.13 GPU-hours in
+all against the 0.5 expected. No page hit the 4,096-token cap.
 
 Chance agreement is small. A mark's text scores 0.8 against another page's text on 1.7% of pairs, and 8 marks
 (all but one under 9 characters; the other a stamp that recurs across a collection's pages) do so on some other
-page; one of each reader's whole-page reads is among them.
+page; one of Vision's and of LightOnOCR's whole-page reads is among them, two of GLM-OCR's and five of
+Qwen3.6-27B's. The same-page floor (each mark against its own page's Vision text with the lines in its box
+removed, measured in measurement review pass 10) is 1 of 35, a 2-character annotation already among these.
 
 **Per-line kind: Vision's line periodicity does not tell handwriting from type on these pages.** On every labelled
 line the AUC is 0.49 (periodicity) and 0.56 (harmonic); on the lines of 15 characters or more it is 0.32, the wrong
@@ -91,22 +135,29 @@ stretch, a mark's run.
 
 - **Truth.** The 35 mark texts the owner reviewed on the 32 detector-eligible core pages (reconciled record
   `marks-set-reconciled-da388b05c388-dac79c80c2f6`), drafted by Gemini 3.7 Flash and Qwen3-VL 8B and kept or
-  corrected by the owner; no reader scored here drafted them. Per-line kind has no owner label: a Vision line is
+  corrected by the owner; no reader scored here drafted them (Qwen3-VL 8B is a smaller relative of Qwen3.6-27B, a
+  drafter's relative, and Qwen3.6-27B chose the B-core pages: Selection). Per-line kind has no owner label: a Vision line is
   labelled handwritten when half its box lies in an owner annotation, marginal-note or signature box, typed when
   under a tenth lies in any mark box (MRK-1; the Azure flags the item named were never made).
 - **Selection.** Every owner-reviewed text on the eligible pages, the set W46.marks-detect read; none chosen by a
   reader or by ABBYY text. The pages were drawn for the marks set by the owner's protocol (phase A independent of
-  any reader, phase B by a Qwen3.6-27B pre-flag band), so they are not a corpus sample (no population weights, P3-3).
+  any reader, phase B by a Qwen3.6-27B pre-flag band), so they are not a corpus sample (no population weights, P3-3). By MRK-1 (P10-2) Qwen3.6-27B is ranked on the
+  A-core's 5 marks alone, too few to rank, and its B-core figures are labelled chosen by its own pre-flag; Vision,
+  LightOnOCR and GLM-OCR are ranked on all 35.
 - **Comparison.** Same pages, same marks, each reader at fixed settings both ways: Vision at the app's settings on
   the 2,400 px freeze copy whole and on the crops; LightOnOCR-3 4B with its card's empty prompt, temperature 0, the
   page at 2,048 px and 4,096 tokens (no page reached the cap), crops as `marks_read.py` cut them (1% pad, at least
-  768 px). The whole-page score aligns the mark to its closest stretch of page text, which is kinder than scoring a
+  768 px); GLM-OCR and Qwen3.6-27B on Sherlock (vLLM, one GPU each) with W46.ocr-regions' request unchanged (the
+  route's prompt, JPEG 95, temperature 0, 4,096 tokens), the page at 1,800 x 2,400 and crops cut to the same 1% pad
+  (`sherlock/mixed-route/mixed_route_cluster.py`); 86 of 86 requests a reader answered, none capped. The whole-page score aligns the mark to its closest stretch of page text, which is kinder than scoring a
   crop's whole reply; the floor row bounds what that kindness can buy.
 - **Noise.** n = 35 marks on 17 pages; page bootstrap, 2,000 resamples, seed 46; read-rate intervals about ±16
-  points, so every whole-against-box gap here is a tie. Both readers are deterministic at these settings; no rerun
-  floor was measured.
+  points, so every whole-against-box gap of the ranked readers is a tie (GLM-OCR's five, the largest, sign test
+  p = 0.23 on its 11 discordant marks). Vision's determinism is measured (its 2026-11-04 and 2026-11-05 runs give
+  identical tokens on 32 of 32 pages); LightOnOCR's, GLM-OCR's and Qwen3.6-27B's at temperature 0 are asserted; no
+  rerun floor was measured.
 - **Scope.** Marks only: these pages have no body-text truth, so the body cost of region routing on mixed pages is
-  W46.ocr-regions' and W46.layout-photo's result on the 96, not this one. Not settled here: GLM-OCR and Qwen3.6-27B
-  (Sherlock pack `mixed-route-20261105`), Gemini (W46.mixed-route-paid), results by handwriting band
+  W46.ocr-regions' and W46.layout-photo's result on the 96, not this one. Not settled here: Qwen3.6-27B's rank on marks
+  (it chose 30 of the 35), Gemini (W46.mixed-route-paid, retired by the owner 2026-11-05), results by handwriting band
   (W46.mixed-route-bands), and whether a two-reader cascade is worth its cost. The layer check is PDFKit and the
   Spotlight importer on scratch PDFs, not the Processor's own writer.

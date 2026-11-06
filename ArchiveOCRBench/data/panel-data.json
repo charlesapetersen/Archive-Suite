@@ -66401,7 +66401,7 @@
    "pp": "3 (7%)",
    "detector": "8 (18%, interval 5-37) at 53% precision",
    "detector_low": "17 (38%, interval 21-60) at 42% precision",
-   "mixed_read": "LightOnOCR-3 4B 16 of 35 given the whole page, 17 from the owner's box; Apple Vision 14 of 35 given the whole page, 13 from the owner's box"
+   "mixed_read": "LightOnOCR-3 4B 16 of 35 given the whole page, 17 from the owner's box; Apple Vision 14 of 35 given the whole page, 13 from the owner's box; GLM-OCR 13 of 35 given the whole page, 18 from the owner's box; Qwen3.6-27B 26 of 35 given the whole page, 19 from the owner's box (not ranked: it pre-flagged the pages of 30 of them; on the other 5, 3 and 4, too few to rank)"
   },
   "gemini": {
    "cost": 1.68,

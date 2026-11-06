@@ -990,6 +990,7 @@ def marks_detect():
 
 
 MIXED_READERS = {"lighton": "LightOnOCR-3 4B", "vision": "Apple Vision", "glm": "GLM-OCR", "qwen27": "Qwen3.6-27B"}
+MIXED_PREFLAGGED = {"qwen27"}   # mixed_route.PREFLAGGED
 
 
 def mixed_route():
@@ -1002,7 +1003,12 @@ def mixed_route():
         w, b = d["whole"].get(key, {}), d["region"].get(f"{key}/oracle")
         if "read" not in w or b is None:
             continue
-        rows.append(f'{name} {w["read"]} of {w["n"]} given the whole page, {b["read"]} from the owner\'s box')
+        row = f'{name} {w["read"]} of {w["n"]} given the whole page, {b["read"]} from the owner\'s box'
+        if key in MIXED_PREFLAGGED and "by_core" in w:   # MRK-1: it chose the B-core, so not ranked on all 35
+            wa, ba = w["by_core"]["A-core"], b["by_core"]["A-core"]
+            row += (f' (not ranked: it pre-flagged the pages of {w["by_core"]["B-core"]["n"]} of them; on the other '
+                    f'{wa["n"]}, {wa["read"]} and {ba["read"]}, too few to rank)')
+        rows.append(row)
     return {"mixed_read": "; ".join(rows)} if rows else {}
 
 

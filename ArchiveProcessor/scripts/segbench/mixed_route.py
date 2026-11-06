@@ -52,6 +52,9 @@ WHOLE = {"vision": "Apple Vision, whole page (the app's settings)",
          "qwen27": "Qwen3.6-27B, whole page (Sherlock)"}
 REGION = {"vision": "Apple Vision", "lighton": "LightOnOCR-3 4B 8-bit", "glm": "GLM-OCR (Sherlock)",
           "qwen27": "Qwen3.6-27B (Sherlock)"}
+# MRK-1 (P10-2): the B-core was drawn from Qwen3.6-27B's pre-flag, so it is ranked on the A-core alone.
+PREFLAGGED = {"qwen27"}
+CORES = ("A-core", "B-core")
 
 
 def page_ids():
@@ -416,11 +419,15 @@ def score_region(todo, text):
     return out
 
 
-def summary(rows):
+def summary(rows, core):
     read = lambda rs: sum(r["nes"] >= R.READ for r in rs) / len(rs) if rs else None
     mean = lambda rs: sum(r["nes"] for r in rs) / len(rs) if rs else None
-    return dict(n=len(rows), read=sum(r["nes"] >= R.READ for r in rows), read_ci=boot_pages(rows, read),
-                mean_nes=round(mean(rows), 3), mean_ci=boot_pages(rows, mean))
+    s = dict(n=len(rows), read=sum(r["nes"] >= R.READ for r in rows), read_ci=boot_pages(rows, read),
+             mean_nes=round(mean(rows), 3), mean_ci=boot_pages(rows, mean))
+    s["by_core"] = {g: dict(n=len(rs), pages=len({r["page"] for r in rs}), read=sum(r["nes"] >= R.READ for r in rs),
+                            mean_nes=round(mean(rs), 3) if rs else None)
+                    for g in CORES for rs in [[r for r in rows if core[r["page"]] == g]]}
+    return s
 
 
 def report():
@@ -429,12 +436,13 @@ def report():
     cls = {f"{pid}#{i}": m["cls"] for pid, i, m in todo}
     whole = score_whole(todo, text)
     region = score_region(todo, text)
+    core = {pid: p["core"] for pid, p in D.truth().items()}
     res = dict(whole={}, region={}, paired={}, lines=None)
     for reader, w in whole.items():
         if "rows" not in w:
             res["whole"][reader] = dict(missing=w["missing"])
             continue
-        s = summary(w["rows"])
+        s = summary(w["rows"], core)
         s["words_mean"] = round(sum(r["words"] for r in w["rows"]) / len(w["rows"]), 3)
         s["null_read_mean"] = round(sum(r["read_share"] for r in w["null"]) / len(w["null"]), 4)
         s["null_marks_any"] = sum(r["nes_max"] >= R.READ for r in w["null"])
@@ -449,7 +457,7 @@ def report():
             s["length_capped"] = sum(x["finish"] == "length" for x in walls)
         res["whole"][reader] = s
     for key, rows in region.items():
-        s = summary(rows)
+        s = summary(rows, core)
         s["by_class"] = {c: dict(n=sum(cls[r["mark"]] == c for r in rows),
                                  read=sum(cls[r["mark"]] == c and r["nes"] >= R.READ for r in rows))
                          for c in sorted(set(cls.values()))}
@@ -521,23 +529,42 @@ def markdown(res, n):
          "bootstrap.", "", "## Marks: whole page and by region", "",
          "| Route | Read | Mean NES | Mark words found | Floor: read on another page |",
          "|---|---|---|---:|---|"]
+    flag = lambda reader: " ‡" if reader in PREFLAGGED else ""
     for reader, s in res["whole"].items():
         if "missing" in s:
             L.append(f"| {WHOLE[reader]} | not run yet ({s['missing']} pages missing) | | | |")
             continue
-        L.append(f"| {WHOLE[reader]} | {pct(s['read'], s['n'])}{ci(s['read_ci'])} | {s['mean_nes']:.2f}"
+        L.append(f"| {WHOLE[reader]}{flag(reader)} | {pct(s['read'], s['n'])}{ci(s['read_ci'])} | {s['mean_nes']:.2f}"
                  f"{ci(s['mean_ci'], 1, '{:.2f}')} | {s['words_mean'] * 100:.0f}% | "
                  f"{s['null_read_mean'] * 100:.1f}% a page; {s['null_marks_any']} marks on at least one, "
                  f"{s['read_also_elsewhere']} of them among its reads |")
     for key, s in res["region"].items():
         reader, arm = key.split("/")
-        L.append(f"| {REGION[reader]}, {R.ARM_NAMES[arm]} | {pct(s['read'], s['n'])}{ci(s['read_ci'])} | "
+        L.append(f"| {REGION[reader]}, {R.ARM_NAMES[arm]}{flag(reader)} | {pct(s['read'], s['n'])}{ci(s['read_ci'])} | "
                  f"{s['mean_nes']:.2f}{ci(s['mean_ci'], 1, '{:.2f}')} | | |")
+    if any(r in PREFLAGGED and "n" in s for r, s in res["whole"].items()):
+        L += ["", "‡ Not ranked on all 35 (MRK-1): the B-core pages were drawn from Qwen3.6-27B's own pre-flag, so its "
+              "B-core figures are chosen by its own pre-flag, and it is ranked on the A-core alone, below, which is "
+              "too few marks to rank."]
     if res["paired"]:
         L += ["", "The same reader, whole page against the owner's box (marks read):", "",
               "| Reader | Both | Whole page only | Box only | Neither |", "|---|---:|---:|---:|---:|"]
         for reader, p in res["paired"].items():
-            L.append(f"| {REGION[reader]} | {p['both']} | {p['whole_only']} | {p['crop_only']} | {p['neither']} |")
+            L.append(f"| {REGION[reader]}{flag(reader)} | {p['both']} | {p['whole_only']} | {p['crop_only']} | {p['neither']} |")
+    rows = [(f"{WHOLE[r]}", r, s) for r, s in res["whole"].items() if "by_core" in s]
+    rows += [(f"{REGION[k.split('/')[0]]}, owner's box", k.split("/")[0], s) for k, s in res["region"].items()
+             if k.endswith("/oracle")]
+    if rows:
+        a, b = rows[0][2]["by_core"]["A-core"], rows[0][2]["by_core"]["B-core"]
+        L += ["", f"By core (MRK-1): the A-core, drawn independently of any reader ({a['n']} marks on {a['pages']} "
+              f"pages), and the B-core, drawn from Qwen3.6-27B's pre-flag bands ({b['n']} marks on {b['pages']} pages). "
+              "Marks read, mean NES:", "", "| Route | A-core | B-core |", "|---|---|---|"]
+        for name, reader, s in rows:
+            g = s["by_core"]
+            cell = lambda c: f"{pct(c['read'], c['n'])}, {c['mean_nes']:.2f}"
+            tail = " (too few to rank)" if reader in PREFLAGGED else ""
+            btail = " (chosen by its own pre-flag)" if reader in PREFLAGGED else ""
+            L.append(f"| {name} | {cell(g['A-core'])}{tail} | {cell(g['B-core'])}{btail} |")
     first = next((s for s in res["whole"].values() if "by_class" in s), None)
     if first:
         classes = list(first["by_class"])
