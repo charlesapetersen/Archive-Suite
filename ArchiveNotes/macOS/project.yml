@@ -34,6 +34,8 @@ targets:
     dependencies:
       - package: ArchiveCore
         product: ArchiveCore
+      - package: ArchiveCore
+        product: ArchiveCoreUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.archivenotes.app

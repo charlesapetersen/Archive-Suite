@@ -41,6 +41,9 @@ targets:
       - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, also in the UI suite
     dependencies:
       - package: ArchiveCore
+        product: ArchiveCore
+      - package: ArchiveCore
+        product: ArchiveCoreUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.archivereader.app

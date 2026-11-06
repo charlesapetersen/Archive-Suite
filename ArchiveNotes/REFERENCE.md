@@ -362,7 +362,7 @@ macOS/Sources/ArchiveNotes/
                                    and converted to the ISO day (W24.cal1-validator)
     NoteTagBar.swift               The tag bar under the editor (an.tagbar, W40.notes-detail-layout): tags as
                                    tokens with a remove ×, wrapping to 3 lines then scrolling (FlowLayout);
-                                   `edits` turns the list's Tags cell into adds/removes. Add/remove subjects through ArchiveCore's SubjectEntryField
+                                   `edits` turns the list's Tags cell into adds/removes. Add/remove subjects through ArchiveCoreUI's SubjectEntryField
                                    (W40.fix-notes-tag-entry): autocompletes from other notes' tags,
                                    Return/comma add and keep the keyboard, Tab takes the suggestion, no
                                    Add button; edits queue and save in order. Retries the exact failed

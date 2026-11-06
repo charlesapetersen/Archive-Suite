@@ -3,9 +3,15 @@ import PackageDescription
 let package = Package(
     name: "ArchiveCore",
     platforms: [.macOS(.v14)],
-    products: [ .library(name: "ArchiveCore", targets: ["ArchiveCore"]) ],
+    products: [
+        .library(name: "ArchiveCore", targets: ["ArchiveCore"]),
+        // The suite's shared AppKit/SwiftUI controls (the tag-entry field). Kept out of ArchiveCore,
+        // which stays UI-free so the Processor and every non-UI caller link no app framework (W9.c3).
+        .library(name: "ArchiveCoreUI", targets: ["ArchiveCoreUI"]),
+    ],
     targets: [
         .target(name: "ArchiveCore"),
+        .target(name: "ArchiveCoreUI"),
         .testTarget(name: "ArchiveCoreTests", dependencies: ["ArchiveCore"]),
     ]
 )

@@ -7,6 +7,8 @@
 #   2) NO file in either tree may call a move / rename / delete / trash / content-write API,
 #      except at the individually audited sites in the ALLOW list below.
 #   3) ArchiveCore must remain UI-free: no `import AppKit` or `import SwiftUI` in its sources.
+#      The suite's shared controls live in the package's separate `ArchiveCoreUI` target instead,
+#      which rules 1-2 and the enumerator rule still read (gate-fix, 2026-11-06).
 #
 # Run before every commit; exit non-zero on violation. It is ALSO run by the daemon's health gate
 # (`ops/autonomous/health-gate.sh`, step `write-surface-lint`, with its self-test alongside as step
@@ -88,16 +90,17 @@ cd "$REPO_ROOT" || { echo "✗ cannot cd to $REPO_ROOT"; exit 1; }
 SRC_READER="ArchiveReader/macOS/Sources/ArchiveReader"
 SRC_CORE="packages/ArchiveCore/Sources/ArchiveCore"
 SRC_NOTES="ArchiveNotes/macOS/Sources/ArchiveNotes"
+SRC_CORE_UI="packages/ArchiveCore/Sources/ArchiveCoreUI"   # the shared controls; UI by design
 
-SRC_TAGWRITE=(    "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
-SRC_DESTRUCTIVE=( "$SRC_READER" "$SRC_CORE" )
-SRC_ENUMERATOR=(  "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
+SRC_TAGWRITE=(    "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" )
+SRC_DESTRUCTIVE=( "$SRC_READER" "$SRC_CORE" "$SRC_CORE_UI" )
+SRC_ENUMERATOR=(  "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" )
 SRC_UI_FREE=(     "$SRC_CORE" )
 
 # The UNION — every tree any rule reads. Guard (a) below existence-checks exactly these, so a tree
 # that appears in a rule list but not here would never be checked, and a rename would put that rule
 # back to being silently skipped by grep. Guard (a2) checks for precisely that drift.
-SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" )
+SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_NOTES" "$SRC_CORE_UI" )
 
 SEP=$'\x1f'   # unit separator — cannot occur in Swift source, so a code line can't forge a key
 

@@ -1,5 +1,6 @@
 import SwiftUI
 import ArchiveCore
+import ArchiveCoreUI
 
 /// Tag editor for the current selection (single file or group), or for the document window's open file. Every control applies immediately
 /// via `NavigationModel.applyEdit` → `TagWriter` (delta-based, verified, grouped-undoable). Group

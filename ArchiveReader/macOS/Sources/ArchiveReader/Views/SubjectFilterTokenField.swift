@@ -1,5 +1,6 @@
 import SwiftUI
 import ArchiveCore
+import ArchiveCoreUI
 import AppKit
 
 /// The tag-**filter** field: the selected subject filters ARE the tokens, shown *inside* the field

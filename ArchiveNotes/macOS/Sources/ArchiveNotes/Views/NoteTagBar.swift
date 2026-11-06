@@ -1,5 +1,6 @@
 import SwiftUI
 import ArchiveCore
+import ArchiveCoreUI
 
 /// The tag bar under the note's editor (W40.notes-detail-layout; owner session notes-1 row 23: "'Tags' should
 /// appear in a separate editing pane below the note, not in the Inspector or in Details"). The tags show as tokens

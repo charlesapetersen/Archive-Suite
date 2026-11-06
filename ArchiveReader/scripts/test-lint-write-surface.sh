@@ -26,6 +26,8 @@ CORE_SRC="packages/ArchiveCore/Sources/ArchiveCore"
 # The fixture must therefore carry the Notes tree as well, or the missing-root guard fires on every
 # case and the control stops meaning anything.
 NOTES_SRC="ArchiveNotes/macOS/Sources/ArchiveNotes"
+# gate-fix (2026-11-06): the package's shared controls are their own target, read by every rule but 3.
+CORE_UI_SRC="packages/ArchiveCore/Sources/ArchiveCoreUI"
 
 pass=0; failed=0
 SCRATCH=""
@@ -36,7 +38,7 @@ trap cleanup EXIT
 fresh_tree() {
   cleanup
   SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/lint-write-surface-test.XXXXXX")"
-  for s in "$READER_SRC" "$CORE_SRC" "$NOTES_SRC"; do
+  for s in "$READER_SRC" "$CORE_SRC" "$NOTES_SRC" "$CORE_UI_SRC"; do
     mkdir -p "$SCRATCH/$(dirname "$s")"
     cp -R "$REPO/$s" "$SCRATCH/$(dirname "$s")/"
   done
@@ -281,6 +283,31 @@ struct PlantedImportProse {}
 SWIFT
 expect 0 "AppKit spelling in ArchiveCore prose still passes" "lint clean"
 
+echo "── the shared controls target: UI imports allowed, the write rules still read it ──"
+fresh_tree
+cat > "$SCRATCH/$CORE_UI_SRC/PlantedControl.swift" <<'SWIFT'
+import SwiftUI
+import AppKit
+struct PlantedControl {}
+SWIFT
+expect 0 "an AppKit/SwiftUI import in ArchiveCoreUI passes (rule 3 is ArchiveCore's alone)" "lint clean"
+
+fresh_tree
+cat > "$SCRATCH/$CORE_UI_SRC/PlantedUITagWrite.swift" <<'SWIFT'
+import AppKit
+func plantedWrite(_ url: URL, _ tags: [String]) throws {
+    try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
+}
+SWIFT
+expect 1 "a tag write in ArchiveCoreUI FAILS (the controls are not a hole in rule 1)" "PlantedUITagWrite.swift"
+
+fresh_tree
+cat > "$SCRATCH/$CORE_UI_SRC/PlantedUIDelete.swift" <<'SWIFT'
+import Foundation
+func plantedDelete(_ url: URL) throws { try FileManager.default.removeItem(at: url) }
+SWIFT
+expect 1 "a delete in ArchiveCoreUI FAILS (rule 2 reads it)" "PlantedUIDelete.swift"
+
 echo "── …and rule 2 deliberately does NOT: Notes writes .md files for a living ──"
 fresh_tree
 mkdir -p "$SCRATCH/$NOTES_SRC/Store"
@@ -303,7 +330,7 @@ fresh_tree
 # drift it exists to catch: without the guard, renaming the Notes tree would silently narrow rules 1
 # and 3 back to nothing and the lint would print "✓ clean".
 MUT="$SCRATCH/mutant-lint.sh"
-/usr/bin/sed 's|^SRCS=( "\$SRC_READER" "\$SRC_CORE" "\$SRC_NOTES" )$|SRCS=( "$SRC_READER" "$SRC_CORE" )|' \
+/usr/bin/sed 's|^SRCS=( "\$SRC_READER" "\$SRC_CORE" "\$SRC_NOTES" "\$SRC_CORE_UI" )$|SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_CORE_UI" )|' \
   "$LINT" > "$MUT"
 if cmp -s "$MUT" "$LINT"; then
   echo "✗ union-guard mutant changed NOTHING — the sed no longer matches, so this case is vacuous"

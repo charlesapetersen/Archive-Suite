@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ArchiveCore
+import ArchiveCoreUI
 
 // MARK: - NSViewRepresentable bridge
 

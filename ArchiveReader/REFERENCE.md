@@ -497,14 +497,14 @@ Views/
                               through TagWriter, so existing tags never lost. Return with text typed
                               writes and keeps the field (W40.fix-reader-tag-entry); while a cell is
                               edited the list holds its rows and snapshot until the edit ends.
-  (ArchiveCore) TagEntry      The tag fields' shared completion lookup (list cell, filter, ⌘I sheet, Notes'
+  (ArchiveCoreUI) TagEntry    The tag fields' shared completion lookup (list cell, filter, ⌘I sheet, Notes'
                               tag field): only leading space is trimmed, so a typed space ends a completion.
-                              In `packages/ArchiveCore/.../TagEntry/` since W40.fix-notes-tag-entry.
+                              In `packages/ArchiveCore/Sources/ArchiveCoreUI/TagEntry/` (the UI target; ArchiveCore stays UI-free).
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware tag editor sheet (⌘I); `targetPaths` = the document window's file.
-  (ArchiveCore) SubjectEntryField  The sheet's add-a-subject token field, shared with Notes: autocompletes;
+  (ArchiveCoreUI) SubjectEntryField  The sheet's add-a-subject token field, shared with Notes: autocompletes;
                               Return/comma/Tab add and the field keeps no tokens; Done adds what is still
                               typed; a tag typed in full is never filled in with a longer one.
   DocumentTagActions.swift    The Tags menu in the document window: the open file, via NavigationModel's
