@@ -90,25 +90,50 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
 
 // MARK: - Probe tests
 
+private func bodyMethod(_ request: URLRequest) -> String? {
+    guard let body = request.httpBody,
+          let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else { return nil }
+    return json["method"] as? String
+}
+
 @Suite struct ZoteroClientProbeTests {
 
-    @Test func probeSelectsBBT() async {
+    @Test func probeSelectsLocalAPIFromItsRoot() async {
         let stub = StubZoteroTransport()
-        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        await stub.enqueue(statusCode: 200, data: Data("Nothing to see here.".utf8))
         let client = ZoteroClient(transport: stub)
 
-        let backend = await client.availability()
-        #expect(backend == .betterBibTeX)
+        #expect(await client.availability() == .localAPI)
+        #expect(await stub.invocations.first?.request.url?.absoluteString == "http://127.0.0.1:23119/api/")
+        #expect(await stub.callCount == 1)
     }
 
-    @Test func probeFallsToLocalAPI() async {
+    @Test func probeTriesTheListingWhenTheRootIsMissing() async {
         let stub = StubZoteroTransport()
-        await stub.enqueueError(URLError(.cannotConnectToHost))
+        await stub.enqueue(statusCode: 404, data: Data())
         await stub.enqueue(statusCode: 200, json: makeLocalAPIProbeResponse())
         let client = ZoteroClient(transport: stub)
 
-        let backend = await client.availability()
-        #expect(backend == .localAPI)
+        #expect(await client.availability() == .localAPI)
+    }
+
+    @Test func probeFallsToBBT() async {
+        let stub = StubZoteroTransport()
+        await stub.enqueueError(URLError(.cannotConnectToHost))
+        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        let client = ZoteroClient(transport: stub)
+
+        #expect(await client.availability() == .betterBibTeX)
+    }
+
+    @Test func probeLocalAPIOffFallsToBBT() async {
+        let stub = StubZoteroTransport()
+        await stub.enqueue(statusCode: 403, data: Data("Local API is not enabled".utf8))
+        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        let client = ZoteroClient(transport: stub)
+
+        #expect(await client.availability() == .betterBibTeX)
+        #expect(await stub.callCount == 2) // a 403 root is final: no listing request
     }
 
     @Test func probeUnavailableWhenBothFail() async {
@@ -121,31 +146,45 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
         #expect(backend == .unavailable)
     }
 
+    /// W40.fix-notes-zotero-fetch: the old probe sent BBT `item.search ""`, which lists every item, and timed
+    /// out on a large library. Neither probe may ask for the library's contents.
+    @Test func probeNeverListsTheLibrary() async {
+        let stub = StubZoteroTransport()
+        await stub.enqueue(statusCode: 403, data: Data())
+        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        let client = ZoteroClient(transport: stub)
+        _ = await client.availability()
+
+        let requests = await stub.invocations.map(\.request)
+        #expect(requests.map { bodyMethod($0) } == [nil, "api.ready"])
+        #expect(requests.allSatisfy { $0.timeoutInterval <= 3 })
+    }
+
     @Test func probeCacheTTL() async {
         let stub = StubZoteroTransport()
-        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        await stub.enqueue(statusCode: 200, data: Data())
         let client = ZoteroClient(transport: stub)
 
         let first = await client.availability()
-        #expect(first == .betterBibTeX)
+        #expect(first == .localAPI)
 
         // Second call should use cache — no new transport calls
         let callsBefore = await stub.callCount
         let second = await client.availability()
-        #expect(second == .betterBibTeX)
+        #expect(second == .localAPI)
         #expect(await stub.callCount == callsBefore)
     }
 
     @Test func probeResetCache() async {
         let stub = StubZoteroTransport()
-        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        await stub.enqueue(statusCode: 200, data: Data())
         let client = ZoteroClient(transport: stub)
 
         _ = await client.availability()
         let callsAfterFirst = await stub.callCount
 
         await client.resetProbeCache()
-        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        await stub.enqueue(statusCode: 200, data: Data())
 
         _ = await client.availability()
         #expect(await stub.callCount > callsAfterFirst)
@@ -154,11 +193,64 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
 
 // MARK: - CSL fetch tests
 
+private func localCSLResponse(title: String = "Oral History") -> Any {
+    [
+        "csljson": [
+            "type": "document",
+            "title": title,
+            "author": [["family": "Moore", "given": "Gordon E."]],
+            "issued": ["date-parts": [[2001]]],
+        ] as [String: Any],
+    ] as [String: Any]
+}
+
+private func expectClientError(_ expected: ZoteroClient.ClientError,
+                               _ body: () async throws -> Void) async {
+    do {
+        try await body()
+        Issue.record("Expected ClientError.\(expected)")
+    } catch let error as ZoteroClient.ClientError {
+        #expect(error == expected)
+    } catch {
+        Issue.record("Unexpected error type: \(error)")
+    }
+}
+
 @Suite struct ZoteroClientFetchTests {
 
-    @Test func fetchCSLviaBBT() async throws {
+    @Test func fetchCSLviaLocalAPIAsksForTheItemOnly() async throws {
         let stub = StubZoteroTransport()
-        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
+        await stub.enqueue(statusCode: 200, json: localCSLResponse())
+
+        let client = ZoteroClient(transport: stub)
+        let csl = try await client.fetchCSL(makeRef())
+
+        #expect(csl.title == "Oral History")
+        #expect(csl.author?.first?.family == "Moore")
+        #expect(await stub.callCount == 1) // no probe in front of the fetch
+        let req = await stub.invocations[0].request
+        #expect(req.url?.path == "/api/users/0/items/ABCD1234")
+        #expect(req.timeoutInterval == 10)
+    }
+
+    /// The owner's failure (notes-1 rows 50-51): a probe that timed out made every fetch throw
+    /// `.unavailable` for 30 s although Zotero answered. A failed probe must not stop a fetch.
+    @Test func fetchSucceedsAfterAFailedProbe() async throws {
+        let stub = StubZoteroTransport()
+        await stub.enqueueError(URLError(.timedOut))
+        await stub.enqueueError(URLError(.timedOut))
+        let client = ZoteroClient(transport: stub)
+        #expect(await client.availability() == .unavailable)
+
+        await stub.enqueue(statusCode: 200, json: localCSLResponse())
+        let csl = try await client.fetchCSL(makeRef())
+        #expect(csl.title == "Oral History")
+        #expect(await client.availability() == .localAPI) // the fetch refreshed the status
+    }
+
+    @Test func fetchCSLviaBBTWhenTheLocalAPIIsOff() async throws {
+        let stub = StubZoteroTransport()
+        await stub.enqueue(statusCode: 403, data: Data("Local API is not enabled".utf8))
         await stub.enqueue(statusCode: 200, json: [
             "jsonrpc": "2.0",
             "result": ["1:ABCD1234": "moore2001"],
@@ -171,50 +263,18 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
         ] as [String: Any])
 
         let client = ZoteroClient(transport: stub)
-        let ref = makeRef()
-        let csl = try await client.fetchCSL(ref)
+        let csl = try await client.fetchCSL(makeRef())
 
         #expect(csl.title == "Oral History")
         #expect(csl.author?.count == 1)
-        #expect(csl.author?.first?.family == "Moore")
         #expect(csl.author?.first?.given == "Gordon E.")
         #expect(csl.issued?.dateParts == [[2001]])
-    }
-
-    @Test func fetchCSLviaLocalAPI() async throws {
-        let stub = StubZoteroTransport()
-        await stub.enqueueError(URLError(.cannotConnectToHost))
-        await stub.enqueue(statusCode: 200, json: makeLocalAPIProbeResponse())
-        await stub.enqueue(statusCode: 200, json: [
-            "csljson": [
-                "type": "document",
-                "title": "Oral History",
-                "author": [["family": "Moore", "given": "Gordon E."]],
-                "issued": ["date-parts": [[2001]]],
-            ] as [String: Any],
-        ] as [String: Any])
-
-        let client = ZoteroClient(transport: stub)
-        let ref = makeRef()
-        let csl = try await client.fetchCSL(ref)
-
-        #expect(csl.title == "Oral History")
-        #expect(csl.author?.first?.family == "Moore")
+        #expect(await client.availability() == .betterBibTeX)
     }
 
     @Test func fetchCSLCacheHit() async throws {
         let stub = StubZoteroTransport()
-        await stub.enqueue(statusCode: 200, json: makeBBTProbeResponse())
-        await stub.enqueue(statusCode: 200, json: [
-            "jsonrpc": "2.0",
-            "result": ["1:ABCD1234": "moore2001"],
-            "id": 1,
-        ] as [String: Any])
-        await stub.enqueue(statusCode: 200, json: [
-            "jsonrpc": "2.0",
-            "result": sampleCSLJSON,
-            "id": 2,
-        ] as [String: Any])
+        await stub.enqueue(statusCode: 200, json: localCSLResponse())
 
         let client = ZoteroClient(transport: stub)
         let ref = makeRef()
@@ -227,43 +287,82 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
         #expect(await stub.callCount == callsAfterFirst)
     }
 
-    @Test func fetchUnavailableThrows() async {
+    @Test func fetchUnreachableIsUnavailableWithoutABBTAttempt() async {
         let stub = StubZoteroTransport()
         await stub.enqueueError(URLError(.cannotConnectToHost))
-        await stub.enqueueError(URLError(.cannotConnectToHost))
-
         let client = ZoteroClient(transport: stub)
-        let ref = makeRef()
 
-        do {
-            _ = try await client.fetchCSL(ref)
-            Issue.record("Expected ClientError.unavailable")
-        } catch is ZoteroClient.ClientError {
-            // expected
-        } catch {
-            Issue.record("Unexpected error type: \(error)")
-        }
+        await expectClientError(.unavailable) { _ = try await client.fetchCSL(makeRef()) }
+        #expect(await stub.callCount == 1)
+    }
+
+    @Test func fetchSlowZoteroIsTimedOut() async {
+        let stub = StubZoteroTransport()
+        await stub.enqueueError(URLError(.timedOut))
+        let client = ZoteroClient(transport: stub)
+
+        await expectClientError(.timedOut) { _ = try await client.fetchCSL(makeRef()) }
+        #expect(await stub.callCount == 1)
+    }
+
+    /// When BBT cannot help either, the local API's answer is reported: it names the setting to change.
+    @Test func localAPIOffIsReportedWhenBBTIsAbsent() async {
+        let stub = StubZoteroTransport()
+        await stub.enqueue(statusCode: 403, data: Data())
+        await stub.enqueue(statusCode: 404, data: Data())
+        let client = ZoteroClient(transport: stub)
+
+        await expectClientError(.localAPIOff) { _ = try await client.fetchCSL(makeRef()) }
+    }
+
+    @Test func unknownItemIsItemNotFound() async {
+        let stub = StubZoteroTransport()
+        await stub.enqueue(statusCode: 404, data: Data("Not found".utf8))
+        await stub.enqueue(statusCode: 404, data: Data())
+        let client = ZoteroClient(transport: stub)
+
+        await expectClientError(.itemNotFound) { _ = try await client.fetchCitation(makeRef()) }
     }
 
     @Test func fetchCitationViaLocalAPI() async throws {
         let stub = StubZoteroTransport()
-        await stub.enqueueError(URLError(.cannotConnectToHost))
-        await stub.enqueue(statusCode: 200, json: makeLocalAPIProbeResponse())
         await stub.enqueue(statusCode: 200, json: [
             "bib": "<div class=\"csl-bib-body\">Moore, Gordon E. <i>Oral History</i>. 2001.</div>",
         ] as [String: Any])
 
         let client = ZoteroClient(transport: stub)
-        let ref = makeRef()
-        let citation = try await client.fetchCitation(ref)
+        let citation = try await client.fetchCitation(makeRef(), styleID: "apa")
 
         #expect(citation == "Moore, Gordon E. Oral History. 2001.")
+        let query = await stub.invocations[0].request.url?.query ?? ""
+        #expect(query.contains("include=bib") && query.contains("style=apa"))
+    }
+
+    /// BBT renders a style through `item.bibliography` with the style's full URI (`item.export` takes a
+    /// translator, so the old call could never succeed).
+    @Test func fetchCitationViaBBTUsesBibliography() async throws {
+        let stub = StubZoteroTransport()
+        await stub.enqueue(statusCode: 403, data: Data())
+        await stub.enqueue(statusCode: 200, json: [
+            "jsonrpc": "2.0", "result": ["1:ABCD1234": "moore2001"], "id": 1,
+        ] as [String: Any])
+        await stub.enqueue(statusCode: 200, json: [
+            "jsonrpc": "2.0", "result": "Moore, Gordon E. Oral History. 2001.", "id": 4,
+        ] as [String: Any])
+
+        let client = ZoteroClient(transport: stub)
+        let citation = try await client.fetchCitation(makeRef(), styleID: "apa")
+
+        #expect(citation == "Moore, Gordon E. Oral History. 2001.")
+        let last = await stub.invocations.last!.request
+        #expect(bodyMethod(last) == "item.bibliography")
+        let body = try JSONSerialization.jsonObject(with: last.httpBody ?? Data()) as? [String: Any]
+        let params = body?["params"] as? [Any]
+        #expect((params?.last as? [String: Any])?["id"] as? String == "http://www.zotero.org/styles/apa")
     }
 
     @Test func fetchGroupLibrary() async throws {
         let stub = StubZoteroTransport()
-        await stub.enqueueError(URLError(.cannotConnectToHost))
-        await stub.enqueue(statusCode: 200, json: makeLocalAPIProbeResponse())
         await stub.enqueue(statusCode: 200, json: [
             "csljson": [
                 "type": "document",
@@ -281,6 +380,28 @@ private func makeRef(key: String = "ABCD1234", library: ZoteroLibrary = .user) -
     }
 }
 
+// MARK: - What the user reads (W40.fix-notes-zotero-fetch)
+
+@Suite struct ZoteroClientErrorTextTests {
+
+    /// The sheet showed "(ArchiveNotes.ZoteroClient.ClientError error 0.)". Every case is a sentence.
+    @Test(arguments: [ZoteroClient.ClientError.off, .unavailable, .timedOut, .localAPIOff,
+                      .itemNotFound, .unexpectedResponse])
+    func everyErrorIsASentence(_ error: ZoteroClient.ClientError) {
+        let text = error.localizedDescription
+        #expect(!text.contains("ClientError"))
+        #expect(!text.contains("error 0"))
+        #expect(text.hasSuffix("."))
+        #expect(text.count > 40)
+    }
+
+    @Test func unreachableNamesZoterosSetting() {
+        let text = ZoteroClient.ClientError.unavailable.localizedDescription
+        #expect(text.contains("Zotero is running"))
+        #expect(text.contains("Allow other applications on this computer to communicate with Zotero"))
+    }
+}
+
 // MARK: - Zotero's real local-API response (W40.fix-notes-zotero-csljson-crash)
 
 /// Zotero 10.0.6's body for `GET /api/users/0/items/5SXHDTMB?include=csljson`, other keys trimmed, as measured
@@ -294,8 +415,6 @@ private let realZoteroCSLBody = #"""
 
     private func localAPIClient(body: Data) async -> ZoteroClient {
         let stub = StubZoteroTransport()
-        await stub.enqueueError(URLError(.cannotConnectToHost))
-        await stub.enqueue(statusCode: 200, json: makeLocalAPIProbeResponse())
         await stub.enqueue(statusCode: 200, data: body)
         return ZoteroClient(transport: stub)
     }

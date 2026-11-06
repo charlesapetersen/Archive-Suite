@@ -11,7 +11,7 @@ protocol ZoteroTransport: Sendable {
 struct URLSessionZoteroTransport: ZoteroTransport {
     let session: URLSession
 
-    init(timeout: TimeInterval = 1.5) {
+    init(timeout: TimeInterval = 10) {
         let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest = timeout
         cfg.timeoutIntervalForResource = timeout + 1
@@ -103,12 +103,20 @@ struct ZoteroCSLItem: Codable, Sendable, Equatable {
 /// Off-main-actor client for probing Zotero's localhost API and fetching
 /// CSL metadata. All network calls go through an injected `ZoteroTransport`
 /// so tests use a stub (00-overview §D.3).
+///
+/// A fetch asks Zotero for the one item by key and classifies what comes back; it never consults the
+/// availability probe. W40.fix-notes-zotero-fetch: on the owner's Mac (a 190 MB library with Better
+/// BibTeX) the old probe, a BBT `item.search ""` that lists every item and then `items?limit=1`, timed out
+/// at 1.5 s, and every fetch threw `.unavailable` from that cached verdict while Zotero answered a shell.
 actor ZoteroClient {
 
     struct Config: Sendable {
         var host = "127.0.0.1"
         var port = 23119
-        var timeout: TimeInterval = 1.5
+        /// A fetch's limit. Generous, because a busy Zotero (a large library, a sync) answers slowly.
+        var timeout: TimeInterval = 10
+        /// The availability probe's limit (never longer than `timeout`).
+        var probeTimeout: TimeInterval = 3
     }
 
     enum Backend: Sendable, Equatable {
@@ -117,10 +125,47 @@ actor ZoteroClient {
         case unavailable
     }
 
-    enum ClientError: Error, Sendable {
+    /// Every failure a caller sees. Each says what to check, because the sheet shows it to the user.
+    enum ClientError: Error, Sendable, Equatable, LocalizedError {
+        /// Zotero integration is switched off in Notes' own Settings.
+        case off
+        /// Nothing answered at the configured host and port.
         case unavailable
+        /// Zotero accepted the connection but did not answer in time.
+        case timedOut
+        /// Zotero answered that its local API is switched off (HTTP 403).
+        case localAPIOff
         case itemNotFound
         case unexpectedResponse
+
+        var errorDescription: String? {
+            switch self {
+            case .off:
+                "Zotero is switched off in Notes. Turn on “Enable Zotero integration” in Notes' Settings (⌘,)."
+            case .unavailable:
+                "Notes could not reach Zotero. Check that Zotero is running, and that “Allow other applications "
+                    + "on this computer to communicate with Zotero” is on in Zotero's Settings ▸ Advanced. "
+                    + "Notes looks for it at the host and port in Notes' Settings (⌘,)."
+            case .timedOut:
+                "Zotero did not answer in time. It may be busy with a large library or a sync; try again in a moment."
+            case .localAPIOff:
+                "Zotero is running, but it does not let other applications read it. In Zotero's Settings ▸ "
+                    + "Advanced, turn on “Allow other applications on this computer to communicate with Zotero”."
+            case .itemNotFound:
+                "Zotero has no item with this link's key. The item may have been deleted, or be in another library."
+            case .unexpectedResponse:
+                "Zotero answered in a form Notes cannot read. Notes needs Zotero 7 or later."
+            }
+        }
+
+        /// Failures that mean another backend could still answer (the local API is off or missing, or it does
+        /// not know the item). An unreachable or slow Zotero is not retried: BBT runs in the same process.
+        var worthTryingBBT: Bool {
+            switch self {
+            case .localAPIOff, .itemNotFound, .unexpectedResponse: true
+            case .off, .unavailable, .timedOut: false
+            }
+        }
     }
 
     private let transport: ZoteroTransport
@@ -147,7 +192,8 @@ actor ZoteroClient {
 
     // MARK: - Availability probe
 
-    /// Returns the best available backend, caching the result for 30s.
+    /// Returns the best available backend, caching the result for 30s. Only a status signal: fetches
+    /// do not depend on it.
     func availability() async -> Backend {
         if let (backend, stamp) = cachedBackend,
            Date().timeIntervalSince(stamp) < probeTTL {
@@ -164,30 +210,40 @@ actor ZoteroClient {
     }
 
     private func probe() async -> Backend {
-        // 1. Try Better BibTeX JSON-RPC ping.
-        if await probeBBT() { return .betterBibTeX }
-        // 2. Try Zotero 7 local API.
+        // Both probes are constant-cost; neither lists the library.
         if await probeLocalAPI() { return .localAPI }
+        if await probeBBT() { return .betterBibTeX }
         return .unavailable
     }
 
+    /// `GET /api/` is the local API's root (200 when it is on, 403 when off). A Zotero that does not
+    /// answer the root with 200 gets one listing request, `items?limit=1`, before the local API is
+    /// written off.
+    private func probeLocalAPI() async -> Bool {
+        for path in ["/api/", "/api/users/0/items?limit=1"] {
+            do {
+                let (_, resp) = try await send(request(path: path, timeout: probeTimeout))
+                if resp.statusCode == 200 { return true }
+                if resp.statusCode == 403 { return false }
+            } catch {
+                return false
+            }
+        }
+        return false
+    }
+
+    /// `api.ready` costs Better BibTeX nothing. Any well-formed JSON-RPC reply (even -32601, an older BBT
+    /// without the method) proves BBT is present.
     private func probeBBT() async -> Bool {
-        let url = baseURL(path: "/better-bibtex/json-rpc")
-        var req = URLRequest(url: url)
+        var req = request(path: "/better-bibtex/json-rpc", timeout: probeTimeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let body: [String: Any] = [
-            "jsonrpc": "2.0",
-            "method": "item.search",
-            "params": [""],
-            "id": 1,
-        ]
+        let body: [String: Any] = ["jsonrpc": "2.0", "method": "api.ready", "params": [] as [Any], "id": 1]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         do {
-            let (data, resp) = try await transport.send(req)
+            let (data, resp) = try await send(req)
             guard resp.statusCode == 200 else { return false }
-            // Any well-formed JSON-RPC reply (even -32601) proves BBT is present.
             guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   json["jsonrpc"] != nil else { return false }
             return true
@@ -196,74 +252,63 @@ actor ZoteroClient {
         }
     }
 
-    private func probeLocalAPI() async -> Bool {
-        let url = baseURL(path: "/api/users/0/items?limit=1")
-        let req = URLRequest(url: url)
-        do {
-            let (_, resp) = try await transport.send(req)
-            return resp.statusCode == 200
-        } catch {
-            return false
-        }
-    }
+    private var probeTimeout: TimeInterval { min(config.probeTimeout, config.timeout) }
 
     // MARK: - Fetch CSL metadata
 
-    /// Fetch CSL-JSON metadata for a Zotero reference. Uses the best available
-    /// backend, falling through from BBT → local API → error.
+    /// Fetch CSL-JSON metadata for a Zotero reference: the local API by key first, then Better BibTeX when
+    /// the local API cannot answer for this item. Throws a `ClientError`.
     func fetchCSL(_ ref: ZoteroRef) async throws -> ZoteroCSLItem {
         let cacheKey = metaCacheKey(ref)
         if let cached = metaCache[cacheKey] { return cached }
-
-        let backend = await availability()
-        let item: ZoteroCSLItem
-
-        switch backend {
-        case .betterBibTeX:
-            if let bbt = try? await fetchCSLviaBBT(ref) {
-                item = bbt
-            } else if let local = try? await fetchCSLviaLocalAPI(ref) {
-                item = local
-            } else {
-                throw ClientError.itemNotFound
-            }
-        case .localAPI:
-            item = try await fetchCSLviaLocalAPI(ref)
-        case .unavailable:
-            throw ClientError.unavailable
-        }
-
+        let item = try await localThenBBT(local: { try await $0.fetchCSLviaLocalAPI(ref) },
+                                          bbt: { try await $0.fetchCSLviaBBT(ref) })
         metaCache[cacheKey] = item
         return item
     }
 
     // MARK: - Fetch formatted citation
 
-    /// Fetch a formatted bibliography citation string.
+    /// Fetch a formatted bibliography citation string, in the same backend order as `fetchCSL`.
     func fetchCitation(_ ref: ZoteroRef, styleID: String = "chicago-note-bibliography") async throws -> String {
         let cacheKey = "\(metaCacheKey(ref))|\(styleID)"
         if let cached = citationCache[cacheKey] { return cached }
-
-        let backend = await availability()
-        let citation: String
-
-        switch backend {
-        case .betterBibTeX:
-            if let bbt = try? await fetchCitationViaBBT(ref, styleID: styleID) {
-                citation = bbt
-            } else if let local = try? await fetchCitationViaLocalAPI(ref, styleID: styleID) {
-                citation = local
-            } else {
-                throw ClientError.itemNotFound
-            }
-        case .localAPI:
-            citation = try await fetchCitationViaLocalAPI(ref, styleID: styleID)
-        case .unavailable:
-            throw ClientError.unavailable
-        }
-
+        let citation = try await localThenBBT(
+            local: { try await $0.fetchCitationViaLocalAPI(ref, styleID: styleID) },
+            bbt: { try await $0.fetchCitationViaBBT(ref, styleID: styleID) })
         citationCache[cacheKey] = citation
         return citation
+    }
+
+    /// Runs the local-API attempt, falls back to BBT only when that could help, and reports the local
+    /// API's error when BBT fails too (it names the setting the user can change). A success refreshes
+    /// the availability cache, so the status signal never contradicts a fetch that just worked.
+    private func localThenBBT<T: Sendable>(
+        local: (isolated ZoteroClient) async throws -> T,
+        bbt: (isolated ZoteroClient) async throws -> T
+    ) async throws -> T {
+        let localError: ClientError
+        do {
+            let value = try await local(self)
+            cachedBackend = (.localAPI, Date())
+            return value
+        } catch let error as ClientError {
+            localError = error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            localError = .unexpectedResponse
+        }
+        guard localError.worthTryingBBT else { throw localError }
+        do {
+            let value = try await bbt(self)
+            cachedBackend = (.betterBibTeX, Date())
+            return value
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw localError
+        }
     }
 
     // MARK: - BBT fetch internals
@@ -330,15 +375,17 @@ actor ZoteroClient {
             throw ClientError.itemNotFound
         }
 
-        // Export with the requested style
-        let exportBody: [String: Any] = [
+        // `item.export` takes a translator, not a style; `item.bibliography` renders a CSL style, which it
+        // names by the style's full URI (the local API accepts the short ID).
+        let styleURI = styleID.contains("://") ? styleID : "http://www.zotero.org/styles/\(styleID)"
+        let bibBody: [String: Any] = [
             "jsonrpc": "2.0",
-            "method": "item.export",
-            "params": [[citekey], styleID],
+            "method": "item.bibliography",
+            "params": [[citekey], ["id": styleURI, "contentType": "text"]] as [Any],
             "id": 4,
         ]
-        let expData = try await jsonRPC(exportBody)
-        guard let bibStr = expData["result"] as? String else {
+        let bibData = try await jsonRPC(bibBody)
+        guard let bibStr = bibData["result"] as? String, !bibStr.isEmpty else {
             throw ClientError.unexpectedResponse
         }
         return stripHTMLTags(bibStr)
@@ -348,11 +395,8 @@ actor ZoteroClient {
 
     private func fetchCSLviaLocalAPI(_ ref: ZoteroRef) async throws -> ZoteroCSLItem {
         let path = localAPIItemPath(ref)
-        let url = baseURL(path: "\(path)?include=csljson")
-        let req = URLRequest(url: url)
-
-        let (data, resp) = try await transport.send(req)
-        guard resp.statusCode == 200 else { throw ClientError.itemNotFound }
+        let (data, resp) = try await send(request(path: "\(path)?include=csljson", timeout: config.timeout))
+        try checkLocalAPIStatus(resp)
 
         // Local API returns a JSON object with a "csljson" key. Zotero 7+ puts a string there that holds
         // a CSL array (measured on 10.0.6, W40.d10); an object or an array is accepted too.
@@ -378,17 +422,18 @@ actor ZoteroClient {
         guard let object = value as? [String: Any], JSONSerialization.isValidJSONObject(object) else {
             throw ClientError.unexpectedResponse
         }
-        let cslData = try JSONSerialization.data(withJSONObject: object)
-        return try JSONDecoder().decode(ZoteroCSLItem.self, from: cslData)
+        guard let cslData = try? JSONSerialization.data(withJSONObject: object),
+              let item = try? JSONDecoder().decode(ZoteroCSLItem.self, from: cslData) else {
+            throw ClientError.unexpectedResponse
+        }
+        return item
     }
 
     private func fetchCitationViaLocalAPI(_ ref: ZoteroRef, styleID: String) async throws -> String {
         let path = localAPIItemPath(ref)
-        let url = baseURL(path: "\(path)?include=bib&style=\(styleID)&linkwrap=0")
-        let req = URLRequest(url: url)
-
-        let (data, resp) = try await transport.send(req)
-        guard resp.statusCode == 200 else { throw ClientError.itemNotFound }
+        let (data, resp) = try await send(request(path: "\(path)?include=bib&style=\(styleID)&linkwrap=0",
+                                                  timeout: config.timeout))
+        try checkLocalAPIStatus(resp)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let bibHTML = json["bib"] as? String else {
@@ -414,14 +459,48 @@ actor ZoteroClient {
         return components.url!
     }
 
+    private func request(path: String, timeout: TimeInterval) -> URLRequest {
+        var req = URLRequest(url: baseURL(path: path))
+        req.timeoutInterval = timeout
+        return req
+    }
+
+    /// The only call into the transport. Whatever the transport throws comes out as a `ClientError`
+    /// (or a cancellation), so the user never sees a raw `URLError` or an enum's case number.
+    private func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        do {
+            return try await transport.send(request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError {
+            switch error.code {
+            case .cancelled: throw CancellationError()
+            case .timedOut: throw ClientError.timedOut
+            default: throw ClientError.unavailable
+            }
+        } catch {
+            throw ClientError.unavailable
+        }
+    }
+
+    /// 403 is Zotero's answer when "Allow other applications…" is off; 404 is an unknown item (or a
+    /// Zotero without the local API, which the BBT fallback then covers).
+    private func checkLocalAPIStatus(_ resp: HTTPURLResponse) throws {
+        switch resp.statusCode {
+        case 200: return
+        case 403: throw ClientError.localAPIOff
+        case 404: throw ClientError.itemNotFound
+        default: throw ClientError.unexpectedResponse
+        }
+    }
+
     private func jsonRPC(_ body: [String: Any]) async throws -> [String: Any] {
-        let url = baseURL(path: "/better-bibtex/json-rpc")
-        var req = URLRequest(url: url)
+        var req = request(path: "/better-bibtex/json-rpc", timeout: config.timeout)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, resp) = try await transport.send(req)
+        let (data, resp) = try await send(req)
         guard resp.statusCode == 200 else { throw ClientError.unexpectedResponse }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -458,7 +537,9 @@ actor ZoteroClient {
         guard let data = jsonString.data(using: .utf8) else {
             throw ClientError.unexpectedResponse
         }
-        let items = try JSONDecoder().decode([ZoteroCSLItem].self, from: data)
+        guard let items = try? JSONDecoder().decode([ZoteroCSLItem].self, from: data) else {
+            throw ClientError.unexpectedResponse
+        }
         guard let first = items.first else {
             throw ClientError.itemNotFound
         }

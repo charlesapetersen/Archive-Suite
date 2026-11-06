@@ -66,7 +66,7 @@ final class ZoteroStatusModel: ObservableObject {
     /// The style is captured at command time so the citation request observes the current Settings value.
     func fetchAutoFillData(for ref: ZoteroRef) async throws -> (csl: ZoteroCSLItem, citation: String?) {
         let settings = ZoteroSettingsStore.current
-        guard settings.enabled else { throw ZoteroClient.ClientError.unavailable }
+        guard settings.enabled else { throw ZoteroClient.ClientError.off }
         let csl = try await client.fetchCSL(ref)
         let citation = try? await client.fetchCitation(ref, styleID: settings.styleID)
         return (csl, citation)
@@ -74,7 +74,7 @@ final class ZoteroStatusModel: ObservableObject {
 
     func fetchCitation(for ref: ZoteroRef) async throws -> String {
         let settings = ZoteroSettingsStore.current
-        guard settings.enabled else { throw ZoteroClient.ClientError.unavailable }
+        guard settings.enabled else { throw ZoteroClient.ClientError.off }
         return try await client.fetchCitation(ref, styleID: settings.styleID)
     }
 

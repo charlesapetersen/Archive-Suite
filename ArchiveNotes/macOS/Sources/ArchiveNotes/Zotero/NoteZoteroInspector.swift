@@ -9,7 +9,8 @@ struct NoteZoteroInspector: View {
     @State private var refs: [ZoteroRef] = []
     @State private var link = ""
     @State private var fetching: Set<String> = []
-    @State private var failed: Set<String> = []
+    /// selectLink → why its citation could not be fetched, shown under the chip.
+    @State private var failed: [String: String] = [:]
     @State private var saving = false
     @State private var saveError: String?
 
@@ -19,12 +20,19 @@ struct NoteZoteroInspector: View {
             ForEach(refs, id: \.selectLink) { ref in
                 HStack {
                     ZoteroChipView(ref: ref, isFetching: fetching.contains(ref.selectLink),
-                                   didFail: failed.contains(ref.selectLink))
-                    if failed.contains(ref.selectLink) {
+                                   didFail: failed[ref.selectLink] != nil)
+                    if failed[ref.selectLink] != nil {
                         Button("Retry citation") { fetch(ref) }
                             .font(.caption)
                             .accessibilityIdentifier("an.zotero.retry.\(ref.itemKey)")
                     }
+                }
+                if let reason = failed[ref.selectLink] {
+                    Text(reason)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("an.zotero.failure.\(ref.itemKey)")
                 }
             }
             HStack {
@@ -67,16 +75,18 @@ struct NoteZoteroInspector: View {
 
     private func fetch(_ ref: ZoteroRef) {
         guard fetching.insert(ref.selectLink).inserted else { return }
-        failed.remove(ref.selectLink)
+        failed[ref.selectLink] = nil
         Task { @MainActor in
             defer { fetching.remove(ref.selectLink) }
             do {
                 let citation = try await status.fetchCitation(for: ref)
                 if !(await model.cacheZoteroCitation(citation, for: ref, in: itemID)) {
-                    failed.insert(ref.selectLink)
+                    failed[ref.selectLink] = "The citation came from Zotero but could not be saved to the note."
                 }
+            } catch is CancellationError {
+                return
             } catch {
-                failed.insert(ref.selectLink)
+                failed[ref.selectLink] = error.localizedDescription
             }
         }
     }

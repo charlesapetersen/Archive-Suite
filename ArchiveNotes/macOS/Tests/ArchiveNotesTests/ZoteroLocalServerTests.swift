@@ -356,4 +356,21 @@ private func makeStubClient(timeout: TimeInterval = 1.5) -> ZoteroClient {
         // definitively not an indefinite wait.
         #expect(elapsed < 6.0)
     }
+
+    /// A Zotero that accepts and never answers reads as `.timedOut` over the real transport, a sentence
+    /// that says Zotero is busy, not that it is missing (W40.fix-notes-zotero-fetch).
+    @Test func testSilentServerIsTimedOut() async throws {
+        StubURLProtocol.install(.hang)
+        defer { StubURLProtocol.reset() }
+
+        let client = makeStubClient(timeout: 0.6)
+        let ref = ZoteroRef(selectLink: "zotero://select/library/items/ABCD1234",
+                            itemKey: "ABCD1234", library: .user)
+        do {
+            _ = try await client.fetchCSL(ref)
+            Issue.record("Expected ClientError.timedOut")
+        } catch let error as ZoteroClient.ClientError {
+            #expect(error == .timedOut)
+        }
+    }
 }

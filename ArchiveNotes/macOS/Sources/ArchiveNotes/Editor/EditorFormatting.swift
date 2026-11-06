@@ -275,9 +275,10 @@ final class FormattingContext: ObservableObject {
                                                                  target: reference.target)
                     })
             } catch {
+                // Every client failure is a `ClientError` whose description says what to check.
                 let detail = error.localizedDescription
                 self.zoteroAutoFillError = "Zotero metadata could not be fetched. \(detail)"
-                notesModel.statusMessage = "Couldn't fetch Zotero metadata — check that Zotero is running."
+                notesModel.statusMessage = "Couldn't fetch Zotero metadata."
             }
         }
     }
