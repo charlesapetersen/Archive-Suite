@@ -27059,6 +27059,158 @@
    }
   }
  },
+ "seg_adapt_lora": {
+  "rows": [
+   {
+    "box": "Lincoln",
+    "set": "gaps after 50",
+    "arm": "base",
+    "gaps": 207,
+    "errors": 42,
+    "err_per_100": 20.28985507246377,
+    "false_splits": 40,
+    "false_merges": 2,
+    "starts": [
+     66,
+     68
+    ],
+    "paired": null,
+    "rerun": {
+     "diff": 1.4492753623188406,
+     "lo": 0.0,
+     "hi": 3.4188034188034186,
+     "gaps": 207,
+     "items": 63
+    }
+   },
+   {
+    "box": "Lincoln",
+    "set": "gaps after 50",
+    "arm": "k50",
+    "gaps": 207,
+    "errors": 36,
+    "err_per_100": 17.391304347826086,
+    "false_splits": 34,
+    "false_merges": 2,
+    "starts": [
+     66,
+     68
+    ],
+    "paired": {
+     "diff": -2.898550724637681,
+     "lo": -6.349206349206349,
+     "hi": -0.4166666666666667,
+     "gaps": 207,
+     "items": 63
+    },
+    "rerun": null
+   },
+   {
+    "box": "Lincoln",
+    "set": "gaps after 200",
+    "arm": "base",
+    "gaps": 59,
+    "errors": 6,
+    "err_per_100": 10.169491525423728,
+    "false_splits": 6,
+    "false_merges": 0,
+    "starts": [
+     17,
+     17
+    ],
+    "paired": null,
+    "rerun": {
+     "diff": 1.694915254237288,
+     "lo": 0.0,
+     "hi": 7.6923076923076925,
+     "gaps": 59,
+     "items": 17
+    }
+   },
+   {
+    "box": "Lincoln",
+    "set": "gaps after 200",
+    "arm": "k200",
+    "gaps": 59,
+    "errors": 3,
+    "err_per_100": 5.084745762711864,
+    "false_splits": 2,
+    "false_merges": 1,
+    "starts": [
+     16,
+     17
+    ],
+    "paired": {
+     "diff": -5.084745762711864,
+     "lo": -14.705882352941176,
+     "hi": 0.0,
+     "gaps": 59,
+     "items": 17
+    },
+    "rerun": null
+   },
+   {
+    "box": "Lincoln2",
+    "set": "whole box",
+    "arm": "base",
+    "gaps": 244,
+    "errors": 42,
+    "err_per_100": 17.21311475409836,
+    "false_splits": 41,
+    "false_merges": 1,
+    "starts": [
+     68,
+     69
+    ],
+    "paired": null,
+    "rerun": null
+   },
+   {
+    "box": "Lincoln2",
+    "set": "whole box",
+    "arm": "k50",
+    "gaps": 244,
+    "errors": 38,
+    "err_per_100": 15.573770491803279,
+    "false_splits": 35,
+    "false_merges": 3,
+    "starts": [
+     66,
+     69
+    ],
+    "paired": {
+     "diff": -1.639344262295082,
+     "lo": -4.504504504504505,
+     "hi": 1.2195121951219512,
+     "gaps": 244,
+     "items": 70
+    },
+    "rerun": null
+   },
+   {
+    "box": "Lincoln2",
+    "set": "whole box",
+    "arm": "k200",
+    "gaps": 244,
+    "errors": 12,
+    "err_per_100": 4.918032786885246,
+    "false_splits": 10,
+    "false_merges": 2,
+    "starts": [
+     67,
+     69
+    ],
+    "paired": {
+     "diff": -12.295081967213115,
+     "lo": -18.75,
+     "hi": -7.352941176470588,
+     "gaps": 244,
+     "items": 70
+    },
+    "rerun": null
+   }
+  ]
+ },
  "seg_window_modality": {
   "pooled": [
    {

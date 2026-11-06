@@ -379,6 +379,26 @@ def seg_context():
             "vote_flips": d["vote_flips"]}
 
 
+def seg_adapt_lora():
+    """W46.seg-adapt-lora: the corpus 2B against its LoRA continuations on a user's corrected gaps of one Lincoln box,
+    scored on box 1's gaps after the training ones and on a second box no training row saw."""
+    path = RESULTS / "seg-adapt-lora.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    if any(d["failed_windows"].values()):
+        sys.exit(f"seg-adapt-lora.json has failed windows: {d['failed_windows']}")
+    rows = []
+    for box, b in d["boxes"].items():
+        for label, s in b["sets"].items():
+            for arm, t in s["arms"].items():
+                rows.append({"box": box, "set": label, "arm": arm, "gaps": t["gaps"], "errors": t["errors"],
+                             "err_per_100": t["err_per_100"], "false_splits": t["fs"], "false_merges": t["fm"],
+                             "starts": [t["catalogue"][0] + t["internal"][0], t["catalogue"][1] + t["internal"][1]],
+                             "paired": s["paired"].get(arm), "rerun": s.get("rerun", {}).get("paired") if arm == "base" else None})
+    return {"rows": rows}
+
+
 def seg_window_modality():
     """W46.seg-window-modality: the 2B's window sizes with and without images, and the three models' six-run vote,
     pooled over the development and test boxes, with Lincoln on its own."""
@@ -1393,7 +1413,7 @@ def main():
              "dating_undated": json.loads(DATING_UNDATED.read_text()) if DATING_UNDATED.exists() else None,
              "seg_date": json.loads((RESULTS / "seg-date-model-final.json").read_text())
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
-             "seg_context": seg_context(), "seg_window_modality": seg_window_modality(), "seg_tabme": seg_tabme(),
+             "seg_context": seg_context(), "seg_adapt_lora": seg_adapt_lora(), "seg_window_modality": seg_window_modality(), "seg_tabme": seg_tabme(),
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
              "public": pub, "ocr_scorers": ocr_scorers(),
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),

@@ -151,6 +151,12 @@ footer p { font-size: 13px; }
     <p class="note">Every window sent twice to the same model, once as before and once with a COLLECTION FACTS block above its OCR: the catalogue line and item count (CREST, Lincoln) or the box and folder label photos' OCR (the owner's Stanton and RG 165), the span of years in the box's text, the share of low-text pages and a document-length prior. Nothing in it comes from the box's boundaries. The rerun column is the noise floor: the request without the block is byte-identical to the one FarmShare answered earlier, so its changed gap decisions are what a rerun alone changes. Only Lincoln moves beyond that, for both models, and there the catalogue's item count is close to the answer; on the owner's boxes the block changes nothing beyond rerun noise, so the app's window prompt is unchanged. One run per arm; one vote can move a box several points (the 2B's CREST gain is one vote). Source: <code>seg-context.md</code> and <code>seg-context.json</code>.</p>
   </section>
 
+  <section class="panel" id="seg-adapt-lora" hidden>
+    <div class="head"><h2>Adapting the 2B to a new material from a user's corrections</h2><span class="meta">LoRA continuation · two Lincoln boxes · Sherlock</span></div>
+    <div class="tbl"><table><thead><tr><th>Box and gaps scored</th><th>Model</th><th>Gaps</th><th>Errors per 100 gaps</th><th>False splits</th><th>False merges</th><th>Starts found</th><th>Change against the 2B (95% interval)</th></tr></thead><tbody id="seg-adapt-lora-rows"></tbody></table></div>
+    <p class="note">The corpus-trained Qwen3.5 2B, and the same model after a LoRA continuation on a user's corrections of the first k gaps of one Lincoln Papers box (k = 50 and 200, three corpus windows replayed for each correction window), all served the same way on Sherlock. Box 1's rows count only the gaps after each arm's k, which no training row saw; box 2 is the next 70 catalogue items of the same series, which nothing trained on. Box 2's truth is the catalogue's starts and Gemini 3.7 Flash's continuation calls, so it scores catalogue starts and continuations but no start inside an item. The interval resamples catalogue items; the base row's interval is a rerun of the same requests against FarmShare's earlier answers, the noise floor. Source: <code>seg-adapt-lora.md</code> and <code>seg-adapt-lora.json</code>.</p>
+  </section>
+
   <section class="panel" id="seg-tabme" hidden>
     <h2>Segmentation on clean public scans (TABME++)</h2>
     <p class="note" id="seg-tabme-lede"></p>
@@ -693,6 +699,17 @@ if (segContext) {
   }
   document.getElementById('seg-context-rows').innerHTML = ctxRows.join('');
   document.getElementById('seg-context').hidden = !ctxRows.length;
+}
+
+const sal = DATA.seg_adapt_lora;
+if (sal) {
+  const salNames = {base: 'Trained Qwen3.5 2B', k50: 'LoRA on 50 corrected gaps', k200: 'LoRA on 200 corrected gaps'};
+  const ci = p => (p.diff > 0 ? '+' : '') + p.diff.toFixed(1) + ' (' + p.lo.toFixed(1) + ' to ' + p.hi.toFixed(1) + ')';
+  document.getElementById('seg-adapt-lora-rows').innerHTML = sal.rows.map(r => '<tr><td>' + (r.box === 'Lincoln2' ? 'Box 2, whole' : 'Box 1, ' + r.set) +
+    '</td><td>' + salNames[r.arm] + '</td><td>' + r.gaps + '</td><td>' + r.err_per_100.toFixed(1) + '</td><td>' + r.false_splits + '</td><td>' +
+    r.false_merges + '</td><td>' + r.starts[0] + ' / ' + r.starts[1] + '</td><td>' +
+    (r.paired ? ci(r.paired) : r.rerun ? 'rerun: ' + ci(r.rerun) : '—') + '</td></tr>').join('');
+  document.getElementById('seg-adapt-lora').hidden = false;
 }
 
 const stb = DATA.seg_tabme;

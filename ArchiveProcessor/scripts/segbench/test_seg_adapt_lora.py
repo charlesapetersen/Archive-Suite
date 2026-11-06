@@ -106,5 +106,37 @@ class ReplaySearch(unittest.TestCase):
             L.replay_source(self.root, 5885, str(self.root / "missing"))
 
 
+class Scoring(unittest.TestCase):
+    """gap_kinds, tally and paired on a five-page box: items A (pages 1-3, a start inside it at 3) and B (4-5)."""
+    def setUp(self):
+        self.manifest = {"pages": [{"id": "A", "label": "New"}, {"id": "A", "label": "Cont"},
+                                   {"id": "A", "label": "New"}, {"id": "B", "label": "New"},
+                                   {"id": "B", "label": "Cont"}]}
+
+        class Box:
+            truth = {0: False, 1: True, 2: True, 3: False}
+            unsure = {3}
+        self.box = Box()
+
+    def test_kinds(self):
+        self.assertEqual(L.gap_kinds(self.manifest), {0: "continue", 1: "internal", 2: "catalogue", 3: "continue"})
+
+    def test_tally_skips_unsure_and_splits_errors(self):
+        new = {0: True, 1: False, 2: True, 3: True}     # a false split, a missed start, a right start, an unsure gap
+        t = L.tally(self.box, L.gap_kinds(self.manifest), new, [0, 1, 2, 3])
+        self.assertEqual((t["gaps"], t["errors"], t["fs"], t["fm"]), (3, 2, 1, 1))
+        self.assertEqual((t["catalogue"], t["internal"], t["continue"]), ([1, 1], [0, 1], [0, 1]))
+
+    def test_paired_difference(self):
+        a = {0: True, 1: False, 2: True, 3: True}
+        b = {0: False, 1: True, 2: True, 3: True}
+        groups = {0: "A", 1: "A", 2: "A", 3: "B"}
+        p = L.paired(self.box, groups, a, b, [0, 1, 2, 3])
+        self.assertAlmostEqual(p["diff"], -200 / 3)
+        self.assertEqual((p["gaps"], p["items"]), (3, 1))
+        self.assertLessEqual(p["lo"], p["diff"])
+        self.assertGreaterEqual(p["hi"], p["diff"])
+
+
 if __name__ == "__main__":
     unittest.main()
