@@ -205,7 +205,10 @@ truth's own error from the random controls is 1 of 17. The image prompt (Gemini 
 Gemini route that gives a title; the app's call is below the bar on publication date, against the printed date and
 the owner's tags. `W47.item-fields-more-checks` draws the image prompt's filled values for the owner to reach the
 floor (built: the second sheet, 195 questions); `W47.item-fields-more-score` folds it, and `W47.item-fields-build`
-waits on that. The owner's notes ask for inference (a name from a first name or
+waits on that. With the second and third sheets folded (2026-11-06, `W47.item-fields-third-score`) the image prompt
+fills kind, byline, publication, publication date and recipient place by the rule; title stays too close (53/56 on
+the draw, stratified 0.91 [0.83, 0.94]; about 13 more right drawn pairs would fill it), its misses a kicker line taken
+into the headline and a title run over two pages. The owner's notes ask for inference (a name from a first name or
 initials, a paper from its initials) as a user-set level, title case for display, and the letterhead kept apart from
 the sending place. W46.ent-truth-owner-fold (2026-11-05) folded the entity answers: a sending place is one the
 document writes (a letterhead included, the owner's caveat noted), never an inferred one
