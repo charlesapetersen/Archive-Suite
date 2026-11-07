@@ -15,6 +15,8 @@
 
 ## Medium Priority
 
+- **Correspondence export (CMIF or a four-field CSV)** — the entity feature's sender, recipient, place and date fields exported for correspSearch (CMIF carries inferred marks) or as CSV; parked 2026-11-06 (Phase 4 of the processing review, owner: neither until a user asks). The sidecar fields are the same either way.
+
 ### Tagging Enhancements
 - **Tag suggestions from nearby documents** — use surrounding document context to improve tag accuracy
 - **Tag editing UI** — edit applied tags directly in the file pane without reprocessing

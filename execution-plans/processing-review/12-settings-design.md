@@ -91,7 +91,7 @@ money is involved: no cluster, no money, overnight, no kit.
 ### 3.2 The collection interview (a collection or a project of similar collections)
 
 Measured: the document mix (typewritten, printed, handwritten, forms and registers, clippings, newspapers) by the
-on-device classifier on a sample of the photographs (139 of 144 right, 0.2 s a page, `kind-classifier.md`), shown as
+on-device classifier on a sample of the photographs (137 of 141 owner pages right after the mixed-cut rework, about 0.6 s a page in all; `kind-atrium.md`, `kind-classifier.md` §6; the note first said 139 of 144 and 0.2 s, the old definition and the text-lines step alone), shown as
 shares the user can correct; the page count.
 
 Asked: the period (decades or centuries), the languages, the scripts (Latin, Kurrent, Greek, Hebrew, Arabic,

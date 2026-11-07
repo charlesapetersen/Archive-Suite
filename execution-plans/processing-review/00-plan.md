@@ -205,7 +205,7 @@ enhancement as OCR input on and off, dewarping, layout first, page-pair classifi
 context for dating, entity cues for dating and segmentation, and user-trained models against general ones.
 Sherlock first, FarmShare as fallback, the Mac for profile 1, paid APIs where a question needs them.
 
-## Phase 4 — decisions and the work queue (interactive)
+## Phase 4 — the rules, the table and the work queue (interactive)
 
 **The review's output is a way for users to choose their settings, not the owner's defaults (owner, 2026-11-04).**
 First: "Instead of setting my defaults, we should create a wizard or walkthrough or similar for users that produces
@@ -227,22 +227,45 @@ direction as it now stands:
   seeing what each change costs or gains.
 - **Defaults exist only behind this**, for a user who skips it, and the owner may set those.
 
-So each stage's recommendation is written as a rule the settings layer can apply: given the user's answers, which
-route and settings, with the measured reason, the expected cost and time, the alternatives with their own figures,
-and the fallback when an answer rules the first choice out. How the Q&A, the trade-off view and any wizard should
-work was researched first, in a Fable session (`W46.settings-design-research`, done 2026-11-04), which presented
-its options to the owner on a working prototype: the design and the owner's calls are `12-settings-design.md` (two
-interviews, the limits-first sheet with the range one tab away, live inheritance with the source of each value
-shown, the document mix measured and the period, languages and scripts asked, starting points as fills, priorities
-asked and shown as editable weights). Phase 4 fills that design with rules and files its build (the interviews, the
-rule table the sheet reads, the range view, the settings document per collection and the general layer; nothing
-assumes the Processor's present settings model, owner 2026-11-04). The owner's calls in Phase 4 are about the rules,
-the presentation and the skip-defaults, not about his own configuration.
+How the Q&A, the trade-off view and any wizard should work was researched first, in a Fable session
+(`W46.settings-design-research`, done 2026-11-04), which presented its options to the owner on a working prototype: the
+design and the owner's calls are `12-settings-design.md` (two interviews, the limits-first sheet with the range one tab
+away, live inheritance with the source of each value shown, the document mix measured and the period, languages and
+scripts asked, starting points as fills, priorities asked and shown as editable weights).
 
-- One decision note per stage, with the recommendation per profile and document kind, and what would change it as
-  models move. Each note ends in the settings layer's rule for that stage (above).
-- The owner's calls, walked one at a time.
-- The implementation queue filed with `ops/autonomous/plan-edit.sh`: the integration stages (W42.int-s1 to s7),
-  changes to app defaults and routes, the training kit and its plug-in point, the marks layer, and the long-term
-  entity and language items recorded with their test needs. Then `W46.review-done` is approved and the held items
-  are kept, rewritten or retired.
+**Reconciled with that design (owner, 2026-11-06).** Phase 4 was planned on 2026-10-20, before the design, and its
+per-profile decision notes were the owner's-defaults framing the design replaced: the recommendation per profile is what
+the solver computes at run time from the user's answers and a rule table, so nobody writes it as prose. The app already
+bundles two bench tables, `segbench-results/options.json` (decoded by `SegmentationApproach.swift`, with a test that fails
+if the two drift) and `segbench-results/ocr-page-guidance.json` (checked by `scripts/test-ocr-page-guidance.sh`), and its
+segmentation chooser already reads the user's keys, signed-in tools, plans and memory and offers only the routes they can
+use; the integration plan's stages 4 and 6 (2026-10-14) planned the same mechanism for OCR. The settings layer is the
+newer version of all of these, so Phase 4's output is what that layer loads, and nothing it produces is a per-profile
+essay:
+
+1. **The rule table**, `segbench-results/settings-routes.json`: one generated JSON for every stage, built from the result
+   files by `ArchiveProcessor/scripts/segbench/settings_routes.py` with a drift test, in the pattern of the two existing
+   tables. Its schema is `13-stage-rules/00-index.md`. The prototype's `settings-design/figures.json` and
+   `build_figures.py` are its draft; their hand-entered parts become bench outputs. Phase 4 writes the schema and the rows
+   with their sources; the generator and its test are the first build item.
+2. **One short rule note per stage** in `13-stage-rules/`, holding only what a table cannot: whether there is a choice at
+   all, the comparison metric and tie rule, the kind rules, the fallback, the caveats carried from
+   `11-measurement-audit.md` and `measure-reviews/`, what would change the rule as models move, and the owner's open
+   calls. The stages the design lists as no choice get a paragraph and a switch where the owner ruled one; segmentation,
+   reading, dating, entities and the training kit get the table rows and the stage rule.
+3. **The five user profiles become solver test cases**, not prose: the solver run on the table with each profile's
+   answers must give the expected pick per document kind. That is the stage-by-route check this plan asked for, and the
+   router tests integration stage 4 asked for.
+4. **The owner's calls, walked one at a time**: the rules the figures do not settle, the defaults behind the interviews,
+   the default stage weights, where the collection's settings document lives and whether the Reader and Notes read it,
+   and the two limits from the integration plan the design has no answer for ("local only" as an explicit switch; the
+   quality floor).
+5. **The queue filed with `ops/autonomous/plan-edit.sh`**: the settings build (the generator and its drift test, the
+   solver in Swift, the two interviews, the sheet, the range view, the settings document and the general layer), which
+   replaces integration stages 4 and 6; integration stages 1-3, 5 and 7 as they stand; the per-stage app changes (the
+   rotation default, the mixed-route setting, the kit and its plug-in point, the marks layer); the gaps the table cannot
+   fill honestly (`12-settings-design.md` §3.9) as items; the long-term entity and language items with their test needs.
+   Then `W46.review-done` is approved and the held items are kept, rewritten or retired.
+
+The owner's calls in Phase 4 are about the rules, the presentation and the skip-defaults, not about his own
+configuration. Progress is in `STATE.md`, Phase 4.

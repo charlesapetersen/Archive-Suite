@@ -131,3 +131,21 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
   per-project layering) and shown to the owner on a working prototype built from the bench's own figures
   (`settings-design/`, rebuilt by `build_figures.py` from `ArchiveOCRBench/data/panel-data.json`). The owner's six
   calls are in its section 1. Phase 4 fills the design with rules (section 3.8) and files the gaps it names (3.9).
+
+## Phase 4 (owner-started Fable session, 2026-11-06)
+
+Gate checked, not asked (owner, 2026-10-30): all 77 experiments W46.review-phase4 waited on were done in the trackers on
+2026-11-06 20:50; no open item outside the three review gates changes what Phase 4 reads. The engine is paused for the
+session (`manager.py pause "Archive Suite"`, as in Phase 2); the weekly Claude window stood at 91% with the reset on
+Tuesday 2026-11-10 18:00, which the owner weighed and accepted.
+
+- [x] 2026-11-06 — Phase 4 reconciled with the settings design (owner): its output is the rule table, one short rule
+  note per stage and the solver's profile test cases, not per-profile decision notes; integration stages 4 and 6 are
+  replaced by the settings build. `00-plan.md` §"Phase 4" rewritten; schema and note format in `13-stage-rules/00-index.md`.
+- [x] 2026-11-06 — The twelve stage rule notes drafted (parallel subagents, one pass), then checked against every measure-review
+  pass by one verifier, then read by this session. Drafts land in `13-stage-rules/01-..12-*.md`.
+- [x] 2026-11-06 — The solver's profile test cases, `13-stage-rules/13-profile-tests.md`, derived from the notes' section 9.
+- [x] 2026-11-06 — The owner's calls, walked one at a time (eleven); recorded in `13-stage-rules/14-owner-calls.md` and in each note.
+- [x] 2026-11-06 — The queue filed with plan-edit.sh (55 items) (the settings build, integration stages 1-3, 5 and 7, the per-stage app changes,
+  the table's gaps); `W46.review-done` approved; the 16 held items kept, rewritten or retired.
+- [ ] Commit, push, worktree removed, engine resumed (`manager.py resume "Archive Suite"`).
