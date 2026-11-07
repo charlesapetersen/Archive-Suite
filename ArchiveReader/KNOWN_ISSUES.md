@@ -2,6 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-doc-keys-focus, 2026-11-07) — document arrows and clicked-pane focus
+
+Plain arrows pan the focused PDF page, bounded at its edges; modified arrows retain menu and text-selection behavior. Clicking a PDF or extracted-text pane updates the focus border and focused zoom even without a selection. Rebuilt panes recover keyboard focus only when the window itself holds it, preserving the Find field’s caret.
+
+`DocumentPaneInputTests` exercises real PDFKit scroll geometry and never-ordered AppKit windows, including PDF/extracted-text replacements and a live field editor. Whole-window pointer/key verification remains in W40.fix-reader-doc-keys-focus-ui (blocked on W40.vm-macos27-reader); add/run `ViewerUITests.testDocumentPaneKeyboardFocusAndPan` there and inspect its screenshots.
+
 ## PDF header metadata and format ambiguities (W44.reocr-spec, 2026-11-07)
 
 Core now uses one structured parse for stripping and header metadata; `Kind:` and reader provenance

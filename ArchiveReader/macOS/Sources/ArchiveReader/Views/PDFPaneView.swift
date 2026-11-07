@@ -47,6 +47,12 @@ final class PDFPaneController {
     /// The user made a selection in this pane — set by `DocumentViewerModel`, which clears the other
     /// pane's so only one holds one (W40.fix-reader-copy-text-pane).
     var userSelected: (() -> Void)?
+    /// This pane's view became first responder (a click, Tab, Focus Image / Text Page), so the focus border
+    /// moves to it; and whether the viewer's focused pane is this one, so a freshly built view takes the
+    /// focus back when the old one left the window holding it. Set by `DocumentViewerModel`.
+    /// W40.fix-reader-doc-keys-focus.
+    var tookFocus: (() -> Void)?
+    var holdsFocus: (() -> Bool)?
     /// Called after the zoom is recorded or reset, so the viewer can republish what depends on it (whether
     /// Reset Zoom has anything to do). Set by `DocumentViewerModel`.
     var zoomChanged: (() -> Void)?
@@ -564,6 +570,69 @@ final class ReaderPDFView: PDFView {
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    // MARK: Arrow keys pan, and the focus follows the responder (W40.fix-reader-doc-keys-focus)
+
+    /// The owner's Reader session 2 (rows 6, 7): the arrow keys did nothing in the document window, and a
+    /// click in the text pane did not move the focus border. PDFKit's single-page mode reads ←/→ as page
+    /// turns, which a one-page document never has, so the arrows alone pan the page here instead.
+    override func keyDown(with event: NSEvent) {
+        if let direction = Self.panKey(event) { pan(direction); return }
+        super.keyDown(with: event)
+    }
+
+    /// How far one arrow press moves the page: a tenth of the pane, and never less than `minPanStep` points.
+    static let panFraction: CGFloat = 0.1
+    static let minPanStep: CGFloat = 40
+
+    /// The direction a plain arrow key moves the view over the page (x to the right, y up), nil for anything
+    /// else: a modifier means a menu command (⌘⇧↑ / ⌘⇧↓ page through the segment, ⌘⌥← / ⌘⌥→ switch the pane).
+    static func panKey(_ event: NSEvent) -> CGVector? {
+        guard event.type == .keyDown, let key = event.charactersIgnoringModifiers?.unicodeScalars.first,
+              event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                .subtracting([.numericPad, .function, .capsLock]).isEmpty else { return nil }
+        switch Int(key.value) {
+        case NSUpArrowFunctionKey: return CGVector(dx: 0, dy: 1)
+        case NSDownArrowFunctionKey: return CGVector(dx: 0, dy: -1)
+        case NSLeftArrowFunctionKey: return CGVector(dx: -1, dy: 0)
+        case NSRightArrowFunctionKey: return CGVector(dx: 1, dy: 0)
+        default: return nil
+        }
+    }
+
+    /// Scroll the page one step in `direction`, clamped to its edges. A page that fits the pane has nowhere
+    /// to go, so nothing moves.
+    func pan(_ direction: CGVector) {
+        guard let clip = documentView?.enclosingScrollView?.contentView else { return }
+        let visible = clip.bounds
+        let dx = direction.dx * max(Self.minPanStep, visible.width * Self.panFraction)
+        let dy = direction.dy * max(Self.minPanStep, visible.height * Self.panFraction)
+        let moved = NSRect(origin: CGPoint(x: visible.minX + dx, y: visible.minY + (clip.isFlipped ? -dy : dy)),
+                           size: visible.size)
+        let origin = clip.constrainBoundsRect(moved).origin
+        guard origin != visible.origin else { return }
+        clip.scroll(to: origin)
+        clip.enclosingScrollView?.reflectScrolledClipView(clip)
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { paneController?.tookFocus?() }
+        return became
+    }
+
+    /// Each page gets a fresh view (DV-3), and the old one leaves the window holding the focus, which then
+    /// falls to the window itself, so the arrows reached nothing after a page turn or on opening. The new
+    /// view takes it back when its pane is the focused one; never from a field or another view.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, paneController?.holdsFocus?() == true else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window, window.firstResponder === window,
+                  self.paneController?.holdsFocus?() == true else { return }
+            window.makeFirstResponder(self)
+        }
     }
 
     /// `true` for a zoom-in key, `false` for zoom-out, `nil` for anything else. Command alone, except

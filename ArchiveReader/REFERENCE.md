@@ -286,8 +286,8 @@ writes against the real corpus — always a copy.
   right-click menu (Set as Secondary Sort / Default Sort).
 - *Row context menu only (no menu-bar item):* Open in Default App — opens every selected file, read-only.
 
-*Document window* (the **focused pane** carries an accent border; switch it with `⌘⌥←`/`⌘⌥→`)
-- `↑/↓` **scroll** the focused page (PDFView) — *not* document cycling
+*Document window* (the **focused pane** carries an accent border; click a pane or switch it with `⌘⌥←`/`⌘⌥→`)
+- `←/→/↑/↓` **pan** the focused PDF page, stopping at its edges; a fitted page stays put. In the extracted-text pane, arrows keep their native text-navigation behavior (W40.fix-reader-doc-keys-focus).
 - `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
 - `⌘+`/`⌘−` zoom in/out the focused pane (also `⌘=`, and `⌘↑`/`⌘↓`, answered by the panes since a menu item

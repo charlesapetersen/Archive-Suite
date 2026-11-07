@@ -17,6 +17,10 @@ final class ExtractedTextController {
     /// The user made a selection here (the view is first responder, so it is not find's doing). Set by
     /// `DocumentViewerModel`, which clears the image pane's selection so only one pane holds one.
     var userSelected: (() -> Void)?
+    /// The view became first responder, and whether the text pane is the focused one — as
+    /// `PDFPaneController.tookFocus` / `holdsFocus` (W40.fix-reader-doc-keys-focus).
+    var tookFocus: (() -> Void)?
+    var holdsFocus: (() -> Bool)?
 
     /// The selected text, verbatim (nil if nothing is selected here).
     func plainSelection() -> String? {
@@ -169,5 +173,25 @@ final class ExtractedTextView: NSTextView {
     override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(copy(_:)), let canCopy = controller?.canCopySelection { return canCopy() }
         return super.validateMenuItem(menuItem)
+    }
+
+    /// A click here moves the focus border to the text pane (owner's Reader session 2, row 7), as Tab or
+    /// Focus Text Page does.
+    override func becomeFirstResponder() -> Bool {
+        let became = super.becomeFirstResponder()
+        if became { controller?.tookFocus?() }
+        return became
+    }
+
+    /// Takes the focus back when the text pane is the focused one and nothing holds it, as `ReaderPDFView`
+    /// does for a rebuilt PDF pane.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, controller?.holdsFocus?() == true else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window, window.firstResponder === window,
+                  self.controller?.holdsFocus?() == true else { return }
+            window.makeFirstResponder(self)
+        }
     }
 }

@@ -88,11 +88,15 @@ final class DocumentViewerModel: ObservableObject {
         textController.copySelection = { [weak self] in self?.copyPlainSelection() }
         textController.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
         textController.userSelected = { [weak self] in self?.userSelected(in: .right) }
+        textController.tookFocus = { [weak self] in self?.paneTookFocus(.right) }
+        textController.holdsFocus = { [weak self] in self?.focusedPane == .right }
         for controller in [leftController, rightController] {
             controller.copySelection = { [weak self] in self?.copyPlainSelection() }
             controller.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
             let pane: Pane = controller === leftController ? .left : .right
             controller.userSelected = { [weak self] in self?.userSelected(in: pane) }
+            controller.tookFocus = { [weak self] in self?.paneTookFocus(pane) }
+            controller.holdsFocus = { [weak self] in self?.focusedPane == pane }
             // ⌘= / ⌘↑ / ⌘↓ reaching either pane zoom the FOCUSED pane (`ReaderPDFView.performKeyEquivalent`).
             controller.zoomFocused = { [weak self] zoomIn in
                 if zoomIn { self?.zoomFocusedIn() } else { self?.zoomFocusedOut() }
@@ -161,6 +165,12 @@ final class DocumentViewerModel: ObservableObject {
     func focusPane(_ p: Pane) {
         focusedPane = p
         if p == .right, !hasTextPage { textController.focus() } else { controller(p).focus() }
+    }
+    /// A pane's view became first responder — a click in it, Tab, or `focusPane` — so the focus border and
+    /// the zoom keys follow it (owner's Reader session 2, row 7: a click in the text pane left the border on
+    /// the image). W40.fix-reader-doc-keys-focus.
+    func paneTookFocus(_ p: Pane) {
+        if focusedPane != p { focusedPane = p }
     }
     func zoomFocusedIn()  { focusedPane == .left ? leftController.zoomIn() : zoomTextIn() }
     func zoomFocusedOut() { focusedPane == .left ? leftController.zoomOut() : zoomTextOut() }
