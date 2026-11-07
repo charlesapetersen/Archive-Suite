@@ -2,6 +2,7 @@
 """W46.ent-truth-owner-fold: the owner's entity answers folded into W46.fix-ent-truth, and the sending-place rule.
 
     python3 ent_truth_owner.py fold      # ent-truth/owner-corrections.json (private), from the item-field sheet
+                                         # and W46.place-rule-sheet's sending places (fold_places)
     python3 ent_truth_owner.py report    # segbench-results/ent-truth-owner.md and .json: the restated scores
 
 Where the answers come from. W47.item-fields-retruth's sheet (answered 2026-11-05) carried 20 entity controls: fields
@@ -64,6 +65,50 @@ NOTE_RULINGS = {
 }
 NOTE_CONFIRMS = {("7027e78edadc8045", "recipient"), ("ff1879de353d9f77", "sender"), ("ff1879de353d9f77", "recipient"),
                  ("3846b1232f5cff80", "sender"), ("3846b1232f5cff80", "recipient"), ("2a7dd985f800b3d2", "sender")}
+
+# W46.place-rule-fold: the owner's answers on W46.place-rule-sheet's 20 sending places (answered 2026-11-06), one
+# question a document (ent_place_sheet.py): "1" confirms the place shown as where the document says it was sent from,
+# "=" typed empty says the document does not say. PLACE_NOTE_RULINGS holds the notes that override an answer.
+PLACE_SHEET = os.path.join(ET.CACHE, "place-sheet")
+PLACE_NOTE_RULINGS = {
+    "43aea2d84ff37d78": ("none", "answered as the place, but the note: no sent-from place given"),
+}
+
+
+def fold_places(truth, docs):
+    """The place sheet's answers as sending_place corrections, set outright so place_rule leaves them as he set them:
+    the places the rule keeps on the document, with the asked place kept when he confirmed it (marked named: he says
+    the document writes it) and dropped when he said the document does not say. Returns the asked list."""
+    key = json.load(open(os.path.join(PLACE_SHEET, "key.json"), encoding="utf-8"))["items"]
+    answers = json.load(open(os.path.join(PLACE_SHEET, "answers.json"), encoding="utf-8"))
+    text = {d["id"]: d["text"] for d in ET.load_docs()}
+    asked = []
+    for n, k in sorted(key.items()):
+        d, a = k["doc"], answers.get(n)
+        if "sending_place" in docs.get(d, {}):
+            raise SystemExit(f"{d}: the place sheet asks a sending place the item-field sheet already settled")
+        if d in PLACE_NOTE_RULINGS:
+            act, why = PLACE_NOTE_RULINGS[d]
+            written, by = {"none": False}[act], "note"
+        elif a == "1":
+            written, by, why = True, "sheet answer", None
+        elif a == "=":
+            written, by, why = False, "sheet answer", None
+        else:
+            raise SystemExit(f"{n}: answer {a!r} is neither a confirmation nor an empty correction")
+        built = truth[d]["sending_place"]
+        asked_e = [e for e in built if e["name"] == k["place"]]
+        if len(asked_e) != 1:
+            raise SystemExit(f"{d}: the asked place {k['place']!r} is not once in the truth as built")
+        kept = ET.place_rule({**truth[d], "owner_checked": [], "unscored": []}, text[d])["sending_place"]
+        value = [e for e in built if (written if e is asked_e[0] else e in kept)]
+        value = [{**e, "class": "named"} if e is asked_e[0] else e for e in value]
+        docs.setdefault(d, {})["sending_place"] = {"action": "set", "value": value, "how": "place sheet " + by.split()[-1],
+                                                   **({"reason": why} if why else {})}
+        asked.append({"doc": d, "class": k["class"], "kind": k["kind"], "place_class": k["place_class"],
+                      "answer": a, "by": by, "written": written,
+                      "in_text": ET.in_text(k["place"].split(",")[0], text[d])})
+    return asked
 
 
 def names(v):
@@ -139,9 +184,11 @@ def fold():
         if not truth[d][f]:
             raise SystemExit(f"{d} {f}: a note confirms a field the truth has empty")
         docs[d][f] = {"action": "confirm", "how": "note", "reason": "a note on the document names the same"}
-    return {"_about": "W46.ent-truth-owner-fold: the owner's answers and notes on W47.item-fields-retruth's sheet, "
-                      "applied by ent_truth.load_truth. Private (the owner's material).",
-            "docs": dict(docs), "asked": asked}
+    place_asked = fold_places(truth, docs)
+    return {"_about": "W46.ent-truth-owner-fold and W46.place-rule-fold: the owner's answers and notes on "
+                      "W47.item-fields-retruth's sheet and W46.place-rule-sheet's, applied by ent_truth.load_truth. "
+                      "Private (the owner's material).",
+            "docs": dict(docs), "asked": asked, "place_asked": place_asked}
 
 
 def cmd_fold(_a):
@@ -252,6 +299,10 @@ def cmd_report(_a):
                           "gemini-3.7 tagging-new-rerun, Vision")):
         s["paired"][name] = {k: paired_city(P_[a_], P_[b_], by[k]) for k in ("built", "owner+rule")}
     s["asked"] = dict(collections.Counter(x["field"] for x in corr["asked"]))
+    s["place_sheet"] = {cls: {"n": sum(x["class"] == cls for x in corr["place_asked"]),
+                              "written": sum(x["class"] == cls and x["written"] for x in corr["place_asked"]),
+                              "by_note": sum(x["class"] == cls and x["by"] == "note" for x in corr["place_asked"])}
+                        for cls in ("kept", "emptied")}
     json.dump(s, open(RESULTS[:-3] + ".json", "w"), indent=1)
     open(RESULTS, "w").write(report(s))
     print(RESULTS)
@@ -262,7 +313,7 @@ def f3(x):
 
 
 def report(s):
-    R = s["rulings"]
+    R, ps = s["rulings"], s["place_sheet"]
     L = ["# The entity truth with the owner's answers, and the sending-place rule (W46.ent-truth-owner-fold)", "",
          "Generated by `scripts/segbench/ent_truth_owner.py report`; method in its header. Counts only: the truth and "
          "the corrections stay in the bench cache (`ent-truth/truth.jsonl`, `ent-truth/owner-corrections.json`). "
@@ -313,10 +364,19 @@ def report(s):
           "", "## The rule", "",
           f"The owner emptied all {ak_inf} inferred places he was asked and the {ak_inst} taken from an "
           f"institution's name; of the {ak_hd} heading-or-address places asked, he upheld {ak_hd_up} (one in a "
-          f"letterhead address) and emptied {ak_hd - ak_hd_up}, his note saying the place is not given in the text. So "
-          "the emptied class (inferred places) is supported by his answers, and the kept heading-or-address class, "
-          f"which holds {hd_kept} of the {owner_rule_named} places the truth now keeps, rests on {ak_hd} rulings, 1 "
-          "of them against it (W46.place-rule-sheet checks it). The "
+          f"letterhead address) and emptied {ak_hd - ak_hd_up}, his note saying the place is not given in the text. So on "
+          "that sheet the emptied class (inferred places) was supported by his answers, and the kept heading-or-address class, "
+          f"which holds {hd_kept} of the {owner_rule_named} places the truth now keeps, rested on {ak_hd} rulings, 1 "
+          "of them against it.", "",
+          f"W46.place-rule-sheet then asked {ps['kept']['n']} places the rule keeps in a heading or address and "
+          f"{ps['emptied']['n']} it emptied (W46.place-rule-fold folds the answers; the class error is in "
+          f"`ent-place-rule.md`): he confirmed {ps['kept']['written']} of the {ps['kept']['n']} kept places as where "
+          f"the document says it was sent from, and of the {ps['emptied']['n']} emptied, said {ps['emptied']['written']}"
+          f" are written and {ps['emptied']['n'] - ps['emptied']['written']} are not ({ps['emptied']['by_note']} by a "
+          "note overriding the answer). So the kept class holds, and the emptied class does not: a place the "
+          "truth's drafters classed as inferred is, as often as not on this draw, one he finds written, and the "
+          "rule's emptied places on the documents nobody checked are uncertain truth. His answers are set outright "
+          "on those documents, so the rule does not touch them. The "
           "sending place is a place the document writes, in a dateline, a letterhead or an address, and never one "
           "inferred from the collection, the content or an institution's name (`ent_truth.place_rule`). A letterhead "
           "place stays: the owner upheld one, and his note that a letterhead is not always where a letter was sent "
@@ -360,8 +420,10 @@ def report(s):
           "## Measurement card", "",
           "- **Truth.** W46.fix-ent-truth (GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating), with the "
           "owner's answers on the 23 fields his sheet asked (all of them fields Sonnet ruled for its own reader) and "
-          "six confirming notes. The rest of the set has no owner check; the 20 documents asked (23 fields) were "
-          "chosen as Sonnet's self-rulings, so they say how far to trust those, not the agreed rows. "
+          "six confirming notes, and on the 20 sending places W46.place-rule-sheet asked (a seeded draw of the "
+          "places the rule keeps in a heading or address and of those it emptied). The rest of the set has no owner "
+          "check; the 20 documents the first sheet asked (23 fields) were chosen as Sonnet's self-rulings, so they "
+          "say how far to trust those, not the agreed rows. "
           + ET.SELF_RULINGS + " No scored route drafted the truth.",
           "- **Selection.** The 138 correspondence documents and the reports' own subsets (the 82 with cached "
           "tagging replies); nothing chosen by a scored route. The set itself was chosen by ABBYY text: its 56 "
@@ -377,7 +439,8 @@ def report(s):
           "cannot tell a letterhead from a typed address or check a place against the image; its dateline count is "
           "low because the OCR often puts the date on its own line. Whether a letterhead place should count when "
           "nothing else names the place is the owner's caveat and is not tested; the kept heading-or-address class "
-          "is checked by the owner on 3 places (W46.place-rule-sheet and W46.place-rule-fold check it on more). "
+          f"is checked by the owner on {3 + ps['kept']['n']} places, the emptied class on {ps['emptied']['n']} more "
+          "(W46.place-rule-fold). "
           "The app's tagging prompt carries the rule since 4374254d (W46.ent-place-rule-paid, `ent-place-rule.md`); "
           "the dedicated entity prompt with the rule tied and was left unchanged.", ""]
     return "\n".join(L)

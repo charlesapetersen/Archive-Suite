@@ -45,23 +45,23 @@
     "docs": 137
    },
    "sending_place": {
-    "precision": 0.6190476190476191,
-    "recall": 0.7647058823529411,
-    "f1": 0.6842105263157895,
-    "tp": 52,
-    "fp": 32,
+    "precision": 0.6666666666666666,
+    "recall": 0.7777777777777778,
+    "f1": 0.717948717948718,
+    "tp": 56,
+    "fp": 28,
     "fn": 16,
-    "wrong_when_filled_docs": 32,
-    "filled_when_empty": 18,
-    "truth_nonempty": 68,
+    "wrong_when_filled_docs": 28,
+    "filled_when_empty": 14,
+    "truth_nonempty": 72,
     "docs": 138
    },
    "city": {
-    "tp": 63,
-    "fp": 21,
+    "tp": 67,
+    "fp": 17,
     "fn": 5,
-    "f1": 0.8289473684210527,
-    "precision": 0.75
+    "f1": 0.8589743589743589,
+    "precision": 0.7976190476190477
    },
    "n": 138
   },
@@ -138,21 +138,21 @@
    },
    "sending_place": {
     "precision": 0.855072463768116,
-    "recall": 0.8676470588235294,
-    "f1": 0.8613138686131386,
+    "recall": 0.8194444444444444,
+    "f1": 0.8368794326241135,
     "tp": 59,
     "fp": 10,
-    "fn": 9,
+    "fn": 13,
     "wrong_when_filled_docs": 10,
     "filled_when_empty": 2,
-    "truth_nonempty": 68,
+    "truth_nonempty": 72,
     "docs": 138
    },
    "city": {
     "tp": 63,
     "fp": 6,
-    "fn": 5,
-    "f1": 0.9197080291970803,
+    "fn": 9,
+    "f1": 0.8936170212765957,
     "precision": 0.9130434782608695
    },
    "n": 138
@@ -184,21 +184,21 @@
    },
    "sending_place": {
     "precision": 0.7575757575757576,
-    "recall": 0.7352941176470589,
-    "f1": 0.746268656716418,
+    "recall": 0.6944444444444444,
+    "f1": 0.7246376811594203,
     "tp": 50,
     "fp": 16,
-    "fn": 18,
+    "fn": 22,
     "wrong_when_filled_docs": 16,
     "filled_when_empty": 1,
-    "truth_nonempty": 68,
+    "truth_nonempty": 72,
     "docs": 138
    },
    "city": {
     "tp": 61,
     "fp": 5,
-    "fn": 7,
-    "f1": 0.9104477611940298,
+    "fn": 11,
+    "f1": 0.8840579710144928,
     "precision": 0.9242424242424242
    },
    "n": 138
@@ -276,21 +276,21 @@
    },
    "sending_place": {
     "precision": 0.8333333333333334,
-    "recall": 0.8088235294117647,
-    "f1": 0.8208955223880597,
+    "recall": 0.7638888888888888,
+    "f1": 0.7971014492753623,
     "tp": 55,
     "fp": 11,
-    "fn": 13,
+    "fn": 17,
     "wrong_when_filled_docs": 11,
     "filled_when_empty": 1,
-    "truth_nonempty": 68,
+    "truth_nonempty": 72,
     "docs": 138
    },
    "city": {
     "tp": 61,
     "fp": 5,
-    "fn": 7,
-    "f1": 0.9104477611940298,
+    "fn": 11,
+    "f1": 0.8840579710144928,
     "precision": 0.9242424242424242
    },
    "n": 138
@@ -360,15 +360,15 @@
    },
    "sending_place": {
     "n": 138,
-    "diff": 0.062058130400628464,
-    "lo": -0.014872216351610512,
-    "hi": 0.1398601398601398
+    "diff": 0.006688963210702337,
+    "lo": -0.07792207792207795,
+    "hi": 0.08914285714285708
    },
    "city": {
     "n": 138,
-    "diff": 0.08150039277297716,
-    "lo": 0.0248958727754639,
-    "hi": 0.14382566585956413
+    "diff": 0.025083612040133874,
+    "lo": -0.0388278388278388,
+    "hi": 0.08499509643674397
    }
   },
   "entity: the rule added": {
@@ -388,15 +388,15 @@
    },
    "sending_place": {
     "n": 138,
-    "diff": -0.040418346225078894,
-    "lo": -0.10645302897278319,
-    "hi": 0.01904358865848499
+    "diff": -0.039777983348751156,
+    "lo": -0.10460536680144938,
+    "hi": 0.018014243820695497
    },
    "city": {
     "n": 138,
-    "diff": -0.009260268003050465,
-    "lo": -0.0376838235294118,
-    "hi": 0.014663461538461542
+    "diff": -0.009559050262102908,
+    "lo": -0.037553832902670115,
+    "hi": 0.01381230854915061
    }
   },
   "tagging with the rule against entity with it": {
@@ -416,14 +416,14 @@
    },
    "sending_place": {
     "n": 138,
-    "diff": -0.07462686567164178,
-    "lo": -0.17518248175182483,
-    "hi": 0.019178082191780854
+    "diff": -0.07246376811594202,
+    "lo": -0.1705426356589147,
+    "hi": 0.018713680685511713
    },
    "city": {
     "n": 138,
     "diff": 0.0,
-    "lo": -0.023345153664302565,
+    "lo": -0.02324263038548746,
     "hi": 0.02392617067335079
    }
   },
@@ -517,40 +517,746 @@
    "a": "tagging-new",
    "b": "tagging-place",
    "full": {
-    "n": 112,
-    "diff": 0.0036782603991993845,
-    "lo": -0.06876553438276711,
-    "hi": 0.0739791247024354
+    "n": 120,
+    "diff": -0.021750845049723244,
+    "lo": -0.10056258790436012,
+    "hi": 0.05847953216374269
    },
    "city": {
-    "n": 112,
-    "diff": 0.010818412938821798,
-    "lo": -0.036484245439469376,
-    "hi": 0.053787268331990434
+    "n": 120,
+    "diff": -0.008817910155293207,
+    "lo": -0.06632198252807986,
+    "hi": 0.046954595791805165
    }
   },
   "entity: the rule added": {
    "a": "entity3k",
    "b": "entity3k-place",
    "full": {
-    "n": 112,
-    "diff": -0.04700640490114183,
-    "lo": -0.11054691632286051,
-    "hi": 0.012587412587412583
+    "n": 120,
+    "diff": -0.04600115528015547,
+    "lo": -0.1076779540091104,
+    "hi": 0.011935208866155067
    },
    "city": {
-    "n": 112,
-    "diff": -0.016040100250626632,
-    "lo": -0.04170582706766912,
+    "n": 120,
+    "diff": -0.015963871238775407,
+    "lo": -0.042293233082706716,
     "hi": 0.0
    }
   }
  },
- "rule_dropped": 26,
+ "rule_dropped": 18,
+ "owner_check": {
+  "kept": {
+   "n": 12,
+   "written": 12,
+   "wrong": 0,
+   "wilson": [
+    0.0,
+    0.243
+   ],
+   "by_note": 0,
+   "kinds": {
+    "heading or address": 12
+   },
+   "written_kinds": {
+    "heading or address": 12
+   }
+  },
+  "emptied": {
+   "n": 8,
+   "written": 4,
+   "wrong": 4,
+   "wilson": [
+    0.215,
+    0.785
+   ],
+   "by_note": 1,
+   "kinds": {
+    "institution name": 1,
+    "inferred": 7
+   },
+   "written_kinds": {
+    "inferred": 4
+   }
+  }
+ },
+ "subsets": {
+  "owner-checked place": {
+   "n": 32,
+   "scores": {
+    "tagging-new": {
+     "sender": {
+      "precision": 0.9047619047619048,
+      "recall": 0.6129032258064516,
+      "f1": 0.7307692307692307,
+      "tp": 19,
+      "fp": 2,
+      "fn": 12,
+      "wrong_when_filled_docs": 2,
+      "filled_when_empty": 1,
+      "truth_nonempty": 30,
+      "docs": 32
+     },
+     "recipient": {
+      "precision": 0.9423076923076923,
+      "recall": 0.9245283018867925,
+      "f1": 0.9333333333333333,
+      "tp": 49,
+      "fp": 3,
+      "fn": 4,
+      "wrong_when_filled_docs": 3,
+      "filled_when_empty": 0,
+      "truth_nonempty": 30,
+      "docs": 31
+     },
+     "sending_place": {
+      "precision": 0.6956521739130435,
+      "recall": 0.8888888888888888,
+      "f1": 0.7804878048780488,
+      "tp": 16,
+      "fp": 7,
+      "fn": 2,
+      "wrong_when_filled_docs": 7,
+      "filled_when_empty": 6,
+      "truth_nonempty": 18,
+      "docs": 32
+     },
+     "city": {
+      "tp": 17,
+      "fp": 6,
+      "fn": 1,
+      "f1": 0.8292682926829268,
+      "precision": 0.7391304347826086
+     },
+     "n": 32
+    },
+    "tagging-place": {
+     "sender": {
+      "precision": 0.9047619047619048,
+      "recall": 0.6129032258064516,
+      "f1": 0.7307692307692307,
+      "tp": 19,
+      "fp": 2,
+      "fn": 12,
+      "wrong_when_filled_docs": 2,
+      "filled_when_empty": 1,
+      "truth_nonempty": 30,
+      "docs": 32
+     },
+     "recipient": {
+      "precision": 0.9615384615384616,
+      "recall": 0.9433962264150944,
+      "f1": 0.9523809523809524,
+      "tp": 50,
+      "fp": 2,
+      "fn": 3,
+      "wrong_when_filled_docs": 2,
+      "filled_when_empty": 0,
+      "truth_nonempty": 30,
+      "docs": 31
+     },
+     "sending_place": {
+      "precision": 0.9230769230769231,
+      "recall": 0.6666666666666666,
+      "f1": 0.7741935483870968,
+      "tp": 12,
+      "fp": 1,
+      "fn": 6,
+      "wrong_when_filled_docs": 1,
+      "filled_when_empty": 0,
+      "truth_nonempty": 18,
+      "docs": 32
+     },
+     "city": {
+      "tp": 13,
+      "fp": 0,
+      "fn": 5,
+      "f1": 0.8387096774193549,
+      "precision": 1.0
+     },
+     "n": 32
+    },
+    "entity3k": {
+     "sender": {
+      "precision": 0.7241379310344828,
+      "recall": 0.6774193548387096,
+      "f1": 0.7,
+      "tp": 21,
+      "fp": 8,
+      "fn": 10,
+      "wrong_when_filled_docs": 8,
+      "filled_when_empty": 1,
+      "truth_nonempty": 30,
+      "docs": 32
+     },
+     "recipient": {
+      "precision": 0.9622641509433962,
+      "recall": 0.9622641509433962,
+      "f1": 0.9622641509433962,
+      "tp": 51,
+      "fp": 2,
+      "fn": 2,
+      "wrong_when_filled_docs": 2,
+      "filled_when_empty": 0,
+      "truth_nonempty": 30,
+      "docs": 31
+     },
+     "sending_place": {
+      "precision": 1.0,
+      "recall": 0.7222222222222222,
+      "f1": 0.8387096774193548,
+      "tp": 13,
+      "fp": 0,
+      "fn": 5,
+      "wrong_when_filled_docs": 0,
+      "filled_when_empty": 0,
+      "truth_nonempty": 18,
+      "docs": 32
+     },
+     "city": {
+      "tp": 13,
+      "fp": 0,
+      "fn": 5,
+      "f1": 0.8387096774193549,
+      "precision": 1.0
+     },
+     "n": 32
+    },
+    "entity3k-place": {
+     "sender": {
+      "precision": 0.6896551724137931,
+      "recall": 0.6451612903225806,
+      "f1": 0.6666666666666667,
+      "tp": 20,
+      "fp": 9,
+      "fn": 11,
+      "wrong_when_filled_docs": 9,
+      "filled_when_empty": 1,
+      "truth_nonempty": 30,
+      "docs": 32
+     },
+     "recipient": {
+      "precision": 0.9811320754716981,
+      "recall": 0.9811320754716981,
+      "f1": 0.9811320754716981,
+      "tp": 52,
+      "fp": 1,
+      "fn": 1,
+      "wrong_when_filled_docs": 1,
+      "filled_when_empty": 0,
+      "truth_nonempty": 30,
+      "docs": 31
+     },
+     "sending_place": {
+      "precision": 1.0,
+      "recall": 0.7222222222222222,
+      "f1": 0.8387096774193548,
+      "tp": 13,
+      "fp": 0,
+      "fn": 5,
+      "wrong_when_filled_docs": 0,
+      "filled_when_empty": 0,
+      "truth_nonempty": 18,
+      "docs": 32
+     },
+     "city": {
+      "tp": 13,
+      "fp": 0,
+      "fn": 5,
+      "f1": 0.8387096774193549,
+      "precision": 1.0
+     },
+     "n": 32
+    }
+   },
+   "paired": {
+    "tagging: the rule added": {
+     "a": "tagging-new",
+     "b": "tagging-place",
+     "full": {
+      "n": 32,
+      "diff": -0.006294256490952055,
+      "lo": -0.1853281853281854,
+      "hi": 0.16205128205128205
+     },
+     "city": {
+      "n": 32,
+      "diff": 0.009441384736428082,
+      "lo": -0.1711652402896643,
+      "hi": 0.17575757575757578
+     }
+    },
+    "entity: the rule added": {
+     "a": "entity3k",
+     "b": "entity3k-place",
+     "full": {
+      "n": 32,
+      "diff": 0.0,
+      "lo": 0.0,
+      "hi": 0.0
+     },
+     "city": {
+      "n": 32,
+      "diff": 0.0,
+      "lo": 0.0,
+      "hi": 0.0
+     }
+    }
+   }
+  },
+  "the rest": {
+   "n": 106,
+   "scores": {
+    "tagging-new": {
+     "sender": {
+      "precision": 0.9264705882352942,
+      "recall": 0.6057692307692307,
+      "f1": 0.7325581395348838,
+      "tp": 63,
+      "fp": 5,
+      "fn": 41,
+      "wrong_when_filled_docs": 5,
+      "filled_when_empty": 0,
+      "truth_nonempty": 97,
+      "docs": 104
+     },
+     "recipient": {
+      "precision": 0.8252427184466019,
+      "recall": 0.7203389830508474,
+      "f1": 0.7692307692307693,
+      "tp": 85,
+      "fp": 18,
+      "fn": 33,
+      "wrong_when_filled_docs": 18,
+      "filled_when_empty": 1,
+      "truth_nonempty": 100,
+      "docs": 106
+     },
+     "sending_place": {
+      "precision": 0.6557377049180327,
+      "recall": 0.7407407407407407,
+      "f1": 0.6956521739130433,
+      "tp": 40,
+      "fp": 21,
+      "fn": 14,
+      "wrong_when_filled_docs": 21,
+      "filled_when_empty": 8,
+      "truth_nonempty": 54,
+      "docs": 106
+     },
+     "city": {
+      "tp": 50,
+      "fp": 11,
+      "fn": 4,
+      "f1": 0.8695652173913043,
+      "precision": 0.819672131147541
+     },
+     "n": 106
+    },
+    "tagging-place": {
+     "sender": {
+      "precision": 0.9,
+      "recall": 0.6057692307692307,
+      "f1": 0.7241379310344827,
+      "tp": 63,
+      "fp": 7,
+      "fn": 41,
+      "wrong_when_filled_docs": 7,
+      "filled_when_empty": 0,
+      "truth_nonempty": 97,
+      "docs": 104
+     },
+     "recipient": {
+      "precision": 0.8155339805825242,
+      "recall": 0.711864406779661,
+      "f1": 0.7601809954751131,
+      "tp": 84,
+      "fp": 19,
+      "fn": 34,
+      "wrong_when_filled_docs": 19,
+      "filled_when_empty": 1,
+      "truth_nonempty": 100,
+      "docs": 106
+     },
+     "sending_place": {
+      "precision": 0.7169811320754716,
+      "recall": 0.7037037037037037,
+      "f1": 0.7102803738317758,
+      "tp": 38,
+      "fp": 15,
+      "fn": 16,
+      "wrong_when_filled_docs": 15,
+      "filled_when_empty": 1,
+      "truth_nonempty": 54,
+      "docs": 106
+     },
+     "city": {
+      "tp": 48,
+      "fp": 5,
+      "fn": 6,
+      "f1": 0.897196261682243,
+      "precision": 0.9056603773584906
+     },
+     "n": 106
+    },
+    "entity3k": {
+     "sender": {
+      "precision": 0.7469879518072289,
+      "recall": 0.5961538461538461,
+      "f1": 0.6631016042780747,
+      "tp": 62,
+      "fp": 21,
+      "fn": 42,
+      "wrong_when_filled_docs": 21,
+      "filled_when_empty": 0,
+      "truth_nonempty": 97,
+      "docs": 104
+     },
+     "recipient": {
+      "precision": 0.8558558558558559,
+      "recall": 0.8050847457627118,
+      "f1": 0.8296943231441049,
+      "tp": 95,
+      "fp": 16,
+      "fn": 23,
+      "wrong_when_filled_docs": 15,
+      "filled_when_empty": 1,
+      "truth_nonempty": 100,
+      "docs": 106
+     },
+     "sending_place": {
+      "precision": 0.8214285714285714,
+      "recall": 0.8518518518518519,
+      "f1": 0.8363636363636364,
+      "tp": 46,
+      "fp": 10,
+      "fn": 8,
+      "wrong_when_filled_docs": 10,
+      "filled_when_empty": 2,
+      "truth_nonempty": 54,
+      "docs": 106
+     },
+     "city": {
+      "tp": 50,
+      "fp": 6,
+      "fn": 4,
+      "f1": 0.9090909090909091,
+      "precision": 0.8928571428571429
+     },
+     "n": 106
+    },
+    "entity3k-place": {
+     "sender": {
+      "precision": 0.7831325301204819,
+      "recall": 0.625,
+      "f1": 0.6951871657754011,
+      "tp": 65,
+      "fp": 18,
+      "fn": 39,
+      "wrong_when_filled_docs": 18,
+      "filled_when_empty": 0,
+      "truth_nonempty": 97,
+      "docs": 104
+     },
+     "recipient": {
+      "precision": 0.8558558558558559,
+      "recall": 0.8050847457627118,
+      "f1": 0.8296943231441049,
+      "tp": 95,
+      "fp": 16,
+      "fn": 23,
+      "wrong_when_filled_docs": 15,
+      "filled_when_empty": 1,
+      "truth_nonempty": 100,
+      "docs": 106
+     },
+     "sending_place": {
+      "precision": 0.7924528301886793,
+      "recall": 0.7777777777777778,
+      "f1": 0.7850467289719626,
+      "tp": 42,
+      "fp": 11,
+      "fn": 12,
+      "wrong_when_filled_docs": 11,
+      "filled_when_empty": 1,
+      "truth_nonempty": 54,
+      "docs": 106
+     },
+     "city": {
+      "tp": 48,
+      "fp": 5,
+      "fn": 6,
+      "f1": 0.897196261682243,
+      "precision": 0.9056603773584906
+     },
+     "n": 106
+    }
+   },
+   "paired": {
+    "tagging: the rule added": {
+     "a": "tagging-new",
+     "b": "tagging-place",
+     "full": {
+      "n": 106,
+      "diff": 0.01462819991873221,
+      "lo": -0.07534766118836911,
+      "hi": 0.10543840177580466
+     },
+     "city": {
+      "n": 106,
+      "diff": 0.027631044290938656,
+      "lo": -0.0372192162649615,
+      "hi": 0.0897797264850193
+     }
+    },
+    "entity: the rule added": {
+     "a": "entity3k",
+     "b": "entity3k-place",
+     "full": {
+      "n": 106,
+      "diff": -0.051316907391673716,
+      "lo": -0.13461538461538458,
+      "hi": 0.0236307015936984
+     },
+     "city": {
+      "n": 106,
+      "diff": -0.011894647408666081,
+      "lo": -0.048120300751879785,
+      "hi": 0.02066382539067546
+     }
+    }
+   }
+  },
+  "the rest, rule did not empty": {
+   "n": 88,
+   "scores": {
+    "tagging-new": {
+     "sender": {
+      "precision": 0.9245283018867925,
+      "recall": 0.5697674418604651,
+      "f1": 0.7050359712230215,
+      "tp": 49,
+      "fp": 4,
+      "fn": 37,
+      "wrong_when_filled_docs": 4,
+      "filled_when_empty": 0,
+      "truth_nonempty": 79,
+      "docs": 86
+     },
+     "recipient": {
+      "precision": 0.8441558441558441,
+      "recall": 0.7558139534883721,
+      "f1": 0.7975460122699386,
+      "tp": 65,
+      "fp": 12,
+      "fn": 21,
+      "wrong_when_filled_docs": 12,
+      "filled_when_empty": 1,
+      "truth_nonempty": 82,
+      "docs": 88
+     },
+     "sending_place": {
+      "precision": 0.7407407407407407,
+      "recall": 0.7407407407407407,
+      "f1": 0.7407407407407407,
+      "tp": 40,
+      "fp": 14,
+      "fn": 14,
+      "wrong_when_filled_docs": 14,
+      "filled_when_empty": 1,
+      "truth_nonempty": 54,
+      "docs": 88
+     },
+     "city": {
+      "tp": 50,
+      "fp": 4,
+      "fn": 4,
+      "f1": 0.9259259259259259,
+      "precision": 0.9259259259259259
+     },
+     "n": 88
+    },
+    "tagging-place": {
+     "sender": {
+      "precision": 0.8909090909090909,
+      "recall": 0.5697674418604651,
+      "f1": 0.6950354609929079,
+      "tp": 49,
+      "fp": 6,
+      "fn": 37,
+      "wrong_when_filled_docs": 6,
+      "filled_when_empty": 0,
+      "truth_nonempty": 79,
+      "docs": 86
+     },
+     "recipient": {
+      "precision": 0.8311688311688312,
+      "recall": 0.7441860465116279,
+      "f1": 0.7852760736196319,
+      "tp": 64,
+      "fp": 13,
+      "fn": 22,
+      "wrong_when_filled_docs": 13,
+      "filled_when_empty": 1,
+      "truth_nonempty": 82,
+      "docs": 88
+     },
+     "sending_place": {
+      "precision": 0.7307692307692307,
+      "recall": 0.7037037037037037,
+      "f1": 0.7169811320754716,
+      "tp": 38,
+      "fp": 14,
+      "fn": 16,
+      "wrong_when_filled_docs": 14,
+      "filled_when_empty": 0,
+      "truth_nonempty": 54,
+      "docs": 88
+     },
+     "city": {
+      "tp": 48,
+      "fp": 4,
+      "fn": 6,
+      "f1": 0.9056603773584906,
+      "precision": 0.9230769230769231
+     },
+     "n": 88
+    },
+    "entity3k": {
+     "sender": {
+      "precision": 0.7101449275362319,
+      "recall": 0.5697674418604651,
+      "f1": 0.632258064516129,
+      "tp": 49,
+      "fp": 20,
+      "fn": 37,
+      "wrong_when_filled_docs": 20,
+      "filled_when_empty": 0,
+      "truth_nonempty": 79,
+      "docs": 86
+     },
+     "recipient": {
+      "precision": 0.8333333333333334,
+      "recall": 0.7558139534883721,
+      "f1": 0.7926829268292682,
+      "tp": 65,
+      "fp": 13,
+      "fn": 21,
+      "wrong_when_filled_docs": 12,
+      "filled_when_empty": 1,
+      "truth_nonempty": 82,
+      "docs": 88
+     },
+     "sending_place": {
+      "precision": 0.8518518518518519,
+      "recall": 0.8518518518518519,
+      "f1": 0.8518518518518519,
+      "tp": 46,
+      "fp": 8,
+      "fn": 8,
+      "wrong_when_filled_docs": 8,
+      "filled_when_empty": 0,
+      "truth_nonempty": 54,
+      "docs": 88
+     },
+     "city": {
+      "tp": 50,
+      "fp": 4,
+      "fn": 4,
+      "f1": 0.9259259259259259,
+      "precision": 0.9259259259259259
+     },
+     "n": 88
+    },
+    "entity3k-place": {
+     "sender": {
+      "precision": 0.7536231884057971,
+      "recall": 0.6046511627906976,
+      "f1": 0.6709677419354838,
+      "tp": 52,
+      "fp": 17,
+      "fn": 34,
+      "wrong_when_filled_docs": 17,
+      "filled_when_empty": 0,
+      "truth_nonempty": 79,
+      "docs": 86
+     },
+     "recipient": {
+      "precision": 0.8461538461538461,
+      "recall": 0.7674418604651163,
+      "f1": 0.8048780487804877,
+      "tp": 66,
+      "fp": 12,
+      "fn": 20,
+      "wrong_when_filled_docs": 11,
+      "filled_when_empty": 1,
+      "truth_nonempty": 82,
+      "docs": 88
+     },
+     "sending_place": {
+      "precision": 0.8076923076923077,
+      "recall": 0.7777777777777778,
+      "f1": 0.7924528301886792,
+      "tp": 42,
+      "fp": 10,
+      "fn": 12,
+      "wrong_when_filled_docs": 10,
+      "filled_when_empty": 0,
+      "truth_nonempty": 54,
+      "docs": 88
+     },
+     "city": {
+      "tp": 48,
+      "fp": 4,
+      "fn": 6,
+      "f1": 0.9056603773584906,
+      "precision": 0.9230769230769231
+     },
+     "n": 88
+    }
+   },
+   "paired": {
+    "tagging: the rule added": {
+     "a": "tagging-new",
+     "b": "tagging-place",
+     "full": {
+      "n": 88,
+      "diff": -0.02375960866526905,
+      "lo": -0.11026484334429643,
+      "hi": 0.0596171505262415
+     },
+     "city": {
+      "n": 88,
+      "diff": -0.020265548567435343,
+      "lo": -0.06969520481459912,
+      "hi": 0.018001800180017957
+     }
+    },
+    "entity: the rule added": {
+     "a": "entity3k",
+     "b": "entity3k-place",
+     "full": {
+      "n": 88,
+      "diff": -0.05939902166317257,
+      "lo": -0.13989441930618407,
+      "hi": 0.015082956259426794
+     },
+     "city": {
+      "n": 88,
+      "diff": -0.020265548567435343,
+      "lo": -0.05538740920096852,
+      "hi": 0.0
+     }
+    }
+   }
+  }
+ },
  "place_moves": {
   "tagging": {
-   "emptied, truth has none": 17,
-   "emptied, truth has one": 1,
+   "emptied, truth has none": 13,
+   "emptied, truth has one": 5,
    "filled, truth has none": 0,
    "other change": 5
   },

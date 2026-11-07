@@ -548,7 +548,8 @@ def apply_owner(r, corr):
 
 
 def load_truth(owner=True, rule=True, correspondence=True):
-    """The truth rows. owner: with the owner's corrections (OWNER_CORRECTIONS, written by ent_truth_owner.py fold);
+    """The truth rows. owner: with the owner's corrections (OWNER_CORRECTIONS, written by ent_truth_owner.py fold from
+    the item-field sheet and, since W46.place-rule-fold, W46.place-rule-sheet's 20 sending places);
     rule: with the sending-place rule (place_rule). Both on is the truth as it now stands, and what new scoring uses;
     both off is truth.jsonl as W46.fix-ent-truth built it, which the W46 entity reports up to 2026-11-05 were scored
     against (ent_truth_owner.py report restates their figures)."""

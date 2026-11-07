@@ -93,6 +93,53 @@ class Apply(unittest.TestCase):
         self.assertEqual(s["sending_place"]["filled_when_empty"], 1)
 
 
+class FoldPlaces(unittest.TestCase):
+    """W46.place-rule-fold: the place sheet's answers set the sending place outright, notes first."""
+
+    def run_fold(self, answers, truth, docs=None):
+        import json
+        import tempfile
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as d:
+            key = {f"{i}:place": {"doc": i, "class": c, "kind": "k", "place_class": "named", "place": p}
+                   for i, (c, p) in answers["key"].items()}
+            json.dump({"items": key}, open(os.path.join(d, "key.json"), "w"))
+            json.dump({f"{i}:place": a for i, a in answers["a"].items()}, open(os.path.join(d, "answers.json"), "w"))
+            text = [{"id": i, "text": ""} for i in truth]
+            docs = docs if docs is not None else {}
+            with mock.patch.object(O, "PLACE_SHEET", d), mock.patch.object(E, "load_docs", lambda: text), \
+                    mock.patch.object(O, "PLACE_NOTE_RULINGS", {"d4": ("none", "note")}):
+                return O.fold_places(truth, docs), docs
+
+    def test_answers(self):
+        inf = ent("Stanford, California", "correspondence-inferred")
+        written = ent("Boston, Massachusetts", quote="Boston, Mass.")
+        truth = {"d1": row(id="d1", sending_place=[written]), "d2": row(id="d2", sending_place=[inf]),
+                 "d3": row(id="d3", sending_place=[inf, written]), "d4": row(id="d4", sending_place=[inf])}
+        ans = {"key": {"d1": ("kept", written["name"]), "d2": ("emptied", inf["name"]),
+                       "d3": ("emptied", inf["name"]), "d4": ("emptied", inf["name"])},
+               "a": {"d1": "=", "d2": "1", "d3": "=", "d4": "1"}}
+        asked, docs = self.run_fold(ans, truth)
+        sp = {d: docs[d]["sending_place"]["value"] for d in docs}
+        self.assertEqual(sp["d1"], [])                                       # kept, he says not written
+        self.assertEqual(sp["d2"], [{**inf, "class": "named"}])               # emptied, he says written
+        self.assertEqual(sp["d3"], [written])                                 # the rule's other place stays
+        self.assertEqual(sp["d4"], [])                                        # the note overrides the answer
+        self.assertEqual(docs["d4"]["sending_place"]["how"], "place sheet note")
+        self.assertEqual([x["written"] for x in asked], [False, True, False, False])
+        r = E.apply_owner(truth["d2"], docs)
+        self.assertIs(E.place_rule(r, ""), r)                                 # the rule leaves his answer alone
+        self.assertEqual(r["sending_place"][0]["name"], "Stanford, California")
+
+    def test_refuses_a_settled_place_or_an_unknown_answer(self):
+        truth = {"d1": row(id="d1", sending_place=[ent("Paris, France", quote="Paris")])}
+        ans = {"key": {"d1": ("kept", "Paris, France")}, "a": {"d1": "1"}}
+        with self.assertRaises(SystemExit):
+            self.run_fold(ans, truth, docs={"d1": {"sending_place": {"action": "confirm"}}})
+        with self.assertRaises(SystemExit):
+            self.run_fold({**ans, "a": {"d1": "?"}}, truth)
+
+
 class SameThing(unittest.TestCase):
     def test_place_by_city_names_by_ed2(self):
         self.assertTrue(O.same_thing("sending_place", ["Philadelphia, PA"], ["Philadelphia, Pennsylvania"]))

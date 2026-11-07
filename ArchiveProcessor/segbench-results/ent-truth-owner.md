@@ -14,7 +14,7 @@ W47.item-fields-retruth's sheet asked 23 entity fields where Claude Sonnet 5 had
 
 "Upheld" counts a note that confirms the name; "another name" counts the one note that gives the name the document is signed with, which neither option had, as well as an answer taking reader A's different name. An unscored field is one whose note leaves it unsettled (an answer and a note that disagree, or a note doubting the name); it is left out of every score below. Of the 11 sending places answered, W47.item-fields-score.md counts 0 upheld; 2 of its 11 "Luna's" are the same city in Luna's spelling ("Philadelphia, PA", "St. Paul"), so the place stood on 2 and was emptied on 9; a note empties one more.
 
-The corrections file covers 21 documents: confirm (note) 7, confirm (sheet answer) 5, set (note) 2, set (sheet answer) 11, unscored (note) 3 (six of the confirmations are notes on other documents of the set that name the sender or recipient the truth already has).
+The corrections file covers 41 documents: confirm (note) 7, confirm (sheet answer) 5, set (note) 2, set (place sheet answer) 19, set (place sheet note) 1, set (sheet answer) 11, unscored (note) 3 (six of the confirmations are notes on other documents of the set that name the sender or recipient the truth already has).
 
 ## Where the truth's sending places stand
 
@@ -33,15 +33,17 @@ So of the 104 places, 5 sit on a line with a date; 54 sit in a heading or addres
 
 ## The rule
 
-The owner emptied all 8 inferred places he was asked and the 1 taken from an institution's name; of the 3 heading-or-address places asked, he upheld 2 (one in a letterhead address) and emptied 1, his note saying the place is not given in the text. So the emptied class (inferred places) is supported by his answers, and the kept heading-or-address class, which holds 51 of the 68 places the truth now keeps, rests on 3 rulings, 1 of them against it (W46.place-rule-sheet checks it). The sending place is a place the document writes, in a dateline, a letterhead or an address, and never one inferred from the collection, the content or an institution's name (`ent_truth.place_rule`). A letterhead place stays: the owner upheld one, and his note that a letterhead is not always where a letter was sent from is a caveat with no rule the text can apply. The definition the truth was drafted with (`ent_truth.PROMPT`: "the dateline's place, or the letterhead address") already asked for a written place; what changes is that its inferred classes no longer count, so a route that fills one is wrong when filled, where before it was set aside.
+The owner emptied all 8 inferred places he was asked and the 1 taken from an institution's name; of the 3 heading-or-address places asked, he upheld 2 (one in a letterhead address) and emptied 1, his note saying the place is not given in the text. So on that sheet the emptied class (inferred places) was supported by his answers, and the kept heading-or-address class, which holds 51 of the 72 places the truth now keeps, rested on 3 rulings, 1 of them against it.
+
+W46.place-rule-sheet then asked 12 places the rule keeps in a heading or address and 8 it emptied (W46.place-rule-fold folds the answers; the class error is in `ent-place-rule.md`): he confirmed 12 of the 12 kept places as where the document says it was sent from, and of the 8 emptied, said 4 are written and 4 are not (1 by a note overriding the answer). So the kept class holds, and the emptied class does not: a place the truth's drafters classed as inferred is, as often as not on this draw, one he finds written, and the rule's emptied places on the documents nobody checked are uncertain truth. His answers are set outright on those documents, so the rule does not touch them. The sending place is a place the document writes, in a dateline, a letterhead or an address, and never one inferred from the collection, the content or an institution's name (`ent_truth.place_rule`). A letterhead place stays: the owner upheld one, and his note that a letterhead is not always where a letter was sent from is a caveat with no rule the text can apply. The definition the truth was drafted with (`ent_truth.PROMPT`: "the dateline's place, or the letterhead address") already asked for a written place; what changes is that its inferred classes no longer count, so a route that fills one is wrong when filled, where before it was set aside.
 
 | truth | documents with a place | named places | inferred places | unscored fields |
 |---|---|---|---|---|
 | built | 104 | 72 | 32 | 0 |
-| owner | 94 | 70 | 24 | 3 |
-| owner+rule | 68 | 68 | 0 | 3 |
+| owner | 90 | 73 | 17 | 3 |
+| owner+rule | 72 | 72 | 0 | 3 |
 
-The rule empties or trims the place on 26 documents the owner did not answer.
+The rule empties or trims the place on 18 documents the owner did not answer.
 
 ## The W46 entity scores restated
 
@@ -49,26 +51,26 @@ Sending place, ed2 on the full string (P / R / F1) and by its city (F1, as the r
 
 | route (report) | n | built: P / R / F1 · city | owner: F1 · city | owner+rule: P / R / F1 · city | filled, no place: built → owner+rule |
 |---|---|---|---|---|---|
-| gemini-3.8-flash tagging reply, ABBYY (82) (ent-score) | 82 | 0.61 / 0.64 / 0.62 · 0.89 | 0.68 · 0.87 | 0.61 / 0.73 / 0.67 · 0.81 | 1 → 10 |
-| qwen3.6-27b tagging reply, ABBYY (82) (ent-score) | 82 | 0.43 / 0.56 / 0.49 · 0.70 | 0.53 · 0.67 | 0.46 / 0.65 / 0.54 · 0.67 | 3 → 18 |
-| qwen3.5-4b tagging reply, ABBYY (82) (ent-score) | 82 | 0.27 / 0.36 / 0.31 · 0.45 | 0.36 · 0.45 | 0.31 / 0.43 / 0.36 · 0.45 | 7 → 22 |
-| qwen3-vl-8b tagging reply, ABBYY (82) (ent-score) | 82 | 0.43 / 0.46 / 0.44 · 0.72 | 0.49 · 0.71 | 0.42 / 0.51 / 0.46 · 0.66 | 3 → 15 |
-| nltagger (138) (ent-score) | 138 | 0.03 / 0.04 / 0.04 · 0.20 | 0.04 · 0.20 | 0.03 / 0.04 / 0.04 · 0.20 | 18 → 35 |
-| gliner2.5-small-schema (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.07 | 0.00 · 0.05 | 0.00 / 0.00 / 0.00 · 0.03 | 11 → 24 |
-| gliner2.5-small-labels (138) (ent-score) | 138 | 0.01 / 0.01 / 0.01 · 0.08 | 0.01 · 0.07 | 0.01 / 0.01 / 0.01 · 0.06 | 22 → 44 |
-| gliner2.5-small-spans-rule (138) (ent-score) | 138 | 0.07 / 0.04 / 0.05 · 0.19 | 0.07 · 0.19 | 0.09 / 0.06 / 0.07 · 0.19 | 10 → 21 |
-| gliner2.5-base-schema (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.18 | 0.01 · 0.16 | 0.01 / 0.01 / 0.01 · 0.16 | 18 → 35 |
-| gliner2.5-base-labels (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.17 | 0.01 · 0.16 | 0.01 / 0.01 / 0.01 · 0.16 | 18 → 39 |
-| gliner2.5-base-spans-rule (138) (ent-score) | 138 | 0.14 / 0.11 / 0.12 · 0.33 | 0.14 · 0.33 | 0.15 / 0.13 / 0.14 · 0.33 | 11 → 19 |
-| gliner2.5-multi-schema (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.16 | 0.02 · 0.15 | 0.02 / 0.01 / 0.02 · 0.15 | 16 → 32 |
-| gliner2.5-multi-labels (138) (ent-score) | 138 | 0.02 / 0.03 / 0.02 · 0.18 | 0.02 · 0.18 | 0.02 / 0.03 / 0.02 · 0.16 | 17 → 36 |
-| gliner2.5-multi-spans-rule (138) (ent-score) | 138 | 0.07 / 0.07 / 0.07 · 0.31 | 0.07 · 0.31 | 0.07 / 0.07 / 0.07 · 0.30 | 16 → 28 |
-| gemini-3.7 tagging, Vision (ent-score-paid) | 138 | 0.60 / 0.64 / 0.62 · 0.90 | 0.64 · 0.88 | 0.58 / 0.69 / 0.63 · 0.83 | 1 → 14 |
-| gemini-3.7 entity3k, Vision (ent-score-paid) | 138 | 0.87 / 0.82 / 0.84 · 0.91 | 0.86 · 0.92 | 0.86 / 0.87 / 0.86 · 0.92 | 0 → 2 |
-| gemini-3.7 entity8k, Vision (ent-score-paid) | 138 | 0.87 / 0.82 / 0.84 · 0.91 | 0.86 · 0.92 | 0.86 / 0.87 / 0.86 · 0.92 | 0 → 2 |
+| gemini-3.8-flash tagging reply, ABBYY (82) (ent-score) | 82 | 0.61 / 0.64 / 0.62 · 0.89 | 0.67 · 0.85 | 0.61 / 0.71 / 0.66 · 0.80 | 1 → 10 |
+| qwen3.6-27b tagging reply, ABBYY (82) (ent-score) | 82 | 0.43 / 0.56 / 0.49 · 0.70 | 0.53 · 0.67 | 0.46 / 0.63 / 0.53 · 0.67 | 3 → 17 |
+| qwen3.5-4b tagging reply, ABBYY (82) (ent-score) | 82 | 0.27 / 0.36 / 0.31 · 0.45 | 0.36 · 0.45 | 0.31 / 0.42 / 0.36 · 0.44 | 7 → 21 |
+| qwen3-vl-8b tagging reply, ABBYY (82) (ent-score) | 82 | 0.43 / 0.46 / 0.44 · 0.72 | 0.49 · 0.70 | 0.42 / 0.50 / 0.46 · 0.65 | 3 → 14 |
+| nltagger (138) (ent-score) | 138 | 0.03 / 0.04 / 0.04 · 0.20 | 0.04 · 0.21 | 0.03 / 0.04 / 0.04 · 0.21 | 18 → 32 |
+| gliner2.5-small-schema (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.07 | 0.00 · 0.05 | 0.00 / 0.00 / 0.00 · 0.05 | 11 → 23 |
+| gliner2.5-small-labels (138) (ent-score) | 138 | 0.01 / 0.01 / 0.01 · 0.08 | 0.01 · 0.06 | 0.01 / 0.01 / 0.01 · 0.06 | 22 → 42 |
+| gliner2.5-small-spans-rule (138) (ent-score) | 138 | 0.07 / 0.04 / 0.05 · 0.19 | 0.07 · 0.19 | 0.09 / 0.06 / 0.07 · 0.18 | 10 → 21 |
+| gliner2.5-base-schema (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.18 | 0.01 · 0.16 | 0.01 / 0.01 / 0.01 · 0.16 | 18 → 32 |
+| gliner2.5-base-labels (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.17 | 0.01 · 0.16 | 0.01 / 0.01 / 0.01 · 0.16 | 18 → 36 |
+| gliner2.5-base-spans-rule (138) (ent-score) | 138 | 0.14 / 0.11 / 0.12 · 0.33 | 0.14 · 0.32 | 0.15 / 0.12 / 0.14 · 0.32 | 11 → 19 |
+| gliner2.5-multi-schema (138) (ent-score) | 138 | 0.00 / 0.00 / 0.00 · 0.16 | 0.02 · 0.16 | 0.02 / 0.01 / 0.02 · 0.16 | 16 → 30 |
+| gliner2.5-multi-labels (138) (ent-score) | 138 | 0.02 / 0.03 / 0.02 · 0.18 | 0.02 · 0.17 | 0.02 / 0.03 / 0.02 · 0.17 | 17 → 34 |
+| gliner2.5-multi-spans-rule (138) (ent-score) | 138 | 0.07 / 0.07 / 0.07 · 0.31 | 0.07 · 0.30 | 0.07 / 0.07 / 0.07 · 0.29 | 16 → 28 |
+| gemini-3.7 tagging, Vision (ent-score-paid) | 138 | 0.60 / 0.64 / 0.62 · 0.90 | 0.63 · 0.85 | 0.59 / 0.67 / 0.63 · 0.82 | 1 → 13 |
+| gemini-3.7 entity3k, Vision (ent-score-paid) | 138 | 0.87 / 0.82 / 0.84 · 0.91 | 0.84 · 0.90 | 0.86 / 0.82 / 0.84 · 0.89 | 0 → 2 |
+| gemini-3.7 entity8k, Vision (ent-score-paid) | 138 | 0.87 / 0.82 / 0.84 · 0.91 | 0.84 · 0.90 | 0.86 / 0.82 / 0.84 · 0.89 | 0 → 2 |
 | gemini-3.7 entity8k-rerun, Vision (ent-score-paid) | 40 | 0.75 / 0.71 / 0.73 · 0.94 | 0.75 · 0.97 | 0.75 / 0.75 / 0.75 · 0.94 | 0 → 1 |
-| gemini-3.7 tagging-v1, Vision (ent-prompt-app) | 138 | 0.56 / 0.62 / 0.59 · 0.90 | 0.61 · 0.89 | 0.57 / 0.68 / 0.62 · 0.83 | 1 → 15 |
-| gemini-3.7 tagging-new, Vision (ent-prompt-app) | 138 | 0.78 / 0.75 / 0.77 · 0.92 | 0.75 · 0.90 | 0.62 / 0.76 / 0.68 · 0.83 | 1 → 18 |
+| gemini-3.7 tagging-v1, Vision (ent-prompt-app) | 138 | 0.56 / 0.62 / 0.59 · 0.90 | 0.60 · 0.86 | 0.57 / 0.64 / 0.60 · 0.84 | 1 → 13 |
+| gemini-3.7 tagging-new, Vision (ent-prompt-app) | 138 | 0.78 / 0.75 / 0.77 · 0.92 | 0.75 · 0.89 | 0.67 / 0.78 / 0.72 · 0.86 | 1 → 14 |
 | gemini-3.7 tagging-new-rerun, Vision (ent-prompt-app) | 40 | 0.61 / 0.65 / 0.63 · 0.97 | 0.57 · 0.91 | 0.45 / 0.62 / 0.53 · 0.84 | 0 → 6 |
 
 Sender and recipient, ed2 F1, built → with the owner's answers (the rule touches only the place):
@@ -101,8 +103,8 @@ Paired differences in sending-place F1 (b minus a, document bootstrap 95%, ent_s
 
 | comparison | n | full string, built | full string, now | city, built | city, now |
 |---|---|---|---|---|---|
-| entity3k vs tagging | 138 | +0.23 [+0.13, +0.33] | +0.23 [+0.13, +0.34] | +0.01 [-0.02, +0.05] | +0.09 [+0.04, +0.14] |
-| tagging-new vs tagging | 138 | +0.15 [+0.01, +0.28] | +0.05 [-0.07, +0.18] | +0.03 [-0.01, +0.07] | -0.00 [-0.05, +0.05] |
+| entity3k vs tagging | 138 | +0.23 [+0.13, +0.33] | +0.21 [+0.11, +0.31] | +0.01 [-0.02, +0.05] | +0.07 [+0.03, +0.12] |
+| tagging-new vs tagging | 138 | +0.15 [+0.01, +0.28] | +0.09 [-0.03, +0.21] | +0.03 [-0.01, +0.07] | +0.04 [-0.02, +0.09] |
 | rerun floor: entity8k again | 40 | -0.16 [-0.34, +0.00] | -0.16 [-0.35, +0.00] | -0.03 [-0.11, +0.00] | -0.03 [-0.11, +0.00] |
 | rerun floor: tagging-new again | 40 | -0.08 [-0.29, +0.12] | -0.05 [-0.24, +0.13] | -0.03 [-0.10, +0.00] | +0.00 [-0.09, +0.09] |
 
@@ -110,8 +112,8 @@ W46.ent-robust is not restated: it scores each route's reply against the same ex
 
 ## Measurement card
 
-- **Truth.** W46.fix-ent-truth (GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating), with the owner's answers on the 23 fields his sheet asked (all of them fields Sonnet ruled for its own reader) and six confirming notes. The rest of the set has no owner check; the 20 documents asked (23 fields) were chosen as Sonnet's self-rulings, so they say how far to trust those, not the agreed rows. Sonnet ruled for its own reader on sender 17, recipient 18 and sending place 33 fields of the 138; the owner's sheet asked 5, 6 and 12, so 12, 12 and 21 self-rulings were never asked (the place rule has since emptied 14 of those places; 8 senders and 4 recipients stay filled where the readers named different people). The owner overturned 3 of the 7 asked sender and recipient rulings he settled (Wilson about 0.16 to 0.75), which suggests about 2-3% of those fields are wrong in the truth: small beside the gaps the entity reports give, but a truth error the scores do not carry (counts from measurement review pass 11, P11-5). No scored route drafted the truth.
+- **Truth.** W46.fix-ent-truth (GPT 5.6 Luna and Claude Sonnet 5 drafts, Sonnet adjudicating), with the owner's answers on the 23 fields his sheet asked (all of them fields Sonnet ruled for its own reader) and six confirming notes, and on the 20 sending places W46.place-rule-sheet asked (a seeded draw of the places the rule keeps in a heading or address and of those it emptied). The rest of the set has no owner check; the 20 documents the first sheet asked (23 fields) were chosen as Sonnet's self-rulings, so they say how far to trust those, not the agreed rows. Sonnet ruled for its own reader on sender 17, recipient 18 and sending place 33 fields of the 138; the owner's sheet asked 5, 6 and 12, so 12, 12 and 21 self-rulings were never asked (the place rule has since emptied 14 of those places; 8 senders and 4 recipients stay filled where the readers named different people). The owner overturned 3 of the 7 asked sender and recipient rulings he settled (Wilson about 0.16 to 0.75), which suggests about 2-3% of those fields are wrong in the truth: small beside the gaps the entity reports give, but a truth error the scores do not carry (counts from measurement review pass 11, P11-5). No scored route drafted the truth.
 - **Selection.** The 138 correspondence documents and the reports' own subsets (the 82 with cached tagging replies); nothing chosen by a scored route. The set itself was chosen by ABBYY text: its 56 additions came from the agreed, year-tagged pool with ABBYY text, as the date-tagging sample's letters did (`ent-truth.md`), so undated documents and documents without ABBYY text are not in it. The sheet's entity controls were drawn by the adjudicator's side, not by a route.
 - **Comparison.** Each route's cached replies exactly as its report scored them; only the truth changes. ent-score's tagging replies read ABBYY text (scored before the owner's 2026-10-30 rule; no new ABBYY arm is run here); the Gemini 3.7 arms read Apple Vision text.
 - **Noise.** Paired bootstrap intervals above, beside each prompt's rerun floor. A difference inside its interval, or inside the rerun floor, is a tie.
-- **Scope.** The rule rests on 12 owner rulings on places and on `place_kind`, a text heuristic that cannot tell a letterhead from a typed address or check a place against the image; its dateline count is low because the OCR often puts the date on its own line. Whether a letterhead place should count when nothing else names the place is the owner's caveat and is not tested; the kept heading-or-address class is checked by the owner on 3 places (W46.place-rule-sheet and W46.place-rule-fold check it on more). The app's tagging prompt carries the rule since 4374254d (W46.ent-place-rule-paid, `ent-place-rule.md`); the dedicated entity prompt with the rule tied and was left unchanged.
+- **Scope.** The rule rests on 12 owner rulings on places and on `place_kind`, a text heuristic that cannot tell a letterhead from a typed address or check a place against the image; its dateline count is low because the OCR often puts the date on its own line. Whether a letterhead place should count when nothing else names the place is the owner's caveat and is not tested; the kept heading-or-address class is checked by the owner on 15 places, the emptied class on 8 more (W46.place-rule-fold). The app's tagging prompt carries the rule since 4374254d (W46.ent-place-rule-paid, `ent-place-rule.md`); the dedicated entity prompt with the rule tied and was left unchanged.

@@ -15,37 +15,74 @@ ed2 on the full string, P / R / F1, and the place by its city (F1). "Filled, no 
 
 | arm | n | sender F1 | recipient F1 | place P / R / F1 | place by city | filled, no place | place wrong (all) | wrong where a place is written |
 |---|---|---|---|---|---|---|---|---|
-| tagging-new | 138 | 0.73 | 0.82 | 0.62 / 0.76 / 0.68 | 0.83 | 18 | 32 | 14 |
+| tagging-new | 138 | 0.73 | 0.82 | 0.67 / 0.78 / 0.72 | 0.86 | 14 | 28 | 14 |
 | tagging-new-rerun | 40 | 0.75 | 0.90 | 0.45 / 0.62 / 0.53 | 0.84 | 6 | 12 | 6 |
-| entity3k | 138 | 0.67 | 0.87 | 0.86 / 0.87 / 0.86 | 0.92 | 2 | 10 | 8 |
-| tagging-place | 138 | 0.73 | 0.82 | 0.76 / 0.74 / 0.75 | 0.91 | 1 | 16 | 15 |
+| entity3k | 138 | 0.67 | 0.87 | 0.86 / 0.82 / 0.84 | 0.89 | 2 | 10 | 8 |
+| tagging-place | 138 | 0.73 | 0.82 | 0.76 / 0.69 / 0.72 | 0.88 | 1 | 16 | 15 |
 | tagging-place-rerun | 40 | 0.75 | 0.90 | 0.62 / 0.62 / 0.62 | 1.00 | 0 | 6 | 6 |
-| entity3k-place | 138 | 0.69 | 0.88 | 0.83 / 0.81 / 0.82 | 0.91 | 1 | 11 | 10 |
+| entity3k-place | 138 | 0.69 | 0.88 | 0.83 / 0.76 / 0.80 | 0.88 | 1 | 11 | 10 |
 | entity3k-place-rerun | 40 | 0.72 | 0.90 | 0.81 / 0.81 / 0.81 | 1.00 | 0 | 3 | 3 |
 
 ## Paired differences in ed2 F1, b minus a (95% bootstrap interval)
 
 | comparison | a → b | n | sender | recipient | sending place | place by city |
 |---|---|---|---|---|---|---|
-| tagging: the rule added | tagging-new → tagging-place | 138 | -0.01 [-0.02, +0.00] | +0.00 [-0.02, +0.02] | +0.06 [-0.01, +0.14] | +0.08 [+0.02, +0.14] |
-| entity: the rule added | entity3k → entity3k-place | 138 | +0.02 [-0.01, +0.05] | +0.01 [-0.01, +0.03] | -0.04 [-0.11, +0.02] | -0.01 [-0.04, +0.01] |
-| tagging with the rule against entity with it | entity3k-place → tagging-place | 138 | +0.04 [-0.00, +0.08] | -0.06 [-0.13, +0.00] | -0.07 [-0.18, +0.02] | +0.00 [-0.02, +0.02] |
+| tagging: the rule added | tagging-new → tagging-place | 138 | -0.01 [-0.02, +0.00] | +0.00 [-0.02, +0.02] | +0.01 [-0.08, +0.09] | +0.03 [-0.04, +0.08] |
+| entity: the rule added | entity3k → entity3k-place | 138 | +0.02 [-0.01, +0.05] | +0.01 [-0.01, +0.03] | -0.04 [-0.10, +0.02] | -0.01 [-0.04, +0.01] |
+| tagging with the rule against entity with it | entity3k-place → tagging-place | 138 | +0.04 [-0.00, +0.08] | -0.06 [-0.13, +0.00] | -0.07 [-0.17, +0.02] | +0.00 [-0.02, +0.02] |
 | rerun floor: tagging-new again | tagging-new → tagging-new-rerun | 40 | +0.00 [+0.00, +0.00] | +0.00 [+0.00, +0.00] | -0.05 [-0.24, +0.13] | +0.00 [-0.09, +0.09] |
 | rerun floor: tagging-place again | tagging-place → tagging-place-rerun | 40 | +0.00 [+0.00, +0.00] | +0.00 [+0.00, +0.00] | -0.02 [-0.19, +0.13] | +0.03 [+0.00, +0.11] |
 | rerun floor: entity3k-place again | entity3k-place → entity3k-place-rerun | 40 | +0.00 [+0.00, +0.00] | +0.01 [+0.00, +0.05] | -0.03 [-0.22, +0.16] | +0.03 [+0.00, +0.11] |
 
-The rule's arms again without the 26 documents whose place the truth's rule emptied (measurement review pass 11, P11-3): on those the prompt's rule and the truth's rule agree by construction.
+The rule's arms again without the 18 documents whose place the truth's rule emptied (measurement review pass 11, P11-3): on those the prompt's rule and the truth's rule agree by construction.
 
 | comparison | a → b | n | sending place | place by city |
 |---|---|---|---|---|
-| tagging: the rule added | tagging-new → tagging-place | 112 | +0.00 [-0.07, +0.07] | +0.01 [-0.04, +0.05] |
-| entity: the rule added | entity3k → entity3k-place | 112 | -0.05 [-0.11, +0.01] | -0.02 [-0.04, +0.00] |
+| tagging: the rule added | tagging-new → tagging-place | 120 | -0.02 [-0.10, +0.06] | -0.01 [-0.07, +0.05] |
+| entity: the rule added | entity3k → entity3k-place | 120 | -0.05 [-0.11, +0.01] | -0.02 [-0.04, +0.00] |
+
+## The owner's check of the rule's classes (W46.place-rule-sheet, W46.place-rule-fold)
+
+The owner was asked, on 20 documents, whether the place shown is where the document says it was sent from (answered 2026-11-06, notes read first). The rule is wrong on a kept place he says the document does not write, and on an emptied place he says it does.
+
+| class | asked | he says written | he says not written | the rule wrong | 95% Wilson | of them by a note |
+|---|---|---|---|---|---|---|
+| kept, in a heading or address | 12 | 12 | 0 | 0 of 12 | 0% to 24% | 0 |
+| emptied by the rule | 8 | 4 | 4 | 4 of 8 | 22% to 78% | 1 |
+
+Emptied places asked, by what `place_kind` found: inferred 7 (4 of them written), institution name 1 (0 of them written).
+
+The arms on the documents whose sending place the owner checked (on either sheet), on the rest, and on the rest without the documents the rule emptied:
+
+| documents | n | arm | place F1 (ed2) | place by city | filled, no place |
+|---|---|---|---|---|---|
+| owner-checked place | 32 | tagging-new | 0.78 | 0.83 | 6 |
+| owner-checked place | 32 | tagging-place | 0.77 | 0.84 | 0 |
+| owner-checked place | 32 | entity3k | 0.84 | 0.84 | 0 |
+| owner-checked place | 32 | entity3k-place | 0.84 | 0.84 | 0 |
+| the rest | 106 | tagging-new | 0.70 | 0.87 | 8 |
+| the rest | 106 | tagging-place | 0.71 | 0.90 | 1 |
+| the rest | 106 | entity3k | 0.84 | 0.91 | 2 |
+| the rest | 106 | entity3k-place | 0.79 | 0.90 | 1 |
+| the rest, rule did not empty | 88 | tagging-new | 0.74 | 0.93 | 1 |
+| the rest, rule did not empty | 88 | tagging-place | 0.72 | 0.91 | 0 |
+| the rest, rule did not empty | 88 | entity3k | 0.85 | 0.93 | 0 |
+| the rest, rule did not empty | 88 | entity3k-place | 0.79 | 0.91 | 0 |
+
+| documents | comparison | n | sending place | place by city |
+|---|---|---|---|---|
+| owner-checked place | tagging: the rule added | 32 | -0.01 [-0.19, +0.16] | +0.01 [-0.17, +0.18] |
+| owner-checked place | entity: the rule added | 32 | +0.00 [+0.00, +0.00] | +0.00 [+0.00, +0.00] |
+| the rest | tagging: the rule added | 106 | +0.01 [-0.08, +0.11] | +0.03 [-0.04, +0.09] |
+| the rest | entity: the rule added | 106 | -0.05 [-0.13, +0.02] | -0.01 [-0.05, +0.02] |
+| the rest, rule did not empty | tagging: the rule added | 88 | -0.02 [-0.11, +0.06] | -0.02 [-0.07, +0.02] |
+| the rest, rule did not empty | entity: the rule added | 88 | -0.06 [-0.14, +0.02] | -0.02 [-0.06, +0.00] |
 
 What the rule changed in the place, document by document:
 
 | prompt | emptied, truth has none | emptied, truth has one | filled, truth has none | other change |
 |---|---|---|---|---|
-| tagging | 17 | 1 | 0 | 5 |
+| tagging | 13 | 5 | 0 | 5 |
 | entity | 1 | 2 | 0 | 7 |
 
 ## The dates the tagging call returns
@@ -69,58 +106,69 @@ Spend: $1.01 estimated over 356 gateway calls (356 answered). the gateway's own 
 
 ## Reading
 
-- **The tagging prompt: the model follows the owner's definition, and the line ships.** Documents where it names a
-  place and the truth has none fall from 18 to 1 of 138. The places wrong where the truth has one do not fall (14 to
-  15; right 52 to 50): the 32 to 16 "wrong" in the table counts each invented place as wrong as well. On the full
-  string, precision 0.62 to 0.76 and recall 0.76 to 0.74, F1 +0.06 (interval -0.01 to +0.14, a tie by itself); by
-  the city alone 0.83 to 0.91, +0.08 (+0.02 to +0.14), above the rerun floor (+0.03 on 40). That gain rests on the 26
-  documents whose place the truth's rule emptied, where the prompt's rule and the truth's rule agree by construction:
-  on the other 112, by city +0.01 (-0.04 to +0.05) and full string +0.00 (-0.07 to +0.07), a tie. So it measures the
-  model following the definition it was given, not an accuracy gain; shipping the line before Phase 4 is a cheap
-  prompt change with no production data. Of the 23 documents whose place changed, 17 were emptied where the truth
-  has none, 1 emptied where it has one ("Stanford, California", a place the truth's drafters read in an image, which
-  the text heuristic cannot class, so it counts against the rule arm), and 5 respelled ("Washington, D.C." and
-  "Washington, District of Columbia" both ways, "Oxford, England"). The sender and recipient do not move (-0.01 and
-  0.00, inside the floor).
+- **The owner's check (W46.place-rule-fold, 2026-11-06): the kept class holds, the emptied class does not.** Of the
+  12 places the rule keeps in a heading or address, he confirmed all 12 as where the document says it was sent from
+  (0 wrong, 0% to 24%); none was a recipient's inside address. Of the 8 places the rule emptied, he says 4 are
+  written (the rule wrong on 4 of 8, 22% to 78%): all 4 were places the truth's drafters classed as inferred, so that
+  class is not a reliable sign that the document does not write the place, and the 18 emptied places nobody checked
+  are uncertain truth (on this draw, about half would be written). His 20 answers are set outright, so the rule no
+  longer touches those documents; the figures below are against that truth.
+- **The tagging prompt: no measured gain in the place now, and fewer invented places.** Documents where it names a
+  place and the truth has none still fall, from 14 to 1 of 138; the places wrong where the truth has one do not fall
+  (14 to 15). On the full string F1 0.72 to 0.72, +0.01 (interval -0.08 to +0.09); by the city 0.86 to 0.88, +0.03
+  (-0.04 to +0.08), at the rerun floor (+0.03 on 40): a tie, where before the fold it was +0.08 (+0.02 to +0.14).
+  The gain went with the four places the owner restored: the old prompt named all four right and the rule line
+  emptied all four, while on the four he says are not written it emptied the two the old prompt had filled. On the
+  32 documents whose place the owner checked (either sheet) the line ties (by city +0.01, -0.17 to +0.18); on the
+  other 106 +0.03 (-0.04 to +0.09); on those 106 without the 18 the truth's rule empties, -0.02 (-0.07 to +0.02).
+  So the line, shipped in 4374254d, trades invented places for written places a drafter called inferred, and on this
+  truth that is a tie; Phase 4 decides it with the entity feature. Of the 23 documents whose place changed, 13 were
+  emptied where the truth has none, 5 emptied where it has one (4 of them the owner's restored places), and 5
+  respelled. The sender and recipient do not move (-0.01 and 0.00, inside the floor).
 - **Dates hold.** The year, month, day and date_uncertain the same call returns differ on 3 of the 138 documents,
   all three an estimated year (date_uncertain true both times), where the new prompt's own rerun differs on 2 of 40
   and the old prompt's on 1 of 40. Against the owner's Finder date tags on the 82: year right 74 before and 76 after;
   months and Date Uncertain identical.
 - **The dedicated entity prompt: no gain, left unchanged.** It already filled a place where none is written on only
   2 documents, because its rule asks for the quote of each name; with the rule, 1. Its place F1 moves -0.04 (interval
-  -0.11 to +0.02) and by city -0.01, a tie leaning worse: of its 3 emptied places 2 are places the truth keeps
-  ("New York, New York" read from a letterhead's "YORK", and "At Sea"). So ENTITY_PROMPT keeps its line, and the
+  -0.10 to +0.02) and by city -0.01, a tie leaning worse: of its 3 emptied places 2 are places the truth keeps
+  ("New York, New York" read from a letterhead's "YORK", and "At Sea"). It named none of the four places the owner
+  restored, with the rule or without it. So ENTITY_PROMPT keeps its line, and the
   rule's wording stays here (ENTITY_PLACE) for the entity feature's own prompt to start from.
-- **Tagging against the dedicated prompt, both with the rule:** place by city a tie (0.91 each, +0.00); full string
-  -0.07 (interval -0.18 to +0.02), the tagging call's respellings against the dedicated prompt's normalised names.
+- **Tagging against the dedicated prompt, both with the rule:** place by city a tie (0.88 each, +0.00); full string
+  -0.07 (interval -0.17 to +0.02), the tagging call's respellings against the dedicated prompt's normalised names.
 
 What it means for the app: TagGenerator.generateTags' author_location now asks for a written place only, null when
 the document writes none, never one inferred from an institution's name, the collection or the nearby documents
-(mirrored in date_tagging.PROMPT and prompts.md). The sidecar field's shape is unchanged. Phase 4 decides the place
-rule with the entity feature; this is the evidence it reads. The owner's caveat that a letterhead is not always where
+(mirrored in date_tagging.PROMPT and prompts.md). The sidecar field's shape is unchanged. On the owner-checked truth
+the line is a tie in the place, with fewer invented places and more written ones missed; this item changes no prompt.
+Phase 4 decides the place rule with the entity feature; this is the evidence it reads. The owner's caveat that a letterhead is not always where
 a letter was sent from has no text rule and is not tested here.
 
 ## Measurement card
 
 - **Truth:** W46.fix-ent-truth's 138 correspondence documents (model truth: GPT 5.6 Luna and Claude Sonnet 5 drafts,
-  Sonnet rulings) with the owner's answers on 21 documents and the sending-place rule (`ent_truth.load_truth()`,
-  W46.ent-truth-owner-fold). The rule empties the place on 26 documents the owner did not answer, by the class and
-  quote the truth's drafters gave, which the owner has not checked one by one; the kept heading-or-address class
-  (51 of the 68 places the truth keeps) rests on 3 owner rulings, one of them against it (W46.place-rule-sheet and
-  W46.place-rule-fold check both classes). Dates on the 82 against the owner's own Finder tags. No Gemini drafted
-  or ruled.
+  Sonnet rulings) with the owner's answers on 41 documents (the item-field sheet's 21, W46.ent-truth-owner-fold, and
+  W46.place-rule-sheet's 20 sending places, W46.place-rule-fold) and the sending-place rule
+  (`ent_truth.load_truth()`). The owner has checked the sending place on 32 documents. The rule empties the place on
+  18 documents he did not check, by the class and quote the truth's drafters gave; his check found that class wrong
+  on 4 of 8, so those 18 are the weakest rows. The kept heading-or-address class rests on 15 owner rulings, 1
+  against it. Dates on the 82 against the owner's own Finder tags. No Gemini drafted or ruled.
 - **Selection:** as W46.ent-score-paid (82 of the date-tagging sample's correspondence documents plus 56 chosen by
   ABBYY text cues, not by any route tested here). The rule's wording was written once, from the owner's definition,
   and not tuned on these replies; but the definition came from the owner's answers on 12 of these documents, and the
   prompt's rule and the truth's rule say the same thing, so the gain measures how well the model follows the
-  definition, not a held-out accuracy (on the 112 documents the rule did not empty it is a tie).
+  definition, not a held-out accuracy. The 20 places of W46.place-rule-sheet were a seeded draw (seed 4651) from the
+  pools `place_kind` defines, chosen by no route's reading.
 - **Comparison:** each arm against its own baseline differs in the one place line: the same Vision text, first
   3,000 characters, context block, model, temperature 0, token cap and gateway (tagging-new and entity3k's cached
   replies, prompt-checked).
-- **Noise:** n 138 (82 for the owner's dates, 40 per rerun floor); paired document bootstrap, 2,000 draws, 95%
-  intervals. Rerun floors on 40: full-string place -0.05, -0.02 and -0.03; by city 0.00, +0.03 and +0.03; dates 1-2
+- **Noise:** n 138 (82 for the owner's dates, 40 per rerun floor, 12 and 8 for the owner's class check with Wilson
+  intervals); paired document bootstrap, 2,000 draws, 95% intervals. Rerun floors on 40: full-string place -0.05, -0.02 and -0.03; by city 0.00, +0.03 and +0.03; dates 1-2
   of 40 documents, all estimated years.
 - **Scope:** one model (Gemini 3.7 Flash), text only, correspondence documents only. It does not settle another
   model's reading of the rule (the app's other routes), non-correspondence documents (the tagging prompt runs on all,
-  so its dates there are untested), whether "an address" pulls in a recipient's inside address (the places wrong
-  where one is written did not fall), or whether a letterhead place is where a letter was sent from.
+  so its dates there are untested), whether "an address" pulls in a recipient's inside address (none of the 12 kept
+  places the owner checked was one, which bounds it only loosely; the places wrong where one is written did not
+  fall), or whether a letterhead place is where a letter was sent from (two of the owner's notes say a letterhead in
+  view belonged to the sheet behind).
