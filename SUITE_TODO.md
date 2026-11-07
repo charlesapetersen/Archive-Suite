@@ -88,6 +88,7 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   literature and the current models, measured in Phase 3 (74 items plus the measurement audit's), and decided in Phase
   4 as the rules the settings layer applies: `13-stage-rules/` (one note per stage, the table schema, the owner's calls,
   the solver's test cases). `00-plan.md`; `STATE.md`. Kept until the settings build ships, as its source; delete then.
+- `reocr/` — **DESIGNED 2026-11-07 (W44, Reader ↔ Processor)**: person-set OCR Poor flag, per-page Kind/provenance, sandbox-compatible hand-off, ranked re-read and recoverable text-only replacement. `00-plan.md`; retained until the three implementation items ship.
 - `integration/` — **APPROVED 2026-10-14 (W42.int, the suite)**: Vision OCR's engine inside Archive Processor. Stages 1-3,
   5 and 7 filed 2026-11-06 in §"Vision OCR's engine"; stages 4 and 6 replaced by §"The settings layer — W46.settings".
 - `containers/` — **APPROVED 2026-10-21 (W47, all three apps)**: repository, collection, accession, series, box and
@@ -746,19 +747,11 @@ the two apps, outlined the features, and left the design to us.
 - **A flag the user sets** is stored with the file, so it survives without either app open. It can be set in a moment
   while reading, filtered on in the Reader, and dealt with in a batch later.
 
-Four items, in order. Each later one waits on the one before.
+Design shipped as W44.reocr-plan; the implementation plan is `execution-plans/reocr/00-plan.md`.
+The three remaining items follow it in order; Processor also waits for the shared settings/ranking work.
 
-- [ ] **`W44.reocr-plan` — design the flag, the hand-off and the rewrite of a file's text page [S · ~1 session]** (lane: suite) (uses: light) (blocked-on: W43.sweep-owner-ok, W46.review-done). Owner, 2026-10-16. Write `execution-plans/reocr/00-plan.md` and index it above. Settle each of these with the reason: **Parked 2026-10-20 (owner): waits on `W43.sweep-owner-ok`, so it resumes when the paid sweep is approved.**
-  - **The flag.** A new Finder tag (proposed `OCR Poor`, a Subject like `OCR Failed`) in SPEC/tag-format.md, set by a person and never by a model, and cleared when a re-read is accepted.
-  - **The page kind.** Record it in the page-2 header, as a `Kind:` line beside `Classification:`, so a user's correction persists and the Reader can show it. Give its values and how the shared `PDFHeaderParser` reads it. Add a provider/model parse to `PDFHeaderParser`, so either app can say which reader made the current text.
-  - **The hand-off.** A Processor URL scheme (`archiveprocessor://improve-ocr?…`) for one or a few files. For a larger selection, a hand-off file in a shared app-group or Application Support location. Say which, and how a sandbox or TCC limit affects it. The Processor must already be installed; say what the Reader shows if it is not.
-  - **The rewrite.** Replace only the text page and keep everything else: the image page byte for byte, the file's path (Notes' `archivereader://` citations and the Reader's durable links depend on it), its Finder tags and dates. Keep the previous version recoverable (a sibling backup, or the app's own versions folder with an undo) until the user accepts the new text. Use the same write path as the tag writer's atomic, crash-safe replace. This is a write to the user's files and is Tier-2 throughout; tests run on scratch copies only, never the real corpus.
-  - **Which pages are read.** For a processed two-page PDF, only the image page is read, not the old text page. Name how a multi-page original is handled.
-  - **The record.** Keep each flag and re-read (old reader, new reader, kind before and after, the user's verdict) as a local record. These are pages a person judged bad, and a later bench can use them as a difficulty signal.
-
-  End with an owner gate only if a choice is genuinely his, for example in-place replacement against writing a new file. Otherwise the plan decides.
 - [ ] **`W44.reocr-spec` — the flag, the Kind line and the header parse in SPEC and ArchiveCore [S-M · ~1 session · Tier-2]** (lane: suite) (uses: build) (blocked-on: W44.reocr-plan, W46.review-done). Change SPEC/tag-format.md and `packages/ArchiveCore` as the plan says, so both apps read and write the same thing: the `OCR Poor` tag, the header's `Kind:` line, and provider/model parsing. The Processor writes `Kind:` on every new text page from the classifier, or from the user's choice. No migration: nothing has been produced. Tests in ArchiveCore and both apps' tag and header round trips.
-- [ ] **`W44.reocr-processor` — "Improve OCR" in the Processor: the ranked choice and the rewrite [M-L · ~2-3 sessions · Tier-2]** (lane: processor) (uses: build) (blocked-on: W44.reocr-spec, W46.review-done). Build it as the plan says.
+- [ ] **`W44.reocr-processor` — "Improve OCR" in the Processor: the ranked choice and the rewrite [M-L · ~2-3 sessions · Tier-2]** (lane: processor) (uses: build) (blocked-on: W44.reocr-spec, W46.review-done, W46.settings-solver, W46.settings-layers, W43.app-guide-refresh). Build it as `execution-plans/reocr/00-plan.md` says.
   - **The dialog** opens from the URL scheme or hand-off, from the Files tab, and from a "files flagged OCR Poor" picker over a chosen folder. It shows each file: its current reader (from the header), its kind (from the header, else the classifier on the image page), and a kind picker the user can change.
   - **The ranked list** comes from `OCRPageGuidance` for the chosen kind and re-ranks when the kind changes. Each row shows the model's NES for that kind, its price per 1,000 pages and the estimated cost for these pages. It also says whether the model is ready (keyed, a local model on this Mac, an institutional computing run). The current reader is marked as such, and models the app cannot offer are left out. Mixed selections are grouped by kind.
   - **The result.** Read the image pages, rewrite the text pages as specified, and show the old and new text side by side to accept or roll back. Accepting clears the flag and records the re-read.
