@@ -23,6 +23,7 @@ final class PDFPaneController {
     /// The region on screen when the PDF / JPEG switch was used, reapplied to the other image's fresh view.
     private(set) var pendingViewport: Viewport?
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
+    private var isApplyingFind = false // true while find selects its hit, which is not the user's selection
     private var findQuery = ""         // active find query to highlight on this pane ("" = none)
     private(set) var findCurrentIndex: Int? // which match on THIS pane is the current selection; nil = highlight-only
     /// The page whose text layer find reads when the shown page is a stand-in for it — the PDF's image page
@@ -43,6 +44,9 @@ final class PDFPaneController {
     /// A zoom key reaching this pane (`true` = in), forwarded to the viewer so it zooms the FOCUSED pane —
     /// which may be the extracted-text pane, not a PDFView at all. Set by `DocumentViewerModel`.
     var zoomFocused: ((Bool) -> Void)?
+    /// The user made a selection in this pane — set by `DocumentViewerModel`, which clears the other
+    /// pane's so only one holds one (W40.fix-reader-copy-text-pane).
+    var userSelected: (() -> Void)?
     /// Called after the zoom is recorded or reset, so the viewer can republish what depends on it (whether
     /// Reset Zoom has anything to do). Set by `DocumentViewerModel`.
     var zoomChanged: (() -> Void)?
@@ -238,9 +242,19 @@ final class PDFPaneController {
 
     /// A text selection is drawn under page overlays, so the placeholder steps aside for good once one
     /// appears (a drag-select, Select All). Clearing the selection does not bring it back.
+    ///
+    /// A non-empty selection while this pane is first responder is the user's (find selects its hit with
+    /// the caret in the find field), so the viewer is told, to clear the other pane's.
     func selectionChanged() {
-        guard placeholderOverlay.isShowing else { return }
-        if let s = pdfView?.currentSelection?.string, !s.isEmpty { placeholderOverlay.retire() }
+        guard let v = pdfView, let s = v.currentSelection?.string, !s.isEmpty else { return }
+        if placeholderOverlay.isShowing { placeholderOverlay.retire() }
+        if !isApplyingFind, v.window?.firstResponder === v { userSelected?() }
+    }
+
+    /// Drop this pane's text selection (another pane took the live one).
+    func clearSelection() {
+        guard let v = pdfView, v.currentSelection != nil else { return }
+        v.clearSelection()
     }
 
     /// Give this pane keyboard focus (so ↑/↓ scroll it and text selection lands here).
@@ -314,7 +328,9 @@ final class PDFPaneController {
         for m in matches { m.color = .systemYellow.withAlphaComponent(0.5) }
         v.highlightedSelections = matches.isEmpty ? nil : matches
         if let i = findCurrentIndex, matches.indices.contains(i) {
+            isApplyingFind = true
             v.setCurrentSelection(matches[i], animate: true)
+            isApplyingFind = false
             if scroll {
                 v.scrollSelectionToVisible(nil)
                 if let page = doc.page(at: 0) { scrollAgain(to: matches[i].bounds(for: page), on: page, in: v) }

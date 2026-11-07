@@ -101,13 +101,22 @@ final class DocumentFindTests: XCTestCase {
 
     func testExtractedTextHighlightsEveryMatchAndMarksTheCurrentHit() {
         let text = "zulu one zulu two"
-        let lit = ExtractedTextPane.highlighted(text, find: (query: "ZULU", current: 1))
-        let backgrounds = lit.runs.compactMap { run in run.backgroundColor.map { (String(lit[run.range].characters), $0) } }
+        let storage = NSTextStorage(string: text)
+        let current = ExtractedTextPane.highlight(storage, find: (query: "ZULU", current: 1))
+        var backgrounds: [(String, NSColor)] = []
+        storage.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            if let color = value as? NSColor { backgrounds.append(((text as NSString).substring(with: range), color)) }
+        }
         XCTAssertEqual(backgrounds.map(\.0), ["zulu", "zulu"], "both matches are highlighted")
         XCTAssertNotEqual(backgrounds[0].1, backgrounds[1].1, "the current hit stands out from the others")
-        XCTAssertEqual(backgrounds[1].1, Color(nsColor: .findHighlightColor))
-        XCTAssertTrue(ExtractedTextPane.highlighted(text, find: nil).runs.allSatisfy { $0.backgroundColor == nil },
-                      "no search, no highlight")
+        XCTAssertEqual(backgrounds[1].1, .findHighlightColor)
+        XCTAssertEqual(current, NSRange(location: 9, length: 4), "the current hit is the one scrolled to")
+        ExtractedTextPane.highlight(storage, find: nil)
+        var any = false
+        storage.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: storage.length)) { v, _, _ in
+            if v != nil { any = true }
+        }
+        XCTAssertFalse(any, "no search, no highlight")
     }
 
     // MARK: DocumentPagePairs — the interleaved image/OCR-text page-pair arithmetic (W23.m2)

@@ -39,6 +39,8 @@ final class DocumentViewerModel: ObservableObject {
 
     let leftController: PDFPaneController     // the current pair's image page (PDF page 2·pair)
     let rightController: PDFPaneController   // the current pair's OCR text page (PDF page 2·pair + 1)
+    /// The right pane when the pair has no OCR text page but its image page has text (a one-page PDF).
+    let textController = ExtractedTextController()
 
     /// Whether the view driven by this model renders a find bar — i.e. whether the user can type a query
     /// at all. The Document menu's `Find…` / `Find Next` / `Find Previous` gate on it, and so do the find
@@ -81,10 +83,16 @@ final class DocumentViewerModel: ObservableObject {
         if persists, AppSettings.viewerTextScale > 0 {
             textScale = Self.clampedTextScale(CGFloat(AppSettings.viewerTextScale))
         }
-        // Edit ▸ Copy (⌘C) reaching either pane copies the viewer's selection (`ReaderPDFView.copy(_:)`).
+        // Edit ▸ Copy (⌘C) reaching any pane copies the viewer's selection (`ReaderPDFView.copy(_:)`,
+        // `ExtractedTextView.copy(_:)`), and a selection the user makes in one pane clears the other's.
+        textController.copySelection = { [weak self] in self?.copyPlainSelection() }
+        textController.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
+        textController.userSelected = { [weak self] in self?.userSelected(in: .right) }
         for controller in [leftController, rightController] {
             controller.copySelection = { [weak self] in self?.copyPlainSelection() }
             controller.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
+            let pane: Pane = controller === leftController ? .left : .right
+            controller.userSelected = { [weak self] in self?.userSelected(in: pane) }
             // ⌘= / ⌘↑ / ⌘↓ reaching either pane zoom the FOCUSED pane (`ReaderPDFView.performKeyEquivalent`).
             controller.zoomFocused = { [weak self] zoomIn in
                 if zoomIn { self?.zoomFocusedIn() } else { self?.zoomFocusedOut() }
@@ -150,7 +158,10 @@ final class DocumentViewerModel: ObservableObject {
     private func controller(_ p: Pane) -> PDFPaneController { p == .left ? leftController : rightController }
 
     /// Move keyboard focus to a pane (so ↑/↓ scroll it and ⌘↑/⌘↓ zoom it).
-    func focusPane(_ p: Pane) { focusedPane = p; controller(p).focus() }
+    func focusPane(_ p: Pane) {
+        focusedPane = p
+        if p == .right, !hasTextPage { textController.focus() } else { controller(p).focus() }
+    }
     func zoomFocusedIn()  { focusedPane == .left ? leftController.zoomIn() : zoomTextIn() }
     func zoomFocusedOut() { focusedPane == .left ? leftController.zoomOut() : zoomTextOut() }
     func fitFocused()     { focusedPane == .left ? leftController.fit() : fitText() }
@@ -281,22 +292,55 @@ final class DocumentViewerModel: ObservableObject {
         return hasText ? nil : "No OCR text layer — this document is image-only, so text search and copy won’t work here."
     }
 
-    /// Intelligent copy (prose-cleaned) from whichever pane holds the selection — ⌥⌘C.
-    func copySelection() {
-        let opts = AppSettings.copyOptions
-        let text = rightController.cleanedSelection(opts) ?? leftController.cleanedSelection(opts)
-        copyToPasteboard(text)
-    }
+    // MARK: Copy — one live selection (W40.fix-reader-copy-text-pane)
 
-    /// Plain/direct copy — the raw selected text, exactly as PDFKit reports it (no cleaning) — ⌘C, which
+    /// Intelligent copy (prose-cleaned) from the pane that holds the selection — ⌥⌘C.
+    func copySelection() { copyToPasteboard(cleanedCopyText(AppSettings.copyOptions)) }
+
+    /// Plain/direct copy — the raw selected text, exactly as the pane reports it (no cleaning) — ⌘C, which
     /// is Edit ▸ Copy reaching a pane's `copy:` (W48.reader-copy-shortcut).
-    func copyPlainSelection() {
-        let text = rightController.plainSelection() ?? leftController.plainSelection()
-        copyToPasteboard(text)
+    func copyPlainSelection() { copyToPasteboard(plainCopyText) }
+
+    /// What ⌘C puts on the pasteboard (tests read it here rather than from the owner's clipboard).
+    var plainCopyText: String? { selectedText(plainSelection(in:)) }
+
+    /// What ⌥⌘C puts on the pasteboard.
+    func cleanedCopyText(_ opts: CopyTextOptions) -> String? {
+        selectedText { pane in
+            pane == .left ? leftController.cleanedSelection(opts)
+                : hasTextPage ? rightController.cleanedSelection(opts) : textController.cleanedSelection(opts)
+        }
     }
 
-    /// Either pane has selected text — what enables Edit ▸ Copy over the viewer.
-    var hasTextSelection: Bool { rightController.plainSelection() != nil || leftController.plainSelection() != nil }
+    /// Any pane has selected text — what enables Edit ▸ Copy over the viewer.
+    var hasTextSelection: Bool { plainSelection(in: .left) != nil || plainSelection(in: .right) != nil }
+
+    /// The right pane is a PDFView over the OCR text page when the pair has one, else the extracted text.
+    private func plainSelection(in pane: Pane) -> String? {
+        pane == .left ? leftController.plainSelection()
+            : hasTextPage ? rightController.plainSelection() : textController.plainSelection()
+    }
+
+    /// The focused pane's selection, else the other's. A selection the user makes moves the focus to its
+    /// pane and clears the other (`userSelected`), so this is the pane the user selected in; only find,
+    /// which selects its hit in both panes of the pair, leaves two, and then the focused pane is the one
+    /// that shows the hit.
+    private func selectedText(_ read: (Pane) -> String?) -> String? {
+        let other: Pane = focusedPane == .left ? .right : .left
+        return read(focusedPane) ?? read(other)
+    }
+
+    /// The user selected text in `pane`: it takes the focus border, and the other pane's selection goes, so
+    /// it is never ambiguous what a copy or a service takes (owner's Reader session 2, row 12).
+    func userSelected(in pane: Pane) {
+        focusedPane = pane
+        if pane == .left {
+            rightController.clearSelection()
+            textController.clearSelection()
+        } else {
+            leftController.clearSelection()
+        }
+    }
 
     private func copyToPasteboard(_ text: String?) {
         guard let text, !text.isEmpty else { return }

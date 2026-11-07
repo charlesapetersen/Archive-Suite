@@ -141,9 +141,13 @@ final class DocumentTextZoomTests: XCTestCase {
     func testExtractedTextPaneLaysOutLargerWhenZoomed() {
         let text = String(repeating: "Archival OCR text on a single-page scan. ", count: 30)
         func height(_ scale: CGFloat) -> CGFloat {
-            let host = NSHostingView(rootView: Text(text).font(.system(size: ExtractedTextPane.baseSize * scale))
-                .frame(width: 300).fixedSize(horizontal: false, vertical: true))
-            return host.fittingSize.height
+            // The pane's own text view and font (an NSTextView since W40.fix-reader-copy-text-pane).
+            let view = ExtractedTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 10))
+            view.string = text
+            view.font = ExtractedTextPane.font(scale: scale)
+            guard let layout = view.layoutManager, let container = view.textContainer else { return 0 }
+            layout.ensureLayout(for: container)
+            return layout.usedRect(for: container).height
         }
         XCTAssertGreaterThan(height(1), 0)
         XCTAssertGreaterThan(height(2), height(1) * 1.5)

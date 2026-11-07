@@ -134,8 +134,8 @@ struct PreviewSheet: View {
                         .id(model.pageIdentity)
                         .frame(maxWidth: .infinity)
                 } else if let text = model.embeddedText {
-                    ExtractedTextPane(text: text, scale: model.textScale)
-                        .accessibilityIdentifier("ar.preview.textPane")
+                    ExtractedTextPane(text: text, scale: model.textScale, controller: model.textController,
+                                      id: "ar.preview.textPane")
                 } else {
                     ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                            description: Text(model.pairCount > 1

@@ -93,9 +93,9 @@ struct DocumentWindowView: View {
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))
                     } else if let text = model.embeddedText {
-                        ExtractedTextPane(text: text, scale: model.textScale, find: model.extractedTextFind)
+                        ExtractedTextPane(text: text, scale: model.textScale, controller: model.textController,
+                                          find: model.extractedTextFind, id: "ar.doc.textPane")
                             .overlay(focusBorder(.right))
-                        .accessibilityIdentifier("ar.doc.textPane")
                     } else {
                         ContentUnavailableView("No OCR text page", systemImage: "text.slash",
                                                description: Text(model.pairCount > 1
