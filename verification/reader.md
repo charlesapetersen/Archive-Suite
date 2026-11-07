@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 35 · works 5 · broken 0 · fixed-pending-recheck 7 · dropped 1` (works: R-25, R-28, R-29, R-47, R-48; fixed-pending-recheck: R-11, R-13, R-20, R-21, R-23, R-45, R-46; dropped: R-26). Updated by `W40.fix-reader-fts-snippets`, 2026-11-05 (R-11 to `fixed-pending-recheck`).
+- **Count:** `unproven 27 · works 13 · broken 3 · fixed-pending-recheck 4 · dropped 1` (works: R-17, R-21, R-23, R-25, R-28, R-29, R-30, R-37, R-44, R-45, R-46, R-47, R-48; broken: R-16, R-35, R-43; fixed-pending-recheck: R-11, R-13, R-20, R-36; dropped: R-26). Updated by `W40.g1-reader-2-ledger`, 2026-11-06, from the owner's Reader session 2 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)) and what it left on disk ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -239,6 +239,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-31 W40.fts-snippet-sample-rerun — `fixed-pending-recheck` → `works`: the corpus-size lane on the W40.c2 sample (`run-reader-at-size.sh --optimized --only sample`, twice, sample unchanged) has `Bureau of the Budget` at 12.8 ms on the sample (2.2 s before) and 271 ms at 102,478 rows (41.7 s before), 215 of 215 hits with previews; the test's under-1-s assertion passes. Same evidence file.
   - 2026-11-05 W40.fix-reader-fts-snippets — `works` → `fixed-pending-recheck`: the owner's Reader session 1 (2026-11-04) found hits without a snippet after a slow query. Missing snippets are now filled in, off the main thread, as rows are drawn, and a query of stop words alone is quoted by scanning the body (one `snippet()` call for `the` took 0.9 s). At 102k, `Bureau of the Budget` 190 of 190 hits, `the` 981 of the first 1,000; the hits left without one are photographs with no text. [`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md).
   - 2026-11-06 W40.fix-reader-ocr-search-names — stays `fixed-pending-recheck`: the owner's Reader session 2 (row 22) found "Riesman" listing files with the word only in the file name. The box (and its smart-folder rule) now match the body column alone, `body : (…)`; Advanced Search's "Any text" still reaches names. Test with a name-only and a classification-only hit.
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `fixed-pending-recheck`. In the owner's session 2, before the fix above, every hit with text had its snippet (session 1's complaint, seen fixed on the owner's pages), but the box matched file names (row 22, B; the fix above). The name fix itself has not been seen by the owner ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md), task 6).
 - **Notes:** **Drift.** The search runs as you type, after 150 ms. There is no `.onSubmit` on the field, so
   `SMOKE_TEST.md` step G's "Submit-on-Return" is out of date. The behaviour is arguably better, but the record
   is wrong.
@@ -284,6 +285,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d7 — `unproven` → `broken`: every tag edit stalls the main thread ~1.6 s and a sort change 1–5.5 s at 116k rows; filed `W40.fix-reader-list-recompute-at-size` (S2).
   - 2026-10-31 W40.fix-reader-list-recompute-at-size — `fixed-pending-recheck`: at 115,999 rows, `-O`, one tag edit → list 139 ms, a warm sort change 62–171 ms, the table's per-change refresh 21 ms; `ReaderAtSizeTests` asserts 400 ms budgets. A sort's first sight of its keys still costs up to 2.7 s once per session. Scrolling's frame rate is still unmeasured. [`evidence/reader/W40.fix-reader-list-recompute-at-size.md`](evidence/reader/W40.fix-reader-list-recompute-at-size.md).
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `fixed-pending-recheck`. In the owner's session 2, on the 5,039-file sample: the Columns chip turned a column off and on, the ⚑ and ⚠︎ headers' tooltips and sorts worked, and at the narrowest window the Read column stayed in view ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md), task 1). Not shown: the right-click header picker (row 3 asks for the columns there: `W40.fix-reader-columns-in-header`) and the at-size stall the fix is for, which a 5,039-file session does not reach. No sort caret on ⚑ and ⚠︎ (row 4, C): `W40.fix-reader-sort-indicator-icons`.
 - **Notes:** the headers read "Type" and "Read". There are also flag (⚑) and warning (⚠︎) columns that no
   guide lists.
 
@@ -338,11 +340,12 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   (store only); `ArchiveReaderTests/LibrarySortFilterTests.testEffectiveSubjectsUnion`. No test goes through
   `applyScope` or a restored scope. View-state persistence is off in UI-test mode, so no UITest can cover the
   relaunch half.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md) (synthetic fixture and the real-corpus sample): Save Current Search… from a tag filter, the scope lists the two tagged files, Clear restores the full list, the smart folder survives a relaunch, and its context-menu Delete removes it. No file was written by any of it.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md) (synthetic fixture and the real-corpus sample): Save Current Search… from a tag filter, the scope lists the two tagged files, Clear restores the full list, the smart folder survives a relaunch, and its context-menu Delete removes it. No file was written by any of it. 2026-11-06 · owner session reader-2, task 6 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): an Advanced Search with an OCR-text rule was saved as a smart folder and reopened with Edit Smart Folder… to change a rule, both working; the smart folder showed no item count (row 23).
+- **Status:** `broken` — `W40.fix-reader-smart-folders` (S4)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: rename, the count badge, the pre-filled name and a restored scope after relaunch were not shown (view-state restore is off in UI-test mode).
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: with the owner watching, smart folders showed no count where folders do (row 23, C), the count this row promises; and one with an OCR-text rule lists snippets when the user is not searching (row 24). Fix item `W40.fix-reader-smart-folders` (S4). Saving and editing worked.
 - **Notes:** a smart folder that includes an OCR query shows no count badge.
 
 ### R-17 · View state survives a relaunch
@@ -356,10 +359,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderTests/NavigationModelDefaultsIsolationTests.testAnUnpinnedModelPersistsItsViewStateOnlyInTheInjectedDomain`
   (the write half); `ArchiveReaderTests/NavigationModelTests.testSanitizedPathPrefixDropsOutOfRootPrefix` (the
   pure guard). No test restores a saved state into a fresh model.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 7 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): with a row scrolled to the top of a long list, ⌘Q and relaunch brought the list back at that row, on the owner's Mac (macOS 27.2) with the 5,039-file sample. The root guard was not exercised; the unit test above covers it.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `works`: the owner saw the view come back after a relaunch.
 - **Notes:** the root guard covers the folder prefix only (`S-004`).
 
 ### R-18 · Tag cloud
@@ -373,10 +377,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   (`Views/NavigationModel.swift:437`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testTagCloudShowsSubjectsNotDateTokens`,
   `.testTagCloudPanelToggles`. No test opens the context menu.
-- **Runtime evidence:** none.
+- **Runtime evidence:** none for the context menu. 2026-11-06 · owner session reader-2, task 5: the threshold stepper worked, but it should be a slider (row 19, C: `W40.fix-reader-tagcloud-slider`).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `unproven`: the session did not use the context menu ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)).
 - **Notes:** All/Any appears only with more than one tag selected. The menu also carries Rename tag… and Find
   similar tags… (R-28, R-29).
 
@@ -401,6 +406,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: the Unread-view exit after verify and the partial-failure message were not shown.
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `unproven`: in the owner's session 2 (task 4), Mark Read & Next Unread kept a good pace, and the session copy shows four files changed Unread → Read with nothing else on them changed, each a `readState` line in the audit ledger ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)). The two clauses above were again not shown.
 - **Notes:** **Drift.**
   - "Option, off" is not an option. The default is hard-coded (`TagWriter.swift:132`), and `OptionsView` has no
     toggle for it.
@@ -425,6 +431,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence for ⌘⇧M; stays `unproven`: ⌘]/⌘[ and the bare keys were not pressed. Whether the bare keys fire inside the inline editor is `S-015` (the Space key there does: `W40.fix-reader-inline-keys`).
   - 2026-10-31 W40.fix-reader-inline-keys — `fixed-pending-recheck`: the bare keys stand down while a field editor has focus; in the VM journey (step 2a) Space, `]`, `[` and `\` typed into the inline editor landed in the field and moved nothing. S-015 cleared. ⌘]/⌘[ and the bare keys on the list itself are still unpressed. [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md).
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `fixed-pending-recheck`: in the owner's session 2 (task 4) ⇧⌘M in the list went through a run of unread files at a good pace ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)). The bare keys, ⌘]/⌘[ and ⇧⌘M from a document window were not reported on.
 
 ### R-21 · Undo a tag change
 
@@ -438,8 +445,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   checks persisted identity and applies `TagWriter.applyOccurrence` to each entry.
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 5a, 5b), through `undoLast`. At the writer level, `ArchiveReaderTests/TagWriterTests.testOccurrenceUndoPreservesConcurrentUnrelatedTag`
   and `.testOccurrenceInverseRestoresDuplicateTag` test the writer's inverse.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): one ⌘Z undid a three-file rename as one step, a second ⌘Z undid the three-file group edit, and the tags after the first undo equalled those before the rename. Every other file stayed byte-identical.
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): one ⌘Z undid a three-file rename as one step, a second ⌘Z undid the three-file group edit, and the tags after the first undo equalled those before the rename. Every other file stayed byte-identical. 2026-11-06 · owner session reader-2, tasks 4, 5 and 7 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): Undo and Redo of a read-state change worked; ⌘Z in the file-name filter undid the typing, not a tag (one level only, row 20: `W40.fix-reader-filter-undo-levels`); after ⌘Q and relaunch, ⌘Z before any click undid the change from before the quit. The session copy and the ledger agree on every undo and redo ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `works` (both runs).
@@ -457,6 +464,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-11-04 owner session reader-1 — `broken`: ⌘Z with the caret in the file-name filter undid the last tag change instead of the typing (suspect S-001 confirmed); after a relaunch ⌘Z did nothing until the list was clicked. Fix item `W40.fix-reader-undo-focus`.
   - 2026-11-05 W40.fix-reader-undo-focus — `fixed-pending-recheck`: a bare ⌘Z in any editable text field undoes the typing and leaves the tags alone (`TextUndoGuard`), and the list has the keyboard at launch, so ⌘Z works with no click. VM: `UndoFocusUITests` passes and fails on both counts with the fix switched off. [`evidence/reader/W40.fix-reader-undo-focus.md`](evidence/reader/W40.fix-reader-undo-focus.md).
   - 2026-11-05 W40.fix-reader-redo — still `fixed-pending-recheck`: Redo Tag Change (⇧⌘Z) added (session row 21). `RedoTagChangeTests` (unit, scratch files) and `UndoFocusUITests.testShiftCommandZRedoesTheTagChangeAndBelongsToTheFocusedField` (VM). [`evidence/reader/W40.fix-reader-redo.md`](evidence/reader/W40.fix-reader-redo.md).
+  - 2026-11-06 W40.g1-reader-2-ledger — `fixed-pending-recheck` → `works`: the owner saw Undo, Redo, ⌘Z belonging to the focused field and ⌘Z at once after a relaunch (runtime evidence above). The status line's "Undo 1 change" could say more (row 13: `W40.fix-reader-undo-status-detail`).
 
 ### R-22 · Tag editor sheet
 
@@ -481,6 +489,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — runtime evidence for subjects (single and group); stays `unproven`: Year/Month/Day, Quality, colour and tri-state were not shown.
   - 2026-11-05 W40.fix-reader-tag-entry — the subject field autocompletes (owner session reader-1 row 28): Tab adds the suggestion, Return adds what is typed and keeps the sheet open, Done adds what is still typed. VM run: [`evidence/reader/W40.fix-reader-tag-entry.md`](evidence/reader/W40.fix-reader-tag-entry.md). Stays `unproven` for the same reasons.
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `unproven`. In the owner's session 2 (task 5) ⌘I took three tags from the keyboard, one by Tab completion, a quality, a Sent-with date set and emptied, and one tag on several files at once; the session copy and the ledger show the sheet's writes to Year, Day, Date Uncertain, Quality and a colour (Red, Purple, each removed again), each one delta ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)). Not shown: a Month write (after Tab, typing in Month chose nothing until it was clicked, row 16, A) and group tri-state. The date controls are `W40.fix-reader-date-fields` (rows 16, 17, 18, 21); tags appear a little slowly after Return or Tab (row 15, C: `W40.fix-reader-tag-add-speed`); the sheet as an inspector is `W40.reader-edit-info-inspector` (row 14).
 - **Notes:** each control writes as soon as it changes (`Views/TagEditorView.swift:4-5`), so one sheet session
   makes several writes and several undo steps. Tri-state is real for subjects. For Quality, Color and Read it
   is only a "(mixed)" label. The sheet also holds Read state and Flag.
@@ -498,13 +507,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   (`:566-581`) calls `NavigationModel.commitSubjectEdit` (`Views/NavigationModel.swift:1290`).
 - **Real-path test:** `ArchiveReaderUITests/TriageJourneyUITests.testTriageWritesKeepEveryOtherTagColourAndByte` (steps 2a, 2), through the cell; `TagEntryUITests.testTagEntryKeepsFocusAndASpaceEndsACompletion` (steps 1, 2: two tags in a row, a space in a completion). At the writer level, `ArchiveReaderTests/SubjectTokenEditIntegrationTests.testInlineEditPreservesFacetTokensAndBytes`
   and `.testInlineEditInverseRoundTrips` test `TagEditing.subjectDelta` and `TagWriter` directly.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): a Space typed in the focused token field opened the Preview sheet instead (an earlier run's two-word tag was written as its first word), and Return did not commit; the tag was written only on leaving the field. Leaving the field kept every other tag and colour.
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): a Space typed in the focused token field opened the Preview sheet instead (an earlier run's two-word tag was written as its first word), and Return did not commit; the tag was written only on leaving the field. Leaving the field kept every other tag and colour. 2026-11-06 · owner session reader-2, task 5: two tags in a row and a two-word tag written whole (History).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-inline-keys` (S2).
   - 2026-10-31 W40.fix-reader-inline-keys — `fixed-pending-recheck`: a Space types a space (the two-word tag `W40d8 Inline` was written whole), and Return commits the edit as one delta, with every other file byte-identical. [`evidence/reader/W40.fix-reader-inline-keys.md`](evidence/reader/W40.fix-reader-inline-keys.md).
   - 2026-11-04 owner session reader-1 rows 29, 36 — the field let go after every tag, and a space typed into a completion was refused. 2026-11-05 W40.fix-reader-tag-entry — stays `fixed-pending-recheck`: Return writes and keeps the keyboard (two tags in a row, no click), and "W40te Al" + " Two" wrote `W40te Al Two` with "W40te Alpha Beta" suggested. [`evidence/reader/W40.fix-reader-tag-entry.md`](evidence/reader/W40.fix-reader-tag-entry.md).
+  - 2026-11-06 W40.g1-reader-2-ledger — `fixed-pending-recheck` → `works`: in the owner's session 2 (task 5), two tags in a row in a row's tag field, one a two-word tag starting like an existing one, went in as meant ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)). On disk, `Silicon Street` was written whole, one delta, beside the existing `Silicon Valley …` tags, every other tag kept ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
 - **Notes:** **Drift.** The live editor is the AppKit cell. `Views/SubjectTokenField.swift`, which the guide
   names, is referenced only by the dead `TagsCell` (R-25), so it is dead too. Autocomplete returns at most 20
   and leaves out an exact match. There is no case-duplicate warning here (R-27). 2026-10-16 `W40.e5` deleted
@@ -589,6 +599,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-15 W40.d8 — runtime evidence added; stays `unproven`: the Options toggle was not turned off.
   - 2026-11-06 W40.fix-tags-case-insensitive — promise replaced (owner session reader-1, row 30): the warning and
     its toggle are gone, case variants are one tag; the 2026-10-15 evidence is for the old promise.
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `unproven`: in the owner's session 2 (task 5) adding a case variant gave the expected message and the library's spelling ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)); the filter, cloud, counts, rename and similar-tags halves of the new promise were not tried.
 - **Notes:** the inline token editor (R-23) writes an added subject in the library's spelling too, with no note.
 
 ### R-28 · Rename a tag across the archive
@@ -641,13 +652,14 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `Views/AppKitTableView.swift`.
 - **Real-path test:** `ArchiveReaderTests/FlagStoreTests.testSetFlagPersists`, `.testGroupToggleFlag`
   (store only).
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 4 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): ⇧⌘F flagged a file and ⚑ showed at once. The session copy shows no file changed other than by its tags ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)), so the flag was not written into the file.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-05 W40.reader-remove-notes — the note field and the store's note half removed (owner session reader-1
     rows 24, 25); the flag is unchanged. The next pack (W40.g1-reader-2) no longer lists the note as a known
     problem. Stays `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `works`: the owner flagged a file and saw ⚑ at once; nothing in the file changed.
 - **Notes:** none.
 
 ### R-31 · Copy file links
@@ -723,10 +735,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/ViewerUITests.testPreviewOpensAndDismisses`,
   `.testFitPageCommandReachesThePreviewSheet`, `.testFindCommandsAreDisabledInThePreviewSheetOnly`. None opens
   it with Space or tests browsing, cycling, copy or ⌘O.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): Space on a selected file opened the preview, and the image arrived with the text on real scans ("preview is fast now"; `W40.fix-reader-preview-image-speed`, seen on the owner's pages for the first time).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — runtime evidence added; stays `unproven`: browsing, cycling, copy, zoom and ⌘O in the sheet were not tried.
 - **Notes:** ↑/↓ replace a multi-file selection with one row. ⌘⇧C is bound three times while the sheet is
   open: the sheet's button, Copy Link(s) and Copy Cleaned. Which one wins has not been checked.
 
@@ -747,10 +760,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/ViewerUITests.testDocumentViewerOpens` (⌘O opens a second window);
   `ArchiveReaderTests/DocumentViewerPagePairTests.testNextWalksPairsBeforeMovingToTheNextFileAndPreviousComesBackToTheLastPair`.
   Nothing tests the splitter, persistence, ⌥⌘0 or the focus border.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): the 12-pair *00114 Young papers.pdf* opened and paged, and the text size changes worked; the arrow keys did nothing in the document view (row 6), and a click in the text pane did not seem to move the focus (row 7).
+- **Status:** `broken` — `W40.fix-reader-doc-keys-focus` (S3)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: with the owner watching, ↑/↓ did not scroll (the owner expects the arrow keys to move the image) and a click did not give the text pane the focus border (rows 6, 7, both A; an A row that contradicts the promise counts, as in notes-1). Fix item `W40.fix-reader-doc-keys-focus` (S3). The View menu's "Show All Tabs" was unclear, and the owner asks for a tiled view of all pages (row 9: `W40.reader-tiled-pages`).
 - **Notes:** **Drift.**
   - No ⏎ handler was found. Only a double-click and ⌘O open the viewer.
   - ⌥⌘0 resets the split to the saved default, not to ⅔.
@@ -766,12 +780,17 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Reached by:** Document ▸ Copy, ⌘C (`ArchiveReaderCommands.swift:158`), calls
   `DocumentViewerModel.copyPlainSelection`. Document ▸ Copy Cleaned for Prose, ⌘⇧C (`:160`), calls
   `copySelection`, which reads `AppSettings.copyOptions` and runs `CopyTextCleaner.clean` (`Core/CopyTextCleaner.swift`).
-- **Real-path test:** none through the viewer. `ArchiveReaderTests/CopyTextCleanerTests.testSingleNewlinesBecomeSpaces`,
-  `.testBlankLineIsParagraphBreak` and `.testDeHyphenationJoinsSplitWord` test the cleaner.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** `ArchiveReaderTests/DocumentCopyTextPaneTests` (8, the text pane's selection through ⌘C and
+  ⌥⌘C, one live selection, a render guard; `W40.fix-reader-copy-text-pane`).
+  `ArchiveReaderTests/CopyTextCleanerTests.testSingleNewlinesBecomeSpaces`,
+  `.testBlankLineIsParagraphBreak` and `.testDeHyphenationJoinsSplitWord` test the cleaner. The VM interaction
+  check is `W40.fix-reader-copy-text-pane-ui`.
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): Copy Cleaned for Prose from the image page kept the paragraph breaks on real OCR (`W40.fix-reader-prose-paragraphs`, seen on the owner's pages for the first time). Edit ▸ Copy was greyed (row 10), and no copy command took the selection in the text pane (row 11).
+- **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 owner session reader-2 — `unproven` → `broken` (recorded by W40.g1-reader-2-ledger): rows 10, 11 (B) — Edit ▸ Copy greyed, and every copy took the image page, never the text pane's selection; with both panes selected it was unclear which one a copy takes (row 12). Fix item `W40.fix-reader-copy-text-pane` (S2).
+  - 2026-11-06 W40.fix-reader-copy-text-pane — `broken` → `fixed-pending-recheck` (recorded by W40.g1-reader-2-ledger; the fix did not edit this row): a one-page PDF's text pane is now a read-only AppKit text view, so ⌘C, ⌥⌘C and the services take its selection, and a selection in one pane clears the other. `DocumentCopyTextPaneTests`; the VM check waits on `W40.vm-macos27-reader`.
 - **Notes:** the code tries the text pane first, then the image pane. If both panes hold a selection, the text
   pane wins.
 
@@ -788,10 +807,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderTests/DocumentViewerPagePairTests.testFindWalksMatchesAcrossPairsAndDocumentsInReadingOrder`,
   `.testFindNavigatesToAMatchOnALaterPairsTextPage`; `ArchiveReaderTests/DocumentFindTests.testNextAdvancesThroughEveryMatchThenWraps`.
   Nothing tests the bar, the "N of M" text or the highlighting.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): in the 12-pair *00114 Young papers.pdf*, ⌘F on a word found on several pages lit each hit on both the image and the text page, and Find Next moved both ("Find in both pages works well"). Find across several open documents was not tried.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `works`: the owner saw find highlight and step through a multi-page document.
 - **Notes:** the search runs on Return or ⌘G, not while typing, and matching ignores case.
 
 ### R-38 · Unusual files degrade instead of crashing
@@ -844,6 +864,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d7 — popover data cost measured at 116k rows (30 ms). Status unchanged: the popover itself was not driven.
+  - 2026-11-06 W40.g1-reader-2-ledger — stays `unproven` (no real-path test): in the owner's session 2 (task 1) the popover "works well" ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)), but its counts did not update live while the index built (row 1, A: `W40.fix-reader-health-live`), and a file's ⚠︎ does not say what is wrong or how to fix it (row 2, A: `W40.fix-reader-health-issue-detail`).
 - **Notes:** no current guide describes the popover. Its only record is the SMOKE_TEST step. It also has a
   Non-standard PDFs row.
 
@@ -900,11 +921,15 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Real-path test:** `ArchiveReaderUITests/ViewerUITests.testJPEGImageSwitchIsAvailableAndSticky`;
   `ArchiveReaderTests/DocumentRenderGuardTests.testLinkedJPEGPartnerRendersAndPreferenceRestores`;
   `ArchiveReaderTests/ArchiveLinkWriterTests.testPageLinkCarriesOnlyTheCleanlyResolvedJPEGPartner`.
-- **Runtime evidence:** none. The W40.a3 screenshots show the JPEG fixture drawn in the preview and the viewer,
-  but they were a suite run (see the header).
-- **Status:** `unproven`
+- **Runtime evidence:** The W40.a3 screenshots show the JPEG fixture drawn in the preview and the viewer,
+  but they were a suite run (see the header). 2026-11-06 · owner session reader-2, task 3
+  ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): the toolbar's PDF / JPEG switch offered JPEG on
+  *Cambridge/YUNG 2 8 Scans LLMed/00114 Young papers.pdf*, which has no JPEG (row 8). Checked in the session copy
+  by this item: `Archival Photos JPEGS/` has no Cambridge `00114` file; four other folders hold a `00114 …` JPEG.
+- **Status:** `broken` — `W40.fix-reader-jpeg-switch-missing` (S3)
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: the switch is to appear only when the PDF has a JPEG partner (greyed with a tooltip since `W40.fix-reader-jpeg-toolbar`), and the owner saw it offer JPEG on a file with none (row 8, A; contradicts the promise). Fix item `W40.fix-reader-jpeg-switch-missing` (S3).
 - **Notes:** the preview sheet shows the choice but never saves it.
 
 ### R-44 · Durable archive links
@@ -925,10 +950,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `.testCopiedPageLinkRoundTripsToTheSamePage`, `.testRevealOfAnAbsentFileRequestsNothing`;
   `ArchiveReaderUITests/ViewerUITests.testCopyPageLinkIsEnabledInTheDocumentWindow`. No test sends a real
   `archivereader://` URL to the app. `DeepLinkTests` is skipped on the host lane by standing practice.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session reader-2, task 8 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): an archive link to a file (⇧⌘L) and to a later page of an open document (⌥⌘L), pasted and clicked, each brought the owner back to the right file and page. A missing file and a moved archive were not tried.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `works`: both links resolved with the owner watching. The status line's note on where a link opens is not wanted (row 25: `W40.fix-reader-link-status-line`).
 - **Notes:**
   - A document link without a page selects the row but opens no window, as a test asserts.
   - Copy Archive Link(s) refuses until the JPEG-partner scan is ready (`NavigationModel.swift:1388-1393`).
@@ -959,8 +985,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `.testApplyWithMismatchedIdentityAbortsAndLeavesReplacementUntouched`;
   `ArchiveReaderTests/TriageTests.testMarkReadRemovesOnlyUnreadAndPreservesOtherTags` (checks the bytes are
   unchanged); `ArchiveCoreTests/TagWriterPrimitiveTests.testReplacedFileAbortsAndLeavesReplacementUntouched`.
-- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): no write changed content, location, another file, an unrelated tag or a colour, on the synthetic fixture or on 76 real-corpus sample files. But every write added `com.apple.quarantine` (`0086;…;ArchiveReader;`) or rewrote an existing one (`0082` → `0086`), an xattr outside "only Finder tags". 2026-10-31 · [`evidence/reader/W40.fix-reader-tag-quarantine.md`](evidence/reader/W40.fix-reader-tag-quarantine.md): with `user-selected.executable` and a held scope, every journey step on the synthetic fixture left every file's quarantine stamp, or its absence, unchanged.
-- **Status:** `fixed-pending-recheck` (builder is not verifier)
+- **Runtime evidence:** 2026-10-15 · `f5c31a95` · [`evidence/reader/W40.d8-triage.md`](evidence/reader/W40.d8-triage.md): no write changed content, location, another file, an unrelated tag or a colour, on the synthetic fixture or on 76 real-corpus sample files. But every write added `com.apple.quarantine` (`0086;…;ArchiveReader;`) or rewrote an existing one (`0082` → `0086`), an xattr outside "only Finder tags". 2026-10-31 · [`evidence/reader/W40.fix-reader-tag-quarantine.md`](evidence/reader/W40.fix-reader-tag-quarantine.md): with `user-selected.executable` and a held scope, every journey step on the synthetic fixture left every file's quarantine stamp, or its absence, unchanged. 2026-11-06 · owner session reader-2 · [`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md): the owner's own triage and tagging on a clone of the 5,039-PDF real sample (tasks 4, 5, 7) changed the Finder tags of 11 files and nothing else. No file's size changed, no changed file's bytes, no other extended attribute on any of the 8,748 files (quarantine and FinderInfo included), and the only file added was the root identity file, the named exception.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-10-15 W40.d8 — `broken`: `W40.fix-reader-tag-quarantine` (S3).
@@ -983,6 +1009,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
     by the app and forbids removing the stamp; `com.apple.security.files.user-selected.executable` stops it
     for writes under a user-selected or bookmark scope, and the Debug fixture root now holds such a scope.
     `TriageJourneyUITests` fails outright on any quarantine change; half the GUI fixture carries a PDFpen stamp.
+  - 2026-11-06 W40.g1-reader-2-ledger — `fixed-pending-recheck` → `works`: what the owner's session 2 left on disk, read without writing (runtime evidence above). Every write went through the audited writer: each changed file's ledger lines replay to its tags on disk (R-46). The tag names are now stored with the system's no-colour suffix (`Unread\n0`), the form `.tagNamesKey` writes; names, order and colour label are unchanged.
 - **Notes:**
   - The writer-level identity tests above passed only because each handed the writer a new `URL`, while the app
     passes the same `ArchiveFile.url` to the capture and the write. Since `W40.fix-identity-url-cache` the
@@ -1024,8 +1051,13 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `NavigationUITests.testLedgerUndoShowsVerifiedResultOnScratchFixture`.
 - **Runtime evidence:** builder scratch tests and VM check, 2026-10-18:
   [`evidence/reader/W40.audit-ledger-undo.md`](evidence/reader/W40.audit-ledger-undo.md).
-  Independent promise recheck remains pending.
-- **Status:** `fixed-pending-recheck` (both recording and durable undo; builder is not verifier)
+  2026-11-06 · owner session reader-2 · [`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md):
+  the owner's ledger, read from inside the app's container by a read-only test, has 54 lines for the session
+  copy. Replaying them from the sample's tags gives exactly the tags on disk for all 11 changed files, each line's
+  `before` matching the last line's `after`; undo and redo lines name the group they reverse; every line carries a
+  bookmark and file number; none is `unverified`. ⌘Z straight after a quit and relaunch undid the change from
+  before the quit (task 7).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unreachable` (a promise with no implementation).
   - 2026-10-16 W40.f1 — memory-only undo demonstrated (`UndoDurabilityTests.testTheUndoHistoryDoesNotSurviveARelaunch`,
@@ -1036,6 +1068,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-18 W40.audit-ledger-undo — durable undo wired; the original relaunch assertion is reversed
     because the owner requested undo to outlive quit. Scratch evidence and limitations:
     [`evidence/reader/W40.audit-ledger-undo.md`](evidence/reader/W40.audit-ledger-undo.md).
+  - 2026-11-06 W40.g1-reader-2-ledger — `fixed-pending-recheck` → `works`, both recording and durable undo: the
+    owner's ledger matches the owner's session on disk line for line, and undo outlived a quit with the owner
+    watching (runtime evidence above).
 - **Notes:** the on-disk ledger remains unbounded; ordinary forward lines are not fsynced. Interrupted
   undo attempts consume the group; only members whose failure is known and not an identity refusal are
   re-recorded for a retry (`W40.fix-reader-undo-partial`). No schema migration: no production
@@ -1086,7 +1121,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   live in the navigation window, the Save Search sheet, Options and an open document viewer; System back; restored
   after a relaunch; the argument wins). `AccessibilityAuditUITests` and `VisualReviewUITests` gain `…BySetting` variants that force the
   mode through the setting (`LayoutGuard.dark/lightSettingArguments`).
-- **Runtime evidence:** [`evidence/reader/W48.appearance-verify.md`](evidence/reader/W48.appearance-verify.md) (VM, `57596365`).
+- **Runtime evidence:** [`evidence/reader/W48.appearance-verify.md`](evidence/reader/W48.appearance-verify.md) (VM, `57596365`). 2026-11-06 · owner session reader-2, task 7 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): on the owner's Mac (macOS 27.2), switching Options ▸ Appearance between Light and Dark, the title bar behind "Archive Reader" was one even background in both (`W40.fix-reader-titlebar-gradient`, never seen on macOS 27 before; the VM then ran 26.2).
 - **Status:** `works`
 - **History:**
   - 2026-10-31 W48.appearance-reader — row written, `unproven`. The builder's VM runs:
