@@ -647,8 +647,11 @@ def cmd_corpus_lines(a):
                     args += [out, os.path.join(lines, key + ".json")]
                 except Exception as e:
                     print(m["id"], e, flush=True)
-            if args:
-                subprocess.run([str(LO.HELPER), "lines", *args], check=False)
+            if args:   # the helper has hung on a batch at 0% CPU (twice on 2026-11-06): give up on that batch
+                try:
+                    subprocess.run([str(LO.HELPER), "lines", *args], check=False, timeout=300)
+                except subprocess.TimeoutExpired:
+                    print(f"  batch at {k} timed out; its photos stay unread at turn {turn}", flush=True)
             for i in range(0, len(args), 2):
                 os.remove(args[i])   # the rendered page is scratch; the lines are kept
             done += len(args) // 2
@@ -731,6 +734,18 @@ def cmd_corpus(a):
         else:
             purple[f"taken out: {why_out.get(r['id'], 'not in the revised sample')}"] += 1
     res["purple_sample"] = dict(purple)
+    # How far to trust a read box number: on the truth set, of the photos where Vision + parser gives a container, how
+    # many give the right one (owner-ruled and unanimous cells alike), by colour
+    prec = collections.Counter()
+    for r in truth():
+        if r["illegible_photo"] or "container" in r["carried"]:
+            continue
+        got = vision_read(lines_of(r["id"]), r["colour"])["container"]
+        if got is not None:
+            prec[(r["colour"], "given")] += 1
+            prec[(r["colour"], "right")] += same("container", r["fields"].get("container"), got)
+    res["vision_box_precision"] = {c: {"given": prec[(c, "given")], "right": prec[(c, "right")]}
+                                   for c in ("Red", "Purple")}
     for k in ("read", "turns", "red_steps", "purple_vs_box"):
         res[k] = dict(res[k])
     os.makedirs(OUT, exist_ok=True)
@@ -761,9 +776,11 @@ def load(name):
 
 
 def corpus_speed():
-    p = os.path.join(CACHE, "corpus-lines.log")
-    m = re.findall(r"^(\d+) readings in (\d+)s", open(p).read(), re.M) if os.path.exists(p) else []
-    return (int(m[-1][0]), int(m[-1][1])) if m else None
+    """(photos, seconds) of the first, EXIF-turn pass: the later turns' clock holds a helper that hung for 14
+    minutes on one batch on 2026-11-06 and was stopped (its 40 photos are unread at that turn)."""
+    p = os.path.join(CACHE, "corpus-lines-run1.log")   # the first run's log, kept when the run was restarted
+    m = re.findall(r"^\s+(\d+)/\1 (\d+)s$", open(p).read(), re.M) if os.path.exists(p) else []
+    return (int(m[0][0]), int(m[0][1])) if m else None
 
 
 def cmd_report(a):
@@ -839,7 +856,7 @@ def cmd_report(a):
               "measure on a stranger's tree. The owner's own tree is the real case. Its names are informal, so the "
               "patterns recognise little of it and the level map rests on the user's confirmation (the design's "
               "once-per-root sheet), as the plan expected:", "",
-              f"- Level 1, {o['level1_names']} names over {o['pdfs']:,} PDFs: " +
+              f"- Level 1 (the tree as listed by W47.ct-truth on 2026-10-29), {o['level1_names']} names over {o['pdfs']:,} PDFs: " +
               ", ".join(f"{k} {n:,}" for k, n in sorted(o["level1_pdfs"].items(), key=lambda x: -x[1])) +
               " PDFs (names: " + ", ".join(f"{k} {n}" for k, n in o["level1_names_by_class"].items()) + ").",
               "- Level 2, in PDFs: " + ", ".join(f"{k} {n:,}" for k, n in sorted(o["level2_pdfs"].items(),
@@ -862,10 +879,13 @@ def cmd_report(a):
         L += ["", f"A folder label that reads a box number ({n_pv:,} Purple photos), against the last box photo before "
               "it in its directory:", "", "| folder's box | count | share |", "|---|---|---|"]
         L += [f"| {k} | {n:,} | {pc(n / n_pv)} |" for k, n in sorted(pv.items(), key=lambda x: -x[1])]
-        L += ["", "A folder giving another box than the box photo before it is a box change with no box photo, or a "
-              "misread; the truth set bounds the misreads (Vision's container score on folder labels above). "
-              "Boxes skipped are usually boxes not requested, not missed photos; a lower number is a box photographed "
-              "out of order or a misread.", ""]
+        vp = C["vision_box_precision"]
+        L += ["", f"How far a read box number can be trusted: on the truth set, where Vision + parser gives a container "
+              f"it is right on {vp['Red']['right']} of {vp['Red']['given']} box photos and {vp['Purple']['right']} of "
+              f"{vp['Purple']['given']} folder photos. A folder giving another box than the box photo before it is a "
+              "box change with no box photo, or a misread of either photo. "
+              "Boxes skipped are most likely boxes not requested, not missed photos. Box photos are so rarely misread "
+              "that a lower number is, nearly always, a box photographed out of numeric order.", ""]
         ps = C["purple_sample"]
         n = sum(ps.values())
         L += ["## What Purple marks", "", f"The truth sample's Purple photos as drawn ({n}, stratified by repository; "
@@ -879,14 +899,50 @@ def cmd_report(a):
     L += ["## Speed and the price of the corpus's markers", "",
           f"The corpus holds {n_marks:,} single-colour markers."]
     if sp:
-        L.append(f"- Vision + parser: {sp[0]:,} readings (every turn tried) in {sp[1] / 60:.0f} minutes on this Mac, "
-                 f"{sp[1] / max(sp[0], 1):.2f} s a reading, rendering included; $0.")
+        L.append(f"- Vision + parser: the corpus's {sp[0]:,} paired markers at the EXIF turn in {sp[1] / 60:.0f} "
+                 f"minutes on this Mac, {sp[1] / max(sp[0], 1):.2f} s a photo, rendering the JPEG included; $0. "
+                 "Trying the other turns where no number read roughly doubled it.")
     if gsp:
         L.append(f"- {NAMES[gem]}: median {gsp['median_s']} s a photo (mean {gsp['mean_s']}), peak "
                  f"{gsp['peak_gb']} GB; the corpus's markers in about {n_marks * gsp['mean_s'] / 3600:.1f} hours; $0.")
     L += [f"- Gemini 3.7 Flash through the gateway (the truth's third reader, for W47.ct-read-paid's price): "
           f"$0.0023 a photo measured on the truth build's 215 calls, so about ${n_marks * 0.0023:.0f} for the "
-          "corpus: over the $7 line, so a full backfill read asks the owner first.", ""]
+          "corpus: over the $7 line, so a full backfill read asks the owner first.", "",
+          "Timings were taken inside an engine session, which macOS runs at background priority; such timings have "
+          "measured several times slower than an interactive run, so read them as upper bounds.", ""]
+    if C:
+        vp, rs = C["vision_box_precision"]["Red"], C["red_steps"]
+        low = rs.get("lower number", 0) / max(sum(rs.values()), 1)
+        kind = S["routes"]["vision"]["kind"]["scored"]
+        L += ["## What it recommends, per field (for W47.ct-design-ok)", "",
+              "Free routes only; W47.ct-read-paid adds the gateway arm before the design review. On the hard cells "
+              "the owner ruled, Gemini 3.7 Flash is ahead of every free route on almost every field, although those "
+              "are cells where at least one drafter was wrong, which handicaps a drafter; the paid arm should "
+              "confirm that on the whole set.", "",
+              f"- **What the photo is:** the marker's colour (the Box or Folder button), right on {kind['right']} of "
+              f"{kind['n']}; no reader is needed, and Gemma's own call is worse.",
+              "- **Container and folder number:** Vision + parser. It ties Gemma on both, takes a fraction of the "
+              f"time, and on a box photo the box number it gives is right {vp['right']} of {vp['given']} times. It "
+              "misses about a quarter of the box numbers that are there, so the capture card asks when it reads none.",
+              "- **Repository, collection title, collection number, date:** Gemma 3 12B, ahead of Vision + parser on "
+              "each with an interval above zero, but still wrong or empty on a third to a half of the filled cells: "
+              "proposed values the user confirms once per run, not facts.",
+              "- **Accession, series, series title:** Vision + parser; they are anchored by their keyword, Gemma's "
+              "difference is a tie, and Gemma fills an accession where there is none.",
+              "- **Collection subtitle, box title, other identifying marks, folder title:** no free route reads them. "
+              "Vision's high accuracy on the first three comes from leaving them empty, and Gemma fills them where "
+              "there is nothing. Leave them to the user, or to the paid arm if it reads them.",
+              "- **Route B:** the name patterns cover every convention the plan names; the owner's informal names need "
+              "the once-per-root level-map sheet, as designed.",
+              f"- **Carry-forward:** box photos come in no fixed order. {pc(low)} of the steps between box photos go to "
+              "a lower number, and box photos are rarely misread, so the plan's warning \"a box number goes "
+              "backwards\" would fire on about one step in four; it should not be a warning. A folder label that "
+              "names its box is the better check: the run is flagged where it disagrees with the box photo before it.",
+              "- **Purple:** a folder label for nearly all of the drawn photos; two were \"No Folder\" sheets and one "
+              "a document page. Purple can be taken as a folder start, with \"No Folder\" sheets recognised by their "
+              "text.",
+              "- **The corpus's markers:** Vision + parser reads them all in minutes for $0, Gemma in most of a day for "
+              "$0; Gemini would cost about $10, over the $7 line.", ""]
     L += ["## Measurement card", "",
           "- **Truth:** W47.ct-truth-final's: the owner's answers on three sheets and his notes, his rules applied to "
           "the readers' readings (reported apart), and for the rest the three drafters unanimous. Drafters are scored "

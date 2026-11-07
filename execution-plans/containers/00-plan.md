@@ -161,7 +161,9 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
    (`W47.ct-truth-jpeg`, `segbench-results/ct-truth.md`); the first, PDF-built draft is `ct-truth-pdf.md`.
 2. `W47.ct-truth-owner-ok` — OWNER GATE: that sheet answered.
 3. `W47.ct-read` — the free reading routes scored per field, the Route B name patterns scored on the tree set,
-   plus carry-forward and Purple's meaning.
+   plus carry-forward and Purple's meaning. Done 2026-11-06 (`segbench-results/ct-read.md`): numbers from Vision + parser,
+   titles from Gemma 3 12B as proposals; box photos come in no numeric order (27% of steps go down), so the
+   "box number goes backwards" warning in Design 4 is for the design review to drop.
 4. `W47.ct-read-paid` — the gateway arm.
 5. `W47.ct-design-ok` — OWNER GATE: the figures and this design, before app code.
 6. `W47.ct-spec` — `SPEC/containers.md` and the ArchiveCore model.
