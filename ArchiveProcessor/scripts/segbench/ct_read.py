@@ -566,16 +566,359 @@ def cmd_trees(a):
     print(json.dumps(res["owner_tree"], indent=1))
 
 
+# --- carry-forward and Purple, on the corpus ------------------------------------------------------------------------
+# Read-only on the corpus: tags with getxattr(2), each marker's paired JPEG original opened and rendered into the
+# cache. Vision lines on every marker (Red and Purple), at the EXIF turn and, when that reads no box or folder number,
+# at the other three. A folder label often repeats its box number ("Box 18", "5-9"), so a Purple whose box differs
+# from the last Red before it in its directory is a box change with no box photo, or a misread: the truth set's
+# Vision score on that field bounds the second.
+
+CORPUS_DIR = os.path.join(CACHE, "corpus")
+INVENTORY = os.path.join(CORPUS_DIR, "inventory.json")   # private: corpus paths
+
+
+def inventory():
+    if os.path.exists(INVENTORY):
+        return json.load(open(INVENTORY, encoding="utf-8"))
+    import corpus_survey as CS
+    dirs = []
+    for folder, names in CS.walk(CS.CORPUS):
+        marks = []
+        for i, n in enumerate(names):
+            got = set(CS.read_tags(os.path.join(CS.CORPUS, folder, n))) & CS.LABEL_COLOURS
+            if len(got) == 1:
+                rel = os.path.join(folder, n)
+                marks.append({"id": CT.marker_id(rel), "path": rel, "pos": i, "colour": got.pop()})
+        dirs.append({"folder": folder, "n": len(names), "markers": marks})
+    os.makedirs(CORPUS_DIR, exist_ok=True)
+    with open(INVENTORY, "w", encoding="utf-8") as fh:
+        json.dump(dirs, fh, ensure_ascii=False)
+    return dirs
+
+
+def corpus_key(mid, turn):
+    return mid if turn == 0 else f"{mid}-{turn}"
+
+
+def corpus_lines(key):
+    p = os.path.join(CORPUS_DIR, "lines", key + ".json")
+    return json.load(open(p, encoding="utf-8")).get("lines", []) if os.path.exists(p) else None
+
+
+def numbers_of(lines, colour):
+    got = vision_read(lines, colour)
+    return got["container"], got["folder"]
+
+
+def cmd_corpus_lines(a):
+    import layout_order as LO
+    from PIL import Image, ImageOps
+    LO.build_helper()
+    dirs = inventory()
+    pairs = CT.load_pairs()
+    pages, lines = os.path.join(CORPUS_DIR, "pages"), os.path.join(CORPUS_DIR, "lines")
+    os.makedirs(pages, exist_ok=True)
+    os.makedirs(lines, exist_ok=True)
+    marks = [m for d in dirs for m in d["markers"] if pairs.get(m["path"])]
+    t0, done = time.time(), 0
+    for turn in (0, 90, 270, 180):
+        todo = []
+        for m in marks:
+            key = corpus_key(m["id"], turn)
+            if os.path.exists(os.path.join(lines, key + ".json")):
+                continue
+            if turn and any(x is not None for t in (0, 90, 270, 180) if t != turn
+                            for x in [corpus_lines(corpus_key(m["id"], t))] if x is not None
+                            and any(numbers_of(x, m["colour"]))):
+                continue   # an earlier turn read a box or folder number
+            if turn and corpus_lines(m["id"]) is None:
+                continue   # the photo did not render at all
+            todo.append((m, key))
+        print(f"turn {turn}: {len(todo)} photos", flush=True)
+        for k in range(0, len(todo), 40):
+            args = []
+            for m, key in todo[k:k + 40]:
+                out = os.path.join(pages, key + ".jpg")
+                try:
+                    with Image.open(pairs[m["path"]]) as im:
+                        up = ImageOps.exif_transpose(im).convert("RGB")
+                        up.thumbnail((CT.MAX_SIDE, CT.MAX_SIDE), Image.Resampling.LANCZOS)
+                        (up.rotate(turn, expand=True) if turn else up).save(out, "JPEG", quality=90)
+                    args += [out, os.path.join(lines, key + ".json")]
+                except Exception as e:
+                    print(m["id"], e, flush=True)
+            if args:
+                subprocess.run([str(LO.HELPER), "lines", *args], check=False)
+            for i in range(0, len(args), 2):
+                os.remove(args[i])   # the rendered page is scratch; the lines are kept
+            done += len(args) // 2
+            print(f"  {k + len(args) // 2}/{len(todo)} {round(time.time() - t0)}s", flush=True)
+    print(f"{done} readings in {round(time.time() - t0)}s; {lines}")
+
+
+def best_numbers(m):
+    for t in (0, 90, 270, 180):
+        x = corpus_lines(corpus_key(m["id"], t))
+        if x is not None:
+            got = numbers_of(x, m["colour"])
+            if any(got):
+                return got, t
+    return (None, None), None
+
+
+def box_no(container):
+    m = re.fullmatch(r"(\w+) (\d+)[A-Z]?", container or "")
+    return (m.group(1), int(m.group(2))) if m else None
+
+
+def cmd_corpus(a):
+    dirs = inventory()
+    pairs = CT.load_pairs()
+    res = {"directories": len(dirs), "pdfs": sum(d["n"] for d in dirs),
+           "markers": dict(collections.Counter(m["colour"] for d in dirs for m in d["markers"])),
+           "with_jpeg": dict(collections.Counter(m["colour"] for d in dirs for m in d["markers"] if pairs.get(m["path"]))),
+           "read": collections.Counter(), "turns": collections.Counter(), "red_steps": collections.Counter(),
+           "purple_vs_box": collections.Counter(), "dirs_with_red": 0, "dirs_with_markers": 0}
+    for d in dirs:
+        marks = d["markers"]
+        res["dirs_with_markers"] += bool(marks)
+        res["dirs_with_red"] += any(m["colour"] == "Red" for m in marks)
+        last_box = None   # the last Red's read box number in this directory
+        last_red = False  # a Red was seen, read or not
+        for m in marks:
+            if not pairs.get(m["path"]):
+                if m["colour"] == "Red":
+                    last_box, last_red = None, True
+                continue
+            (cont, fold), t = best_numbers(m)
+            b = box_no(cont)
+            res["read"][f"{m['colour']}: {'box' if b else 'no box'}{', folder' if fold else ''}"] += 1
+            res["turns"][f"{m['colour']} {t}"] += 1
+            if m["colour"] == "Red":
+                if b and last_box:
+                    if b[0] != last_box[0]:
+                        step = "another container type"
+                    elif b[1] == last_box[1]:
+                        step = "same box again"
+                    elif b[1] == last_box[1] + 1:
+                        step = "next box"
+                    elif b[1] > last_box[1]:
+                        step = "boxes skipped"
+                    else:
+                        step = "lower number"
+                    res["red_steps"][step] += 1
+                last_box, last_red = (b or None), True
+            elif b:
+                if not last_red:
+                    res["purple_vs_box"]["folder gives a box, no box photo before it in its directory"] += 1
+                elif last_box is None:
+                    res["purple_vs_box"]["folder gives a box, the box photo before it unread"] += 1
+                elif b[1] == last_box[1]:
+                    res["purple_vs_box"]["same box as the box photo before it"] += 1
+                else:
+                    res["purple_vs_box"]["another box than the box photo before it"] += 1
+    # Purple's meaning: the truth sample's Purple photos as drawn, with the ones the owner took out and why
+    pool = jsonl(os.path.join(CT.POOL, "sample.jsonl"))
+    final = {r["id"]: r for r in jsonl(TRUTH)}
+    why_out = {**CT.DROPPED, **CT.DROPPED_FINAL, **LEFT_OUT}
+    purple = collections.Counter()
+    for r in pool:
+        if r["colour"] != "Purple":
+            continue
+        if r["id"] in final:
+            t = final[r["id"]]
+            purple["folder label, unlabelled folder" if t["unlabelled"] else t["fields"]["kind"]] += 1
+        else:
+            purple[f"taken out: {why_out.get(r['id'], 'not in the revised sample')}"] += 1
+    res["purple_sample"] = dict(purple)
+    for k in ("read", "turns", "red_steps", "purple_vs_box"):
+        res[k] = dict(res[k])
+    os.makedirs(OUT, exist_ok=True)
+    with open(os.path.join(OUT, "corpus.json"), "w") as fh:
+        json.dump(res, fh, indent=1)
+    print(json.dumps(res, indent=1))
+
+
+# --- the report -----------------------------------------------------------------------------------------------------
+
+def pc(x):
+    return "–" if x is None else f"{100 * x:.0f}%"
+
+
+def ci(t):
+    return "" if not t or not t.get("ci") else f" ({100 * t['ci'][0]:.0f}–{100 * t['ci'][1]:.0f})"
+
+
+def cell(t):
+    if not t or not t["n"]:
+        return "–"
+    return f"{pc(t['acc'])}{ci(t)}, n {t['n']}"
+
+
+def load(name):
+    p = os.path.join(OUT, name)
+    return json.load(open(p)) if os.path.exists(p) else None
+
+
+def corpus_speed():
+    p = os.path.join(CACHE, "corpus-lines.log")
+    m = re.findall(r"^(\d+) readings in (\d+)s", open(p).read(), re.M) if os.path.exists(p) else []
+    return (int(m[-1][0]), int(m[-1][1])) if m else None
+
+
+def cmd_report(a):
+    S, T, C = load("score.json"), load("trees.json"), load("corpus.json")
+    first = load("score-vision-firstpass.json")
+    gem = next(iter(MODELS))
+    L = ["# Container labels and folder trees: the routes scored per field (W47.ct-read)", "",
+         "Written by `scripts/segbench/ct_read.py report`. The truth is W47.ct-truth-final's (`ct-truth-final.md`): "
+         f"{S['photos']} box and folder marker photos (its 196 less the one the owner's third-sheet note drops). Label values "
+         "stay in the cache; this page gives counts only.", ""]
+    L += ["## The routes", "",
+          "- **Apple Vision + parser:** the app's Vision settings (accurate, language correction), the truth build's "
+          "lines on the upright photo, and a pattern parser written in `ct_read.py` from the plan's list of label "
+          "forms. The marker's colour gives the kind (the companions' Box or Folder button). The parser was written "
+          "before its first score and is scored as written.",
+          f"- **{NAMES[gem]}** on this Mac, which drafted none of the truth, read blind with the final reading rules "
+          "and a prompt whose every example is invented. Scored on every cell.",
+          "- **The truth's three drafters** (Qwen3-VL 8B, Qwen3.5 4B, Gemini 3.7 Flash) are scored only on the owner's "
+          "own cells, less their prompt's example fields (FLD-9). Those are the cells the three disagreed on, so the "
+          "figures are on the hard cells, not a fair whole-set score.",
+          "- **Not run:** the corpus PDFs' text layer (owner, 2026-10-30: no arm takes the ABBYY text as input; the "
+          "item, filed on 2026-10-21, named it) and any plan route (root CLAUDE.md). The gateway arm is "
+          "W47.ct-read-paid.", ""]
+    c = S["cells"]
+    L += [f"Cells scored: {c.get('owner', 0)} the owner's, {c.get('readers', 0)} the three readers' unanimous, "
+          f"{c.get('rule', 0)} settled by the owner's rules (reported apart, P11-7). Out of every score: "
+          + ", ".join(f"{n} {k[5:]}" for k, n in sorted(S["cells_out"].items())) + ".", ""]
+    L += ["## Per field: the two routes that drafted nothing", "",
+          "On the owner's and the unanimous cells. Accuracy with its 95% interval and the cell count; then, of the "
+          "cells with a value, how many were read right, and of the empty ones, how many the route filled. The "
+          f"gap is {NAMES[gem]} less Vision on the same cells, with a 95% bootstrap interval over photos; an "
+          "interval across zero is a tie.", "",
+          f"| field | Vision + parser | right of filled | filled when empty | {NAMES[gem]} | right of filled | "
+          "filled when empty | gap |", "|---|---|---|---|---|---|---|---|"]
+    for f in SCORED:
+        v, g = S["routes"]["vision"][f].get("scored"), S["routes"][gem][f].get("scored")
+        gp = S["gaps"].get(f)
+        gs = "–" if not gp else f"{100 * gp['gap']:+.0f} ({100 * gp['ci'][0]:+.0f} to {100 * gp['ci'][1]:+.0f})"
+        def fe(t):
+            return ("–", "–") if not t else (f"{t['filled_right']}/{t['filled']}", f"{t['false_fill']}/{t['empty']}")
+        L.append(f"| {CT.LABELS.get(f, f)} | {cell(v)} | {fe(v)[0]} | {fe(v)[1]} | {cell(g)} | {fe(g)[0]} | "
+                 f"{fe(g)[1]} | {gs} |")
+    L += ["", "### On the rule-settled cells, apart", "", f"| field | Vision + parser | {NAMES[gem]} |", "|---|---|---|"]
+    for f in SCORED:
+        r1, r2 = S["routes"]["vision"][f].get("rule"), S["routes"][gem][f].get("rule")
+        if r1 or r2:
+            L.append(f"| {CT.LABELS.get(f, f)} | {cell(r1)} | {cell(r2)} |")
+    L += ["", "## Per field: the owner's own cells, every route", "",
+          "The cells the three drafters split on, which the owner ruled: the hard cells. Every route on the same "
+          "cells, less each row's prompt-example fields for the drafters.", "",
+          "| field | " + " | ".join(NAMES[k] for k in ROUTES) + " |", "|---|" + "---|" * len(ROUTES)]
+    for f in SCORED:
+        L.append(f"| {CT.LABELS.get(f, f)} | " + " | ".join(cell(S["routes"][k][f].get("owner")) for k in ROUTES) + " |")
+    L += ["", "Paired gaps on the owner's cells, each drafter less " + NAMES[gem] + " (95% bootstrap over photos):", "",
+          "| field | " + " | ".join(NAMES[d] for d in DRAFTERS) + " |", "|---|" + "---|" * len(DRAFTERS)]
+    for f in SCORED:
+        row = []
+        for d in DRAFTERS:
+            gp = S["gaps_owner"][d].get(f)
+            row.append("–" if not gp else f"{100 * gp['gap']:+.0f} ({100 * gp['ci'][0]:+.0f} to {100 * gp['ci'][1]:+.0f})")
+        L.append(f"| {CT.LABELS.get(f, f)} | " + " | ".join(row) + " |")
+    L += ["", f"Replies that did not parse: " + ", ".join(f"{NAMES[k]} {n}" for k, n in S["unparsed"].items()) + ".", ""]
+    if T:
+        L += ["## Route B: the folder-tree name patterns", "",
+              f"On the synthetic tree set (`ct_trees.json`, {T['trees']} trees, {T['files']} files in the plan's "
+              f"naming conventions): the pre-filled level map was right for {T['maps_right']} of {T['trees']} trees, "
+              "and per field:", "", "| field | right | cells |", "|---|---|---|"]
+        for f, t in T["fields"].items():
+            L.append(f"| {CT.LABELS.get(f, f)} | {pc(t['acc'])} | {t['n']} |")
+        o = T["owner_tree"]
+        L += ["", "That set was written to the conventions the patterns cover, and the patterns were written after its "
+              "list of conventions was seen, so a perfect score says the patterns cover the conventions; it is not a "
+              "measure on a stranger's tree. The owner's own tree is the real case. Its names are informal, so the "
+              "patterns recognise little of it and the level map rests on the user's confirmation (the design's "
+              "once-per-root sheet), as the plan expected:", "",
+              f"- Level 1, {o['level1_names']} names over {o['pdfs']:,} PDFs: " +
+              ", ".join(f"{k} {n:,}" for k, n in sorted(o["level1_pdfs"].items(), key=lambda x: -x[1])) +
+              " PDFs (names: " + ", ".join(f"{k} {n}" for k, n in o["level1_names_by_class"].items()) + ").",
+              "- Level 2, in PDFs: " + ", ".join(f"{k} {n:,}" for k, n in sorted(o["level2_pdfs"].items(),
+                                                                                    key=lambda x: -x[1])) + ".", ""]
+    if C:
+        rs, pv = C["red_steps"], C["purple_vs_box"]
+        L += ["## Carry-forward, on the corpus", "",
+              f"Every single-colour marker in the corpus: {C['markers'].get('Red', 0):,} Red and "
+              f"{C['markers'].get('Purple', 0):,} Purple in {C['directories']} directories ({C['dirs_with_markers']} "
+              f"with a marker, {C['dirs_with_red']} with a box photo); {C['with_jpeg'].get('Red', 0):,} and "
+              f"{C['with_jpeg'].get('Purple', 0):,} have a paired JPEG original, which is what was read (Vision "
+              "+ parser, at the EXIF turn and then the other three until a number reads).", "",
+              "| what Vision read | photos |", "|---|---|"]
+        L += [f"| {k} | {n:,} |" for k, n in sorted(C["read"].items())]
+        n_steps = sum(rs.values())
+        L += ["", f"From one box photo to the next in a directory, where both read a box number ({n_steps} steps):", "",
+              "| step | count | share |", "|---|---|---|"]
+        L += [f"| {k} | {n} | {pc(n / n_steps)} |" for k, n in sorted(rs.items(), key=lambda x: -x[1])]
+        n_pv = sum(pv.values())
+        L += ["", f"A folder label that reads a box number ({n_pv:,} Purple photos), against the last box photo before "
+              "it in its directory:", "", "| folder's box | count | share |", "|---|---|---|"]
+        L += [f"| {k} | {n:,} | {pc(n / n_pv)} |" for k, n in sorted(pv.items(), key=lambda x: -x[1])]
+        L += ["", "A folder giving another box than the box photo before it is a box change with no box photo, or a "
+              "misread; the truth set bounds the misreads (Vision's container score on folder labels above). "
+              "Boxes skipped are usually boxes not requested, not missed photos; a lower number is a box photographed "
+              "out of order or a misread.", ""]
+        ps = C["purple_sample"]
+        n = sum(ps.values())
+        L += ["## What Purple marks", "", f"The truth sample's Purple photos as drawn ({n}, stratified by repository; "
+              "the owner's rulings and the photos he took out, with his reason):", "",
+              "| what it is | photos | share |", "|---|---|---|"]
+        L += [f"| {k} | {v} | {pc(v / n)}{'' if not v else ''} |" for k, v in sorted(ps.items(), key=lambda x: -x[1])]
+        L.append("")
+    sp = corpus_speed()
+    gsp = S["speed"].get(gem, {})
+    n_marks = sum(C["markers"].values()) if C else 4399
+    L += ["## Speed and the price of the corpus's markers", "",
+          f"The corpus holds {n_marks:,} single-colour markers."]
+    if sp:
+        L.append(f"- Vision + parser: {sp[0]:,} readings (every turn tried) in {sp[1] / 60:.0f} minutes on this Mac, "
+                 f"{sp[1] / max(sp[0], 1):.2f} s a reading, rendering included; $0.")
+    if gsp:
+        L.append(f"- {NAMES[gem]}: median {gsp['median_s']} s a photo (mean {gsp['mean_s']}), peak "
+                 f"{gsp['peak_gb']} GB; the corpus's markers in about {n_marks * gsp['mean_s'] / 3600:.1f} hours; $0.")
+    L += [f"- Gemini 3.7 Flash through the gateway (the truth's third reader, for W47.ct-read-paid's price): "
+          f"$0.0023 a photo measured on the truth build's 215 calls, so about ${n_marks * 0.0023:.0f} for the "
+          "corpus: over the $7 line, so a full backfill read asks the owner first.", ""]
+    L += ["## Measurement card", "",
+          "- **Truth:** W47.ct-truth-final's: the owner's answers on three sheets and his notes, his rules applied to "
+          "the readers' readings (reported apart), and for the rest the three drafters unanimous. Drafters are scored "
+          "only on the owner's cells, less prompt examples; the routes that drafted nothing on every cell.",
+          "- **Selection:** the truth build's stratified draw by repository (square-root allocation, a floor of two), "
+          "less the photos the owner took out. The pairing cut's lean stands beside every figure here (P10-6): 54 "
+          "photos left out, 43 of them Red, toward little-changed PDFs. The sample is not weighted to the corpus, so "
+          "a figure is the sample's.",
+          "- **Comparison:** every route on the same upright photos; Vision lines are the truth build's (the reread "
+          "photos' own lines for the 15 reread). Same cells for every paired gap.",
+          "- **Noise:** one pass at temperature 0; Wilson intervals on each figure, bootstrap intervals over photos "
+          "on each gap; no rerun floor was measured, so a gap near zero is a tie.",
+          "- **Scope:** the routes on this sample of one researcher's photos; the tree patterns on a synthetic set "
+          "and the owner's names; carry-forward measured with Vision's own misreads mixed in. It settles no design: "
+          "that is W47.ct-design-ok.", ""]
+    if first:
+        L += [f"The Vision parser's score is its first pass (`score-vision-firstpass.json` in the cache)."]
+    open(RESULTS, "w", encoding="utf-8").write("\n".join(L) + "\n")
+    print(RESULTS)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("collect")
     c.add_argument("--model", required=True, choices=sorted(MODELS))
     c.add_argument("--limit", type=int, default=0)
-    for name in ("score", "trees"):
+    for name in ("score", "trees", "corpus-lines", "corpus", "report"):
         sub.add_parser(name)
     a = ap.parse_args()
-    {"collect": cmd_collect, "score": cmd_score, "trees": cmd_trees}[a.cmd](a)
+    {"collect": cmd_collect, "score": cmd_score, "trees": cmd_trees, "corpus-lines": cmd_corpus_lines,
+     "corpus": cmd_corpus, "report": cmd_report}[a.cmd](a)
 
 
 if __name__ == "__main__":
