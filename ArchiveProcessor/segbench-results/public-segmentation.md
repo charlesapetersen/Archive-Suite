@@ -94,7 +94,7 @@ middle/tail pages, duplicates, reordering, unaudited labels, changed images and 
 
 ## Free comparisons completed 2026-10-19
 
-All six FarmShare runs completed with no missing, rejected, or failed windows: 44 per CREST run and 88 per
+All six FarmShare runs (eight with the combined 2B's two, below) completed with no missing, rejected, or failed windows: 44 per CREST run and 88 per
 Lincoln run. Requests use the unchanged seven-page image+Apple Vision prompt, window combiner and document
 scorer, with models predicting photo kinds themselves. No public truth selected a model or rule setting.
 The fitted rule baseline is fixed from 551 owner-development pages; no public labels or OCR entered fitting.
@@ -108,6 +108,7 @@ The fitted rule baseline is fixed from 551 owner-development pages; no public la
 |Qwen3.5 27B teacher, FarmShare|113/128 (88.28%)|106/261 (40.61%)|
 |Trained Qwen3.5 2B, FarmShare|104/128 (81.25%)|93/261 (35.63%)|
 |Trained Qwen3.5 4B, FarmShare|113/128 (88.28%)|130/261 (49.81%)|
+|Combined segmentation + dating 2B, FarmShare|110/128 (85.94%)|87/261 (33.33%)|
 
 Scored on the owner's rulings (rescored 2026-10-31, W46.seg-truth-rescore). CREST is easier for the teacher and the 4B than the owner's locked
 boxes (88.3% each, against 81.5% and 80.0% on the pooled test boxes); for the 2B it is about level (81.2% against
@@ -121,7 +122,9 @@ boundary count (segment figures conditional). The other gaps remain agent-audite
 Per-model false splits/merges, boundary F1, and all additive counts are in the two `*-scores.json` files,
 rescored with the unsure mask on 2026-10-31 (W46.seg-report-refresh; each file records `unsure_gaps`).
 
-FarmShare job IDs: teacher 1857094, 2B 1857095, 4B 1857096. Raw answers, summaries, timing and original images
+**The combined segmentation + dating 2B** (W43.seg-date-public; the frozen `seg-date-2b` weights of `seg-date-model.md`, no retraining) ran the same windows as job 1857598 on 2026-10-19, with no failed window, and was scored from its cached answers on the current truth on 2026-11-06. It sits with the separate 2B, not above it: CREST 110/128 against 104/128 (boundary F1 0.949 against 0.931; 2 false splits and 1 merge against 2 and 2), Lincoln 87/261 against 93/261 (F1 0.761 against 0.772; 45 false splits and 2 merges against 44 and 1). Each gap is about one long document on 128 and 261 pages, a few points either way, inside the rerun floor below on Lincoln and near it on CREST. It stays behind the 4B on both boxes. This is a public generalization comparison only: it does not reopen the locked private test or the decision to keep separate segmentation and dating models (Mac public full date 135/150 against 137/150).
+
+FarmShare job IDs: teacher 1857094, 2B 1857095, 4B 1857096, combined 2B 1857598. Raw answers, summaries, timing and original images
 remain outside git. Only metadata/truth/numeric scores are published. Hosted reference routes were run later and are reported
 in `seg-lincoln-cloud.md` and `seg-lincoln-gateway.md`; this report's own runs made no paid or subscription-agent call. Source construction
 and the available free CPU/FarmShare comparisons are finished; no more corpus work is needed for these boxes.
@@ -131,5 +134,5 @@ and the available free CPU/FarmShare comparisons are finished; no more corpus wo
 - **Truth.** Agent-audited truths, frozen before any model ran (contact-sheet review of every page; no model output informed them), with the owner's 2026-10-31 rulings on their ambiguous gaps folded in (W46.seg-truth-sheet, W46.seg-truth-rescore). CREST: 74|75 joined; unsure 45|46, 87|88, 93|94, 110|111. Lincoln: 229|230 joined; unsure 76|77, 106|107, 230|231. Their other gaps remain agent-audited, which is weaker than the owner-ruled boxes they are set against. Unsure gaps are out of every boundary count; segment figures (pages exact) take each route's own call there, the conditional reading (W46.seg-unsure-mask, `score.py`). Photo kinds come from each model, not from truth photos.
 - **Selection.** CREST is folder 00170027, the one complete PDF folder (documents 1-22, checksum- and page-count-checked; 00170021 was rejected for missing numbers). Lincoln is catalogue positions 2-73 in shelf order, stopped near 250 pages at a whole-item boundary. Neither box was chosen by a model, by ABBYY text or by the By the People transcriptions. CREST has a known hole: the two exempt pages after stream page 94 are absent.
 - **Comparison.** Every route got the same seven-page image and Apple Vision prompt, window combiner and document scorer, on FarmShare; the rule baseline was fitted on the 551 owner-development pages only. The comparison with the owner's locked boxes sets an agent-audited truth with model photo labels against owner truth with truth photos.
-- **Noise.** 128 pages and 261 pages, one run per route, no intervals. Against the rerun floor of 1.4-3.2 points a box (SEG-10) the teacher and the 4B on CREST (88.3% each) are a tie; a byte-identical rerun moved Lincoln's 2B by 1.6 points (`seg-window-modality.md`).
+- **Noise.** 128 pages and 261 pages, one run per route, no intervals. Against the rerun floor of 1.4-3.2 points a box (SEG-10) the teacher and the 4B on CREST (88.3% each) are a tie; a byte-identical rerun moved Lincoln's 2B by 1.6 points (`seg-window-modality.md`). The combined 2B against the separate 2B (+4.7 points on CREST, -2.3 on Lincoln) is a tie on Lincoln and not a clear win on CREST.
 - **Scope.** Two public boxes, not the owner's material. Nothing here makes a claim about unseen or pretraining-clean data, and a public box is not shown to be easier: Lincoln is harder.

@@ -1105,11 +1105,6 @@ Design-level ideas the owner wants recorded but explicitly de-prioritised. An au
 
 
 
-## FarmShare extensions — owner, 2026-10-19
-
-
-- [ ] **W43.seg-date-public — test the frozen combined model on both public segmentation boxes [S · ~0.2 session]** (lane: segbench) (uses: light) (blocked-on: W43.sweep-owner-ok, W46.review-done). Owner19Oct: queue the combined model on frozen CREST128/Lincoln261 pages, same prompts/scorer beside the three completed public model rows. Use existing combined weights; no retraining, no private locked-test repeat and no revised adoption decision. **Resume/retrieve the already-submitted recorded job, never submit a duplicate.** Report numeric scores, refresh benchmark and reconcile trackers. Notes: `execution-plans/farmshare-extensions-20261019.md` and durable `Long term storage/FarmShare-20261019`. **Parked 2026-10-20 (owner): waits on `W43.sweep-owner-ok`, so it resumes when the paid sweep is approved.**
-
 ## Nice-to-have, end of project — W46 (owner, 2026-10-22)
 
 **2026-11-04:** the owner retired the twelve items that were here (not run; §"⛔ DECLINED") and promoted four into §"Document processing review — W46". The gate stays for new nice-to-have work, as root CLAUDE.md files it.

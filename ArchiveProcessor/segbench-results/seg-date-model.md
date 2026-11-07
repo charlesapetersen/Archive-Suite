@@ -52,7 +52,7 @@ loss, within the frozen limit. Mac comparisons use each model's own photo predic
 **15 of 16 predeclared decision fields pass. Mac public full-date accuracy fails:** 135/150 (90.00%) versus
 137/150 (91.33%), a 1.333-point loss. This is only two documents; it is not evidence of a statistically
 reliable difference. It nevertheless exceeds the owner's fixed maximum-one-point rule. **Keep the
-separate segmentation and dating models under that rule.** No combined-model default or publication.
+separate segmentation and dating models under that rule.** No combined-model default or publication. On the two public segmentation boxes it sits level with the separate 2B and behind the 4B (`public-segmentation.md`, W43.seg-date-public).
 All counts and exact-fraction decisions are in `seg-date-model-final.json`.
 
 The Mac run took 4343s for dates plus segmentation, with 3437s for the 187 segmentation windows. MLX peak

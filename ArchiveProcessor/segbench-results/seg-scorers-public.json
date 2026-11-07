@@ -1986,6 +1986,7 @@
     "window-local-seg-4b-8bit": "Lincoln: window 1-4 not collected; run `method_window.py collect` first",
     "window-local-seg-2b-8bit": "Lincoln: window 1-4 not collected; run `method_window.py collect` first",
     "window-local-seg-date-2b-8bit": "Lincoln: window 1-4 not collected; run `method_window.py collect` first",
+    "window-local-seg-2b-8bit-mac-r8": "Lincoln: window 1-4 not collected; run `method_window.py collect` first",
     "whole-gemini": "Lincoln: unit 1-261 not collected; run `method_whole.py collect` first",
     "whole-gemini-c10": "Lincoln: unit 1-10 not collected; run `method_whole.py collect` first"
    },
@@ -3754,6 +3755,7 @@
     "window-local-seg-4b-8bit": "CREST: window 1-4 not collected; run `method_window.py collect` first",
     "window-local-seg-2b-8bit": "CREST: window 1-4 not collected; run `method_window.py collect` first",
     "window-local-seg-date-2b-8bit": "CREST: window 1-4 not collected; run `method_window.py collect` first",
+    "window-local-seg-2b-8bit-mac-r8": "CREST: window 1-4 not collected; run `method_window.py collect` first",
     "whole-gemini": "CREST: unit 1-128 not collected; run `method_whole.py collect` first",
     "whole-gemini-c10": "CREST: unit 1-10 not collected; run `method_whole.py collect` first"
    },

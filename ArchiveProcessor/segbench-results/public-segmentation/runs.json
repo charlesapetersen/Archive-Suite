@@ -60,11 +60,32 @@
       "wall_s": 86.5,
       "pages_per_hour_per_gpu": 10857.5,
       "raw_root": "Long term storage/FarmShare-20261018/results/seg/public-lincoln-fs-seg-4b"
+    },
+    {
+      "box": "crest",
+      "key": "fs-seg-date-2b",
+      "windows": 44,
+      "failed": 0,
+      "left": 0,
+      "wall_s": 23.8,
+      "pages_per_hour_per_gpu": 19330.2,
+      "raw_root": "Long term storage/FarmShare-20261019/results/seg/public-crest-fs-seg-date-2b"
+    },
+    {
+      "box": "lincoln",
+      "key": "fs-seg-date-2b",
+      "windows": 88,
+      "failed": 0,
+      "left": 0,
+      "wall_s": 41.6,
+      "pages_per_hour_per_gpu": 22598.1,
+      "raw_root": "Long term storage/FarmShare-20261019/results/seg/public-lincoln-fs-seg-date-2b"
     }
   ],
   "jobs": {
     "fs-qwen3.5-27b": 1857094,
     "fs-seg-2b": 1857095,
-    "fs-seg-4b": 1857096
+    "fs-seg-4b": 1857096,
+    "fs-seg-date-2b": 1857598
   }
 }
