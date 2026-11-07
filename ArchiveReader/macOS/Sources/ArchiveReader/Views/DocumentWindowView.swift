@@ -252,23 +252,37 @@ struct DocumentWindowView: View {
     /// W40.fix-reader-jpeg-toolbar: the PDF / JPEG switch for the image pane, which the owner could not
     /// find in the Document menu alone. It always shows which image is on screen; with no JPEG original it
     /// stays on PDF, disabled, and its tooltip says why.
+    ///
+    /// W40.fix-reader-jpeg-switch-missing: on macOS 27 a disabled segmented control in the toolbar does not
+    /// look disabled, so the owner saw JPEG offered on a file with no JPEG original (the pairing was right).
+    /// Without a partner the switch is now a greyed "PDF only" that offers no JPEG side at all.
     private var imageSourceSwitch: some View {
         // The tooltip sits on a wrapper: a disabled control's own tooltip is not shown, and the reason
         // matters most exactly when the switch is disabled.
         HStack(spacing: 0) {
-            Picker("Image", selection: Binding(
-                get: { model.imageSource },
-                set: { if $0 != model.imageSource { model.toggleImageSource() } }
-            )) {
-                Text("PDF").tag(DocumentImageSource.pdf)
-                Text("JPEG").tag(DocumentImageSource.jpeg)
+            if model.hasJPEGPartner {
+                Picker("Image", selection: Binding(
+                    get: { model.imageSource },
+                    set: { if $0 != model.imageSource { model.toggleImageSource() } }
+                )) {
+                    Text("PDF").tag(DocumentImageSource.pdf)
+                    Text("JPEG").tag(DocumentImageSource.jpeg)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .accessibilityLabel("Image source")
+                .accessibilityIdentifier("ar.doc.imageSource")
+            } else {
+                // Greyed by its own colour, not only by `.disabled`, which is what failed to show.
+                Button {} label: { Text("PDF only").foregroundStyle(.secondary) }
+                    .buttonStyle(.plain)
+                    .fixedSize()
+                    .disabled(true)
+                    .accessibilityLabel("Image source")
+                    .accessibilityValue("PDF only")
+                    .accessibilityHint(model.jpegUnavailableReason ?? "")
+                    .accessibilityIdentifier("ar.doc.imageSource")
             }
-            .pickerStyle(.segmented)
-            .fixedSize()
-            .disabled(!model.hasJPEGPartner)
-            .accessibilityLabel("Image source")
-            .accessibilityHint(model.hasJPEGPartner ? "" : (model.jpegUnavailableReason ?? ""))
-            .accessibilityIdentifier("ar.doc.imageSource")
         }
         .contentShape(Rectangle())
         .help(model.hasJPEGPartner

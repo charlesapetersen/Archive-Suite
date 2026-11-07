@@ -572,6 +572,10 @@ final class ViewerUITests: FixtureUITestCase {
         let unpaired = app.descendants(matching: .any)["ar.doc.imageSource"].firstMatch
         XCTAssertTrue(unpaired.waitForExistence(timeout: 5), "the switch stays in the toolbar without a partner")
         XCTAssertFalse(unpaired.isEnabled, "without a JPEG original the switch is disabled")
+        // W40.fix-reader-jpeg-switch-missing: and it offers no JPEG side to click.
+        let offeredJPEG = unpaired.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == 'JPEG' OR title == 'JPEG'")).firstMatch
+        XCTAssertFalse(offeredJPEG.exists, "without a JPEG original the switch does not offer JPEG")
         captureScreenshot("jpeg-toolbar-2-unpaired")
         pressKey("w", modifiers: .command)
         settle(0.5)

@@ -110,6 +110,50 @@ final class DocumentImageSourceTests: XCTestCase {
         XCTAssertNil(foundReason, "a document with a JPEG original has no reason to show")
     }
 
+    /// W40.fix-reader-jpeg-switch-missing: the owner's case. *00114 Young papers.pdf* has no JPEG original;
+    /// the JPEG folder holds other `00114 …` files, which share the number but not the name, so they must not
+    /// pair with it. (They did not: the defect was the switch looking live on macOS 27, not the pairing.)
+    func testNumberSharedWithOtherJPEGsIsNotAPartner() throws {
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reader-jpeg-00114-\(UUID().uuidString)", isDirectory: true)
+        let main = parent.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName, isDirectory: true)
+        let jpegRoot = parent.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true)
+        let box = main.appendingPathComponent("Cambridge/YUNG 2 8 Scans LLMed", isDirectory: true)
+        try FileManager.default.createDirectory(at: box, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let jpegData = try Self.grayJPEG()
+        let pdf = box.appendingPathComponent("00114 Young papers.pdf")
+        let doc = PDFDocument()
+        doc.insert(try XCTUnwrap(PDFPage(image: try XCTUnwrap(NSImage(data: jpegData)))), at: 0)
+        XCTAssertTrue(doc.write(to: pdf))
+        // Names as they are in the real JPEG folder (read-only `find`, 2026-11-06).
+        let others = ["Churchill Archives/Young, Michael/00114 — Young, Michael.jpeg",
+                      "Churchill Archives/Young, Sasha/00114 — Young, Sasha.jpeg",
+                      "Swarthmore/00114 — Swarthmore.jpg",
+                      "Hoover Institute/Friedrich Hayek papers/00114 IMG — Hayek Papers.jpg"]
+        for relative in others {
+            let url = jpegRoot.appendingPathComponent(relative)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try jpegData.write(to: url)
+        }
+        let index = JPEGPartnerIndex(jpegRoot: jpegRoot, scan: CorpusWalker.scanFingerprints(root: jpegRoot))
+        XCTAssertTrue(index.isClean)
+        XCTAssertEqual(index.candidates.count, others.count)
+        XCTAssertEqual(index.resolve(pdfURL: pdf, mainRoot: main), JPEGPartnerResolution.none)
+
+        let target = ArchiveLinkTarget(rootPath: parent.path,
+                                       marker: RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date()),
+                                       mainRootPath: main.path)
+        let model = DocumentViewerModel(persists: false, thumbnailer: nil)
+        model.updateArchiveContext(target: target, index: index)
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        XCTAssertFalse(model.hasJPEGPartner, "no JPEG side to offer")
+        XCTAssertTrue(model.jpegUnavailableReason?.contains("no file with this file's name") == true,
+                      "\(model.jpegUnavailableReason ?? "nil")")
+    }
+
     private static func grayJPEG() throws -> Data {
         let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 40, pixelsHigh: 50,
                                                  bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
