@@ -62,6 +62,7 @@ class TagGenerator: ObservableObject {
         - "day": format "Day D" (e.g. "Day 15", "Day 3"), or null if not determinable
         - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
         - "subject_tags": \(vocabulary.isEmpty ? "2–6 general-but-specific subject tags (e.g. \"Democratic Party\", \"taxes\", \"education\", \"transportation\", \"business\", \"literature\", \"economics\", \"foreign policy\", \"civil rights\", \"military\", \"journalism\", \"science\", \"health care\", \"labor unions\"). Do NOT use overly broad terms like \"politics\" or \"history\"." : "2–6 tags chosen ONLY from this controlled vocabulary: [\(vocabulary.map { "\"\($0)\"" }.joined(separator: ", "))]. Use only tags from this list that are relevant to the document. Do not invent new tags.")
+        - Never emit "OCR Poor": it is a person's assessment, not a subject inferred by the model.
         - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
         - "author_name": the person who wrote, signed or sent the document (a signature, a typed name under the closing, a "From:" line, a byline), or null. Always a person: if no person is named as its writer, null, never the organisation on the letterhead
         - "recipient_name": everyone it is addressed to, a person or a body such as a committee or "All Employees" (the inside address, a "To:" line, the salutation), names separated by "; " (e.g. "Jane Doe; John Smith"), or null. Copies ("cc") are not recipients
@@ -186,8 +187,18 @@ class TagGenerator: ObservableObject {
         tags.dateUncertain = json["date_uncertain"] as? Bool ?? false
         // Enforce both the upper bound and, when configured, the controlled vocabulary. The prompt is
         // advisory; models can still invent values or alter case/spacing, so canonicalize at this boundary.
+        // W44.reocr-spec: Poor OCR is a person's flag, even if a configured vocabulary includes it.
+        // Filter before the cap so it cannot displace a legitimate subject, and again after canonicalization.
+        func isPoorFlag(_ value: String) -> Bool {
+            isSameTag(value.trimmingCharacters(in: .whitespacesAndNewlines), DocumentTags.poorOCRTag)
+        }
         tags.subjectTags = ControlledVocabulary.enforce(
-            json["subject_tags"] as? [String] ?? [], vocabulary: vocabulary)
+            (json["subject_tags"] as? [String] ?? []).filter { !isPoorFlag($0) }, vocabulary: vocabulary)
+            .filter { !isPoorFlag($0) }
+        // Malformed date strings are also model-controlled tag positions; none can smuggle in the flag.
+        if let year = tags.year, isPoorFlag(year) { tags.year = nil }
+        if let month = tags.month, isPoorFlag(month) { tags.month = nil }
+        if let day = tags.day, isPoorFlag(day) { tags.day = nil }
         tags.format = json["format"] as? String
         tags.authorName = Self.names(json["author_name"])
         tags.recipientName = Self.names(json["recipient_name"])

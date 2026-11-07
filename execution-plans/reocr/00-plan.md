@@ -1,9 +1,10 @@
 # Improve OCR — Reader flag, Processor re-read, recoverable text replacement
 
-Design delivered by W44.reocr-plan, 2026-11-07, against `1b9e5078`. Implementation remains in
-W44.reocr-spec, W44.reocr-processor and W44.reocr-reader. Both prerequisite gates are answered:
+Design delivered by W44.reocr-plan, 2026-11-07, against `1b9e5078`. The shared contract ships in
+W44.reocr-spec (2026-11-07, this commit). Implementation remains in W44.reocr-processor and
+W44.reocr-reader. Both prerequisite gates are answered:
 W43.sweep-owner-ok (2026-10-21) and W46.review-done (2026-11-06). No owner choice remains here.
-Keep this plan until those three items ship, then fold the implemented contract into SPEC and app
+Keep this plan until the two remaining items ship, then fold the implemented contract into SPEC and app
 references and delete it. No migration: there is no app-produced production material to migrate.
 
 ## 1. Decisions and boundaries
@@ -26,6 +27,12 @@ Reader's Core Directive, tag-write choke point and write-surface lint remain bin
 authorizes implementation and scratch-copy tests, never a dev/test write to the real corpus.
 
 ## 2. Flag and page header (W44.reocr-spec)
+
+**Shared contract implemented 2026-11-07 (this commit).** Normative grammar and parser limitations:
+`SPEC/tag-format.md` §Poor OCR / §2-page PDF structure. Core exposes `OCRPageKind`,
+`PDFHeaderParser.parse`, `ExtractedContent.textPages` and unknown/uniform/mixed metadata summaries;
+Processor writes known Kind with actual-reader provenance. Flag UI/generations and acceptance behavior
+below remain requirements for the next two items. Keep this plan until they ship.
 
 **Flag:** the Subject tag `OCR Poor`, distinct from Q1–Q3 importance and from `OCR Failed` (execution
 failure). Compare by existing `tagKey`/`isSameTag`, write the canonical spelling on a new addition,

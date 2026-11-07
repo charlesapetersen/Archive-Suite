@@ -469,6 +469,23 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
+    func testReOCRHeaderThroughReaderExtractorKeepsFullSearchText() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ReaderReOCR-\(UUID()).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let header = "Extracted text.\nKind: filename.jpg\nAtlas · Qwen fp8 · 7 November 2026\nClassification: Document Start\nKind: forms\nDocument date: 1957\nSent with: 1958\n\nReport from the harbour."
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["Scan text layer", header], to: url))
+        let before = try Data(contentsOf: url)
+        let content = try XCTUnwrap(PDFTextExtractor.extract(url))
+        XCTAssertEqual(content.textPages.first?.header?.kind, .forms)
+        XCTAssertEqual(content.textPages.first?.header?.provenance?.provider, "Atlas")
+        XCTAssertEqual(content.textPages.first?.header?.documentDate, "1957")
+        XCTAssertEqual(content.classification, "Document Start")
+        XCTAssertEqual(content.strippedBody, "Report from the harbour.")
+        XCTAssertTrue(content.fullBody.contains("Scan text layer"))
+        XCTAssertTrue(content.fullBody.contains("Kind: forms"))
+        XCTAssertEqual(try Data(contentsOf: url), before)
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")

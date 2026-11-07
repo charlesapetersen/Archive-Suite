@@ -1,5 +1,6 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
+import ArchiveCore
 import Foundation
 import PDFKit
 import SwiftUI
@@ -220,6 +221,12 @@ enum OCRPageKindTestDriver {
         let header = PDFDocument(url: pdfURL)?.page(at: 1)?.string ?? ""
         check("6 the PDF header names the model that read the page, not the run's",
               header.contains("Gemini \u{00B7} \(flash.displayName)") && !header.contains(claude.displayName))
+        let parsedHeader = PDFHeaderParser.parse(header)
+        check("6 structured header round-trips Kind, actual reader and body together",
+              parsedHeader.header?.kind == .typewritten
+              && parsedHeader.header?.provenance?.provider == "Gemini"
+              && parsedHeader.header?.provenance?.model == flash.displayName
+              && parsedHeader.body == r.text)
         check("6 the reclassify copy keeps the record",
               r.with(classification: .documentContinuation, rotationDegrees: 90).pageReader == r.pageReader)
 
@@ -239,6 +246,9 @@ enum OCRPageKindTestDriver {
         r = await ocr(image, own)
         check("6 a page the user set to the run's own model is not counted as rerouted",
               r.pageReader?.reason == .same && r.pageReader?.isRouted == false && r.text?.contains("CLAUDE-TEXT") == true)
+        _ = try? PDFGenerator().generate(imageURL: image, result: r, model: claude, outputURL: pdfURL)
+        check("6 a known kind is written even when the reader is the run's own model",
+              PDFHeaderParser.extract(pdfURL)?.textPages.first?.header?.kind == .typewritten)
         await script.reset()
         r = await ocr(image, kept)
         check("6 an uncertain page is read by the run's model and records why",
@@ -273,6 +283,11 @@ enum OCRPageKindTestDriver {
               r.text?.contains("CLAUDE-TEXT") == true && calls.first?.contains("openrouter") == true
               && r.secondReader?.firstReader == "OpenRouter · \(qwen.displayName)" && r.pageReader?.reason == .kind
               && r.pageReader?.model == qwen.displayName, "\(calls)")
+
+        _ = try? PDFGenerator().generate(imageURL: image, result: r, model: qwen, outputURL: pdfURL)
+        let fallbackHeader = PDFHeaderParser.extract(pdfURL)?.textPages.first?.header
+        check("6 fallback provenance wins over routing while the original Kind remains",
+              fallbackHeader?.kind == .forms && fallbackHeader?.provenance?.model == claude.displayName)
 
         // 7. The run history adds the routed pages' price difference and counts them.
         let snapshot = RunHistorySnapshot(

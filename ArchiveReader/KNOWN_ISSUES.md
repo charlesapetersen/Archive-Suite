@@ -2,6 +2,21 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## PDF header metadata and format ambiguities (W44.reocr-spec, 2026-11-07)
+
+Core now uses one structured parse for stripping and header metadata; `Kind:` and reader provenance
+are per physical text page, with unknown/mixed summaries for merged files. Reader's existing FTS
+still indexes all text including headers; its existing stripped display remains page 2 only. The
+feature's menus, filter, hand-off and completion refresh are separate queued W44 items.
+
+PDFKit can omit the blank separator below the header. A body whose first line looks exactly like the
+next optional header field can therefore be interpreted as metadata. A filename indistinguishable
+from provenance has a similar prefix ambiguity. Later body lookalikes stay text; malformed provenance
+is retained raw, never repaired from a later body line. Missing/invalid/repeated/late Kind stays unknown.
+These limits are pinned by `ArchiveCoreTests/ReOCRHeaderTests`; they are not classifier evidence or
+proof that a file has a valid image/text pair. The normative grammar is in
+[`SPEC/tag-format.md`](../SPEC/tag-format.md#2-page-pdf-structure).
+
 ## Find in the document window: what "both panes" can and cannot do (W40.fix-reader-find-both-panes, 2026-11-05)
 
 A find hit is the k-th match of each pane of its page pair, selected in both and stepped together; the

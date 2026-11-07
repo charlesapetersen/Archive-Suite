@@ -79,8 +79,24 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Quality** *(the rating facet)* | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **The single importance/quality rating (W19, 2026-07-18) — MERGED with + supersedes the legacy Priority facet** (`Q3` = old `P10`). A human 0–3 rating; **`Q0`/unrated writes NO tag** (absence *is* 0 stars, so the wire only ever carries `Q1`/`Q2`/`Q3`). Human-set everywhere, **never LLM-emitted**: Notes (front-matter `quality`), Reader (edit), Processor's interactive tagging (Live Capture tag card + Process Files manual tagging), and the **phone companions** (per-page/segment — the old priority control now emits `Q`). Q-prefix can never collide with the digits-only Year test. |
 | **Priority** *(legacy → Quality)* | `P7`–`P10`, on pre-W19 files only | 0–1 | **RETIRED — merged into Quality (W19, 2026-07-18).** No longer written by any app or companion. **Read-only alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3` and `P7` as unrated, so pre-W19 phone-captured files still resolve without a corpus rewrite. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
-| **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`. |
+| **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`; a person flags inadequate transcription with `OCR Poor` (below). |
 | **Color label** | `.labelNumberKey` + color-name token | 0–1 | **Red = 6 ⇒ box** photo; **Purple = 3 ⇒ folder** photo. Only these two are meaningful to the Suite. |
+
+**Poor OCR (W44.reocr-spec).** `OCR Poor` is an ordinary Subject token, independent of the
+Q1–Q3 importance rating and the execution-failure subject `OCR Failed`. Only an explicit person's
+action sets it; models, confidence scores and failed reads never set it. Match the whole token using
+`tagKey`/`isSameTag` (case-folded), never a substring. New feature additions use canonical `OCR Poor`;
+model-response parsing rejects this token in all tag-bearing fields, even with a controlled vocabulary;
+if already present, keep every spelling and occurrence verbatim. Generic subject editing keeps the
+existing subject spelling rules. `DocumentTags.hasPoorOCR` is a read-only projection over `raw`, not
+a new facet, and does not consume those subjects.
+
+Writes use the apps' audited tag adapters and occurrence-aware deltas/undo. A read error is never an
+empty list. Removal targets only that token's identity, preserving unrelated subjects (including
+`OCR Failed`), dates, ratings, Read/Unread, colour and PDF bytes. Feature flagging/filtering, the shared
+flag-generation protocol and acceptance clearing ship in W44.reocr-processor/reader; this contract
+alone does not authorize an automatic flag clear. Acceptance may clear only the reviewed generation;
+cancel/reject/failure leaves the flag. Improve OCR also works without a flag and never adds it implicitly.
 
 **Two tokens for one date facet.** Year, Month, Day, Decade and Sent With are 0–1. When a file carries
 two tokens that parse as the same one, the **last wins** and each earlier one is demoted to a subject,
@@ -153,9 +169,10 @@ Processor `OCR/PDFTextExtractor.swift` and Reader `Search/PDFTextExtractor.swift
 
 ```
 Extracted text.
-<original filename>            ← verbatim source name, ANY image ext (.jpg/.png/.tiff/.heic); may be ABSENT
+<original filename>            ← source name (control chars flattened to spaces), any image ext; may be ABSENT
 <Provider> · <Model> · <D Month YYYY>   ← separator is U+00B7 with surrounding spaces; date e.g. "9 March 2026"
-Classification: <value>        ← OPTIONAL line; absent on older/heuristic/Mistral/hand-added files
+Classification: <value>        ← OPTIONAL segmentation value; absent when unknown
+Kind: <kind>                   ← OPTIONAL: handwritten, typewritten, printed or forms; absent when unknown
 Document date: <display>       ← OPTIONAL (W37); the document's OWN date, e.g. "Nov 3, 1957"
 Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e.g. "Mar 12, 1958"
                                ← blank line
@@ -170,7 +187,8 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
   `Apple Vision · macOS Vision` in the header's provider/model positions.
   Imported text (W41.app-institutional-compute) uses the per-page `_meta.cluster` name; for example,
   `FarmShare · Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739)`, or another institution's cluster.
-  Imported cluster and model labels are flattened to one line; middle-dot tokens are replaced by commas so they
+  All newly written provider/model labels use `ImportedReading.headerComponent`: flattened to one line,
+  with middle-dot tokens replaced by commas so they
   cannot introduce the header's separators. Missing/blank cluster provenance is not imported. Matching is by the
   input image's SHA-256, never its name.
 - **Classification — verified values (exact strings):** `Document Start`, `Continuation`, `Box`,
@@ -185,13 +203,52 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
   `Classification:` line in the OCR body (an archival security marking), on another page or in the file name
   is not the classification. PDFKit drops the blank separator from a real page's text, so the header ends at
   the first line that is not a header line; a wrapped provider line may take one continuation line.
+- **Kind (W44.reocr-spec)** is per text page, independent of segmentation Classification. Exact IDs:
+  `handwritten`, `typewritten`, `printed`, `forms`; labels Handwritten, Typewritten, Printed, Form or table.
+  New output writes the explicit person's choice when supplied to `PDFGenerator.generate(pageKind:)`,
+  otherwise the classifier's stored `pageReader.kind`, otherwise a validated imported kind. A known
+  classifier kind is written even when it did not change the reader. Missing, invalid (including imported
+  `mixed`), repeated or conflicting Kind is unknown, with Core diagnostics; absence is never guessed
+  printed. Newspaper/register/script attributes belong to settings, not new Kind IDs. No new classifier
+  call is implied on routes that have no classification; they leave Kind absent. No migration is written
+  because there is no app-produced production material to migrate.
+- **One structured header parse.** Core `PDFHeaderParser.parse` drives stripping, classification,
+  provenance, Kind and source-date extraction together. On unrotated text pages, PDFKit selections
+  recover physical header-line order (its `page.string` can group short lines across wide provenance).
+  Strip only the header selections' exact character ranges from the original string; keep body order
+  and `fullBody` unchanged. Rotated pages or unavailable/invalid selections use conservative string
+  parsing. Require the exact sentinel as the first physical line.
+  Inspect only the immediately following provenance slots (one optional filename, allowing PDFKit's
+  two-line filename split), with at most one provenance continuation completing the processing date.
+  A completed provenance line may follow a dot-containing filename in the first prefix slot;
+  a malformed three-position line is retained unless an explicit filename extension disambiguates it;
+  once the slot after the filename contains provenance, even malformed, it cannot be replaced by later
+  text. Never search the rest of the page for fields. Optional fields follow the displayed order; stop at the first
+  non-header line or blank separator. Repeated/late Kind is consumed but diagnosed and remains unknown;
+  other repeated/out-of-order fields begin the body. Preserve raw malformed provenance for inspection,
+  with unknown structured provenance: require exactly three separator-delimited, nonempty positions and
+  a valid `d MMMM yyyy` processing date for `PDFReaderProvenance`. Provider/model are display strings,
+  including cluster and pinned precision labels, never enum lookups or executable routes.
+- **Ambiguity when PDFKit drops the separator.** A body starting immediately with a valid-looking
+  optional field in the expected slot can be read as header metadata. This format cannot distinguish
+  that case. A later lookalike, or a field following a retained blank separator, stays in the body.
+  The filename slot is opaque, even when it starts `Kind:` or `Classification:`. A filename that is
+  itself indistinguishable from a complete provenance line has the same prefix ambiguity; the first
+  complete candidate wins. These are parser limits, not evidence of another classifier result.
 - **Source-date lines (W37.dual-date).** `Document date:` / `Sent with:` are the SOURCE document's dates
-  (`ArchiveDate.display` form), distinct from the provider line's OCR processing date, and only an
-  output-time snapshot: the live value is always the Finder tags. Exact case-sensitive prefixes
-  (`PDFHeaderParser.documentDatePrefix` / `sentWithPrefix`), recognised only inside the header block
-  (after the provider line, before the first blank line), so a body line starting with the same words
-  is never stripped. Written today only where the date is known at render time — Live Capture; Process
-  Files renders PDFs before tagging and does not rewrite finished PDFs to add them.
+  (`ArchiveDate.display` form), distinct from the processing date. They are output-time snapshots;
+  fresh Finder tags remain authoritative. Exact case-sensitive prefixes, after Classification/Kind,
+  consumed only within the same ordered header block. Written only where dates are known at render
+  time (Live Capture); Process Files does not rewrite finished PDFs to add them.
+- **Per-page metadata and mixed summaries.** `ExtractedContent.textPages` records zero-based physical
+  text slots 1, 3, 5… with optional `PDFPageHeader`. Missing headers stay represented. Kind and full
+  provenance summaries are unknown when all slots are unknown, uniform only when every slot agrees,
+  and mixed for differing values or a known value beside an unknown. This metadata does not prove a
+  valid image/text pair. Both app extractors expose these page values. Existing `fullBody` retains
+  all pages and headers for Reader FTS; `strippedBody` and top-level classification retain their
+  page-2-only behavior until their consumers are explicitly changed. Do not assign page 2's metadata
+  to every image of an interleaved file. Actual-reader provenance precedence stays imported, fallback,
+  routed reader, Local Agent, gateway, then run model. This item adds no corpus content writer to Core.
 - **Reading segments = document units.** A _document_ (a `Document Start` + following `Continuation`
   pages) is finer than the Red/Purple box/folder markers. The Classification lives in page-2 **text**,
   so it is read via the content index, not a tag.
@@ -276,7 +333,7 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 | Color label (Red=6/Purple=3) | `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `Core/DocumentTags.swift` (`ArchiveColor`), `Core/TagWriter.swift` |
 | **Sent With** date (W37) | `Tagging/DocumentSegmenter.swift` (`enclosureOf`), `OCR/OCRProcessor+Tagging.swift` (cover date → `GeneratedTags.sentWith`), `Views/ManualTaggingSheet.swift` | ArchiveCore `Tags/ArchiveDate.swift` (`ArchiveDate`, `SentWithTag`, `DateRangeFilter`) + `DocumentTags.sentWith`; Reader `Core/LibraryFilter.swift` (year range), `Views/TagEditorView.swift` (⌘I sheet); Notes front-matter `additional_dates` → `NotesTagProjector` |
 | Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`; own date, sent-with fallback) |
-| 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
+| 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`, structured per-page metadata and summaries). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
 | Classification enum / values | `Models/ProviderModels.swift` (`DocumentClassification`), `OCR/PDFTextExtractor.swift` (shim maps string→enum) | `ArchiveCore` `PDFHeaderParser` returns raw `String?`; `Core/DocumentRuns.swift`, `Search/ContentIndex.swift` |
 
 ---

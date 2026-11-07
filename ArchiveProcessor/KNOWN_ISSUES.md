@@ -2,6 +2,19 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Human Poor OCR flag and new-output headers (W44.reocr-spec, 2026-11-07)
+
+`OCR Poor` is reserved for a person's assessment. `TagGenerator.parseTagResponse` rejects that token
+in model-produced subjects and malformed date positions, even if it appears in a controlled vocabulary;
+manual subject editing and copy-source tags keep their existing semantics. New text pages record a
+known Kind (explicit choice, classifier record, then validated import), with unknown left absent.
+Actual-reader provenance precedence is unchanged; all freeform labels are sanitized and fitted to
+one line. PDFKit can group short header lines across a wide provenance line; Core recovers the
+header's physical order and removes only its exact character ranges from the original transcription.
+Core exposes per-text-page headers through both app extractors. The improvement dialog,
+flag-generation store and content replacement remain queued under W44.reocr-processor/reader.
+Scratch proofs: `test-dual-date.sh`, `test-ocr-page-kind.sh`, `test-institutional-compute-import.sh`.
+
 ## FIXED (W46.ocr-ppocrv6-hands-curve, 2026-11-02): incomplete fine-tune evaluation could shrink its sample
 
 `scripts/segbench/ocr_ppocrv6_hands.py::cmd_report` previously skipped missing held-out readings, so an

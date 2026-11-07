@@ -9,6 +9,8 @@ struct PDFTextExtractor {
     struct ExtractionResult {
         let text: String?
         let classification: DocumentClassification?
+        /// Metadata for each physical text slot; no first-page inference across a merged file.
+        let textPages: [PDFTextPageMetadata]
     }
 
     /// Extract text from a PDF file, delegating to the shared Core parser.
@@ -17,11 +19,11 @@ struct PDFTextExtractor {
     /// For any other PDF: returns all-pages text, nil classification.
     static func extract(from url: URL) -> ExtractionResult {
         guard let content = PDFHeaderParser.extract(url) else {
-            return ExtractionResult(text: nil, classification: nil)
+            return ExtractionResult(text: nil, classification: nil, textPages: [])
         }
 
         let text = content.strippedBody.isEmpty ? nil : content.strippedBody
-        return ExtractionResult(text: text, classification: mapClassification(content.classification))
+        return ExtractionResult(text: text, classification: mapClassification(content.classification), textPages: content.textPages)
     }
 
     /// Map the Core parser's raw classification string to the Processor's persisted enum.

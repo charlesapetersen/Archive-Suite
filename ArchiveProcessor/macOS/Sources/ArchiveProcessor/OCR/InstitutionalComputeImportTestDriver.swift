@@ -202,6 +202,13 @@ enum InstitutionalComputeImportTestDriver {
         check("the PDF header names FarmShare, its model, precision and job in the provider/model positions",
               page2.contains("FarmShare \u{00B7} Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739) \u{00B7} ")
               && page2.contains("BOX-ONE text from FarmShare"), String(page2.prefix(200)))
+        let parsed = PDFHeaderParser.extract(pdf)?.textPages.first?.header
+        check("the shared parser reads the imported reader, precision and Kind together",
+              parsed?.provenance?.provider == "FarmShare" && parsed?.provenance?.model == matched.imported?.headerModel
+              && parsed?.kind == .typewritten, "\(String(describing: parsed)) raw: \(page2.debugDescription)")
+        let shim = PDFTextExtractor.extract(from: pdf)
+        check("the Processor shim exposes the same per-page Kind and stripped body",
+              shim.textPages.first?.header?.kind == .typewritten && shim.text == matched.text, "\(String(describing: shim.text))")
         if let other = imported.result(for: box2) {
             let otherPDF = root.appendingPathComponent("out/other.pdf")
             _ = try? PDFGenerator().generate(imageURL: box2, result: other, model: flash, outputURL: otherPDF,
@@ -275,6 +282,25 @@ enum InstitutionalComputeImportTestDriver {
               (fm.enumerator(atPath: input.path)?.allObjects as? [String] ?? []).filter { $0.hasSuffix(".jpg") }.count == 5
               && (fm.enumerator(atPath: input.path)?.allObjects as? [String] ?? []).allSatisfy {
                   $0.hasSuffix(".jpg") || !$0.contains(".") })
+        // Exercise the real model-response boundary through an injected HTTP reply, with no keys or network.
+        NetworkSession.testTransport = { request in
+            let payload = #"{"year":"ocr poor","month":"OCR Poor","day":"OCR Poor","subject_tags":["OCR Poor","oCr pOoR","OCR Poorly","History"]}"#
+            let reply: [String: Any] = ["candidates": [["finishReason": "STOP", "content": ["parts": [["text": payload]]]]]]
+            return (try JSONSerialization.data(withJSONObject: reply),
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        if NetworkSession.testTransportIsActive {
+            let segment = DocumentSegment(pdfURLs: [pdf], texts: ["Report."])
+            for vocabulary in [[], ["OCR Poor", "OCR Poorly", "History"]] {
+                let generated = await TagGenerator().generateTags(for: segment, nearbySegments: [], provider: .gemini,
+                    model: flash, thinkingLevel: nil, apiKey: "test-only", vocabulary: vocabulary)
+                check("automatic tagging cannot set the person's Poor OCR flag (vocabulary \(vocabulary.count))",
+                      generated.subjectTags == ["OCR Poorly", "History"]
+                      && !generated.allTags.contains { isSameTag($0, DocumentTags.poorOCRTag) })
+            }
+        } else { check("injected tag transport is active; no live request attempted", false) }
+        NetworkSession.testTransport = nil
+
         finish(results)
     }
 

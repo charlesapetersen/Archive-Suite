@@ -34,6 +34,21 @@ final class TagWriterTests: XCTestCase {
         try url.resourceValues(forKeys: [.labelNumberKey]).labelNumber
     }
 
+    /// W44.reocr-spec: contract only; the feature's durable flag-generation adapter ships later.
+    func testPoorOCRSubjectDeltaAndOccurrenceUndoPreserveBytesAndOtherTags() throws {
+        let initial = ["Red", "oCr pOoR", "OCR Poor", "OCR Failed", "OCR Poorly", "Q3", "Unread", "History", "History"]
+        let url = try makeFile("poor-ocr.pdf", tags: initial, label: 6)
+        let bytes = try Data(contentsOf: url)
+        let noop = try TagWriter.apply(TagDelta(add: [DocumentTags.poorOCRTag]), to: url)
+        XCTAssertTrue(noop.isNoOp, "existing spelling remains verbatim")
+        let removed = try TagWriter.apply(TagDelta(remove: [DocumentTags.poorOCRTag]), to: url)
+        XCTAssertTrue(multisetEqual(try readTags(url), initial.filter { !isSameTag($0, DocumentTags.poorOCRTag) }))
+        _ = try TagWriter.applyOccurrence(removed.occurrenceInverse, to: url, undoing: .init(removed))
+        XCTAssertTrue(multisetEqual(try readTags(url), initial))
+        XCTAssertEqual(try Data(contentsOf: url), bytes)
+        XCTAssertEqual(try URL(fileURLWithPath: url.path).resourceValues(forKeys: [.labelNumberKey]).labelNumber, 6)
+    }
+
     // MARK: Read-state fast path
 
     func testSetReadStateSwapsAndPreservesOtherTags() throws {

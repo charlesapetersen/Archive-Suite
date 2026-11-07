@@ -79,6 +79,11 @@ public struct DocumentTags: Sendable, Equatable {
     public var quality: Int?          // 1...3; nil = unrated (the wire never carries Q0)
     public var readState: ReadState?
     public var color: ArchiveColor?
+    /// Human-set Subject flag, independent of Q1–Q3 importance and execution failure.
+    /// The raw subject occurrences and spellings remain intact; this never drives a write.
+    public static let poorOCRTag = "OCR Poor"
+    public var hasPoorOCR: Bool { raw.contains { isSameTag($0, Self.poorOCRTag) } }
+
     public var subjects: [String]     // everything not claimed by another facet, verbatim
 
     // The EXACT verbatim raw token that was consumed for each single-valued date/quality facet

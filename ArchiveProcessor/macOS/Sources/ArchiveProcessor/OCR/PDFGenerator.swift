@@ -46,7 +46,7 @@ struct PDFGenerator {
                   originalFileName: String? = nil, gatewayDisplayName: String? = nil,
                   localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                   pdfImageMB: Double = 0, textColumns: Int = 1,
-                  sourceDates: PDFSourceDates? = nil) throws -> ImagePageOutcome {
+                  sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) throws -> ImagePageOutcome {
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
 
@@ -65,7 +65,7 @@ struct PDFGenerator {
                                     gatewayDisplayName: gatewayDisplayName,
                                     localAgentDisplayName: localAgentDisplayName,
                                     localAgentModelName: localAgentModelName,
-                                    textColumns: textColumns, sourceDates: sourceDates)
+                                    textColumns: textColumns, sourceDates: sourceDates, pageKind: pageKind)
         pdfDocument.insert(textPage, at: pdfDocument.pageCount)
 
         guard pdfDocument.write(to: outputURL) else {
@@ -255,37 +255,45 @@ struct PDFGenerator {
     private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
                               gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                               localAgentModelName: String? = nil, textColumns: Int = 1,
-                              sourceDates: PDFSourceDates? = nil) -> PDFPage {
+                              sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) -> PDFPage {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
         let dateStr = dateFormatter.string(from: Date())
 
         var headerLine = "Extracted text."
-        var importedMetaRange: NSRange?
+        var provenanceRange: NSRange?
         if let fileName = originalFileName {
-            headerLine += "\n\(fileName)"
+            headerLine += "\n\(fileName.components(separatedBy: .controlCharacters).joined(separator: " "))"
         }
+        // Keep actual-reader precedence, then sanitize both display positions for every backend.
+        // A custom gateway/CLI label cannot inject another separator or a Kind/header line.
+        let providerName: String
+        let modelName: String
         if let imported = result.imported {
-            // W41.app-institutional-compute: an institutional-computing bulk run wrote the text — name it, its model, precision and job.
-            let metaLine = "\(imported.headerSource) \u{00B7} \(imported.headerModel) \u{00B7} \(dateStr)"
-            importedMetaRange = NSRange(location: headerLine.utf16.count + 1, length: metaLine.utf16.count)
-            headerLine += "\n\(metaLine)"
+            providerName = imported.headerSource; modelName = imported.headerModel
         } else if let reader = result.secondReader {
-            // W41.app-ocr-default: Gemini refused this page and another model wrote the text — name that model.
-            headerLine += "\n\(reader.provider) \u{00B7} \(reader.model) \u{00B7} \(dateStr)"
+            providerName = reader.provider; modelName = reader.model
         } else if let routed = result.pageReader, routed.isRouted {
-            // W41.app-page-kind: the page's kind (or the user) chose another model than the run's — name that model.
-            headerLine += "\n\(routed.provider) \u{00B7} \(routed.model) \u{00B7} \(dateStr)"
+            providerName = routed.provider; modelName = routed.model
         } else if let localName = localAgentDisplayName {
-            headerLine += "\n\(localName) \u{00B7} \(localAgentModelName ?? "CLI default") \u{00B7} \(dateStr)"
+            providerName = localName; modelName = localAgentModelName ?? "CLI default"
         } else if let gwName = gatewayDisplayName {
-            headerLine += "\n\(gwName) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
+            providerName = gwName; modelName = model.displayName
         } else {
-            headerLine += "\n\(model.provider.rawValue) \u{00B7} \(model.displayName) \u{00B7} \(dateStr)"
+            providerName = model.provider.rawValue; modelName = model.displayName
         }
+        let metaLine = "\(ImportedReading.headerComponent(providerName)) · \(ImportedReading.headerComponent(modelName)) · \(dateStr)"
+        provenanceRange = NSRange(location: headerLine.utf16.count + 1, length: metaLine.utf16.count)
+        headerLine += "\n\(metaLine)"
         if let classification = result.classification {
             headerLine += "\nClassification: \(classification.displayName)"
+        }
+        // Kind is distinct from segmentation classification. Validate imported freeform kinds;
+        // missing/unknown (including "mixed") stays absent, never guessed printed.
+        if let kind = pageKind ?? result.pageReader?.kind.flatMap(OCRPageKind.init(rawValue:))
+            ?? result.imported?.kind.flatMap(OCRPageKind.init(rawValue:)) {
+            headerLine += "\n\(PDFHeaderParser.kindPrefix)\(kind.rawValue)"
         }
         // W37.dual-date — the document's own date / covering-letter date, after Classification and
         // before the blank separator, only when known at render time (see `PDFSourceDates`).
@@ -334,16 +342,19 @@ struct PDFGenerator {
         let pageWidth: CGFloat = 612
         let margin: CGFloat = 54
         let fullTextWidth = pageWidth - 2 * margin
-        // Institutional names plus precision/job details can wrap the processing date onto a new line.
-        // The shared Reader parser then mistakes that continuation for body text. Keep this contract line
-        // together by fitting its font to the available width; retain the full cluster/model provenance.
-        if let range = importedMetaRange {
-            let meta = headerString.attributedSubstring(from: range)
-            let width = CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(meta), nil, nil, nil))
-            if width > fullTextWidth {
+        // Freeform gateway/CLI/cluster labels can wrap across several extracted lines. Fit every
+        // provenance line, preserving its full display labels in the same single-line grammar.
+        if let range = provenanceRange {
+            // SF's optical metrics change with point size: a one-shot ratio measured at 11pt
+            // can still wrap at the smaller font. Re-measure the actual fitted font before layout.
+            var pointSize = headerFont.pointSize
+            for _ in 0..<8 {
+                let meta = headerString.attributedSubstring(from: range)
+                let width = CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(meta), nil, nil, nil))
+                if width <= fullTextWidth * 0.98 { break }
+                pointSize *= fullTextWidth * 0.98 / width
                 headerString.addAttribute(.font,
-                    value: NSFont.systemFont(ofSize: headerFont.pointSize * fullTextWidth / width * 0.98, weight: .semibold),
-                    range: range)
+                    value: NSFont.systemFont(ofSize: pointSize, weight: .semibold), range: range)
             }
         }
         let cols = SessionProcessingConfig.clampTextColumns(textColumns)

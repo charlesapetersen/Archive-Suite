@@ -1,187 +1,312 @@
 import Foundation
 import PDFKit
 
-/// Text extracted from a PDF for indexing and display.
-///
-/// - `fullBody`: every page's text concatenated (header lines included). Feed this to FTS — it
-///   preserves page-1 text-layer content and the header metadata that Reader historically indexed.
-/// - `strippedBody`: page-2 body text with the Processor header removed. Use for display.
-/// - `classification`: the raw `Classification:` value (e.g. "Document Start"), or `nil`.
-/// - `pageCount`: from `PDFDocument.pageCount`.
+/// The classifier's four measured classes. Unknown is nil, never an inferred printed page.
+public enum OCRPageKind: String, CaseIterable, Codable, Sendable {
+    case handwritten, typewritten, printed, forms
+
+    public var displayName: String {
+        switch self {
+        case .handwritten: "Handwritten"
+        case .typewritten: "Typewritten"
+        case .printed: "Printed"
+        case .forms: "Form or table"
+        }
+    }
+}
+
+/// Display provenance only. These strings never authorize an execution route or identify a model ID.
+public struct PDFReaderProvenance: Sendable, Equatable {
+    public let provider: String
+    public let model: String
+    public let processingDate: String
+}
+
+public enum PDFHeaderDiagnostic: String, Sendable, Equatable {
+    case missingProvenance, malformedProvenance, missingKind, invalidKind, repeatedKind, outOfOrderKind
+}
+
+public struct PDFPageHeader: Sendable, Equatable {
+    public var originalFilename: String?
+    public var rawProvenance: String?
+    public var provenance: PDFReaderProvenance?
+    public var classification: String?
+    public var kind: OCRPageKind?
+    public var documentDate: String?
+    public var sentWith: String?
+    public var diagnostics: [PDFHeaderDiagnostic] = []
+}
+
+public struct ParsedPDFTextPage: Sendable, Equatable {
+    public let header: PDFPageHeader?
+    public let body: String
+    internal var headerLineCount: Int = 0
+}
+
+/// Zero-based physical text slot. Missing headers remain represented, so a summary cannot silently
+/// apply the first pair's metadata to an unknown page. This is metadata, not proof of a valid pair.
+public struct PDFTextPageMetadata: Sendable, Equatable {
+    public let pageIndex: Int
+    public let header: PDFPageHeader?
+}
+
+public enum PDFMetadataSummary<Value: Sendable & Equatable>: Sendable, Equatable {
+    case unknown
+    case uniform(Value)
+    /// Includes a known value beside an unknown page, as well as two different known values.
+    case mixed
+
+    static func summarize(_ values: [Value?]) -> Self {
+        guard values.contains(where: { $0 != nil }) else { return .unknown }
+        guard let first = values.first, let first else { return .mixed }
+        return values.allSatisfy { $0 == first } ? .uniform(first) : .mixed
+    }
+}
+
+/// Existing fullBody (all pages for FTS) and strippedBody (page 2 for display) semantics are preserved.
+/// Per-page metadata is separate: never apply the first text page's Kind/reader to a whole merged file.
 public struct ExtractedContent: Sendable {
     public var fullBody: String
     public var strippedBody: String
     public var classification: String?
     public var pageCount: Int
+    public var textPages: [PDFTextPageMetadata]
 
-    public init(fullBody: String, strippedBody: String, classification: String?, pageCount: Int) {
+    public var kindSummary: PDFMetadataSummary<OCRPageKind> {
+        .summarize(textPages.map { $0.header?.kind })
+    }
+    public var readerSummary: PDFMetadataSummary<PDFReaderProvenance> {
+        .summarize(textPages.map { $0.header?.provenance })
+    }
+
+    public init(fullBody: String, strippedBody: String, classification: String?, pageCount: Int,
+                textPages: [PDFTextPageMetadata] = []) {
         self.fullBody = fullBody
         self.strippedBody = strippedBody
         self.classification = classification
         self.pageCount = pageCount
+        self.textPages = textPages
     }
 }
 
-/// Extracts selectable text from a PDF. Read-only; guards corrupt / non-PDF / unusual page counts
-/// by returning nil or whatever text exists (never crashes).
+/// Read-only parsing of the single SPEC header grammar. Stripping and metadata use the same scan.
 public enum PDFHeaderParser {
-
-    /// Extract text content from a PDF at the given URL.
-    ///
-    /// Returns `nil` if the PDF can't be opened (corrupt / encrypted / non-PDF).
-    /// The returned `ExtractedContent` provides both a full-body view (all pages, for FTS)
-    /// and a stripped-body view (header removed, for display).
-    public static func extract(_ url: URL) -> ExtractedContent? {
-        guard let doc = PDFDocument(url: url) else { return nil }
-
-        // Collect per-page text.
-        var pageTexts: [String] = []
-        for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i), let text = page.string, !text.isEmpty else { continue }
-            pageTexts.append(text)
-        }
-
-        let fullBody = pageTexts.joined(separator: "\n")
-
-        // Parse the Processor's app-format header from page 2: the classification and strippedBody.
-        // W40.fix-core-classification-from-body: the classification comes from that header block only,
-        // never from a `Classification:` line in OCR body text or on another page.
-        let strippedBody: String
-        var classification: String?
-        if doc.pageCount >= 2, let textPage = doc.page(at: 1),
-           let pageText = textPage.string, pageText.hasPrefix("Extracted text.") {
-            strippedBody = stripHeader(from: pageText)
-            classification = parseClassification(from: pageText)
-        } else {
-            // Not app-format — stripped = full (nothing to strip), and no header to read a classification from.
-            strippedBody = fullBody
-        }
-
-        return ExtractedContent(
-            fullBody: fullBody,
-            strippedBody: strippedBody,
-            classification: classification,
-            pageCount: doc.pageCount
-        )
-    }
-
-    /// Parse the `Classification:` value from an app-format page-2 text. Returns `nil` if absent or empty.
-    ///
-    /// Read only from the header block (`stripHeader`'s layout): the page must start `Extracted text.`, and
-    /// the line must directly follow the provider/model line, ahead of any source-date line (the SPEC's
-    /// order). A `Classification:` line in the OCR body (an archival security marking) or a file name that
-    /// starts with the word is not the classification (W40.fix-core-classification-from-body).
-    ///
-    /// The scan stops at the first line that is not a header line, not only at the blank separator: PDFKit
-    /// drops that blank line from a real page's text (seen on the corpus's app-format PDFs, 2026-11-06), so
-    /// the header runs straight into the body. A body whose FIRST line is a `Classification:` line under a
-    /// header without one therefore still reads as the header's; nothing on such a page tells them apart.
-    public static func parseClassification(from text: String) -> String? {
-        let lines = text.components(separatedBy: .newlines)
-        guard let first = lines.first, first.trimmingCharacters(in: .whitespaces).hasPrefix("Extracted text.") else {
-            return nil
-        }
-        var seenMetaLine = false, metaLineEnded = false, extraLine = false
-        for line in lines.dropFirst() {
-            let t = line.trimmingCharacters(in: .whitespaces)
-            if t.isEmpty { break }  // the blank separator, when the text kept it
-            if !seenMetaLine {
-                // The optional file name comes before the meta line and is skipped whatever it says.
-                if t.contains(" \u{00B7} ") { seenMetaLine = true; metaLineEnded = endsWithYear(t) }
-                continue
-            }
-            if t.hasPrefix("Classification:") {
-                let value = t.dropFirst("Classification:".count).trimmingCharacters(in: .whitespaces)
-                return value.isEmpty ? nil : value
-            }
-            if isSourceDateLine(t) { return nil }  // the classification comes before the date lines
-            // One more line may belong to the meta line: the rest of a wrapped one (it has not reached its
-            // closing `d MMMM yyyy` date yet), or the real one after a file name with " · " in it.
-            if !extraLine && (!metaLineEnded || (t.contains(" \u{00B7} ") && endsWithYear(t))) {
-                extraLine = true
-                metaLineEnded = true
-                continue
-            }
-            return nil  // the body: the header had no classification
-        }
-        return nil
-    }
-
-    /// The meta line ends with the Processor's `d MMMM yyyy` processing date.
-    private static func endsWithYear(_ trimmed: String) -> Bool {
-        trimmed.range(of: #"[0-9]{4}$"#, options: .regularExpression) != nil
-    }
-
-    /// W37.dual-date: exact prefix of the optional source-document date line in the OCR-text header
-    /// (the item's OWN date, e.g. `Document date: Nov 3, 1957`). Distinct from the provider line's OCR
-    /// processing date. Written by Processor `PDFGenerator.makeTextPage`.
     public static let documentDatePrefix = "Document date: "
-    /// W37.dual-date: exact prefix of the optional covering-letter date line (`Sent with: Mar 12, 1958`).
     public static let sentWithPrefix = "Sent with: "
+    public static let kindPrefix = "Kind: "
 
-    /// True when a trimmed header line is one of the two W37 source-date lines. Exact, case-sensitive
-    /// prefixes; only consulted INSIDE the header block (after the provider/model line, before the first
-    /// blank line), so body text that happens to start with these words is never consumed.
-    static func isSourceDateLine(_ trimmed: String) -> Bool {
-        trimmed.hasPrefix(documentDatePrefix) || trimmed.hasPrefix(sentWithPrefix)
+    public static func extract(_ url: URL) -> ExtractedContent? {
+        guard let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
+        var texts: [String] = []
+        var textPages: [PDFTextPageMetadata] = []
+        var firstTextPage: ParsedPDFTextPage?
+        for i in 0..<doc.pageCount {
+            let text = doc.page(at: i)?.string ?? ""
+            if !text.isEmpty { texts.append(text) }
+            if i % 2 == 1 {
+                let parsed = doc.page(at: i).map { parse($0) } ?? parse(text)
+                textPages.append(PDFTextPageMetadata(pageIndex: i, header: parsed.header))
+                if i == 1 { firstTextPage = parsed }
+            }
+        }
+        let fullBody = texts.joined(separator: "\n")
+        return ExtractedContent(fullBody: fullBody,
+            strippedBody: firstTextPage?.header != nil ? firstTextPage!.body : fullBody,
+            classification: firstTextPage?.header?.classification, pageCount: doc.pageCount,
+            textPages: textPages)
     }
 
-    /// Strip the Processor's app-format header from page-2 text, returning only the body below it.
-    ///
-    /// Header format (from PDFGenerator.makeTextPage):
-    ///   Extracted text.
-    ///   {original filename}
-    ///   {Provider} · {Model} · {Date}
-    ///   Classification: {value}   (optional)
-    ///   Document date: {display}  (optional, W37.dual-date)
-    ///   Sent with: {display}      (optional, W37.dual-date)
-    ///
-    ///   {body text}
-    public static func stripHeader(from pageText: String) -> String {
-        let lines = pageText.components(separatedBy: .newlines)
-        var bodyStartIndex = 0
-        var seenMetaLine = false
-
-        for (i, line) in lines.enumerated() {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed.hasPrefix("Classification:") {
-                bodyStartIndex = i + 1
-                continue
+    /// PDFKit can group short header lines together across a wide provenance line, returning Kind
+    /// before provenance in `page.string`. Recover the header's physical order, but remove only its
+    /// exact character ranges from the original string: never reorder the transcription or FTS text.
+    public static func parse(_ page: PDFPage) -> ParsedPDFTextPage {
+        let raw = page.string ?? ""
+        guard page.rotation % 360 == 0,
+              let selection = page.selection(for: page.bounds(for: .mediaBox)) else { return parse(raw) }
+        let lines = selection.selectionsByLine().filter { !($0.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .sorted {
+                let a = $0.bounds(for: page), b = $1.bounds(for: page)
+                return a.maxY != b.maxY ? a.maxY > b.maxY : a.minX < b.minX
             }
-
-            // W37 source-date lines sit after the provider/model line and before the blank separator.
-            // Gated on `seenMetaLine` so they are only recognised inside the header block; the loop has
-            // already broken out at the first blank line, so body text never reaches this test.
-            if seenMetaLine && isSourceDateLine(trimmed) {
-                bodyStartIndex = i + 1
-                continue
+        let rawString = raw as NSString
+        var orderedLines: [(text: String, selection: PDFSelection?)] = []
+        for line in lines {
+            orderedLines.append(((line.string ?? "").trimmingCharacters(in: .newlines), line))
+            let ranges = (0..<line.numberOfTextRanges(on: page)).map { line.range(at: $0, on: page) }
+            if let end = ranges.filter({ $0.location != NSNotFound && $0.location <= rawString.length
+                && $0.length <= rawString.length - $0.location }).map({ $0.location + $0.length }).max(),
+               hasBlankSeparator(after: end, in: rawString) {
+                orderedLines.append(("", nil))
             }
-
-            // Header ends at the first blank line after "Extracted text."
-            if trimmed.isEmpty && i > 0 {
-                bodyStartIndex = i + 1
-                break
-            }
-
-            if trimmed.hasPrefix("Extracted text.") || trimmed.contains(" \u{00B7} ") {
-                if trimmed.contains(" \u{00B7} ") { seenMetaLine = true }
-                bodyStartIndex = i + 1
-                continue
-            }
-
-            // Unknown line before the meta line (e.g. filename) — skip, don't mistake for body.
-            if !seenMetaLine {
-                continue
-            }
-
-            // Reached body text.
-            bodyStartIndex = i
-            break
         }
+        let ordered = orderedLines.map(\.text).joined(separator: "\n")
+        var parsed = parse(ordered)
+        guard parsed.header != nil, parsed.headerLineCount > 0, parsed.headerLineCount <= orderedLines.count else {
+            return parse(raw)
+        }
+        let body = NSMutableString(string: raw)
+        var headerRanges = IndexSet()
+        for line in orderedLines.prefix(parsed.headerLineCount).compactMap(\.selection) {
+            for i in 0..<line.numberOfTextRanges(on: page) {
+                let range = line.range(at: i, on: page)
+                guard range.location != NSNotFound, range.location <= body.length,
+                      range.length <= body.length - range.location else { return parse(raw) }
+                headerRanges.insert(integersIn: range.location..<(range.location + range.length))
+            }
+        }
+        for range in headerRanges.rangeView.reversed() {
+            body.deleteCharacters(in: NSRange(location: range.lowerBound, length: range.count))
+        }
+        parsed = ParsedPDFTextPage(header: parsed.header,
+            body: (body as String).trimmingCharacters(in: .whitespacesAndNewlines),
+            headerLineCount: parsed.headerLineCount)
+        return parsed
+    }
 
-        return lines.dropFirst(bodyStartIndex)
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Preserve a separator PDFKit actually retained. Inspect only the whitespace immediately
+    /// following a selected line, so a later blank paragraph cannot change the header boundary.
+    static func hasBlankSeparator(after offset: Int, in raw: NSString) -> Bool {
+        guard offset >= 0, offset <= raw.length else { return false }
+        var end = offset
+        while end < raw.length, let scalar = UnicodeScalar(Int(raw.character(at: end))),
+              CharacterSet.whitespacesAndNewlines.contains(scalar) { end += 1 }
+        let gap = raw.substring(with: NSRange(location: offset, length: end - offset))
+            .replacingOccurrences(of: "\r\n", with: "\n")
+        return gap.unicodeScalars.filter { CharacterSet.newlines.contains($0) }.count >= 2
+    }
+
+    public static func parseClassification(from text: String) -> String? { parse(text).header?.classification }
+    public static func stripHeader(from pageText: String) -> String { parse(pageText).body }
+
+    /// Stops at a blank separator or the first non-header line (PDFKit often drops blank lines).
+    /// A valid-looking optional field at the very start of the body without that separator is
+    /// intrinsically ambiguous in this format; it can be consumed as a header field. No body search.
+    public static func parse(_ text: String) -> ParsedPDFTextPage {
+        let lines = text.components(separatedBy: .newlines)
+        func trimmed(_ index: Int) -> String { lines[index].trimmingCharacters(in: .whitespaces) }
+        guard lines.first?.trimmingCharacters(in: .whitespaces) == "Extracted text." else {
+            return ParsedPDFTextPage(header: nil, body: lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        var header = PDFPageHeader()
+        // One optional filename precedes provenance. PDFKit can split that filename at an underscore
+        // into two extracted lines. Inspect only these prefix slots, never arbitrary body lines.
+        let candidates = [1, 2, 3].compactMap { start -> ProvenanceCandidate? in
+            guard start < lines.count, (1..<start).allSatisfy({ !trimmed($0).isEmpty }),
+                  start < 3 || !isField(trimmed(2)) else { return nil }
+            return provenanceCandidate(lines, at: start)
+        }
+        // Only the first prefix slot can be a dot-containing filename. Once a provenance line
+        // occupies the slot after it, keep even a malformed one; never repair it from the body.
+        let first = candidates.first
+        let selected: ProvenanceCandidate?
+        if let first, first.start == 1, !first.complete,
+           (first.raw.components(separatedBy: " · ").count < 3 || looksLikeFilename(first.raw)),
+           let afterFilename = candidates.first(where: { $0.start == 2 }) {
+            selected = afterFilename
+        } else { selected = first }
+        guard let meta = selected else {
+            header.diagnostics = [.missingProvenance, .missingKind]
+            return ParsedPDFTextPage(header: header, body: lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        if meta.start > 1 { header.originalFilename = lines[1..<meta.start].joined(separator: "\n") }
+        header.rawProvenance = meta.raw
+        header.provenance = parseProvenance(meta.raw)
+        if header.provenance == nil { header.diagnostics.append(.malformedProvenance) }
+
+        var index = meta.end
+        var lastField = -1
+        var kinds: [String] = []
+        while index < lines.count {
+            let line = trimmed(index)
+            if line.isEmpty { index += 1; break }
+            let field: Int
+            let value: String
+            if line.hasPrefix("Classification:") {
+                field = 0; value = String(line.dropFirst("Classification:".count)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("Kind:") {
+                field = 1; value = String(line.dropFirst("Kind:".count)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix(documentDatePrefix) {
+                field = 2; value = String(line.dropFirst(documentDatePrefix.count))
+            } else if line.hasPrefix(sentWithPrefix) {
+                field = 3; value = String(line.dropFirst(sentWithPrefix.count))
+            } else { break }
+            // Repeated or late Kind is consumed, diagnosed and never trusted. Other out-of-order
+            // fields start the body; this preserves an archival Classification: security marking.
+            if field == 1 {
+                kinds.append(value)
+                if field < lastField { header.diagnostics.append(.outOfOrderKind) }
+            } else if field <= lastField { break }
+            switch field {
+            case 0: header.classification = value.isEmpty ? nil : value
+            case 2: header.documentDate = value
+            case 3: header.sentWith = value
+            default: break
+            }
+            lastField = max(lastField, field)
+            index += 1
+        }
+        if kinds.isEmpty { header.diagnostics.append(.missingKind) }
+        else if kinds.count > 1 { header.diagnostics.append(.repeatedKind) }
+        else if let kind = OCRPageKind(rawValue: kinds[0]) { header.kind = kind }
+        else { header.diagnostics.append(.invalidKind) }
+        if header.diagnostics.contains(.outOfOrderKind) { header.kind = nil }
+        return ParsedPDFTextPage(header: header, body: lines.dropFirst(index).joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines), headerLineCount: index)
+    }
+
+    private struct ProvenanceCandidate {
+        let start: Int
+        let end: Int
+        let raw: String
+        let complete: Bool
+    }
+
+    private static func provenanceCandidate(_ lines: [String], at start: Int) -> ProvenanceCandidate? {
+        guard start < lines.count else { return nil }
+        let line = lines[start].trimmingCharacters(in: .whitespaces)
+        guard line.contains(" · ") || line.hasSuffix(" ·") else { return nil }
+        var raw = line
+        var end = start + 1
+        // Existing one-line provenance wrap, commonly just the date on a second line. Do not eat
+        // body text to repair malformed provenance: join only if the continuation completes a date.
+        if !endsWithYear(raw), end < lines.count {
+            let next = lines[end].trimmingCharacters(in: .whitespaces)
+            if !next.isEmpty, !isField(next), endsWithYear(next) {
+                let joined = raw + " " + next
+                if parseProvenance(joined) != nil {
+                    raw = joined; end += 1
+                }
+            }
+        }
+        let count = raw.components(separatedBy: " · ").count
+        return ProvenanceCandidate(start: start, end: end, raw: raw, complete: count >= 3 && endsWithYear(raw))
+    }
+
+    private static func looksLikeFilename(_ line: String) -> Bool {
+        // An explicit extension disambiguates a filename containing several middle dots from a
+        // malformed three-position provenance line. Extensionless provenance lookalikes are ambiguous.
+        line.range(of: #"\.[A-Za-z0-9]{1,8}$"#, options: .regularExpression) != nil
+    }
+
+    private static func isField(_ line: String) -> Bool {
+        ["Classification:", "Kind:", documentDatePrefix, sentWithPrefix].contains { line.hasPrefix($0) }
+    }
+
+    private static func endsWithYear(_ text: String) -> Bool {
+        text.range(of: #"[0-9]{4}$"#, options: .regularExpression) != nil
+    }
+
+    private static func parseProvenance(_ raw: String) -> PDFReaderProvenance? {
+        let parts = raw.components(separatedBy: " · ").map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count == 3, !parts[0].isEmpty, !parts[1].isEmpty,
+              parts.allSatisfy({ !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) }),
+              parts[2].range(of: #"^[0-9]{1,2} [A-Za-z]+ [0-9]{4}$"#, options: .regularExpression) != nil else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "d MMMM yyyy"
+        formatter.isLenient = false
+        guard let date = formatter.date(from: parts[2]), formatter.string(from: date) == parts[2] else { return nil }
+        return PDFReaderProvenance(provider: parts[0], model: parts[1], processingDate: parts[2])
     }
 }

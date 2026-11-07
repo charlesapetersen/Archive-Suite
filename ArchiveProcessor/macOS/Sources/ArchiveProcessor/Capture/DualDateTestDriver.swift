@@ -329,6 +329,45 @@ enum DualDateTestDriver {
         check("...and the stripped body is exactly the OCR text", extracted?.strippedBody == "Report on the harbour works.")
         check("...and classification still parses", extracted?.classification == "Document Start")
 
+        // W44.reocr-spec: new-output Kind/provenance, plus existing audited tag semantics on scratch.
+        for kind in OCRPageKind.allCases {
+            _ = try? PDFGenerator().generate(imageURL: tmp.appendingPathComponent("missing.jpg"),
+                result: OCRResult(text: "Report.", classification: .documentStart, errorMessage: nil, errorCode: nil),
+                model: model, outputURL: pdfURL, originalFileName: "Kind: filename.jpg", sourceDates: sourceDates,
+                pageKind: kind)
+            let parsed = PDFHeaderParser.extract(pdfURL)
+            let h = parsed?.textPages.first?.header
+            check("Kind \(kind.rawValue) round-trips with both source dates and actual provenance",
+                  h?.kind == kind && h?.documentDate == "1957" && h?.sentWith == "Mar 12, 1958"
+                  && h?.provenance?.model == model.displayName && h?.diagnostics.isEmpty == true
+                  && parsed?.strippedBody == "Report.")
+        }
+        let gatewayLabel = "Kind: a very long custom gateway name " + String(repeating: "University ", count: 10) + "· Region\nWest"
+        _ = try? PDFGenerator().generate(imageURL: tmp.appendingPathComponent("missing.jpg"),
+            result: OCRResult(text: "Report.", classification: nil, errorMessage: nil, errorCode: nil),
+            model: model, outputURL: pdfURL, gatewayDisplayName: gatewayLabel, pageKind: .printed)
+        let gatewayHeader = PDFHeaderParser.extract(pdfURL)?.textPages.first?.header
+        check("a long gateway label round-trips whole after separator/control sanitization: \(String(describing: gatewayHeader)) raw: \((PDFDocument(url: pdfURL)?.page(at: 1)?.string ?? "").debugDescription)",
+              gatewayHeader?.provenance?.provider == ImportedReading.headerComponent(gatewayLabel)
+              && gatewayHeader?.provenance?.model == model.displayName && gatewayHeader?.kind == .printed)
+        for kind in ["mixed", "unknown", ""] {
+            let imported = ImportedReading(source: "Atlas", model: "Qwen", preset: nil, precision: nil, job: nil, kind: kind)
+            _ = try? PDFGenerator().generate(imageURL: tmp.appendingPathComponent("missing.jpg"),
+                result: OCRResult(text: "Report.", classification: nil, errorMessage: nil, errorCode: nil, imported: imported),
+                model: model, outputURL: pdfURL)
+            let h = PDFHeaderParser.extract(pdfURL)?.textPages.first?.header
+            check("unknown imported kind '\(kind)' remains absent", h?.kind == nil && h?.diagnostics.contains(.missingKind) == true)
+        }
+        let rawTags = ["oCr pOoR", "OCR Poor", "OCR Failed", "OCR Poorly", "Q3", "Unread", "History", "History"]
+        do {
+            let before = try Data(contentsOf: pdfURL)
+            try MacOSTagger.applyTags(rawTags, to: pdfURL, stampUnread: false)
+            let read = try MacOSTagger.readTags(from: pdfURL)
+            check("Processor tag round-trip retains Poor as an ordinary Subject and every occurrence",
+                  multisetEqual(read, rawTags) && DocumentTags.parse(raw: read, labelNumber: nil).hasPoorOCR)
+            check("Processor tag writes leave PDF bytes intact", try Data(contentsOf: pdfURL) == before)
+        } catch { check("Processor Poor tag contract", false) }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["DUAL_DATE_TEST_OUT"]
