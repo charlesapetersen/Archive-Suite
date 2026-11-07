@@ -167,20 +167,21 @@ actor ContentIndex {
         }
     }
 
-    /// Full-text search → matching file paths. Input is tokenized and quoted so arbitrary user text
-    /// can never be an FTS5 syntax error; terms are AND-combined.
+    /// Full-text search of the **OCR text** (the body column) → matching file paths. This is the
+    /// "Search OCR text" box: a word only in the file name or the classification is not a hit
+    /// (W40.fix-reader-ocr-search-names; the filter bar's name box searches names). Input is tokenized
+    /// and quoted so arbitrary user text can never be an FTS5 syntax error; terms are AND-combined.
     ///
     /// Returns **all** matching paths by default (`limit == nil`), ordered by **bm25 relevance**
-    /// (best match first). Column weights: name=10, classification=5, body=1 — so a filename or
-    /// classification hit outranks a body-only hit, and the order is explainable from what the user
-    /// can see. `limit` remains available for callers/tests that deliberately want a bounded result.
+    /// (best match first). `limit` remains available for callers/tests that deliberately want a
+    /// bounded result.
     func search(_ query: String, limit: Int? = nil) -> [String] {
         rankedHits(query, limit: limit).map { $0.path }
     }
 
     /// `search`'s hits with their FTS rowids, which `snippetMap` seeks by.
     private func rankedHits(_ query: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
-        rankedHits(match: ftsMatchExpression(query), limit: limit)
+        rankedHits(match: ocrTextMatchExpression(query), limit: limit)
     }
 
     /// Paths matching a ready-made FTS5 expression (an Advanced Search text rule, `AdvancedSearch`), bm25
@@ -202,8 +203,9 @@ actor ContentIndex {
 
     private func rankedHits(match: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
         guard !match.isEmpty else { return [] }
-        // bm25 weights in FTS5 column order (body, classification, name): name hits rank
-        // highest (10), then classification (5), then body (1). bm25 returns negative scores
+        // bm25 weights in FTS5 column order (body, classification, name), for an expression that
+        // reaches every column (Advanced Search's "Any text"): name hits rank highest (10), then
+        // classification (5), then body (1). bm25 returns negative scores
         // (more negative = more relevant); ORDER BY ascending puts the best matches first.
         let sql = limit == nil
             ? "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0);"
@@ -481,6 +483,13 @@ actor ContentIndex {
     /// prefix expansion on 1–2-char terms is too broad (performance + relevance).
     nonisolated func ftsMatchExpression(_ query: String) -> String {
         matchTerms(query).map { $0.term }.joined(separator: " ")
+    }
+
+    /// `ftsMatchExpression` limited to the body column, the OCR text: `body : ("term1" "term2"*)`.
+    /// What `search` and `searchRanked` match with; empty for an empty query.
+    nonisolated func ocrTextMatchExpression(_ query: String) -> String {
+        let expression = ftsMatchExpression(query)
+        return expression.isEmpty ? "" : "body : (\(expression))"
     }
 
     /// The expression `snippet()` is given: `ftsMatchExpression` without its `SearchSnippet.stopWords`

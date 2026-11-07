@@ -201,8 +201,8 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   library's (SPEC rule 4, ArchiveCore `TagIdentity.swift`).
 - **Reading/grouping is user-driven manual multi-selection** — never auto-groups; segment awareness is opt-in
   and degrades silently.
-- **Full-text OCR search is in v1** via the app's content index (not Spotlight) + in-doc `⌘F`; bm25-ranked
-  (name/classification/body weights), auto-refreshed when an index pass completes, `.relevance` sort during a query.
+- **Full-text OCR search is in v1** via the app's content index (not Spotlight) + in-doc `⌘F`; it searches the OCR text
+  (the body column) only, never file names (W40.fix-reader-ocr-search-names); bm25-ranked, auto-refreshed when an index pass completes, `.relevance` sort during a query.
 - **Smart folders are a scoped root** — a saved search enters a base scope; user filters layer on top (AND);
   Clear resets the user layer to the base set; a folder / All Files exits the scope; scope persists across
   relaunch. A smart folder IS an Advanced Search (`Core/AdvancedSearch.swift`, W40.reader-advanced-search): a

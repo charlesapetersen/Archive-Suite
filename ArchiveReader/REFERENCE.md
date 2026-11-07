@@ -226,8 +226,10 @@ writes against the real corpus — always a copy.
   **Pruned (gated):** stale rows (files removed or under a previous root) are evicted by a separate
   `pruneIfSettled` pass — gated on settled + non-empty + two-emission absence confirmation +
   component-boundary root scope; batched deletes; never folded into the indexing emission.
-  **Relevance-ranked search (bm25):** search results are ordered by FTS5 `bm25` score (column weights:
-  name=10, classification=5, body=1 — filename/classification hits outrank body-only hits). The nav list
+  **Relevance-ranked search (bm25):** search results are ordered by FTS5 `bm25` score. The Search OCR text
+  box matches the body column alone (`body : (…)`, W40.fix-reader-ocr-search-names: a word only in a file
+  name or classification is no hit; the filter bar's name box searches names). Advanced Search's "Any text"
+  reaches every column, weighted name=10, classification=5, body=1. The nav list
   auto-switches to a `.relevance` sort while a query is active (falls back to the default sort on clear).
   **Search-during-index refresh:** when an index pass finishes, the active FTS query (user + scope) is
   automatically re-run so newly indexed files appear without a manual re-search.
@@ -402,7 +404,7 @@ The decisions are in CLAUDE.md §Decisions (authoritative). Original text:
 - **Reading/grouping is user-driven manual multi-selection** — the app never auto-groups; segment
   awareness is opt-in convenience that degrades silently when the classification is absent.
 - **Full-text OCR search is in v1** via the app's content index (not Spotlight content indexing) + in-doc `⌘F`.
-  Results are **bm25 relevance-ranked** (name/classification/body column weights) and auto-refreshed when
+  It matches the OCR text only, not file names. Results are **bm25 relevance-ranked** and auto-refreshed when
   an index pass completes. The nav list auto-selects a `.relevance` sort during an active query.
 - **Smart folders are a scoped root** — selecting a saved search enters a base scope (the visible
   universe); user filters layer on top (AND); Clear All resets the user layer to neutral (back to the base

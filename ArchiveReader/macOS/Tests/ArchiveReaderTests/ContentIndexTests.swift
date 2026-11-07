@@ -222,7 +222,32 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
-    // bm25 relevance ranking: a term in name (weight 10) outranks classification (5) outranks body (1).
+    /// The "Search OCR text" box matches the OCR text only (W40.fix-reader-ocr-search-names, owner's Reader
+    /// session 2 row 22): a word only in the file name or the classification is not a hit, through either
+    /// `search` or `searchRanked`, and Advanced Search's "Any text" (an unqualified expression) still finds both.
+    func testOCRTextSearchSkipsNameAndClassification() async throws {
+        let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
+        try await idx.open()
+        try await idx.upsert(path: "/body.pdf", mtime: 1, name: "report",
+                             classification: nil, body: "a letter to David Riesman about the seminar")
+        try await idx.upsert(path: "/Riesman to Petersen.pdf", mtime: 1, name: "Riesman to Petersen",
+                             classification: nil, body: "a routine document")
+        try await idx.upsert(path: "/class.pdf", mtime: 1, name: "memo",
+                             classification: "Riesman papers", body: "a routine document")
+        let plain = await idx.search("Riesman")
+        XCTAssertEqual(plain, ["/body.pdf"])
+        let ranked = await idx.searchRanked("riesm")
+        XCTAssertEqual(ranked.paths, ["/body.pdf"], "the prefix term is limited to the OCR text too")
+        XCTAssertNotNil(ranked.snippets["/body.pdf"])
+        XCTAssertEqual(idx.ocrTextMatchExpression("cold war"), "body : (\"cold\" \"war\"*)")
+        XCTAssertEqual(idx.ocrTextMatchExpression("  "), "")
+        let anyText = await idx.search(expression: "\"riesman\"")
+        XCTAssertEqual(Set(anyText), ["/body.pdf", "/Riesman to Petersen.pdf", "/class.pdf"])
+        await idx.close()
+    }
+
+    // bm25 relevance ranking for an expression over every column (Advanced Search's "Any text"): a term in
+    // name (weight 10) outranks classification (5) outranks body (1).
     func testBm25RankedSearch() async throws {
         let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
         try await idx.open()
@@ -235,7 +260,7 @@ final class ContentIndexTests: XCTestCase {
         // "budget" in name (weight 10.0 → ranks first)
         try await idx.upsert(path: "/name.pdf", mtime: 1, name: "budget",
                              classification: nil, body: "a routine document")
-        let results = await idx.search("budget")
+        let results = await idx.search(expression: "\"budget\"")
         XCTAssertEqual(results.count, 3)
         // bm25 with weights (body=1, class=5, name=10): name hit first, body-only hit last.
         XCTAssertEqual(results.first, "/name.pdf", "name hit (weight 10) should rank first")
@@ -328,15 +353,18 @@ final class ContentIndexTests: XCTestCase {
     }
 
     /// An image-only doc (empty body) that matches on name/classification yields a path but NO snippet
-    /// entry (empty snippets are dropped, so the UI shows the row without a preview line).
+    /// entry under Advanced Search's "Any text" (empty snippets are dropped, so the UI shows the row without
+    /// a preview line), and is no hit at all for the OCR-text box (W40.fix-reader-ocr-search-names).
     func testSearchRankedEmptyBodyHasNoSnippet() async throws {
         let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
         try await idx.open()
         try await idx.upsert(path: "/scan.pdf", mtime: 1, name: "budget scan", classification: nil,
                              body: "", pageCount: 3, hasText: false, readable: true)
-        let ranked = await idx.searchRanked("budget")
+        let ranked = await idx.searchRanked(expression: "\"budget\"")
         XCTAssertEqual(ranked.paths, ["/scan.pdf"])          // matches on the name column
         XCTAssertNil(ranked.snippets["/scan.pdf"])           // empty body → no KWIC preview
+        let ocrBox = await idx.searchRanked("budget")
+        XCTAssertTrue(ocrBox.paths.isEmpty)
         await idx.close()
     }
 
@@ -414,12 +442,12 @@ final class ContentIndexTests: XCTestCase {
                                  body: "commonterm in document \(i)")
         }
         try await idx.upsert(path: "/commonterm-empty.pdf", mtime: 1, name: "commonterm empty",
-                             classification: nil, body: "")   // a name hit with no body to quote
+                             classification: nil, body: "")   // the word in its name only, no body to quote
         let ranked = await idx.searchRanked("commonterm", snippetBudget: 0)
-        XCTAssertEqual(ranked.paths.count, 6)
+        XCTAssertEqual(ranked.paths.count, 5, "a name-only match is no OCR-text hit")
         XCTAssertTrue(ranked.snippets.isEmpty, "precondition: the search gave no previews")
 
-        let asked = ranked.paths + ["/not-indexed.pdf"]
+        let asked = ranked.paths + ["/commonterm-empty.pdf", "/not-indexed.pdf"]
         let filled = await idx.snippets("commonterm", for: asked)
         XCTAssertEqual(filled.attempted, asked.count)
         XCTAssertEqual(Set(filled.snippets.keys), Set((0..<5).map { "/f\($0).pdf" }))

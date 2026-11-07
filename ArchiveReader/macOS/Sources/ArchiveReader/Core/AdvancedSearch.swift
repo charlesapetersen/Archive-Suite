@@ -16,7 +16,8 @@ import ArchiveCore
 // no-NOT rule (owner, 2026-11-04).
 
 enum RuleField: String, Codable, Sendable, CaseIterable {
-    /// OCR text, file name and classification: the columns the Find box searches.
+    /// OCR text, file name and classification: every column of the index ("Any text"). The Find box searches
+    /// the OCR text alone, as `ocrText` does (W40.fix-reader-ocr-search-names).
     case text
     /// The OCR text alone (the index's body column).
     case ocrText
@@ -264,7 +265,7 @@ extension AdvancedSearch {
         var rules: [SearchRule] = []
         let findWords = AdvancedSearch.words(fullTextQuery)
         if !findWords.isEmpty {
-            var r = SearchRule(field: .text, op: .allWords)
+            var r = SearchRule(field: .ocrText, op: .allWords)   // the box searches the OCR text alone
             var ws = findWords
             if let last = ws.last, last.count > 2, !last.hasSuffix("*") { ws[ws.count - 1] = last + "*" }
             r.text = ws.joined(separator: " ")

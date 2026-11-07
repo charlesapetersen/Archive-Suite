@@ -216,8 +216,8 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 ### R-11 · Full-text OCR search
 
 - **Promise:** search the OCR text of the whole archive (⌘⌥F focuses the field; the query runs on Return).
-  The search uses the app's own FTS5 index, not Spotlight. Results are ranked by bm25, with name above
-  classification above body. While a query is active the list sorts by relevance. When an index pass
+  The search uses the app's own FTS5 index, not Spotlight, and matches the OCR text only, not file names or
+  the classification. Results are ranked by bm25. While a query is active the list sorts by relevance. When an index pass
   finishes, the query re-runs so new files appear.
 - **Promised in:** `CLAUDE.md` §Architecture (content index), §Keyboard map, §Decisions; `README.md` §What it
   does; `SMOKE_TEST.md` step G ("Submit-on-Return").
@@ -227,7 +227,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `ORDER BY bm25(fts,1.0,5.0,10.0)` in `Search/ContentIndex.swift:189`. The re-run after a pass is
   `refreshFullTextSearchIfActive` (`NavigationModel.swift:697`, wired at `:184`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testOCRSearchShowsKeywordInContextSnippet`,
-  `.testOCRSearchFieldExists`; `ArchiveReaderTests/ContentIndexTests.testBm25RankedSearch`.
+  `.testOCRSearchFieldExists`; `ArchiveReaderTests/ContentIndexTests.testBm25RankedSearch`, `.testOCRTextSearchSkipsNameAndClassification`.
 - **Runtime evidence:** [`evidence/reader/W40.d7-at-size.md`](evidence/reader/W40.d7-at-size.md). On the `W40.c2` sample's real OCR text, and on that text replicated to 102,478
   rows: single distinctive terms answer in 11–146 ms at 102k, `the` in 0.7 s, but `Bureau of the Budget` takes
   2.2 s on the sample and **41.7 s** at 102k (`-O`). Index build: 5,268 PDFs in 9.2 s, one pass. After `W40.fix-reader-fts-snippet-stall`: 12.8 ms on the sample and **271 ms** at 102k, all 215 previews ([`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md)). After `W40.fix-reader-fts-snippets`, hits the search left without a preview get one as their rows are drawn: at 102k the first 1,000 hits of each query have one wherever the row has body text, no fill call holding the index over 37 ms ([`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md)).
@@ -238,6 +238,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-31 W40.fix-reader-fts-snippet-stall — `fixed-pending-recheck`: snippets leave out stop words, seek each hit by rowid and stop after 250 ms. On 60 long bodies `Bureau of the Budget` went from 2 of 60 previews in the budget (~135 ms a document) to 60 of 60 in 26 ms. Not yet re-run on the W40.c2 sample, which is in the owner's backup (`W40.fts-snippet-sample-rerun`). [`evidence/reader/W40.fix-reader-fts-snippet-stall.md`](evidence/reader/W40.fix-reader-fts-snippet-stall.md).
   - 2026-10-31 W40.fts-snippet-sample-rerun — `fixed-pending-recheck` → `works`: the corpus-size lane on the W40.c2 sample (`run-reader-at-size.sh --optimized --only sample`, twice, sample unchanged) has `Bureau of the Budget` at 12.8 ms on the sample (2.2 s before) and 271 ms at 102,478 rows (41.7 s before), 215 of 215 hits with previews; the test's under-1-s assertion passes. Same evidence file.
   - 2026-11-05 W40.fix-reader-fts-snippets — `works` → `fixed-pending-recheck`: the owner's Reader session 1 (2026-11-04) found hits without a snippet after a slow query. Missing snippets are now filled in, off the main thread, as rows are drawn, and a query of stop words alone is quoted by scanning the body (one `snippet()` call for `the` took 0.9 s). At 102k, `Bureau of the Budget` 190 of 190 hits, `the` 981 of the first 1,000; the hits left without one are photographs with no text. [`evidence/reader/W40.fix-reader-fts-snippets.md`](evidence/reader/W40.fix-reader-fts-snippets.md).
+  - 2026-11-06 W40.fix-reader-ocr-search-names — stays `fixed-pending-recheck`: the owner's Reader session 2 (row 22) found "Riesman" listing files with the word only in the file name. The box (and its smart-folder rule) now match the body column alone, `body : (…)`; Advanced Search's "Any text" still reaches names. Test with a name-only and a classification-only hit.
 - **Notes:** **Drift.** The search runs as you type, after 150 ms. There is no `.onSubmit` on the field, so
   `SMOKE_TEST.md` step G's "Submit-on-Return" is out of date. The behaviour is arguably better, but the record
   is wrong.
