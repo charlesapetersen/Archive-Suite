@@ -33,6 +33,12 @@ printf 'tart %s\n' "$*" >> "$calls"
 case "${1:-}" in
   list)
     [ "${GUI_VM_FAKE_MODE:-pass}" = missing_vm ] && exit 0
+    # tart_stop_clean polls `tart list --format json` until the guest reports stopped (W40.vm-macos27).
+    # Answer it in JSON, or every simulated stop waits out its 60 s limit: on 2026-11-06 that made this
+    # proof take 1,083 s and pushed the gate past its 3,000 s cap twice.
+    case " $* " in
+      *" --format json "*) printf '%s\n' '[{"Name":"archive-gui-runner","Running":false,"State":"stopped"}]'; exit 0 ;;
+    esac
     printf '%s\n' 'Source Name Disk Size Accessed State' 'local archive-gui-runner 120 91 stopped'
     ;;
   stop|run|ip) exit 0 ;;
@@ -90,7 +96,7 @@ run_gate() { # mode expected-exit label
   out="$ROOT/$label.out"
   : > "$CALLS"; : > "$ROOT/count"
   GUI_VM_FAKE_MODE="$mode" GUI_VM_FAKE_CALLS="$CALLS" GUI_VM_FAKE_COUNT="$ROOT/count" \
-    AUTONOMOUS_GUI_VM_BIN_DIR="$BIN" AUTONOMOUS_GUI_VM_APPS="reader notes processor" \
+    AUTONOMOUS_GUI_VM_PAUSED="${PAUSED-}" AUTONOMOUS_GUI_VM_BIN_DIR="$BIN" AUTONOMOUS_GUI_VM_APPS="reader notes processor" \
     AUTONOMOUS_GUI_VM_STATE="$STATE" ART_DIR="$ART" TART_LOCK_DIR="$ROOT/lock" \
     "$GATE" >"$out" 2>&1
   rc=$?
@@ -147,6 +153,20 @@ want_not "$CALLS" 'xcodebuild test' 'full guest disk never starts an Xcode build
 
 run_gate missing_vm 3 missing-vm-skip
 want "$ROOT/missing-vm-skip.out" "VM 'archive-gui-runner' does not exist" 'missing VM is fail-open SKIPPED'
+
+# The pause (W40.vm-macos27-harness): a skip that names its reason, before any boot or Xcode run.
+PAUSED='a test reason' run_gate pass 3 paused-skip
+want "$ROOT/paused-skip.out" 'SKIPPED: paused: a test reason' 'the pause is a SKIPPED that names its reason'
+want_not "$CALLS" 'tart run' 'the pause never boots the VM'
+# Unset (not empty) means the gate's own default pause, which names the item that owns it.
+( unset PAUSED; : > "$CALLS"; GUI_VM_FAKE_MODE=pass GUI_VM_FAKE_CALLS="$CALLS" GUI_VM_FAKE_COUNT="$ROOT/count" \
+    AUTONOMOUS_GUI_VM_BIN_DIR="$BIN" AUTONOMOUS_GUI_VM_STATE="$STATE" ART_DIR="$ART" TART_LOCK_DIR="$ROOT/lock" \
+    env -u AUTONOMOUS_GUI_VM_PAUSED "$GATE" >"$ROOT/default-pause.out" 2>&1; echo "rc=$?" >>"$ROOT/default-pause.out" )
+want "$ROOT/default-pause.out" 'W40.vm-macos27-harness' 'the default pause names W40.vm-macos27-harness'
+want "$ROOT/default-pause.out" 'rc=3' 'the default pause exits 3 (SKIPPED)'
+
+# A whole run of this proof must stay short: the gate's 50-minute cap has to leave room for the real VM lane.
+[ "$SECONDS" -lt 300 ] && pass "proof ran in ${SECONDS}s (under 300 s)" || bad "proof took ${SECONDS}s (300 s is the most it should take)"
 
 echo
 [ "$fail" = 0 ] && echo 'prove-gui-vm: ALL PASSED' || echo 'prove-gui-vm: FAILURES'
