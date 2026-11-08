@@ -43,7 +43,10 @@ Protocol.
 - **Mark Read/Unread** in one keystroke; read files drop out of an Unread view.
 - **Document window**: two-up viewer (image left / OCR text right), independent per-pane zoom, a
   draggable splitter (default ⅔ : ⅓), keyboard-driven page-scroll + document cycling, intelligent copy
-  (line-break-aware, de-hyphenating), and in-document Find.
+  (line-break-aware, de-hyphenating), and in-document Find. **View ▸ All Pages Tiled** (also in the
+  document toolbar) shows every PDF page as a numbered tile, including OCR pages. Click a tile to
+  read it; the toolbar returns to the selected page. Window tabbing is disabled to keep pages and
+  windows distinct.
 - **Options** (⌘,): link format, copy behavior, viewer defaults, and more.
 - Fully keyboard-operable.
 

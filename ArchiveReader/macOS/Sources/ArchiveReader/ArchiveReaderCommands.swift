@@ -29,6 +29,8 @@ struct ArchiveReaderCommands: Commands {
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
 
+    private var noReadingPane: Bool { doc == nil || doc?.showingAllPages == true }
+
     private var noSelection: Bool { nav?.selectedFiles.isEmpty ?? true }
     /// W40.fix-reader-menus-follow-window: the Tags menu follows the window in front. With the navigation
     /// window in front (its preview sheet included) it acts on the list's selection; with a document window
@@ -60,14 +62,19 @@ struct ArchiveReaderCommands: Commands {
                 }
                 .keyboardShortcut("t", modifiers: [.command, .control])
             }
-            // W40.fix-reader-jpeg-toolbar: listed whenever a document is open, disabled without a JPEG
-            // original, so it can be found; the document toolbar's PDF / JPEG switch says why.
+            if let doc, doc.supportsPageOverview {
+                Toggle("All Pages Tiled", isOn: Binding(
+                    get: { doc.showingAllPages }, set: { doc.setShowingAllPages($0) }
+                ))
+                .disabled(!doc.canShowAllPages)
+            }
+            // The source switch applies to the reading panes; tiles always depict PDF pages.
             if let doc {
                 Button(doc.isShowingJPEG ? "Show PDF Image" : "Show JPEG Image") {
                     doc.toggleImageSource()
                 }
                 .keyboardShortcut("j", modifiers: [.command, .option])
-                .disabled(!doc.hasJPEGPartner)
+                .disabled(!doc.hasJPEGPartner || doc.showingAllPages)
             }
         }
 
@@ -81,14 +88,14 @@ struct ArchiveReaderCommands: Commands {
             // ⌥⌘C, not ⇧⌘C: ⇧⌘C is Selection ▸ Copy Link(s), and with the preview sheet up both items are
             // enabled in the nav window at once (W40.fix-reader-visual-polish).
             Button("Copy Cleaned for Prose") { doc?.copySelection() }
-                .keyboardShortcut("c", modifiers: [.command, .option]).disabled(doc == nil)
+                .keyboardShortcut("c", modifiers: [.command, .option]).disabled(noReadingPane)
             // ⌥⌘L: ⌘L is Focus Tag Filter and ⇧⌘L Copy Archive Link(s), which the preview sheet leaves enabled
             // beside this one, so the page link takes the remaining L.
             Button("Copy Archive Link to This Page") {
                 if let doc, let linkContext { doc.copyArchivePageLink(context: linkContext) }
             }
             .keyboardShortcut("l", modifiers: [.command, .option])
-            .disabled(doc == nil || linkContext?.target == nil)
+            .disabled(noReadingPane || linkContext?.target == nil)
         }
 
         // File
@@ -205,16 +212,16 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut(.downArrow, modifiers: [.command, .shift]).disabled(doc == nil)
             Divider()
             Button("Focus Image Page") { doc?.focusPane(.left) }
-                .keyboardShortcut(.leftArrow, modifiers: [.command, .option]).disabled(doc == nil)
+                .keyboardShortcut(.leftArrow, modifiers: [.command, .option]).disabled(noReadingPane)
             Button("Focus Text Page") { doc?.focusPane(.right) }
-                .keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(doc == nil)
+                .keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(noReadingPane)
             Divider()
             Button("Zoom In") { doc?.zoomFocusedIn() }
-                .keyboardShortcut("+", modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("+", modifiers: .command).disabled(noReadingPane)
             Button("Zoom Out") { doc?.zoomFocusedOut() }
-                .keyboardShortcut("-", modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("-", modifiers: .command).disabled(noReadingPane)
             Button("Fit Page") { doc?.fitFocused() }
-                .keyboardShortcut("0", modifiers: .command).disabled(doc == nil)
+                .keyboardShortcut("0", modifiers: .command).disabled(noReadingPane)
             Divider()
             // These three need MORE than a published viewer: they need one whose view renders a find bar.
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
@@ -229,10 +236,10 @@ struct ArchiveReaderCommands: Commands {
             Button("Find Previous") { doc?.showingFind = true; doc?.findPrevious() }
                 .keyboardShortcut("g", modifiers: [.command, .shift]).disabled(noFind)
             Divider()
-            Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(doc == nil)
-            Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(doc == nil)
-            Button("Zoom In (Text)") { doc?.zoomTextIn() }.disabled(doc == nil)
-            Button("Zoom Out (Text)") { doc?.zoomTextOut() }.disabled(doc == nil)
+            Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(noReadingPane)
+            Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(noReadingPane)
+            Button("Zoom In (Text)") { doc?.zoomTextIn() }.disabled(noReadingPane)
+            Button("Zoom Out (Text)") { doc?.zoomTextOut() }.disabled(noReadingPane)
         }
     }
 

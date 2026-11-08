@@ -6,6 +6,38 @@ import ArchiveCore
 
 @MainActor
 final class DocumentImageSourceTests: XCTestCase {
+    func testOpeningAPDFTileLeavesTheJPEGAndShowsTheClickedScan() throws {
+        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("tile-jpeg-\(UUID())")
+        let main = parent.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName)
+        let jpegs = parent.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName)
+        try FileManager.default.createDirectory(at: main, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: jpegs, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let pdf = main.appendingPathComponent("letter.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["first scan", "first OCR", "second scan", "second OCR"], to: pdf))
+        try Self.grayJPEG().write(to: jpegs.appendingPathComponent("letter.jpg"))
+        let index = JPEGPartnerIndex(jpegRoot: jpegs, scan: CorpusWalker.scanFingerprints(root: jpegs))
+        let marker = RootMarker(guid: UUID(), name: "scratch", kind: .reader, createdAt: Date())
+        let target = ArchiveLinkTarget(rootPath: parent.path, marker: marker, mainRootPath: main.path)
+        let suiteName = "TileJPEG-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preferences = DocumentImageSourcePreferences(defaults: defaults)
+        let reader = DocumentViewerModel(persists: true, imageSourcePreferences: preferences, thumbnailer: nil)
+        reader.updateArchiveContext(target: target, index: index)
+        reader.load(DocumentSelection(filePaths: [pdf.path]))
+        XCTAssertTrue(reader.hasJPEGPartner)
+        reader.toggleImageSource()
+        XCTAssertTrue(reader.isShowingJPEG)
+        reader.setShowingAllPages(true)
+        reader.openTiledPage(3)
+        XCTAssertFalse(reader.isShowingJPEG)
+        XCTAssertTrue(reader.displayedImagePage?.string?.contains("second scan") == true)
+        XCTAssertEqual(preferences.source(rootGUID: target.preferenceGUID,
+                                          relativePath: "\(ReaderArchiveLayout.mainDirectoryName)/letter.pdf"), .jpeg,
+                       "opening a PDF tile leaves the saved source preference alone")
+    }
+
     func testLayoutUsesCommonParentAndRecognizesOldMainGrant() throws {
         let parent = FileManager.default.temporaryDirectory
             .appendingPathComponent("reader-layout-\(UUID().uuidString)", isDirectory: true)

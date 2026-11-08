@@ -84,6 +84,13 @@ struct DocumentWindowView: View {
             ContentUnavailableView(model.loadError ?? "No document",
                                    systemImage: "doc.questionmark",
                                    description: Text(model.loadError == nil ? "Select files in the navigation window." : ""))
+        } else if model.showingAllPages, let path = model.currentFilePath, let document = model.current {
+            DocumentPageOverview(path: path, pageCount: document.pageCount,
+                                 selectedPage: model.focusedPageNumber) { page in
+                model.openTiledPage(page)
+                DispatchQueue.main.async { model.focusPane(model.focusedPane) }
+            }
+            .id(path)
         } else {
             GeometryReader { geo in
                 let total = geo.size.width
@@ -212,52 +219,64 @@ struct DocumentWindowView: View {
 
             Divider()
 
-            imageSourceSwitch
-
-            Divider()
-
-            // W40.fix-reader-doc-toolbar: the owner could not tell the two zoom pairs apart (both were
-            // magnifying glasses) and saw the text pair and the per-pane Fit arrows do nothing — the text pair
-            // never reached a one-page PDF's text before W40.fix-reader-text-zoom, and Fit has no visible effect
-            // on a page already fitted. The text pair now shows text-size glyphs, and the two Fit buttons are
-            // gone: Reset Zoom did what both did, and ⌘0 still fits the focused pane alone.
-            Button { model.leftController.zoomOut() } label: { Label("Zoom Out Image", systemImage: "minus.magnifyingglass") }
-                .help("Zoom out the image page, on the left")
-                .accessibilityIdentifier("ar.doc.imageZoomOut")
-            Button { model.leftController.zoomIn() } label: { Label("Zoom In Image", systemImage: "plus.magnifyingglass") }
-                .help("Zoom in the image page, on the left")
-                .accessibilityIdentifier("ar.doc.imageZoomIn")
-
-            Divider()
-
-            Button { model.zoomTextOut() } label: { Label("Smaller Text", systemImage: "textformat.size.smaller") }
-                .help("Make the OCR text on the right smaller")
-                .accessibilityIdentifier("ar.doc.textZoomOut")
-            Button { model.zoomTextIn() } label: { Label("Larger Text", systemImage: "textformat.size.larger") }
-                .help("Make the OCR text on the right larger")
-                .accessibilityIdentifier("ar.doc.textZoomIn")
-
-            Divider()
-
-            Button { model.copyPlainSelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
-                .help("Copy the selected text exactly (⌘C)")
-            Button { model.copySelection() } label: { Label("Copy Cleaned", systemImage: "doc.on.doc.fill") }
-                .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌥⌘C)")
-            Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
-                .help("Search for text in this document (⌘F)")
-            // The tooltip sits on a wrapper, like the image switch's: a disabled button's own is not shown.
-            HStack(spacing: 0) {
-                Button { fraction = defaultFraction; model.resetZoom() } label: {
-                    Label("Reset Zoom", systemImage: "arrow.counterclockwise")
-                }
-                .keyboardShortcut("0", modifiers: [.command, .option])
-                .disabled(model.zoomIsDefault)
-                .accessibilityIdentifier("ar.doc.resetZoom")
+            Button {
+                model.setShowingAllPages(!model.showingAllPages)
+            } label: {
+                Label(model.showingAllPages ? "Read Selected Page" : "All Pages Tiled",
+                      systemImage: model.showingAllPages ? "doc.text.image" : "square.grid.2x2")
             }
-            .contentShape(Rectangle())
-            .help(model.zoomIsDefault
-                  ? "Both pages already fit their panes, with the text at its normal size"
-                  : "Fit both pages to their panes and the text to its normal size (⌥⌘0; ⌘0 fits the focused page alone)")
+            .disabled(!model.canShowAllPages)
+            .help(model.showingAllPages ? "Return to the selected scan and OCR text" : "View every PDF page as a numbered tile; click a tile to read it")
+            .accessibilityIdentifier("ar.doc.allPages")
+
+            if !model.showingAllPages {
+                imageSourceSwitch
+
+                Divider()
+
+                // W40.fix-reader-doc-toolbar: the owner could not tell the two zoom pairs apart (both were
+                // magnifying glasses) and saw the text pair and the per-pane Fit arrows do nothing — the text pair
+                // never reached a one-page PDF's text before W40.fix-reader-text-zoom, and Fit has no visible effect
+                // on a page already fitted. The text pair now shows text-size glyphs, and the two Fit buttons are
+                // gone: Reset Zoom did what both did, and ⌘0 still fits the focused pane alone.
+                Button { model.leftController.zoomOut() } label: { Label("Zoom Out Image", systemImage: "minus.magnifyingglass") }
+                    .help("Zoom out the image page, on the left")
+                    .accessibilityIdentifier("ar.doc.imageZoomOut")
+                Button { model.leftController.zoomIn() } label: { Label("Zoom In Image", systemImage: "plus.magnifyingglass") }
+                    .help("Zoom in the image page, on the left")
+                    .accessibilityIdentifier("ar.doc.imageZoomIn")
+
+                Divider()
+
+                Button { model.zoomTextOut() } label: { Label("Smaller Text", systemImage: "textformat.size.smaller") }
+                    .help("Make the OCR text on the right smaller")
+                    .accessibilityIdentifier("ar.doc.textZoomOut")
+                Button { model.zoomTextIn() } label: { Label("Larger Text", systemImage: "textformat.size.larger") }
+                    .help("Make the OCR text on the right larger")
+                    .accessibilityIdentifier("ar.doc.textZoomIn")
+
+                Divider()
+
+                Button { model.copyPlainSelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
+                    .help("Copy the selected text exactly (⌘C)")
+                Button { model.copySelection() } label: { Label("Copy Cleaned", systemImage: "doc.on.doc.fill") }
+                    .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌥⌘C)")
+                Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
+                    .help("Search for text in this document (⌘F)")
+                // The tooltip sits on a wrapper, like the image switch's: a disabled button's own is not shown.
+                HStack(spacing: 0) {
+                    Button { fraction = defaultFraction; model.resetZoom() } label: {
+                        Label("Reset Zoom", systemImage: "arrow.counterclockwise")
+                    }
+                    .keyboardShortcut("0", modifiers: [.command, .option])
+                    .disabled(model.zoomIsDefault)
+                    .accessibilityIdentifier("ar.doc.resetZoom")
+                }
+                .contentShape(Rectangle())
+                .help(model.zoomIsDefault
+                      ? "Both pages already fit their panes, with the text at its normal size"
+                      : "Fit both pages to their panes and the text to its normal size (⌥⌘0; ⌘0 fits the focused page alone)")
+            }
         }
     }
 
@@ -338,6 +357,7 @@ struct DocumentWindowView: View {
     private func configureWindow(_ window: NSWindow) {
         guard !didConfigureWindow else { return }
         didConfigureWindow = true
+        window.tabbingMode = .disallowed   // View ▸ All Pages Tiled is about pages, never window tabs.
         docWindow = window   // kept so onDisappear can persist the final size (DV-1)
         // Target: the user's remembered size, else maximize (first ever open). The `> 2` guards skip a
         // redundant setFrame when the scene's `.defaultSize` already opened at the target — avoids the

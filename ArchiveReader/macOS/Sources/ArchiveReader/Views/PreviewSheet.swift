@@ -29,7 +29,7 @@ struct PreviewSheet: View {
     /// `DocumentWindowView`), and publishing the model to the scene enables every `.disabled(doc == nil)`
     /// item in the Document menu. Without the flag, `Find…`/`Find Next`/`Find Previous` look live here and
     /// do nothing (`W26.previewzoom-fu1`). ⌘O opens the full viewer, which does have find.
-    @StateObject private var model = DocumentViewerModel(persists: false, supportsFind: false)
+    @StateObject private var model = DocumentViewerModel(persists: false, supportsFind: false, supportsPageOverview: false)
     /// The image pages drawn ahead of time, so the image arrives with the text (W40.fix-reader-preview-image-speed).
     @ObservedObject private var prefetcher = PreviewImagePrefetcher.shared
 

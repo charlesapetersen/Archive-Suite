@@ -55,6 +55,29 @@ final class DocumentViewerModel: ObservableObject {
     /// "does not write zoom to defaults" and "has no find bar" are different facts about a viewer; a future
     /// non-persisting viewer that DOES render a find bar would silently inherit the wrong answer.
     let supportsFind: Bool
+    /// The preview sheet has reading panes but no all-pages overview.
+    let supportsPageOverview: Bool
+    @Published private(set) var showingAllPages = false
+
+    var canShowAllPages: Bool { supportsPageOverview && (current?.pageCount ?? 0) > 1 }
+
+    func setShowingAllPages(_ show: Bool) {
+        showingAllPages = show && canShowAllPages
+        if showingAllPages {
+            leftController.clearSelection()
+            rightController.clearSelection()
+            textController.clearSelection()
+        }
+    }
+
+    /// A tile names a physical PDF page, including OCR pages and an odd trailing scan.
+    func openTiledPage(_ page: Int) {
+        guard let current, page >= 1, page <= current.pageCount else { return }
+        prepareFindForManualCycle()
+        // Tiles depict PDF pages. Show exactly the clicked page without changing the saved JPEG preference.
+        imageSource = .pdf
+        goToPDFPage(page)
+    }
     /// Shared renderer for the page-link payload. `nil` is an explicit degradation seam for tests;
     /// production uses the app-owned cache actor below.
     private let thumbnailer: PDFThumbnailer?
@@ -70,12 +93,13 @@ final class DocumentViewerModel: ObservableObject {
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
     /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
-    init(persists: Bool = true, supportsFind: Bool = true,
+    init(persists: Bool = true, supportsFind: Bool = true, supportsPageOverview: Bool = true,
          imageSourcePreferences: DocumentImageSourcePreferences = DocumentImageSourcePreferences(),
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         leftController = PDFPaneController(key: "left", persists: persists)
         rightController = PDFPaneController(key: "right", persists: persists)
         self.supportsFind = supportsFind
+        self.supportsPageOverview = supportsPageOverview
         self.imageSourcePreferences = imageSourcePreferences
         self.persistsImageSource = persists
         self.persistsTextScale = persists
@@ -120,6 +144,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// Step forward one page pair; past the current document's last pair, move to the next file.
     func next() {
+        showingAllPages = false
         if pair + 1 < pairCount { prepareFindForManualCycle(); setPair(pair + 1); return }
         guard index < urls.count - 1 else { return }
         prepareFindForManualCycle()
@@ -129,6 +154,7 @@ final class DocumentViewerModel: ObservableObject {
     /// Step back one page pair; before the current document's first pair, move to the previous file and
     /// land on its LAST pair, so walking backwards visits every pair rather than skipping to page 1.
     func previous() {
+        showingAllPages = false
         if pair > 0 { prepareFindForManualCycle(); setPair(pair - 1); return }
         guard index > 0 else { return }
         prepareFindForManualCycle()
@@ -228,6 +254,7 @@ final class DocumentViewerModel: ObservableObject {
     var positionLabel: String {
         guard !urls.isEmpty else { return "" }
         let file = "\(index + 1) of \(urls.count)"
+        if showingAllPages { return "\(file) · all \(current?.pageCount ?? 0) PDF pages" }
         guard pairCount > 1 else { return file }
         return "\(file) · page \(pair + 1) of \(pairCount)"
     }
@@ -320,7 +347,7 @@ final class DocumentViewerModel: ObservableObject {
     }
 
     /// Any pane has selected text — what enables Edit ▸ Copy over the viewer.
-    var hasTextSelection: Bool { plainSelection(in: .left) != nil || plainSelection(in: .right) != nil }
+    var hasTextSelection: Bool { !showingAllPages && (plainSelection(in: .left) != nil || plainSelection(in: .right) != nil) }
 
     /// The right pane is a PDFView over the OCR text page when the pair has one, else the extracted text.
     private func plainSelection(in pane: Pane) -> String? {
@@ -333,6 +360,7 @@ final class DocumentViewerModel: ObservableObject {
     /// which selects its hit in both panes of the pair, leaves two, and then the focused pane is the one
     /// that shows the hit.
     private func selectedText(_ read: (Pane) -> String?) -> String? {
+        guard !showingAllPages else { return nil }
         let other: Pane = focusedPane == .left ? .right : .left
         return read(focusedPane) ?? read(other)
     }
@@ -363,7 +391,8 @@ final class DocumentViewerModel: ObservableObject {
     /// (A very large multi-document selection therefore pauses briefly on the first search; acceptable
     /// because the viewer opens one document at a time and selections are bounded in practice.)
     func performFind() {
-        guard supportsFind else { return }      // no find bar → no query, and no highlight to clear
+        guard supportsFind else { return }
+        showingAllPages = false
         let query = findQuery
         lastFoundQuery = query
         guard !query.isEmpty else {
@@ -389,6 +418,7 @@ final class DocumentViewerModel: ObservableObject {
     /// Show the find bar and ask the view to focus its field. ⌘F and the toolbar's Find button.
     func beginFind() {
         guard supportsFind else { return }
+        showingAllPages = false
         showingFind = true
         findFocusRequest += 1
     }
@@ -396,6 +426,7 @@ final class DocumentViewerModel: ObservableObject {
     /// Move to the next match (wrapping past the last), rebuilding first if the query changed. ⌘G.
     func findNext() {
         guard supportsFind else { return }
+        showingAllPages = false
         if findQuery != lastFoundQuery { performFind(); return }
         findNavigator.next()
         refreshFindPublished()
@@ -405,6 +436,7 @@ final class DocumentViewerModel: ObservableObject {
     /// Step to the previous match (wrapping before the first), rebuilding first if the query changed. ⌘⇧G.
     func findPrevious() {
         guard supportsFind else { return }
+        showingAllPages = false
         if findQuery != lastFoundQuery { performFind(); return }
         findNavigator.previous()
         refreshFindPublished()
@@ -498,6 +530,7 @@ final class DocumentViewerModel: ObservableObject {
     /// pair instead of showing nothing. A cited OCR text page that no longer exists degrades to its
     /// pair's image page rather than focusing an empty pane.
     func goToPDFPage(_ page: Int) {
+        showingAllPages = false
         let pageIndex = max(0, page - 1)
         setPair(DocumentPagePairs.pair(ofPageIndex: pageIndex))
         // Set after `setPair` — which pulls focus off a text pane that doesn't exist — and re-check
@@ -564,6 +597,7 @@ final class DocumentViewerModel: ObservableObject {
     ]
 
     private func loadCurrent() {
+        showingAllPages = false
         pair = 0   // a newly loaded document always opens on its first page pair
         tagStatus = nil
         jpegPartnerPage = nil

@@ -5,6 +5,40 @@ import AppKit
 /// All tests run against the pre-built GUI fixture.
 final class ViewerUITests: FixtureUITestCase {
 
+    /// W40.reader-tiled-pages: run in the off-screen VM, with the generated two-page PDF fixture.
+    func testAllPagesOverview() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        let name = app.textFields["ar.filter.name"]
+        name.click()
+        name.typeText("00001")
+        settle(1)
+        XCTAssertEqual(rowCount, 1, "use the generated two-page PDF, independent of date sorting")
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        let allPages = viewMenuItem("All Pages Tiled")
+        XCTAssertTrue(allPages.isEnabled)
+        let bar = app.menuBars.element(boundBy: 0)
+        XCTAssertFalse(bar.menuItems["Show All Tabs"].exists, "window tabs must not be confused with document pages")
+        allPages.click()
+        let tile = app.buttons["ar.doc.pageTile.2"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 5), "the OCR page also has a numbered tile")
+        settle(2)   // allow the asynchronous page thumbnails to draw before the pixel capture
+        captureScreenshot("w40-tiled-pages-overview")
+        XCTAssertFalse(documentMenuItem("Zoom In").isEnabled, "pane commands do not target hidden views")
+        closeMenu()
+        tile.click()
+        XCTAssertFalse(app.buttons["ar.doc.pageTile.2"].exists)
+        XCTAssertTrue(documentMenuItem("Zoom In").isEnabled)
+        closeMenu()
+        captureScreenshot("w40-tiled-pages-open-page2")
+        viewMenuItem("All Pages Tiled").click()
+        pressKey("f", modifiers: .command)
+        XCTAssertTrue(app.textFields["ar.doc.findField"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["ar.doc.pageTile.2"].exists, "Find returns to the reading panes")
+        pressKey("w", modifiers: .command)
+    }
+
     // MARK: - Preview via toolbar (W5.d1–d4)
 
     func testPreviewOpensAndDismisses() throws {

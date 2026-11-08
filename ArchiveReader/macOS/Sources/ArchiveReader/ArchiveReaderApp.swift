@@ -27,6 +27,7 @@ struct ArchiveReaderApp: App {
     /// -only-testing:ArchiveReaderTests` never takes the owner's screen (→ `ArchiveTestHost`).
     init() {
         MainActor.assumeIsolated {
+            NSWindow.allowsAutomaticWindowTabbing = false
             ArchiveTestHost.suppressWindowsIfUnitTestHost()
 #if DEBUG
             let appearanceForced = UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
