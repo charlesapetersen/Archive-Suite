@@ -19,8 +19,55 @@ final class TransientStateUITests: NotesFixtureUITestCase {
     static let links = [TransientLink(first: "an.detail.header", second: "an.editor.text")]
 
     private var plant = false
+    private var pinnedLayout: Layout? = .sideBySide
+    override var layoutLaunchArguments: [String] { pinnedLayout.map(Self.layoutArguments) ?? [] }
     override var extraLaunchArguments: [String] {
         TransientCheck.launchArguments(sections: Self.sections, links: Self.links, plant: plant)
+    }
+
+    /// W40.fix-notes-inspector-flicker: resizing the note for the inspector must not make it blink or reverse
+    /// direction. Exercise the toolbar and the menu/shortcut separately: each used to request its own animation.
+    /// Record this test with TRANSIENT_VIDEO=1 to check the rendered text and source chip between settled states.
+    func testInspectorTogglesKeepTheNoteStableInBothLayouts() throws {
+        pinnedLayout = nil
+        try withFixture {
+            let window = mainWindow
+            _ = selectItem(uuid: Self.idReader)
+            let editor = window.textViews["an.editor.text"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            let body = editor.value as? String
+            XCTAssertFalse(body?.isEmpty ?? true, "exercise a loaded note with a source chip")
+            let inspector = window.descendants(matching: .any)["an.inspector"].firstMatch
+            let toggle = window.buttons["an.inspector.toggle"].firstMatch
+            @MainActor func menu(_ title: String) {
+                app.menuBars.menuBarItems["View"].click()
+                app.menuItems[title].click()
+            }
+            defer { menu("Side by Side") }
+            if !inspector.exists { toggle.click() }
+            for (layout, title) in [(Layout.sideBySide, "Side by Side"), (.stacked, "List Above Note")] {
+                menu(title)
+                assertLayout(layout, in: window)
+                for route in ["toolbar", "shortcut", "menu"] {
+                    for showing in [false, true] {
+                        TransientCheck.check("\(layout.rawValue) \(route) \(showing ? "show" : "hide") inspector",
+                                             in: app, test: self) {
+                            switch route {
+                            case "toolbar": toggle.click()
+                            case "shortcut": app.typeKey("i", modifierFlags: [.command, .option])
+                            default: menu(showing ? "Show Inspector" : "Hide Inspector")
+                            }
+                        }
+                        XCTAssertEqual(inspector.exists, showing)
+                        XCTAssertEqual(editor.value as? String, body, "the same note stays loaded")
+                    }
+                }
+                let url = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("uitest-inspector-stable-\(layout.rawValue).png")
+                try window.screenshot().pngRepresentation.write(to: url)
+                print("[shot] inspector-stable-\(layout.rawValue): wrote \(url.path)")
+            }
+        }
     }
 
     func testCommonTransitionsShowNoTransientState() throws {

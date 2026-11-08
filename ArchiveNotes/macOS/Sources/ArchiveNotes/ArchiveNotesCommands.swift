@@ -191,7 +191,7 @@ struct LayoutCommands: Commands {
     var body: some Commands {
         CommandGroup(before: .toolbar) {
             Button(showingInspector ? "Hide Inspector" : "Show Inspector") {
-                withAnimation { showingInspector.toggle() }
+                showingInspector.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
             Divider()

@@ -90,7 +90,6 @@ struct NotesBrowserView: View {
                              id: "an.divider.inspector")
                 NoteInspectorPanel(nav: nav)
                     .frame(width: inspectorWidth)
-                    .transition(.move(edge: .trailing))
             }
         }
         // The list needs 527 pt for its fixed filter controls in the VM; reserve 540 so its
@@ -102,7 +101,9 @@ struct NotesBrowserView: View {
         // moved to the inspector that is less than the side-by-side floor, which then holds (W40.notes-detail-layout).
         .frame(minHeight: max(560, layoutMode == .stacked ? NotesLayoutSettings.stackedMinHeight : 0))
         .animation(.easeInOut(duration: 0.18), value: showingTree)
-        .animation(.easeInOut(duration: 0.18), value: showingInspector)
+        // Open the inspector in one layout pass. Animating the shell repeatedly resizes/reflows TextKit and
+        // triggers its resize scroll restoration, making the note move rapidly (especially when stacked).
+        .animation(nil, value: showingInspector)
         .background(indexReadyProbe)                               // hidden XCUITest index-ready signal (§3.4)
         .background(NotesWindowAccessor { configureWindow($0) })   // restore/remember window size (DV-1)
         .task { await model.bootstrap() }   // open the store + load organization + items (idempotent)
@@ -218,7 +219,7 @@ struct NotesBrowserView: View {
         }
         ToolbarItem(placement: .primaryAction) {
             Button {
-                withAnimation { showingInspector.toggle() }
+                showingInspector.toggle()
             } label: {
                 Image(systemName: "sidebar.right")
             }
