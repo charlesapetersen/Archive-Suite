@@ -205,20 +205,16 @@ final class NavigationUITests: FixtureUITestCase {
         let all = tagCount()
         XCTAssertGreaterThan(all, 0, "Tag cloud should show tags when open")
 
-        // The panel's `ar.tagCloud` identifier covers its children, so the stepper is found by its label.
-        let stepper = app.steppers["Minimum files per tag"]
-        if !stepper.waitForExistence(timeout: 3) {
-            print("[tagcloud-tree] \(app.windows.firstMatch.debugDescription)")
-        }
-        XCTAssertTrue(stepper.exists, "the minimum-count control should be in the panel")
-        let increment = stepper.incrementArrows.firstMatch
-        XCTAssertTrue(increment.waitForExistence(timeout: 3), "the control should have an increment arrow")
+        // The panel's identifier covers its children, so find the slider by its label.
+        let slider = app.sliders["Minimum files per tag"]
+        XCTAssertTrue(slider.waitForExistence(timeout: 3), "the minimum-count slider should be in the panel")
+        XCTAssertEqual(app.steppers.matching(identifier: "Minimum files per tag").count, 0)
 
-        // The fixture has 12 files, so a minimum of 13 hides every tag; stop as soon as the count drops.
-        for _ in 0..<13 where tagCount() == all {
-            increment.click()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        }
+        // One drag reaches above the most common tag's count, hiding every tag in this fixture.
+        slider.adjust(toNormalizedSliderPosition: 1)
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagCount() == 0 }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [hidden], timeout: 3), .completed,
+                       "the slider should hide rare tags immediately")
         XCTAssertLessThan(tagCount(), all, "raising the minimum should hide the tags on fewer files")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'On at least'")).firstMatch.exists
                       || app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'On at least'")).firstMatch.exists,
@@ -227,6 +223,11 @@ final class NavigationUITests: FixtureUITestCase {
                       || app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' of '")).firstMatch.exists,
                       "the header should say how many of the tags are shown")
         captureScreenshot("tagcloud-min-count")
+        slider.adjust(toNormalizedSliderPosition: 0)
+        let restored = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in tagCount() == all }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [restored], timeout: 3), .completed,
+                       "dragging back should show every tag")
+        captureScreenshot("tagcloud-min-count-restored")
         button.click()
     }
 

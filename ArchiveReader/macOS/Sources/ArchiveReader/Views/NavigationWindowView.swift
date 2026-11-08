@@ -350,17 +350,9 @@ struct NavigationWindowView: View {
                     .foregroundStyle(.primary).font(.caption)
             }
             .padding([.horizontal, .top], 10)
-            // Hides the tags used on fewer than N of the visible files; remembered between launches. The panel's
-            // `ar.tagCloud` identifier covers it, so UI tests find it by its label.
-            Stepper(value: $tagCloudMinCount, in: 1...999) {
-                Text(tagCloudMinCount == 1 ? "Showing every tag" : "On at least \(tagCloudMinCount) files")
-                    .font(.caption).foregroundStyle(.primary)
-            }
-            .controlSize(.small)
-            .help("Hide the tags used on fewer files than this")
-            .accessibilityLabel("Minimum files per tag")
-            .accessibilityValue("\(tagCloudMinCount)")
-            .padding(.horizontal, 10).padding(.vertical, 6)
+            TagCloudThresholdControl(minimumCount: $tagCloudMinCount,
+                                     maximumCount: allTags.map(\.count).max() ?? 1)
+                .padding(.horizontal, 10).padding(.vertical, 6)
             Divider()
             if cloud.isEmpty {
                 Text(allTags.isEmpty ? "No tags in the current view."
@@ -1004,5 +996,26 @@ final class ContextMenuActions: NSObject {
     @objc func setDisplayCalendar(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let calendar = DisplayCalendar(rawValue: raw) else { return }
         model.setDisplayCalendar(calendar)
+    }
+}
+
+/// The unfiltered cloud sets the range so hiding rare tags does not rescale the slider while dragging.
+/// Include a remembered threshold above this scope's counts so opening a smaller folder never changes it.
+struct TagCloudThresholdControl: View {
+    @Binding var minimumCount: Int
+    let maximumCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(minimumCount == 1 ? "Showing every tag" : "On at least \(minimumCount) files")
+                .font(.caption).foregroundStyle(.primary)
+            Slider(value: Binding(get: { Double(minimumCount) },
+                                  set: { minimumCount = Int($0.rounded()) }),
+                   in: 1...Double(max(2, maximumCount + 1, minimumCount)), step: 1)
+                .controlSize(.small)
+                .help("Hide the tags used on fewer files than this")
+                .accessibilityLabel("Minimum files per tag")
+                .accessibilityValue("\(minimumCount)")
+        }
     }
 }

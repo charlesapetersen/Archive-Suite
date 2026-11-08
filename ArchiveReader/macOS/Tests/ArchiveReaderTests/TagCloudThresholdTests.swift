@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import ArchiveReader
 
 /// W40.fix-reader-tagcloud-threshold: the tag cloud's minimum-count control.
@@ -26,6 +27,20 @@ final class TagCloudThresholdTests: XCTestCase {
 
     func testATagInTheFilterInAnotherCaseStays() {
         XCTAssertEqual(tags(4, keeping: ["budget"]), ["Budget", "Jerry Brown"], "case variants are one tag")
+    }
+
+    @MainActor
+    func testThresholdControlRendersAtMinimumPanelWidth() throws {
+        for scheme in [ColorScheme.light, .dark] {
+            for minimum in [1, 7, 999] {
+                let control = TagCloudThresholdControl(minimumCount: .constant(minimum), maximumCount: 12)
+                    .padding(10).environment(\.colorScheme, scheme)
+                let view = NSHostingView(rootView: control)
+                let png = try XCTUnwrap(RenderProbe.pngData(fromAppKitView: view, size: CGSize(width: 160, height: 70)))
+                writeRenderArtifact(png, named: "tagcloud-threshold-\(minimum)-\(scheme).png")
+                assertRendersNonBlank(RenderProbe.cgImage(fromPNG: png), "tag cloud threshold")
+            }
+        }
     }
 
     func testTheMinimumIsResetOnAFixtureUITestLaunch() {

@@ -2,6 +2,16 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-tagcloud-slider, 2026-11-08) — drag the tag cloud threshold
+
+The minimum-file threshold is now a slider with an explicit count label. It uses whole numbers, spans the
+current view's tag counts plus one (so all tags can be hidden), and keeps a remembered higher threshold
+when browsing a smaller scope. The same AppStorage key remembers the choice between launches. Tags in the
+active filter remain clickable even below the threshold. Narrow-panel light/dark render checks cover 1, 7
+and a remembered 999; their images were inspected. Reader smoke: 726 tests, three skipped, zero failures;
+write-surface lint and all 25 mutation checks passed. NavigationUITests.testTagCloudMinimumCountHidesRareTags passed in the macOS 27.2 VM, dragging to hide
+all fixture tags and back to show every tag; both screenshots were inspected.
+
 ## ✅ CLOSED (W40.fix-reader-sort-indicator-icons, 2026-11-08) — sort carets on the icon columns
 
 The Flag and Needs attention headers now draw a compact up/down caret for the primary sort. AppKit
