@@ -14843,3 +14843,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 - [x] **W40.fix-reader-link-status-line — No explanation in the status line after copying a link [XS · S4]** (lane: reader) (uses: build) — Found by the owner's Reader guided session 2, 2026-11-06 (`verification/sessions/reader-2-returned.md`, row 25); the owner's call: fix everything on the form, the B rows first. The status line's note of where a link opens (W40.fix-reader-link-paste-help, session 1 row 38) is not needed (owner); the copy confirmation stays. · §W40 · SHIPPED 2026-11-08 (this commit).
   The status line keeps only the singular/plural copy confirmation; opening instructions remain in the README. The existing scratch link-copy regression checks the exact messages, alongside its link round-trip and file/marker/tag preservation assertions. Verified: Reader smoke passed (726 tests, 3 skipped, zero failures); write-surface lint and all 25 mutation proofs passed; separate diff review clear. This wording-only change keeps the existing status-line view and binding. No rehearsal-cache scratch was created or retained; the smoke log is kept in /private/tmp/W40.fix-reader-link-status-line-smoke.log.
   <!-- /W40.fix-reader-link-status-line -->
+
+- [x] **W40.reader-tiled-pages — View all pages of a multi-page document tiled, and a clear View menu [S-M · S4]** · §W40 · SHIPPED 2026-11-08 (this commit) (lane: reader) (uses: build,vm) — Found by the owner's Reader guided session 2, 2026-11-06 (`verification/sessions/reader-2-returned.md`, row 9); the owner's call: fix everything on the form, the B rows first. The owner was not sure what View ▸ Show All Tabs does (macOS window tabbing): turn window tabbing off for the document window, or say what it is for. For multi-page documents, add a view of all pages tiled. The Reader's VM UITests do not pass on macOS 27 until `W40.vm-macos27-reader`; verify with the unit bundle and the render guards, and name the UITest still to run.
+
+  Added View ▸ All Pages Tiled and a toolbar toggle: numbered lazy thumbnails of every physical PDF page,
+  click-to-read into its scan/OCR pair, and return-to-reading for Find/cycling. Hidden-pane actions are
+  disabled. Tiles open the exact PDF page even from JPEG mode, preserving the saved JPEG preference.
+  Automatic window tabbing is off; document windows disallow tabs, and Show All Tabs is absent from View.
+  Reader smoke: 731 tests, 3 skipped, 0 failures; no new compiler warnings. Five-page scratch navigation,
+  byte-unchanged and pixel guards plus the paired-JPEG regression pass; all five tile PNGs inspected.
+  ViewerUITests.testAllPagesOverview passed in the macOS 27.2 off-screen VM (1 test, 0 failures); both
+  screenshots inspected. The original broader-suite warning remains W40.vm-macos27-reader; this focused
+  check needs no deferral. Separate adversarial review and write-surface lint + 25/25 mutation checks passed.
+  Implementation checkpoint: ac603551. No rehearsal-cache inputs created; retained only temporary
+  verification logs, result bundle and screenshots for audit. No paid run or real-corpus access.
+  <!-- /W40.reader-tiled-pages -->

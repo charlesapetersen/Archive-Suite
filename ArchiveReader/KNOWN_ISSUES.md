@@ -2,6 +2,24 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.reader-tiled-pages, 2026-11-08) — all PDF pages tiled, without window tabs
+
+View ▸ All Pages Tiled and the document toolbar show numbered tiles for every physical PDF page,
+including OCR pages and an odd trailing scan. Click a tile to read its scan/OCR pair; the toolbar returns
+to the selected page. Find and page cycling also return to reading. Pane-only commands are disabled in
+the overview. Tiles always open the PDF page even when the JPEG original was selected, without changing
+the saved JPEG preference. Rendering is serial, off-main and read-only; offscreen tiles release their
+bitmaps. The preview sheet keeps its existing reading view. Automatic window tabbing is off, and document
+windows disallow it; View no longer offers Show All Tabs.
+
+Reader smoke passed: 731 tests, three skipped, zero failures; no new compiler warnings. Five-page scratch
+coverage verifies page/focus mapping, find/cycling, unavailable/invalid inputs, distinct rendered tiles and
+unchanged PDF bytes; the paired-JPEG regression passes. All five headless tile PNGs were inspected.
+ViewerUITests.testAllPagesOverview passed in the macOS 27.2 VM, including the absent Show All Tabs item,
+OCR-tile opening and Find's return to reading; both screenshots were inspected. Separate adversarial review,
+write-surface lint and its 25 mutation checks passed. The broader VM suite remains tracked by
+W40.vm-macos27-reader; this feature's focused interaction check is verified.
+
 ## ✅ CLOSED (W40.fix-reader-tagcloud-slider, 2026-11-08) — drag the tag cloud threshold
 
 The minimum-file threshold is now a slider with an explicit count label. It uses whole numbers, spans the
