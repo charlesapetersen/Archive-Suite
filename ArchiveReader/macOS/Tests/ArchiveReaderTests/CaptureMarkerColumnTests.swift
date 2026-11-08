@@ -5,7 +5,7 @@ import ArchiveCore
 
 /// The page-2 classification column, named Capture marker since W40.fix-reader-columns (it was Provenance),
 /// and the list's other column affordances from that item: header tooltips, the ⚑ and ⚠︎ sorts, and the
-/// visible column chooser that shares `NavigationModel.hiddenColumns` with the header's menu.
+/// header column chooser that writes `NavigationModel.hiddenColumns`.
 @MainActor
 final class CaptureMarkerColumnTests: XCTestCase {
     func testCaptureMarkerColumnIsNamedAndExplainedAndHiddenOnlyByChoice() throws {

@@ -132,7 +132,7 @@ final class NavigationModel: ObservableObject {
     /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
     /// Missing/unindexed rows stay absent and render as an em dash; classification never drives a write.
     @Published private(set) var classifications: [String: String] = [:]
-    /// The list columns the user has hidden, from the Columns chip or the header's menu (W40.fix-reader-columns).
+    /// The list columns the user has hidden, from the header's menu (W40.fix-reader-columns-in-header).
     @Published var hiddenColumns: Set<String> = [] {
         didSet { if hiddenColumns != oldValue { AppSettings.setHiddenColumns(hiddenColumns, in: defaults) } }
     }

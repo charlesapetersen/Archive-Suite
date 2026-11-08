@@ -248,9 +248,10 @@ writes against the real corpus — always a copy.
   Columns: ⚑ Flag, ⚠︎ Needs attention, Document date, File name, File type, File tags, Quality, Read, plus the
   display-only **Capture marker** (`Box`/`Folder`/`Document Start`/`Continuation`, the page-2 `Classification:`
   line; `W18.reader-breadcrumb`, named Provenance until `W40.fix-reader-columns`). Every header has a tooltip and
-  every column but Capture marker sorts (⚑ and ⚠︎ put the marked files first). Columns are chosen from the filter
-  bar's **Columns** chip or the header's right-click menu; both write `NavigationModel.hiddenColumns`, which
-  persists. Capture marker is hidden while no file in the library has a marker, since files made before the apps
+  every column but Capture marker sorts (⚑ and ⚠︎ put the marked files first). Right-click any column header
+  to show or hide columns, as in Finder (W40.fix-reader-columns-in-header). The menu writes
+  `NavigationModel.hiddenColumns`, which persists; File name is always shown. Capture marker is hidden while
+  no file in the library has a marker, since files made before the apps
   have none. It names the kind of capture, not the container a file is in (that is `W47.ct-reader-view`'s
   Container column).
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
@@ -497,7 +498,7 @@ Views/
                               cell view itself, so ContextMenuTableView hands it on — W40.fix-reader-read-toggle);
                               ContextMenuTableView + ContextMenuActions trampoline to NavigationModel;
                               column tooltips + chooser titles live in `columnDefinitions`; the header
-                              menu and the Columns chip both set `NavigationModel.hiddenColumns`.
+                              menu sets `NavigationModel.hiddenColumns`.
                               Text cells are TintedTextCellView: a `tint` (normal, emphasized) follows the
                               row's selection. Type and Read labels use primary/selected text colours;
                               Unread is semibold (W40.fix-reader-a11y-contrast). ReaderColors supplies

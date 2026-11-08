@@ -19,7 +19,7 @@ struct AppKitTableView: NSViewRepresentable {
         let sortField: SortField?
         /// Gives and takes width when the table's space changes (the tag cloud opening, the window resizing).
         var flexible = false
-        /// The name in the Columns chip and the header's menu, where a bare ⚑ or ⚠︎ says nothing.
+        /// The name in the header's menu, where a bare ⚑ or ⚠︎ says nothing.
         var menuTitle: String? = nil
         /// The header's tooltip: what the column shows and how it sorts (W40.fix-reader-columns).
         var toolTip = ""
@@ -30,7 +30,7 @@ struct AppKitTableView: NSViewRepresentable {
     /// The page-2 `Classification:` column. Its id predates the column's name, Capture marker.
     static let captureMarkerColumnID = "classification"
 
-    /// One source for construction, the Columns chip, the header's menu and tests.
+    /// One source for construction, the header's menu and tests.
     static let columnDefinitions: [ColumnDefinition] = [
         .init(id: "flag", title: "⚑", width: 26, minWidth: 26, maxWidth: 30, sortField: .flag,
               menuTitle: "⚑ Flag",
@@ -252,7 +252,7 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
-        // Shown or hidden from the Columns chip or the header's menu, or Capture marker's first value arriving.
+        // Shown or hidden from the header's menu, or Capture marker's first value arriving.
         if coordinator.applyHiddenColumns(model.effectiveHiddenColumns, to: tableView) {
             coordinator.columnFitter?.fit()
         }
@@ -1321,8 +1321,8 @@ final class WrappingTokenField: NSTokenField {
 // MARK: - Column-picker header view
 
 /// Right-click the table header → a menu with checkmark toggles for each column plus sort options.
-/// "File name" is always visible (disabled toggle); all others can be hidden, from here or the filter bar's
-/// Columns chip; both write `NavigationModel.hiddenColumns`. If the clicked column is sortable, a
+/// "File name" is always visible (disabled toggle); the other available columns can be hidden.
+/// Choices write `NavigationModel.hiddenColumns`. If the clicked column is sortable, a
 /// secondary-sort section lets the user set it without Option-clicking.
 @MainActor
 final class ColumnPickerHeaderView: NSTableHeaderView {
@@ -1342,6 +1342,8 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     override func menu(for event: NSEvent) -> NSMenu? {
         guard let tv = tableView else { return nil }
         let menu = NSMenu(title: "Columns")
+        // Availability is explicit: AppKit must not re-enable the fixed name or absent Capture marker.
+        menu.autoenablesItems = false
 
         // Column visibility toggles
         for col in tv.tableColumns {
@@ -1408,7 +1410,8 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     }
 
     @objc private func toggleColumn(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String,
+        guard let id = sender.representedObject as? String, id != "name",
+              isColumnAvailable?(id) ?? true,
               let col = tableView?.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
         onSetColumnVisible?(id, col.isHidden)
     }

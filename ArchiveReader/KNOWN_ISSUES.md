@@ -2,6 +2,17 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-columns-in-header, 2026-11-08) — choose columns from the headers
+
+Right-click a list column header to show or hide columns, as in Finder (Reader session 2, row 3).
+The filter bar's Columns chip is removed. Hidden columns remain in the header menu so they can be shown
+again, and choices persist between launches. File name stays checked and disabled; Capture marker is
+disabled while no file has one. Explicit menu validation and action guards protect those fixed choices.
+Existing secondary-sort commands remain in the same menu. ColumnHeaderMenuTests covers the real menu's
+validation, hide/show actions, persistence, unchanged sort and an off-screen header render;
+ColumnHeaderUITests.testHeaderMenuShowsAndHidesAColumn passed in the macOS 27.2 VM; all three screenshots
+were inspected. Reader smoke: 724 tests, three skipped, zero failures; write-surface lint clean.
+
 ## ✅ CLOSED (W40.fix-reader-in-effect-folder, 2026-11-08) — In effect shows filters and searches
 
 The ordinary sidebar folder no longer appears as an In effect chip (Reader session 2, row 5). Smart folders

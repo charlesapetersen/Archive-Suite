@@ -14819,3 +14819,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Followed returned row 5: the ordinary sidebar folder is omitted; smart-folder/Advanced Search scopes remain because their saved rules narrow the list even after Clear All. Empty explanations and Clear Folder recovery retain the location. Clearing a search leaves the sidebar selection intact.
   Verification: Reader unit smoke passed (722 tests, 3 skipped, zero failures, including scratch ActiveFiltersTests and render guards), write-surface lint and all 25 mutation proofs passed, independent diff review clear, and both focused VM checks passed (navigation folder/search transition and smart-folder counts/previews); screenshots inspected. No item-owned rehearsal cache was created or retained.
   <!-- /W40.fix-reader-in-effect-folder -->
+
+- [x] **W40.fix-reader-columns-in-header — Columns are turned on and off from the column headers [S · S4]** · §W40 · SHIPPED 2026-11-08 (this commit). (lane: reader) — Found by the owner's Reader guided session 2, 2026-11-06 (`verification/sessions/reader-2-returned.md`, row 3); the owner's call: fix everything on the form, the B rows first. The Columns chip works; the owner would rather have it built into the columns (the header's right-click menu, as in Finder), if possible. If the header menu is added, the chip may go. The Reader's VM UITests do not pass on macOS 27 until `W40.vm-macos27-reader`; verify with the unit bundle and the render guards, and name the UITest still to run.
+  Right-click a column header to hide/show columns; the redundant filter-bar chip is removed. Menu validation
+  keeps File name and unavailable Capture marker disabled, and action dispatch guards those choices. Hidden
+  columns stay listed for restoration; the existing defaults and sort commands remain. ColumnHeaderMenuTests
+  covers the real menu, persistence, hide/show and a header render; ColumnHeaderUITests replaces the chip test
+  with live header interaction. No bench-cache scratch was created. Reader smoke: 724 tests, three skipped, zero failures; write-surface
+  lint clean. The header render attachment and all three VM screenshots were inspected. Focused macOS 27.2 VM run:
+  ColumnHeaderUITests.testHeaderMenuShowsAndHidesAColumn passed (one test, zero failures); no check deferred.
+  VM screenshots/results retained in /private/tmp/w40-reader-columns-vm and the exported header render in
+  /private/tmp/w40-reader-columns-render for review.
+  <!-- /W40.fix-reader-columns-in-header -->
