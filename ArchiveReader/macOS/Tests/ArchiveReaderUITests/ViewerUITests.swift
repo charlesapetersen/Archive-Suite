@@ -287,6 +287,13 @@ final class ViewerUITests: FixtureUITestCase {
         XCTAssertTrue(waitForStatus("Marked 1 Read."), "⌘R marks the open file: \(status.accessibilityText)")
         pressKey("z", modifiers: .command)
         XCTAssertTrue(waitForStatus("Undid 1"), "⌘Z undoes it: \(status.accessibilityText)")
+        XCTAssertTrue(status.accessibilityText.contains("Read state: “Read” → “Unread”"), status.accessibilityText)
+        captureScreenshot("w40-undo-status-document-detail")
+        pressKey("z", modifiers: [.command, .shift])
+        XCTAssertTrue(waitForStatus("Redid 1"), "⇧⌘Z redoes it: \(status.accessibilityText)")
+        XCTAssertTrue(status.accessibilityText.contains("Read state: “Unread” → “Read”"), status.accessibilityText)
+        pressKey("z", modifiers: .command)
+        XCTAssertTrue(waitForStatus("Undid 1"))
 
         pressKey("w", modifiers: .command)
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))

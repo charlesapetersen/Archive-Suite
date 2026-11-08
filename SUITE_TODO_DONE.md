@@ -14792,3 +14792,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   /tmp/reader-inspector-* for review. No real corpus access,
   paid calls or ArchiveSuiteRehearsal scratch/cache was created; no bench inputs were retained.
   <!-- /W40.reader-edit-info-inspector -->
+
+- [x] **W40.fix-reader-undo-status-detail — The status line names what Undo and Redo changed, and to what [S · S4]** (lane: reader) (uses: build) — Found by the owner's Reader guided session 2, 2026-11-06 (`verification/sessions/reader-2-returned.md`, row 13); the owner's call: fix everything on the form, the B rows first. It says only "Undo 1 change" and "Redid 1 change"; say which file, which field and from what to what (for several files, a count and the change). · §W40 · SHIPPED 2026-11-08 (this commit).
+  Undo and Redo now name the changed file (or distinct file count), the field and its before/after
+  values, using only verified write results. Subjects show exact added/removed occurrences without claiming
+  unrelated tags vanished; grouped files share counted descriptions. Successive writes coalesce only when
+  snapshots are continuous, so a concurrent edit is never attributed to Undo. Partial failures and retries
+  retain their existing warnings. The document window uses the same completed status, with full hover help.
+  Verification: Reader unit smoke (718 tests, 3 platform skips, no failures), scratch undo/redo and status
+  cases, write-surface lint and 25 mutation proofs, independent adversarial review, and two passing VM tests:
+  NavigationUITests.testLedgerUndoShowsVerifiedResultOnScratchFixture and ViewerUITests.testMenusFollowTheDocumentWindow.
+  Read all three screenshots: library Undo/Redo and document Undo show the full detail. Evidence retained in
+  /private/tmp/reader-undo-status-vm-20261108 and /private/tmp/reader-undo-status-unit-20261108.log.
+  No paid calls, real corpus access or ArchiveSuiteRehearsal cache/scratch was created or retained.
+  <!-- /W40.fix-reader-undo-status-detail -->

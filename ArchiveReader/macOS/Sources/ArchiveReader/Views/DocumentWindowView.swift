@@ -322,6 +322,7 @@ struct DocumentWindowView: View {
             Text(model.title).lineLimit(1).truncationMode(.middle)
             if let status = model.tagStatus {
                 Text(status).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    .help(status)
                     .accessibilityIdentifier("ar.doc.tagStatus")
             }
             Spacer()

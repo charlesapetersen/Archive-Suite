@@ -85,6 +85,7 @@ final class RedoTagChangeTests: XCTestCase {
         m.redoLast()
         XCTAssertEqual(Set(try tags(a)), ["Unread", "First"])
         XCTAssertEqual(Set(try tags(b)), ["Unread", "First"])
+        XCTAssertEqual(m.statusMessage, "Redid 2 changes in 2 files: Subjects: added “First” (2 files).")
         m.redoLast()
         XCTAssertEqual(Set(try tags(a)), ["Unread", "First", "Second"])
         XCTAssertEqual(m.redoDepth, 0)
@@ -115,6 +116,7 @@ final class RedoTagChangeTests: XCTestCase {
         XCTAssertEqual(m.redoDepth, 1)
         m.redoLast()
         XCTAssertEqual(try tags(url).sorted(), ["Other", "Unread", "X"], "no second X; the other edit survives")
+        XCTAssertEqual(m.statusMessage, "Redid 0 changes.")
     }
 
     func testRedoRefusesAReplacedFile() throws {

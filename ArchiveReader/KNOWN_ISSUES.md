@@ -2,6 +2,17 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-undo-status-detail, 2026-11-08) — Undo and Redo describe the verified change
+
+The status names the file, field and before/after values; groups count distinct files and combine matching
+changes. Subject changes list precise added/removed tokens, preserving duplicate and case differences.
+Descriptions come from the actual verified writes, so a concurrent edit, a no-op or a failed member is not
+reported as a successful reversal. Multiple writes to one file combine only across continuous snapshots.
+Failure counts and retry guidance remain visible. The document window shares the completed status and offers
+its full text on hover. Scratch undo/redo tests cover relaunch, groups, partial retries and document routing;
+`TagChangeStatusTests` covers dates, labels, occurrences and external edits between writes. The focused VM
+ledger-undo check now asserts Undo and Redo details and screenshots both before restoring the scratch tags.
+
 ## ✅ CLOSED (W40.reader-edit-info-inspector, 2026-11-07) — Edit Info stays open beside the files
 
 ⌘I and the library toolbar show or hide a resizable right-hand inspector. It follows the visible selection

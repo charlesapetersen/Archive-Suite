@@ -68,19 +68,14 @@ struct DocumentTagActions {
 
     func undo() {
         guard let navigation, canUndo else { return }
-        // The ledger is shared with the list, so the newest change may be on another file: name it.
-        let names = navigation.nextUndoFileNames()
         navigation.undoLast()
-        let shown = names.prefix(3).joined(separator: ", ") + (names.count > 3 ? ", …" : "")
-        viewer.tagStatus = navigation.statusMessage + (names.isEmpty ? "" : " (\(shown))")
+        viewer.tagStatus = navigation.statusMessage
     }
 
     func redo() {
         guard let navigation, canRedo else { return }
-        let names = navigation.nextRedoFileNames()
         navigation.redoLast()
-        let shown = names.prefix(3).joined(separator: ", ") + (names.count > 3 ? ", …" : "")
-        viewer.tagStatus = navigation.statusMessage + (names.isEmpty ? "" : " (\(shown))")
+        viewer.tagStatus = navigation.statusMessage
     }
 }
 

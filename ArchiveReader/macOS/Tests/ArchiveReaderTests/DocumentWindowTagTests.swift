@@ -75,7 +75,10 @@ final class DocumentWindowTagTests: XCTestCase {
         doc.undo()
         XCTAssertEqual(try tagsOnDisk(fixture.files[1]), ["Unread", "Smith"])
         XCTAssertEqual(model.undoDepth, 0)
-        XCTAssertEqual(doc.viewer.tagStatus, "Undid 1 change. (beta.pdf)", "the status names the file it reverted")
+        XCTAssertEqual(doc.viewer.tagStatus, "Undid 1 change in beta.pdf: Read state: “Read” → “Unread”.", "the status names the file it reverted")
+        doc.redo()
+        XCTAssertEqual(try tagsOnDisk(fixture.files[1]), ["Read", "Smith"])
+        XCTAssertEqual(doc.viewer.tagStatus, "Redid 1 change in beta.pdf: Read state: “Unread” → “Read”.")
     }
 
     func testUndoIsOffInFindButAvailableWhileTheInspectorIsOpen() throws {

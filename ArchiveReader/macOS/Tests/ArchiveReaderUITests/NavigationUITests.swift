@@ -672,12 +672,21 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(undo.isEnabled)
         undo.click()
         XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"]))
-        XCTAssertTrue(app.staticTexts["Undid 1 change."].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Undid 1 change in \(name): Read state: “Read” → “Unread”."].waitForExistence(timeout: 5))
         let afterTags = try XCTUnwrap(URL(fileURLWithPath: path).resourceValues(forKeys: [.tagNamesKey]).tagNames)
         XCTAssertEqual(beforeTags.sorted(), afterTags.sorted())
         XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), beforeBytes)
         XCTAssertFalse(undo.isEnabled, "inverse records cannot become redo candidates")
         captureScreenshot("w40-audit-ledger-undo-verified")
+        app.menuBars.menuBarItems["Tags"].click()
+        app.menuItems["Redo Tag Change"].click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Read"], excluding: ["Unread"]))
+        XCTAssertTrue(app.staticTexts["Redid 1 change in \(name): Read state: “Unread” → “Read”."]
+            .waitForExistence(timeout: 5))
+        captureScreenshot("w40-undo-status-redo-detail")
+        undo.click()
+        XCTAssertTrue(waitForTags(on: name, containing: ["Unread"], excluding: ["Read"]))
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), beforeBytes)
     }
 
     /// W40.fix-reader-sent-with-date (ledger R-26): the ⌘I sheet is the one date editor, so it sets, flags and

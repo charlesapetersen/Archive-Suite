@@ -1613,7 +1613,7 @@ final class NavigationModel: ObservableObject {
     /// or (`redo`) a redo of an undo.
     private func reverse(_ batch: [AuditLedger.Entry], redo: Bool) {
         guard let group = batch.first?.group else { return }
-        let verb = redo ? "redo" : "undo", verbed = redo ? "Redid" : "Undid", undone = redo ? "redone" : "undone"
+        let verb = redo ? "redo" : "undo", undone = redo ? "redone" : "undone"
         // Reserve durably before the first inverse. An append failure must never allow a later
         // relaunch to replay a non-idempotent occurrence addition.
         guard redo ? AuditLedger.shared.beginRedo(group) : AuditLedger.shared.beginUndo(group) else {
@@ -1658,8 +1658,7 @@ final class NavigationModel: ObservableObject {
         let kept = AuditLedger.shared.keepForRetry(retryable.reversed(), of: group, redo: redo) ? retryable.count : 0
         library.applyVerifiedWrites(verified)
         refreshUndoHistory()
-        let changed = verified.filter { !$0.isNoOp }.count
-        var message = "\(verbed) \(changed) change\(changed == 1 ? "" : "s")"
+        var message = TagChangeStatus.reversal(verified, redo: redo)
         if !failures.isEmpty {
             message += "; \(failures.count) could not be \(undone) (\(failures.prefix(3).joined(separator: ", ")))."
             if kept > 0 {

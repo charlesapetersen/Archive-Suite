@@ -64,7 +64,7 @@ final class UndoDurabilityTests: XCTestCase {
         XCTAssertEqual(relaunched.undoDepth, 1)
         relaunched.undoLast()
         XCTAssertEqual(try tags(fixture.files[0]), ["Unread"])
-        XCTAssertEqual(relaunched.statusMessage, "Undid 1 change.")
+        XCTAssertEqual(relaunched.statusMessage, "Undid 1 change in a.pdf: Read state: “Read” → “Unread”.")
         XCTAssertEqual(NavigationModel(defaults: defaults).undoDepth, 0, "a consumed action never returns")
     }
 
@@ -110,7 +110,7 @@ final class UndoDurabilityTests: XCTestCase {
         model.undoLast()
         XCTAssertEqual(try tags(fixture.files[0]), ["Unread"])
         XCTAssertEqual(try tags(fixture.files[1]), ["Read"], "precondition: the lock made b's undo fail")
-        XCTAssertEqual(model.statusMessage, "Undid 1 change; 1 could not be undone (b.pdf). Undo again to retry.")
+        XCTAssertEqual(model.statusMessage, "Undid 1 change in a.pdf: Read state: “Read” → “Unread”; 1 could not be undone (b.pdf). Undo again to retry.")
         XCTAssertEqual(model.undoDepth, 1, "the failed member is offered again")
 
         // a was reversed: a later edit to it must survive the retry, which names b alone.
@@ -121,7 +121,7 @@ final class UndoDurabilityTests: XCTestCase {
         relaunched.undoLast()
         XCTAssertEqual(try tags(fixture.files[1]), ["Unread"])
         XCTAssertEqual(try tags(fixture.files[0]), ["Read"], "the retry never re-applies a reversed member")
-        XCTAssertEqual(relaunched.statusMessage, "Undid 1 change.")
+        XCTAssertEqual(relaunched.statusMessage, "Undid 1 change in b.pdf: Read state: “Read” → “Unread”.")
         XCTAssertEqual(NavigationModel(defaults: defaults).undoDepth, 0)
     }
 
