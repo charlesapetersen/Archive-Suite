@@ -3,6 +3,23 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W40.fix-notes-inspector-flicker, 2026-11-08) — inspector visibility settles once
+
+Opening or closing the inspector no longer animates the whole browser, repeatedly reflowing TextKit and
+triggering resize scroll restoration. The toolbar and View-menu/⌥⌘I actions no longer request animation,
+and the shell clears animation for inspector visibility changes. Editor identity and scroll logic stay intact.
+
+Full Notes smoke passes (245 XCTest + 1159 Swift Testing), including render guards, with no new source
+warnings. Real VNC input in the off-screen macOS 27.2 VM verified toolbar/menu/shortcut toggles in both
+layouts; source-chip note text and attachment remain rendered. Screenshots and sampled video frames were
+inspected. A 412-frame recording (median 100 ms gap) showed no pane-sized blink; pixel-scan returns were
+confined to cursor/menu/tooltip-sized regions. It cannot rule out changes shorter than a captured frame.
+Host pixel-guard PNGs could not be read because macOS denied app-container access even outside the sandbox.
+
+The new `TransientStateUITests.testInspectorTogglesKeepTheNoteStableInBothLayouts` compiles but the first
+synthesized toolbar click does nothing in this macOS 27 harness, on both baseline and fixed builds. Re-run
+it after W40.vm-macos27-notes; the real VNC interaction check passed. No host display or real store was used.
+
 ## ✅ FIXED (W40.fix-notes-folder-drag-again, 2026-11-08) — native folder-row dragging
 
 Folder rows now supply their UUID payload through the native List's `itemProvider`, with click selection
