@@ -670,6 +670,38 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(toggle.waitForNonExistence(timeout: 5), "turned off, the filter should leave the filter bar")
     }
 
+    func testPDFWarningExplainsMissingTextAndOffersActions() throws {
+        typeInField("ar.filter.name", text: "IMG_NOTEXT")
+        waitForRows(minimum: 1, timeout: 10)
+        let warning = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "ar.fileHealth.cell.warning.")).firstMatch
+        XCTAssertTrue(warning.waitForExistence(timeout: 10))
+        warning.click()
+        XCTAssertTrue(app.buttons["ar.fileHealth.open"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["ar.fileHealth.reveal"].exists)
+        XCTAssertTrue(app.staticTexts["No selectable text"].exists)
+        captureScreenshot("w40-file-health-no-text-detail")
+        pressKey(XCUIKeyboardKey.escape.rawValue, modifiers: [])
+        XCTAssertTrue(app.buttons["ar.fileHealth.open"].waitForNonExistence(timeout: 5))
+    }
+
+    /// A click on a file's alert explains the conflict and opens that file's existing editor.
+    func testFileHealthWarningOpensDetailsAndEditInfoForThatFile() throws {
+        showAmbiguousDatesFromHealth()
+        let warnings = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "ar.fileHealth.cell.date."))
+        let warning = warnings.firstMatch
+        XCTAssertTrue(warning.waitForExistence(timeout: 10))
+        warning.click()
+        let editInfo = app.buttons["ar.fileHealth.editInfo"]
+        XCTAssertTrue(editInfo.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Conflicting date tags"].exists)
+        captureScreenshot("w40-file-health-date-detail")
+        editInfo.click()
+        let notice = app.descendants(matching: .any)["ar.tagEditor.dateAmbiguity"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5))
+        XCTAssertTrue(notice.label.contains("1983 was set aside"))
+        app.buttons["ar.tagEditor.done"].click()
+    }
+
     /// W40.fix-reader-health-live: exercise the presented popover independently of Edit Info.
     /// The gated unit regression supplies deterministic in-progress indexing updates.
     func testLibraryHealthPopoverShowsCountsAndFilters() {

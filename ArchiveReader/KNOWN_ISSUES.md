@@ -2,6 +2,24 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-health-issue-detail, 2026-11-07) — file warnings explain the issue and offer actions
+
+Click the ⚠︎ in the PDF warning column or an ambiguous Date cell for the file's name, path, exact symptom,
+and next steps. An unreadable PDF is described as a failed open, with possible causes rather than a claim of
+corruption; missing selectable text explains why OCR search cannot find its contents. Open Document and
+Reveal in Finder act on the named file. Reader does not repair PDF contents or run OCR. Conflicting dates
+name the tags used and set aside, with Edit Info selecting that file alone in the existing editor.
+
+An unchanged index refresh preserves an open explanation; changed issues or cell reuse dismiss it. Presented
+actions capture their file, so a selection change or reused cell cannot redirect them. Opening details or a
+document writes no tags. `FileHealthDetailTests` covers real table cells, distinct symptoms, healthy cells,
+click targets, action targeting across selection changes/reuse, and headless renders in light and dark.
+`NavigationUITests.testFileHealthWarningOpensDetailsAndEditInfoForThatFile` covers the actual table click,
+popover and Edit Info path in the off-screen VM.
+`NavigationUITests.testPDFWarningExplainsMissingTextAndOffersActions` checks the PDF warning, its viewing
+and Finder actions, and Escape dismissal. The new popover leaves identifiers on individual controls; a
+container identifier propagated over them in SwiftUI and prevented the VM from finding the actions.
+
 ## ✅ CLOSED (W40.fix-reader-health-live, 2026-11-07) — Library health updates while indexing
 
 The open health popover observes the navigation model directly, so discovery and tag changes refresh its

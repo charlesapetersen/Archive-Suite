@@ -134,7 +134,11 @@ struct NavigationWindowView: View {
             scrollTargetID: model.scrollTargetID,
             scrollTargetAtTop: model.scrollTargetAtTop,
             onDoubleClick: { openSelection() },
-            buildContextMenu: { _ in buildNSContextMenu() }
+            buildContextMenu: { _ in buildNSContextMenu() },
+            onOpenFile: { file in
+                model.showingPreview = false
+                openWindow(id: WindowID.document, value: DocumentSelection(filePaths: [file.path]))
+            }
         )
         .overlay { tableOverlay }
         // Focus-scoped Space → preview (fires only when the list has key focus, so Space still types

@@ -39,7 +39,7 @@ struct AppKitTableView: NSViewRepresentable {
         .init(id: "warning", title: "⚠︎", width: 24, minWidth: 24, maxWidth: 28, sortField: .attention,
               menuTitle: "⚠︎ Needs attention",
               toolTip: "Needs attention: a PDF that could not be opened or has no selectable text. "
-                  + "Click to sort these files first."),
+                  + "Click to sort these files first; click a file’s warning for its reason and next steps."),
         .init(id: "date", title: "Document date", width: 140, minWidth: 110, maxWidth: 220, sortField: .date,
               toolTip: "The document's own date, from its tags. Click to sort; undated files go last."),
         // File name's and File tags' minimums are what lets every column fit at the 900-pt window beside the
@@ -97,6 +97,7 @@ struct AppKitTableView: NSViewRepresentable {
     var scrollTargetAtTop = false
     var onDoubleClick: () -> Void
     var buildContextMenu: (Set<ArchiveFile.ID>) -> NSMenu?
+    var onOpenFile: (ArchiveFile) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -469,10 +470,15 @@ struct AppKitTableView: NSViewRepresentable {
             if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? TintedTextCellView {
                 cell = reused
             } else {
-                cell = colID == "read" ? Self.makeReadStateCell(identifier: cellID) : Self.makeTextCell(identifier: cellID)
+                if colID == "warning" || colID == "date" {
+                    cell = Self.installLabel(in: FileHealthCellView(), identifier: cellID)
+                } else {
+                    cell = colID == "read" ? Self.makeReadStateCell(identifier: cellID) : Self.makeTextCell(identifier: cellID)
+                }
             }
 
             guard let file else {
+                (cell as? FileHealthCellView)?.configure(detail: nil, onAction: { _ in })
                 cell.textField?.stringValue = ""
                 (cell as? ReadStateCellView)?.file = nil
                 return cell
@@ -555,6 +561,26 @@ struct AppKitTableView: NSViewRepresentable {
                 tf.stringValue = ""
             }
 
+            if let healthCell = cell as? FileHealthCellView {
+                let detail = FileHealthDetail(file: file, status: parent.model.formatStatus(for: file.path))
+                let hasWarning = colID == "warning" ? detail.pdfIssue != nil : file.dateIsAmbiguous
+                if hasWarning {
+                    healthCell.configure(detail: detail) { [weak self] action in
+                        guard let self else { return }
+                        // The popover acts on the file it names, even after cell reuse or a selection change.
+                        switch action {
+                        case .openDocument: self.parent.onOpenFile(file)
+                        case .revealInFinder: NSWorkspace.shared.activateFileViewerSelecting([file.url])
+                        case .editInfo:
+                            guard self.parent.model.displayed.contains(where: { $0.id == file.id }) else { return }
+                            self.parent.model.selection = [file.id]
+                            self.parent.model.showingEditor = true
+                        }
+                    }
+                } else {
+                    healthCell.configure(detail: nil, onAction: { _ in })
+                }
+            }
             return cell
         }
 
