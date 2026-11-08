@@ -561,6 +561,7 @@ final class ReaderAtSizeTests: XCTestCase {
         print("D7 table screen with every row queuing its snippet: median \(ms(queuedTimes[100])) "
               + "p95 \(ms(queuedTimes[190])) max \(ms(queuedTimes.last!)) "
               + "(queued \(navigation.pendingSnippetCountForTesting) paths)")
+        XCTAssertGreaterThan(navigation.pendingSnippetCountForTesting, 0, "non-vacuity: drawing searched rows queued previews")
         // A newer, empty result: the fill task, not yet run, finds nothing to ask the closing index for.
         navigation.setFullTextResultForTesting(query: "", paths: [], snippets: [:])
 

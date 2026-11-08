@@ -35,7 +35,7 @@ final class NavigationModel: ObservableObject {
     /// an older thumbnail task, even when both began against the same pasteboard change count.
     private var archiveCopyGeneration = 0
     let flags: FlagStore
-    let savedSearches = SavedSearchStore()
+    let savedSearches: SavedSearchStore
     let excludedFolders: ExcludedFoldersStore
     /// W24.cal1-reader: each document's display calendar, app-side (never written to the corpus).
     let displayCalendars: DisplayCalendarPreferences
@@ -73,9 +73,8 @@ final class NavigationModel: ObservableObject {
     /// filter indicators.
     @Published private(set) var baseTextHits: [UUID: Set<String>] = [:]
     /// The scope's positive text rules together (`AdvancedSearch.rankingExpression`): their bm25 order, used for
-    /// the relevance sort while Find is empty, and snippets for the top hits.
+    /// the relevance sort while Find is empty. Scope rules never supply preview snippets.
     private var baseRank: [String: Int]?
-    @Published private(set) var baseSnippets: [String: String] = [:]
     private var baseFtsGeneration = 0
     // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
     /// The non-modal inspector follows the visible selection. Its editor owns explicit target paths.
@@ -199,6 +198,7 @@ final class NavigationModel: ObservableObject {
          indexer: ContentIndexer = ContentIndexer(),
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         self.defaults = defaults
+        self.savedSearches = SavedSearchStore(defaults: defaults)
         self.flags = FlagStore(defaults: defaults)
         self.hiddenColumns = AppSettings.hiddenColumns(in: defaults)
         self.indexer = indexer
@@ -305,6 +305,7 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated {
                 guard let self else { return }
                 self.folderTree = self.buildFolderTree()
+                self.refreshSmartFolderCounts()
                 self.recompute()
                 self.pruneExcludedFromIndex()
             } }
@@ -506,7 +507,7 @@ final class NavigationModel: ObservableObject {
         guard rulesChanged else { return }   // a rename: the rows, their answers and the sort all stand
         scopeRules = rules
         baseTextHits = [:]
-        baseRank = nil; baseSnippets = [:]
+        baseRank = nil
         if rules.rankingExpression != nil, sort.first?.field != .relevance { sort = [ARSortDescriptor(field: .relevance)] }
         runBaseFullTextSearch()
     }
@@ -514,7 +515,7 @@ final class NavigationModel: ObservableObject {
     /// Leave the scope (smart folder or Advanced Search); the caller recomputes.
     private func exitScope() {
         scope = nil; scopeIsSaved = false; scopeRules = nil
-        baseFtsGeneration += 1; baseTextHits = [:]; baseRank = nil; baseSnippets = [:]
+        baseFtsGeneration += 1; baseTextHits = [:]; baseRank = nil
         if ftsRank == nil, sort.first?.field == .relevance { sort = LibrarySort.default }
     }
 
@@ -554,7 +555,7 @@ final class NavigationModel: ObservableObject {
             guard let self else { return }
             var ranked: ContentIndex.RankedSearch?
             if let expression = rules.rankingExpression {
-                ranked = await self.indexer.searchRanked(expression: expression, snippetLimit: self.ftsSnippetLimit)
+                ranked = await self.indexer.searchRanked(expression: expression, snippetLimit: 0)
             }
             // One positive text rule is its own ranking expression: its hits are the ranked paths, not a second query.
             let textRules = rules.textRules
@@ -567,7 +568,6 @@ final class NavigationModel: ObservableObject {
             guard generation == self.baseFtsGeneration else { return }
             self.baseTextHits = hits
             self.baseRank = ranked.map { Dictionary($0.paths.enumerated().map { ($1, $0) }) { a, _ in a } }
-            self.baseSnippets = ranked?.snippets ?? [:]
             self.recompute()
         }
     }
@@ -920,8 +920,8 @@ final class NavigationModel: ObservableObject {
             self.classifications = classifications
             self.needsAttentionCount = count
             self.recompute()
-            if self.savedSearches.searches.contains(where: { $0.search.uses(.needsAttention) }) {
-                self.refreshSmartFolderCounts()   // their counts waited for the statuses
+            if self.savedSearches.searches.contains(where: { $0.search.uses(.needsAttention) || $0.search.hasTextRules }) {
+                self.refreshSmartFolderCounts()   // counts follow committed content and format statuses
             }
         }
     }
@@ -1039,12 +1039,8 @@ final class NavigationModel: ObservableObject {
     /// queued, and arrives with a later table reload), an empty-body doc, or the snippet carries no
     /// highlighted match. The list cell renders the returned runs as a dimmed second line under the name.
     func searchSnippet(for path: String) -> [SearchSnippet.Segment]? {
-        guard let hits = ftsPaths else {
-            // No Find query: the scope's text rules give the top hits a snippet (no fill-in for the rest).
-            guard let raw = baseSnippets[path], !raw.isEmpty else { return nil }
-            let segments = SearchSnippet.segments(from: raw)
-            return SearchSnippet.hasMatch(segments) ? segments : nil
-        }
+        guard !fullTextQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let hits = ftsPaths else { return nil }
         guard let raw = ftsSnippets[path], !raw.isEmpty else {
             if hits.contains(path) { requestSnippet(for: path) }
             return nil
@@ -1063,6 +1059,7 @@ final class NavigationModel: ObservableObject {
     /// Publishes a full-text result without an index, as `runFullTextSearch` would: the 150k list lane
     /// (`ReaderAtSizeTests`) measures the rows' cost with a query active and every snippet still to fill.
     func setFullTextResultForTesting(query: String, paths: [String], snippets: [String: String]) {
+        fullTextQuery = query
         ftsGeneration += 1
         ftsPaths = Set(paths)
         ftsRank = Dictionary(uniqueKeysWithValues: paths.enumerated().map { ($1, $0) })
@@ -1367,23 +1364,27 @@ final class NavigationModel: ObservableObject {
         }
     }
 
-    /// D2: recompute each smart folder's matching-file count over the whole library (cached; refreshed
-    /// on library or saved-search changes, so the sidebar isn't O(searches·N) per render).
+    private var smartFolderCountGeneration = 0
+
+    /// Count each saved rule tree over the whole library, independently of the open scope and user filters.
+    /// Text rules use the same index answers as the Advanced Search form. Keep the previous counts until
+    /// refreshed answers arrive; a changed library, rule, flag, exclusion or index pass supersedes the task.
     private func refreshSmartFolderCounts() {
-        var files = library.files
-        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            files = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
+        smartFolderCountGeneration += 1
+        let generation = smartFolderCountGeneration
+        let searches = savedSearches.searches
+        smartFolderCounts = smartFolderCounts.filter { id, _ in searches.contains { $0.id == id } }
+        Task { [weak self] in
+            guard let self, generation == self.smartFolderCountGeneration else { return }
+            var counts: [UUID: Int] = [:]
+            for search in searches {
+                let count = await self.countMatches(search.search)
+                guard generation == self.smartFolderCountGeneration else { return }
+                counts[search.id] = count
+            }
+            guard generation == self.smartFolderCountGeneration else { return }
+            self.smartFolderCounts = counts
         }
-        // A smart folder with a text rule gets no count: its index answers are not here, and a count that
-        // left them out would overstate the folder.
-        var counts: [UUID: Int] = [:]
-        for s in savedSearches.searches where !s.search.hasTextRules {
-            // As the folder would show it: folder rules outside the current root left out.
-            let rules = s.search.droppingFolders(outside: rootStore.discoveredPathPrefix).search
-            let context = ruleContext(for: rules)
-            counts[s.id] = files.reduce(0) { $0 + (rules.matches($1, context) ? 1 : 0) }
-        }
-        smartFolderCounts = counts
     }
 
     /// Build the sidebar folder tree from the discovered file paths under the archive root — no extra

@@ -84,6 +84,54 @@ final class AdvancedSearchUITests: FixtureUITestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// W40.fix-reader-smart-folders: saved OCR rules count and scope files; only a typed text search
+    /// contributes previews. The synthetic fixture puts California in bodies, never in file names.
+    func testSmartFolderCountsAndPreviewsOnlyForUserTextSearch() throws {
+        deleteSmartFolders()
+        app.buttons["ar.filter.advanced"].click()
+        let count = app.staticTexts["ar.advanced.count"]
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        let text = app.textFields.matching(identifier: "ar.advanced.rule.text").firstMatch
+        text.click()
+        text.typeText("smartfolderabsentzzqx")
+        XCTAssertTrue(waitFor(count, toRead: "0 documents match"), "wait for the OCR rule, not the old unfiltered count")
+        text.typeKey("a", modifierFlags: .command)
+        text.typeText("California")
+        let deadline = Date().addingTimeInterval(30)
+        var matches = 0
+        while Date() < deadline {
+            let label = (count.value as? String) ?? count.label
+            matches = Int(label.split(separator: " ").first ?? "") ?? 0
+            if matches > 0 { break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertGreaterThan(matches, 0, "the scratch OCR rule matches files")
+        app.buttons["ar.advanced.saveAs"].click()
+        let name = app.textFields["ar.advanced.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.click(); name.typeText(folderName)
+        app.buttons["ar.advanced.saveNamed"].click()
+        let folder = smartFolder()
+        XCTAssertTrue(folder.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForRowCount(matches))
+        XCTAssertTrue(waitFor(folder, toRead: "\(matches) documents"), "sidebar counts the OCR rule")
+        let preview = table.staticTexts.matching(NSPredicate(
+            format: "value CONTAINS[c] %@ OR label CONTAINS[c] %@", "California", "California")).firstMatch
+        XCTAssertFalse(preview.exists, "saved OCR rules list filenames without snippets")
+        _ = captureScreenshot("smart-folder-files-and-count")
+        let query = app.textFields["ar.filter.ocr"]
+        query.click(); query.typeText("California")
+        XCTAssertTrue(preview.waitForExistence(timeout: 10), "typing a text search adds the preview")
+        _ = captureScreenshot("smart-folder-text-search")
+        app.buttons["ar.filter.ocrClear"].click()
+        XCTAssertTrue(waitForRowCount(matches))
+        let clearDeadline = Date().addingTimeInterval(5)
+        while preview.exists, Date() < clearDeadline { RunLoop.current.run(until: Date().addingTimeInterval(0.2)) }
+        XCTAssertFalse(preview.exists, "clearing text search restores plain filenames")
+        XCTAssertTrue(waitFor(folder, toRead: "\(matches) documents"))
+        _ = captureScreenshot("smart-folder-cleared-search")
+    }
+
     private func smartFolder() -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: "ar.sidebar.smart")
             .matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", folderName, folderName)).firstMatch

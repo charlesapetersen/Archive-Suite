@@ -26,10 +26,11 @@ struct SidebarView: View {
         List(selection: $selection) {
             Section {
                 ForEach(model.savedSearches.searches) { s in
-                    // Badge is tag-facet-only, so hide it for smart folders that also carry an OCR query
-                    // (the opened list is a subset — the count would over-state and contradict it).
-                    row(name: s.name, systemImage: "folder.badge.gearshape",
-                        count: s.search.hasTextRules ? nil : model.smartFolderCounts[s.id])
+                    SidebarItemRow(name: s.name, systemImage: "folder.badge.gearshape",
+                        count: model.smartFolderCounts[s.id])
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(s.name)
+                        .accessibilityValue(model.smartFolderCounts[s.id].map { "\($0) documents" } ?? "Counting")
                         .tag(SidebarView.smartPrefix + s.id.uuidString)
                         .accessibilityIdentifier("ar.sidebar.smart")
                         .contextMenu {
@@ -54,12 +55,12 @@ struct SidebarView: View {
             }
 
             Section("Folders") {
-                row(name: "All Files", systemImage: "tray.full", count: model.folderTree?.fileCount)
+                SidebarItemRow(name: "All Files", systemImage: "tray.full", count: model.folderTree?.fileCount)
                     .tag(SidebarView.allFilesTag)
                     .accessibilityIdentifier("ar.sidebar.allFiles")
                 if let root = model.folderTree {
                     OutlineGroup(root.children, children: \.childrenOrNil) { node in
-                        row(name: node.name, systemImage: "folder", count: node.fileCount)
+                        SidebarItemRow(name: node.name, systemImage: "folder", count: node.fileCount)
                             .tag(node.path)
                             .help(node.path)
                             .accessibilityIdentifier("ar.sidebar.folder")
@@ -93,8 +94,15 @@ struct SidebarView: View {
             ?? (model.filter.pathPrefix ?? SidebarView.allFilesTag)
         if selection != want { selection = want }
     }
+}
 
-    private func row(name: String, systemImage: String, count: Int?) -> some View {
+/// The same count row for ordinary folders and smart folders, also rendered by the headless guard.
+struct SidebarItemRow: View {
+    let name: String
+    let systemImage: String
+    let count: Int?
+
+    var body: some View {
         HStack {
             Label(name, systemImage: systemImage)
             Spacer(minLength: 6)

@@ -2,6 +2,23 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-smart-folders, 2026-11-08) — smart folders count files and open without snippets
+
+Sidebar counts now evaluate every saved rule tree, including OCR text, negative text and nested all/any
+rules. Counts describe the folder's base set across the library, independently of the currently open folder
+and user filters, and leave excluded folders out. Committed content-index changes refresh OCR counts even
+when the smart folder is closed; generation checks discard superseded answers after rule or library changes.
+
+Opening a smart folder or unsaved Advanced Search lists its matching files without OCR previews. Typing in
+Search OCR text supplies snippets from that query; clearing it returns to the base set and plain filenames.
+Scope relevance sorting remains available without extracting unused snippets. Injected test defaults now also
+own the saved-search store, so scratch smart-folder tests never write the owner's saved searches.
+
+`AdvancedSearchScopeTests` covers real scratch indexing, nested/negative/zero counts, user narrowing,
+reindexing, exclusions, rapid rule replacement/deletion and snippet clearing, and renders the shared sidebar
+count row and actual filename formatter. `AdvancedSearchUITests.testSmartFolderCountsAndPreviewsOnlyForUserTextSearch`
+checks the sidebar count and saved-folder/search/clear transitions in the off-screen VM.
+
 ## ✅ CLOSED (W40.fix-reader-tag-add-speed, 2026-11-08) — verified tags render before the large-library refresh
 
 The inspector already submitted Return and Tab promptly. Scratch timing found the delay after verification:
