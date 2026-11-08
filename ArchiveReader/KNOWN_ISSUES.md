@@ -1073,3 +1073,10 @@ old links. The Core Directive and SPEC now disclose this single creation excepti
 choosing a folder creates the marker if absent, so Notes accepts the folder the Reader shows with no
 link copy first. Reopening at launch still only reads; an archive-link copy still creates one for a root
 that has none. A read-only folder opens with no marker (`.degraded(.notWritable)`) and copies refuse.
+
+### W40.fix-reader-link-status-line — concise archive-link copy confirmation (fixed 2026-11-08)
+
+Copy Archive Link now confirms only “Copied 1 archive link.” (or the plural), as requested in Reader
+session 2, row 25. The opening instructions added by W40.fix-reader-link-paste-help remain in the README;
+they no longer fill the status line. `RootMarkerDisclosureTests` checks the exact singular/plural messages
+alongside the scratch link round-trip and marker, file-byte and tag preservation checks.

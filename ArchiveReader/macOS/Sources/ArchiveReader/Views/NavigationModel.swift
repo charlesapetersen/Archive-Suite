@@ -2034,12 +2034,9 @@ final class NavigationModel: ObservableObject {
         statusMessage = "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."
     }
 
-    /// Says where an `archivereader://` link opens: the owner's guided session (reader-1, row 38) did not
-    /// know where to paste one (`W40.fix-reader-link-paste-help`). The README says the same.
+    /// Keep the status line to the copy confirmation (owner, reader-2 row 25).
     static func archiveLinksCopiedMessage(count: Int) -> String {
-        let one = count == 1
-        return "Copied \(count) archive link\(one ? "" : "s"). To open \(one ? "it" : "one"), paste into "
-            + "Archive Notes, Apple Notes, Mail or Messages and click it, or into Safari’s address bar."
+        "Copied \(count) archive link\(count == 1 ? "" : "s")."
     }
 
     func copyArchiveLinks() {
