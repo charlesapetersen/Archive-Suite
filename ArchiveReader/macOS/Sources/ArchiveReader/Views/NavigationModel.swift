@@ -827,8 +827,14 @@ final class NavigationModel: ObservableObject {
 
     // MARK: What is in effect (W40.fix-reader-filter-bar)
 
-    /// Every filter and search in effect, as the filter bar's chip row shows them.
+    /// Filters and searches shown in the In effect row. The ordinary folder is already selected in the
+    /// sidebar; a smart folder stays here because its saved rules keep narrowing the list.
     var activeFilterChips: [ActiveFilterChip] {
+        listConstraints.filter { $0.facet != .folder }
+    }
+
+    /// All constraints, including the sidebar location, for empty-list explanations and recovery actions.
+    var listConstraints: [ActiveFilterChip] {
         ActiveFilterChip.chips(filter: filter, smartFolderName: scope?.name,
                                fullTextQuery: ftsPaths == nil ? nil : fullTextQuery)
     }
@@ -845,14 +851,14 @@ final class NavigationModel: ObservableObject {
                                     ftsPaths: facet == .text ? nil : ftsPaths)
             return universe.contains(where: pred)
         }
-        let facets = activeFilterChips.map(\.facet)
+        let facets = listConstraints.map(\.facet)
         let causes = facets.filter { !$0.isLocation && bringsRowsBack($0) }
         return causes.isEmpty ? facets.filter { $0.isLocation && bringsRowsBack($0) } : causes
     }
 
     /// The empty list's sentence, naming what hides the rows.
     var emptyListExplanation: String {
-        ActiveFilterChip.emptyExplanation(chips: activeFilterChips, causes: emptyListCauses)
+        ActiveFilterChip.emptyExplanation(chips: listConstraints, causes: emptyListCauses)
     }
 
     /// A chip's ✕: turn that one filter or search off, leaving the rest.

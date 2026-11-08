@@ -523,6 +523,33 @@ final class NavigationUITests: FixtureUITestCase {
         captureScreenshot("w40-filter-bar-cleared")
     }
 
+    /// W40.fix-reader-in-effect-folder: a sidebar folder is a location, while a carried search stays visible.
+    func testInEffectOmitsTheSidebarFolderAndKeepsTheSearch() throws {
+        waitForRows(minimum: 5, timeout: 10)
+        let allFiles = app.staticTexts.matching(identifier: "ar.sidebar.allFiles").firstMatch
+        if !allFiles.exists { toolbarButton("ar.toolbar.sidebar").click() }
+        let folder = app.descendants(matching: .any).matching(identifier: "ar.sidebar.folder").firstMatch
+        XCTAssertTrue(folder.waitForExistence(timeout: 5))
+        folder.click()
+        XCTAssertTrue(waitForRowCount(1), "Box 2 contains one fixture file")
+        XCTAssertFalse(app.descendants(matching: .any)["ar.filter.chip.folder"].exists)
+        captureScreenshot("w40-in-effect-folder-only")
+
+        typeInField("ar.filter.name", text: "zz-no-such-file")
+        let nameChip = app.buttons["ar.filter.chip.name"]
+        XCTAssertTrue(nameChip.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.descendants(matching: .any)["ar.filter.chip.folder"].exists)
+        let empty = app.descendants(matching: .any)["ar.empty.filteredOut"]
+        XCTAssertTrue(empty.waitForExistence(timeout: 5))
+        XCTAssertTrue(empty.accessibilityText.contains("Box 2"), "the explanation still gives the folder")
+        captureScreenshot("w40-in-effect-folder-and-search")
+        nameChip.click()
+        XCTAssertTrue(waitForRowCount(1), "clearing the search keeps the selected folder")
+        XCTAssertTrue(nameChip.waitForNonExistence(timeout: 5))
+        allFiles.click()
+        waitForRows(minimum: 5, timeout: 10)
+    }
+
     // MARK: - OCR search field exists (W5.d1 infrastructure)
 
     func testOCRSearchFieldExists() throws {

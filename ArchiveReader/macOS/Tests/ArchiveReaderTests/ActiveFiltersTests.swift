@@ -98,7 +98,8 @@ final class ActiveFiltersTests: XCTestCase {
         let jones = model.displayed[0].path.replacingOccurrences(of: "/Smith/Smith letter.pdf", with: "/Jones")
         model.setFolderScope(jones)
         XCTAssertTrue(model.displayed.isEmpty, "precondition: the search still applies in the new folder")
-        XCTAssertEqual(model.activeFilterChips.map(\.facet), [.folder, .name], "both are shown in effect")
+        XCTAssertEqual(model.activeFilterChips.map(\.facet), [.name], "the sidebar folder is not a filter chip")
+        XCTAssertEqual(model.listConstraints.map(\.facet), [.folder, .name], "empty-list recovery keeps the folder")
         XCTAssertEqual(model.emptyListCauses, [.name], "the name is blamed, not the folder the user chose")
         XCTAssertEqual(model.emptyListExplanation,
                        "The file-name filter \u{201c}smith\u{201d} hides every file in the folder \u{201c}Jones\u{201d}.")
@@ -106,8 +107,38 @@ final class ActiveFiltersTests: XCTestCase {
         model.removeFilter(.name)
         XCTAssertEqual(model.displayed.map(\.name), ["Jones memo.pdf"])
         XCTAssertEqual(model.filterSearchText, "", "the field empties with the chip")
-        XCTAssertEqual(model.activeFilterChips.map(\.facet), [.folder])
+        XCTAssertTrue(model.activeFilterChips.isEmpty, "a folder alone needs no In effect row")
+        XCTAssertEqual(model.filter.pathPrefix, jones, "removing a search keeps the sidebar selection")
         XCTAssertTrue(model.emptyListCauses.isEmpty)
+    }
+
+    func testAnEmptySidebarFolderKeepsItsExplanationAndRecovery() throws {
+        let root = try makeRoot()
+        let model = fixtureNavigationModel(pinnedTo: root)
+        model.filter.read = .all
+        model.setFolderScope(root.appendingPathComponent("Empty").path)
+        XCTAssertTrue(model.displayed.isEmpty)
+        XCTAssertTrue(model.activeFilterChips.isEmpty)
+        XCTAssertEqual(model.emptyListCauses, [.folder])
+        XCTAssertEqual(model.emptyListExplanation, "The folder “Empty” hides every file.")
+        XCTAssertEqual(model.listConstraints.map(\.facet), [.folder], "the empty view still offers Clear Folder")
+        model.removeFilter(.folder)
+        XCTAssertEqual(model.displayed.count, 2)
+    }
+
+    func testASmartFoldersRulesStayInEffectUntilItsChipIsRemoved() throws {
+        let root = try makeRoot()
+        let model = fixtureNavigationModel(pinnedTo: root)
+        var rule = SearchRule(field: .fileName)
+        rule.text = "smith"
+        model.runAdvancedSearch(AdvancedSearch(combine: .all, rules: [rule]))
+        XCTAssertEqual(model.displayed.map(\.name), ["Smith letter.pdf"])
+        XCTAssertEqual(model.activeFilterChips.map(\.facet), [.smartFolder])
+        model.clearUserFilters()
+        XCTAssertEqual(model.activeFilterChips.map(\.facet), [.smartFolder], "Clear All retains the base rules")
+        model.removeFilter(.smartFolder)
+        XCTAssertTrue(model.activeFilterChips.isEmpty)
+        XCTAssertEqual(model.displayed.count, 2)
     }
 
     func testTheFolderIsNotBlamedWhileAnotherFilterAloneIs() throws {

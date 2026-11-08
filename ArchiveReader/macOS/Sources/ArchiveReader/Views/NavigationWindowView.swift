@@ -304,7 +304,7 @@ struct NavigationWindowView: View {
     /// One button per filter that alone hides the rows, then Clear All (the filter bar's Clear: a smart folder
     /// stays, which is why leaving one is its own button when it is the cause).
     private var filteredOutActions: some View {
-        let chips = model.activeFilterChips
+        let chips = model.listConstraints
         let causes = chips.filter { model.emptyListCauses.contains($0.facet) }
         return VStack(spacing: 6) {
             ForEach(causes) { chip in

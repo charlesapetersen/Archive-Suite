@@ -2,6 +2,15 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-in-effect-folder, 2026-11-08) — In effect shows filters and searches
+
+The ordinary sidebar folder no longer appears as an In effect chip (Reader session 2, row 5). Smart folders
+and unsaved Advanced Searches keep their chip: their rules still apply after Clear All, so the chip explains
+that base search and offers a way to leave it. Empty-list explanations still name the ordinary folder, and
+Clear Folder remains available when its scope alone hides every file. Clearing a search chip keeps the sidebar
+selection. `ActiveFiltersTests` covers these cases on scratch files; the focused navigation UITest checks the
+folder/search transition and screenshots the row in the off-screen VM.
+
 ## ✅ CLOSED (W40.fix-reader-smart-folders, 2026-11-08) — smart folders count files and open without snippets
 
 Sidebar counts now evaluate every saved rule tree, including OCR text, negative text and nested all/any
