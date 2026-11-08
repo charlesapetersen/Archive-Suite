@@ -793,8 +793,7 @@ struct NavigationWindowView: View {
                 .accessibilityValue(healthIssues ? "some files need a look" : "")
                 .accessibilityIdentifier("ar.status.health")
                 .popover(isPresented: $showingHealth) {
-                    DataQualityView(q: model.dataQuality, needsAttention: model.needsAttentionCount,
-                                    ambiguousDates: model.ambiguousDateCount,
+                    DataQualityView(model: model,
                                     showNeedsAttention: { model.filter.needsAttentionOnly = true; showingHealth = false },
                                     showAmbiguousDates: { model.filter.ambiguousDatesOnly = true; showingHealth = false })
                 }
@@ -888,13 +887,13 @@ private struct ActiveFilterChipView: View {
 
 /// A small library-health readout (data-quality counts). The two counts that have a list filter carry a Show
 /// button for it; the filter bar shows those filters only while they are on (W40.fix-reader-health-counts).
-private struct DataQualityView: View {
-    let q: NavigationModel.DataQuality
-    let needsAttention: Int
-    let ambiguousDates: Int
+struct DataQualityView: View {
+    // The presented popover owns its observation; passing counts here freezes a snapshot at opening.
+    @ObservedObject var model: NavigationModel
     let showNeedsAttention: () -> Void
     let showAmbiguousDates: () -> Void
     var body: some View {
+        let q = model.dataQuality
         VStack(alignment: .leading, spacing: 6) {
             Text("Library health").font(.headline)
             row("Total files", q.total)
@@ -903,10 +902,10 @@ private struct DataQualityView: View {
             row("Date uncertain", q.dateUncertain)
             row("Box/folder markers", q.markers)
             row("Both Read + Unread (corrupt)", q.bothReadUnread, warn: q.bothReadUnread > 0)
-            filterRow("Non-standard PDFs (need attention)", needsAttention,
+            filterRow("Non-standard PDFs (need attention)", model.needsAttentionCount,
                       help: "Show only non-standard PDFs — files that couldn't be opened, or have no selectable text",
                       id: "ar.health.needsAttention", action: showNeedsAttention)
-            filterRow("Ambiguous dates", ambiguousDates,
+            filterRow("Ambiguous dates", model.ambiguousDateCount,
                       help: "Show only files with two tags for one date (two Years, Months, Days, Decades or Sent With dates)",
                       id: "ar.health.ambiguousDates", action: showAmbiguousDates)
         }

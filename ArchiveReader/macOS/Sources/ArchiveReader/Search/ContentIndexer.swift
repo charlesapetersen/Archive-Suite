@@ -9,6 +9,10 @@ final class ContentIndexer: ObservableObject {
     /// (done, total) while indexing; nil when idle.
     @Published private(set) var progress: (done: Int, total: Int)?
 
+    /// Advances after a batch is committed, so health can read new results before the pass ends.
+    /// Extraction progress alone isn't enough: it is published more often than rows are written.
+    @Published private(set) var contentRevision = 0
+
     /// Why the content index is degraded, when it is (`nil` = healthy).
     ///
     /// The index is a disposable cache, so a failure here is never data loss — but without this it
@@ -172,7 +176,10 @@ final class ContentIndexer: ObservableObject {
                 // Never let PDFDocument materialise a cloud placeholder. If a previously-local file
                 // became dataless, remove only its disposable content row so stale OCR text cannot
                 // masquerade as a current searchable result.
-                do { try await idx.deletePaths(datalessPaths) }
+                do {
+                    try await idx.deletePaths(datalessPaths)
+                    await self?.didCommit(gen)
+                }
                 catch { cacheRowsDropped = datalessPaths.count }
             }
             let work = files.filter { f in
@@ -224,7 +231,10 @@ final class ContentIndexer: ObservableObject {
 
                     // Flush the batch when full.
                     if batch.count >= batchSize {
-                        do { try await idx.upsertBatch(batch) } catch { droppedRows += batch.count }
+                        do {
+                            try await idx.upsertBatch(batch)
+                            await self?.didCommit(gen)
+                        } catch { droppedRows += batch.count }
                         batch.removeAll(keepingCapacity: true)
                     }
 
@@ -245,7 +255,10 @@ final class ContentIndexer: ObservableObject {
 
             // Flush any remaining rows.
             if !batch.isEmpty {
-                do { try await idx.upsertBatch(batch) } catch { droppedRows += batch.count }
+                do {
+                    try await idx.upsertBatch(batch)
+                    await self?.didCommit(gen)
+                } catch { droppedRows += batch.count }
             }
 
             // Post-pass maintenance (actor-isolated): merge FTS segments + truncate WAL.
@@ -563,6 +576,11 @@ final class ContentIndexer: ObservableObject {
 
     /// Publish progress only for the current pass (a superseded/cancelled pass is ignored).
     private func report(_ p: (Int, Int)?, _ gen: Int) { guard gen == generation else { return } ; progress = p }
+
+    private func didCommit(_ gen: Int) {
+        guard gen == generation else { return }
+        contentRevision += 1
+    }
 
     /// How a pass ended, from the pass's own point of view. `finish` maps this to the published
     /// `failure`, so health is decided in exactly one place — and the mapping is a pure function the

@@ -2,6 +2,22 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-health-live, 2026-11-07) — Library health updates while indexing
+
+The open health popover observes the navigation model directly, so discovery and tag changes refresh its
+counts without reopening it. PDF health refreshes after successful index batch commits, coalesced to at most
+once a second during a fast build, with an immediate refresh when indexing becomes idle. Extraction progress
+alone does not trigger reads of uncommitted results. Counts remain scoped to the current library.
+
+`LibraryHealthLiveTests` holds the last two of 502 synthetic extractions, verifies 500 committed health results
+before the pass finishes, then verifies the final partial batch and a cleared library. It renders the same
+mounted popover through discovery, indexing and completion. The existing ambiguous-date navigation UITest
+now opens the popover once and waits for its Show button, rather than reopening it until counts arrive.
+`NavigationUITests.testLibraryHealthPopoverShowsCountsAndFilters` exercises that health/filter path on its
+own. The broader `testTwoYearTagsAreFlaggedAndTheFilterFindsThem` reached it successfully in the macOS 27 VM
+but failed later at the Edit Info ambiguity notice; that remaining interaction belongs to the already-open
+W40.vm-macos27-reader work. Its original assertions are retained.
+
 ## ✅ CLOSED (W40.fix-reader-filter-undo-levels, 2026-11-07) — multiple filename-filter undo steps
 
 The file-name filter has its own native field editor and undo history. Each typing, paste, replacement or deletion edit can be undone and redone separately; undo/redo publishes the result to the live filter. Binding echoes retain the caret and history, while Clear or another external reset starts fresh history. Marked-text editing keeps native input-method behavior, and switching fields keeps their undo histories separate.

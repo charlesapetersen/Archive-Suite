@@ -654,18 +654,39 @@ final class NavigationUITests: FixtureUITestCase {
     /// toggle only while it is on), its Date cell is flagged naming the Year set aside, and the ⌘I sheet says the
     /// same. Read-only: nothing is written.
     func testTwoYearTagsAreFlaggedAndTheFilterFindsThem() throws {
+        showAmbiguousDatesFromHealth()
+        clickRow(0)
+        toolbarButton("ar.toolbar.editTags").click()
+        let notice = app.descendants(matching: .any)["ar.tagEditor.dateAmbiguity"]
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "the ⌘I sheet should flag the ambiguous date")
+        XCTAssertTrue(notice.label.contains("1983 was set aside"), "sheet notice: \(notice.label)")
+        captureScreenshot("w40-date-ambiguity-sheet")
+        app.buttons["ar.tagEditor.done"].click()
+
+        let toggle = app.descendants(matching: .any)["ar.filter.ambiguousDates"]
+        toggle.click()
+        waitForRows(minimum: 2, timeout: 10)
+        XCTAssertGreaterThan(rowCount, 1, "turning the filter off should bring the other rows back")
+        XCTAssertTrue(toggle.waitForNonExistence(timeout: 5), "turned off, the filter should leave the filter bar")
+    }
+
+    /// W40.fix-reader-health-live: exercise the presented popover independently of Edit Info.
+    /// The gated unit regression supplies deterministic in-progress indexing updates.
+    func testLibraryHealthPopoverShowsCountsAndFilters() {
+        showAmbiguousDatesFromHealth()
+    }
+
+    private func showAmbiguousDatesFromHealth() {
         let toggle = app.descendants(matching: .any)["ar.filter.ambiguousDates"]
         XCTAssertFalse(toggle.exists, "the filter bar should not show the ambiguous-dates count while the filter is off")
         let health = app.descendants(matching: .any)["ar.status.health"]
         XCTAssertTrue(health.waitForExistence(timeout: 10))
         let show = app.descendants(matching: .any)["ar.health.ambiguousDates"]
-        // The count arrives after the library loads; reopen the popover until its Show button is enabled.
-        let deadline = Date().addingTimeInterval(15)
-        repeat {
-            health.click()
-            if show.waitForExistence(timeout: 3), show.isEnabled { break }
-            app.typeKey(.escape, modifierFlags: [])
-        } while Date() < deadline
+        // Keep the popover open while counts arrive (W40.fix-reader-health-live).
+        health.click()
+        XCTAssertTrue(show.waitForExistence(timeout: 3))
+        let enabled = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: show)
+        wait(for: [enabled], timeout: 15)
         XCTAssertTrue(show.isEnabled, "a fixture with two Year tags should offer the filter in Library health")
         captureScreenshot("w40-health-popover")
         show.click()
@@ -680,19 +701,6 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(dateCell.label.contains("Two Year tags: 1984 is used, 1983 was set aside."),
                       "Date cell label: \(dateCell.label)")
         captureScreenshot("w40-date-ambiguity-filtered-row")
-
-        clickRow(0)
-        toolbarButton("ar.toolbar.editTags").click()
-        let notice = app.descendants(matching: .any)["ar.tagEditor.dateAmbiguity"]
-        XCTAssertTrue(notice.waitForExistence(timeout: 5), "the ⌘I sheet should flag the ambiguous date")
-        XCTAssertTrue(notice.label.contains("1983 was set aside"), "sheet notice: \(notice.label)")
-        captureScreenshot("w40-date-ambiguity-sheet")
-        app.buttons["ar.tagEditor.done"].click()
-
-        toggle.click()
-        waitForRows(minimum: 2, timeout: 10)
-        XCTAssertGreaterThan(rowCount, 1, "turning the filter off should bring the other rows back")
-        XCTAssertTrue(toggle.waitForNonExistence(timeout: 5), "turned off, the filter should leave the filter bar")
     }
 
     // MARK: - Phantom selection (W40.fix-reader-phantom-selection)

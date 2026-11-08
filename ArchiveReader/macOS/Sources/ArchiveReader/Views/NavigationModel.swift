@@ -257,6 +257,13 @@ final class NavigationModel: ObservableObject {
                 }
             } }
             .store(in: &cancellables)
+        // Committed results become visible during a long build. Coalesce fast batches to avoid
+        // repeatedly reading/sorting the whole library; the idle callback above still flushes the end.
+        indexer.$contentRevision
+            .dropFirst()
+            .throttle(for: .seconds(1), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.refreshFormatStatuses() } }
+            .store(in: &cancellables)
         // A quit straight after a scroll still saves the place (W40.fix-reader-restore-scroll).
         NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.topRowWrite?.perform() } }
@@ -893,7 +900,7 @@ final class NavigationModel: ObservableObject {
     private var formatGeneration = 0
     /// Fold the content index's per-file classification + format flags (+ needs-attention count) into
     /// the model, then recompute. Generation-guarded so a slower earlier refresh can't clobber a newer one
-    /// (same pattern as `runFullTextSearch`). Triggered on library change and when an index pass finishes.
+    /// (same pattern as `runFullTextSearch`). Triggered on library change, committed batches and pass end.
     func refreshFormatStatuses() {
         formatGeneration += 1
         let generation = formatGeneration
