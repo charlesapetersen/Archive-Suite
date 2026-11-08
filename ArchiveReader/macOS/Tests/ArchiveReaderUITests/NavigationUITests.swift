@@ -362,6 +362,38 @@ final class NavigationUITests: FixtureUITestCase {
 
     // MARK: - Name filter reduces rows
 
+    /// W40.fix-reader-filter-undo-levels: multiple edits remain independently undoable while the
+    /// debounced list and its filter chips refresh. Text undo must continue to own both shortcuts.
+    func testFilenameFilterUndoesAndRedoesSuccessiveEdits() throws {
+        let field = app.textFields["ar.filter.name"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let initialRows = rowCount
+        let chip = app.buttons["ar.filter.chip.name"]
+        func expectFilter(_ value: String) {
+            let predicate = NSPredicate { _, _ in
+                let correctText = (field.value as? String ?? "") == value
+                let correctFilter = value.isEmpty ? !chip.exists : chip.exists && chip.label == "Remove Name: \(value)"
+                return correctText && correctFilter
+            }
+            expectation(for: predicate, evaluatedWith: field)
+            waitForExpectations(timeout: 5)
+        }
+        field.click()
+        field.typeText("abc")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        XCTAssertEqual(field.value as? String, "abc")
+        for value in ["ab", "a", ""] {
+            pressKey("z", modifiers: .command)
+            expectFilter(value)
+        }
+        waitForRows(minimum: initialRows, timeout: 5)
+        for value in ["a", "ab", "abc"] {
+            pressKey("z", modifiers: [.command, .shift])
+            expectFilter(value)
+        }
+        captureScreenshot("w40-filename-filter-multiple-undo-redo")
+    }
+
     func testNameFilterReducesRows() throws {
         waitForRows(minimum: 5, timeout: 10)
         let countBefore = rowCount

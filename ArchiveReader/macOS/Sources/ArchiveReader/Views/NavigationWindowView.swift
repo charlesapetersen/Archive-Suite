@@ -504,9 +504,7 @@ struct NavigationWindowView: View {
     /// chips in the row below while on.
     private var filterBarSearchControls: some View {
         HStack(spacing: 12) {
-            TextField("Filter file name…", text: $model.filterSearchText)
-                .textFieldStyle(.roundedBorder)
-                .controlSize(.large)
+            FilenameFilterField(text: $model.filterSearchText)
                 .frame(minWidth: 140, idealWidth: 260, maxWidth: 300)   // a narrow window must not squeeze it to nothing
                 .help("Filter the list by file name")
                 .accessibilityLabel("Filter file name")

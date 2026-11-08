@@ -2,6 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-filter-undo-levels, 2026-11-07) — multiple filename-filter undo steps
+
+The file-name filter has its own native field editor and undo history. Each typing, paste, replacement or deletion edit can be undone and redone separately; undo/redo publishes the result to the live filter. Binding echoes retain the caret and history, while Clear or another external reset starts fresh history. Marked-text editing keeps native input-method behavior, and switching fields keeps their undo histories separate.
+
+Covered by `FilenameFilterFieldTests`, `NavigationUITests.testFilenameFilterUndoesAndRedoesSuccessiveEdits` (field, filter chip and list), and `UndoFocusUITests` (text versus tag history on scratch files).
+
 ## ✅ CLOSED (W40.fix-reader-doc-keys-focus, 2026-11-07) — document arrows and clicked-pane focus
 
 Plain arrows pan the focused PDF page, bounded at its edges; modified arrows retain menu and text-selection behavior. Clicking a PDF or extracted-text pane updates the focus border and focused zoom even without a selection. Rebuilt panes recover keyboard focus only when the window itself holds it, preserving the Find field’s caret.

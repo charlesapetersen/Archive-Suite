@@ -130,9 +130,11 @@ final class UndoFocusUITests: FixtureUITestCase {
         XCTAssertEqual(Self.tags(Self.xattr(path)), before, "⇧⌘Z in the filter must not redo the tag change")
         // Leave the filter empty with its typing redoable, then ⇧⌘Z from the list: the tag change, not the
         // text (Edit ▸ Redo must not take the key while the list has the keyboard).
-        pressKey("z", modifiers: .command)
-        settle(1)
-        XCTAssertNotEqual(filter.value as? String, "zq", "precondition: the filter's typing is undone again")
+        for expected in ["z", ""] {
+            pressKey("z", modifiers: .command)
+            settle(1)
+            XCTAssertEqual(filter.value as? String ?? "", expected, "the filter undoes one edit at a time")
+        }
         clickRow(0)
         pressKey("z", modifiers: [.command, .shift])
         XCTAssertTrue(waitFor { Self.tags(Self.xattr(path)) == after },
