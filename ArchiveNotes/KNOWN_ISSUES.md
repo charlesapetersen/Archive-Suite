@@ -15,7 +15,10 @@ waits for the table's mouse handling to finish, as Tags already did.
 a scratch store. Injecting a control reset reproduced the old durable date loss and tag-removal request;
 ordinary focus loss alone did not reproduce the owner's exact gesture. The tests also cover real date
 replacement, explicit date/tag clearing, unchanged blur and preservation of the note's body and subjects.
-The focused interaction regression is `InspectorPanelUITests.testDateAndTagsEditInTheList`.
+Full Notes smoke passes (245 XCTest + 1159 Swift Testing), including the existing table pixel guards.
+`InspectorPanelUITests.testDateAndTagsEditInTheList` passes in the macOS 27.2 off-screen VM with a seeded
+1968 date: unchanged date/tag blur, replacement, Escape and clearing; all three PNGs were inspected.
+The broader VM-suite fixes remain tracked separately by W40.vm-macos27-notes.
 
 ## ⚠️ LIMIT (W40.fix-notes-choose-store, 2026-10-29) — Choose Store Folder… cannot always see an enclosing archive
 

@@ -14858,3 +14858,19 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Implementation checkpoint: ac603551. No rehearsal-cache inputs created; retained only temporary
   verification logs, result bundle and screenshots for audit. No paid run or real-corpus access.
   <!-- /W40.reader-tiled-pages -->
+
+- [x] **W40.fix-notes-date-cell-erase — Double-clicking a date in the list and leaving it unchanged keeps the date [S · S2 · Tier-2]** · §W40 · SHIPPED 2026-11-08 (this commit) (lane: notes) (uses: build) — Found by the owner's Notes guided session 2, 2026-11-06 (`verification/sessions/notes-2-returned.md`, row 11); the owner's call: fix everything on the form, the B rows first. Double-click the date cell, change nothing, click away: the date is gone. Data loss on a write path, so Tier-2 (adversarial review and a functional test on a scratch store). Check the tags cell's same path. Notes' VM UITests do not pass on macOS 27 until `W40.vm-macos27-notes`; verify with the unit bundle and render guards, and name the UITest still to run.
+  Date/Title cells now save the last actual edit notification; untouched controls write nothing,
+  and a later control reset cannot erase a typed date. Tags requires a genuine edit too. Date
+  double-click startup waits for table mouse handling to end, matching Tags. Explicit clears remain live.
+  Tier-2: independent adversarial review clear; injected resets reproduced old durable date loss,
+  tag-removal requests and typed-date loss against the original behavior. Ordinary blur alone
+  did not reproduce the owner’s exact failure. Five new lifecycle tests use real AppKit field editors
+  and the production date-cell factory on a scratch store, preserving the body and subjects.
+  Full Notes smoke: 245 XCTest + 1159 Swift Testing = 1404 tests, no failures or new compiler warnings;
+  existing table pixel guards pass. InspectorPanelUITests.testDateAndTagsEditInTheList passed in
+  the macOS 27.2 off-screen VM with a seeded 1968 date: unchanged date/tag blur, replacement,
+  Escape and explicit clearing. Three VM PNGs inspected. The broader VM suite remains W40.vm-macos27-notes.
+  Implementation checkpoint: 24a3a22b. No rehearsal-cache inputs created; temporary logs, result bundles
+  and VM screenshots retained under /tmp/notes-date-* for audit. No paid run or real-store/corpus access.
+  <!-- /W40.fix-notes-date-cell-erase -->

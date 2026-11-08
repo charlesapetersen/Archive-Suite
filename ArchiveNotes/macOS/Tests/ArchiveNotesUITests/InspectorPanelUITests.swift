@@ -101,11 +101,16 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             _ = selectItem(uuid: id)
             @MainActor func markdown() -> String { rawMarkdown(inItemDir: id) ?? "" }
             @MainActor func saved(_ check: @escaping (String) -> Bool) -> Bool { pollUntil(timeout: 12) { check(markdown()) } }
-            let before = markdown()
             let dateCell = mainWindow.descendants(matching: .any)["an.cell.date.\(id)"]
             XCTAssertTrue(dateCell.waitForExistence(timeout: 10), "the list shows the Date column")
+            // The plain note starts undated. Seed a real date before checking that an untouched edit keeps it.
+            dateCell.doubleClick()
+            app.typeKey("a", modifierFlags: .command)
+            app.typeText("1968\r")
+            XCTAssertTrue(saved { $0.contains("date: 1968") && $0.contains("date_precision: year") })
+            let before = markdown()
             let displayedDate = dateCell.value as? String
-            XCTAssertFalse(displayedDate?.isEmpty ?? true, "the fixture starts with a visible date")
+            XCTAssertEqual(displayedDate, "1968", "the untouched edit must exercise a populated date")
 
             // W40.fix-notes-date-cell-erase: merely opening a cell and leaving it must write nothing.
             dateCell.doubleClick()
