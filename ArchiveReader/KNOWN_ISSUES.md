@@ -2,6 +2,23 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-tag-add-speed, 2026-11-08) — verified tags render before the large-library refresh
+
+The inspector already submitted Return and Tab promptly. Scratch timing found the delay after verification:
+at 50,001 synthetic rows the queued cache/filter/sort pass occupied the main thread for 394–592 ms. Large
+snapshots with unchanged paths now prepare immutable presentation data off-main; verified library tags can
+render while that work runs. A newer library snapshot cancels the preparation, and a newer filter/sort view
+supersedes its presentation. Small libraries keep their inexpensive synchronous refresh. Rapid successive
+inspector additions retain the verified tag's spelling before autocomplete finishes refreshing.
+
+The writer, identity checks, verification and durable undo journal remain synchronous and unchanged.
+`DocumentWindowTagTests.testInspectorReturnAndTabDoNotWaitForLargeLibraryPresentation` exercises the real
+Return and Tab delegate routes, fresh scratch tags, unchanged file bytes, one undo per key, rapid case variants,
+a superseding filter and an empty replacement library. Its 250 ms main-thread budget fails the measured old
+path. The test also renders the verified chip. `TagEntryUITests.testInspectorShowsTagsAfterReturnAndTab`
+checks both visible chips and disk tags in the off-screen VM. Timing details:
+`verification/evidence/reader/W40.fix-reader-tag-add-speed.md`.
+
 ## ✅ CLOSED (W40.fix-reader-undo-status-detail, 2026-11-08) — Undo and Redo describe the verified change
 
 The status names the file, field and before/after values; groups count distinct files and combine matching

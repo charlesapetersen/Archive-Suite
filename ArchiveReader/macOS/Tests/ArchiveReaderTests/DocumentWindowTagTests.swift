@@ -1,4 +1,7 @@
 import XCTest
+import SwiftUI
+import ArchiveCore
+import ArchiveCoreUI
 @testable import ArchiveReader
 
 /// `W40.fix-reader-menus-follow-window`: with a document window in front, the Tags menu acts on the file that
@@ -55,6 +58,91 @@ final class DocumentWindowTagTests: XCTestCase {
         let viewer = DocumentViewerModel(persists: false, thumbnailer: nil)
         viewer.load(DocumentSelection(filePaths: paths))
         return DocumentTagActions(router: router, viewer: viewer)
+    }
+
+    /// Exercises both actual delegate routes, verified writes and the next UI turns at scale. A tiny
+    /// library hid the regression: its whole refresh took ~1 ms, versus ~400 ms for these 50k rows.
+    func testInspectorReturnAndTabDoNotWaitForLargeLibraryPresentation() async throws {
+        let fixture = try makeRoot([("timing.pdf", ["Unread", "Keep"])])
+        let bytes = try Data(contentsOf: fixture.files[0])
+        let indexer = ContentIndexer(url: ledgerDir.appendingPathComponent("index.sqlite"))
+        let model = NavigationModel(defaults: fixtureDefaults(pinnedTo: fixture.root), indexer: indexer, thumbnailer: nil)
+        let real = try XCTUnwrap(model.library.files.first)
+        let rows = (0..<50_000).map { i in
+            ArchiveFile(url: fixture.root.appendingPathComponent("Box/fake-\(i).pdf"), name: "fake-\(i).pdf", fileType: "PDF",
+                        tags: real.tags, contentModified: nil, isDataless: true)
+        }
+        model.library.replaceFilesForTesting([real] + rows)
+        try await waitUntil { model.displayed.count == rows.count + 1 && indexer.completedPassesForTesting > 0 && indexer.progress == nil }
+        // Flush the index-completion callbacks before measuring the tag-entry path.
+        await mainTurn(); await mainTurn()
+
+        let field = SubjectEntryField(draft: .constant(""), placeholder: "Add tag", identifier: "timing",
+            suggestions: { [] }, onAdd: { model.applyEdit(.addSubject($0), paths: [real.path]) })
+        let coordinator = field.makeCoordinator()
+        let tf = NSTokenField()
+        for (subject, isReturn) in [("Return Tag", true), ("Tab Tag", false)] {
+            let start = Date()
+            if isReturn {
+                let editor = NSTextView(); editor.string = subject
+                XCTAssertTrue(coordinator.control(tf, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))))
+            } else {
+                tf.objectValue = [subject]
+                coordinator.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification, object: tf))
+            }
+            await mainTurn(); await mainTurn()
+            let elapsed = Date().timeIntervalSince(start)
+            print("TAG_ENTRY \(isReturn ? "Return" : "Tab") verified + next UI turns: \(elapsed * 1000) ms, rows=\(rows.count + 1)")
+            XCTAssertLessThan(elapsed, 0.25, "the verified chip must not wait for the whole library's cache and sort pass")
+            XCTAssertTrue(model.libraryFiles(atPaths: [real.path])[0].subjects.contains(subject))
+            XCTAssertTrue(try tagsOnDisk(fixture.files[0]).contains(subject))
+            if isReturn {
+                let view = NSHostingView(rootView: TagInspectorView(model: model, paths: [real.path], onClose: {}).environment(\.colorScheme, .light))
+                let png = try XCTUnwrap(RenderProbe.pngData(fromAppKitView: view, size: CGSize(width: 340, height: 700)))
+                writeRenderArtifact(png, named: "tag-entry-immediate-return.png")
+                assertRendersNonBlank(RenderProbe.cgImage(fromPNG: png), "verified tag during background refresh")
+            }
+        }
+        // A quick case variant before autocomplete finishes must keep the verified spelling.
+        model.applyEdit(.addSubject("return tag"), paths: [real.path])
+        XCTAssertFalse(try tagsOnDisk(fixture.files[0]).contains("return tag"))
+        XCTAssertEqual(model.undoDepth, 2, "each key is one undo; the case variant is a no-op")
+        try await waitUntil { model.allSubjects.contains("Tab Tag") }
+        XCTAssertEqual(model.displayed.count, rows.count + 1)
+
+        // An older prepared presentation cannot undo a newer filter/sort decision.
+        model.applyEdit(.addSubject("Later"), paths: [real.path])
+        await mainTurn()   // start preparing the old, unfiltered presentation
+        model.filter.searchText = "timing"
+        model.recompute()
+        try await waitUntil { model.allSubjects.contains("Later") }
+        XCTAssertEqual(model.displayed.map(\.path), [real.path])
+
+        // A library/root replacement invalidates pending work before it can repopulate the list.
+        model.applyEdit(.addSubject("Superseded"), paths: [real.path])
+        await mainTurn()
+        model.library.replaceFilesForTesting([])
+        await mainTurn(); await mainTurn()
+        try await waitUntil { model.displayed.isEmpty && model.allSubjects.isEmpty }
+        XCTAssertTrue(model.library.files.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: fixture.files[0]), bytes, "only Finder metadata was edited")
+        try await waitUntil { indexer.progress == nil }
+        await mainTurn(); await mainTurn()
+        await indexer.closeForTesting()
+    }
+
+    private func mainTurn() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+    }
+
+    private func waitUntil(_ predicate: () -> Bool) async throws {
+        for _ in 0..<500 {
+            if predicate() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("library presentation did not settle")
     }
 
     func testMarkReadActsOnTheOpenFileNotTheListSelection() throws {

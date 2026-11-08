@@ -43,6 +43,35 @@ final class TagEntryUITests: FixtureUITestCase {
         try await super.tearDown()
     }
 
+    /// W40.fix-reader-tag-add-speed: observe the chips as well as the verified on-disk tags.
+    func testInspectorShowsTagsAfterReturnAndTab() throws {
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        waitForRows(minimum: 2, timeout: 15)
+        guard let (_, firstPath) = rowFile(0), let (_, secondPath) = rowFile(1) else {
+            return XCTFail("two fixture files are needed")
+        }
+        clickRow(0)
+        pressKey("i", modifiers: .command)
+        let add = app.textFields["ar.tagEditor.addSubject"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.click()
+        typeSlowly("W40te Speed")
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(app.buttons["ar.tagEditor.chip.W40te Speed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(tags(firstPath).contains("W40te Speed"))
+        captureScreenshot("tag-speed-return")
+
+        clickRow(1)
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.click()
+        typeSlowly("W40te Spe")
+        app.typeKey(.tab, modifierFlags: [])
+        XCTAssertTrue(app.buttons["ar.tagEditor.chip.W40te Speed"].waitForExistence(timeout: 2))
+        XCTAssertTrue(tags(secondPath).contains("W40te Speed"))
+        XCTAssertFalse(tags(secondPath).contains("W40te Spe"))
+        captureScreenshot("tag-speed-tab")
+    }
+
     func testTagEntryKeepsFocusAndASpaceEndsACompletion() throws {
         XCTAssertTrue(table.waitForExistence(timeout: 10))
         waitForRows(minimum: 2, timeout: 15)

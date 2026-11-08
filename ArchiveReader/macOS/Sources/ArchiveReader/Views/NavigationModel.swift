@@ -217,13 +217,19 @@ final class NavigationModel: ObservableObject {
         restoreViewState()   // last session's filter + sort override the defaults (C2)
         filterSearchText = filter.searchText   // seed from restored state
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
-        // fires on main; assumeIsolated keeps the recompute on the MainActor without an async hop.
+        // fires on main. Defer its consumption until the new value commits (@Published uses willSet).
         library.$files
-            // Deliver ASYNC on the main queue. @Published emits in willSet (before the property is
-            // committed), so a synchronous sink would read the OLD `library.files` inside recompute()
-            // — which made the list show 0 of N. receive(on:) defers until after the value commits.
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.libraryDidChange() } }
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                guard let self else { return }
+                // Invalidate before willSet finishes, including work already preparing off-main.
+                self.libraryRevision &+= 1
+                self.libraryPreparation?.cancel()
+                let revision = self.libraryRevision
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.libraryRevision == revision else { return }
+                    self.libraryDidChange()
+                }
+            } }
             .store(in: &cancellables)
         // Debounce the filename search text — 150 ms pause before recomputing (fixes the typing
         // beachball at 40k+ rows by keeping recompute off the per-keystroke path).
@@ -762,39 +768,40 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Derived
 
+    private var viewRevision: UInt64 = 0
+
+    private func presentationInput(_ files: [ArchiveFile]) -> LibraryPresentation.Input {
+        let prefixes = rootStore.discoveredPathPrefix.map { excludedFolders.absolutePrefixes(rootPath: $0) } ?? []
+        return LibraryPresentation.Input(files: files, excludedPrefixes: prefixes,
+            matches: rowPredicate(scope: scope, filter: filter, ftsPaths: ftsPaths),
+            sort: sort, marks: sortMarks(), rank: ftsRank ?? baseRank)
+    }
+
     func recompute() {
-        var base = library.files
-        // Exclude user-designated folders before any other filtering.
-        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            base = base.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
-        }
-        // Counted after the exclusion, so the toggle never offers files no filter can list.
-        let ambiguous = base.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) }
-        if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
-        let universe = base
-        base = base.filter(rowPredicate(scope: scope, filter: filter, ftsPaths: ftsPaths))
-        let causes = base.isEmpty ? emptyCauses(in: universe) : []
+        viewRevision &+= 1
+        let input = presentationInput(library.files)
+        present(input.build(), marks: input.marks)
+    }
+
+    private func present(_ result: LibraryPresentation, marks: SortMarks) {
+        if result.ambiguousCount != ambiguousDateCount { ambiguousDateCount = result.ambiguousCount }
+        let causes = result.displayed.isEmpty ? emptyCauses(in: result.universe) : []
         if causes != emptyListCauses { emptyListCauses = causes }
-        if let rank = ftsRank ?? baseRank, sort.first?.field == .relevance {
-            // bm25 relevance ordering: sort by the rank map (0 = best match); Find's, else the scope's.
-            displayed = base.sorted { (rank[$0.path] ?? Int.max) < (rank[$1.path] ?? Int.max) }
-        } else {
-            lastSortMarks = sortMarks()
-            displayed = LibrarySort.sorted(base, by: sort, marks: lastSortMarks)
-        }
+        lastSortMarks = marks
+        displayed = result.displayed
         displayedGeneration += 1
         _tagCloudCache = nil
-        duplicatedNames = DuplicateNames.duplicatedNames(in: displayed)   // O(n) filename-collision set
+        duplicatedNames = result.duplicatedNames
         pruneSelectionToDisplayed()
-        refreshSelectionCache()   // sort order affects the selection cache too
-        persistViewState()        // C2: remember filter + sort across launches
-        reapplyPendingTopRow()    // a relaunch's place, while the rows are still arriving
+        refreshSelectionCache()
+        persistViewState()
+        reapplyPendingTopRow()
     }
 
     /// Whether a row is listed. The base scope (smart folder) is the visible universe; the user filter layers on
     /// top, the OCR search and the needs-attention status (both from the content index) beside it.
     private func rowPredicate(scope: SavedSearch?, filter: LibraryFilter,
-                              ftsPaths: Set<String>?) -> (ArchiveFile) -> Bool {
+                              ftsPaths: Set<String>?) -> @Sendable (ArchiveFile) -> Bool {
         let rules = scope == nil ? nil : scopeRules
         let context = rules.map { ruleContext(for: $0) }
         let statuses = formatStatuses
@@ -1154,12 +1161,6 @@ final class NavigationModel: ObservableObject {
         let visible = Set(displayed.map(\.id))
         if !selection.isSubset(of: visible) { selection.formIntersection(visible) }
     }
-    /// One entry per tag (case variants are one tag), in the spelling most files use.
-    private func refreshSubjectsCache() {
-        allSubjectsCache = tagCounts(library.files.lazy.map(\.subjects)).map(\.tag)
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        subjectSpellingByKey = Dictionary(allSubjectsCache.map { (tagKey($0), $0) }, uniquingKeysWith: { a, _ in a })
-    }
     private var subjectSpellingByKey: [String: String] = [:]
 
     /// Tag cloud over the *currently displayed* rows: each **subject** tag with the number of visible
@@ -1196,6 +1197,8 @@ final class NavigationModel: ObservableObject {
     // "unchanged" only ever
     // yields a briefly-stale derived cache, self-healing on the next real change; never a data risk.
     private var pathsSig = 0, subjectsSig = 0, matchSig = 0
+    private var libraryRevision: UInt64 = 0
+    private var libraryPreparation: Task<LibraryPresentation.Refresh?, Never>?
 
     /// React to a new `library.files`: rebuild only what actually changed, then recompute + index.
     private func libraryDidChange() {
@@ -1203,11 +1206,45 @@ final class NavigationModel: ObservableObject {
         let ps = LibraryChangeSignature.paths(files)
         let pathsChanged = ps != pathsSig
         if pathsChanged { pathsSig = ps; folderTree = buildFolderTree() }            // paths → folder tree
+        // Tag edits leave the path set alone. At scale the cache + sort pass used to block the
+        // first frame with the verified chip for ~400 ms (50k rows, Debug). Prepare immutable data
+        // off-main; smaller libraries keep the cheap synchronous path. No write or ledger work moves.
+        if !pathsChanged, files.count >= 1_000 {
+            let revision = libraryRevision, view = viewRevision
+            let input = presentationInput(files), previousSubjects = subjectsSig
+            let preparation = Task.detached(priority: .userInitiated) {
+                LibraryPresentation.Refresh.prepare(input, previousSubjects: previousSubjects)
+            }
+            libraryPreparation = preparation
+            Task { [weak self] in
+                guard let result = await preparation.value, !preparation.isCancelled,
+                      let self, self.libraryRevision == revision else { return }
+                self.libraryPreparation = nil
+                self.updateLibraryCaches(subjects: result.subjectsSignature, matches: result.matchSignature,
+                                         spellings: result.spellings)
+                // A filter/sort/flag change may already have recomputed a newer presentation.
+                if self.viewRevision == view { self.present(result.presentation, marks: input.marks) }
+                self.finishLibraryChange(files, pathsChanged: false)
+            }
+            return
+        }
         let ss = LibraryChangeSignature.subjects(files)
-        if ss != subjectsSig { subjectsSig = ss; refreshSubjectsCache() }            // subjects → autocomplete
-        let ms = LibraryChangeSignature.matchFacets(files)
-        if ms != matchSig { matchSig = ms; refreshSmartFolderCounts() }              // match facets → badges
-        recompute()                                     // always — a row's read-state/tags may have moved it
+        let spellings = ss == subjectsSig ? nil : LibraryPresentation.subjectSpellings(files)
+        updateLibraryCaches(subjects: ss, matches: LibraryChangeSignature.matchFacets(files), spellings: spellings)
+        recompute()
+        finishLibraryChange(files, pathsChanged: pathsChanged)
+    }
+
+    private func updateLibraryCaches(subjects: Int, matches: Int, spellings: [String]?) {
+        subjectsSig = subjects
+        if let spellings {
+            allSubjectsCache = spellings
+            subjectSpellingByKey = Dictionary(spellings.map { (tagKey($0), $0) }, uniquingKeysWith: { a, _ in a })
+        }
+        if matches != matchSig { matchSig = matches; refreshSmartFolderCounts() }
+    }
+
+    private func finishLibraryChange(_ files: [ArchiveFile], pathsChanged: Bool) {
         // Filter excluded folders before indexing so excluded files are never added to the content index.
         let filesToIndex: [ArchiveFile]
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
@@ -1776,6 +1813,10 @@ final class NavigationModel: ObservableObject {
             }
         }
         library.applyVerifiedWrites(verified)   // one O(N+M) overlay pass (was per-file O(N*M))
+        if case .addSubject(let subject) = op, verified.contains(where: { DocumentTags.parse(raw: $0.after, labelNumber: $0.afterLabel).subjects.contains(subject) }) {
+            // The next Return may precede the background autocomplete refresh.
+            subjectSpellingByKey[tagKey(subject)] = subject
+        }
         refreshUndoHistory()
         statusMessage = "Edited \(changed) file\(changed == 1 ? "" : "s")"
             + (failures > 0 ? "; \(failures) could not update." : ".")

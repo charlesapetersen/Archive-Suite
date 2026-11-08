@@ -136,7 +136,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
 }
 
 /// What the in-memory test cannot see on the file: the content index's answers.
-struct RuleContext {
+struct RuleContext: Sendable {
     /// Per text rule id, the paths matching its `ftsExpression`. A text rule missing here (its query has not
     /// returned yet) is skipped like an inactive one.
     var textHits: [UUID: Set<String>] = [:]
