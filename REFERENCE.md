@@ -157,3 +157,105 @@ covers this directory — the file's real protection is living outside it.
 
 Use it to answer "what did this look like before?" — resolving an old SHA a doc cites, or recovering a
 removed `.dmg`. It is a read‑only archive, not a remote.
+
+## Review pause record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+   ⏸ **Paced *whole-project* reviews are PAUSED for the daemon (owner, 2026-07-29; re-confirmed 2026-08-01).**
+   The original wording said "while it drains the `SUITE_TODO.md` **Wave 23** bug queue" — **that condition has
+   now been MET** (Wave 23 is 34 done / 8 open, and all 8 remaining are `-fu` follow-ups rather than original
+   findings). The owner was shown exactly that on 2026-08-01 and **chose to keep the pause anyway**, including
+   declining a narrowly-scoped Notes-only review. **So do not lift the pause on the grounds that Wave 23 is
+   drained** — that argument has already been made to him and turned down. See [`REVIEW.md`](REVIEW.md).
+   **This does NOT relax this step:** the
+   per-change Tier-2 gate (adversarial self-review + a functional test on anything with no undo) is
+   unchanged and still mandatory. What's paused is *proactively hunting for new findings*, not reviewing
+   your own change.
+
+## Signing record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+- **Signing: a local self‑signed cert, `CODE_SIGN_IDENTITY: "Archive Suite Dev"`** — **not** ad‑hoc (`"-"`) since 2026‑08‑07, still not notarized (ad‑hoc pinned the designated requirement to the **cdhash**, so every rebuild looked like a new program and macOS forgot every TCC grant). Create the identity once per machine with **[`ops/setup-signing-cert.sh`](ops/setup-signing-cert.sh)**, which carries the full rationale and the traps; key at `~/.local/share/archive-suite-signing/` — **back it up** (losing it ⇒ new cert ⇒ re‑grant every prompt). iOS stays ad‑hoc (a macOS cert is invalid there), and so does **every build inside the Tart GUI‑VM** — no keychain in the guest, so `gui-vm-gate.sh`/`vm-gui-runner.sh` pass `CODE_SIGN_IDENTITY=-`; ⛔ don't provision the cert into the VM (W28.cert‑fu1).
+  ⚠️ **A self‑signed cert has no Team ID**, so `ENABLE_HARDENED_RUNTIME: YES` + **library validation** refuses Xcode 16's `<App>.debug.dylib` (*no team ≠ same team*) — the app dies at launch with SIGABRT, taking every app‑hosted test with it. Reader/Notes therefore use **Debug‑only** `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow` entitlements for their app-hosted tests. Processor instead sets `ENABLE_DEBUG_DYLIB: NO` (Debug) and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` (Release), keeping strict library validation — why: [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) §*Releasing*, W28.cert-fu2. **⛔ Release must contain neither debug entitlement.**
+  Full record — why ad‑hoc failed, W7.1, W28.cert‑fu1: `SUITE_TODO_DONE.md` §*Signing + TCC consent*.
+
+## Completed tracker record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+- **Completed work → `SUITE_TODO_DONE.md`** (root) — when an item ships, **move its whole entry there**, **appended at the END** (header line names its section as `· §<section>`, last line `  <!-- /<TAG> -->`), instead of ticking it in place (2026-08-01: 47 open items were buried among 160 done ones in one 3,580-line file). Doc-sync is unchanged — the move still happens in the same commit as the code. Kept rather than deleted because the entries cite the commits that shipped them and often carry *why* a later change may or may not revisit that code. **Append-only, with `merge=union` in `.gitattributes`** (`W35.done-union`, 2026-10-08) so two workers finishing at once never conflict — safe only because no existing line is ever edited; the unique last line stops union fusing two entries that end alike. ⚠️ `next-queue-item.sh` and `check-tracker-sync.sh` both read it; don't rename it without them.
+
+## Owner sheet record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+**Every owner sheet has notes, shows what it does not ask, and shows pages upright (owner, 2026-11-05).** Any sheet
+the owner answers (truth checks, rulings, label or field disputes) has three things, built in before it is offered:
+- **A notes box per item** (a photo, a page, a document), optional, saved in the answers file beside the answers under
+  its own key (`_notes` or `_notes/<id>`). Typing in it never triggers the sheet's answer keys. The fold carries each
+  note on its truth row, and the session that scores reads the notes first, since a note can correct what was not
+  asked or say an item should be dropped.
+- **The fields it does not ask**, listed on each item with the value going into the truth (agreed by the readers, or
+  ruled by a reader), so the owner can correct one in the notes. That means every truth the item has, not only the
+  one being asked: on a letter, the sender, recipient and date from the entity and date truths as well as the item
+  fields. The item-field sheet listed only its own fields, and the owner's notes asked of many letters "did we get the
+  date, the sender, the recipient?" (2026-11-05). The header says that unasked fields go in as listed.
+- **Pages and photos upright.** Matching a JPEG to its PDF page's orientation does not make it upright. Check each
+  image with `segbench/ocr_orient.swift` (Apple Vision at all four turns), turn only clear wins, check close calls
+  by eye, and give every image a "turn" button that turns its boxes with it. The sheet says which pages it turned.
+  The pattern is `item_fields_retruth.py`'s sheet (a51cc0ef), with `ct_truth.py`'s notes (9c5d42d9).
+
+It was written after the label sheet (W47.ct-truth-jpeg) showed 36 photos turned and left the owner asking whether
+fields it did not ask were checked at all; once it had a notes box, he left notes on 127 photos. The item-field sheet had the
+same three gaps until it was fixed the same day.
+
+
+## Worktree isolation record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+**Before you edit, build, or commit anything in this repo, be in your own dedicated git worktree — never
+work directly in this primary checkout.** This is *unconditional*: do it even if you believe you are the
+only instance running. You cannot know that another instance or subagent won't start in parallel, and
+**the owner does not track worktrees** — so the only coordination-free way to stop parallel instances from
+clobbering each other's uncommitted edits and racing the build cache is that *nobody* works in the primary
+checkout. (A pure read-only / question-answering session that changes nothing is the only exception — don't
+spin up a worktree just to answer a question.)
+
+
+## Repository layout record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+## Repo map
+
+```
+Archive-Suite/
+├── SPEC/tag-format.md      # THE shared tag/PDF contract — single source of truth for all apps
+├── OWNER_AUTHORIZATIONS.md # what the owner has cleared on gated paths, + each grant's ⛔ constraints
+├── packages/ArchiveCore/   # shared Swift package (tags, PDF, durable links, suite marker)
+├── release/                # suite-level release tooling (combined DMG)
+├── launch.sh               # dispatcher → ./launch.sh reader|processor|notes
+├── ArchiveProcessor/       # outer = relocated app repo
+│   ├── macOS/              #   XcodeGen project dir: project.yml (authoritative), Sources/, generated .xcodeproj (gitignored)
+│   ├── ArchiveCapture/     #   Android capture companion
+│   └── ArchiveCaptureiOS/  #   iOS capture companion
+├── ArchiveReader/          # outer = relocated app repo
+│   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
+├── ArchiveNotes/           # provenance-first note-taking app
+│   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
+└── ArchiveOCRBench/        # the bench's measured OCR, segmentation and handwriting results as one page; kept current (below)
+```
+
+The inner XcodeGen project dirs are named `macOS/` (de-nested from the old `App/App/` layout that
+was a byproduct of the repo merge). Each app's `launch.sh`/`bootstrap.sh` use paths relative to
+themselves.
+
+
+## Documentation record
+
+Full text moved from `CLAUDE.md` by doc-fix (2026-11-08); the guide retains every rule.
+
+Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). **Owner grants on gated paths live in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md)** — committed on purpose (moved out of the gitignored maintenance plan 2026-08-01) because a grant plus its ⛔ constraints is durable policy that needs history and recoverability; entries there are a permanent record, marked discharged when the item ships rather than deleted. Don't keep a doc "just because" — fold durable bits into these and drop the rest. Untracked scratch docs that are done/superseded (e.g. completed-run review reports) are archived under the gitignored **`old/`** folder (see `old/README.md`) rather than deleted — recoverable, out of the way.

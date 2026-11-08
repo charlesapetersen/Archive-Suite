@@ -88,16 +88,10 @@ The whole per-change checklist in one place, so no rule hides inside a longer se
    **full-codebase review**, use the paced method in [`REVIEW.md`](REVIEW.md) — one subsystem per session,
    lean fan-out, refute-verify; **never** one giant fan-out (it blows a usage window). Use the `/code-review`
    skill for the working diff.
-   ⏸ **Paced *whole-project* reviews are PAUSED for the daemon (owner, 2026-07-29; re-confirmed 2026-08-01).**
-   The original wording said "while it drains the `SUITE_TODO.md` **Wave 23** bug queue" — **that condition has
-   now been MET** (Wave 23 is 34 done / 8 open, and all 8 remaining are `-fu` follow-ups rather than original
-   findings). The owner was shown exactly that on 2026-08-01 and **chose to keep the pause anyway**, including
-   declining a narrowly-scoped Notes-only review. **So do not lift the pause on the grounds that Wave 23 is
-   drained** — that argument has already been made to him and turned down. See [`REVIEW.md`](REVIEW.md).
-   **This does NOT relax this step:** the
-   per-change Tier-2 gate (adversarial self-review + a functional test on anything with no undo) is
-   unchanged and still mandatory. What's paused is *proactively hunting for new findings*, not reviewing
-   your own change.
+   ⏸ **Paced whole-project reviews remain PAUSED for the daemon** (owner, 2026-07-29, re-confirmed
+   2026-08-01), including targeted Notes review. Draining Wave 23 does not lift the pause: the owner
+   already declined that argument. Per-change Tier-2 review remains mandatory; proactive finding hunts
+   stay paused. See [`REVIEW.md`](REVIEW.md); history: [`REFERENCE.md`](REFERENCE.md) §"Review pause record".
 4. **Docs move with the code — in the SAME commit** (→ *Docs & backlog convention*, below): flip the
    shipped `SUITE_TODO.md` checkbox, update `KNOWN_ISSUES.md`, delete a shipped `execution-plans/` plan.
    `SUITE_TODO.md` is the tracker of record; an unattended run reconciles it **before it ends**.
@@ -115,13 +109,9 @@ session with `--dangerously-skip-permissions`; use `--permission-mode default` +
 
 ## Worktree-first — mandatory before any edit (every agent & instance)
 
-**Before you edit, build, or commit anything in this repo, be in your own dedicated git worktree — never
-work directly in this primary checkout.** This is *unconditional*: do it even if you believe you are the
-only instance running. You cannot know that another instance or subagent won't start in parallel, and
-**the owner does not track worktrees** — so the only coordination-free way to stop parallel instances from
-clobbering each other's uncommitted edits and racing the build cache is that *nobody* works in the primary
-checkout. (A pure read-only / question-answering session that changes nothing is the only exception — don't
-spin up a worktree just to answer a question.)
+**Before any edit, build or commit, use your own dedicated git worktree, never the primary checkout.**
+This is unconditional, even if you think you are alone. Pure read-only sessions need no worktree.
+Rationale: [`REFERENCE.md`](REFERENCE.md) §"Worktree isolation record".
 
 **Make this your first step — it's idempotent, so it's safe to run at the start of every session:**
 ```bash
@@ -159,27 +149,15 @@ Ownership lanes, per-app build commands, and shared hotspots: [`AGENTS.md`](AGEN
 
 ## Repo map
 
-```
-Archive-Suite/
-├── SPEC/tag-format.md      # THE shared tag/PDF contract — single source of truth for all apps
-├── OWNER_AUTHORIZATIONS.md # what the owner has cleared on gated paths, + each grant's ⛔ constraints
-├── packages/ArchiveCore/   # shared Swift package (tags, PDF, durable links, suite marker)
-├── release/                # suite-level release tooling (combined DMG)
-├── launch.sh               # dispatcher → ./launch.sh reader|processor|notes
-├── ArchiveProcessor/       # outer = relocated app repo
-│   ├── macOS/              #   XcodeGen project dir: project.yml (authoritative), Sources/, generated .xcodeproj (gitignored)
-│   ├── ArchiveCapture/     #   Android capture companion
-│   └── ArchiveCaptureiOS/  #   iOS capture companion
-├── ArchiveReader/          # outer = relocated app repo
-│   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
-├── ArchiveNotes/           # provenance-first note-taking app
-│   └── macOS/              #   XcodeGen project dir: project.yml, Sources/, Tests/, generated .xcodeproj (gitignored)
-└── ArchiveOCRBench/        # the bench's measured OCR, segmentation and handwriting results as one page; kept current (below)
-```
+- `SPEC/tag-format.md`: shared tag/PDF contract; `OWNER_AUTHORIZATIONS.md`: owner grants and binding constraints.
+- `packages/ArchiveCore/`: shared Swift package (tags, PDF, durable links, suite marker).
+- `ArchiveProcessor/`, `ArchiveReader/`, `ArchiveNotes/`: each app's XcodeGen project is in `macOS/`;
+  `project.yml` is authoritative and `.xcodeproj` is generated/gitignored. Processor's companions are
+  `ArchiveCapture/` (Android) and `ArchiveCaptureiOS/` (iOS). Launch/bootstrap scripts resolve their own paths.
+- `launch.sh`: app dispatcher; `release/`: combined DMG tooling.
+- `ArchiveOCRBench/`: readable measured OCR, segmentation and handwriting results; keep current (below).
 
-The inner XcodeGen project dirs are named `macOS/` (de-nested from the old `App/App/` layout that
-was a byproduct of the repo merge). Each app's `launch.sh`/`bootstrap.sh` use paths relative to
-themselves.
+Expanded tree and layout history: [`REFERENCE.md`](REFERENCE.md) §"Repository layout record".
 
 ## The shared contract is the risk
 
@@ -294,9 +272,16 @@ environment and what may move to the backup:
 - **Run:** `./launch.sh reader|processor` from the root (build‑if‑stale, then launch), or `cd <app> && ./launch.sh`.
 - **Per‑worktree DerivedData** (`-derivedDataPath ./build/DD`) so concurrent agents/worktrees don't collide. `build/` is gitignored.
 - **Three apps, three bundle IDs** (`com.archiveprocessor.app`, `com.archivereader.app`, `com.archivenotes.app`) — never merged.
-- **Signing: a local self‑signed cert, `CODE_SIGN_IDENTITY: "Archive Suite Dev"`** — **not** ad‑hoc (`"-"`) since 2026‑08‑07, still not notarized (ad‑hoc pinned the designated requirement to the **cdhash**, so every rebuild looked like a new program and macOS forgot every TCC grant). Create the identity once per machine with **[`ops/setup-signing-cert.sh`](ops/setup-signing-cert.sh)**, which carries the full rationale and the traps; key at `~/.local/share/archive-suite-signing/` — **back it up** (losing it ⇒ new cert ⇒ re‑grant every prompt). iOS stays ad‑hoc (a macOS cert is invalid there), and so does **every build inside the Tart GUI‑VM** — no keychain in the guest, so `gui-vm-gate.sh`/`vm-gui-runner.sh` pass `CODE_SIGN_IDENTITY=-`; ⛔ don't provision the cert into the VM (W28.cert‑fu1).
-  ⚠️ **A self‑signed cert has no Team ID**, so `ENABLE_HARDENED_RUNTIME: YES` + **library validation** refuses Xcode 16's `<App>.debug.dylib` (*no team ≠ same team*) — the app dies at launch with SIGABRT, taking every app‑hosted test with it. Reader/Notes therefore use **Debug‑only** `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow` entitlements for their app-hosted tests. Processor instead sets `ENABLE_DEBUG_DYLIB: NO` (Debug) and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` (Release), keeping strict library validation — why: [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) §*Releasing*, W28.cert-fu2. **⛔ Release must contain neither debug entitlement.**
-  Full record — why ad‑hoc failed, W7.1, W28.cert‑fu1: `SUITE_TODO_DONE.md` §*Signing + TCC consent*.
+- **Signing:** local self-signed `CODE_SIGN_IDENTITY: "Archive Suite Dev"`, never ad-hoc on the host;
+  not notarized. Create it once per machine with [`ops/setup-signing-cert.sh`](ops/setup-signing-cert.sh).
+  **Back up** `~/.local/share/archive-suite-signing/`; losing the key requires a new cert and every consent again.
+  **iOS and every Tart GUI-VM build stay ad-hoc** (`CODE_SIGN_IDENTITY=-`); ⛔ never provision the cert into the VM.
+  Self-signed certs have no Team ID: library validation rejects Xcode's Debug dylib. Reader/Notes use
+  **Debug-only** `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow`
+  entitlements for app-hosted tests. Processor keeps strict validation with `ENABLE_DEBUG_DYLIB: NO` (Debug)
+  and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` (Release); see its guide §*Releasing*.
+  **⛔ Release must contain neither debug entitlement.** Full rationale and incident references:
+  [`REFERENCE.md`](REFERENCE.md) §"Signing record"; `SUITE_TODO_DONE.md` §*Signing + TCC consent*.
 - **Never** hand‑edit a `.pbxproj` (edit `project.yml` + regenerate). **Never** write to a real corpus during dev/test — copy to the scratchpad first (Reader's Core Directive).
 
 ## Docs & backlog convention
@@ -314,12 +299,21 @@ is part of the change, full stop.
 
 Three tiers, so nothing sprawls or goes stale:
 - **Near-term work → `SUITE_TODO.md`** (root) — the single live to-do queue, **OPEN items only**; it also **indexes the active execution plans** (below).
-- **Completed work → `SUITE_TODO_DONE.md`** (root) — when an item ships, **move its whole entry there**, **appended at the END** (header line names its section as `· §<section>`, last line `  <!-- /<TAG> -->`), instead of ticking it in place (2026-08-01: 47 open items were buried among 160 done ones in one 3,580-line file). Doc-sync is unchanged — the move still happens in the same commit as the code. Kept rather than deleted because the entries cite the commits that shipped them and often carry *why* a later change may or may not revisit that code. **Append-only, with `merge=union` in `.gitattributes`** (`W35.done-union`, 2026-10-08) so two workers finishing at once never conflict — safe only because no existing line is ever edited; the unique last line stops union fusing two entries that end alike. ⚠️ `next-queue-item.sh` and `check-tracker-sync.sh` both read it; don't rename it without them.
+- **Completed work → `SUITE_TODO_DONE.md`** — move the whole shipped entry there in the same commit,
+  appended at the END. Header: `· §<section>`; unique last line: `  <!-- /<TAG> -->`. **Append-only:** never
+  edit an existing line (`merge=union` in `.gitattributes` depends on this). Retain the commit references and
+  rationale. `next-queue-item.sh` and `check-tracker-sync.sh` read it; never rename it without updating them.
+  History: [`REFERENCE.md`](REFERENCE.md) §"Completed tracker record".
 - **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.
 - **In-flight progress notes → `execution-plans/items/<TAG>.md`** — checkpoint notes, session notes and saved-draft branches for one open item, written by its claimant; the `SUITE_TODO.md` entry carries only a pointer line, never the notes (they made that shared file a rebase-conflict hotspot). Deleted when the item ships, useful lines folded into its `SUITE_TODO_DONE.md` entry. Detail: `ops/autonomous/README.md` §L2.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 
-Reference/authoritative material lives in each app's `CLAUDE.md` (with an **Implementation Map**), `README.md`, `AGENTS.md`, `KNOWN_ISSUES.md`, and test procedures; canonical cross-app contracts live in `SPEC/` (`tag-format.md`, `relay-object-format.md`). **Owner grants on gated paths live in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md)** — committed on purpose (moved out of the gitignored maintenance plan 2026-08-01) because a grant plus its ⛔ constraints is durable policy that needs history and recoverability; entries there are a permanent record, marked discharged when the item ships rather than deleted. Don't keep a doc "just because" — fold durable bits into these and drop the rest. Untracked scratch docs that are done/superseded (e.g. completed-run review reports) are archived under the gitignored **`old/`** folder (see `old/README.md`) rather than deleted — recoverable, out of the way.
+Reference material belongs in each app's guides (including an Implementation Map), README, AGENTS,
+KNOWN_ISSUES and test procedures; cross-app contracts belong in `SPEC/` (`tag-format.md`, `relay-object-format.md`).
+Owner grants and their constraints are a permanent committed record in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md):
+mark discharged on shipping, never delete. Fold durable detail into these sources; discard redundant docs.
+Archive superseded untracked scratch docs under gitignored `old/` (see `old/README.md`) rather than deleting them.
+Rationale: [`REFERENCE.md`](REFERENCE.md) §"Documentation record".
 
 **Owner review sessions.** Owner, 2026-10-15: before any session the owner runs by hand (a guided session, an acceptance pass, a review
 sheet), judge whether it is the right time, by reading the open work rather than checking that the blockers are
@@ -334,25 +328,18 @@ fallback that still narrows the search (the line, or how far through the page it
 A box never reveals which reading is the current truth. The pattern is W46's blind sheet
 (`ArchiveProcessor/scripts/segbench/ocr_truth_bias.py`, commit 938bdccf).
 
-**Every owner sheet has notes, shows what it does not ask, and shows pages upright (owner, 2026-11-05).** Any sheet
-the owner answers (truth checks, rulings, label or field disputes) has three things, built in before it is offered:
-- **A notes box per item** (a photo, a page, a document), optional, saved in the answers file beside the answers under
-  its own key (`_notes` or `_notes/<id>`). Typing in it never triggers the sheet's answer keys. The fold carries each
-  note on its truth row, and the session that scores reads the notes first, since a note can correct what was not
-  asked or say an item should be dropped.
-- **The fields it does not ask**, listed on each item with the value going into the truth (agreed by the readers, or
-  ruled by a reader), so the owner can correct one in the notes. That means every truth the item has, not only the
-  one being asked: on a letter, the sender, recipient and date from the entity and date truths as well as the item
-  fields. The item-field sheet listed only its own fields, and the owner's notes asked of many letters "did we get the
-  date, the sender, the recipient?" (2026-11-05). The header says that unasked fields go in as listed.
-- **Pages and photos upright.** Matching a JPEG to its PDF page's orientation does not make it upright. Check each
-  image with `segbench/ocr_orient.swift` (Apple Vision at all four turns), turn only clear wins, check close calls
-  by eye, and give every image a "turn" button that turns its boxes with it. The sheet says which pages it turned.
-  The pattern is `item_fields_retruth.py`'s sheet (a51cc0ef), with `ct_truth.py`'s notes (9c5d42d9).
-
-It was written after the label sheet (W47.ct-truth-jpeg) showed 36 photos turned and left the owner asking whether
-fields it did not ask were checked at all; once it had a notes box, he left notes on 127 photos. The item-field sheet had the
-same three gaps until it was fixed the same day.
+**Every owner sheet has notes, unasked fields and upright pages** (owner, 2026-11-05), built in before
+it is offered:
+- **Optional notes per item**, saved beside answers under `_notes` or `_notes/<id>`. Typing never triggers
+  answer shortcuts. Fold each note onto its truth row; the scoring session reads notes first, since they can
+  correct unasked fields or drop an item.
+- **List every unasked truth field and its incoming value on each item**, whether agreed or ruled by readers.
+  Include related truths: a letter lists sender, recipient and date from entity/date truth as well as item
+  fields. The header says unasked fields go in as listed; the owner can correct them in notes.
+- **Show pages/photos upright**, not merely aligned to PDF orientation. Check every image with
+  `segbench/ocr_orient.swift` (Apple Vision at four turns), turn clear wins only, inspect close calls by eye,
+  and provide a turn button that rotates boxes too. State which pages the sheet turned.
+Patterns and the incidents behind these rules: [`REFERENCE.md`](REFERENCE.md) §"Owner sheet record".
 
 **ArchiveOCRBench stays current (owner, 2026-10-15).** `ArchiveOCRBench/` is the readable record of what the
 bench has measured. A change that commits a measured OCR or segmentation result updates it in the same commit.

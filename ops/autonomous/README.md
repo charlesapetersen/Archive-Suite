@@ -1307,6 +1307,17 @@ is active:
   plan-only `[x]` would block any future dependent forever. Resolvability is preserved **by construction**, and
   Pass 3 deliberately leaves plan-only entries behind (those are a tracker gap to fix, not a compaction target).
 
+**Answered HOLD gates (doc-fix, 2026-11-08).** The three passes deliberately never touch HOLD. When its
+answered detail grows the plan over budget, an assigned doc-fix session can run
+`bash ops/autonomous/plan-edit.sh "$PLAN" archive-answered`. Under the same stable plan lock, this appends
+eligible completed answers verbatim to `.maintenance/AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md`, flushes them to disk,
+then replaces each with a completed tag and a mandatory read-before-dependent-work link. Every answer and
+constraint still binds. Open gates, ambiguous separated continuations, section narrative and the unwalked
+Daemon Report stay inline. Tags remain resolvable; deleting them would strand dependencies. A failed archive
+write leaves the plan unchanged, and a second successful run is a no-op. Prove this on scratch with
+`python3 ops/autonomous/tests/prove-plan-archive.py`. This is a separate locked helper operation, not a fourth
+automatic compactor pass. The 2026-11-08 trigger was 166,365 B, including 76,427 B of HOLD (85 completed entries).
+
 ### 2026-08-04 — this compactor silently no-op'd for weeks. Read this before editing it.
 
 Owner: *"token use is the real bottleneck for development, not build speed."* The plan had reached **462 KB /

@@ -9,5 +9,6 @@
 # or plan-edit.sh PLAN hold TAG NOTE: hand an open item to the owner (appends `(needs: owner)` and the note).
 # or plan-edit.sh PLAN release TAG NOTE: lift that hold once the owner's part is done (removes `(needs: owner)`).
 # or plan-edit.sh PLAN due|rearm GATE NOTE: tick or untick a machine gate in `## RECURRING` (W40.token-pass's W40.token-fix-due).
+# or plan-edit.sh PLAN archive-answered: archive answered HOLD details, keeping completed tags and mandatory read pointers.
 set -euo pipefail
 exec python3 "$(dirname "$0")/plan-edit.py" "$@"

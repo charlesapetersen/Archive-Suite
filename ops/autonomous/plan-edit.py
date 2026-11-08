@@ -95,7 +95,42 @@ def edit(plan, action, values):
     with plan.with_name(plan.name + ".lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         text = plan.read_text()
-        if action in ("complete", "block"):
+        if action == "archive-answered":
+            if values:
+                raise ValueError("archive-answered takes no arguments")
+            start, end = section(text, "## HOLD QUEUE")
+            body = text[start:end]
+            archive = plan.with_name("AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md")
+            moves = []
+            for tag, lo, hi in entries(body):
+                original = body[lo:hi]
+                if not re.match(r"^[-*]\s+\[[xX]\]", original) or "OWNER ANSWERED" not in original:
+                    continue
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag) or tag == "?":
+                    raise ValueError("invalid answered gate tag")
+                # entries() stops at a blank. A later indented paragraph or fence may
+                # still belong to this gate: leave ambiguous spans wholly inline.
+                following = body[hi:].lstrip("\r\n")
+                if following and not re.match(r"(?:[-*]\s+\[[ xX]\]|#{1,6} )", following):
+                    continue
+                stub = ("- [x] **" + tag + "** — ANSWER ARCHIVED: read [question, answer and binding constraints]("
+                        + archive.name + "#" + tag + ") before dependent work.\n")
+                if len(stub.encode()) < len(original.encode()):
+                    moves.append((tag, lo, hi, original, stub))
+            if not moves:
+                return
+            # Archive first, under the SAME plan lock; a failed append must never
+            # remove an answer. An interruption before replacement may duplicate
+            # an archive record on retry, but cannot lose one.
+            with archive.open("a") as out:
+                for tag, _, _, original, _ in moves:
+                    out.write('\n<a id="' + tag + '"></a>\n\n' + original + "\n")
+                out.flush()
+                os.fsync(out.fileno())
+            for _, lo, hi, _, stub in reversed(moves):
+                body = body[:lo] + stub + body[hi:]
+            text = text[:start] + body + text[end:]
+        elif action in ("complete", "block"):
             tag, sha, result = values
             if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):
                 raise ValueError("invalid tag")
