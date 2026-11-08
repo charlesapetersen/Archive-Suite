@@ -530,8 +530,8 @@ Views/
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware inspector editor (⌘I); immutable `targetPaths` protect drafts across selection changes.
   TagInspectorView.swift      Right-hand column for the visible selection or document; keeps drafts while hidden.
-  (ArchiveCoreUI) SubjectEntryField  The sheet's add-a-subject token field, shared with Notes: autocompletes;
-                              Return/comma/Tab add and the field keeps no tokens; Done adds what is still
+  (ArchiveCoreUI) SubjectEntryField  The inspector's add-a-subject token field, shared with Notes: autocompletes;
+                              Return/comma/Tab add and the field keeps no tokens; Close adds what is still
                               typed; a tag typed in full is never filled in with a longer one.
   DocumentTagActions.swift    The Tags menu in the document window: the open file, via NavigationModel's
                               TagWriter actions (`paths:`), checks and undo ledger; no write path of its own.

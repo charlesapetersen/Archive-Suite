@@ -6,16 +6,21 @@ final class NavigationUITests: FixtureUITestCase {
 
     /// The inspector is modeless: browsing and filtering remain available while it stays open.
     func testEditInfoInspectorFollowsSelectionAndCommandIToggles() throws {
+        let year = app.textFields["ar.tagEditor.year"]
+        // Visibility is deliberately remembered between app launches; normalize it for this test.
+        if app.buttons["ar.tagEditor.done"].exists {
+            app.typeKey("i", modifierFlags: .command)
+            XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+        }
         let table = app.tables["ar.table"]
         let first = table.tableRows.element(boundBy: 0)
         XCTAssertTrue(first.waitForExistence(timeout: 5))
-        first.click()
+        visiblePoint(of: first).tap()
         app.typeKey("i", modifierFlags: .command)
-        let year = app.textFields["ar.tagEditor.year"]
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(app.sheets.count, 0, "Edit Info belongs in the right-hand column")
         let next = table.tableRows.element(boundBy: 1)
-        next.click()
+        visiblePoint(of: next).tap()
         XCTAssertTrue(year.waitForExistence(timeout: 5), "browsing leaves the inspector open")
         XCTAssertGreaterThan(year.frame.minX, table.frame.midX)
         captureScreenshot("w40-edit-info-inspector")
@@ -697,7 +702,8 @@ final class NavigationUITests: FixtureUITestCase {
         let field = app.textFields["ar.tagEditor.sentWith"]
         XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")
         field.click()
-        XCTAssertFalse(app.buttons["Set"].exists || app.buttons["Clear Uncertain"].exists || app.buttons["Add"].exists,
+        XCTAssertFalse(app.buttons["Set"].exists || app.buttons["Clear"].exists
+                       || app.buttons["Clear Uncertain"].exists || app.buttons["Add"].exists,
                        "the inspector applies its fields as typed, without field action buttons")
         field.typeText("1958-03-12\r")
         XCTAssertTrue(waitForTags(on: name, containing: ["842", "Sent With 1958-03-12"]),

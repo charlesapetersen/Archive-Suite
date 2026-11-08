@@ -26,11 +26,11 @@ struct DocumentWindowView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-            if model.showingFind { findBar; Divider() }
-            if let note = model.formatNote { formatBanner(note); Divider() }
-            content
-            Divider()
-            statusBar
+                if model.showingFind { findBar; Divider() }
+                if let note = model.formatNote { formatBanner(note); Divider() }
+                content
+                Divider()
+                statusBar
             }
             if model.showingTagEditor {
                 PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,

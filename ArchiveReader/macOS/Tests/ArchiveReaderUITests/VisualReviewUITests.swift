@@ -260,8 +260,8 @@ final class VisualReviewUITests: FixtureUITestCase {
         if app.textFields["ar.tagEditor.addSubject"].waitForExistence(timeout: 5) {
             shoot(name)
         } else { missing.append(name) }
-        // Cancel, never Done: Done is the write path.
-        cancel()
+        // This tour types nothing; hide the modeless inspector before the next screen.
+        app.typeKey("i", modifierFlags: .command)
         pause(0.5)
     }
 

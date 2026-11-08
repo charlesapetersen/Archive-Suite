@@ -14772,3 +14772,23 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   The PDF warning and ambiguous Date cell open a file-specific popover with the symptom, repair guidance, and Open Document / Reveal in Finder or Edit Info actions. Reader never repairs PDF contents; the guidance distinguishes failed opening from missing selectable text without assuming corruption. Actions capture the named file, opening a document preserves multiselection, and Edit Info selects that file alone. Unchanged indexing refreshes preserve the open explanation; changed issues or reused cells dismiss it. Individual accessibility identifiers stay on the actions rather than propagating a container identifier over them.
   Verified: Reader smoke 710 tests (3 expected skips), four focused unit regressions, six light/dark render guards (PNGs inspected), two focused off-screen macOS 27 VM tests for date details/Edit Info and missing-text details/actions/Escape, write-surface lint and all 25 mutation checks. Separate adversarial review and final self-review found no open findings; no new compiler warnings. No item-owned rehearsal-cache scratch created; scratch fixtures reclaim themselves. Temporary logs, exported render PNGs and VM screenshots are retained in /tmp for review. No corpus access or spending.
   <!-- /W40.fix-reader-health-issue-detail -->
+
+- [x] **W40.reader-edit-info-inspector — Edit Info becomes an inspector, a right-hand column the user can keep open [M · S4]** · §W40 · SHIPPED 2026-11-07 (this commit) (lane: reader) (uses: build,vm) — Found by the owner's Reader guided session 2, 2026-11-06 (`verification/sessions/reader-2-returned.md`, row 14); the owner's call: fix everything on the form, the B rows first. An inspector is more Mac-like and can stay open all the time (owner); Notes made the same move in session 1. Keep ⌘I. The write path stays the one Edit Info uses today; any change to it is Tier-2. The Reader's VM UITests do not pass on macOS 27 until `W40.vm-macos27-reader`; verify with the unit bundle and the render guards, and name the UITest still to run.
+
+  Edit Info now stays beside the library or document in a resizable right-hand column. ⌘I and the library
+  toolbar toggle it; width and visibility persist separately for the two window kinds. It follows the visible
+  selection/open document and offers an empty state with no selection. Each selection has immutable edit
+  targets; hidden rows leave list actions immediately, while a departing draft still writes only its own files.
+  Valid fields keep the existing NavigationModel → TagWriter path; invalid drafts and their hints survive
+  hiding/reopening on the same selection. TextUndoGuard keeps typing undo separate from tag undo.
+  Implementation checkpoint: f7855301. Verification: 711 Reader unit tests (3 expected skips), scratch
+  targeting and undo regressions, six light/dark minimum-column renders inspected, write-surface lint and
+  all 25 mutation proofs, and separate adversarial review. Five focused off-screen VM tests cover selection,
+  Close/⌘I, pending and invalid drafts with disk-tag checks, health-warning actions, document following and
+  document menus. Guest-only notification banners initially intercepted Close; dismissed over VNC and the
+  physical button checked. The new checks are NavigationUITests.testEditInfoInspectorFollowsSelectionAndCommandIToggles,
+  NavigationUITests.testInspectorDraftTargetsAndHiddenInvalidDraft and ViewerUITests.testDocumentInspectorFollowsOpenFile;
+  no inspector-specific interaction remains deferred to the broader VM item. Evidence retained under
+  /tmp/reader-inspector-* for review. No real corpus access,
+  paid calls or ArchiveSuiteRehearsal scratch/cache was created; no bench inputs were retained.
+  <!-- /W40.reader-edit-info-inspector -->

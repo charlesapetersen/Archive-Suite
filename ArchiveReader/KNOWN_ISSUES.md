@@ -2,6 +2,21 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.reader-edit-info-inspector, 2026-11-07) — Edit Info stays open beside the files
+
+⌘I and the library toolbar show or hide a resizable right-hand inspector. It follows the visible selection
+or the document window's open file, with separate remembered widths and visibility. Filtering away a row
+removes it from list actions immediately. Each editor instance keeps explicit original target paths, so a
+field leaving focus or disappearing cannot write its draft to the newly selected file. Hiding retains invalid
+date text and its hint; valid fields still apply through the existing audited writer. An open document
+inspector no longer disables tag undo from the document panes; TextUndoGuard protects typing in fields.
+
+`PhantomSelectionTests` and `DocumentWindowTagTests` cover scratch targeting and undo; `TagInspectorRenderTests`
+renders empty, single and mixed groups in light/dark at the minimum column width. Focused VM tests cover
+selection and ⌘I/Close, pending/invalid drafts with on-disk tag assertions, document following, health-warning
+actions and document menus. The visual-tour helper now hides the inspector with ⌘I instead of sheet Escape.
+
+
 ## ✅ CLOSED (W40.fix-reader-health-issue-detail, 2026-11-07) — file warnings explain the issue and offer actions
 
 Click the ⚠︎ in the PDF warning column or an ambiguous Date cell for the file's name, path, exact symptom,
