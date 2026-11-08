@@ -68,6 +68,9 @@ struct AppKitTableView: NSViewRepresentable {
     static func addColumns(to tableView: NSTableView) {
         for col in columnDefinitions {
             let tc = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(col.id))
+            if col.id == "flag" || col.id == "warning" {
+                tc.headerCell = IconSortHeaderCell(textCell: col.title)
+            }
             tc.title = col.title
             tc.width = col.width
             tc.minWidth = col.minWidth
@@ -1316,6 +1319,52 @@ final class WrappingTokenField: NSTokenField {
         super.textDidEndEditing(notification)
         DispatchQueue.main.async { [weak self] in self?.onEditingChange?() }
     }
+}
+
+// MARK: - Compact sortable icon headers
+
+/// AppKit suppresses the sort indicator in these narrow columns. Draw the icon and the primary-sort
+/// caret together, without the native text header's padding, so the minimum-width window still fits.
+@MainActor
+final class IconSortHeaderCell: NSTableHeaderCell {
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        guard let header = controlView as? NSTableHeaderView, let table = header.tableView,
+              let column = table.tableColumns.first(where: { $0.headerCell === self }) else {
+            super.drawInterior(withFrame: cellFrame, in: controlView)
+            return
+        }
+        // Use the whole header even if AppKit reserves its usual sort-indicator inset.
+        let cellFrame = header.headerRect(ofColumn: table.column(withIdentifier: column.identifier))
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        cellFrame.clip()
+        let primary = table.sortDescriptors.first
+        let active = primary?.key == column.sortDescriptorPrototype?.key
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font ?? NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .foregroundColor: NSColor.headerTextColor
+        ]
+        let size = (stringValue as NSString).size(withAttributes: attributes)
+        let title = NSRect(x: cellFrame.minX + 4, y: cellFrame.midY - size.height / 2,
+                           width: size.width, height: size.height)
+        (stringValue as NSString).draw(in: title, withAttributes: attributes)
+        guard active, let primary else { return }
+        let caret = NSBezierPath()
+        let x = cellFrame.maxX - 8, y = cellFrame.midY
+        let tip: CGFloat = primary.ascending == controlView.isFlipped ? -2 : 2
+        caret.move(to: NSPoint(x: x - 3, y: y - tip))
+        caret.line(to: NSPoint(x: x, y: y + tip))
+        caret.line(to: NSPoint(x: x + 3, y: y - tip))
+        caret.lineWidth = 1.25
+        caret.lineCapStyle = .round
+        caret.lineJoinStyle = .round
+        NSColor.secondaryLabelColor.setStroke()
+        caret.stroke()
+    }
+
+    // The compact drawing above owns the indicator, including when a user widens the column.
+    override func drawSortIndicator(withFrame cellFrame: NSRect, in controlView: NSView,
+                                    ascending: Bool, priority: Int) {}
 }
 
 // MARK: - Column-picker header view

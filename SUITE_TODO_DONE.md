@@ -14831,3 +14831,7 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   VM screenshots/results retained in /private/tmp/w40-reader-columns-vm and the exported header render in
   /private/tmp/w40-reader-columns-render for review.
   <!-- /W40.fix-reader-columns-in-header -->
+
+- [x] **W40.fix-reader-sort-indicator-icons — The sort caret shows on the ⚑ and ⚠︎ columns [XS · S4]** (lane: reader) (uses: build) — Found by the owner's Reader guided session 2, 2026-11-06 (`verification/sessions/reader-2-returned.md`, row 4); the owner's call: fix everything on the form, the B rows first. Sorting by ⚑ or ⚠︎ works but shows no caret or similar, so it is not clear the list is sorted by them. · §W40 · SHIPPED 2026-11-08 (this commit).
+  Compact primary-sort carets fit beside both icons at their original widths; the native header cells suppressed them. Native header clicks, sort prototypes, titles and accessibility remain. Minimum-window column-fit tests pass; light/dark render guards compare both directions and retain the glyphs. Verified: Reader smoke PASS (725 tests, 3 skipped, zero failures), write-surface lint and 25/25 mutation proofs; separate diff review clear. Focused off-screen macOS 27.2 VM test passed, checking changing caret pixels and primary-sort menu state; all four screenshots inspected. Logs/screenshots retained in /private/tmp/reader-sort-icons-final-evidence. Bench cache: no item scratch created or retained in ArchiveSuiteRehearsal; only test logs and screenshots in /tmp.
+  <!-- /W40.fix-reader-sort-indicator-icons -->

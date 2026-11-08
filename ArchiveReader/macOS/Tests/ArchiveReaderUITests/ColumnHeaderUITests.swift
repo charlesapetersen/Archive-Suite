@@ -40,4 +40,26 @@ final class ColumnHeaderUITests: FixtureUITestCase {
         XCTAssertEqual(rowCount, rowsBefore)
         _ = captureScreenshot("column-header-type-restored")
     }
+
+    func testIconHeadersShowBothSortDirections() throws {
+        let rowsBefore = rowCount
+        for (title, name) in [("⚑", "flag"), ("⚠︎", "warning")] {
+            let header = table.staticTexts[title].exists ? table.staticTexts[title] : table.buttons[title]
+            XCTAssertTrue(header.waitForExistence(timeout: 5))
+            var directions: [Data] = []
+            for direction in ["ascending", "descending"] {
+                header.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).click()
+                RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+                XCTAssertEqual(rowCount, rowsBefore)
+                directions.append(header.screenshot().pngRepresentation)
+                _ = captureScreenshot("sort-header-\(name)-\(direction)")
+            }
+            XCTAssertNotEqual(directions[0], directions[1], "the caret must change direction")
+            header.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.5)).rightClick()
+            XCTAssertTrue(app.menuItems["Default Sort (date, then name)"].waitForExistence(timeout: 5))
+            XCTAssertFalse(app.menuItems["Set as Secondary Sort (A→Z)"].exists,
+                           "clicking the icon makes it the primary sort")
+            app.typeKey(.escape, modifierFlags: [])
+        }
+    }
 }

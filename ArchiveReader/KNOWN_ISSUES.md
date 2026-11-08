@@ -2,6 +2,15 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.fix-reader-sort-indicator-icons, 2026-11-08) — sort carets on the icon columns
+
+The Flag and Needs attention headers now draw a compact up/down caret for the primary sort. AppKit
+suppressed its native indicator in these narrow columns, even with twelve extra points. The compact
+header cell keeps the original widths, native sorting and header accessibility; the minimum-window fit
+still keeps Read on screen. SortIndicatorHeaderTests checks both directions and visible icons in light/dark
+at the narrow-window fit; its direction comparison failed with the native cells. The focused VM test clicks
+the icons, compares their rendered directions and checks that each becomes the primary sort.
+
 ## ✅ CLOSED (W40.fix-reader-columns-in-header, 2026-11-08) — choose columns from the headers
 
 Right-click a list column header to show or hide columns, as in Finder (Reader session 2, row 3).
