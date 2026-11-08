@@ -90,24 +90,28 @@ final class PhantomSelectionTests: XCTestCase {
         XCTAssertEqual(try tagsOnDisk(fixture.files[1]), ["Unread", "Smith"], "the hidden row is not")
     }
 
-    /// An edit in the open tag editor can move its targets out of the filter ("Remove X" under a tag-X
-    /// filter). The sheet keeps acting on them until it closes; then they leave the selection.
-    func testTheOpenTagEditorKeepsItsTargetsUntilItCloses() throws {
+    /// A persistent inspector must never keep hidden files in the list's action targets.
+    /// A field leaving focus still owns the paths it was typed for, independently of the new selection.
+    func testInspectorPrunesHiddenSelectionButAnOldDraftKeepsItsOwnTargets() throws {
         let fixture = try makeRoot(files: ["alpha.pdf", "beta.pdf"])
         let model = fixtureNavigationModel(pinnedTo: fixture.root)
         model.filter.searchText = "alpha"
         model.recompute()
         selectAll(in: model)
         model.showingEditor = true
+        let draftPaths = model.selectedFiles.map(\.path)
 
-        model.filter.searchText = "matches-no-file"   // stands in for an edit that unfilters the rows
+        model.filter.searchText = "beta"
         model.recompute()
-        XCTAssertEqual(model.selectedFiles.map(\.url.lastPathComponent), ["alpha.pdf"],
-                       "the open editor still has the file it was opened on")
-
-        model.showingEditor = false
-        XCTAssertTrue(model.selection.isEmpty, "closed, the hidden row leaves the selection")
         XCTAssertTrue(model.selectedFiles.isEmpty)
+        selectAll(in: model)
+        XCTAssertEqual(model.selectedFiles.map(\.url.lastPathComponent), ["beta.pdf"])
+        model.applyEdit(.setYear(1962), paths: draftPaths)
+        XCTAssertEqual(try tagsOnDisk(fixture.files[0]), ["Unread", "Smith", "1962"])
+        XCTAssertEqual(try tagsOnDisk(fixture.files[1]), ["Unread", "Smith"], "old draft never writes the new selection")
+        XCTAssertTrue(model.showingEditor, "the inspector stays open while browsing")
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk(fixture.files[0]), ["Unread", "Smith"])
     }
 
     /// Opening the editor never widens the selection to a row that was already hidden.

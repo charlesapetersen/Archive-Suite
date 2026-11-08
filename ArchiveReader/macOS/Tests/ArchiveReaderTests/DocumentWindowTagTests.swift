@@ -78,7 +78,7 @@ final class DocumentWindowTagTests: XCTestCase {
         XCTAssertEqual(doc.viewer.tagStatus, "Undid 1 change. (beta.pdf)", "the status names the file it reverted")
     }
 
-    func testUndoIsOffWhileTheFindFieldOrTheTagEditorHasTheKeyboard() throws {
+    func testUndoIsOffInFindButAvailableWhileTheInspectorIsOpen() throws {
         let fixture = try makeRoot([("alpha.pdf", ["Unread"])])
         let model = fixtureNavigationModel(pinnedTo: fixture.root)
         let doc = documentWindow(model, paths: [try libraryPath(model, fixture.files[0])])
@@ -93,8 +93,9 @@ final class DocumentWindowTagTests: XCTestCase {
         doc.viewer.findFieldFocused = false
         doc.editTags()
         XCTAssertTrue(doc.viewer.showingTagEditor)
-        XCTAssertEqual(doc.viewer.tagEditorPath, doc.viewer.currentFilePath, "the sheet is pinned to the open file")
-        XCTAssertFalse(doc.canUndo, "nor in the tag editor's fields")
+        XCTAssertTrue(doc.canUndo, "an open inspector must not disable undo from the document panes; TextUndoGuard protects fields")
+        doc.editTags()
+        XCTAssertFalse(doc.viewer.showingTagEditor, "⌘I toggles the inspector")
     }
 
     func testTheTagEditorsEditGoesToTheOpenFileOnly() throws {

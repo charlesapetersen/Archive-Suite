@@ -4,6 +4,78 @@ import XCTest
 /// sort, and filter bar. All tests run against the pre-built GUI fixture.
 final class NavigationUITests: FixtureUITestCase {
 
+    /// The inspector is modeless: browsing and filtering remain available while it stays open.
+    func testEditInfoInspectorFollowsSelectionAndCommandIToggles() throws {
+        let table = app.tables["ar.table"]
+        let first = table.tableRows.element(boundBy: 0)
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        first.click()
+        app.typeKey("i", modifierFlags: .command)
+        let year = app.textFields["ar.tagEditor.year"]
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.sheets.count, 0, "Edit Info belongs in the right-hand column")
+        let next = table.tableRows.element(boundBy: 1)
+        next.click()
+        XCTAssertTrue(year.waitForExistence(timeout: 5), "browsing leaves the inspector open")
+        XCTAssertGreaterThan(year.frame.minX, table.frame.midX)
+        captureScreenshot("w40-edit-info-inspector")
+        app.typeKey("i", modifierFlags: .command)
+        XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+        app.typeKey("i", modifierFlags: .command)
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        app.buttons["ar.tagEditor.done"].click()
+        XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+    }
+
+    /// A departing field must commit to its original file, including when a filter removes that row.
+    func testInspectorDraftTargetsAndHiddenInvalidDraft() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        typeInField("ar.filter.name", text: "00002")
+        XCTAssertTrue(waitForRowCount(1))
+        clickRow(0)
+        toolbarButton("ar.toolbar.editTags").click()
+        let year = app.textFields["ar.tagEditor.year"]
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        year.click()
+        pressKey("a", modifiers: .command)
+        year.typeText("1962")  // no Return: leave by changing the library selection
+        let name = app.textFields["ar.filter.name"]
+        name.click()
+        pressKey("a", modifiers: .command)
+        name.typeText("00003")
+        XCTAssertTrue(waitForRowCount(1))
+        clickRow(0)
+        XCTAssertTrue(waitForTags(on: "00002 IMG — Brown.pdf", containing: ["1962", "Economics", "Unread"], excluding: ["1975"]))
+        XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["842"], excluding: ["1962"]))
+        XCTAssertEqual(year.value as? String, "842", "the new selection seeds a new draft")
+
+        year.click()
+        pressKey("a", modifiers: .command)
+        year.typeText("invalid")
+        app.typeKey("i", modifierFlags: .command)
+        XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+        app.typeKey("i", modifierFlags: .command)
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        XCTAssertEqual(year.value as? String, "invalid", "hiding must retain the invalid draft")
+        XCTAssertTrue(app.staticTexts["Use a year from 100 to 9999"].exists)
+        XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["842"], excluding: ["1962", "invalid"]))
+        captureScreenshot("w40-inspector-invalid-draft")
+        year.click()
+        pressKey("a", modifiers: .command)
+        year.typeText("842\r")
+        let add = app.textFields["ar.tagEditor.addSubject"]
+        add.click()
+        add.typeText("Inspector hidden focus")
+        app.typeKey("i", modifierFlags: .command)
+        XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+        app.typeText("x")  // a hidden native tag editor must not keep taking keystrokes
+        app.typeKey("i", modifierFlags: .command)
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["Inspector hidden focus"], excluding: ["x"]))
+        XCTAssertEqual(add.value as? String ?? "", "")
+        app.buttons["ar.tagEditor.done"].click()
+    }
+
     // MARK: - Table population
 
     func testTablePopulatesWithFixtureFiles() throws {
@@ -532,7 +604,7 @@ final class NavigationUITests: FixtureUITestCase {
         addField.typeText(addedTag + "\r")   // Return adds the tag: there is no Add button
         XCTAssertTrue(waitForTags(on: targetName, containing: [addedTag]),
                       "the editor's subject addition should be verified on the scratch document")
-        app.buttons["Done"].click()
+        app.buttons["ar.tagEditor.done"].click()
 
         // Remove the basename narrowing before proving that the tag-cloud selection itself limits the
         // result to this one document. That makes `filter.subjects` (the source read by beginRenameTag)
@@ -625,11 +697,8 @@ final class NavigationUITests: FixtureUITestCase {
         let field = app.textFields["ar.tagEditor.sentWith"]
         XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")
         field.click()
-        // Scoped to the sheet: the filter bar behind it has its own Clear, which resets a filter.
-        let sheet = app.sheets.firstMatch
-        XCTAssertFalse(sheet.buttons["Set"].exists || sheet.buttons["Clear"].exists
-                       || sheet.buttons["Add"].exists || sheet.buttons["Clear Uncertain"].exists,
-                       "the sheet applies its fields as typed: no Set, Clear or Add button (W40.fix-suite-no-set-clear)")
+        XCTAssertFalse(app.buttons["Set"].exists || app.buttons["Clear Uncertain"].exists || app.buttons["Add"].exists,
+                       "the inspector applies its fields as typed, without field action buttons")
         field.typeText("1958-03-12\r")
         XCTAssertTrue(waitForTags(on: name, containing: ["842", "Sent With 1958-03-12"]),
                       "Return should write the Sent-With date and keep the document's own date")

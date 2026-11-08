@@ -18,13 +18,13 @@ struct DocumentTagActions {
 
     /// A file is open and there is a library to write through.
     var canTag: Bool { navigation != nil && viewer.currentFilePath != nil }
-    /// Off while the find field or the tag editor has the keyboard, so ⌘Z there never undoes a tag change.
+    /// Off while Find has the keyboard; TextUndoGuard gives inspector fields their own typing undo.
     var canUndo: Bool {
-        (navigation?.undoDepth ?? 0) > 0 && !viewer.findFieldFocused && !viewer.showingTagEditor
+        (navigation?.undoDepth ?? 0) > 0 && !viewer.findFieldFocused
     }
     /// Off in the same places as `canUndo`, so ⇧⌘Z there never redoes a tag change.
     var canRedo: Bool {
-        (navigation?.redoDepth ?? 0) > 0 && !viewer.findFieldFocused && !viewer.showingTagEditor
+        (navigation?.redoDepth ?? 0) > 0 && !viewer.findFieldFocused
     }
 
     func mark(_ state: ReadState) {
@@ -57,8 +57,7 @@ struct DocumentTagActions {
 
     func editTags() {
         guard canTag else { return }
-        viewer.tagEditorPath = viewer.currentFilePath
-        viewer.showingTagEditor = true
+        viewer.showingTagEditor.toggle()
     }
 
     func toggleFlag() {

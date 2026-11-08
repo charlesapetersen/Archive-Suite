@@ -7,13 +7,11 @@ import ArchiveCoreUI
 /// edits show Finder-style tri-state: subjects on all vs. some; facets show "(mixed)" when they differ.
 struct TagEditorView: View {
     @ObservedObject var model: NavigationModel
-    /// From `SheetSizing.fitted` over the presenting window, so the sheet never overhangs it (W40.fix-reader-tag-editor-chips).
-    var size: CGSize = TagEditorView.preferredSize
-    static let preferredSize = CGSize(width: 480, height: 620)
-    /// Set by the document window: edit these files rather than the list's selection
+    /// Immutable for this editor instance, so a departing field always writes its original targets.
     /// (W40.fix-reader-menus-follow-window). Every write still goes through `NavigationModel` → `TagWriter`.
-    var targetPaths: [String]? = nil
-    @Environment(\.dismiss) private var dismiss
+    let targetPaths: [String]
+    var isVisible = true
+    var onClose: () -> Void = {}
     @State private var subjectDraft = ""
     @State private var dateDrafts: [DateField: String] = [:]
     /// The fields typed in since they were last applied or seeded: only these are written.
@@ -23,21 +21,19 @@ struct TagEditorView: View {
 
     var body: some View {
         let files = targetFiles
-        let s = targetPaths == nil ? model.groupSummary : GroupTagSummary(files.map(\.tags))
+        let s = GroupTagSummary(files.map(\.tags))
         VStack(spacing: 0) {
             HStack {
                 Text(s.count == 1 ? "Edit Info" : "Edit Info — \(s.count) files").font(.headline)
                 Spacer()
-                // Typed text sticks, as in the list's tag field: Done adds a subject still in the field and applies
-                // a date still being typed. While a tag is being typed, Return belongs to the field, which adds it
-                // and keeps the keyboard.
-                // A date field's Return applies that field and leaves the sheet open; an entry that is not a
-                // date keeps the sheet open, its red hint showing, rather than closing on a value never written.
-                Button("Done") { addSubject(); commitDateFields(); if invalidFields.isEmpty { dismiss() } }
-                    .keyboardShortcut(subjectDraft.isEmpty && focusedField == nil ? .defaultAction : nil)
+                Button("Close") { addSubject(); commitDateFields(); if invalidFields.isEmpty { onClose() } }
+                    .help("Hide Edit Info")
                     .accessibilityIdentifier("ar.tagEditor.done")
             }
             .padding()
+            Text(files.count == 1 ? (files.first?.name ?? "") : "Changes apply to all selected files.")
+                .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(2).padding(.horizontal).padding(.bottom, 8)
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
@@ -56,7 +52,14 @@ struct TagEditorView: View {
                 .padding()
             }
         }
-        .frame(width: size.width, height: size.height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onChange(of: isVisible) { _, visible in
+            if !visible {
+                focusedField = nil
+                addSubject()
+                commitDateFields()
+            }
+        }
     }
 
     // MARK: Subjects
@@ -104,7 +107,7 @@ struct TagEditorView: View {
             .overlay(Capsule().strokeBorder(partial ? Color.secondary.opacity(0.7) : Color.accentColor.opacity(0.55),
                                             style: StrokeStyle(lineWidth: 1, dash: partial ? [3, 2] : [])))
             .contentShape(Capsule())
-            .frame(maxWidth: 420)   // a very long subject truncates rather than overrunning the sheet
+            .frame(maxWidth: 420)   // a very long subject truncates rather than overrunning the inspector
         }
         .buttonStyle(.plain)
         .help(partial ? "On some of the selected files. Click to remove “\(subject)” from all of them."
@@ -158,7 +161,7 @@ struct TagEditorView: View {
             uncertainToggle(relevant: files, op: TagEditOp.setDateUncertain) { $0.tags.dateUncertain }
                 .accessibilityIdentifier("ar.tagEditor.dateUncertain")
             Divider()
-            // W37: the covering letter's date, for an enclosure that has its own date above. The sheet is the one
+            // W37: the covering letter's date, for an enclosure that has its own date above. The inspector is the one
             // date editor (owner, 2026-10-12), so Sent-With lives here too (W40.fix-reader-sent-with-date).
             HStack {
                 Text("Sent with").frame(width: 68, alignment: .leading)
@@ -173,7 +176,7 @@ struct TagEditorView: View {
                 .accessibilityIdentifier("ar.tagEditor.sentWithUncertain")
         }
         .onAppear { seedDateFields(files) }
-        // A date changed by this sheet or elsewhere shows here, unless the field is being typed in or holds
+        // A date changed by this inspector or elsewhere shows here, unless the field is being typed in or holds
         // text not applied yet, which a reseed would throw away.
         .onChange(of: DateFacets(files)) { seedDateFields(files) }
         .onChange(of: focusedField) { old, _ in if let old { commit(old) } }
@@ -226,7 +229,7 @@ struct TagEditorView: View {
     }
 
     /// What a typed-in field writes when it is applied, or `nil` for nothing. `shared` is the field's text when
-    /// the sheet seeded it (`DateFacets`): the value every file shares, or `.some(nil)` when the files differ.
+    /// the inspector seeded it (`DateFacets`): the value every file shares, or `.some(nil)` when the files differ.
     static func edit(_ field: DateField, typed text: String, shared: String??) -> TagEditOp? {
         guard let op = dateOp(field, text) else { return nil }
         let typed = text.trimmingCharacters(in: .whitespaces)
@@ -368,16 +371,15 @@ struct TagEditorView: View {
 
     // MARK: Helpers
 
-    /// The files this sheet edits: the document window's open file, else the list's selection.
+    /// The files this inspector edits: the document window's open file, else the list's selection.
     private var targetFiles: [ArchiveFile] {
-        guard let targetPaths else { return model.selectedFiles }
-        return model.libraryFiles(atPaths: targetPaths)
+        model.libraryFiles(atPaths: targetPaths)
     }
 
     private func apply(_ op: TagEditOp) { model.applyEdit(op, paths: targetPaths) }
     private func markReadState(_ state: ReadState) { model.mark(state, paths: targetPaths) }
     private func toggleFlag() {
-        if let targetPaths { model.toggleFlag(paths: targetPaths) } else { model.toggleFlagSelection() }
+        model.toggleFlag(paths: targetPaths)
     }
 
     private func title(_ t: String) -> some View { Text(t).font(.subheadline.bold()) }

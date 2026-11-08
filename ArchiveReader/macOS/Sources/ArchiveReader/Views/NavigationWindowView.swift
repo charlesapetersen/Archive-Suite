@@ -13,6 +13,8 @@ struct NavigationWindowView: View {
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.sidebarWidth") private var sidebarWidth = 210.0
+    @AppStorage("ar.infoWidth") private var infoWidth = 380.0
+    @AppStorage("ar.infoVisible") private var infoVisible = false
     @AppStorage("ar.tagCloudWidth") private var tagCloudWidth = 240.0
     @AppStorage("ar.tagCloudMinCount") private var tagCloudMinCount = 1   // W40.fix-reader-tagcloud-threshold
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
@@ -47,6 +49,17 @@ struct NavigationWindowView: View {
                 Divider()
                 statusBar
             }
+            if model.showingEditor {
+                PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,
+                             label: "Edit Info width", id: "ar.divider.info")
+            }
+            // Keep the editor mounted when hidden: an invalid draft and its hint survive ⌘I.
+            TagInspectorView(model: model, paths: model.selectedFiles.map(\.path), isVisible: model.showingEditor) {
+                model.showingEditor = false
+            }
+            .frame(width: model.showingEditor ? infoWidth : 0)
+            .clipped().opacity(model.showingEditor ? 1 : 0)
+            .disabled(!model.showingEditor).accessibilityHidden(!model.showingEditor)
         }
         .frame(minWidth: 900, minHeight: 560)
         .overlay(alignment: .top) { TitleBarBackdrop() }   // W40.fix-reader-titlebar-gradient
@@ -57,9 +70,7 @@ struct NavigationWindowView: View {
         .onChange(of: model.filter) { model.recompute() }
         .onChange(of: model.sort) { model.recompute() }
         .onChange(of: calendarsEnabled) { model.refreshDisplayedRows() }
-        .sheet(isPresented: $model.showingEditor) {
-            TagEditorView(model: model, size: SheetSizing.fitted(TagEditorView.preferredSize, in: contentSize))
-        }
+        .onChange(of: model.showingEditor) { _, visible in infoVisible = visible }
         .sheet(isPresented: Binding(get: { model.renamingTag != nil },
                                     set: { if !$0 { model.renamingTag = nil } })) {
             if let t = model.renamingTag { RenameTagSheet(model: model, oldTag: t) }
@@ -97,7 +108,7 @@ struct NavigationWindowView: View {
         // W23.m4 — page-link publication + the deep-link "open the viewer ON the cited page" bridge.
         // Extracted into one modifier: adding them inline blew this body's type-check budget.
         .archivePageLinkBridge(model: model, context: linkContext, openWindow: openWindow)
-        .onAppear { deepLinkRouter.nav = model; model.attach(linkContext: linkContext) }
+        .onAppear { deepLinkRouter.nav = model; model.attach(linkContext: linkContext); model.showingEditor = infoVisible }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.applicationDidBecomeActive()
         }
@@ -715,9 +726,8 @@ struct NavigationWindowView: View {
                 .help("Mark the selected documents as unread (⌘U)")
                 .accessibilityIdentifier("ar.toolbar.markUnread")
 
-            Button { model.showingEditor = true } label: { Label("Edit Info", systemImage: "info.circle") }
-                .disabled(model.selectedFiles.isEmpty)
-                .help("Edit the tags, date, quality and flag of the selected documents (⌘I)")
+            Button { model.showingEditor.toggle() } label: { Label("Edit Info", systemImage: "info.circle") }
+                .help("Show or hide the tags, date, quality and flag of the selected documents (⌘I)")
                 .accessibilityIdentifier("ar.toolbar.editTags")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }

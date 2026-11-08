@@ -66,7 +66,7 @@ final class MenuShortcutTests: XCTestCase {
         XCTAssertEqual(key(of: "File ▸ Choose Archive Folder…"), shortcut("o", [.command, .shift]))
         XCTAssertEqual(key(of: "Selection ▸ Copy Link(s)"), shortcut("c", [.command, .shift]))
         XCTAssertEqual(key(of: "Selection ▸ Open in Document Window"), shortcut("o", [.command]))
-        XCTAssertEqual(key(of: "Tags ▸ Edit Info…"), shortcut("i", [.command]))
+        XCTAssertEqual(key(of: "Tags ▸ Edit Info"), shortcut("i", [.command]))
         XCTAssertEqual(key(of: "Document ▸ Find…"), shortcut("f", [.command]))
         // ⌥⌘T is the Mac's Show/Hide Toolbar and ⌃⌘S its Show/Hide Sidebar: nothing else may take them.
         XCTAssertNil(all.first { $0.1 == shortcut("t", [.command, .option]) }, "⌥⌘T is the Mac's toolbar key")

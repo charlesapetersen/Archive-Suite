@@ -12,6 +12,8 @@ struct DocumentWindowView: View {
     @EnvironmentObject private var linkContext: ArchiveLinkContext
     @EnvironmentObject private var router: DeepLinkRouter
 
+    @AppStorage("ar.doc.infoWidth") private var infoWidth = 380.0
+    @AppStorage("ar.doc.infoVisible") private var infoVisible = false
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @FocusState private var findFocused: Bool
     @State private var didConfigureWindow = false
@@ -22,12 +24,21 @@ struct DocumentWindowView: View {
     private let minPane: CGFloat = 140
 
     var body: some View {
-        VStack(spacing: 0) {
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
             if model.showingFind { findBar; Divider() }
             if let note = model.formatNote { formatBanner(note); Divider() }
             content
             Divider()
             statusBar
+            }
+            if model.showingTagEditor {
+                PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,
+                             label: "Edit Info width", id: "ar.divider.info")
+            }
+            tagInspector.frame(width: model.showingTagEditor ? infoWidth : 0)
+                .clipped().opacity(model.showingTagEditor ? 1 : 0)
+                .disabled(!model.showingTagEditor).accessibilityHidden(!model.showingTagEditor)
         }
         .frame(minWidth: 900, minHeight: 600)
         .background(WindowAccessor { configureWindow($0) })   // DV-1: open maximized, then remember size
@@ -40,12 +51,13 @@ struct DocumentWindowView: View {
         .focusedSceneValue(\.archiveLinkContext, linkContext)
         // W40.fix-reader-menus-follow-window: the Tags menu acts on this window's open file.
         .focusedSceneValue(\.documentTagActions, DocumentTagActions(router: router, viewer: model))
-        .sheet(isPresented: $model.showingTagEditor) { tagEditorSheet }
+        .onChange(of: model.showingTagEditor) { _, visible in infoVisible = visible }
         .onChange(of: findFocused) { model.findFieldFocused = findFocused }
         .onReceive(linkContext.$target.combineLatest(linkContext.$jpegPartnerIndex)) { target, index in
             model.updateArchiveContext(target: target, index: index)
         }
         .onAppear {
+            model.showingTagEditor = infoVisible
             fraction = defaultFraction
             if let selection { model.load(selection) }
             // A deep link that cited a page opens straight on it (W23.m4 defect 3). Deferred first
@@ -292,16 +304,14 @@ struct DocumentWindowView: View {
               : (model.jpegUnavailableReason ?? "No JPEG original for this file."))
     }
 
-    /// The tag editor over this window, editing the open file through the navigation window's model.
-    @ViewBuilder private var tagEditorSheet: some View {
-        if let nav = router.nav, let path = model.tagEditorPath {
-            TagEditorView(model: nav,
-                          size: SheetSizing.fitted(TagEditorView.preferredSize, in: docWindow?.frame.size ?? .zero),
-                          targetPaths: [path])
+    /// The inspector beside this window’s document, editing the open file through the navigation window's model.
+    @ViewBuilder private var tagInspector: some View {
+        if let nav = router.nav, let path = model.currentFilePath {
+            TagInspectorView(model: nav, paths: [path], isVisible: model.showingTagEditor) { model.showingTagEditor = false }
         } else {
             VStack(spacing: 12) {
                 Text("Tags can be edited while the Archive Reader window is open.")
-                Button("Done") { model.showingTagEditor = false }.keyboardShortcut(.defaultAction)
+                Button("Close") { model.showingTagEditor = false }
             }
             .padding()
         }

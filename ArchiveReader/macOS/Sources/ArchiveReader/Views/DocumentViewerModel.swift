@@ -214,11 +214,8 @@ final class DocumentViewerModel: ObservableObject {
 
     /// The open file's path, which the Tags menu acts on in the document window (`DocumentTagActions`).
     var currentFilePath: String? { currentURL?.path }
-    /// The tag editor sheet over the document window, editing `tagEditorPath`.
+    /// The right-hand Edit Info inspector follows the open document.
     @Published var showingTagEditor = false
-    /// The file the open tag editor edits, fixed when it opens, so moving on to another file underneath it
-    /// never turns an edit typed for one file into a write on the next.
-    @Published var tagEditorPath: String?
     /// Whether the find field has the caret. Undo Tag Change (⌘Z) stays off then, so ⌘Z in the field
     /// never undoes a tag change instead of the typing (S-001; `TextUndoGuard` does the same app-wide).
     @Published var findFieldFocused = false

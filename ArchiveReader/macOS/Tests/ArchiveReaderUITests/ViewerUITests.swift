@@ -88,6 +88,28 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    func testDocumentInspectorFollowsOpenFile() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+        pressKey("a", modifiers: .command)
+        pressKey("o", modifiers: .command)
+        let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
+        XCTAssertTrue(viewer.waitForExistence(timeout: 10))
+        pressKey("i", modifiers: .command)
+        let year = viewer.textFields["ar.tagEditor.year"]
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        XCTAssertEqual(viewer.sheets.count, 0)
+        let firstYear = year.value as? String
+        viewer.toolbars.buttons["Next"].firstMatch.click()
+        let deadline = Date().addingTimeInterval(5)
+        while year.value as? String == firstYear, Date() < deadline { settle(0.2) }
+        XCTAssertNotEqual(year.value as? String, firstYear, "the inspector follows the next open document")
+        captureScreenshot("w40-document-inspector")
+        pressKey("i", modifiers: .command)
+        XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+        pressKey("w", modifiers: .command)
+    }
+
     // MARK: - Format banner for no-text-layer PDF (W5.d4)
 
     func testNoTextLayerPDFShowsBanner() throws {
@@ -244,7 +266,7 @@ final class ViewerUITests: FixtureUITestCase {
                        ["Hide Tag Cloud", "Show Tag Cloud"])).firstMatch.exists, "so does the tag cloud toggle")
         closeMenu()
 
-        for title in ["Mark Read", "Mark Unread", "Edit Info…", "Toggle Flag"] {
+        for title in ["Mark Read", "Mark Unread", "Edit Info", "Toggle Flag"] {
             let item = tagsMenuItem(title)
             XCTAssertTrue(item.exists, "\(title) should be in the Tags menu")
             XCTAssertTrue(item.isEnabled, "\(title) should act on the open document")

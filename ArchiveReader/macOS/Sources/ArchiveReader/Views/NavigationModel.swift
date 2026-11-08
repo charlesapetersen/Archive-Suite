@@ -78,9 +78,7 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var baseSnippets: [String: String] = [:]
     private var baseFtsGeneration = 0
     // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
-    /// While the tag editor is open its targets hold still: an edit that moves them out of the filter
-    /// ("Remove X" under a tag-X filter) would otherwise prune them and leave the open sheet acting on
-    /// nothing. They were visible when it opened (pruned here first), and are pruned again on close.
+    /// The non-modal inspector follows the visible selection. Its editor owns explicit target paths.
     @Published var showingEditor = false {
         didSet { if showingEditor != oldValue { pruneSelectionToDisplayed(); refreshSelectionCache() } }
     }
@@ -787,7 +785,7 @@ final class NavigationModel: ObservableObject {
         displayedGeneration += 1
         _tagCloudCache = nil
         duplicatedNames = DuplicateNames.duplicatedNames(in: displayed)   // O(n) filename-collision set
-        if !showingEditor { pruneSelectionToDisplayed() }
+        pruneSelectionToDisplayed()
         refreshSelectionCache()   // sort order affects the selection cache too
         persistViewState()        // C2: remember filter + sort across launches
         reapplyPendingTopRow()    // a relaunch's place, while the rows are still arriving
@@ -1142,9 +1140,7 @@ final class NavigationModel: ObservableObject {
 
     private func refreshSelectionCache() {
         let sel = selection
-        // The open tag editor resolves its (already-pruned) targets against the library — see
-        // `showingEditor`; everything else only against the rows the list shows.
-        let base = showingEditor ? library.files : displayed
+        let base = displayed
         selectedFilesCache = sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort,
                                                                          marks: lastSortMarks)
     }
