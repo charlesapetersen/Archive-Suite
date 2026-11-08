@@ -902,7 +902,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   the drop lands in.
 - **Promised in:** `CLAUDE.md` Impl Map `NotesFolderTreeView` (W9.d1); `09-gap-closure.md` D1;
   `SUITE_TODO_DONE.md` `W9.d1`, `W9.e2-folders`, `W9.e2-fu1`, `W40.fix-notes-folder-drag`.
-- **Reached by:** folder drag (`.onDrag`, `Views/NotesFolderTreeView.swift`, `folderRow`) onto a row. The row's
+- **Reached by:** folder drag (`.itemProvider` on the native List row, `Views/NotesFolderTreeView.swift`, `folderRow`) onto a row. The row's
   drop area (`NotesFolderRowDropTarget`) reaches 8 pt above and below the label. On every pointer move
   `dropTarget(onto:y:rowHeight:)` reads the drag pasteboard (`NotesItemDrag.dragKind`) and the pointer's band
   (`NotesItemDrag.dropZone`: top or bottom quarter = beside, middle = into); the app draws that one target
@@ -913,9 +913,16 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `OrganizationStore.moveFolder` (`Index/OrganizationStore.swift`).
 - **Real-path test:** `ArchiveNotesUITests/NotesE2FolderTests.testE2_FolderDragToBottomEdgeReorders`;
   `.testE2_FolderDragToSiblingGapReorders`; `.testE2_FolderMoveUpAndDownReorderTheLevel`;
-  `.testE2_QuickFolderDragOntoMiddleNests`; `.testE2_FolderDropBelowAnOpenFolderBecomesItsFirstChild`;
+  `.testE2_QuickFolderDragOntoMiddleNests`;
+  `.testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow`; `.testE2_FolderDropBelowAnOpenFolderBecomesItsFirstChild`;
   `.testE2_NoteDropOnAnyPartOfAFolderRowFilesIntoIt`; `ArchiveNotesUITests/NotesGUITests.testG18_DragFolderOntoFolderReparentsIt`.
-- **Runtime evidence:** VM 2026-11-05 (W40.fix-notes-folder-drag): the folder and drag UI tests pass, and the
+- **Runtime evidence:** 2026-11-08 W40.fix-notes-folder-drag-again: real VNC input in the macOS 27.2 VM
+  passes nesting, unselected-child unnesting, blank-area drag starts, parent-with-child moves and cycle
+  refusal, with persisted organization checks; disclosure, click selection, menus and note dragging pass.
+  The click-selection UITest passes; raw XCUITest drags still fail in the known macOS 27 harness. Re-run
+  `testE2_QuickFolderDragOntoMiddleNests` and `testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow`
+  under W40.vm-macos27-notes once its harness dependency is repaired.
+  Earlier VM 2026-11-05 (W40.fix-notes-folder-drag): the folder and drag UI tests pass, and the
   screen video shows the app's outline on the row under a held note; the DEBUG seam
   `an.sidebar.test.dropTarget` shows none left after each drop.
 - **Status:** `fixed-pending-recheck`
@@ -923,6 +930,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 owner session notes-1 — `unproven` → `broken`: reordering by drag works, but a folder cannot be dragged onto another to nest it, and the drop highlight follows the pointer erratically ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 30-31). Fix item `W40.fix-notes-folder-drag`.
   - 2026-11-05 W40.fix-notes-folder-drag — `broken` → `fixed-pending-recheck`: a sidebar label is 16 of the row's 32 pt, and the gaps around it belonged to the List's `onMove` (reorder only), so only an 8 pt band nested; the row now takes the whole height, and the highlight is drawn by the app from the same resolution the drop performs. Recheck by hand in notes-2.
+  - 2026-11-06 owner session notes-2 — `fixed-pending-recheck` → `broken`: folder dragging did not work at all; notes still dragged correctly ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md), row 15).
+  - 2026-11-08 W40.fix-notes-folder-drag-again — `broken` → `fixed-pending-recheck`: native List-row payload registration replaces the label's competing tap/drag handlers; real VNC checks pass both directions, including an unselected child and blank row space.
 - **Notes:** the W9.e2 result: `W9.e2-folders` found both D1 doubts real. A gap drop re-parented instead of
   reordering (filed `W9.e2-fu1`, fixed `af7d049`), and there was no way back to the top level (fixed by Move to
   Top Level). XCUITest's synthesized drag nested even before the fix, so the tests prove the paths, not the

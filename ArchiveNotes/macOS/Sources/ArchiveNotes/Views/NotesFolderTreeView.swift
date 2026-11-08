@@ -231,14 +231,6 @@ struct NotesFolderTreeView: View {
             .contentShape(Rectangle())
             .accessibilityIdentifier("an.sidebar.folder")
             .contextMenu { folderMenu(node) }
-            .onTapGesture {
-                // The tap takes the click from the List, so select the row here too: scoping alone
-                // left no sidebar row highlighted (W40.fix-notes-visual-polish).
-                selection = node.id.uuidString
-                nav.showingTemplates = false
-                model.setFolderScope(node.id)
-            }
-            .onDrag { NotesItemDrag.folderProvider(node.id) }
             .modifier(NotesFolderRowDropTarget(
                 folderID: node.id,
                 target: $dropTarget,
@@ -250,6 +242,10 @@ struct NotesFolderTreeView: View {
                     _ = handleItemDrop([payload], onto: node.id, replicate: replicate, source: source)
                 }))
             .background { dropHighlight(for: node.id) }
+            // Register the payload on the native List row, including its blank area and nested rows.
+            // An inner onDrag + tap handler competed with the outline's mouse-down selection (W40).
+            // Click selection goes through List's binding and applySelection, just like the other rows.
+            .itemProvider { NotesItemDrag.folderProvider(node.id) }
             // Outermost, so the List matches the selection to this row through the drag/drop wrappers.
             .tag(node.id.uuidString)
     }

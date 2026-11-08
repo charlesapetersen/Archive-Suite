@@ -14874,3 +14874,19 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Implementation checkpoint: 24a3a22b. No rehearsal-cache inputs created; temporary logs, result bundles
   and VM screenshots retained under /tmp/notes-date-* for audit. No paid run or real-store/corpus access.
   <!-- /W40.fix-notes-date-cell-erase -->
+
+- [x] **W40.fix-notes-folder-drag-again — Dragging a folder onto another nests it, and dragging it out un-nests it [S · S2]** · §W40 · SHIPPED 2026-11-08 (this commit) (lane: notes) (uses: build,vm) — Found by the owner's Notes guided session 2, 2026-11-06 (`verification/sessions/notes-2-returned.md`, row 15); the owner's call: fix everything on the form, the B rows first. Dragging folders did not work at all, though W40.fix-notes-folder-drag (session 1, rows 30-31) shipped it; ledger N-26 goes to broken. Notes still drag onto folders correctly. Reproduce, then fix. Notes' VM UITests do not pass on macOS 27 until `W40.vm-macos27-notes`; verify with the unit bundle and render guards, and name the UITest still to run.
+  Native List-row `itemProvider` replaces the inner label's tap/drag gestures; selection stays with the
+  List binding. The existing drop/write/cycle paths are unchanged. Real VNC input on macOS 27.2 reproduced
+  the unchanged 4ec1caff baseline's failed quick drag and verified the fixed root → child → root round trip,
+  blank source area, moving a parent with its child, cycle refusal, disclosure/selection/context menus and
+  ordinary note dragging against the generated scratch store. Persisted parent/order/membership checks and
+  PNG inspection passed; full smoke: 245 XCTest + 1159 Swift Testing, including render guards.
+  VM click-selection UITest passes. Raw XCUITest drags still fail under the known W40.vm-macos27-harness /
+  W40.vm-macos27-notes issue: re-run `NotesE2FolderTests.testE2_QuickFolderDragOntoMiddleNests` and
+  `testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow` after that fix (both attempted here; neither
+  reached its drop). The app's corresponding real VNC gestures pass.
+  Added `NotesE2FolderTests.testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow` for blank row starts,
+  an unselected child, persisted sibling order and relaunch. No item bench-cache files were created; only
+  rebuildable worktree DerivedData and /tmp verification evidence (w40-folder-drag-*) were used.
+  <!-- /W40.fix-notes-folder-drag-again -->

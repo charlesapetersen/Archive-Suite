@@ -161,6 +161,47 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.fix-notes-folder-drag-again: native outline rows start a drag from their blank area,
+    /// including an unselected child. The saved parent/order and a relaunch prove both ends of the move.
+    func testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let readingID = Self.folderReading.lowercased(), ideasID = Self.folderIdeas.lowercased()
+            let outline = mainWindow.outlines.firstMatch
+            @MainActor func blankPoint(of row: XCUIElement) -> XCUICoordinate {
+                outline.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0))
+                    .withOffset(CGVector(dx: 0, dy: row.frame.midY - outline.frame.minY))
+            }
+            XCTAssertNil(try XCTUnwrap(folderRecord(id: readingID)).parent)
+            blankPoint(of: folderRow(named: "Reading"))
+                .press(forDuration: 0.05,
+                       thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)),
+                       withVelocity: .slow, thenHoldForDuration: 0.5)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(id: readingID)?.parent == ideasID },
+                          "an unselected folder dragged from blank row space should nest")
+            assertNoDropHighlight()
+
+            mainWindow.descendants(matching: .any)["an.sidebar.allNotes"].firstMatch.click()
+            blankPoint(of: folderRow(named: "Reading"))
+                .press(forDuration: 0.05,
+                       thenDragTo: folderRow(named: "Extracts").coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0))
+                        .withOffset(CGVector(dx: 0, dy: -4)),
+                       withVelocity: .slow, thenHoldForDuration: 0.5)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                guard let reading = self.folderRecord(id: readingID),
+                      let extracts = self.folderRecord(named: "Extracts") else { return false }
+                return reading.parent == nil && reading.sortOrder < extracts.sortOrder
+            }, "dragging the unselected child above a root row should unnest and order it there")
+            assertNoDropHighlight()
+
+            app.terminate()
+            app.launch()
+            app.activate()
+            XCTAssertTrue(folderRow(named: "Reading").exists, "the unnested folder should remain visible after relaunch")
+            XCTAssertNil(try XCTUnwrap(folderRecord(id: readingID)).parent)
+        }
+    }
+
     /// Below an open folder the line means "first child", from either side of it (W40.fix-notes-folder-drag):
     /// the bottom edge of Ideas, once Reading is inside it and showing, puts a third folder above Reading.
     func testE2_FolderDropBelowAnOpenFolderBecomesItsFirstChild() throws {
