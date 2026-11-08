@@ -104,6 +104,16 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             let before = markdown()
             let dateCell = mainWindow.descendants(matching: .any)["an.cell.date.\(id)"]
             XCTAssertTrue(dateCell.waitForExistence(timeout: 10), "the list shows the Date column")
+            let displayedDate = dateCell.value as? String
+            XCTAssertFalse(displayedDate?.isEmpty ?? true, "the fixture starts with a visible date")
+
+            // W40.fix-notes-date-cell-erase: merely opening a cell and leaving it must write nothing.
+            dateCell.doubleClick()
+            mainWindow.textViews["an.editor.text"].click()
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            XCTAssertEqual(markdown(), before, "an untouched Date cell must preserve the whole note")
+            XCTAssertEqual(dateCell.value as? String, displayedDate, "the untouched date stays visible")
+            shot("list-date-unchanged")
 
             dateCell.doubleClick()
             app.typeKey("a", modifierFlags: .command)
@@ -136,6 +146,12 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
             }
             XCTAssertTrue(before.lowercased().contains("silicon valley") && before.lowercased().contains("intel"),
                           "the fixture note starts with two tags")
+            let beforeTags = markdown()
+            mainWindow.textViews["an.editor.text"].click()
+            XCTAssertTrue(pollUntil(timeout: 5) { !tagsField.exists }, "leaving Tags closes the editor")
+            XCTAssertEqual(markdown(), beforeTags, "an untouched Tags cell must preserve the whole note")
+            tagsCell.doubleClick()
+            XCTAssertTrue(tagsField.waitForExistence(timeout: 5))
             app.typeText("list tag\r")
             XCTAssertTrue(saved { $0.contains("List Tag") }, "a tag typed in the list is added")
             let afterAdd = markdown().lowercased()

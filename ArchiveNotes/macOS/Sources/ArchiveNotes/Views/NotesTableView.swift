@@ -470,9 +470,9 @@ struct NotesTableView: NSViewRepresentable {
             if tableView.clickedColumn >= 0, currentSnapshotIDs.indices.contains(tableView.clickedRow) {
                 let id = currentSnapshotIDs[tableView.clickedRow]
                 switch tableView.tableColumns[tableView.clickedColumn].identifier.rawValue {
-                case "date": beginDateEdit(id); return
                 // On the next turn: laid over the cell during the table's own click handling, the field lost the
                 // keyboard again as the double-click finished (VM run 2).
+                case "date": DispatchQueue.main.async { [weak self] in self?.beginDateEdit(id) }; return
                 case "tags": DispatchQueue.main.async { [weak self] in self?.beginTagsEdit(id) }; return
                 default: break
                 }

@@ -3,6 +3,20 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W40.fix-notes-date-cell-erase, 2026-11-08) — untouched list cells cannot clear dates or tags
+
+The Date/Title field now saves only text captured from an actual edit notification, rather than reading
+the control's value as the shared AppKit field editor leaves it. An untouched field writes nothing;
+an explicit empty date still clears it, and a later control reset cannot replace the user's typed date.
+Tags likewise requires an actual edit before committing its token list. Date's double-click startup
+waits for the table's mouse handling to finish, as Tags already did.
+
+`ListCellEditingLifecycleTests` uses unordered AppKit windows and the production date-cell factory over
+a scratch store. Injecting a control reset reproduced the old durable date loss and tag-removal request;
+ordinary focus loss alone did not reproduce the owner's exact gesture. The tests also cover real date
+replacement, explicit date/tag clearing, unchanged blur and preservation of the note's body and subjects.
+The focused interaction regression is `InspectorPanelUITests.testDateAndTagsEditInTheList`.
+
 ## ⚠️ LIMIT (W40.fix-notes-choose-store, 2026-10-29) — Choose Store Folder… cannot always see an enclosing archive
 
 File ▸ Choose Store Folder… refuses a Reader archive, any folder inside one, a folder inside another store and a

@@ -18,6 +18,9 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
     private var cancelled = false
     private var renameID = UUID()
     private var renamingItemID: UUID?
+    /// Only a text-change notification supplies a draft. AppKit can reset the control's value
+    /// while handing its shared field editor back; that is never a request to clear a date.
+    private var editedText: String?
     /// The detail header's title starts an edit on a click; a list cell waits for Return, a double-click
     /// or Rename… (a click there selects the row).
     var beginsOnClick = false
@@ -31,6 +34,7 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
         renamingItemID = itemID
         isRenaming = true
         cancelled = false
+        editedText = nil
         onBegin?()
         stringValue = noteTitle // no replicated-item glyph or “Untitled” placeholder in the draft
         isEditable = true
@@ -85,13 +89,18 @@ final class NoteTitleTextField: NSTextField, NSTextFieldDelegate {
 
     func controlTextDidEndEditing(_ notification: Notification) { finishRename() }
 
+    func controlTextDidChange(_ notification: Notification) {
+        guard isRenaming else { return }
+        editedText = currentEditor()?.string ?? stringValue
+    }
+
     private func finishRename() {
         guard isRenaming else { return }
-        let title = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = (editedText ?? noteTitle).trimmingCharacters(in: .whitespacesAndNewlines)
         isRenaming = false
         isEditable = false
         isSelectable = false
-        if cancelled || (title.isEmpty && !commitsEmpty) || title == noteTitle {
+        if cancelled || editedText == nil || (title.isEmpty && !commitsEmpty) || title == noteTitle {
             attributedStringValue = originalDisplay
         } else {
             let savedDisplay = originalDisplay

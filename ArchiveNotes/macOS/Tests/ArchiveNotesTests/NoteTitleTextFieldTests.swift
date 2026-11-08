@@ -15,16 +15,19 @@ struct NoteTitleTextFieldTests {
         field.beginRename()
         #expect(field.stringValue == "Original", "display glyph is never part of the title draft")
         field.stringValue = "Cancelled"
+        field.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
         #expect(field.control(field, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))))
         #expect(field.stringValue == "⧉ Original" && commits.isEmpty)
         for title in [" \n ", "Original"] {
             field.beginRename()
             field.stringValue = title
+            field.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
             field.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
             #expect(commits.isEmpty)
         }
         field.beginRename()
         field.stringValue = "  New Title  "
+        field.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
         #expect(field.control(field, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))))
         field.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
         #expect(commits == ["New Title"])
@@ -34,6 +37,7 @@ struct NoteTitleTextFieldTests {
         field.onCommit = { title, completion in commits.append(title); completion(false) }
         field.beginRename()
         field.stringValue = "Cannot Save"
+        field.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
         field.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
         #expect(field.stringValue == "Original")
         #expect(commits == ["New Title", "Cannot Save"])

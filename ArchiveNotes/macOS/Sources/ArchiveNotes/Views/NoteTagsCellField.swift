@@ -16,6 +16,7 @@ final class NoteTagsCellField: NSTokenField, NSTokenFieldDelegate {
     private let onEnd: () -> Void
     private var cancelled = false
     private var finished = false
+    private var didChange = false
 
     init(tags: [String], suggestions: @escaping () -> [String], onCommit: @escaping ([String]) -> Void,
          onEnd: @escaping () -> Void) {
@@ -61,6 +62,8 @@ final class NoteTagsCellField: NSTokenField, NSTokenFieldDelegate {
 
     func controlTextDidEndEditing(_ notification: Notification) { finish(pending: nil) }
 
+    func controlTextDidChange(_ notification: Notification) { didChange = true }
+
     /// The tokens in the field, without the text still being typed; nil when the field does not hold a token list,
     /// which saves nothing rather than reading as "every tag removed".
     private var tokens: [String]? {
@@ -74,7 +77,7 @@ final class NoteTagsCellField: NSTokenField, NSTokenFieldDelegate {
     private func finish(pending: String?) {
         guard !finished else { return }
         finished = true
-        if !cancelled, var edited = tokens {
+        if !cancelled, didChange, var edited = tokens {
             if let pending, !pending.isEmpty, !edited.contains(pending) { edited.append(pending) }
             if edited != original { onCommit(edited) }
         }
