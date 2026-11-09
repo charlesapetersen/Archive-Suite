@@ -259,7 +259,7 @@ writes against the real corpus — always a copy.
   and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
   `↑/↓` **scroll** the focused pane; `⌘⇧↑/↓` cycle the segment (see §Keyboard). Intelligent copy +
   in-doc Find. Degrades for non-2-page/corrupt.
-- **Intelligent copy** (`⌥⌘C`): collapse single newlines → space; blank line = paragraph break (keep);
+- **Intelligent copy** (`⇧⌘C`): collapse single newlines → space; blank line = paragraph break (keep);
   de-hyphenate line-end hyphens; works in whichever pane holds the selection. `⌘C` copies verbatim.
 - **Options panel (⌘,):** link format, copy-text cleaning, viewer split, nav defaults, list density,
   (see **§Options** below).
@@ -275,7 +275,7 @@ writes against the real corpus — always a copy.
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
   mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
-- `⌘⇧C` Copy Link(s) · `⌘⇧L` Copy Archive Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
+- `⌥⌘C` Copy Link(s) · `⌘⇧L` Copy Archive Link(s) · `⌘⇧R` Reveal in Finder · `⌘⇧O` Choose Archive Folder…
 - `⌘L` focus tag filter · `⌘F` or `⌘⌥F` Search OCR text (⌘F is Find… in the document window) · `⌘⇧K` Clear All (every filter and search; inside a smart folder, back to its own rules). Each filter chip's ✕ and the OCR box's ✕ clear just that one
 - `⌃⌘S` Show/Hide Sidebar · `⌃⌘T` Show/Hide Tag Cloud (View menu, this window only). ⌃⌘S is the Mac's sidebar key;
   they were `⌥⌘S`/`⌥⌘T` until `W40.fix-suite-shortcuts`, and ⌥⌘T is the Mac's Show/Hide Toolbar
@@ -299,8 +299,8 @@ writes against the real corpus — always a copy.
   (text-size glyphs) and Reset Zoom (`⌥⌘0`), disabled while both pages already fit at the normal text size
   (`DocumentViewerModel.zoomIsDefault`); there are no per-pane Fit buttons (`W40.fix-reader-doc-toolbar`)
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
-  disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⌥⌘C`
-  Edit ▸ Copy Cleaned for Prose (intelligent; not `⌘⇧C`, which is Copy Link(s)); it also starts a
+  disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⇧⌘C`
+  Edit ▸ Copy Cleaned for Prose (intelligent; Copy Link(s) uses `⌥⌘C`); it also starts a
   paragraph where the OCR left no blank line but the page's line boxes show one (Options toggle). Since
   `W48.reader-copy-shortcut` there is no second `⌘C` on the Document menu: it matched before Edit ▸ Copy
   and copied the PDF selection with the caret in the find field
@@ -317,7 +317,7 @@ writes against the real corpus — always a copy.
 
 *Preview sheet* (opened by `Space`/`⌘Y`)
 - `↑/↓` previous/next file in the list (nav selection follows) · `←/→` cycle within a multi-file selection ·
-  `⌘C` (Edit ▸ Copy)/`⌥⌘C` copy verbatim/cleaned · `⌥⌘L` copy the page link · `⌘O` open the full viewer · `Space`/`Esc` close
+  `⌘C` (Edit ▸ Copy)/`⇧⌘C` copy verbatim/cleaned · `⌥⌘L` copy the page link · `⌘O` open the full viewer · `Space`/`Esc` close
 - `⌘+`/`⌘−` (or `⌘↑`/`⌘↓`)/`⌘0` zoom in/out/fit the focused pane — the image pane on open (since `W26.previewzoom`: the
   sheet's viewer model is published by `NavigationWindowView`, so the Document menu acts on it)
 - **No find bar here:** `⌘F`/`⌘G`/`⌘⇧G` are *disabled* in the preview (`DocumentViewerModel.supportsFind`,
@@ -326,10 +326,12 @@ writes against the real corpus — always a copy.
 > **Reconciled with the code, 2026-07-07.** The viewer scheme changed after PLAN was written
 > (shipped UI batch #14): `↑/↓` now **scroll the focused page** instead
 > of cycling documents; cycling moved to `⌘⇧↑/↓`; zoom was `⌘↑/↓` (`⌘+`/`⌘−` added 2026-11-04); reset is `⌥⌘0` (not
-> `⌥⌘=`); `⌘C`/`⌥⌘C` are verbatim/cleaned copy (cleaned was `⌘⇧C` until 2026-10-22). The document window has **no** Mark-Read (`⌘R`) or
+> `⌥⌘=`); `⌘C`/`⇧⌘C` are verbatim/cleaned copy (the owner restored cleaned to `⇧⌘C` on 2026-11-08;
+> Copy Link(s) moved to `⌥⌘C`). The document window has **no** Mark-Read (`⌘R`) or
 > Copy Link(s) shortcut — those are nav-window only; its page link is `⌥⌘L` (since 2026-11-04).
 
-*Across the suite* (`W40.fix-suite-shortcuts`, 2026-11-06). One command, one key, in every app that has it; the
+*Across the suite* (`W40.fix-suite-shortcuts`, 2026-11-06). Shared commands use matching keys, except the
+owner’s 2026-11-08 Reader preference for prose copy (`⇧⌘C`) and file links (`⌥⌘C`); the
 Mac's standard keys (Edit, Window, ⌘, ⌘W ⌘Q ⌘M ⌘H, ⌃⌘F full screen, ⌃⌘S sidebar, ⌥⌘T toolbar) are left to the
 system. `MenuShortcutTests` (Reader and Notes unit bundles) fails on any key two menu-bar commands share; the one
 allowed pair here is ⌘Z/⇧⌘Z, Tags ▸ Undo/Redo Tag Change beside Edit ▸ Undo/Redo (`TextUndoGuard`).
@@ -338,15 +340,15 @@ allowed pair here is ⌘Z/⇧⌘Z, Tags ▸ Undo/Redo Tag Change beside Edit ▸
 |---|---|---|---|
 | Choose the archive folder | `⇧⌘O` Choose Archive Folder… | `⇧⌘O` Choose Archive Folder… | `⇧⌘O` Choose Output Folder… |
 | Open | `⌘O` Open in Document Window | — (double-click a row) | `⌘O` Add Files… |
-| Copy a link to the item | `⇧⌘C` Copy Link(s) | `⇧⌘C` Note ▸ Copy Link | — |
+| Copy a link to the item | `⌥⌘C` Copy Link(s) | `⇧⌘C` Note ▸ Copy Link | — |
 | Its details | `⌘I` Show/Hide Edit Info | `⌥⌘I` Show/Hide Inspector (`⌘I` is Italic) | — |
 | New | — | `⌘N` New Note · `⌥⌘N` New Extract | — |
 | Find | `⌘F` | Edit ▸ Find (system) | — |
 | Start / stop the work | — | — | `⌘R` Start Processing · `⌘.` Stop Processing |
 | Settings | `⌘,` | `⌘,` | `⌘,` |
 
-Same key, different command, by design: `⌘R` (Reader Mark Read, Processor Start Processing), `⌥⌘C` (Reader Copy
-Cleaned for Prose, Notes Inline Code), `⌥⌘0` (Reader reset the split, Notes Body). Each app's own table: Notes
+Same key, different command, by design: `⌘R` (Reader Mark Read, Processor Start Processing), `⇧⌘C` (Reader Copy Cleaned for Prose, Notes Copy Link),
+`⌥⌘C` (Reader Copy Link(s), Notes Inline Code), `⌥⌘0` (Reader reset the split, Notes Body). Each app's own table: Notes
 `REFERENCE.md` §Keyboard map, Processor `REFERENCE.md` §Keyboard map.
 
 ## §Options (⌘, — `OptionsView`, read via `AppSettings`)

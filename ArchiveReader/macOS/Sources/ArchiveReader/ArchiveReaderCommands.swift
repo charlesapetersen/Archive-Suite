@@ -85,10 +85,10 @@ struct ArchiveReaderCommands: Commands {
         // caret in the find field (W48.reader-copy-shortcut).
         CommandGroup(after: .pasteboard) {
             Divider()
-            // ⌥⌘C, not ⇧⌘C: ⇧⌘C is Selection ▸ Copy Link(s), and with the preview sheet up both items are
-            // enabled in the nav window at once (W40.fix-reader-visual-polish).
+            // Owner, 2026-11-08: ⇧⌘C cleans prose; Selection ▸ Copy Link(s) takes ⌥⌘C so
+            // both commands keep distinct shortcuts while the preview sheet is open.
             Button("Copy Cleaned for Prose") { doc?.copySelection() }
-                .keyboardShortcut("c", modifiers: [.command, .option]).disabled(noReadingPane)
+                .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(noReadingPane)
             // ⌥⌘L: ⌘L is Focus Tag Filter and ⇧⌘L Copy Archive Link(s), which the preview sheet leaves enabled
             // beside this one, so the page link takes the remaining L.
             Button("Copy Archive Link to This Page") {
@@ -129,7 +129,7 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(noSelection)
             Button("Copy Link(s)") { nav?.copyLinks() }
-                .keyboardShortcut("c", modifiers: [.command, .shift])
+                .keyboardShortcut("c", modifiers: [.command, .option])
                 .disabled(noSelection)
             Button("Copy Archive Link(s)") { nav?.copyArchiveLinks() }
                 .keyboardShortcut("l", modifiers: [.command, .shift])

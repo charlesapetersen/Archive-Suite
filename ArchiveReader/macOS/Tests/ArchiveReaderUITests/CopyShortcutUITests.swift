@@ -39,7 +39,7 @@ final class CopyShortcutUITests: FixtureUITestCase {
         XCTAssertFalse(menuItem("Edit", "Copy").isEnabled, "Copy must be disabled with no text selected")
         closeMenu()
         XCTAssertEqual(clipboard(after: { pressKey("c", modifiers: .command) }), sentinel)
-        XCTAssertEqual(clipboard(after: { pressKey("c", modifiers: [.command, .option]) }), sentinel)
+        XCTAssertEqual(clipboard(after: { pressKey("c", modifiers: [.command, .shift]) }), sentinel)
 
         // Text selected on the OCR page.
         pressKey("a", modifiers: .command)
@@ -50,8 +50,8 @@ final class CopyShortcutUITests: FixtureUITestCase {
         XCTAssertTrue(plain.contains(pageText), "⌘C should copy the selected page text, got «\(plain)»")
         XCTAssertFalse(NSPasteboard.general.types?.contains(.html) ?? false,
                        "⌘C is the verbatim plain-text copy, not PDFKit's rich copy")
-        let cleaned = clipboard(after: { pressKey("c", modifiers: [.command, .option]) })
-        XCTAssertTrue(cleaned.contains(pageText), "⌥⌘C should copy the selection cleaned, got «\(cleaned)»")
+        let cleaned = clipboard(after: { pressKey("c", modifiers: [.command, .shift]) })
+        XCTAssertTrue(cleaned.contains(pageText), "⇧⌘C should copy the selection cleaned, got «\(cleaned)»")
 
         // Focus on the image pane: the selection on the text page is still what ⌘C copies.
         pressKey(XCUIKeyboardKey.leftArrow.rawValue, modifiers: [.command, .option])
@@ -94,8 +94,8 @@ final class CopyShortcutUITests: FixtureUITestCase {
         settle(0.5)
         let plain = clipboard(after: { pressKey("c", modifiers: .command) })
         XCTAssertTrue(plain.contains(pageText), "⌘C should copy the preview's selected text, got «\(plain)»")
-        let cleaned = clipboard(after: { pressKey("c", modifiers: [.command, .option]) })
-        XCTAssertTrue(cleaned.contains(pageText), "⌥⌘C should copy it cleaned, got «\(cleaned)»")
+        let cleaned = clipboard(after: { pressKey("c", modifiers: [.command, .shift]) })
+        XCTAssertTrue(cleaned.contains(pageText), "⇧⌘C should copy it cleaned, got «\(cleaned)»")
 
         app.buttons["ar.preview.done"].click()
         settle(1)

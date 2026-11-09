@@ -2,6 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ✅ CLOSED (W40.reader-prose-shortcut, 2026-11-08) — prose copy uses Command–Shift–C
+
+The owner’s requested shortcut is ⇧⌘C for Edit ▸ Copy Cleaned for Prose. Selection ▸ Copy Link(s)
+uses the freed ⌥⌘C, keeping the commands distinct even while the preview sheet is open.
+The menu shortcut checks and existing document/preview copy interaction tests use the new bindings.
+
 ## ✅ CLOSED (W40.reader-tiled-pages, 2026-11-08) — all PDF pages tiled, without window tabs
 
 View ▸ All Pages Tiled and the document toolbar show numbered tiles for every physical PDF page,
