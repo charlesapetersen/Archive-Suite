@@ -60,6 +60,8 @@ struct MenuShortcutTests {
         #expect(key(of: "File ▸ New Note") == shortcut("n", [.command]))
         #expect(key(of: "Format ▸ Bulleted List") == shortcut("u", [.command, .option]))
         #expect(key(of: "Format ▸ Numbered List") == shortcut("o", [.command, .option]))
+        #expect(key(of: "Edit ▸ Advanced Search…") == shortcut("f", [.command, .option, .shift]),
+                "Advanced Search must survive installation of TextEditingCommands: \(all.map(\.0))")
         #expect(all.contains { $0.0.hasPrefix("Edit ▸ ") && $0.1 == shortcut("f", [.command]) },
                 "⌘F is Edit ▸ Find: \(all.filter { $0.0.hasPrefix("Edit") }.map(\.0))")
     }

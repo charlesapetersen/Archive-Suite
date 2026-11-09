@@ -3,6 +3,20 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W40.fix-notes-advanced-search-menu, 2026-11-08) — Advanced Search stays in Edit
+
+The command was absent, rather than disabled: the real-menu regression assertion reproduced its disappearance
+at the text-editing insertion point alongside `TextEditingCommands`. It now follows the stable clipboard group,
+so Edit ▸ Advanced Search… and ⇧⌥⌘F reach the front browser's existing scene action. The filter-bar icon and
+per-window form state use the same path as before; no store or corpus writes changed.
+
+The real-menu assertion fails on the baseline and covers the command's exact Edit path and shortcut.
+`NotesAdvancedSearchUITests.testAdvancedSearchMenuAndShortcutTargetTheFrontWindow` passes in the off-screen
+macOS 27.2 VM: menu activation with editor focus, shortcut from the filter field and editor, Extracts routing,
+and switching back to Notes. Both window screenshots were inspected; no new suite crash/hang was harvested.
+Full Notes smoke passes (245 XCTest + 1159 Swift Testing), including existing render guards; no new source
+warnings. The broader macOS 27 harness work remains W40.vm-macos27-notes; this focused menu test passed.
+
 ## ✅ FIXED (W40.fix-notes-inspector-flicker, 2026-11-08) — inspector visibility settles once
 
 Opening or closing the inspector no longer animates the whole browser, repeatedly reflowing TextKit and

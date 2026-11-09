@@ -158,7 +158,9 @@ struct AdvancedSearchCommands: Commands {
     @FocusedValue(\.advancedSearchAction) private var advancedSearch
 
     var body: some Commands {
-        CommandGroup(after: .textEditing) {
+        // TextEditingCommands replaces the text-editing group; an insertion there disappears from Edit.
+        // Anchor to the standard clipboard commands so the window's search stays in the menu and key map.
+        CommandGroup(after: .pasteboard) {
             Button("Advanced Search\u{2026}") { advancedSearch?.open() }
                 .keyboardShortcut("f", modifiers: [.command, .option, .shift])
                 .disabled(advancedSearch == nil)

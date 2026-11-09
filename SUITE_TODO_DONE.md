@@ -14898,3 +14898,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 - [x] **W40.reader-prose-shortcut — Copy Cleaned for Prose uses Command–Shift–C** · §W40 — owner request, 2026-11-08 (lane: reader). SHIPPED 2026-11-08 (this commit).
   Edit ▸ Copy Cleaned for Prose uses ⇧⌘C; Selection ▸ Copy Link(s) moves to the freed ⌥⌘C so the preview keeps distinct commands. Updated the real-menu shortcut checks, existing document/preview copy interaction tests, keyboard reference and smoke checklist. Verification: Reader build and unit smoke (731 tests, three expected skips, zero failures), real-menu binding and duplicate-shortcut checks, write-surface lint and all 25 lint mutation checks. Existing VM copy tests were updated for the next run, not rerun here. No corpus writes or paid calls; no bench-cache inputs created.
   <!-- /W40.reader-prose-shortcut -->
+
+- [x] **W40.fix-notes-advanced-search-menu — Edit ▸ Advanced Search… is in the menu bar and ⇧⌥⌘F opens it [S · S3]** · §W40 · SHIPPED 2026-11-08 (this commit) (lane: notes) (uses: build,vm)
+  Owner's Notes guided session 2, 2026-11-06 (`verification/sessions/notes-2-returned.md`, row 23):
+  Advanced Search was absent from Edit and its shortcut did nothing, while the filter-bar icon worked.
+  Reproduced against the real app menu in `MenuShortcutTests`: the text-editing insertion had disappeared.
+  `AdvancedSearchCommands` now inserts after the stable clipboard group; both windows retain their existing
+  `focusedSceneValue` action and open the same form as the filter-bar icon. No store/corpus write path changed.
+  The baseline menu assertion fails; the focused macOS 27.2 VM test passes (menu, filter-field/editor shortcut,
+  Extracts routing and switching back); both window PNGs were inspected, no new suite crash/hang. The new test
+  is `NotesAdvancedSearchUITests.testAdvancedSearchMenuAndShortcutTargetTheFrontWindow`. Full Notes smoke passes
+  (245 XCTest + 1159 Swift Testing), including existing render guards, with no new source warnings.
+  No item-owned rehearsal cache was created; only disposable /tmp logs/screenshots and the standard reusable VM fixture/DerivedData were used. $0.
+  <!-- /W40.fix-notes-advanced-search-menu -->

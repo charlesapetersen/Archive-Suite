@@ -10,6 +10,58 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
 
     private var allNotes: Set<String> { [Self.idPlain, Self.idReader, Self.idZotero] }
 
+    /// W40.fix-notes-advanced-search-menu: test the real menu and key dispatch, including scene routing.
+    func testAdvancedSearchMenuAndShortcutTargetTheFrontWindow() throws {
+        try withFixture {
+            XCTAssertTrue(waitForIndexReady(timeout: 30))
+            _ = selectItem(uuid: Self.idPlain)
+            let editor = mainWindow.textViews["an.editor.text"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            editor.click()
+
+            app.menuBars.menuBarItems["Edit"].click()
+            let command = app.menuItems["Advanced Search…"]
+            XCTAssertTrue(command.waitForExistence(timeout: 5), "Edit must contain Advanced Search…")
+            XCTAssertTrue(command.isEnabled, "editor focus must retain the window's search action")
+            command.click()
+            assertSearchAndCancel(in: mainWindow)
+
+            for target in [mainWindow.textFields["an.filter.search"], editor] {
+                target.click()
+                app.typeKey("f", modifierFlags: [.command, .option, .shift])
+                assertSearchAndCancel(in: mainWindow)
+            }
+
+            app.menuBars.menuBarItems["Window"].click()
+            app.menuItems["Extracts"].click()
+            let extracts = app.windows["Extracts"]
+            XCTAssertTrue(extracts.waitForExistence(timeout: 10))
+            extracts.textFields["an.filter.search"].click()
+            app.typeKey("f", modifierFlags: [.command, .option, .shift])
+            XCTAssertFalse(mainWindow.sheets.firstMatch.exists, "search belongs to the front window")
+            assertSearchAndCancel(in: extracts)
+
+            // Switching back must restore Notes' action, rather than retain the Extracts closure.
+            app.menuBars.menuBarItems["Window"].click()
+            app.menuItems["Archive Notes"].click()
+            mainWindow.textFields["an.filter.search"].click()
+            app.typeKey("f", modifierFlags: [.command, .option, .shift])
+            XCTAssertFalse(extracts.sheets.firstMatch.exists)
+            assertSearchAndCancel(in: mainWindow)
+        }
+    }
+
+    private func assertSearchAndCancel(in window: XCUIElement,
+                                       file: StaticString = #filePath, line: UInt = #line) {
+        let sheet = window.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 5), "search should open in \(window.title)", file: file, line: line)
+        XCTAssertEqual(sheet.popUpButtons.matching(identifier: "an.advanced.rule.field").count, 3,
+                       "the same starter form as the filter-bar action", file: file, line: line)
+        shot("advanced-search-menu-\(window.title)", in: window)
+        sheet.buttons["Cancel"].click()
+        XCTAssertTrue(pollUntil(timeout: 5) { !sheet.exists }, file: file, line: line)
+    }
+
     func testAdvancedSearchFormSearchSaveAndEdit() throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
@@ -113,10 +165,18 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
             .matching(NSPredicate(format: "value == %@", name)).firstMatch
     }
 
-    private func shot(_ name: String) {
-        let attachment = XCTAttachment(screenshot: mainWindow.screenshot())
+    private func shot(_ name: String, in window: XCUIElement? = nil) {
+        let screenshot = (window ?? mainWindow).screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-\(name).png")
+        do {
+            try screenshot.pngRepresentation.write(to: url, options: .atomic)
+            print("[shot] \(name): wrote \(url.path)")
+        } catch {
+            XCTFail("Could not save search screenshot: \(error)")
+        }
     }
 }
