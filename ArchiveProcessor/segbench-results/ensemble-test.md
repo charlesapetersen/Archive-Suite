@@ -24,3 +24,12 @@ Rescored 2026-11-11 (W46.stale-figures) from the cached calls, no new call: the 
 
 Against the development set (ensemble-dev.md): a drop here is the honest size of what choosing the voter set and levels on the development set bought.
 
+## Measurement card
+
+Added 2026-11-11 (W46.p13-wording, measurement review pass 13, P13-8) after the W46.stale-figures rescore.
+
+- **Truth.** The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings at 101|102 and 102|103, W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap. No scored voter drafted a truth.
+- **Selection.** The two test collections whole, set aside before the finalists, the rule and the levels were frozen on the development boxes (Dean, Deaver, Herrnstein; ensemble-dev.md, ensemble-finalists.json). No page or voter was chosen by a test result; no ABBYY text was used. The spring 2026 prompts saw all five collections (above).
+- **Comparison.** Every finalist and voter on the same 363 pages from the same cached calls, the same scorer and the same truth; the 2026-11-11 rescore changed only the truth, nothing refit or re-chosen.
+- **Noise.** n is 250 and 113 pages, one box each, scored once at temperature 0; no interval is computed here. The rerun floor is 1.4-3.2 points of pages exact a box (seg-boxes-score.md §Noise), so a gap between rows under it, C 85.5% against CW 87.3% included, is a tie. Gaps in one box are not independent.
+- **Scope.** Two boxes, two finalists and their voters' prompts (window-claude, and whole-gemini: Gemini 3.8 Flash, one call per folder). It does not settle the app's routes, which options.md and seg-boxes-score.md measure, or boxes outside these collections.

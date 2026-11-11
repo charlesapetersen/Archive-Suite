@@ -131,6 +131,8 @@ def write_summary() -> None:
     for f in sorted(RESULTS.glob("*.tsv")):
         with open(f, newline="") as fh:
             rows = list(csv.DictReader(fh, delimiter="\t"))
+        if not rows or "pages_in_exact_doc" not in rows[-1]:
+            continue        # another bench's table (e.g. truth-jpeg-owner-answers.tsv), not a segmentation run
         r = rows[-1]
         num = lambda k: float(r[k]) if r[k] != "" else None
         method, _, split = f.stem.rpartition("-")

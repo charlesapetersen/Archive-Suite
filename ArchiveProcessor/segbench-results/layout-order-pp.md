@@ -68,11 +68,12 @@ Notes on the table:
 
 ## What it says
 
-1. **The order rule for the detector the app runs is its own order.** On PP-DocLayoutV3's regions, its coupled order
-   beats the best geometric rules. Tau is 0.977 against 0.900 and 0.905, beyond the interval. The order gap is 4.9
+1. **The order rule for the detector the app runs is its own order: a direction on 15 pages (at most 12 items, one collection), descriptive.** On PP-DocLayoutV3's regions, its
+   coupled order leads the best geometric rules. Tau is 0.977 against 0.900 and 0.905, beyond the interval. The order gap is 4.9
    and 5.9 points smaller, also beyond the interval. On reading-order edit it ties the app sort and beats HDBSCAN.
    This is the rule `03-layout.md` section 3 already states ("the detector's own order"). It now rests on a paired
-   measurement on newspapers, with the same detector, and no longer on a comparison across detectors.
+   measurement on newspapers, with the same detector, and no longer on a comparison across detectors; the intervals
+   are page bootstraps over pages that are not independent (below), so they are optimistic.
 2. **Why the app sort does worse here than on YOLO's regions.** On DocLayout-YOLO's regions the app sort reached
    0.905 (`layout-order.md`), level with its 0.900 here. The geometric rule did not get worse. PP-DocLayoutV3's own
    order is the strong arm. One likely reason, read from the method and not measured: its order is learned with the
@@ -82,7 +83,8 @@ Notes on the table:
 
 ## Caveats
 
-- n is 15 pages, one source (Library of Congress scans). Photographed newspapers are not measured here, as in
+- n is 15 pages, one source (Library of Congress scans): 14 carry the `mss34132` prefix and four share one item, so
+  they hold at most 12 items, almost all from one collection. Photographed newspapers are not measured here, as in
   `layout-pair-newspapers.md`.
 - The truth is NewsBench's volunteer text, partial on some pages; tau is over the lines placed in it (4,157 of 7,601).
 - HDBSCAN's orders were computed in another offline Python (one with scikit-learn and no compiled rapidfuzz), then
@@ -108,6 +110,6 @@ Notes on the table:
   - The tau and gap intervals for both geometric rules exclude 0. The app sort's edit interval crosses 0, so on edit
     it is a tie.
 - **Scope.**
-  - Settled: region order on PP-DocLayoutV3's regions on scanned newspapers.
+  - A direction, not settled: region order on PP-DocLayoutV3's regions on scanned newspapers (a direction on 15 pages (at most 12 items, one collection), descriptive).
   - Not settled: photographed newspapers; other detectors' regions; marks in the stream; handwriting, which the
     detector decides (`layout-order.md`).

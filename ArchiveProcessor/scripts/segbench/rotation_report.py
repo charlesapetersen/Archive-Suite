@@ -41,7 +41,7 @@ set.** RotationDetector's policy was chosen on these 384 turns (W40.fix-processo
 96 were drawn through a 20-word Vision filter, so they hold no page where Vision's text, and its rotation vote, is
 weakest. By page it is 95 of 96 right at all four turns (p034 abstains at all four); zero wrong pages bounds its page
 error at 3.8%, not 1.0%. The held-out owner figure (below, W46.rotation-heldout) is the one a rule cites.
-__HELDOUT_VERDICT__ Five of its six wrong pages are box pages every route, Gemini included, agrees the box stores
+__HELDOUT_VERDICT__ Four of its six wrong pages are among the five box pages every route, Gemini included, agrees the box stores
 turned (two magazine pages upside down, three clippings sideways); they are reported apart, not dropped. Set apart (an
 upper bound, since the routes' own answers chose them), Vision is wrong at one turn on 2 of 114 pages (a clipping's
 flip, a near-blank cover's axis) and abstains on 6, five of them pages the 20-word filter took out of the 96. So "never

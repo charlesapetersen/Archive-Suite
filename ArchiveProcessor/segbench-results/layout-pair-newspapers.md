@@ -7,18 +7,19 @@ W46.ocr-regions' (regions-20261021).
 
 ## What this says
 
-- **On scanned newspapers DocLayout-YOLO beats PP-DocLayoutV3, paired.** Over the four readers PP-DocLayoutV3
+- **On scanned newspapers DocLayout-YOLO leads PP-DocLayoutV3: a direction on 15 pages (at most 12 items, one collection), descriptive.** Over the four readers PP-DocLayoutV3
   is -4.6 [-8.0, -1.1] strict NES behind (85.6 against 90.2), beyond the interval for 3 of 4
   readers (GLM-OCR, LightOnOCR-3 4B, Qwen3.6-27B); PaddleOCR-VL 1.5 is a tie. The unpaired 86.2 against 91.1 of
-  layout-photo-tables.md (GLM-OCR) is a real gap once paired.
+  layout-photo-tables.md (GLM-OCR) holds once paired. Fourteen of the 15 pages carry the `mss34132` prefix and four
+  share one item, so the page bootstrap is optimistic.
 - **The gap is content, not only order.** Order-free it narrows to -2.0 [-2.9, -1.0] and stays below 0 for every
   reader: PP-DocLayoutV3 regions miss or garble words that DocLayout-YOLO's regions keep.
 - **This does not by itself change the app's detector.** The stage rule (03-layout.md section 6) switches
   only if the other detector also clears PP-DocLayoutV3 on photographed newspapers after the quad; no
   photographed newspaper set with truth exists. On photographed modern print (Real5, quad first, GLM-OCR,
   unpaired, the same detector with the app sort) DocLayout-YOLO trails PP-DocLayoutV3 on Skew and Warping
-  (78.2 against 89.1, 78.7 against 85.9), and on the owner's 96 photographs it is 70.9 against 84.9
-  (layout-photo-tables.md). The owner's pages are photographs, so PP-DocLayoutV3 stays the newspaper
+  (78.2 against 89.1, 78.7 against 85.9), and on the owner's 96 photographs, none of them a newspaper, it is
+  70.9 against 84.9 (layout-photo-tables.md). The owner's pages are photographs, so PP-DocLayoutV3 stays the newspaper
   detector; the scan-only loss of about 5 points is stated with it, and W46.layout-photo-newspapers
   (behind W46.nice-to-have) is what would test the photographed half.
 
@@ -61,8 +62,10 @@ W46.ocr-regions' (regions-20261021).
 - **Noise.**
   - n = 15 pages, paired; one reading at temperature 0 per arm. A paired interval that crosses 0 is a tie, as is a
     gap under the 0.49-point rerun floor (ocr-rerun-noise.md, taken by cluster routes as in ocr-pair-matrix.md).
-  - 15 pages is under the 20-page line below which a group is descriptive in the parent reports; the intervals
-    here are wide for that reason.
+  - 15 pages is under the 20-page line below which a group is descriptive in the parent reports, and they are not
+    independent: 14 carry the `mss34132` prefix and four share one item, so they hold at most 12 items, almost all
+    from one Library of Congress collection, and the page bootstrap is optimistic. The result is a direction, not a
+    settled gap.
 - **Scope.**
   - Scans only. No photographed newspaper set with truth exists (the owner corpus has none labelled), so the
     quad-then-detector route on photographed newspapers stays unmeasured; that is W46.layout-photo-newspapers.

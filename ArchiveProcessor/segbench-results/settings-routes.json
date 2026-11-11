@@ -729,7 +729,7 @@
      "caveats": [
       "a second run gives 0.27 s a page (layout-photo-hands.md), likely background QoS (LAY-3); re-timing owed",
       "L9 is scans; photographed newspapers unmeasured",
-      "on L9 scans DocLayout-YOLO beats it by 4.6 NES paired (layout-pair-newspapers.md)",
+      "on L9 scans DocLayout-YOLO leads it by 4.6 NES paired, a direction on 15 pages (at most 12 items, one collection), descriptive (layout-pair-newspapers.md)",
       "regions drop marks (LAY-2)",
       "96 deltas order-sensitive (OCR-6)",
       "one reader, GLM-OCR (layout-photo.md card)"
