@@ -289,6 +289,84 @@ struct NotesAdvancedSearchTests {
         #expect(nav.advancedSearchRequest?.search.rules.map(\.field) == [.text, .tags, .date], "starter rows")
     }
 
+    /// W40.fix-notes-clear-all-advanced (owner, notes-2 row 26): Clear All leaves an unsaved Advanced Search too,
+    /// and the In effect row shows it, with every other filter, each removable alone.
+    @Test func clearAllLeavesTheAdvancedSearchAndTheChipsSayWhatIsInEffect() async throws {
+        let (model, index, root) = try await makeModel()
+        defer { Task { await cleanup(root, index) } }
+        let (a, _, c) = try await seed(model, index)
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        nav.filter.kind = .all
+        #expect(nav.activeFilterChips.isEmpty && !nav.canClearAll, "the kind control alone is no chip")
+
+        nav.runAdvancedSearch(search(.all, rule(.text) { $0.text = "budget" }, rule(.tags)))
+        await nav.waitForScopeTextHits()
+        #expect(nav.canClearAll, "an Advanced Search alone is something to clear")
+        #expect(nav.activeFilterChips.map(\.label) == ["Advanced Search: 1 rule"], "the empty tags row is no rule")
+
+        nav.filter.qualities = [3, 1]
+        nav.filter.tags = ["zeta", "alpha"]
+        nav.filter.dateFrom = 19500000
+        nav.filter.dateTo = 19601231
+        nav.filter.roundup = true
+        nav.searchText = "deficit"
+        #expect(nav.activeFilterChips.map(\.label) == [
+            "Advanced Search: 1 rule", "\u{2605}3", "\u{2605}1", "Tag: alpha", "Tag: zeta", "Years: 1950\u{2013}1960",
+            "Round-up notes", "Search: \u{201c}deficit\u{201d}"])
+
+        // One chip's ✕ removes that one alone.
+        nav.removeFilter(.tag("zeta"))
+        #expect(nav.filter.tags == ["alpha"])
+        nav.removeFilter(.dates)
+        #expect(nav.filter.dateFrom == nil && nav.filter.dateTo == nil && nav.filter.roundup == true)
+        nav.removeFilter(.keyword)
+        #expect(nav.searchText.isEmpty && model.scopeIsUnsavedSearch)
+
+        // Clear All clears the filter bar and the Advanced Search, keeping the kind.
+        nav.clearAll()
+        #expect(!model.scopeIsUnsavedSearch && model.scope == nil)
+        #expect(nav.activeFilterChips.isEmpty && !nav.canClearAll && nav.filter.kind == .all)
+        #expect(nav.displayed.count == 3)
+
+        // The Advanced Search chip's ✕ shows all notes again, leaving the filter bar.
+        nav.runAdvancedSearch(search(.all, rule(.text) { $0.text = "budget" }))
+        await nav.waitForScopeTextHits()
+        #expect(Set(nav.displayed.map(\.id)) == [a, c])
+        nav.filter.roundup = false
+        nav.removeFilter(.advancedSearch)
+        #expect(model.scope == nil && nav.filter.roundup == false)
+        #expect(nav.activeFilterChips.map(\.facet) == [.roundup])
+
+        // A smart folder is where the list looks: a chip, but Clear All keeps it, as in the Reader.
+        nav.clearAll()
+        let smart = try #require(await model.createSmartFolder(
+            name: "Budgets", query: search(.all, rule(.text) { $0.text = "budget" })))
+        model.applySmartScope(smart)
+        nav.filter.qualities = [2]
+        #expect(nav.activeFilterChips.map(\.label) == ["Smart folder: Budgets", "\u{2605}2"])
+        nav.clearAll()
+        #expect(model.selectedSmartId == smart && nav.activeFilterChips.map(\.facet) == [.smartFolder])
+        #expect(!nav.canClearAll)
+        nav.removeFilter(.smartFolder)
+        #expect(model.scope == nil && nav.activeFilterChips.isEmpty)
+    }
+
+    @Test func yearSummaryAndAnyTags() {
+        var f = NotesFilter()
+        #expect(f.dateYearsSummary == nil)
+        f.dateFrom = 19500000
+        #expect(f.dateYearsSummary == "from 1950")
+        f.dateTo = 19501231
+        #expect(f.dateYearsSummary == "1950")
+        f.dateFrom = nil
+        #expect(f.dateYearsSummary == "to 1950")
+        f.tags = ["b", "a"]
+        f.tagCombine = .any
+        let chips = NotesActiveFilterChip.chips(filter: f, keyword: " ", advancedSearch: nil, smartFolderName: nil)
+        #expect(chips.map(\.label) == ["Tag (any): a", "Tag (any): b", "Years: to 1950"])
+        #expect(chips.first?.accessibilityIdentifier == "an.filter.chip.tag.a")
+    }
+
     @Test func saveEditAndCount() async throws {
         let (model, index, root) = try await makeModel()
         defer { Task { await cleanup(root, index) } }

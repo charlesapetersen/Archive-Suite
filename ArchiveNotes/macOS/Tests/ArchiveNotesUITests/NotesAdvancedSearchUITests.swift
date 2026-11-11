@@ -118,8 +118,8 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
             sheet.buttons["an.advanced.search"].click()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idPlain, Self.idReader] },
                           "Search should make the rules the list, saw \(visibleNotes())")
-            XCTAssertTrue(mainWindow.descendants(matching: .any)["an.filter.advancedScope"].firstMatch.exists,
-                          "the bar should say the list is an Advanced Search")
+            XCTAssertTrue(mainWindow.descendants(matching: .any)["an.filter.chip.advancedSearch"].firstMatch.exists,
+                          "the In effect row should say the list is an Advanced Search")
             shot("w40-notes-advanced-scope")
 
             // Edit… reopens it filled in; save it as a smart folder.

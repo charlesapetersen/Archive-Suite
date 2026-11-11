@@ -4,7 +4,7 @@ import AppKit
 /// The item-list filter bar (06-viewers §4, W6-S4). Binds a per-window `NotesNavigationModel` and
 /// surfaces the kind segmented control, a keyword search field (drives FTS — bm25 relevance,
 /// as-you-type), quality (★1–★3) toggles, a tag filter with chips (every tag must match), a year date
-/// range with its own clear button, and Save-as-Smart-Folder / Clear All. Matching any tag rather than
+/// range with its own clear button, Save-as-Smart-Folder / Clear All, and the In effect row of chips. Matching any tag rather than
 /// all of them belongs to Advanced Search (`NotesAdvancedSearchSheet`, the bar's Advanced Search button), not this bar (owner, notes-1
 /// row 37, as ruled for the Reader on 2026-11-04). The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
@@ -20,7 +20,6 @@ struct NotesFilterBar: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            if nav.model.scopeIsUnsavedSearch { advancedScopeRow }
             topRow
             facetRow
             tagFilter
@@ -35,6 +34,8 @@ struct NotesFilterBar: View {
                 .accessibilityIdentifier("an.filter.roundup")
                 Spacer(minLength: 0)
             }
+            let chips = nav.activeFilterChips
+            if !chips.isEmpty { activeFilterChipRow(chips) }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
@@ -89,11 +90,11 @@ struct NotesFilterBar: View {
             .accessibilityIdentifier("an.filter.save")
 
             Button("Clear All") {
-                nav.clearUserFilters()
+                nav.clearAll()
                 pendingTag = ""
             }
-            .disabled(!nav.hasUserFilters && pendingTag.isEmpty)
-            .help("Clear every filter and the search")
+            .disabled(!nav.canClearAll && pendingTag.isEmpty)
+            .help(nav.clearAllHelp)
             .accessibilityIdentifier("an.filter.clear")
         }
     }
@@ -121,21 +122,29 @@ struct NotesFilterBar: View {
         .frame(minWidth: 120)   // so the row fits beside the Advanced Search button at the list's narrowest
     }
 
-    /// Shown while the list is an Advanced Search run without saving, so it can be edited or left
-    /// (W40.notes-advanced-search).
-    private var advancedScopeRow: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "line.3.horizontal.decrease.circle").foregroundStyle(.secondary)
-            Text("Advanced Search").font(.callout)
-            Button("Edit\u{2026}") { nav.openAdvancedSearch() }
-                .accessibilityIdentifier("an.filter.advancedEdit")
-            Button("Show All Notes") { nav.model.setAllNotesScope() }
-                .accessibilityIdentifier("an.filter.advancedDone")
-            Spacer(minLength: 0)
+    /// Every filter and search in effect, each a chip whose ✕ removes it: the Reader's In effect row
+    /// (W40.fix-notes-clear-all-advanced). An Advanced Search run without saving leads it, with Edit… beside
+    /// it, so a list narrowed by one says so (owner, notes-2 row 26).
+    private func activeFilterChipRow(_ chips: [NotesActiveFilterChip]) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("In effect:").foregroundStyle(.secondary).font(.callout)
+                .accessibilityHidden(true)
+            FlowLayout(spacing: 6, lineSpacing: 4) {
+                ForEach(chips) { chip in
+                    NotesActiveFilterChipView(chip: chip) { nav.removeFilter(chip.facet) }
+                    if chip.facet == .advancedSearch {
+                        Button("Edit\u{2026}") { nav.openAdvancedSearch() }
+                            .controlSize(.small)
+                            .help("Edit the Advanced Search's rules")
+                            .accessibilityIdentifier("an.filter.advancedEdit")
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .controlSize(.small)
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("an.filter.advancedScope")
+        .accessibilityLabel("Filters in effect")
+        .accessibilityIdentifier("an.filter.chips")
     }
 
     // MARK: Row 2 — quality · date range; row 3 — tags
@@ -240,5 +249,30 @@ struct NotesFilterBar: View {
                 }
             }
         )
+    }
+}
+
+/// One filter or search in effect. The whole chip is its ✕, one control for the keyboard and VoiceOver as for the
+/// mouse; drawn as the Reader's `ActiveFilterChipView`.
+private struct NotesActiveFilterChipView: View {
+    let chip: NotesActiveFilterChip
+    let remove: () -> Void
+    var body: some View {
+        Button(action: remove) {
+            HStack(spacing: 4) {
+                Text(chip.label).lineLimit(1).truncationMode(.middle)
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+            .font(.callout)
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.45)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: 320)
+        .help("In effect: \(chip.phrase). Click to remove it.")
+        .accessibilityLabel("Remove \(chip.label)")
+        .accessibilityIdentifier(chip.accessibilityIdentifier)
     }
 }

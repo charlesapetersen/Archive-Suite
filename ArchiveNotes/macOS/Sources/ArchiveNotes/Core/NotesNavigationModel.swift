@@ -348,6 +348,56 @@ final class NotesNavigationModel: ObservableObject {
         recompute()                                // ensure a recompute even when filter was already neutral
     }
 
+    // MARK: What is in effect (W40.fix-notes-clear-all-advanced)
+
+    /// Clear All's effect: the filter bar and search box, and an Advanced Search run without saving (owner,
+    /// notes-2 row 26). A folder or smart folder is where the list looks, chosen in the sidebar, so it stays,
+    /// as in the Reader.
+    func clearAll() {
+        clearUserFilters()
+        if model.scopeIsUnsavedSearch { model.setAllNotesScope() }
+    }
+
+    /// Clear All has something to clear.
+    var canClearAll: Bool { hasUserFilters || model.scopeIsUnsavedSearch }
+
+    var clearAllHelp: String {
+        if let name = selectedSmartFolderName {
+            return "Clear every filter and the search, returning to the smart folder \u{201C}\(name)\u{201D}'s own rules"
+        }
+        return "Clear every filter, the search and an Advanced Search. Each chip's \u{2715} clears just that one"
+    }
+
+    /// Filters and searches shown in the bar's In effect row, as the Reader shows them.
+    var activeFilterChips: [NotesActiveFilterChip] {
+        NotesActiveFilterChip.chips(filter: filter, keyword: searchText,
+                                    advancedSearch: model.scopeIsUnsavedSearch ? scope : nil,
+                                    smartFolderName: selectedSmartFolderName)
+    }
+
+    private var selectedSmartFolderName: String? {
+        guard let id = model.selectedSmartId else { return nil }
+        return model.organization.folders.first { $0.id == id }?.name
+    }
+
+    /// A chip's ✕: turn that one filter or search off, leaving the rest.
+    func removeFilter(_ facet: NotesFilterFacet) {
+        switch facet {
+        case .advancedSearch, .smartFolder:
+            model.setAllNotesScope()
+        case .keyword:
+            ftsGeneration &+= 1
+            ftsIDs = nil
+            ftsRank = [:]
+            searchText = ""
+            if sort.first?.field == .relevance { sort = NotesSort.default }
+            filter = filter.removing(facet)
+            recompute()
+        default:
+            filter = filter.removing(facet)
+        }
+    }
+
     /// Make `id` reachable in this window's list before an open request selects it (W7-S3). Clears the
     /// window's user filters when the row is not displayed; when the SHARED folder/smart-folder scope
     /// also excludes it, widens that scope to All Notes and says so, since otherwise the editor loads
