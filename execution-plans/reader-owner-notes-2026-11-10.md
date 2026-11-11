@@ -126,6 +126,8 @@ the preview sheet, toolbar help strings, model help text). A move therefore leav
   keys ⌥⌘1/⌥⌘2/⌥⌘6 are free [R].
 
 **Item.** W40.reader-commands-table, which W40.reader-view-rotate and W40.reader-page-views then use.
+**Shipped 2026-11-11** (`ReaderCommand`, `Core/ReaderCommandTable.swift`): it holds ⌃⌘L/⌃⌘R for rotation and ⌥⌘1/⌥⌘2/⌥⌘6 for
+the page views; ⌘I is free.
 
 ## 4. Rotation and page views (points 7 and 8)
 

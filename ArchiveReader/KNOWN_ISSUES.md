@@ -2,6 +2,21 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## ⚠️ OPEN (W40.fix-reader-inspector-narrow, 2026-11-11) — at the window's narrowest the Inspector runs past its edge
+
+At the navigation window's minimum width (900 pt) with the sidebar shown, the Inspector is laid out past the window's
+right edge, so its header's Close button is outside the window and cannot be clicked; ⌥⌘I and the toolbar button still
+hide it. Found in the VM (macOS 27.2): `NavigationUITests.testInspectorFollowsSelectionAndOptionCommandIToggles`
+fails at its Close click (line 32) on main both before and after W40.reader-commands-table, and the Inspector it
+leaves open (its visibility is remembered) makes `TagEntryUITests.testInspectorShowsTagsAfterReturnAndTab` fail next.
+
+## ✅ CLOSED (W40.reader-commands-table, 2026-11-11) — one command table; Edit Info is the Inspector on ⌥⌘I
+
+Names, keys and tooltips were written beside each control, so a moved key left stale copies: the preview sheet
+bound ⌥⌘C (Copy Link(s)) to the cleaned copy and three tooltips named it. `ReaderCommand` now holds them all, and
+`ReaderCommandTableTests` fails on a clash, a menu item that differs from the table, or any string naming an
+unbound key. Edit Info is View ▸ Show/Hide Inspector, ⌥⌘I, as in Notes; ⌘I is free.
+
 ## ✅ CLOSED (W40.reader-prose-shortcut, 2026-11-08) — prose copy uses Command–Shift–C
 
 The owner’s requested shortcut is ⇧⌘C for Edit ▸ Copy Cleaned for Prose. Selection ▸ Copy Link(s)
@@ -253,7 +268,7 @@ in `test-lint-write-surface.sh`. Only allowance data and prose changed; app beha
 
 The Sort & Filter year range matches a file's own date OR its `Sent With` date (each value meeting both
 bounds) and lists the file once. The Date column shows both dates (`Nov 3, 1957 · sent Mar 12, 1958`), but
-nothing highlights which of the two put the row in the result. The sent-with date is edited in the ⌘I sheet's
+nothing highlights which of the two put the row in the result. The sent-with date is edited in the ⌥⌘I Inspector's
 Date section, the one date editor (owner, 2026-10-12; `W40.fix-reader-sent-with-date`, 2026-10-29).
 
 The filter bar was crowded in a narrow window. Since W40.fix-reader-filter-bar (2026-11-05) the name and OCR
