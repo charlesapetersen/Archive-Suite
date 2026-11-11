@@ -19,9 +19,6 @@ import SwiftUI
 @MainActor
 final class PreviewImagePrefetcher: ObservableObject {
     static let shared = PreviewImagePrefetcher()
-    /// The document window's: its image pane is window-sized, so its box follows the pane
-    /// (`setPixelBox`), and it keeps the open file and the files either side (W40.fix-reader-viewer-switch).
-    static let documentWindow = PreviewImagePrefetcher(pixelBox: CGSize(width: 1536, height: 1536), cacheLimit: 4)
 
     /// A finished bitmap of one page's crop box, unrotated: PDFKit lays a page overlay out in page space and
     /// turns it with the page, so the overlay draws it as it is.
@@ -34,8 +31,8 @@ final class PreviewImagePrefetcher: ObservableObject {
         }
     }
 
-    /// One page of one file, as it was on disk: a rewritten file has a new stamp, so a stale bitmap is never
-    /// shown over a changed scan.
+    /// One page of one file, as it was on disk: a rewritten or replaced file has a new stamp, so a stale
+    /// bitmap is never shown over a changed scan.
     struct Key: Hashable, Sendable {
         let path: String
         let pageIndex: Int
@@ -46,13 +43,17 @@ final class PreviewImagePrefetcher: ObservableObject {
         let size: Int64
         let modifiedSeconds: Int
         let modifiedNanoseconds: Int
+        let inode: UInt64
+        /// The file's bytes are not on this Mac (an evicted cloud file): opening it would download it.
+        let isDataless: Bool
 
         /// `stat(2)`, not `URLResourceValues`: a reused `URL` answers from its resource-value cache.
         static func of(_ path: String) -> FileStamp? {
             var st = stat()
             guard stat(path, &st) == 0 else { return nil }
             return FileStamp(size: Int64(st.st_size), modifiedSeconds: st.st_mtimespec.tv_sec,
-                             modifiedNanoseconds: st.st_mtimespec.tv_nsec)
+                             modifiedNanoseconds: st.st_mtimespec.tv_nsec, inode: UInt64(st.st_ino),
+                             isDataless: st.st_flags & 0x4000_0000 != 0)   // SF_DATALESS
         }
     }
 
@@ -102,6 +103,10 @@ final class PreviewImagePrefetcher: ObservableObject {
             let key = Key(path: path, pageIndex: DocumentPagePairs.imagePageIndex(pair: 0), stamp: stamp)
             return seen.insert(key).inserted ? key : nil
         }
+        // What is asked for and already drawn is the most recently wanted, so a bitmap landing next evicts
+        // something no longer asked for, never one of these (W40.fix-reader-viewer-switch: the window's
+        // neighbours were evicted as soon as they were skipped, and each switch missed the one after).
+        for key in wanted.reversed() where cache[key] != nil { touch(key) }
         startNext()
     }
 

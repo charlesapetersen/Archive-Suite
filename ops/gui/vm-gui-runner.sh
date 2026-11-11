@@ -102,8 +102,10 @@ if [ "${READER_JOURNEY:-}" = "rehearsal" ]; then
   [ -d "$REHEARSAL/reader-sample" ] || die "no Reader rehearsal sample at $REHEARSAL/reader-sample (ArchiveReader/scripts/rehearsal-sample.py make)"
   MKFIXTURE='bash "$GR/ArchiveReader/scripts/make-journey-fixture.sh"'
   CORRUPT_TEST_SELECTOR="ArchiveReaderUITests/TriageJourneyUITests"
+  # W40.fix-reader-viewer-switch: the read-only file-switch measurement runs on the same sample root.
+  [ "${ONLY_TESTING:-}" = "ArchiveReaderUITests/ViewerSwitchUITests" ] && CORRUPT_TEST_SELECTOR="$ONLY_TESTING"
   if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
-    die "READER_JOURNEY=rehearsal runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+    die "READER_JOURNEY=rehearsal runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR (or ArchiveReaderUITests/ViewerSwitchUITests)"
   fi
 elif [ -n "${READER_JOURNEY:-}" ]; then
   die "unknown READER_JOURNEY '$READER_JOURNEY' (use: rehearsal)"

@@ -134,6 +134,21 @@ final class DocumentViewerNeighbourTests: XCTestCase {
         XCTAssertNil(prefetcher.image(path: urls[5].path, pageIndex: 0), "a new size drops the old bitmaps")
     }
 
+    /// A bitmap asked for again, already drawn, must outlive the next one to land (the lane's switches 5–8
+    /// each missed: the file just skipped as drawn was the eviction's oldest).
+    func testABitmapAskedForAgainIsNotTheOneEvicted() throws {
+        let urls = try files(4)
+        let prefetcher = PreviewImagePrefetcher(pixelBox: CGSize(width: 64, height: 64), cacheLimit: 3)
+        for url in urls.prefix(3) {
+            prefetcher.prefetch(paths: [url.path])
+            XCTAssertTrue(waitUntil { prefetcher.image(path: url.path, pageIndex: 0) != nil })
+        }
+        prefetcher.prefetch(paths: [urls[0].path, urls[3].path])   // the oldest, wanted again, and a new one
+        XCTAssertTrue(waitUntil { prefetcher.image(path: urls[3].path, pageIndex: 0) != nil })
+        XCTAssertNotNil(prefetcher.image(path: urls[0].path, pageIndex: 0), "still wanted, so not evicted")
+        XCTAssertNil(prefetcher.image(path: urls[1].path, pageIndex: 0), "the oldest not asked for went")
+    }
+
     private static func grayJPEG() throws -> Data {
         let rep = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 40, pixelsHigh: 50,
                                                  bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,

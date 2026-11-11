@@ -1,5 +1,6 @@
 import SwiftUI
 import PDFKit
+import os
 import ArchiveCore
 
 /// Drives the document window: the selected files, the current document, and page cycling.
@@ -93,6 +94,12 @@ final class DocumentViewerModel: ObservableObject {
     /// The files either side of the open one, and their JPEG originals, opened ahead on `prepareQueue`.
     private var neighbours = NeighbourCache()
     private let prepareQueue = DispatchQueue(label: "ArchiveReader.viewerNeighbours", qos: .userInitiated)
+    /// What the queue should still open: an item no longer wanted when its turn comes is skipped, so holding
+    /// an arrow key never leaves a backlog of opens ahead of the files now either side.
+    private let stillWanted = OSAllocatedUnfairLock(initialState: Set<String>())
+    /// The document window's image pages drawn ahead, at its image pane's size, for the open file and the
+    /// files either side (one per window: two windows of different sizes would wipe each other's).
+    let imagePrefetcher = PreviewImagePrefetcher(pixelBox: CGSize(width: 1536, height: 1536), cacheLimit: 4)
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
     /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
@@ -619,9 +626,14 @@ final class DocumentViewerModel: ObservableObject {
         imageSource = .pdf
         guard urls.indices.contains(index) else { current = nil; loadError = nil; loaded = nil; return }
         let url = urls[index]
+        #if DEBUG
+        if supportsPageOverview {   // the document window, not the preview
+            ViewerSwitchProbe.shared?.switchStarted(bitmapReady: imagePrefetcher.image(path: url.path, pageIndex: 0) != nil)
+        }
+        #endif
         // The file just left is often the next one wanted (Previous after Next), so it is kept, already
         // drawn, beside the neighbours being opened.
-        if let outgoing, let file = outgoing.loaded {
+        if let outgoing, let file = outgoing.loaded, !Self.prefetchDisabled {
             neighbours.keep(document: outgoing.document, file)
             if let page = outgoing.page, let partner = outgoing.partner { neighbours.keep(jpeg: page, partner) }
         }
@@ -664,14 +676,21 @@ final class DocumentViewerModel: ObservableObject {
     /// built and read on that queue and handed over only when finished; from then on only the main actor
     /// touches it, and nothing is ever written. The cache holds the open file's neighbours and nothing else.
     private func prepareNeighbours() {
+        guard !Self.prefetchDisabled else { return }
         let wanted = [index + 1, index - 1].filter { urls.indices.contains($0) }.map { urls[$0] }
         var partners: [String: URL] = [:]
-        for url in wanted { if let partner = jpegPartnerURL(for: url) { partners[url.path] = partner } }
+        // A link that pins its JPEG names one file for every PDF, so nothing is opened ahead for it.
+        if !pinsJPEGPartnerFromLink {
+            for url in wanted { if let partner = jpegPartnerURL(for: url) { partners[url.path] = partner } }
+        }
         neighbours.retain(documents: Set(wanted.map(\.path)), jpegs: Set(partners.values.map(\.path)))
+        let keys = Set(wanted.map { "d:" + $0.path } + partners.values.map { "j:" + $0.path })
+        stillWanted.withLock { $0 = keys }
+        let stillWanted = stillWanted
         for url in wanted {
             if let file = neighbours.start(document: url.path) {
                 prepareQueue.async { [weak self] in
-                    let opened = Handover(Self.openDocument(url))
+                    let opened = Handover(stillWanted.withLock { $0.contains("d:" + url.path) } ? Self.openDocument(url) : nil)
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated { self?.neighbours.finish(document: opened.value, file) }
                     }
@@ -679,7 +698,7 @@ final class DocumentViewerModel: ObservableObject {
             }
             if let partner = partners[url.path], let file = neighbours.start(jpeg: partner.path) {
                 prepareQueue.async { [weak self] in
-                    let opened = Handover(Self.openJPEGPage(partner))
+                    let opened = Handover(stillWanted.withLock { $0.contains("j:" + partner.path) } ? Self.openJPEGPage(partner) : nil)
                     DispatchQueue.main.async {
                         MainActor.assumeIsolated { self?.neighbours.finish(jpeg: opened.value, file) }
                     }
@@ -704,6 +723,12 @@ final class DocumentViewerModel: ObservableObject {
         for i in 0..<min(doc.pageCount, 8) { _ = doc.page(at: i)?.string }
         return doc
     }
+
+    #if DEBUG
+    static var prefetchDisabled: Bool { ViewerSwitchProbe.prefetchDisabled }
+    #else
+    static let prefetchDisabled = false
+    #endif
 
     nonisolated private static func openJPEGPage(_ url: URL) -> PDFPage? {
         guard let image = NSImage(contentsOf: url) else { return nil }
@@ -860,15 +885,22 @@ struct NeighbourCache {
         jpegs = jpegs.filter { keepJPEGs.contains($0.key) }
     }
 
-    /// The file's stamp now if it needs opening (nothing held for it, nothing on the way), else nil.
+    /// The file's stamp now if it needs opening (nothing held for it, nothing on the way), else nil. A file
+    /// whose bytes are not on this Mac is not opened ahead: that would download it unasked.
     mutating func start(document path: String) -> File? {
-        guard documents[path] == nil, pending.insert("d:" + path).inserted else { return nil }
-        return File(path)
+        guard documents[path] == nil, !pending.contains("d:" + path) else { return nil }
+        let file = File(path)
+        guard file.stamp?.isDataless != true else { return nil }
+        pending.insert("d:" + path)
+        return file
     }
 
     mutating func start(jpeg path: String) -> File? {
-        guard jpegs[path] == nil, pending.insert("j:" + path).inserted else { return nil }
-        return File(path)
+        guard jpegs[path] == nil, !pending.contains("j:" + path) else { return nil }
+        let file = File(path)
+        guard file.stamp?.isDataless != true else { return nil }
+        pending.insert("j:" + path)
+        return file
     }
 
     mutating func finish(document: PDFDocument?, _ file: File) {

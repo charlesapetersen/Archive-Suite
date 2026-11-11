@@ -177,9 +177,18 @@ final class ReaderChainAtSizeTests: XCTestCase {
         }
     }
 
+    /// The file-switch budget W40.reader-scale-measure set (W40.fix-reader-viewer-switch): the next file within
+    /// 100 ms main-busy with 5 open.
+    private func assertViewerBudget(_ label: String, _ runs: [Chain]) {
+        guard optimized else { return }
+        print("CH budget \(label): main-busy median \(ms(median(runs.map(\.busy)))) (budget 100.0 ms), "
+              + "visible median \(ms(median(runs.map { $0.visible ?? .infinity }))), "
+              + "longest stall max \(ms(runs.map(\.longest).max() ?? 0))")
+        XCTAssertLessThanOrEqual(median(runs.map(\.busy)), 0.100, "\(label): main-busy")
+    }
+
     // MARK: - Outside measurements (footprint, heap, leaks), run by the harness
 
-    /// Ask the harness to run `kind` (footprint | heap | leaks) on this process; wait for it.
     /// The selection budget W40.reader-scale-measure set (W40.fix-reader-selection-at-size): at most 16 ms main-busy,
     /// the inspector and the table included, and so no stall over one frame either.
     private func assertSelectionBudget(_ label: String, _ runs: [Chain]) {
@@ -190,6 +199,7 @@ final class ReaderChainAtSizeTests: XCTestCase {
         XCTAssertLessThanOrEqual(runs.map(\.longest).max() ?? 0, 0.016, "\(label): a stall over 16 ms")
     }
 
+    /// Ask the harness to run `kind` (footprint | heap | leaks) on this process; wait for it.
     private func outside(_ kind: String, _ label: String, timeout: Double = 900) async {
         guard let dir = handshake("requests") else { print("CH outside \(kind) \(label): no requests dir"); return }
         let base = URL(fileURLWithPath: dir).appendingPathComponent("\(label)-\(kind)")
@@ -404,6 +414,7 @@ final class ReaderChainAtSizeTests: XCTestCase {
                                                visible: { viewer.current !== before && window.renderedIndex == target }))
         }
         summarize("viewer-switch-5", switches)
+        assertViewerBudget("viewer-switch-5", switches)
 
         // ── 5. Memory over a session: 200 tag edits and 200 file switches, footprint every 20 steps.
         print(String(format: "CH memory start footprint %.0f MiB collation-strings %d", footprintMiB(),
@@ -563,7 +574,15 @@ final class ViewEmulation {
 }
 
 /// A document window: its own inspector on the open file (`DocumentWindowView` mounts one on the navigation
-/// model), and the two panes, each showing a copy of its page drawn at window size (`PDFPaneView.show`).
+/// model), and the two panes, each showing a copy of its page in a one-page document (`PDFPaneView.show`).
+///
+/// PDFKit draws a page's tiles on its own `PDFTilePool` queue, not the main thread: sampled in the VM with
+/// real PDFViews on the real sample (W40.fix-reader-viewer-switch), PDFKit came to 65 main-thread samples over
+/// about 15 switches and image decoding to 1, against 1,778 on the tile queue. So the page's draw is emulated
+/// off the main actor, and what the main actor does is the copy and, when the image page's bitmap is drawn
+/// ahead (`DocumentWindowView`'s placeholder), drawing that bitmap at pane size. The file is visible when the
+/// bitmap is drawn, or else when the off-main draw lands. (W40.reader-scale-measure drew the page on the main
+/// actor here, 188 ms a switch, which no real view does.)
 @MainActor
 final class DocumentWindowEmulation {
     private let viewer: DocumentViewerModel
@@ -571,6 +590,7 @@ final class DocumentWindowEmulation {
     private var cancellables: Set<AnyCancellable> = []
     private var pending = false
     private(set) var renderedIndex = -1
+    private var drawing: Int?
 
     init(_ viewer: DocumentViewerModel, _ navigation: NavigationModel) {
         self.viewer = viewer
@@ -578,6 +598,7 @@ final class DocumentWindowEmulation {
     }
 
     func attach() {
+        viewer.imagePrefetcher.setPixelBox(longSide: 1_200)
         render()
         for publisher in [viewer.objectWillChange.eraseToAnyPublisher(),
                           navigation.objectWillChange.eraseToAnyPublisher()] {
@@ -599,13 +620,34 @@ final class DocumentWindowEmulation {
         if viewer.showingTagEditor {   // a hidden inspector observes nothing (W40.fix-reader-selection-at-size)
             ReaderStages.measure("view.document inspector body (emulated)") { _ = navigation.libraryFiles(atPaths: [path]) }
         }
-        guard renderedIndex != index, let document = viewer.current else { return }
-        ReaderStages.measure("view.document panes copy+draw (emulated)") {
+        guard renderedIndex != index, drawing != index, let document = viewer.current else { return }
+        ReaderStages.measure("view.document panes copy (emulated)") {
             for pageIndex in 0..<min(2, document.pageCount) {
                 guard let page = document.page(at: pageIndex), let copy = page.copy() as? PDFPage else { continue }
-                _ = copy.thumbnail(of: NSSize(width: 900, height: 1_200), for: .cropBox)
+                PDFDocument().insert(copy, at: 0)
             }
         }
-        renderedIndex = index
+        let bitmap = viewer.imagePrefetcher.image(path: path, pageIndex: 0)?.image
+        viewer.imagePrefetcher.prefetch(paths: viewer.neighbourhoodPaths)
+        if let bitmap {
+            ReaderStages.measure("view.document placeholder draw (emulated)") {
+                guard let ctx = CGContext(data: nil, width: 900, height: 1_200, bitsPerComponent: 8, bytesPerRow: 0,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return }
+                ctx.interpolationQuality = .high
+                ctx.draw(bitmap, in: CGRect(x: 0, y: 0, width: 900, height: 1_200))
+            }
+            renderedIndex = index
+        } else {
+            drawing = index   // PDFKit's tile draw, off the main actor, from its own read of the file
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                _ = PreviewImagePrefetcher.render(path: path, pageIndex: 0, pixelBox: CGSize(width: 900, height: 1_200))
+                DispatchQueue.main.async { MainActor.assumeIsolated {
+                    guard let self, self.drawing == index else { return }
+                    self.drawing = nil
+                    if self.viewer.index == index { self.renderedIndex = index }
+                } }
+            }
+        }
     }
 }

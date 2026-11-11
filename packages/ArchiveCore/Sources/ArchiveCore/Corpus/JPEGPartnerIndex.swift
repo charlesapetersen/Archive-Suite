@@ -128,7 +128,7 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
         let pdfStem = (relative as NSString).deletingPathExtension
         let jpegRoot = Self.comparisonRootPath(URL(fileURLWithPath: jpegRootPath, isDirectory: true))
         let exactMatches: [JPEGPartnerCandidate]
-        if jpegRoot == lookup.root {
+        if FileSystemKey(jpegRoot) == FileSystemKey(lookup.root) {
             exactMatches = (lookup.byRelativeStem[FileSystemKey(pdfStem)] ?? []).map { candidates[$0] }
         } else {   // the root now resolves elsewhere than when the table was built: compare afresh
             exactMatches = candidates.filter {
