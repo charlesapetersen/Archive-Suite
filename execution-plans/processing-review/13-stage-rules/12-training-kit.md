@@ -51,8 +51,8 @@ margin were call 7.2, decided 2026-11-06: gap accuracy against the shipped 2B, a
 count from the measured "needed" column (about 147 or 267 gaps, `seg-kit-gate.md`), two scored runs, and an anchor
 margin of 3.2 points on the public anchor; W46.kit-gate-rule enforces it (minimum 267, the larger figure). Its held-out
 intervals resample folders and, inside each, documents, so a one-box held-out set has a real interval; the 267 was
-derived again on that resampling (documents alone, 254-282 over five seeds) and stands, and a set of one document is
-refused (W46.kit-gate-groups, measurement review pass 12 P12-1). The solver shows the gate's verdict and
+derived again on that resampling (documents alone, 254-282 over five seeds) and stands, and a set of fewer than 10
+documents is refused (W46.kit-gate-groups, measurement review pass 12 P12-1; W46.kit-gate-docs, pass 13 P13-2). The solver shows the gate's verdict and
 interval, and never shows an after-training segmentation row as selectable without a manifest that passed.
 
 Kind rules. Segmentation rows are per material, not per page kind: a trained student or continuation applies to the
@@ -278,8 +278,11 @@ Decided (session, 14-owner-calls.md section 2): that rule, with an anchor margin
 Since W46.kit-gate-groups (2026-11-11, P12-1): the held-out interval resamples folders and, inside each, documents (it
 resampled folders only, so one folder gave a point: a candidate 2.96 points worse on 270 gaps passed); the minimum,
 derived again on that resampling, stays 267 (documents alone 254-282; as five folders the same gaps need 531, which the
-interval itself carries); one document is refused (`seg-kit-gate.md` §The minimum support). The anchor's point margin
-is unchanged.
+interval itself carries); one document is refused (`seg-kit-gate.md` §The minimum support). Since W46.kit-gate-docs
+(2026-11-11, P13-2): fewer than 10 held-out documents are refused too. With two the draw has three outcomes and a
+candidate truly 3.5 points worse passed about a quarter of the time on 280 gaps (simulated, a 3-point per-document
+spread); from ten the rate is at the few per cent many documents give (`seg-kit-gate.md` §The minimum number of
+documents). The manifest states the folder, document and gap counts. The anchor's point margin is unchanged.
 
 **7.3 The licence statement for research-licensed models run through the kit.** The principle is settled (owner,
 2026-10-20, `00-plan.md`: a model a user runs on their own cluster through the kit may carry a research or
@@ -310,6 +313,9 @@ figure. Carried to note 07 for the trigger; the support question is decided with
 corrections live in the review records; the next box of the same material is the held-out set; the gate's minimum
 support applies to it. So that box needs at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, more
 than Lincoln box 2's 244; the gate resamples its documents (W46.kit-gate-groups), so one box gets a real interval.
+That box also needs at least 10 documents (W46.kit-gate-docs): a material of a few long documents (bound volumes,
+registers) needs a next box, or several, holding ten; owner-like boxes hold about 1.8 gaps a document, so 267 gaps
+are about 150 documents.
 
 **7.6 The fine-tuning answer's mapping.** Section 3 reads "with a coding agent" as Mac-side steps and "on a cluster" as
 adding cluster rows [I]. Confirm, or make the coding agent a requirement for the cluster rows too. Decided (session,

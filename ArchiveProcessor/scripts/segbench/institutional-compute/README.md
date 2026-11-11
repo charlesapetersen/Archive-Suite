@@ -242,11 +242,13 @@ candidate with no shipped run, or no gap the shipped run answered, fails rather 
 (W46.kit-gate-coverage). The candidate passes only with **two scored runs** (a `--run` per run, under the same
 name: two separate `submit.sh seg` jobs of the same model), and in each: the low end of the paired held-out
 gap-accuracy interval above -3 points; **at least 267 known held-out gaps** behind it (your rulings when you have that
-many, else your tags; fewer are refused, since the interval would be too wide to mean anything; so are gaps all in one
-document); and anchor pages
+many, else your tags; fewer are refused, since the interval would be too wide to mean anything); **at least 10
+held-out documents** among them (fewer are refused: with two documents a candidate 3.5 points worse passes about a
+quarter of the time, so a box of a few long volumes or registers needs more than one box, W46.kit-gate-docs); and anchor pages
 exact less than 3.2 points below the shipped model's (W46.kit-gate-rule). `archive-seg-manifest.json` must sit beside the weights the
 app loads (where `check --weights` puts it): Archive Processor refuses a model of yours without one, without an anchor score, or for another
-prompt. The held-out intervals resample your folders and, inside each, their documents (as your tags start them), so
+prompt. The manifest's `heldout` block states the folders, documents and gaps the gate's figure stands on
+(`gate_folders`, `gate_documents`, `gate_gaps`). The held-out intervals resample your folders and, inside each, their documents (as your tags start them), so
 a held-out set of one box still has a real interval (W46.kit-gate-groups); a set of several unlike boxes gets a wider
 one. Separating 3 points of pages-exact needs about 1,850 held-out gaps on the 2026-10-31 truth (`segbench-results/seg-kit-gate.md`, which `kit_gate.py report` recomputes).
 

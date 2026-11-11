@@ -245,6 +245,52 @@ def gate_support(owner: list[dict]) -> dict:
             "gate_minimum": T.MIN_KNOWN_GAPS}
 
 
+DOC_COUNTS = (2, 3, 5, 10, 20, 30)
+DOC_TRUE = (-3.5, -4.5)           # a candidate's true paired difference, points: worse than the gate's 3
+DOC_SPREADS = (3.0, 1.5)          # per-document spread of that difference, points (1.5: between the owner boxes)
+DOC_GAPS, DOC_TRIALS, DOC_DRAWS = 280, 1000, 1000
+
+
+def doc_set(k: int, mean: float, sd: float, rng: random.Random) -> dict:
+    """One simulated held-out box: one folder of DOC_GAPS gaps in k equal documents, the shipped model right on 95%
+    of gaps, the candidate's per-document true difference drawn from N(mean, sd) points."""
+    docs = []
+    for _ in range(k):
+        eff = rng.gauss(mean, sd) / 100
+        doc = []
+        for _ in range(DOC_GAPS // k):
+            b = rng.random() < 0.95
+            a = (b and not rng.random() < -eff / 0.95) if eff < 0 else (b or rng.random() < eff / 0.05)
+            doc.append((a, b))
+        docs.append(doc)
+    return {"box": docs}
+
+
+def gate_documents() -> dict:
+    """The minimum number of held-out documents (W46.kit-gate-docs, measurement review pass 13, P13-2): how often
+    `train_seg.gap_score`'s paired interval passes a candidate truly worse than the gate's 3 points, by the number of
+    documents its gaps fall in. Simulated, not measured: no per-document spread is committed; between the owner
+    boxes it is about 1.5 points after sampling variance, so 3 is the harder plausible case."""
+    sys.path.insert(0, str(data.HERE / "institutional-compute"))
+    import train_seg as T
+    keep, T.DRAWS = T.DRAWS, DOC_DRAWS
+    try:
+        rates = {}
+        for sd in DOC_SPREADS:
+            for mean in DOC_TRUE:
+                row = {}
+                for k in DOC_COUNTS:
+                    rng = random.Random(SEED)
+                    hits = sum(T.gap_score(doc_set(k, mean, sd, rng), random.Random(t), True)["difference_interval"][0]
+                               > -T.GATE_POINTS for t in range(DOC_TRIALS))
+                    row[str(k)] = round(100 * hits / DOC_TRIALS, 1)
+                rates[f"{sd:g} {mean:g}"] = row
+    finally:
+        T.DRAWS = keep
+    return {"rates": rates, "gaps": DOC_GAPS, "trials": DOC_TRIALS, "draws": DOC_DRAWS, "seed": SEED,
+            "gate_minimum": T.MIN_DOCUMENTS}
+
+
 # --- the teacher split ------------------------------------------------------------------------------
 
 def teacher_split(boxes: list[dict]) -> dict:
@@ -340,6 +386,7 @@ def cmd_report() -> None:
                               "needed": {k: needed({n: per[n][k]["half"] for n in SIZES}) for k in per[SIZES[0]]}}
     sens = {f"{b} - {a}": discordant(owner, a, b) for a, b in PAIRS}
     support = gate_support(owner)
+    support["documents"] = gate_documents()
     observed = {}
     for rec in owner + public:
         for key, m in rec["models"].items():
@@ -528,6 +575,38 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           f"the floor is a minimum, not a promise that {support['gate_minimum']} gaps of any box reach ±3 points.",
           "- **A held-out set of one document is refused.** The draw then repeats that document, and no number of "
           "its gaps gives an interval."]
+    dm = support["documents"]
+    L += ["", "### The minimum number of documents (W46.kit-gate-docs)", "",
+          "Until 2026-11-11 the gate refused one held-out document and accepted two. With two, the document draw has "
+          "three outcomes, so the interval's low end is about the worse document's mean, and a candidate passes "
+          "whenever both documents score above -3 (measurement review pass 13, P13-2). The table is simulated, not "
+          f"measured: one folder of {dm['gaps']} known gaps (about the gate's floor) in equal documents, the shipped "
+          "model right on 95% of them, and the candidate's true paired difference varying from document to document "
+          f"with the spread given; each cell is the share of {dm['trials']} simulated boxes on which `train_seg.py "
+          f"check`'s paired interval ({dm['draws']:,} draws) has its low end above -{TARGET:.0f}, so a candidate "
+          f"worse than the gate allows passes. Seed {dm['seed']}.", "",
+          "| per-document spread | true difference | " + " | ".join(f"{k} documents" for k in DOC_COUNTS) + " |",
+          "|---|---:|" + "---:|" * len(DOC_COUNTS)]
+    for key, row in dm["rates"].items():
+        sd, mean = key.split()
+        L.append(f"| {sd} points | {mean} points | " + " | ".join(f"{row[str(k)]}%" for k in DOC_COUNTS) + " |")
+    r3, r15 = dm["rates"]["3 -3.5"], dm["rates"]["1.5 -3.5"]
+    lo3, hi3 = sorted((r3["3"], r3["5"]))
+    lo20, hi20 = sorted((r3["20"], r3["30"]))
+    L += ["", "#### Reading", "",
+          f"- **The gate needs at least {dm['gate_minimum']} held-out documents.** With a 3-point spread, a candidate "
+          f"3.5 points worse passes {r3['2']}% of the time on two documents and {lo3}-{hi3}% on three to five; "
+          f"from ten it passes {r3['10']}%, and {lo20}-{hi20}% at 20-30, so more documents do not lower it "
+          "much: what is left is set by the number of gaps, which the 267-gap floor governs. Below the minimum the "
+          "gate refuses with the count, as it refuses below the known-gap floor, and the manifest states the folders, "
+          "documents and gaps the held-out figure stands on.",
+          "- **The spread is not measured.** No per-document spread of a paired difference is committed; between the "
+          "five owner boxes it is about 1.5 points after sampling variance, so 3 points is the harder plausible case. "
+          f"At 1.5 points two documents still pass the 3.5-point candidate {r15['2']}% of the time, against "
+          f"{r15['10']}% at ten.",
+          "- **Owner-like boxes are far above it.** They hold about 1.8 gaps a document (809 in 441), so a held-out "
+          "set at the 267-gap floor has about 150 documents. The minimum bites on a box of a few long documents, such "
+          "as bound volumes or registers, the case the continuation's next box may be."]
     L += ["", "## Observed, from the same records", "",
           "Known gaps only; pages exact over the documents every unsure gap leaves resolved (W46.seg-unsure-mask).", "",
           "| model | box | known gaps | unscored gaps | gap accuracy | pages exact |", "|---|---|---:|---:|---:|---:|"]
@@ -557,9 +636,9 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           "shipped model. It writes H §6.3's manifest: kit version, prompt id, base build, weights, adapter and "
           "training-data hashes, the scores with intervals, the Mac figures and the gate's verdict, and exits 1 when "
           "the gate fails. The rule, as decided (call 7.2, 2026-11-06; enforced by W46.kit-gate-rule): two scored "
-          "runs, each passing; in each, an anchor score, a held-out score on at least 267 known gaps in more than "
-          "one document (the larger of the two measured \"needed\" figures above, 147 and 267, derived again on the "
-          "gate's own resampling; the owner's rulings when they reach that, else the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 "
+          "runs, each passing; in each, an anchor score, a held-out score on at least 267 known gaps in at "
+          "least 10 documents (the larger of the two measured \"needed\" figures above, 147 and 267, derived again on the "
+          "gate's own resampling, and the documents simulated above, W46.kit-gate-docs; the owner's rulings when they reach that, else the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 "
           "points, over every gap the shipped run answered with the candidate's unanswered gaps counted wrong, and "
           "anchor pages exact less than 3.2 points (the top of the pages-exact rerun floor) below the shipped run's. "
           "A candidate with no shipped run, no paired gap or no paired anchor fails (W46.kit-gate-coverage). The "
@@ -610,7 +689,8 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           "- The plan-route arm (a `claude -p` voter in the kit) is held for the gateway (CLAUDE.md, \"Plan routes "
           "wait for the gateway\"), so the coding-agent leg was not run through `claude -p`. The five-hour "
           "window went from 26% to 39% over this session, which shares it with anything else running; the kit's own "
-          "steps were seconds of CPU."]
+          "steps were seconds of CPU.", "",
+          "The first three are closed by `train_seg.py mac` (W46.kit-mac-build, 2026-11-11): it converts and quantises the merged student, times a warm-up and writes `archive-seg-mac.json` in the build; `check --weights BUILD` then writes the manifest there, its `mac` block from that file, its weights hash of the build with the two kit files left out (the shipped build still hashes to the shipped manifest's `e4e00067…` with a figures file beside it). Run here on the shipped 8-bit 2B (`--build`) with nine Deaver windows at 1,024 px (the first untimed): 18.2 s a window, 6.2 s a page, 4.2 GB peak, 2.5 GB, 9.6 bits a weight, 9 of 9 parsed; `seg-students.md` §On the Mac has 18 s and 4.4 GB on the three development boxes, so one warm-up reproduces the bench's figure to within its rounding (a single run, no rerun floor). The convert half was run on the untrained Qwen/Qwen3.5-2B (no merged student is on this Mac; they are in the owner's backup): it gives the shipped build's shape (2,213M parameters, 9.6 bits a weight, 2.5 GB) and reads coherent text, but answers 1 of 5 windows in a form that parses (it writes a cue per gap and runs past the limit), which is what training teaches and why `mac` exits 1 then."]
     L += ["", "## Measurement card", "",
           "- **Truth.** The owner's ruled boxes (Dean, Deaver, Herrnstein; test boxes Stanton and RG165), Stanton "
           "with the owner's 2026-10-31 segmentation-sheet rulings folded (W46.seg-truth-rescore); the agent-audited "
@@ -626,7 +706,9 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           "`method_openrouter.py`'s caches; the untrained 4B was run on the development boxes only.",
           f"- **Noise.** The bootstrap's intervals above are sampling only; the rerun floor (1.4-3.2 points a box) "
           "is not in them, and truth noise enters only as the discordant-gap sensitivity. Shared-error counts are "
-          "single runs, and descriptive.",
+          "single runs, and descriptive. The minimum number of documents is a simulation, not a measurement: its "
+          "per-document spread is assumed (3 and 1.5 points), and each rate is over 1,000 simulated boxes, about "
+          "±1.4 points at 5%.",
           "- **Scope.** The owner's material and two public boxes. Overlap is not a training ceiling and forecasts "
           "no other teacher. Accuracy on owner-ruled held-out gaps (the checkpack and Sasha) is in "
           "`seg-kit-gate-sherlock.md`.", ""]

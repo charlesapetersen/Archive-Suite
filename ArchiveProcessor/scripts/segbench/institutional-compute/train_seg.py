@@ -39,7 +39,7 @@ count every expected gap: expected, answered and missing, the strict accuracy (a
 answered-only one, and the paired difference over every gap the shipped run answered, the candidate's missing answers
 counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-gate-coverage). The acceptance rule
 (call 7.2, W46.kit-gate-rule): two scored runs, each passing; in each, the paired interval's low end above -3 points
-on at least 267 known held-out gaps in two documents or more, and anchor pages exact less than 3.2 points below the shipped run's. It writes the
+on at least 267 known held-out gaps in at least 10 documents (W46.kit-gate-docs), and anchor pages exact less than 3.2 points below the shipped run's. It writes the
 candidate's manifest (`archive-seg-manifest.json` beside the weights is what the app reads): prompt id, kit version,
 weights and training-data hashes, the scores, and the gate's verdict; it exits 1 when the gate fails. The app refuses a
 model whose manifest lacks the anchor score or names another prompt (`LocalSegmenter.refusal`). Sizes, from
@@ -218,9 +218,14 @@ GATE_POINTS = 3.0         # a candidate may trail the shipped model by less than
 # 2B) and 267 (the 27B teacher against the 2B). A candidate's disagreement with the 2B is not known beforehand, so
 # the larger is the floor. Below it the interval is too wide to mean anything, and the gate refuses. Derived again on
 # the gate's own resampling, folders and inside each documents (W46.kit-gate-groups, seg-kit-gate.md §The minimum
-# support): documents alone, the unit a one-box held-out set has, give 254-282 over five seeds, so 267 stands. A
-# held-out set of one document has no interval at all, and is refused too.
+# support): documents alone, the unit a one-box held-out set has, give 254-282 over five seeds, so 267 stands.
 MIN_KNOWN_GAPS = 267
+# The documents the interval needs (W46.kit-gate-docs, seg-kit-gate.md §The minimum number of documents). With few
+# documents the draw has few outcomes, so the interval is too narrow: on 280 gaps with a per-document spread of 3
+# points, a candidate truly 3.5 points worse passes about a quarter of the time with two documents and about one in
+# ten with three to five; from ten it is at the 4-5% that many documents give. The case is a box of a few long
+# documents (bound volumes, registers); owner-like boxes hold about 1.8 gaps a document.
+MIN_DOCUMENTS = 10
 RUNS_NEEDED = 2
 # On the public anchor, a candidate may score below the shipped run in pages exact by less than this, in each run:
 # the top of the rerun floor measured in pages exact (SEG-10, 1.4-3.2 points a box). The shipped build's anchor is
@@ -471,6 +476,16 @@ def gate_basis(row, paired):
     return ("tags", tags) if tags is not None else (None, None)
 
 
+def gate_counts(row, paired):
+    """The folders, documents and known gaps the gate's held-out figure stands on, as the manifest states them."""
+    _, held = gate_basis(row, paired)
+    if held is None:
+        return {"gate_folders": 0, "gate_documents": 0, "gate_gaps": 0}
+    pre = "paired_" if paired else ""
+    return {"gate_folders": held.get(pre + "folders", 0), "gate_documents": held.get(pre + "documents", 0),
+            "gate_gaps": support(held, paired)}
+
+
 def run_reasons(row, paired, box, shipped_given):
     """Why one scored run fails the gate (an empty list when it passes). Missing evidence is a reason, never a pass
     (W46.kit-gate-coverage); so is support below MIN_KNOWN_GAPS (W46.kit-gate-rule)."""
@@ -507,10 +522,11 @@ def run_reasons(row, paired, box, shipped_given):
                            f"{', paired with the shipped run' if paired else ''}), and the gate needs at least "
                            f"{MIN_KNOWN_GAPS} for its {GATE_POINTS:g}-point interval to mean anything")
         docs = held.get("paired_documents", 0) if paired else held["documents"]
-        if docs < 2:
-            reasons.append(f"one held-out document: {docs} ({basis.replace('_', '-')}"
-                           f"{', paired with the shipped run' if paired else ''}), and the gate's interval resamples "
-                           f"documents, so it needs at least two")
+        if docs < MIN_DOCUMENTS:
+            reasons.append(f"too few held-out documents: {docs} ({basis.replace('_', '-')}"
+                           f"{', paired with the shipped run' if paired else ''}), and the gate needs at least "
+                           f"{MIN_DOCUMENTS}: its interval resamples documents, and with fewer it is too narrow, so a "
+                           f"candidate {GATE_POINTS + 0.5:g} points worse passes too often")
     return reasons
 
 
@@ -575,13 +591,13 @@ def cmd_check(a):
         "training_data": ({"sha256": sha256_of(Path(a.data) / "train.jsonl"),
                            "rule": json.loads((Path(a.data) / "data.json").read_text()).get("rule")} if a.data else None),
         "heldout": {"tags": cand.get("heldout_tags"), "owner_ruled": cand.get("heldout_ruled"),
-                    "gate_scored_on": cand["gate_scored_on"]},
+                    "gate_scored_on": cand["gate_scored_on"], **gate_counts(cand, paired)},
         "anchor": None if not cand["anchor"] else {"box": box, "truth_sha256": sha256_of(a.anchor_truth), **cand["anchor"]},
         "review_load_at_98": None if not cand["anchor"] else cand["anchor"]["review_load_per_100_pages"],
         "scored_runs": len(cand_runs),
         "mac": json.loads(Path(mac).read_text()) if mac else None, "note": a.note,
         "gate": {"rule": f"{RUNS_NEEDED} scored runs, each with an anchor score and a held-out score on at least "
-                         f"{MIN_KNOWN_GAPS} known gaps in two documents or more (the owner's rulings when they reach "
+                         f"{MIN_KNOWN_GAPS} known gaps in at least {MIN_DOCUMENTS} documents (the owner's rulings when they reach "
                          f"that, else the tags), its intervals resampling folders and, inside each, documents; "
                          f"for a candidate other than the shipped model, in each run, a paired held-out gap-accuracy "
                          f"interval against the shipped run, over every gap that run answered with the candidate's "

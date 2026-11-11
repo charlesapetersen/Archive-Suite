@@ -1517,9 +1517,12 @@ class Check(unittest.TestCase):
             self.assertEqual(r.returncode, 1, r.stdout)
             self.assertEqual(m["heldout"]["tags"]["difference_interval"], [0.0, 0.0])
             self.assertFalse(m["gate"]["passed"])
-            self.assertEqual(m["gate"]["reasons"], [f"run {i}: too few known held-out gaps: 2 (tags, paired with the "
-                                                    "shipped run), and the gate needs at least 267 for its 3-point "
-                                                    "interval to mean anything" for i in (1, 2)])
+            self.assertEqual(m["gate"]["reasons"], [x for i in (1, 2) for x in (
+                f"run {i}: too few known held-out gaps: 2 (tags, paired with the shipped run), and the gate needs at "
+                "least 267 for its 3-point interval to mean anything",
+                f"run {i}: too few held-out documents: 2 (tags, paired with the shipped run), and the gate needs at "
+                "least 10: its interval resamples documents, and with fewer it is too narrow, so a candidate 3.5 "
+                "points worse passes too often")])
         with tempfile.TemporaryDirectory() as t:
             r, m = self.coverage_check(Path(t), right, right, fill=264)    # 266 paired gaps, one short
             self.assertEqual(r.returncode, 1, r.stdout)
@@ -1571,9 +1574,28 @@ class Check(unittest.TestCase):
             r, m = self.one_folder_check(Path(t), 276, (), doc=0)
             self.assertEqual(r.returncode, 1, r.stdout)
             self.assertEqual(m["heldout"]["tags"]["paired_documents"], 1)
-            self.assertEqual(m["gate"]["reasons"], [f"run {i}: one held-out document: 1 (tags, paired with the shipped "
-                                                    "run), and the gate's interval resamples documents, so it needs at "
-                                                    "least two" for i in (1, 2)])
+            self.assertEqual(m["gate"]["reasons"], [f"run {i}: too few held-out documents: 1 (tags, paired with the "
+                                                    "shipped run), and the gate needs at least 10: its interval "
+                                                    "resamples documents, and with fewer it is too narrow, so a "
+                                                    "candidate 3.5 points worse passes too often" for i in (1, 2)])
+
+    def test_few_held_out_documents_are_refused(self):
+        # Measurement review pass 13, P13-2: two documents were accepted, and with two the draw has three outcomes, so
+        # a candidate truly 3.5 points worse passed about a fifth of the time. 280 gaps, 10 of them wrong (-3.6).
+        wrong = range(14, 281, 28)
+        for doc, docs, refused in ((140, 2, True), (94, 3, True), (28, 10, False)):
+            with tempfile.TemporaryDirectory() as t:
+                r, m = self.one_folder_check(Path(t), 280, wrong, doc=doc)
+                h = m["heldout"]
+                self.assertEqual((h["tags"]["paired_documents"], h["tags"]["difference"]), (docs, -3.57))
+                self.assertEqual((h["gate_folders"], h["gate_documents"], h["gate_gaps"]), (1, docs, 280))
+                self.assertEqual(r.returncode, 1, r.stdout)
+                said = " ".join(m["gate"]["reasons"])
+                self.assertEqual(f"too few held-out documents: {docs}" in said, refused, said)
+        with tempfile.TemporaryDirectory() as t:    # ten documents, none wrong: the count alone does not refuse
+            r, m = self.one_folder_check(Path(t), 280, (), doc=28)
+            self.assertEqual(r.returncode, 0, r.stdout)
+            self.assertIn("at least 10 documents", m["gate"]["rule"])
 
     # The corpus held-out set the shipped kit is checked on: 22 folders, (gaps, documents) each (corpus_pairs.py).
     CORPUS_HOLDOUT = ((8, 1), (8, 1), (11, 7), (20, 5), (28, 10), (52, 16), (53, 19), (61, 27), (70, 24), (71, 10),
@@ -1598,6 +1620,8 @@ class Check(unittest.TestCase):
             for g in (groups, folders):
                 h = T.gap_score(g, random.Random(T.CHECK_SEED), True)
                 self.assertEqual(h["paired_folders"], 22)
+                self.assertGreaterEqual(h["paired_documents"], 22)    # past MIN_DOCUMENTS either way
+                self.assertGreaterEqual(h["paired_documents"], T.MIN_DOCUMENTS)
                 self.assertEqual(h["difference_interval"][0] > -T.GATE_POINTS, passes, (every, h))
 
     def test_two_scored_runs_each_passing(self):
