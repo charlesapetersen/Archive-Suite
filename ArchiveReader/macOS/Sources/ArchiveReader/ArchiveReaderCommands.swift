@@ -230,6 +230,15 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.fitPage.title) { doc?.fitFocused() }
                 .keyboardShortcut(.fitPage).disabled(noReadingPane)
             Divider()
+            // W40.reader-view-rotate: a turn is a view of the image page, remembered in the Reader's own store; the
+            // file is never changed. In the preview sheet too, whose model is published to the scene.
+            Button(ReaderCommand.rotateLeft.title) { doc?.rotateLeft() }
+                .keyboardShortcut(.rotateLeft).disabled(!(doc?.canRotate ?? false))
+            Button(ReaderCommand.rotateRight.title) { doc?.rotateRight() }
+                .keyboardShortcut(.rotateRight).disabled(!(doc?.canRotate ?? false))
+            Button(ReaderCommand.resetRotation.title) { doc?.resetRotation() }
+                .disabled(!(doc?.canRotate ?? false) || !(doc?.isRotated ?? false))
+            Divider()
             // These three need MORE than a published viewer: they need one whose view renders a find bar.
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
             // which enables every `doc == nil` item (here and under Edit) — but it has no find bar and no way to type a

@@ -126,7 +126,7 @@ struct DocumentWindowView: View {
                     // multi-page document rebuilds the panes too.
                     PDFPaneView(page: model.displayedImagePage, controller: model.leftController,
                                 id: "ar.doc.imagePane", reference: model.imagePage,
-                                placeholder: model.isShowingJPEG ? nil : imagePlaceholder)
+                                placeholder: model.isShowingJPEG ? nil : imagePlaceholder, turns: model.imageTurns)
                         .id(model.imagePaneIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
@@ -280,6 +280,17 @@ struct DocumentWindowView: View {
 
             if !model.showingAllPages {
                 imageSourceSwitch
+
+                Divider()
+
+                Button { model.rotateLeft() } label: { Label(ReaderCommand.rotateLeft.title, systemImage: "rotate.left") }
+                    .disabled(!model.canRotate)
+                    .help(ReaderCommand.rotateLeft.help)
+                    .accessibilityIdentifier("ar.doc.rotateLeft")
+                Button { model.rotateRight() } label: { Label(ReaderCommand.rotateRight.title, systemImage: "rotate.right") }
+                    .disabled(!model.canRotate)
+                    .help(ReaderCommand.rotateRight.help)
+                    .accessibilityIdentifier("ar.doc.rotateRight")
 
                 Divider()
 

@@ -29,6 +29,10 @@ final class PDFPaneController {
     /// The page whose text layer find reads when the shown page is a stand-in for it — the PDF's image page
     /// behind its JPEG original, which has no text of its own. nil = find reads the shown page.
     private var findSource: PDFPage?
+    /// Quarter turns clockwise the reader added to the shown page (W40.reader-view-rotate), applied to the pane's
+    /// private copy of it, so the file and the model's page are never turned. Find boxes on a stand-in are worked
+    /// out on a copy of the source turned the same way.
+    private(set) var turns = 0
     /// Draws the stand-in's find boxes over its page. An overlay rather than annotations: a `PDFPage` copy
     /// shares its annotations with the original, and removing one from the copy leaves it on the original
     /// (measured), so boxes would pile up on the model's JPEG page.
@@ -127,8 +131,14 @@ final class PDFPaneController {
     /// Show a COPY of `page` in a throwaway one-page document (a PDFPage can belong to only one document —
     /// copying avoids detaching it from the source), then restore the zoom. `reference` is the page the
     /// saved zoom is measured against (the PDF's image page for the left pane); nil means `page` itself.
-    func show(_ page: PDFPage?, reference: PDFPage?, placeholder: PlaceholderRequest? = nil, in view: PDFView) {
+    ///
+    /// `turns` quarter-turns the copy clockwise on top of the page's own `/Rotate` (W40.reader-view-rotate). PDFKit
+    /// turns everything drawn in page space with it: the text layer and its selection, find highlights, and the
+    /// overlays below. The zoom unit is measured on the unturned pages, so a turn keeps the zoom's meaning.
+    func show(_ page: PDFPage?, reference: PDFPage?, placeholder: PlaceholderRequest? = nil, turns: Int = 0,
+              in view: PDFView) {
         view.clearSelection()
+        self.turns = Self.quarter(turns)
         findSource = (page != nil && reference != nil && page !== reference) ? reference : nil
         standInOverlay.update(rects: [], current: nil)
         placeholderOverlay.reset(key: findSource == nil ? placeholder?.key : nil,
@@ -138,6 +148,7 @@ final class PDFPaneController {
         view.pageOverlayViewProvider = findSource != nil ? standInOverlay
             : placeholder != nil ? placeholderOverlay : nil
         if let page, let copy = page.copy() as? PDFPage {
+            copy.rotation = Self.quarter(page.rotation / 90 + self.turns) * 90
             let doc = PDFDocument()
             doc.insert(copy, at: 0)
             view.document = doc
@@ -244,7 +255,8 @@ final class PDFPaneController {
         return CGPoint(x: b.minX + x * b.width, y: b.minY + y * b.height)
     }
 
-    private static func quarterTurns(_ page: PDFPage) -> Int { ((page.rotation / 90) % 4 + 4) % 4 }
+    private static func quarterTurns(_ page: PDFPage) -> Int { quarter(page.rotation / 90) }
+    static func quarter(_ turns: Int) -> Int { (turns % 4 + 4) % 4 }
 
     /// A text selection is drawn under page overlays, so the placeholder steps aside for good once one
     /// appears (a drag-select, Select All). Clearing the selection does not bring it back.
@@ -271,7 +283,9 @@ final class PDFPaneController {
     /// call, so a single synchronous scroll anchors stale — the deferred one corrects it).
     private func scrollToTop() {
         guard let v = pdfView, let page = v.document?.page(at: 0) else { return }
-        let top = CGPoint(x: 0, y: page.bounds(for: v.displayBox).height)   // PDF origin bottom-left → y=height is the top
+        // The page's displayed top-left: page space has its origin bottom-left, and a turned page's top is
+        // another of its edges (W40.reader-view-rotate).
+        let top = Self.pagePoint(fromDisplayed: .zero, on: page, box: v.displayBox)
         v.layoutDocumentView()
         v.go(to: PDFDestination(page: page, at: top))
         DispatchQueue.main.async { [weak self, weak v] in
@@ -361,7 +375,8 @@ final class PDFPaneController {
     /// drawn by the pane's overlay, so no page is marked; the current hit is scrolled to.
     /// W40.fix-reader-find-both-panes.
     private func highlightStandIn(_ shown: PDFPage, from source: PDFPage, in v: PDFView, scroll: Bool) {
-        let rects = Self.standInMatchRects(query: findQuery, source: source, shown: shown, box: v.displayBox)
+        let rects = Self.standInMatchRects(query: findQuery, source: source, shown: shown, box: v.displayBox,
+                                           turns: turns)
         let current = findCurrentIndex.flatMap { rects.indices.contains($0) ? $0 : nil }
         standInOverlay.update(rects: rects, current: current)
         if scroll, let current, !rects[current].isEmpty {
@@ -382,9 +397,12 @@ final class PDFPaneController {
 
     /// The boxes, in `shown`'s page space, of `query`'s matches on `source`, in match order — one per match,
     /// an empty box for a match with no bounds, so the k-th box stays the k-th match. Read-only: `source` is
-    /// searched through a copy, so neither page's document is touched.
-    static func standInMatchRects(query: String, source: PDFPage, shown: PDFPage, box: PDFDisplayBox) -> [CGRect] {
+    /// searched through a copy, so neither page's document is touched. `turns` is the reader's turn, already on
+    /// `shown`: the copy of `source` is turned the same way, so the two still show the photograph alike.
+    static func standInMatchRects(query: String, source: PDFPage, shown: PDFPage, box: PDFDisplayBox,
+                                  turns: Int = 0) -> [CGRect] {
         guard !query.isEmpty, let copy = source.copy() as? PDFPage else { return [] }
+        copy.rotation = quarter(source.rotation / 90 + turns) * 90
         let doc = PDFDocument()
         doc.insert(copy, at: 0)
         return doc.findString(query, withOptions: [.caseInsensitive]).map { match in
@@ -471,6 +489,9 @@ struct PDFPaneView: NSViewRepresentable {
     /// Show a prerendered bitmap over the page until PDFKit's own render lands (the preview's image pane).
     /// nil = no placeholder; a request with no image yet still lets a late bitmap be shown.
     var placeholder: PlaceholderRequest? = nil
+    /// Quarter turns clockwise the reader gave this page (W40.reader-view-rotate). The parent puts the turn in the
+    /// pane's `.id`, so a turn builds a fresh view, as a page turn does.
+    var turns: Int = 0
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
@@ -524,7 +545,7 @@ struct PDFPaneView: NSViewRepresentable {
     }
 
     private func loadPage(into view: PDFView) {
-        controller.show(page, reference: reference, placeholder: placeholder, in: view)
+        controller.show(page, reference: reference, placeholder: placeholder, turns: turns, in: view)
     }
 }
 

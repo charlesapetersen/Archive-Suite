@@ -76,15 +76,17 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     case clearAll, focusTagFilter, searchOCRText, advancedSearch
     // Document
     case previousPage, nextPage, focusImagePane, focusTextPane, zoomIn, zoomOut, fitPage, find, findNext, findPrevious
+    // Preview turns a page with ⌘L / ⌘R, which are Focus Tag Filter and Mark Read here, so the turn adds ⌃
+    // (W40.reader-view-rotate).
+    case rotateLeft, rotateRight, resetRotation
     // The document window's own controls
     case resetZoom, endFind
     // The preview sheet's own buttons
     case previewPreviousFile, previewNextFile, previewPreviousPage, previewNextPage, previewDone
     // The list's bare keys
     case listNextUnread, listPreviousUnread, listMarkReadAndNext, listPreview
-    // Held for W40.reader-view-rotate and W40.reader-page-views. Preview turns a page with ⌘L / ⌘R, which are
-    // Focus Tag Filter and Mark Read here, so the turn adds ⌃; its view keys ⌥⌘1 / ⌥⌘2 / ⌥⌘6 are free as they are.
-    case rotateLeft, rotateRight, singlePage, thumbnails, contactSheet
+    // Held for W40.reader-page-views. Preview's view keys ⌥⌘1 / ⌥⌘2 / ⌥⌘6 are free as they are.
+    case singlePage, thumbnails, contactSheet
 
     var context: CommandContext {
         switch self {
@@ -99,7 +101,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     /// Held for a later item: in the table so no other command takes the key, but bound nowhere yet.
     var reserved: Bool {
         switch self {
-        case .rotateLeft, .rotateRight, .singlePage, .thumbnails, .contactSheet: return true
+        case .singlePage, .thumbnails, .contactSheet: return true
         default: return false
         }
     }
@@ -161,6 +163,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .listPreview: return "Preview"
         case .rotateLeft: return "Rotate Left"
         case .rotateRight: return "Rotate Right"
+        case .resetRotation: return "Reset Rotation"
         case .singlePage: return "Hide Thumbnails"
         case .thumbnails: return "Thumbnails"
         case .contactSheet: return "Contact Sheet"
@@ -238,6 +241,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .listPreview: return CommandKey(.space, [])
         case .rotateLeft: return CommandKey("l", [.command, .control])
         case .rotateRight: return CommandKey("r", [.command, .control])
+        case .resetRotation: return nil
         case .singlePage: return CommandKey("1", [.command, .option])
         case .thumbnails: return CommandKey("2", [.command, .option])
         case .contactSheet: return CommandKey("6", [.command, .option])
@@ -270,6 +274,9 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .findPrevious: return "Previous match"
         case .resetZoom:
             return "Fit both pages to their panes and the text to its normal size (\(glyph); \(Self.fitPage.glyph) fits the focused page alone)"
+        case .rotateLeft: return "Turn the image page a quarter turn left, in this view only — the file is not changed"
+        case .rotateRight: return "Turn the image page a quarter turn right, in this view only — the file is not changed"
+        case .resetRotation: return "Show the image page as it is in the file"
         case .previewPreviousFile: return "Previous file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewNextFile: return "Next file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewPreviousPage: return "Previous page in the selection"

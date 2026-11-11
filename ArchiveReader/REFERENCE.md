@@ -270,9 +270,8 @@ Every command's name, key and tooltip is written once, in `ReaderCommand` (`W40.
 (`ArchiveReaderCommands.swift`), the toolbars, the preview sheet's buttons and the document window read it.
 `ReaderCommandTableTests` fails on two commands sharing a key where both answer it (the menu bar together with
 each window's own keys), on a menu item whose name or key differs from the table, and on any string in the app's
-sources that names a key nothing binds. Keys held for coming items: `⌃⌘L`/`⌃⌘R` Rotate Left/Right
-(`W40.reader-view-rotate`; Preview's `⌘L`/`⌘R` are Focus Tag Filter and Mark Read here) and `⌥⌘1`/`⌥⌘2`/`⌥⌘6`
-single page / Thumbnails / Contact Sheet (`W40.reader-page-views`, as in Preview).
+sources that names a key nothing binds. Keys held for a coming item: `⌥⌘1`/`⌥⌘2`/`⌥⌘6` single page / Thumbnails /
+Contact Sheet (`W40.reader-page-views`, as in Preview).
 
 *Navigation window*
 - `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
@@ -306,6 +305,16 @@ single page / Thumbnails / Contact Sheet (`W40.reader-page-views`, as in Preview
   a PDF zoom never reached it). The toolbar has Zoom Out / In Image (magnifiers), Smaller / Larger Text
   (text-size glyphs) and Reset Zoom (`⌥⌘0`), disabled while both pages already fit at the normal text size
   (`DocumentViewerModel.zoomIsDefault`); there are no per-pane Fit buttons (`W40.fix-reader-doc-toolbar`)
+- `⌃⌘L`/`⌃⌘R` Document ▸ Rotate Left / Right, and Reset Rotation (no key), in the document window and the preview
+  sheet, with toolbar buttons in both (`W40.reader-view-rotate`; Preview's `⌘L`/`⌘R` are Focus Tag Filter and Mark
+  Read here, so the turn adds ⌃). A turn is a view of the image page, PDF or JPEG original alike, with its text layer,
+  find highlights and selection turning with it; the OCR text page is not turned. The file is never changed: the
+  pane turns its private copy of the page (`PDFPaneController.show`). The turn is remembered per file and image page
+  in `PageTurnStore`, a `page_turn` table in the library index's database (`library-index-v1.sqlite3`; deleting
+  that file forgets the turns), with the file's size and modification time, so a rewritten file shows upright again.
+  Upright (four turns, or Reset Rotation) deletes the row. Each row is a page the Processor left sideways
+  (`W46.rotation-default`), so `PageTurnStore.turnedPages()` can later serve as rotation truth. Unit-test and
+  fixture launches keep turns in memory only.
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
   disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⇧⌘C`
   Edit ▸ Copy Cleaned for Prose (intelligent; Copy Link(s) uses `⌥⌘C`); it also starts a
@@ -481,6 +490,8 @@ Search/                       Discovery + disposable caches (never the corpus):
                               verified-write ordering, and FSEvents merge for one granted root.
   LibraryIndex.swift          System-SQLite discovery cache: raw tags, stat/ctime fingerprint, dataless
                               state, byte-exact root/path identity, verified rows + scan provenance.
+  PageTurnStore.swift         The viewer's page turns (W40.reader-view-rotate), a `page_turn` table in the
+                              library index's file on its own connection; never the archive file.
   LibraryScan.swift           Dedicated-thread full and fingerprint-diff passes; real monotonic progress.
   CorpusWatcher.swift         FSEvents exact/subtree/root recovery; byte-exact coalescing + path reads.
   RootFolderStore.swift       Security-scoped root bookmark; read-only adoption, identity creation only
@@ -556,7 +567,7 @@ Views/
   DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom, focus border, ⌘F find bar
                               (highlight-all + next/prev ⌘G/⇧⌘G + "N of M" across open docs).
   PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/focus/selection; find
-                              highlight reapplied on rebuild, like zoom).
+                              highlight reapplied on rebuild, like zoom; a view turn on its page copy).
   (Core/)DocumentFind.swift   Pure FindNavigator (match list + wrap cursor) + DocumentFindScanner (per-pane
                               findString counts). Backs the ⌘F in-viewer find; unit-tested (DocumentFindTests).
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.

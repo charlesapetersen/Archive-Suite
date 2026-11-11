@@ -91,6 +91,15 @@ struct PreviewSheet: View {
                 .keyboardShortcut(.previewNextPage)
                 .disabled(!model.canGoNext)
                 .help(ReaderCommand.previewNextPage.help)
+            // Rotate Left / Right are Document menu items (⌃⌘L / ⌃⌘R), which reach this sheet's published model.
+            Button { model.rotateLeft() } label: { Image(systemName: "rotate.left") }
+                .disabled(!model.canRotate)
+                .help(ReaderCommand.rotateLeft.help)
+                .accessibilityIdentifier("ar.preview.rotateLeft")
+            Button { model.rotateRight() } label: { Image(systemName: "rotate.right") }
+                .disabled(!model.canRotate)
+                .help(ReaderCommand.rotateRight.help)
+                .accessibilityIdentifier("ar.preview.rotateRight")
             // Neither copy button binds its key: ⌘C is Edit ▸ Copy, which reaches the sheet's panes through the
             // responder chain and leaves selectable embedded text its own copy (W48.reader-copy-shortcut), and
             // ⇧⌘C is Edit ▸ Copy Cleaned for Prose, which reaches this sheet's published model. This button bound
@@ -142,8 +151,8 @@ struct PreviewSheet: View {
                 // document 0 each time, so `pageIdentity` alone repeats, and a placeholder for the new file
                 // must never land on a view still showing the old one.
                 PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane",
-                            placeholder: imagePlaceholder)
-                    .id("\(model.currentFilePath ?? "")#\(model.pageIdentity)")
+                            placeholder: imagePlaceholder, turns: model.imageTurns)
+                    .id("\(model.currentFilePath ?? "")#\(model.pageIdentity)#\(model.imageTurns)")
                     .frame(maxWidth: .infinity)
                 Divider()
                 if model.hasTextPage {

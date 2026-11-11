@@ -87,6 +87,8 @@ final class DocumentViewerModel: ObservableObject {
     private var archiveLinkTarget: ArchiveLinkTarget?
     private var jpegPartnerIndex: JPEGPartnerIndex?
     private let imageSourcePreferences: DocumentImageSourcePreferences
+    /// Where the image pages' turns are remembered (W40.reader-view-rotate): the Reader's own store, never the file.
+    let pageTurns: PageTurnStore
     private let persistsImageSource: Bool
     private var pinsJPEGPartnerFromLink = false
     private let persistsTextScale: Bool
@@ -105,12 +107,14 @@ final class DocumentViewerModel: ObservableObject {
     /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
     init(persists: Bool = true, supportsFind: Bool = true, supportsPageOverview: Bool = true,
          imageSourcePreferences: DocumentImageSourcePreferences = DocumentImageSourcePreferences(),
+         pageTurns: PageTurnStore = .shared,
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
         leftController = PDFPaneController(key: "left", persists: persists)
         rightController = PDFPaneController(key: "right", persists: persists)
         self.supportsFind = supportsFind
         self.supportsPageOverview = supportsPageOverview
         self.imageSourcePreferences = imageSourcePreferences
+        self.pageTurns = pageTurns
         self.persistsImageSource = persists
         self.persistsTextScale = persists
         self.thumbnailer = thumbnailer
@@ -327,7 +331,31 @@ final class DocumentViewerModel: ObservableObject {
     /// The image pane's identity also covers the PDF / JPEG switch, so the swap always builds a fresh view
     /// that takes the carried zoom and region, rather than leaning on `updateNSView`'s text comparison
     /// (an image page and a JPEG both have no text, so it cannot tell them apart).
-    var imagePaneIdentity: String { "\(pageIdentity)#\(imageSource.rawValue)" }
+    var imagePaneIdentity: String { "\(pageIdentity)#\(imageSource.rawValue)#\(imageTurns)" }
+
+    // MARK: Rotation — a view of the page, the file untouched (W40.reader-view-rotate)
+
+    /// Quarter turns clockwise the reader gave the current image page, 0…3, from `pageTurns`. The PDF's image
+    /// page and its JPEG original are the same photograph, so one turn serves both; the OCR text page is not
+    /// turned. The image pane's identity includes it, so a turn builds a fresh view.
+    var imageTurns: Int {
+        guard let path = currentFilePath, imagePage != nil else { return 0 }
+        return pageTurns.turns(path: path, page: DocumentPagePairs.imagePageIndex(pair: pair))
+    }
+    /// An image page is on screen, so there is something to turn.
+    var canRotate: Bool { imagePage != nil && !showingAllPages }
+    var isRotated: Bool { imageTurns != 0 }
+
+    func rotateLeft() { setImageTurns(imageTurns - 1) }
+    func rotateRight() { setImageTurns(imageTurns + 1) }
+    func resetRotation() { setImageTurns(0) }
+
+    private func setImageTurns(_ turns: Int) {
+        guard canRotate, let path = currentFilePath else { return }
+        objectWillChange.send()
+        leftController.clearSelection()   // a selection's place on screen moves with the page; start clean
+        pageTurns.set(turns, path: path, page: DocumentPagePairs.imagePageIndex(pair: pair))
+    }
 
     /// The text extracted from the current pair's image page, when that pair has no OCR text page (a
     /// single-page PDF with selectable text, or an odd trailing scan). `nil` when a text page exists or
