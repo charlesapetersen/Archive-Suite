@@ -11,8 +11,8 @@ extension FocusedValues {
 }
 
 /// The app's menu bar. Commands act on whichever window is frontmost via `@FocusedObject`
-/// (nav vs. document), and are the single source of the keyboard shortcuts (the toolbars are
-/// clickable but no longer declare these shortcuts, so nothing double-registers).
+/// (nav vs. document), and are where the keyboard shortcuts are bound (the toolbars are clickable but
+/// declare no shortcuts, so nothing double-registers). Names and keys come from `ReaderCommand`.
 struct ArchiveReaderCommands: Commands {
     @FocusedObject private var nav: NavigationModel?
     @FocusedObject private var doc: DocumentViewerModel?
@@ -40,6 +40,8 @@ struct ArchiveReaderCommands: Commands {
     /// The model the corpus-wide tag sheets (Rename, Find Similar) open in; from a document window they open
     /// over the navigation window, which is brought forward.
     private var tagSheetNav: NavigationModel? { nav ?? docTags?.navigation }
+    /// The Inspector in the window in front is open; it names the View menu's Show/Hide Inspector.
+    private var inspectorShown: Bool { nav?.showingEditor ?? docTags?.viewer.showingTagEditor ?? false }
     /// No viewer, or a viewer with no find bar (the preview sheet) — see the Find items below.
     private var noFind: Bool { !(doc?.supportsFind ?? false) }
     /// The navigation window is in front with nothing over it, so Find… searches the library.
@@ -53,15 +55,22 @@ struct ArchiveReaderCommands: Commands {
             // ⌃⌘S is the Mac's Show/Hide Sidebar, and the tag cloud takes the T beside it. They were ⌥⌘S and ⌥⌘T
             // until W40.fix-suite-shortcuts; ⌥⌘T is the Mac's Show/Hide Toolbar.
             if nav != nil {
-                Button(showingSidebar ? "Hide Sidebar" : "Show Sidebar") {
+                Button(ReaderCommand.showSidebar.title(showing: showingSidebar)) {
                     showingSidebar.toggle()
                 }
-                .keyboardShortcut("s", modifiers: [.command, .control])
-                Button(showingTagCloud ? "Hide Tag Cloud" : "Show Tag Cloud") {
+                .keyboardShortcut(.showSidebar)
+                Button(ReaderCommand.showTagCloud.title(showing: showingTagCloud)) {
                     showingTagCloud.toggle()
                 }
-                .keyboardShortcut("t", modifiers: [.command, .control])
+                .keyboardShortcut(.showTagCloud)
             }
+            // The Inspector (Edit Info until W40.reader-commands-table) beside the list, or beside a document
+            // window's file. Named and keyed as Archive Notes' panel is: View ▸ Show/Hide Inspector, ⌥⌘I.
+            Button(ReaderCommand.showInspector.title(showing: inspectorShown)) {
+                if let nav { nav.showingEditor.toggle() } else { docTags?.editTags() }
+            }
+            .keyboardShortcut(.showInspector)
+            .disabled(nav == nil && !(docTags?.canTag ?? false))
             if let doc, doc.supportsPageOverview {
                 Toggle("All Pages Tiled", isOn: Binding(
                     get: { doc.showingAllPages }, set: { doc.setShowingAllPages($0) }
@@ -70,10 +79,10 @@ struct ArchiveReaderCommands: Commands {
             }
             // The source switch applies to the reading panes; tiles always depict PDF pages.
             if let doc {
-                Button(doc.isShowingJPEG ? "Show PDF Image" : "Show JPEG Image") {
+                Button(ReaderCommand.showJPEG.title(showing: doc.isShowingJPEG)) {
                     doc.toggleImageSource()
                 }
-                .keyboardShortcut("j", modifiers: [.command, .option])
+                .keyboardShortcut(.showJPEG)
                 .disabled(!doc.hasJPEGPartner || doc.showingAllPages)
             }
         }
@@ -87,14 +96,14 @@ struct ArchiveReaderCommands: Commands {
             Divider()
             // Owner, 2026-11-08: ⇧⌘C cleans prose; Selection ▸ Copy Link(s) takes ⌥⌘C so
             // both commands keep distinct shortcuts while the preview sheet is open.
-            Button("Copy Cleaned for Prose") { doc?.copySelection() }
-                .keyboardShortcut("c", modifiers: [.command, .shift]).disabled(noReadingPane)
+            Button(ReaderCommand.copyCleaned.title) { doc?.copySelection() }
+                .keyboardShortcut(.copyCleaned).disabled(noReadingPane)
             // ⌥⌘L: ⌘L is Focus Tag Filter and ⇧⌘L Copy Archive Link(s), which the preview sheet leaves enabled
             // beside this one, so the page link takes the remaining L.
-            Button("Copy Archive Link to This Page") {
+            Button(ReaderCommand.copyPageLink.title) {
                 if let doc, let linkContext { doc.copyArchivePageLink(context: linkContext) }
             }
-            .keyboardShortcut("l", modifiers: [.command, .option])
+            .keyboardShortcut(.copyPageLink)
             .disabled(noReadingPane || linkContext?.target == nil)
         }
 
@@ -102,82 +111,80 @@ struct ArchiveReaderCommands: Commands {
         CommandGroup(replacing: .newItem) {
             // Enabled from every Reader window and with none open: the owner pressed ⇧⌘O over a document
             // window and nothing happened (notes-1, row 1). The library window comes forward for the panel.
-            Button("Choose Archive Folder…") {
+            Button(ReaderCommand.chooseFolder.title) {
                 if let nav { nav.chooseRoot() } else {
                     router.requestChooseRoot { openWindow(id: WindowID.navigation) }
                 }
             }
-            .keyboardShortcut("o", modifiers: [.command, .shift])
+            .keyboardShortcut(.chooseFolder)
             // Explicit recovery even though FSEvents normally keeps the library live. ⌘⌥R because
             // ⌘R is Mark Read.
-            Button("Rescan Archive Folder") { nav?.rescan() }
-                .keyboardShortcut("r", modifiers: [.command, .option])
+            Button(ReaderCommand.rescan.title) { nav?.rescan() }
+                .keyboardShortcut(.rescan)
                 .disabled(nav == nil)
-            Button("Save Current Search…") { nav?.showingSaveDialog = true }
+            Button(ReaderCommand.saveSearch.title) { nav?.showingSaveDialog = true }
                 .disabled(nav == nil)
         }
 
         // Selection (nav window)
         CommandMenu("Selection") {
-            Button("Open in Document Window") { openSelection?() }
-                .keyboardShortcut("o", modifiers: .command)
+            Button(ReaderCommand.open.title) { openSelection?() }
+                .keyboardShortcut(.open)
                 .disabled(openSelection == nil || noSelection)
-            Button("Preview") { nav?.showingPreview = true }
-                .keyboardShortcut("y", modifiers: .command)
+            Button(ReaderCommand.preview.title) { nav?.showingPreview = true }
+                .keyboardShortcut(.preview)
                 .disabled(noSelection)
-            Button("Reveal in Finder") { nav?.revealInFinder() }
-                .keyboardShortcut("r", modifiers: [.command, .shift])
+            Button(ReaderCommand.revealInFinder.title) { nav?.revealInFinder() }
+                .keyboardShortcut(.revealInFinder)
                 .disabled(noSelection)
-            Button("Copy Link(s)") { nav?.copyLinks() }
-                .keyboardShortcut("c", modifiers: [.command, .option])
+            Button(ReaderCommand.copyLinks.title) { nav?.copyLinks() }
+                .keyboardShortcut(.copyLinks)
                 .disabled(noSelection)
-            Button("Copy Archive Link(s)") { nav?.copyArchiveLinks() }
-                .keyboardShortcut("l", modifiers: [.command, .shift])
+            Button(ReaderCommand.copyArchiveLinks.title) { nav?.copyArchiveLinks() }
+                .keyboardShortcut(.copyArchiveLinks)
                 .disabled(noSelection)
             Divider()
-            Button("Select Document Run") { nav?.extendSelectionToDocumentRun() }
+            Button(ReaderCommand.selectRun.title) { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)
             Divider()
             // G4 keyboard triage. Bare ] / [ also work when the list has key focus (text-field-safe);
             // the ⌘ accelerators are the discoverable menu equivalents.
-            Button("Next Unread") { nav?.selectNextUnread() }
-                .keyboardShortcut("]", modifiers: .command).disabled(nav == nil)
-            Button("Previous Unread") { nav?.selectPreviousUnread() }
-                .keyboardShortcut("[", modifiers: .command).disabled(nav == nil)
+            Button(ReaderCommand.nextUnread.title) { nav?.selectNextUnread() }
+                .keyboardShortcut(.nextUnread).disabled(nav == nil)
+            Button(ReaderCommand.previousUnread.title) { nav?.selectPreviousUnread() }
+                .keyboardShortcut(.previousUnread).disabled(nav == nil)
         }
 
         // Tags — the list's selection, or the document window's open file (`docTags`)
         CommandMenu("Tags") {
-            Button("Mark Read") { if let nav { nav.mark(.read) } else { docTags?.mark(.read) } }
-                .keyboardShortcut("r", modifiers: .command).disabled(noTagTarget)
-            Button("Mark Unread") { if let nav { nav.mark(.unread) } else { docTags?.mark(.unread) } }
-                .keyboardShortcut("u", modifiers: .command).disabled(noTagTarget)
+            Button(ReaderCommand.markRead.title) { if let nav { nav.mark(.read) } else { docTags?.mark(.read) } }
+                .keyboardShortcut(.markRead).disabled(noTagTarget)
+            Button(ReaderCommand.markUnread.title) { if let nav { nav.mark(.unread) } else { docTags?.mark(.unread) } }
+                .keyboardShortcut(.markUnread).disabled(noTagTarget)
             // G4 one-key triage: mark Read (via TagWriter, undoable) then jump to the next unread.
             // Bare \ also works when the list has key focus (text-field-safe).
-            Button("Mark Read & Next Unread") {
+            Button(ReaderCommand.markReadAndNext.title) {
                 if let nav { nav.markReadAndAdvance() } else { docTags?.markReadAndNextUnread() }
             }
-            .keyboardShortcut("m", modifiers: [.command, .shift]).disabled(noTagTarget)
-            Button("Edit Info") { if let nav { nav.showingEditor.toggle() } else { docTags?.editTags() } }
-                .keyboardShortcut("i", modifiers: .command)
-            Button("Rename Tag…") {
+            .keyboardShortcut(.markReadAndNext).disabled(noTagTarget)
+            Button(ReaderCommand.renameTag.title) {
                 if nav == nil { openWindow(id: WindowID.navigation) }
                 tagSheetNav?.beginRenameTag()
             }
             .disabled(tagSheetNav == nil)
-            Button("Find Similar Tags…") {
+            Button(ReaderCommand.findSimilarTags.title) {
                 if nav == nil { openWindow(id: WindowID.navigation) }
                 tagSheetNav?.showingSimilarTags = true
             }
             .disabled(tagSheetNav == nil)
-            Button("Toggle Flag") { if let nav { nav.toggleFlagSelection() } else { docTags?.toggleFlag() } }
-                .keyboardShortcut("f", modifiers: [.command, .shift]).disabled(noTagTarget)
+            Button(ReaderCommand.toggleFlag.title) { if let nav { nav.toggleFlagSelection() } else { docTags?.toggleFlag() } }
+                .keyboardShortcut(.toggleFlag).disabled(noTagTarget)
             Divider()
-            Button("Undo Tag Change") { if let nav { nav.undoLast() } else { docTags?.undo() } }
-                .keyboardShortcut("z", modifiers: .command)
+            Button(ReaderCommand.undoTagChange.title) { if let nav { nav.undoLast() } else { docTags?.undo() } }
+                .keyboardShortcut(.undoTagChange)
                 .disabled(nav != nil ? (nav?.undoDepth ?? 0) == 0 : !(docTags?.canUndo ?? false))
-            Button("Redo Tag Change") { if let nav { nav.redoLast() } else { docTags?.redo() } }
-                .keyboardShortcut("z", modifiers: [.command, .shift])
+            Button(ReaderCommand.redoTagChange.title) { if let nav { nav.redoLast() } else { docTags?.redo() } }
+                .keyboardShortcut(.redoTagChange)
                 .disabled(nav != nil ? (nav?.redoDepth ?? 0) == 0 : !(docTags?.canRedo ?? false))
         }
 
@@ -190,38 +197,38 @@ struct ArchiveReaderCommands: Commands {
             Button("Sort by Flag") { nav?.sort = sortBy(.flag) }.disabled(nav == nil)
             Button("Sort by Needs Attention") { nav?.sort = sortBy(.attention) }.disabled(nav == nil)
             Divider()
-            Button("Clear All") { nav?.clearUserFilters() }
-            .keyboardShortcut("k", modifiers: [.command, .shift])
+            Button(ReaderCommand.clearAll.title) { nav?.clearUserFilters() }
+            .keyboardShortcut(.clearAll)
             .disabled(nav == nil)
             Divider()
-            Button("Focus Tag Filter") { nav?.requestFocusTagFilter() }
-                .keyboardShortcut("l", modifiers: .command).disabled(nav == nil)
-            Button("Search OCR Text") { nav?.requestFocusSearch() }
-                .keyboardShortcut("f", modifiers: [.command, .option]).disabled(nav == nil)
-            Button("Advanced Search…") { nav?.openAdvancedSearch() }
-                .keyboardShortcut("f", modifiers: [.command, .option, .shift]).disabled(nav == nil)
+            Button(ReaderCommand.focusTagFilter.title) { nav?.requestFocusTagFilter() }
+                .keyboardShortcut(.focusTagFilter).disabled(nav == nil)
+            Button(ReaderCommand.searchOCRText.title) { nav?.requestFocusSearch() }
+                .keyboardShortcut(.searchOCRText).disabled(nav == nil)
+            Button(ReaderCommand.advancedSearch.title) { nav?.openAdvancedSearch() }
+                .keyboardShortcut(.advancedSearch).disabled(nav == nil)
         }
 
         // Document (document window). ↑/↓ ALONE scroll the focused page (handled by the PDF view, not
         // bound here). The focused pane (⌘⌥←/→) is what ⌘+/⌘− zoom. A menu item holds one shortcut, so
         // ⌘= and the older ⌘↑/⌘↓ are answered by the panes themselves (`ReaderPDFView.performKeyEquivalent`).
         CommandMenu("Document") {
-            Button("Previous Page in Segment") { doc?.previous() }
-                .keyboardShortcut(.upArrow, modifiers: [.command, .shift]).disabled(doc == nil)
-            Button("Next Page in Segment") { doc?.next() }
-                .keyboardShortcut(.downArrow, modifiers: [.command, .shift]).disabled(doc == nil)
+            Button(ReaderCommand.previousPage.title) { doc?.previous() }
+                .keyboardShortcut(.previousPage).disabled(doc == nil)
+            Button(ReaderCommand.nextPage.title) { doc?.next() }
+                .keyboardShortcut(.nextPage).disabled(doc == nil)
             Divider()
-            Button("Focus Image Page") { doc?.focusPane(.left) }
-                .keyboardShortcut(.leftArrow, modifiers: [.command, .option]).disabled(noReadingPane)
-            Button("Focus Text Page") { doc?.focusPane(.right) }
-                .keyboardShortcut(.rightArrow, modifiers: [.command, .option]).disabled(noReadingPane)
+            Button(ReaderCommand.focusImagePane.title) { doc?.focusPane(.left) }
+                .keyboardShortcut(.focusImagePane).disabled(noReadingPane)
+            Button(ReaderCommand.focusTextPane.title) { doc?.focusPane(.right) }
+                .keyboardShortcut(.focusTextPane).disabled(noReadingPane)
             Divider()
-            Button("Zoom In") { doc?.zoomFocusedIn() }
-                .keyboardShortcut("+", modifiers: .command).disabled(noReadingPane)
-            Button("Zoom Out") { doc?.zoomFocusedOut() }
-                .keyboardShortcut("-", modifiers: .command).disabled(noReadingPane)
-            Button("Fit Page") { doc?.fitFocused() }
-                .keyboardShortcut("0", modifiers: .command).disabled(noReadingPane)
+            Button(ReaderCommand.zoomIn.title) { doc?.zoomFocusedIn() }
+                .keyboardShortcut(.zoomIn).disabled(noReadingPane)
+            Button(ReaderCommand.zoomOut.title) { doc?.zoomFocusedOut() }
+                .keyboardShortcut(.zoomOut).disabled(noReadingPane)
+            Button(ReaderCommand.fitPage.title) { doc?.fitFocused() }
+                .keyboardShortcut(.fitPage).disabled(noReadingPane)
             Divider()
             // These three need MORE than a published viewer: they need one whose view renders a find bar.
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),
@@ -229,12 +236,12 @@ struct ArchiveReaderCommands: Commands {
             // query, so ⌘F looked live and did nothing there (W26.previewzoom-fu1).
             // ⌘F is Find in every window (W40.fix-suite-shortcuts): with the navigation window in front, and no
             // preview sheet over it, it is Search OCR Text, as ⌥⌘F is. The preview sheet still has no find.
-            Button("Find…") { if !noFind { doc?.beginFind() } else { nav?.requestFocusSearch() } }
-                .keyboardShortcut("f", modifiers: .command).disabled(noFind && !findSearchesLibrary)
-            Button("Find Next") { doc?.showingFind = true; doc?.findNext() }
-                .keyboardShortcut("g", modifiers: .command).disabled(noFind)
-            Button("Find Previous") { doc?.showingFind = true; doc?.findPrevious() }
-                .keyboardShortcut("g", modifiers: [.command, .shift]).disabled(noFind)
+            Button(ReaderCommand.find.title) { if !noFind { doc?.beginFind() } else { nav?.requestFocusSearch() } }
+                .keyboardShortcut(.find).disabled(noFind && !findSearchesLibrary)
+            Button(ReaderCommand.findNext.title) { doc?.showingFind = true; doc?.findNext() }
+                .keyboardShortcut(.findNext).disabled(noFind)
+            Button(ReaderCommand.findPrevious.title) { doc?.showingFind = true; doc?.findPrevious() }
+                .keyboardShortcut(.findPrevious).disabled(noFind)
             Divider()
             Button("Zoom In (Image)") { doc?.leftController.zoomIn() }.disabled(noReadingPane)
             Button("Zoom Out (Image)") { doc?.leftController.zoomOut() }.disabled(noReadingPane)

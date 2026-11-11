@@ -5,7 +5,8 @@ import Combine
 
 /// The document-view window: a two-up viewer — image page (left) / OCR text page (right) — with an
 /// independent zoom per pane, a draggable splitter defaulting to ⅔ : ⅓ (reset per document), page
-/// cycling with ⌘⇧↑/⌘⇧↓, arrow-key panning, verbatim copy (⌘C, Edit ▸ Copy) and intelligent copy (⌥⌘C), and in-document find (⌘F).
+/// cycling with ⇧⌘↑/⇧⌘↓, arrow-key panning, verbatim copy (⌘C, Edit ▸ Copy) and intelligent copy (⇧⌘C), and in-document find (⌘F).
+/// Keys and tooltips come from `ReaderCommand` (W40.reader-commands-table).
 struct DocumentWindowView: View {
     let selection: DocumentSelection?
     @StateObject private var model = DocumentViewerModel()
@@ -40,7 +41,7 @@ struct DocumentWindowView: View {
             }
             if model.showingTagEditor {
                 PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,
-                             label: "Edit Info width", id: "ar.divider.info")
+                             label: "Inspector width", id: "ar.divider.info")
             }
             tagInspector.frame(width: model.showingTagEditor ? infoWidth : 0)
                 .clipped().opacity(model.showingTagEditor ? 1 : 0)
@@ -230,11 +231,11 @@ struct DocumentWindowView: View {
                 .onSubmit { model.findNext() }
                 .accessibilityIdentifier("ar.doc.findField")
             Button { model.findPrevious() } label: { Image(systemName: "chevron.up") }
-                .help("Previous match (⇧⌘G)")
+                .help(ReaderCommand.findPrevious.help)
                 .disabled(model.findQuery.isEmpty)
                 .accessibilityIdentifier("ar.doc.findPrev")
             Button { model.findNext() } label: { Image(systemName: "chevron.down") }
-                .help("Next match (⌘G)")
+                .help(ReaderCommand.findNext.help)
                 .disabled(model.findQuery.isEmpty)
                 .accessibilityIdentifier("ar.doc.findNext")
             Text(model.findStatusText)
@@ -243,8 +244,8 @@ struct DocumentWindowView: View {
                 .frame(minWidth: 72, alignment: .leading)
                 .accessibilityIdentifier("ar.doc.findCount")
             Spacer()
-            Button("Done") { model.endFind() }
-                .keyboardShortcut(.cancelAction)
+            Button(ReaderCommand.endFind.title) { model.endFind() }
+                .keyboardShortcut(.endFind)
         }
         .padding(8)
     }
@@ -260,10 +261,10 @@ struct DocumentWindowView: View {
         ToolbarItemGroup {
             Button { model.previous() } label: { Label("Previous", systemImage: "chevron.up") }
                 .disabled(!model.canGoPrevious)
-                .help("Previous page in this segment (⌘⇧↑)")
+                .help(ReaderCommand.previousPage.help)
             Button { model.next() } label: { Label("Next", systemImage: "chevron.down") }
                 .disabled(!model.canGoNext)
-                .help("Next page in this segment (⌘⇧↓)")
+                .help(ReaderCommand.nextPage.help)
 
             Divider()
 
@@ -306,24 +307,24 @@ struct DocumentWindowView: View {
                 Divider()
 
                 Button { model.copyPlainSelection() } label: { Label("Copy", systemImage: "doc.on.doc") }
-                    .help("Copy the selected text exactly (⌘C)")
+                    .help(ReaderCommand.copyExact.help)
                 Button { model.copySelection() } label: { Label("Copy Cleaned", systemImage: "doc.on.doc.fill") }
-                    .help("Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌥⌘C)")
+                    .help(ReaderCommand.copyCleaned.help)
                 Button { model.beginFind() } label: { Label("Find", systemImage: "magnifyingglass") }
-                    .help("Search for text in this document (⌘F)")
+                    .help(ReaderCommand.find.help)
                 // The tooltip sits on a wrapper, like the image switch's: a disabled button's own is not shown.
                 HStack(spacing: 0) {
                     Button { fraction = defaultFraction; model.resetZoom() } label: {
-                        Label("Reset Zoom", systemImage: "arrow.counterclockwise")
+                        Label(ReaderCommand.resetZoom.title, systemImage: "arrow.counterclockwise")
                     }
-                    .keyboardShortcut("0", modifiers: [.command, .option])
+                    .keyboardShortcut(.resetZoom)
                     .disabled(model.zoomIsDefault)
                     .accessibilityIdentifier("ar.doc.resetZoom")
                 }
                 .contentShape(Rectangle())
                 .help(model.zoomIsDefault
                       ? "Both pages already fit their panes, with the text at its normal size"
-                      : "Fit both pages to their panes and the text to its normal size (⌥⌘0; ⌘0 fits the focused page alone)")
+                      : ReaderCommand.resetZoom.help)
             }
         }
     }
@@ -366,8 +367,8 @@ struct DocumentWindowView: View {
         .contentShape(Rectangle())
         .help(model.hasJPEGPartner
               ? (model.isShowingJPEG
-                 ? "Showing the JPEG original. Switch to the PDF's image (⌥⌘J)"
-                 : "Showing the PDF's image. Switch to the JPEG original (⌥⌘J)")
+                 ? "Showing the JPEG original. Switch to the PDF's image (\(ReaderCommand.showJPEG.glyph))"
+                 : "Showing the PDF's image. Switch to the JPEG original (\(ReaderCommand.showJPEG.glyph))")
               : (model.jpegUnavailableReason ?? "No JPEG original for this file."))
     }
 

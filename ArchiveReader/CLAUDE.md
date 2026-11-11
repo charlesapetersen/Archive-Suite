@@ -163,7 +163,7 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
 - The nav list is an AppKit `NSTableView` (diffable, 150 ms-debounced filter, off the keystroke path); don't
   return to SwiftUI `Table`, which janked at 40k.
 - The display calendar (W24.cal1-reader) is display only — sort, filter and tags keep ISO.
-- **Dates are edited only in the ⌘I inspector**, the one date editor (owner, 2026-10-12); no inline date editing
+- **Dates are edited only in the ⌥⌘I Inspector**, the one date editor (owner, 2026-10-12); no inline date editing
   in the list. The inline subject editor commits the field's tokens on blur, WYSIWYG — a typed-but-not-Return'd
   word sticks (owner, 2026-07-08) — as ONE `TagWriter` delta.
 - A **view / PDF-render** change needs a headless render guard (`RenderProbe` / `DocumentRenderGuardTests`);
@@ -183,7 +183,7 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   copied link groups carry full paths.
 - **Unicode:** normalize (NBSP→space, dash-fold, case/diacritic-fold) for search/type-ahead/sort keys **only**;
   preserve real bytes for display + link encoding.
-- **Multiple same-facet date tags:** deterministic rule (last wins) + flag ambiguous — `DocumentTags.dateAmbiguities`, shown in the Date cell (mark + tooltip naming the set-aside tag), the ⌘I inspector, and the Library health popover's Show button, whose filter-bar toggle appears only while on (W40.fix-reader-date-ambiguity, W40.fix-reader-health-counts).
+- **Multiple same-facet date tags:** deterministic rule (last wins) + flag ambiguous — `DocumentTags.dateAmbiguities`, shown in the Date cell (mark + tooltip naming the set-aside tag), the ⌥⌘I Inspector, and the Library health popover's Show button, whose filter-bar toggle appears only while on (W40.fix-reader-date-ambiguity, W40.fix-reader-health-counts).
 - **Facet-looking subjects** (`1984`, `Q1`, `Read`): heuristics + display-only correction; never affects writes.
 
 ## §Decisions (settled with the owner; the app ships these)

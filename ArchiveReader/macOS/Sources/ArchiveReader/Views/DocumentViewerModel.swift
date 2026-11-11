@@ -251,7 +251,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// The open file's path, which the Tags menu acts on in the document window (`DocumentTagActions`).
     var currentFilePath: String? { currentURL?.path }
-    /// The right-hand Edit Info inspector follows the open document.
+    /// The right-hand Inspector follows the open document.
     @Published var showingTagEditor = false
     /// Whether the find field has the caret. Undo Tag Change (⌘Z) stays off then, so ⌘Z in the field
     /// never undoes a tag change instead of the typing (S-001; `TextUndoGuard` does the same app-wide).
@@ -349,7 +349,7 @@ final class DocumentViewerModel: ObservableObject {
 
     // MARK: Copy — one live selection (W40.fix-reader-copy-text-pane)
 
-    /// Intelligent copy (prose-cleaned) from the pane that holds the selection — ⌥⌘C.
+    /// Intelligent copy (prose-cleaned) from the pane that holds the selection — ⇧⌘C.
     func copySelection() { copyToPasteboard(cleanedCopyText(AppSettings.copyOptions)) }
 
     /// Plain/direct copy — the raw selected text, exactly as the pane reports it (no cleaning) — ⌘C, which
@@ -359,7 +359,7 @@ final class DocumentViewerModel: ObservableObject {
     /// What ⌘C puts on the pasteboard (tests read it here rather than from the owner's clipboard).
     var plainCopyText: String? { selectedText(plainSelection(in:)) }
 
-    /// What ⌥⌘C puts on the pasteboard.
+    /// What ⇧⌘C puts on the pasteboard.
     func cleanedCopyText(_ opts: CopyTextOptions) -> String? {
         selectedText { pane in
             pane == .left ? leftController.cleanedSelection(opts)

@@ -35,7 +35,7 @@ Protocol.
   right-click menu);
   separate filters for tags, Quality (Q1–Q3), and read-state.
 - **Full-text search** across the OCR'd text.
-- **Edit Info** (⌘I) toggles a resizable right-hand inspector for one file or a group: tags, date and Sent-with date, Quality, marker color, read state and flag — safely. It stays open while browsing, follows the selection or open document, and remembers its visibility and width.
+- **Inspector** (View ▸ Show/Hide Inspector, ⌥⌘I, as in Archive Notes; Edit Info until 2026-11-11) toggles a resizable right-hand panel for one file or a group: tags, date and Sent-with date, Quality, marker color, read state and flag — safely. It stays open while browsing, follows the selection or open document, and remembers its visibility and width.
 - **Copy file links** (`file://` URL / path / Markdown / HTML) for single files or groups.
 - **Copy archive links** (`archivereader://`, ⇧⌘L in the Selection menu or the toolbar; ⌥⌘L in a document copies its page) that
   keep working after the folder moves. To open one, paste it into Archive Notes, Apple Notes, Mail or Messages

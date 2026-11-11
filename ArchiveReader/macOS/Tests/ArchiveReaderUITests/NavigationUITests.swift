@@ -5,28 +5,28 @@ import XCTest
 final class NavigationUITests: FixtureUITestCase {
 
     /// The inspector is modeless: browsing and filtering remain available while it stays open.
-    func testEditInfoInspectorFollowsSelectionAndCommandIToggles() throws {
+    func testInspectorFollowsSelectionAndOptionCommandIToggles() throws {
         let year = app.textFields["ar.tagEditor.year"]
         // Visibility is deliberately remembered between app launches; normalize it for this test.
         if app.buttons["ar.tagEditor.done"].exists {
-            app.typeKey("i", modifierFlags: .command)
+            app.typeKey("i", modifierFlags: [.command, .option])
             XCTAssertTrue(year.waitForNonExistence(timeout: 5))
         }
         let table = app.tables["ar.table"]
         let first = table.tableRows.element(boundBy: 0)
         XCTAssertTrue(first.waitForExistence(timeout: 5))
         visiblePoint(of: first).tap()
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.sheets.count, 0, "Edit Info belongs in the right-hand column")
+        XCTAssertEqual(app.sheets.count, 0, "the Inspector belongs in the right-hand column")
         let next = table.tableRows.element(boundBy: 1)
         visiblePoint(of: next).tap()
         XCTAssertTrue(year.waitForExistence(timeout: 5), "browsing leaves the inspector open")
         XCTAssertGreaterThan(year.frame.minX, table.frame.midX)
         captureScreenshot("w40-edit-info-inspector")
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         app.buttons["ar.tagEditor.done"].click()
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
@@ -57,9 +57,9 @@ final class NavigationUITests: FixtureUITestCase {
         year.click()
         pressKey("a", modifiers: .command)
         year.typeText("invalid")
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(year.value as? String, "invalid", "hiding must retain the invalid draft")
         XCTAssertTrue(app.staticTexts["Use a year from 100 to 9999"].exists)
@@ -71,10 +71,10 @@ final class NavigationUITests: FixtureUITestCase {
         let add = app.textFields["ar.tagEditor.addSubject"]
         add.click()
         add.typeText("Inspector hidden focus")
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
         app.typeText("x")  // a hidden native tag editor must not keep taking keystrokes
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["Inspector hidden focus"], excluding: ["x"]))
         XCTAssertEqual(add.value as? String ?? "", "")
@@ -632,7 +632,7 @@ final class NavigationUITests: FixtureUITestCase {
         // (2) Group editor: NavigationModel.applyEdit → TagWriter.apply(expecting:).
         toolbarButton("ar.toolbar.editTags").click()
         let addField = app.textFields["ar.tagEditor.addSubject"]
-        XCTAssertTrue(addField.waitForExistence(timeout: 5), "Edit Info should present its subject field")
+        XCTAssertTrue(addField.waitForExistence(timeout: 5), "the Inspector should present its subject field")
         addField.click()
         addField.typeText(addedTag + "\r")   // Return adds the tag: there is no Add button
         XCTAssertTrue(waitForTags(on: targetName, containing: [addedTag]),

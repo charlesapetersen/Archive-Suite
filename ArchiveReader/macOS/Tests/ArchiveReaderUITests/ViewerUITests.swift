@@ -129,7 +129,7 @@ final class ViewerUITests: FixtureUITestCase {
         pressKey("o", modifiers: .command)
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
         XCTAssertTrue(viewer.waitForExistence(timeout: 10))
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         let year = viewer.textFields["ar.tagEditor.year"]
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(viewer.sheets.count, 0)
@@ -139,7 +139,7 @@ final class ViewerUITests: FixtureUITestCase {
         while year.value as? String == firstYear, Date() < deadline { settle(0.2) }
         XCTAssertNotEqual(year.value as? String, firstYear, "the inspector follows the next open document")
         captureScreenshot("w40-document-inspector")
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
         pressKey("w", modifiers: .command)
     }
@@ -300,12 +300,19 @@ final class ViewerUITests: FixtureUITestCase {
                        ["Hide Tag Cloud", "Show Tag Cloud"])).firstMatch.exists, "so does the tag cloud toggle")
         closeMenu()
 
-        for title in ["Mark Read", "Mark Unread", "Edit Info", "Toggle Flag"] {
+        for title in ["Mark Read", "Mark Unread", "Toggle Flag"] {
             let item = tagsMenuItem(title)
             XCTAssertTrue(item.exists, "\(title) should be in the Tags menu")
             XCTAssertTrue(item.isEnabled, "\(title) should act on the open document")
             closeMenu()
         }
+        // W40.reader-commands-table: Edit Info is View ▸ Show/Hide Inspector (⌥⌘I), as in Archive Notes.
+        _ = viewMenuItem("Show Inspector")
+        let inspector = app.menuBars.menuItems.matching(NSPredicate(format: "title IN %@",
+                                                        ["Show Inspector", "Hide Inspector"])).firstMatch
+        XCTAssertTrue(inspector.exists, "Show/Hide Inspector should be in the View menu")
+        XCTAssertTrue(inspector.isEnabled, "Show/Hide Inspector should act on the open document")
+        closeMenu()
 
         // ⌘U first, so ⌘R is a real change whichever read state the fixture's first file starts in.
         let status = app.staticTexts["ar.doc.tagStatus"]

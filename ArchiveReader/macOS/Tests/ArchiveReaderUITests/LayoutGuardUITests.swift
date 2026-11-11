@@ -47,8 +47,8 @@ final class LayoutGuardUITests: FixtureUITestCase {
         app.typeKey("a", modifierFlags: .command)
         toolbarButton("ar.toolbar.editTags").click()
         let editorDone = app.buttons["ar.tagEditor.done"]
-        XCTAssertTrue(editorDone.waitForExistence(timeout: 5), "the Edit Info sheet should open")
-        LayoutGuard.sweep(main, screen: "Edit Info sheet, \(appearance)", in: self, resize: false)
+        XCTAssertTrue(editorDone.waitForExistence(timeout: 5), "the Inspector should open")
+        LayoutGuard.sweep(main, screen: "Inspector, \(appearance)", in: self, resize: false)
         editorDone.click()
         app.menuBars.menuBarItems["Tags"].click()
         app.menuItems["Find Similar Tags…"].click()

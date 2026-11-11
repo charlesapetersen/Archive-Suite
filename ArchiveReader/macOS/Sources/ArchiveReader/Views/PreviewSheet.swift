@@ -77,34 +77,35 @@ struct PreviewSheet: View {
             // event: SwiftUI hands ⇧↓ to the unmodified ↓ shortcut (measured in the VM), so a separate ⇧↓ shortcut
             // never fired. ⇧-clicking a chevron extends too.
             Button { browse(-1) } label: { Image(systemName: "chevron.up") }
-                .keyboardShortcut(.upArrow, modifiers: [])
-                .help("Previous file in the list (↑; ⇧↑ adds it to the selection)")
+                .keyboardShortcut(.previewPreviousFile)
+                .help(ReaderCommand.previewPreviousFile.help)
             Button { browse(1) } label: { Image(systemName: "chevron.down") }
-                .keyboardShortcut(.downArrow, modifiers: [])
-                .help("Next file in the list (↓; ⇧↓ adds it to the selection)")
+                .keyboardShortcut(.previewNextFile)
+                .help(ReaderCommand.previewNextFile.help)
             // ←/→ cycle the page pairs of this document, then across a multi-file selection opened together.
             Button { model.previous() } label: { Image(systemName: "chevron.left") }
-                .keyboardShortcut(.leftArrow, modifiers: [])
+                .keyboardShortcut(.previewPreviousPage)
                 .disabled(!model.canGoPrevious)
-                .help("Previous page in the selection (←)")
+                .help(ReaderCommand.previewPreviousPage.help)
             Button { model.next() } label: { Image(systemName: "chevron.right") }
-                .keyboardShortcut(.rightArrow, modifiers: [])
+                .keyboardShortcut(.previewNextPage)
                 .disabled(!model.canGoNext)
-                .help("Next page in the selection (→)")
-            // No ⌘C binding on this button: ⌘C is Edit ▸ Copy, which reaches the sheet's panes through the
-            // responder chain and leaves selectable embedded text its own copy (W48.reader-copy-shortcut).
+                .help(ReaderCommand.previewNextPage.help)
+            // Neither copy button binds its key: ⌘C is Edit ▸ Copy, which reaches the sheet's panes through the
+            // responder chain and leaves selectable embedded text its own copy (W48.reader-copy-shortcut), and
+            // ⇧⌘C is Edit ▸ Copy Cleaned for Prose, which reaches this sheet's published model. This button bound
+            // ⌥⌘C after that key had gone to Selection ▸ Copy Link(s) (W40.reader-commands-table).
             Button { model.copyPlainSelection() } label: { Image(systemName: "doc.on.doc") }
-                .help("Copy selected text exactly (⌘C)")
+                .help(ReaderCommand.copyExact.help)
             Button { model.copySelection() } label: { Image(systemName: "doc.on.doc.fill") }
-                .keyboardShortcut("c", modifiers: [.command, .option])
-                .help("Copy selected text cleaned for prose (⌥⌘C)")
+                .help(ReaderCommand.copyCleaned.help)
             Button("Open") { onOpenFull() }
-                .keyboardShortcut("o", modifiers: .command)
-                .help("Open in the full document window (⌘O)")
+                .keyboardShortcut(.open)
+                .help("Open in the full document window (\(ReaderCommand.open.glyph))")
                 .accessibilityIdentifier("ar.preview.open")
-            Button("Done") { dismiss() }
-                .keyboardShortcut(.cancelAction)   // Esc
-                .help("Close preview (Esc or Space)")
+            Button(ReaderCommand.previewDone.title) { dismiss() }
+                .keyboardShortcut(.previewDone)
+                .help(ReaderCommand.previewDone.help)
                 .accessibilityIdentifier("ar.preview.done")
         }
         .padding(10)

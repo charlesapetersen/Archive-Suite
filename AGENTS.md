@@ -142,7 +142,7 @@ plan's `## WORK QUEUE` (`ops/autonomous/next-queue-item.sh` walks only that).
   or on leaving it, and an emptied field clears its value; a tag field adds on Return. A field left untouched
   writes nothing, so tabbing past a group's mixed value never overwrites it, and an invalid entry stays in the
   field with a hint and is never written. A two-state flag is a checkbox, not a Mark/Clear pair. The pattern:
-  the Reader's Edit Info sheet (`TagEditorView`) and Notes' inspector (`NoteMetadataInspector`). Not covered:
+  the Reader's Inspector (`TagEditorView`) and Notes' inspector (`NoteMetadataInspector`). Not covered:
   a sheet's or form's own confirm (OK, Add Model, Save ▸ a segment), and a command that resets a whole
   filter or list (Clear All, Clear History).
 

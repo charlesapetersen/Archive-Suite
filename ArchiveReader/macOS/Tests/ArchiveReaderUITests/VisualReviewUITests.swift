@@ -261,7 +261,7 @@ final class VisualReviewUITests: FixtureUITestCase {
             shoot(name)
         } else { missing.append(name) }
         // This tour types nothing; hide the modeless inspector before the next screen.
-        app.typeKey("i", modifierFlags: .command)
+        app.typeKey("i", modifierFlags: [.command, .option])
         pause(0.5)
     }
 

@@ -34,7 +34,7 @@ struct TagInspectorView: View, Equatable {
             if paths.isEmpty {
                 VStack(spacing: 16) {
                     HStack {
-                        Text("Edit Info").font(.headline)
+                        Text("Inspector").font(.headline)
                         Spacer()
                         Button("Close", action: onClose).accessibilityIdentifier("ar.tagEditor.done")
                     }

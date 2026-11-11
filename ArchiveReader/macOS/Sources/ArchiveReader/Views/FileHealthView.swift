@@ -30,7 +30,7 @@ struct FileHealthDetail {
     var dateIssue: Issue? {
         file.dateAmbiguityText.map {
             Issue(title: "Conflicting date tags", reason: $0,
-                  remedy: "Open Edit Info for this file. Remove a wrong set-aside tag under Tags, or replace the date that is being used in the date fields.")
+                  remedy: "Show this file in the Inspector. Remove a wrong set-aside tag under Tags, or replace the date that is being used in the date fields.")
         }
     }
 
@@ -59,7 +59,7 @@ struct FileHealthView: View {
             }
             if let issue = detail.dateIssue {
                 issueView(issue)
-                Button("Edit Info…") { onAction(.editInfo) }
+                Button("Show in Inspector") { onAction(.editInfo) }
                     .accessibilityIdentifier("ar.fileHealth.editInfo")
             }
         }

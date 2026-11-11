@@ -68,7 +68,9 @@ final class MenuShortcutTests: XCTestCase {
         XCTAssertEqual(key(of: "Selection ▸ Copy Link(s)"), shortcut("c", [.command, .option]))
         XCTAssertEqual(key(of: "Edit ▸ Copy Cleaned for Prose"), shortcut("c", [.command, .shift]))
         XCTAssertEqual(key(of: "Selection ▸ Open in Document Window"), shortcut("o", [.command]))
-        XCTAssertEqual(key(of: "Tags ▸ Edit Info"), shortcut("i", [.command]))
+        // The Inspector is on ⌥⌘I, as in Archive Notes (W40.reader-commands-table); ⌘I is free.
+        XCTAssertEqual(key(of: "View ▸ Show Inspector"), shortcut("i", [.command, .option]))
+        XCTAssertNil(all.first { $0.1 == shortcut("i", [.command]) }, "⌘I was Edit Info's key and is free")
         XCTAssertEqual(key(of: "Document ▸ Find…"), shortcut("f", [.command]))
         // ⌥⌘T is the Mac's Show/Hide Toolbar and ⌃⌘S its Show/Hide Sidebar: nothing else may take them.
         XCTAssertNil(all.first { $0.1 == shortcut("t", [.command, .option]) }, "⌥⌘T is the Mac's toolbar key")

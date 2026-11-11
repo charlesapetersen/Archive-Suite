@@ -174,7 +174,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
         XCTAssertEqual(group.count, 3, "the three selected rows should map to files: \(selected)")
         log("[d8]   group selected: \(group.map { alias[$0.path] ?? "?" }), \(group.filter { !$0.colours.isEmpty }.count) with a colour")
         captureScreenshot("w40-d8-step3-selection")
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         addSubjectInEditor(groupTag)
         before = check("3 group edit, ⌘I on 3 files", from: before,
                        expect: Dictionary(uniqueKeysWithValues: group.map { ($0.path, Delta(add: [groupTag])) }))
@@ -218,10 +218,10 @@ final class TriageJourneyUITests: FixtureUITestCase {
             return XCTFail("two files are needed for the merge")
         }
         clickRow(keepRow)
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         addSubjectInEditor(mergeKeep)
         clickRow(variantRow)
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         addSubjectInEditor(mergeVariant)
         before = check("6a two near-spellings added through ⌘I", from: before,
                        expect: [keepFile.path: Delta(add: [mergeKeep]), variantFile.path: Delta(add: [mergeVariant])])
@@ -230,7 +230,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
                        expect: [variantFile.path: Delta(remove: [mergeVariant], add: [mergeKeep])])
         // A case variant of a tag the file has is that tag: the sheet names the existing spelling, and nothing is written.
         clickRow(variantRow)
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         addSubjectInEditor(caseVariant, expectExistingSpelling: true)
         before = check("6c a case variant is the existing tag", from: before, expect: [:])
 

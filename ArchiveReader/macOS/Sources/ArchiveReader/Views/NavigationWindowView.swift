@@ -51,9 +51,9 @@ struct NavigationWindowView: View {
             }
             if model.showingEditor {
                 PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,
-                             label: "Edit Info width", id: "ar.divider.info")
+                             label: "Inspector width", id: "ar.divider.info")
             }
-            // Keep the editor mounted when hidden: an invalid draft and its hint survive ⌘I. Hidden, it holds
+            // Keep the editor mounted when hidden: an invalid draft and its hint survive ⌥⌘I. Hidden, it holds
             // the selection it had and observes nothing (`inspectorTarget`).
             TagInspectorView(model: model, paths: model.inspectorTarget.paths,
                              identity: String(model.inspectorTarget.generation), isVisible: model.showingEditor) {
@@ -195,7 +195,7 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
         menu.addItem(withTitle: "Toggle Flag", action: #selector(ContextMenuActions.toggleFlag), keyEquivalent: "")
-        menu.addItem(withTitle: "Edit Info…", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
+        menu.addItem(withTitle: "Show Inspector", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
         // W24.cal1-reader: only with Options ▸ Dates ▸ "Show dates in other calendars" on, and a root
         // marker to key the choice by (without one a pick could not be stored).
         let calendarMenu = calendarsEnabled && model.canChooseDisplayCalendar ? displayCalendarMenu() : nil
@@ -542,7 +542,7 @@ struct NavigationWindowView: View {
                 }
                 Button("Advanced…") { model.openAdvancedSearch() }
                     .fixedSize()
-                    .help("Advanced Search: combine rules on text, tags, dates, folders and more (⇧⌥⌘F)")
+                    .help(ReaderCommand.advancedSearch.help)
                     .accessibilityIdentifier("ar.filter.advanced")
             }
             Spacer(minLength: 0)
@@ -669,46 +669,46 @@ struct NavigationWindowView: View {
 
             Button { openSelection() } label: { Label("Open", systemImage: "square.split.2x1") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Open the selected documents for reading (⌘O)")
+                .help(ReaderCommand.open.help)
                 .accessibilityIdentifier("ar.toolbar.open")
 
             Button { model.showingPreview = true } label: { Label("Preview", systemImage: "eye") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Preview the selection 2-up without opening it (Space or ⌘Y)")
+                .help(ReaderCommand.preview.help)
                 .accessibilityIdentifier("ar.toolbar.preview")
 
             Button { model.copyLinks() } label: { Label("Copy Links", systemImage: "link") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Copy links to the selected files (⌘⇧C)")
+                .help(ReaderCommand.copyLinks.help)
                 .accessibilityIdentifier("ar.toolbar.copyLinks")
 
             Button { model.copyArchiveLinks() } label: { Label("Copy Archive Links", systemImage: "link.badge.plus") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Copy durable archive links (⌘⇧L)")
+                .help(ReaderCommand.copyArchiveLinks.help)
                 .accessibilityIdentifier("ar.toolbar.copyArchiveLinks")
 
             Button { model.mark(.read) } label: { Label("Mark Read", systemImage: "checkmark.circle") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Mark the selected documents as read (⌘R)")
+                .help(ReaderCommand.markRead.help)
                 .accessibilityIdentifier("ar.toolbar.markRead")
 
             Button { model.mark(.unread) } label: { Label("Mark Unread", systemImage: "circle") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Mark the selected documents as unread (⌘U)")
+                .help(ReaderCommand.markUnread.help)
                 .accessibilityIdentifier("ar.toolbar.markUnread")
 
-            Button { model.showingEditor.toggle() } label: { Label("Edit Info", systemImage: "info.circle") }
-                .help("Show or hide the tags, date, quality and flag of the selected documents (⌘I)")
+            Button { model.showingEditor.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
+                .help(ReaderCommand.showInspector.help)
                 .accessibilityIdentifier("ar.toolbar.editTags")
 
             Button { model.toggleFlagSelection() } label: { Label("Flag", systemImage: "flag") }
                 .disabled(model.selectedFiles.isEmpty)
-                .help("Flag or unflag the selection — app-only, never written to the file (⌘⇧F)")
+                .help(ReaderCommand.toggleFlag.help)
                 .accessibilityIdentifier("ar.toolbar.flag")
 
             Button { model.undoLast() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
                 .disabled(model.undoDepth == 0)
-                .help("Undo the last tag change (⌘Z)")
+                .help(ReaderCommand.undoTagChange.help)
                 .accessibilityIdentifier("ar.toolbar.undo")
         }
     }

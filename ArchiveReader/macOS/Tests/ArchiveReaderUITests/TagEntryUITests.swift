@@ -51,7 +51,7 @@ final class TagEntryUITests: FixtureUITestCase {
             return XCTFail("two fixture files are needed")
         }
         clickRow(0)
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         let add = app.textFields["ar.tagEditor.addSubject"]
         XCTAssertTrue(add.waitForExistence(timeout: 5))
         add.click()
@@ -110,7 +110,7 @@ final class TagEntryUITests: FixtureUITestCase {
         // (3) Edit Info… on another file: Tab takes the suggestion, Return adds it and keeps the sheet open.
         guard let (_, otherPath) = rowFile(1) else { return XCTFail("row 1 should expose its tag field") }
         clickRow(1)
-        pressKey("i", modifiers: .command)
+        pressKey("i", modifiers: [.command, .option])
         let add = app.textFields["ar.tagEditor.addSubject"]
         XCTAssertTrue(add.waitForExistence(timeout: 5), "⌘I should present the tag editor")
         add.click()

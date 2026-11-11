@@ -124,7 +124,7 @@ final class NavigationModel: ObservableObject {
     }
     /// What the library window's inspector edits (W40.fix-reader-selection-at-size): the selection's paths, frozen
     /// while it is hidden, so a hidden inspector is not rebuilt for every arrow key, and a draft it holds survives
-    /// ⌘I when the selection has not changed meanwhile. `generation` is its identity, and changes only when the set of paths does, not their order.
+    /// ⌥⌘I when the selection has not changed meanwhile. `generation` is its identity, and changes only when the set of paths does, not their order.
     private(set) var inspectorTarget = InspectorTarget()
     struct InspectorTarget: Equatable { var paths: [String] = []; var generation = 0 }
     @Published var showingPreview = false
@@ -1281,7 +1281,7 @@ final class NavigationModel: ObservableObject {
     }
 
     /// Selected files resolved against the DISPLAYED rows only, in sort order — every selection-wide
-    /// action (Edit Info, Mark Read, Open, Copy Links, Flag) acts on this, so none can reach a file the
+    /// action (the Inspector, Mark Read, Open, Copy Links, Flag) acts on this, so none can reach a file the
     /// list does not show. It once resolved against the whole library, which let a filtered-away
     /// selection be tagged unseen (`W40.fix-reader-phantom-selection`). Cached (recomputed on
     /// selection / sort / library change) to avoid an O(N) scan + sort on every SwiftUI render.
@@ -2372,7 +2372,7 @@ final class NavigationModel: ObservableObject {
         announce(statusMessage)
     }
 
-    // MARK: Inline single-file edits (from the list cells). Editing MULTIPLE files uses the ⌘I
+    // MARK: Inline single-file edits (from the list cells). Editing MULTIPLE files uses the ⌥⌘I
     // group editor; these act on exactly one file, still via the audited TagWriter + grouped undo.
 
     func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {

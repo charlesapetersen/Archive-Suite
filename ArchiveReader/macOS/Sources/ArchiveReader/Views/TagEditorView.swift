@@ -26,10 +26,10 @@ struct TagEditorView: View {
         let s = GroupTagSummary(files.map(\.tags))
         VStack(spacing: 0) {
             HStack {
-                Text(s.count == 1 ? "Edit Info" : "Edit Info — \(s.count) files").font(.headline)
+                Text(s.count == 1 ? "Inspector" : "Inspector — \(s.count) files").font(.headline)
                 Spacer()
                 Button("Close") { addSubject(); commitDateFields(); if invalidFields.isEmpty { onClose() } }
-                    .help("Hide Edit Info")
+                    .help("Hide Inspector (\(ReaderCommand.showInspector.glyph))")
                     .accessibilityIdentifier("ar.tagEditor.done")
             }
             .padding()

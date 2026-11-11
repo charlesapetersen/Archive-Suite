@@ -264,13 +264,21 @@ writes against the real corpus — always a copy.
 - **Options panel (⌘,):** link format, copy-text cleaning, viewer split, nav defaults, list density,
   (see **§Options** below).
 
-## §Keyboard map (the menu bar is the single source of shortcuts — `ArchiveReaderCommands.swift`)
+## §Keyboard map (one table, `ReaderCommand` in `Core/ReaderCommandTable.swift`)
+
+Every command's name, key and tooltip is written once, in `ReaderCommand` (`W40.reader-commands-table`); the menus
+(`ArchiveReaderCommands.swift`), the toolbars, the preview sheet's buttons and the document window read it.
+`ReaderCommandTableTests` fails on two commands sharing a key where both answer it (the menu bar together with
+each window's own keys), on a menu item whose name or key differs from the table, and on any string in the app's
+sources that names a key nothing binds. Keys held for coming items: `⌃⌘L`/`⌃⌘R` Rotate Left/Right
+(`W40.reader-view-rotate`; Preview's `⌘L`/`⌘R` are Focus Tag Filter and Mark Read here) and `⌥⌘1`/`⌥⌘2`/`⌥⌘6`
+single page / Thumbnails / Contact Sheet (`W40.reader-page-views`, as in Preview).
 
 *Navigation window*
 - `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
 - `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
   double-click or `⌘O` open in the document window (`⏎` has no handler; ledger R-35)
-- `⌘R` Mark Read · `⌘U` Mark Unread · `⌘I` Show/Hide Edit Info · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped) · `⇧⌘Z` Redo tag change (the newest undo, until a new change; `W40.fix-reader-redo`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
+- `⌘R` Mark Read · `⌘U` Mark Unread · `⌥⌘I` View ▸ Show/Hide Inspector (Edit Info until `W40.reader-commands-table`; `⌘I` is now free, as in Notes, where it is Italic) · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped) · `⇧⌘Z` Redo tag change (the newest undo, until a new change; `W40.fix-reader-redo`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
 - **Keyboard triage (G4):** `⌘]`/`⌘[` Next/Previous Unread · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
@@ -307,8 +315,8 @@ writes against the real corpus — always a copy.
 - `⌥⌘L` Edit ▸ Copy Archive Link to This Page (`⌘L` and `⌘⇧L` are the nav window's). Both copies of what is
   on screen sit under Edit, beside Copy, since `W40.fix-reader-edit-menu-copy` (they were under Document)
 - `⌘F` find in the open document(s) · `⌘G`/`⇧⌘G` next/previous match (highlight-all, wraps, "N of M" across open docs)
-- The **Tags** menu acts on the file the window shows (`W40.fix-reader-menus-follow-window`): `⌘R`/`⌘U`, `⌘I` (the
-  right-hand inspector follows this window's open file), `⌘⇧F`, and `⌘⇧M`, which marks it Read and moves on to
+- The **Tags** menu acts on the file the window shows (`W40.fix-reader-menus-follow-window`): `⌘R`/`⌘U`, `⌘⇧F`, and `⌘⇧M`; View ▸ Show/Hide
+  Inspector (`⌥⌘I`) opens the right-hand Inspector on this window's open file. `⌘⇧M` marks it Read and moves on to
   the window's next Unread file. `⌘Z` undoes the newest change on the shared ledger, which may be on another file,
   so the status line names it; the focused find field disables it and `TextUndoGuard` protects typing in inspector fields. `⇧⌘Z` redoes the
   same way. Rename Tag… and
@@ -341,7 +349,7 @@ allowed pair here is ⌘Z/⇧⌘Z, Tags ▸ Undo/Redo Tag Change beside Edit ▸
 | Choose the archive folder | `⇧⌘O` Choose Archive Folder… | `⇧⌘O` Choose Archive Folder… | `⇧⌘O` Choose Output Folder… |
 | Open | `⌘O` Open in Document Window | — (double-click a row) | `⌘O` Add Files… |
 | Copy a link to the item | `⌥⌘C` Copy Link(s) | `⇧⌘C` Note ▸ Copy Link | — |
-| Its details | `⌘I` Show/Hide Edit Info | `⌥⌘I` Show/Hide Inspector (`⌘I` is Italic) | — |
+| Its details | `⌥⌘I` Show/Hide Inspector | `⌥⌘I` Show/Hide Inspector (`⌘I` is Italic) | — |
 | New | — | `⌘N` New Note · `⌥⌘N` New Extract | — |
 | Find | `⌘F` | Edit ▸ Find (system) | — |
 | Start / stop the work | — | — | `⌘R` Start Processing · `⌘.` Stop Processing |
@@ -518,7 +526,7 @@ Views/
                               selection exits the scope.
   (inline cells)              InlineEditCells.swift (the SwiftUI cells left from the pre-AppKit table) is
                               gone: DateCell deleted by W40.fix-reader-sent-with-date, ReadStateCell by
-                              W40.fix-reader-read-toggle. Dates (incl. Sent-With) are edited in the ⌘I
+                              W40.fix-reader-read-toggle. Dates (incl. Sent-With) are edited in the ⌥⌘I
                               sheet, the one date editor (owner, 2026-10-12); there is no inline date
                               editing in the list. The inline per-row subject editor is AppKitTableView's TagTokenCellView
                               (NSTokenField): autocomplete from the corpus; edit-start-base diff → ONE
@@ -527,13 +535,13 @@ Views/
                               through TagWriter, so existing tags never lost. Return with text typed
                               writes and keeps the field (W40.fix-reader-tag-entry); while a cell is
                               edited the list holds its rows and snapshot until the edit ends.
-  (ArchiveCoreUI) TagEntry    The tag fields' shared completion lookup (list cell, filter, ⌘I inspector, Notes'
+  (ArchiveCoreUI) TagEntry    The tag fields' shared completion lookup (list cell, filter, ⌥⌘I Inspector, Notes'
                               tag field): only leading space is trimmed, so a typed space ends a completion.
                               In `packages/ArchiveCore/Sources/ArchiveCoreUI/TagEntry/` (the UI target; ArchiveCore stays UI-free).
   RenameTagSheet.swift        Corpus-wide tag rename (D1): shows the affected-file count; via TagWriter batch.
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
-  TagEditorView.swift         Group-aware inspector editor (⌘I); immutable `targetPaths` protect drafts across selection changes.
+  TagEditorView.swift         Group-aware Inspector editor (⌥⌘I); immutable `targetPaths` protect drafts across selection changes.
   TagInspectorView.swift      Right-hand column for the visible selection or document; keeps drafts while hidden.
                               Equatable, unobserved; `InspectorFeed` follows the model only while shown.
   IndexProgress.swift         The index pass's count, observed only by the status bar's label.
