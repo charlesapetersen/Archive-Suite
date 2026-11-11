@@ -33,6 +33,141 @@ extension NSAttributedString.Key {
     /// come to follow it (typed above the chip, or the chip left out of a passage) it is a paragraph break, not
     /// a line break (W40.fix-notes-editor-lines).
     static let noteChipLineEnd = NSAttributedString.Key("an.chipLineEnd")
+    /// Highlighted text (Bool), written `<mark>…</mark>` (W40.notes-underline-highlight). The background colour is
+    /// only how it shows: code and the block kinds set and clear `.backgroundColor` themselves, so the serializer
+    /// reads this key. Underline needs no key of its own: it is `.underlineStyle`, written `<u>…</u>`.
+    static let noteHighlight = NSAttributedString.Key("an.highlight")
+}
+
+// MARK: - Underline and highlight (W40.notes-underline-highlight)
+
+/// The two inline styles CommonMark has no syntax for. Notes writes them as the HTML tags most Markdown
+/// renderers show (`<u>`, `<mark>`), which Apple's parser hands back as inline-HTML runs of the tag alone.
+enum InlineTagStyle: CaseIterable {
+    case underline
+    case highlight
+
+    var tagName: String {
+        switch self {
+        case .underline: return "u"
+        case .highlight: return "mark"
+        }
+    }
+
+    static let highlightColor = NSColor.systemYellow.withAlphaComponent(0.4)
+
+    /// Whether `chars` hold one of the four tags at `i`, and its length.
+    nonisolated static func tagLength(in chars: [Character], at i: Int) -> Int? {
+        guard chars[i] == "<" else { return nil }
+        for tag in ["<u>", "</u>", "<mark>", "</mark>"] {
+            let end = i + tag.count
+            if end <= chars.count, String(chars[i..<end]).lowercased() == tag { return tag.count }
+        }
+        return nil
+    }
+
+    /// `markdown` with the tags removed, for the search index. A `\`-escaped tag is typed text and stays.
+    nonisolated static func strippingTags(_ markdown: String) -> String {
+        guard markdown.contains("<") else { return markdown }
+        let chars = Array(markdown)
+        var out = ""
+        out.reserveCapacity(chars.count)
+        var i = 0
+        while i < chars.count {
+            if chars[i] == "\\", i + 1 < chars.count {
+                out.append(chars[i]); out.append(chars[i + 1]); i += 2
+            } else if let length = tagLength(in: chars, at: i) {
+                i += length
+            } else {
+                out.append(chars[i]); i += 1
+            }
+        }
+        return out
+    }
+
+    /// A raw-HTML run made only of these tags, open or closed, in any case. Anything else stays raw HTML.
+    static let tagRunPattern = try! NSRegularExpression(pattern: "^(?:</?(?:u|mark)>)+$", options: .caseInsensitive)
+    static let tagPattern = try! NSRegularExpression(pattern: "<(/?)(u|mark)>", options: .caseInsensitive)
+
+    func apply(to storage: NSMutableAttributedString, range: NSRange) {
+        switch self {
+        case .underline:
+            storage.addAttribute(.underlineStyle, value: NSUnderlineStyle.single.rawValue, range: range)
+        case .highlight:
+            storage.addAttribute(.noteHighlight, value: true, range: range)
+            storage.addAttribute(.backgroundColor, value: Self.highlightColor, range: range)
+        }
+    }
+
+    func remove(from storage: NSMutableAttributedString, range: NSRange) {
+        switch self {
+        case .underline:
+            storage.removeAttribute(.underlineStyle, range: range)
+        case .highlight:
+            storage.removeAttribute(.noteHighlight, range: range)
+            storage.removeAttribute(.backgroundColor, range: range)
+            // Code under the highlight keeps its own background.
+            storage.enumerateAttributes(in: range) { attrs, r, _ in
+                let inCodeBlock: Bool
+                if case .codeBlock? = attrs[.noteBlockKind] as? BlockKind { inCodeBlock = true } else { inCodeBlock = false }
+                if inCodeBlock || attrs[.noteInlineCode] as? Bool == true {
+                    storage.addAttribute(.backgroundColor, value: NSColor.quaternaryLabelColor, range: r)
+                }
+            }
+        }
+    }
+
+    func isOn(_ attrs: [NSAttributedString.Key: Any]) -> Bool {
+        switch self {
+        case .underline: return (attrs[.underlineStyle] as? Int ?? 0) != 0
+        case .highlight: return attrs[.noteHighlight] as? Bool == true
+        }
+    }
+
+    /// Show the highlight again where a code or block-kind change cleared `.backgroundColor` under it.
+    static func restoreHighlight(in storage: NSMutableAttributedString, range: NSRange) {
+        storage.enumerateAttribute(.noteHighlight, in: range) { value, r, _ in
+            if value as? Bool == true { storage.addAttribute(.backgroundColor, value: highlightColor, range: r) }
+        }
+    }
+
+    /// Turn each matched `<u>`…`</u>` and `<mark>`…`</mark>` read from the file into the style, and remove the
+    /// tags. A tag pairs with the nearest open one of its kind in the same paragraph; one left unpaired stays
+    /// raw HTML, as it was before.
+    static func applyTags(in text: NSMutableAttributedString) {
+        let string = text.string as NSString
+        var opens: [String: [NSRange]] = [:]
+        var pairs: [(style: InlineTagStyle, open: NSRange, close: NSRange)] = []
+        text.enumerateAttributes(in: NSRange(location: 0, length: text.length)) { attrs, run, _ in
+            if attrs[.noteBlockSeparator] as? Bool == true { opens = [:]; return }
+            guard attrs[.noteRawHTML] as? Bool == true else { return }
+            let runText = string.substring(with: run)
+            let local = NSRange(location: 0, length: (runText as NSString).length)
+            guard tagRunPattern.firstMatch(in: runText, range: local) != nil else { return }
+            for match in tagPattern.matches(in: runText, range: local) {
+                let name = (runText as NSString).substring(with: match.range(at: 2)).lowercased()
+                guard let style = allCases.first(where: { $0.tagName == name }) else { continue }
+                let tag = NSRange(location: run.location + match.range.location, length: match.range.length)
+                if match.range(at: 1).length == 0 {
+                    opens[name, default: []].append(tag)
+                } else if let open = opens[name]?.popLast(), tag.location > NSMaxRange(open) {
+                    // An empty pair is left as it is: removed, a paragraph of only `<u></u>` would be an empty
+                    // one, which the serializer writes as blank lines.
+                    pairs.append((style, open, tag))
+                }
+            }
+        }
+        guard !pairs.isEmpty else { return }
+        text.beginEditing()
+        for pair in pairs {
+            let start = NSMaxRange(pair.open)
+            pair.style.apply(to: text, range: NSRange(location: start, length: pair.close.location - start))
+        }
+        for tag in pairs.flatMap({ [$0.open, $0.close] }).sorted(by: { $0.location > $1.location }) {
+            text.deleteCharacters(in: tag)
+        }
+        text.endEditing()
+    }
 }
 
 // MARK: - BlockKind (paragraph-level semantic)
@@ -90,6 +225,7 @@ enum MarkdownStyler {
             previous = (run.presentationIntent, attrs)
         }
         dropRawHTMLLineEnd(result)
+        InlineTagStyle.applyTags(in: result)
 
         return result
     }

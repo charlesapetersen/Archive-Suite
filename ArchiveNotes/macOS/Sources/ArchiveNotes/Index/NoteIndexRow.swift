@@ -40,7 +40,9 @@ extension NoteIndexRow {
     /// full off-actor scan; `extractRow` delegates here to keep the mapping DRY.
     init(item: Item, mtime: Double) {
         let bodyText = item.blocks.map(\.markdown).joined(separator: "\n")
-        let fullBody = item.trailingBodyRaw.map { $0 + "\n" + bodyText } ?? bodyText
+        // Without the underline and highlight tags (W40.notes-underline-highlight): indexed, `<mark>` made every
+        // highlighted note match a search for "mark", and `wo<u>rd</u>` would not match "word".
+        let fullBody = InlineTagStyle.strippingTags(item.trailingBodyRaw.map { $0 + "\n" + bodyText } ?? bodyText)
         let encoder = JSONEncoder()
         let tagsJSON = (try? encoder.encode(item.tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let authorsJSON = (try? encoder.encode(item.authors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"

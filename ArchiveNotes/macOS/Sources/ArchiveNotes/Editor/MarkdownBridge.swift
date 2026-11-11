@@ -774,7 +774,10 @@ enum MarkdownBridge {
             escapeAt = endsMarker(i + 1) || isRule ? i : nil
         case "<":
             // Typed text, not raw HTML (which is written as it is): `<div>` or `<!--` here starts an HTML block.
-            escapeAt = i
+            // The serializer's own `<u>` and `<mark>` cannot (they are not block tags, and never stand alone on
+            // their line), and a typed one is already escaped by `escapeMarkdown`.
+            let rest = String(line[i...])
+            escapeAt = rest.hasPrefix("<u>") || rest.hasPrefix("<mark>") ? nil : i
         case "~":
             escapeAt = line.prefix(3).allSatisfy { $0 == "~" } && line.count >= 3 ? i : nil
         case "=":
@@ -820,7 +823,7 @@ enum MarkdownBridge {
 
     private static func serializeInlineRuns(_ storage: NSAttributedString,
                                             range: NSRange) -> String {
-        var result = ""
+        var result = TagWriter()
         storage.enumerateAttributes(in: range) { attrs, runRange, _ in
             let runText = (storage.string as NSString).substring(with: runRange)
 
@@ -837,7 +840,7 @@ enum MarkdownBridge {
                 } else {
                     alt = ""
                 }
-                result += InlineImageMarkdown.emit(alt: alt, path: relPath)
+                result.append(InlineImageMarkdown.emit(alt: alt, path: relPath))
                 return
             }
 
@@ -850,7 +853,7 @@ enum MarkdownBridge {
                 let isNewline: (Int) -> Bool = { let c = text.character(at: $0); return c == 0x0A || c == 0x0D }
                 let atEdge = runRange.location == range.location || NSMaxRange(runRange) == NSMaxRange(range)
                     || isNewline(runRange.location - 1) || isNewline(NSMaxRange(runRange))
-                if !atEdge { result += String(repeating: "\\\n", count: runText.count) }
+                if !atEdge { result.append(String(repeating: "\\\n", count: runText.count)) }
                 return
             }
 
@@ -874,13 +877,13 @@ enum MarkdownBridge {
             // Raw HTML is the file's own text, written as it is: escaped, it gained a backslash before each `\`,
             // `*`, `_`, `[` and `]` on every save (W40.fix-notes-editor-lines review).
             if inCodeBlock || attrs[.noteRawHTML] as? Bool == true {
-                result += runText
+                result.append(runText)
                 return
             }
 
+            var piece = ""
             if isCode {
-                let escaped = wrapInlineCode(runText)
-                result += escaped
+                piece = wrapInlineCode(runText)
             } else {
                 var inner = escapeMarkdown(runText)
 
@@ -910,10 +913,61 @@ enum MarkdownBridge {
                     if !delimiter.isEmpty { inner = wrapEmphasis(inner, in: delimiter) }
                 }
 
-                result += inner
+                piece = inner
+            }
+            result.append(piece, underline: InlineTagStyle.underline.isOn(attrs),
+                          highlight: InlineTagStyle.highlight.isOn(attrs))
+        }
+        return result.finished()
+    }
+
+    /// W40.notes-underline-highlight — the runs' text with `<u>`…`</u>` and `<mark>`…`</mark>` around the stretches
+    /// that have the style, outside each run's link, code and emphasis so those are still read inside them. A tag
+    /// opens and closes where the style starts and ends, not around each run: bold inside underline writes its edge
+    /// spaces outside `**`, they reopen as runs of their own, and tags around each run changed the text on the
+    /// second save. Tags close before a newline (one closed on the next line is an HTML block there) and around an
+    /// image, a hard break and raw text, which do not take the style back from the file.
+    private struct TagWriter {
+        private var text = ""
+        private var underline = false
+        private var highlight = false
+
+        mutating func append(_ piece: String, underline wantU: Bool = false, highlight wantH: Bool = false) {
+            guard wantU || wantH else {
+                closeAll()
+                text += piece
+                return
+            }
+            for ch in piece {
+                if ch == "\n" || ch == "\r\n" || ch == "\r" {
+                    closeAll()
+                } else {
+                    open(underline: wantU, highlight: wantH)
+                }
+                text.append(ch)
             }
         }
-        return result
+
+        mutating func finished() -> String {
+            closeAll()
+            return text
+        }
+
+        private mutating func open(underline wantU: Bool, highlight wantH: Bool) {
+            if underline != wantU {
+                closeAll()
+            } else if highlight && !wantH {
+                text += "</mark>"
+                highlight = false
+            }
+            if wantU && !underline { text += "<u>"; underline = true }
+            if wantH && !highlight { text += "<mark>"; highlight = true }
+        }
+
+        private mutating func closeAll() {
+            if highlight { text += "</mark>"; highlight = false }
+            if underline { text += "</u>"; underline = false }
+        }
     }
 
     // MARK: - Escaping
@@ -922,10 +976,18 @@ enum MarkdownBridge {
     private static func escapeMarkdown(_ text: String) -> String {
         var result = ""
         result.reserveCapacity(text.count)
-        for (i, ch) in text.enumerated() {
+        let chars = Array(text)
+        for (i, ch) in chars.enumerated() {
             switch ch {
             case "\\", "*", "_", "`", "[", "]":
                 result.append("\\")
+                result.append(ch)
+            case "<":
+                // A typed `<u>` or `<mark>` is text, not underline or highlight (W40.notes-underline-highlight), and
+                // a typed `<b>` or `<https://…>` is not HTML or a link. Only a `<` that could open one is escaped; one
+                // ending the run is, because the next run's text follows it.
+                let next = i + 1 < chars.count ? chars[i + 1] : nil
+                if next.map({ ($0.isASCII && $0.isLetter) || "/!?".contains($0) }) ?? true { result.append("\\") }
                 result.append(ch)
             case "#":
                 if i == 0 {

@@ -14,6 +14,13 @@ struct FormatCommands: Commands {
                 Button("Italic") { formatting?.toggleItalic() }
                     .keyboardShortcut("i", modifiers: .command)
                     .disabled(formatting == nil)
+                // W40.notes-underline-highlight: written `<u>…</u>` and `<mark>…</mark>` (`MarkdownBridge`).
+                Button("Underline") { formatting?.toggleUnderline() }
+                    .keyboardShortcut("u", modifiers: .command)
+                    .disabled(formatting == nil)
+                Button("Highlight") { formatting?.toggleHighlight() }
+                    .keyboardShortcut("h", modifiers: [.command, .shift])
+                    .disabled(formatting == nil)
                 Button("Inline Code") { formatting?.toggleInlineCode() }
                     .keyboardShortcut("c", modifiers: [.command, .option])
                     .disabled(formatting == nil)

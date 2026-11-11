@@ -513,6 +513,14 @@ struct MarkdownEditorView: NSViewRepresentable {
         private func currentSerialization() -> String? {
             guard let textView else { return nil }
             if !currentIsRaw, let storage = textView.textStorage {
+                // An input method underlines the text it is composing, in the storage. That is not the note's
+                // underline (W40.notes-underline-highlight), so a save made mid-composition leaves it out; the
+                // composition's commit saves again.
+                if textView.hasMarkedText() {
+                    let copy = NSMutableAttributedString(attributedString: storage)
+                    copy.removeAttribute(.underlineStyle, range: textView.markedRange())
+                    return MarkdownBridge.serialize(copy)
+                }
                 return MarkdownBridge.serialize(storage)
             }
             return textView.string

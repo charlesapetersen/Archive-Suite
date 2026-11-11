@@ -7,6 +7,8 @@ struct FormattingState: Equatable {
     var isBold = false
     var isItalic = false
     var isCode = false
+    var isUnderline = false
+    var isHighlight = false
     var hasLink = false
     var blockKind: BlockKind = .plain
 
@@ -118,6 +120,18 @@ final class FormattingContext: ObservableObject {
     func toggleItalic() {
         guard let tv = textView, tv.isEditable else { return }
         EditorFormatting.toggleItalic(tv, fontSize: fontSize)
+        updateState()
+    }
+
+    func toggleUnderline() {
+        guard let tv = textView, tv.isEditable else { return }
+        EditorFormatting.toggleUnderline(tv)
+        updateState()
+    }
+
+    func toggleHighlight() {
+        guard let tv = textView, tv.isEditable else { return }
+        EditorFormatting.toggleHighlight(tv)
         updateState()
     }
 
@@ -451,6 +465,43 @@ enum EditorFormatting {
         toggleTrait(.italicFontMask, textView: textView, fontSize: fontSize)
     }
 
+    static func toggleUnderline(_ textView: NSTextView) {
+        toggleTagStyle(.underline, textView: textView)
+    }
+
+    static func toggleHighlight(_ textView: NSTextView) {
+        toggleTagStyle(.highlight, textView: textView)
+    }
+
+    /// Underline or highlight (W40.notes-underline-highlight): on for the whole selection unless all of it has it
+    /// already, as Bold is. With no selection it applies to what is typed next. A code block's text is written as it
+    /// is, with no tags, so there it does nothing rather than show a style that is gone on reopen.
+    private static func toggleTagStyle(_ style: InlineTagStyle, textView: NSTextView) {
+        guard let storage = textView.textStorage else { return }
+        let range = textView.selectedRange()
+        if case .codeBlock? = blockKind(at: paragraphRange(for: range, in: storage), in: textView) { return }
+
+        if range.length == 0 {
+            let sample = NSMutableAttributedString(string: " ", attributes: textView.typingAttributes)
+            let one = NSRange(location: 0, length: 1)
+            if style.isOn(textView.typingAttributes) {
+                style.remove(from: sample, range: one)
+            } else {
+                style.apply(to: sample, range: one)
+            }
+            textView.typingAttributes = sample.attributes(at: 0, effectiveRange: nil)
+            return
+        }
+
+        var allHave = true
+        storage.enumerateAttributes(in: range) { attrs, _, stop in
+            if !style.isOn(attrs) { allHave = false; stop.pointee = true }
+        }
+        changeAttributes(textView, in: range) { storage in
+            if allHave { style.remove(from: storage, range: range) } else { style.apply(to: storage, range: range) }
+        }
+    }
+
     static func toggleInlineCode(_ textView: NSTextView, fontSize: CGFloat) {
         guard let storage = textView.textStorage else { return }
         let range = textView.selectedRange()
@@ -466,6 +517,7 @@ enum EditorFormatting {
                 attrs[.backgroundColor] = NSColor.quaternaryLabelColor
                 attrs[.font] = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
             }
+            if attrs[.noteHighlight] as? Bool == true { attrs[.backgroundColor] = InlineTagStyle.highlightColor }
             textView.typingAttributes = attrs
             return
         }
@@ -490,6 +542,7 @@ enum EditorFormatting {
                                  value: NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular),
                                  range: range)
         }
+        InlineTagStyle.restoreHighlight(in: storage, range: range)
         storage.endEditing()
         textView.undoManager?.endUndoGrouping()
     }
@@ -665,6 +718,8 @@ enum EditorFormatting {
             isBold: isBold,
             isItalic: traits.contains(.italicFontMask),
             isCode: attrs[.noteInlineCode] as? Bool == true,
+            isUnderline: InlineTagStyle.underline.isOn(attrs),
+            isHighlight: InlineTagStyle.highlight.isOn(attrs),
             hasLink: attrs[.link] != nil,
             blockKind: blockKind
         )
@@ -862,6 +917,8 @@ enum EditorFormatting {
             storage.addAttribute(.foregroundColor, value: NSColor.textColor, range: range)
             restoreBodyFont(storage: storage, range: range, fontSize: fontSize)
         }
+        // The kinds above clear the background; a highlight is the text's own (a code block's text has none).
+        if case .codeBlock = kind {} else { InlineTagStyle.restoreHighlight(in: storage, range: range) }
     }
 
     /// Restore body-size fonts while preserving inline bold/italic/code traits.

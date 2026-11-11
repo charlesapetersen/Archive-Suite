@@ -519,6 +519,9 @@ struct ExtractBuilder {
                 i += backtickRunLength(chars, at: i)
             } else if ch == "*" || ch == "_" {
                 i += 1
+            } else if let length = InlineTagStyle.tagLength(in: chars, at: i) {
+                // Underline and highlight (W40.notes-underline-highlight); an escaped `\<u>` is typed text.
+                i += length
             } else {
                 out.append(ch)
                 i += 1

@@ -265,10 +265,15 @@ macOS/Sources/ArchiveNotes/
                                    inline images (![alt](path)); buildInsertableBlock seam; idempotent;
                                    ordered lists renumber from each level's first ordinal (W9.d12b);
                                    onJumpBlock + passageSummaries thread note-passage chip jump + live
-                                   title/missing resolve into BlockHeaderAttachment (W7-S3)
+                                   title/missing resolve into BlockHeaderAttachment (W7-S3); underline is
+                                   written <u>…</u> and highlight <mark>…</mark> (CommonMark has neither),
+                                   opened and closed where the style starts and ends (TagWriter); a typed
+                                   `<` that could open a tag is written `\<` (W40.notes-underline-highlight)
     MarkdownAttributes.swift       Custom NSAttributedString.Key defs (noteBlockKind, noteInlineCode,
-                                   noteImageRelPath, noteBlockSource, presentation-only pending thumbnail
-                                   identity) + MarkdownStyler (semantic→visual)
+                                   noteImageRelPath, noteBlockSource, noteHighlight, presentation-only
+                                   pending thumbnail identity) + MarkdownStyler (semantic→visual) +
+                                   InlineTagStyle (pairs <u>/<mark> per paragraph on parse; an unpaired
+                                   or empty pair stays raw HTML; strippingTags for the search index)
     InlineImageAttachment.swift    NSTextAttachment for inline images (thumbnail + rel-path,
                                    Missing/Blocked placeholder kinds); app-wide thumbnailCache keyed
                                    by cacheKey = maxPixels + the file's VERSION (size + ns mtime,
@@ -292,7 +297,8 @@ macOS/Sources/ArchiveNotes/
                                    (passageSourceMissing)
     EditorFormatting.swift         FormattingState + FormattingContext (ObservableObject; currentItemID/
                                    Title/DateDisplay/Kind + weak notesModel) + EditorFormatting actions
-                                   (bold/italic/code/link/heading/list/blockquote/code-block/indent/
+                                   (bold/italic/underline/highlight/code/link/heading/list/blockquote/
+                                   code-block/indent/
                                    outdent) + insertTestBlock + pasteSourceBlocks + createExtract/
                                    appendToExtract + makeNotePassageSource (W7-S2) + FocusedValue key.
                                    indent/outdent have NO toolbar button or Format-menu item: they are
@@ -301,7 +307,7 @@ macOS/Sources/ArchiveNotes/
                                    the ref's stored citation, else its item key — nothing fetches one for
                                    it except Auto-fill (only NoteZoteroInspector fetches)
     FormattingToolbar.swift        SwiftUI toolbar reflecting + driving formatting state (bold/italic/
-                                   code/link, heading menu, lists, blockquote, code block — no indent)
+                                   underline/highlight/code/link, heading menu, lists, blockquote, code block — no indent)
   Views/
     NotesBrowserView.swift         3-pane browsing shell (folder tree │ item list │ detail) for the
                                    Notes + Extracts windows (W6-S1); list/divider/detail in one AnyLayout,
@@ -720,7 +726,7 @@ in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard m
 | Edit | Paste as Source Block(s) | `⇧⌘V` |
 | Edit | Find ▸ Find… · Find Next · Find Previous · Use Selection for Find (the Mac's own, `TextEditingCommands`; the editor's find bar) | `⌘F` · `⌘G` · `⇧⌘G` · `⌘E` |
 | View | Show/Hide Folders · Show/Hide Inspector · Show/Hide Note Header · Formatting Bar · Tag Bar · Layout (Side by Side / List Above Note) | `⌃⌘S` · `⌥⌘I` (`⌘I` is Italic) · — · — · — · — |
-| Format | Bold · Italic · Inline Code · Link… | `⌘B` · `⌘I` · `⌥⌘C` · `⌘K` |
+| Format | Bold · Italic · Underline · Highlight · Inline Code · Link… | `⌘B` · `⌘I` · `⌘U` · `⇧⌘H` · `⌥⌘C` · `⌘K` |
 | Format | Body · Heading 1–6 | `⌥⌘0` · `⌥⌘1`–`⌥⌘6` |
 | Format | Bulleted List · Numbered List · Blockquote · Code Block | `⌥⌘U` · `⌥⌘O` · `⌥⌘Q` · `⌥⌘K` |
 | Note | Copy Link · Attach Zotero Link… · Auto-fill from Zotero… | `⇧⌘C` (the Reader's Copy Link(s)) · `⌃⌘Z` · `⌃⌥⌘Z` (Z for Zotero) |

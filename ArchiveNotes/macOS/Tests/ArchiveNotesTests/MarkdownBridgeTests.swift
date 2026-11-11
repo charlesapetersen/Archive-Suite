@@ -408,7 +408,7 @@ struct MarkdownBridgeTests {
         let base: [NSAttributedString.Key: Any] = [.font: font, .noteBlockKind: BlockKind.plain]
         result.append(NSAttributedString(string: "Start ", attributes: base))
         var mid = base
-        mid[.underlineStyle] = NSUnderlineStyle.single.rawValue   // unsupported
+        mid[.strikethroughStyle] = NSUnderlineStyle.single.rawValue   // unsupported (underline is written, W40.notes-underline-highlight)
         result.append(NSAttributedString(string: "middle", attributes: mid))
         result.append(NSAttributedString(string: " end", attributes: base))
 

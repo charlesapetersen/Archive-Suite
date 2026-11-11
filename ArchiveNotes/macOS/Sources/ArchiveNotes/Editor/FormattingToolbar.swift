@@ -32,6 +32,16 @@ struct FormattingToolbar: View {
                          help: "Italic (⌘I)") {
                 context.toggleItalic()
             }
+            toggleButton(systemImage: "underline", active: context.state.isUnderline,
+                         identifier: "an.editor.toolbar.underline",
+                         help: "Underline (⌘U)") {
+                context.toggleUnderline()
+            }
+            toggleButton(systemImage: "highlighter", active: context.state.isHighlight,
+                         identifier: "an.editor.toolbar.highlight",
+                         help: "Highlight (⇧⌘H)") {
+                context.toggleHighlight()
+            }
             toggleButton(systemImage: "chevron.left.forwardslash.chevron.right",
                          active: context.state.isCode,
                          identifier: "an.editor.toolbar.code",
