@@ -84,6 +84,68 @@ final class AdvancedSearchUITests: FixtureUITestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// W40.fix-reader-advanced-many-rules (owner, 2026-11-10: rules past about seven "get added for a little bit
+    /// and then dropped"): twelve rules added one by one, each from the last row's +, all stay in the form while
+    /// it counts, and all come back when the form reopens on the search in effect.
+    func testTwelveAddedRulesStay() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        waitForRows(minimum: 2, timeout: 15)
+        // A tag change from another process arrives while the form is open (cause A of the owner's notes).
+        let probe = try XCTUnwrap(FileManager.default.enumerator(atPath: Self.fixturePath)?
+            .compactMap { $0 as? String }.first { $0.hasSuffix(".pdf") && !$0.hasPrefix(".") })
+        let probeURL = URL(fileURLWithPath: Self.fixturePath).appendingPathComponent(probe) as NSURL
+        var original: AnyObject?
+        try probeURL.getResourceValue(&original, forKey: .tagNamesKey)
+        let originalTags = original as? [String] ?? []
+        defer { try? probeURL.setResourceValue(originalTags, forKey: .tagNamesKey) }
+
+        app.buttons["ar.filter.advanced"].click()
+        let count = app.staticTexts["ar.advanced.count"]
+        XCTAssertTrue(count.waitForExistence(timeout: 5), "the form opens")
+        let fields = app.popUpButtons.matching(identifier: "ar.advanced.rule.field")
+        let texts = app.textFields.matching(identifier: "ar.advanced.rule.text")
+        XCTAssertEqual(fields.count, 3, "three starter rows")
+        let list = app.sheets.firstMatch.scrollViews["ar.advanced.rules"]
+        XCTAssertTrue(list.exists)
+        let firstHeight = list.frame.height
+        func inView(_ e: XCUIElement) -> Bool { list.frame.contains(CGPoint(x: e.frame.midX, y: e.frame.midY)) }
+        for k in 1...12 {
+            if k == 5 { try probeURL.setResourceValue(originalTags + ["W40 Probe"], forKey: .tagNamesKey) }
+            if k == 9 { try probeURL.setResourceValue(originalTags, forKey: .tagNamesKey) }
+            let adds = app.buttons.matching(identifier: "ar.advanced.add")
+            let last = adds.element(boundBy: adds.count - 1)
+            XCTAssertTrue(inView(last), "the last row is in view before rule \(k)")
+            last.click()
+            XCTAssertEqual(fields.count, 3 + k, "rule \(k) is added")
+            let field = texts.element(boundBy: texts.count - 1)
+            let deadline = Date().addingTimeInterval(2)
+            while !inView(field), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+            if !inView(field) { _ = captureScreenshot("w40-advanced-rule\(k)-hidden") }
+            XCTAssertTrue(inView(field), "rule \(k) is scrolled into view: list \(list.frame), row \(field.frame)")
+            // Each added row is an OCR text row; give it a word, so the search in effect keeps it on reopening.
+            field.click()
+            field.typeText("w\(k)*")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))   // past the count's 200 ms pause
+            XCTAssertEqual(fields.count, 3 + k, "rule \(k) is still there once the count has run")
+        }
+        XCTAssertGreaterThan(list.frame.height, firstHeight, "the list grew as rules were added")
+        _ = captureScreenshot("w40-advanced-twelve-added")
+        RunLoop.current.run(until: Date().addingTimeInterval(3))
+        XCTAssertEqual(fields.count, 15, "all twelve stay after a pause")
+        XCTAssertEqual((texts.allElementsBoundByIndex.compactMap { $0.value as? String }.filter { $0.hasPrefix("w") }).count,
+                       12, "each keeps its word")
+        app.buttons["ar.advanced.search"].click()
+        XCTAssertFalse(count.waitForExistence(timeout: 1), "Search closes the form")
+        app.buttons["ar.filter.advanced"].click()
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        _ = captureScreenshot("w40-advanced-twelve-reopened")
+        XCTAssertEqual(texts.allElementsBoundByIndex.compactMap { $0.value as? String }.filter { $0.hasPrefix("w") }.count,
+                       12, "the reopened form has all twelve")
+        app.buttons["ar.advanced.clear"].click()
+        app.buttons["ar.advanced.search"].click()
+    }
+
     /// W40.fix-reader-smart-folders: saved OCR rules count and scope files; only a typed text search
     /// contributes previews. The synthetic fixture puts California in bodies, never in file names.
     func testSmartFolderCountsAndPreviewsOnlyForUserTextSearch() throws {

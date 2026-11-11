@@ -9,7 +9,11 @@ import ArchiveCore
 struct AdvancedSearchSheet: View {
     @ObservedObject var model: NavigationModel
     let request: AdvancedSearchRequest
-    @State private var search: AdvancedSearch
+    /// The rules as edited, held by the request (W40.fix-reader-advanced-many-rules): view state would fall back
+    /// to the opening rules whenever the sheet is presented again.
+    @ObservedObject private var draft: AdvancedSearchDraft
+    /// A row just added, to scroll into view.
+    @State private var revealRule: UUID?
     @State private var matchCount: Int?
     @State private var naming = false
     @State private var name = ""
@@ -19,17 +23,24 @@ struct AdvancedSearchSheet: View {
     init(model: NavigationModel, request: AdvancedSearchRequest) {
         _model = ObservedObject(wrappedValue: model)
         self.request = request
-        _search = State(initialValue: request.search)
+        _draft = ObservedObject(wrappedValue: request.draft)
     }
 
     private var editing: SavedSearch? { request.editing }
+    private var search: AdvancedSearch { draft.search }
+
+    /// Tall enough for every row up to the cap, so the list grows as rules are added before it scrolls.
+    private var listHeight: CGFloat {
+        func rows(_ rules: [SearchRule]) -> Int { rules.reduce(0) { $0 + 1 + ($1.field == .group ? rows($1.children) : 0) } }
+        return min(420, max(150, CGFloat(rows(search.rules)) * 30 + 8))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(editing.map { "Edit Smart Folder \u{201c}\($0.name)\u{201d}" } ?? "Advanced Search").font(.headline)
             HStack(spacing: 6) {
                 Text("Match")
-                Picker("Match", selection: $search.combine) {
+                Picker("Match", selection: $draft.search.combine) {
                     Text("all").tag(RuleCombine.all)
                     Text("any").tag(RuleCombine.any)
                 }
@@ -37,12 +48,20 @@ struct AdvancedSearchSheet: View {
                 .accessibilityIdentifier("ar.advanced.combine")
                 Text("of the following rules")
             }
-            ScrollView {
-                RuleListView(rules: $search.rules, model: model, depth: 0)
-                    .padding(.vertical, 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    RuleListView(rules: $draft.search.rules, model: model, depth: 0, onAdded: { revealRule = $0 })
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .onChange(of: revealRule) { _, id in
+                    guard let id else { return }
+                    // After the layout that holds the new row.
+                    DispatchQueue.main.async { proxy.scrollTo(id); revealRule = nil }
+                }
             }
-            .frame(minHeight: 150, idealHeight: 260, maxHeight: 420)
+            .frame(minHeight: 150, idealHeight: listHeight, maxHeight: 420)
+            .accessibilityIdentifier("ar.advanced.rules")
             Text(countText)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("ar.advanced.count")
@@ -59,7 +78,7 @@ struct AdvancedSearchSheet: View {
                 }
             }
             HStack {
-                Button("Clear") { search = .starter }
+                Button("Clear") { draft.search = .starter }
                     .help("Start again from the starter rows")
                     .accessibilityIdentifier("ar.advanced.clear")
                 Spacer()
@@ -81,7 +100,8 @@ struct AdvancedSearchSheet: View {
         .padding(18)
         .frame(minWidth: 880, idealWidth: 900)
         .task(id: search) {
-            // A short pause, so typing a word runs one count, not one per key.
+            // A short pause, so typing a word runs one count, not one per key. The next edit cancels this count.
+            let search = search
             try? await Task.sleep(nanoseconds: 200_000_000)
             guard !Task.isCancelled else { return }
             let n = await model.countMatches(search)
@@ -97,11 +117,7 @@ struct AdvancedSearchSheet: View {
     }
 
     private func commit() {
-        if let editing {
-            model.updateSmartFolder(editing.id, search: search)
-        } else {
-            model.runAdvancedSearch(search)
-        }
+        model.commitAdvancedSearch(request)
         dismiss()
     }
 
@@ -117,22 +133,19 @@ private struct RuleListView: View {
     @Binding var rules: [SearchRule]
     @ObservedObject var model: NavigationModel
     let depth: Int
+    let onAdded: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach($rules) { $rule in
                 RuleRowView(rule: $rule, model: model, depth: depth,
                             canRemove: rules.count > 1,
-                            onAdd: { add(after: rule.id, group: $0) },
-                            onRemove: { rules.removeAll { $0.id == rule.id } })
+                            onAdd: { onAdded(rules.insertRule(after: rule.id, group: $0)) },
+                            onRemove: { rules.removeAll { $0.id == rule.id } },
+                            onAdded: onAdded)
+                    .id(rule.id)
             }
         }
-    }
-
-    private func add(after id: UUID, group: Bool) {
-        let new = group ? SearchRule.group(.any, [SearchRule(field: .ocrText)]) : SearchRule(field: .ocrText)
-        let i = rules.firstIndex { $0.id == id }.map { $0 + 1 } ?? rules.endIndex
-        rules.insert(new, at: i)
     }
 }
 
@@ -143,6 +156,7 @@ private struct RuleRowView: View {
     let canRemove: Bool
     let onAdd: (_ group: Bool) -> Void
     let onRemove: () -> Void
+    let onAdded: (UUID) -> Void
 
     var body: some View {
         if rule.field == .group {
@@ -158,7 +172,7 @@ private struct RuleRowView: View {
                     Spacer(minLength: 8)
                     rowButtons
                 }
-                RuleListView(rules: $rule.children, model: model, depth: depth + 1)
+                RuleListView(rules: $rule.children, model: model, depth: depth + 1, onAdded: onAdded)
                     .padding(.leading, 22)
             }
         } else {

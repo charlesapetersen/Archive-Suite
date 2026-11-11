@@ -256,6 +256,18 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
     static func dateKeys(_ text: String) -> (lower: Int, upper: Int)? { AdvancedSearchText.dateKeys(text) }
 }
 
+extension Array where Element == SearchRule {
+    /// The form's + and group buttons: a new OCR text row (or a group holding one) after the row `id`, or at the
+    /// end when there is none. There is no limit on how many. Returns the new row's id, to scroll to it.
+    @discardableResult
+    mutating func insertRule(after id: UUID?, group: Bool = false) -> UUID {
+        let new = group ? SearchRule.group(.any, [SearchRule(field: .ocrText)]) : SearchRule(field: .ocrText)
+        let i = id.flatMap { id in firstIndex { $0.id == id } }.map { $0 + 1 } ?? endIndex
+        insert(new, at: i)
+        return new.id
+    }
+}
+
 // MARK: - From the filter bar
 
 extension AdvancedSearch {

@@ -18,10 +18,27 @@ struct FolderNode: Identifiable, Hashable, Sendable {
 /// View model for the navigation window: owns the library + root store, the filter/sort/selection
 /// state, and the (safe) actions. All tag mutations go through `TagWriter`.
 /// The Advanced Search form's subject: `editing` is the smart folder being edited, nil for a new search.
+/// The form edits `draft`, which the request holds, so a sheet that is presented again or rebuilt resumes the
+/// rules as edited, not as they opened (W40.fix-reader-advanced-many-rules).
+@MainActor
 struct AdvancedSearchRequest: Identifiable {
     let id = UUID()
     var editing: SavedSearch?
-    var search: AdvancedSearch
+    let draft: AdvancedSearchDraft
+
+    init(editing: SavedSearch?, search: AdvancedSearch) {
+        self.editing = editing
+        draft = AdvancedSearchDraft(search)
+    }
+
+    var search: AdvancedSearch { draft.search }
+}
+
+/// The form's working copy of its rules. A reference, so every view of one request edits the same rules.
+@MainActor
+final class AdvancedSearchDraft: ObservableObject {
+    @Published var search: AdvancedSearch
+    init(_ search: AdvancedSearch) { self.search = search }
 }
 
 @MainActor
@@ -473,8 +490,10 @@ final class NavigationModel: ObservableObject {
 
     /// How many files `search` matches over the whole library (excluded folders left out), for the form's count.
     /// Its text rules run through the index first.
+    /// Cancelling the calling task (the form's next edit) stops the row pass too; the count it then returns is
+    /// partial, for a caller that drops it.
     func countMatches(_ search: AdvancedSearch) async -> Int {
-        await countWithBasis(search).count
+        await countWithBasis(search, cancellable: true).count
     }
 
     /// A saved search as it was last counted: its rules as tested and their outside answers (text hits, flagged,
@@ -494,19 +513,29 @@ final class NavigationModel: ObservableObject {
     }
 
     /// `countMatches`, with the basis it counted on. The row test runs off the main actor over the library as
-    /// it is when the text answers arrive.
-    private func countWithBasis(_ search: AdvancedSearch) async -> (basis: CountBasis, count: Int) {
+    /// it is when the text answers arrive. `cancellable`: the caller's cancellation stops the text queries
+    /// still to run and the row pass, so a form edited rule after rule at full corpus size does not stack one
+    /// whole-library pass per edit (W40.fix-reader-advanced-many-rules).
+    private func countWithBasis(_ search: AdvancedSearch,
+                                cancellable: Bool = false) async -> (basis: CountBasis, count: Int) {
         let rules = search.droppingFolders(outside: rootStore.discoveredPathPrefix).search
-        let hits = await textHits(for: rules)
+        let hits = await textHits(for: rules, stopOnCancel: cancellable)
         var context = ruleContext(for: rules)
         context.textHits = hits
         let files = library.files, excluded = excludedAbsolutePrefixes()
         let basis = CountBasis(search: search, rules: rules, context: context, filesRevision: library.filesRevision)
-        let count = await Task.detached(priority: .userInitiated) {
+        if cancellable, Task.isCancelled { return (basis, 0) }
+        let pass = Task.detached(priority: .userInitiated) {
             ReaderStages.measure("model.countMatches.rows") {
-                files.reduce(0) { $0 + (basis.counts($1, excluded: excluded) ? 1 : 0) }
+                var n = 0
+                for (i, file) in files.enumerated() {
+                    if cancellable, i & 4095 == 0, Task.isCancelled { break }
+                    if basis.counts(file, excluded: excluded) { n += 1 }
+                }
+                return n
             }
-        }.value
+        }
+        let count = await withTaskCancellationHandler { await pass.value } onCancel: { pass.cancel() }
         return (basis, count)
     }
 
@@ -516,13 +545,23 @@ final class NavigationModel: ObservableObject {
     }
 
     /// Each active text rule's index answer, by rule id.
-    private func textHits(for search: AdvancedSearch) async -> [UUID: Set<String>] {
+    private func textHits(for search: AdvancedSearch, stopOnCancel: Bool = false) async -> [UUID: Set<String>] {
         var hits: [UUID: Set<String>] = [:]
         for rule in search.textRules {
+            if stopOnCancel, Task.isCancelled { break }
             guard let expression = rule.ftsExpression else { continue }
             hits[rule.id] = Set(await indexer.search(expression: expression))
         }
         return hits
+    }
+
+    /// The form's Search (or Save, when editing a smart folder): what its draft holds now.
+    func commitAdvancedSearch(_ request: AdvancedSearchRequest) {
+        if let editing = request.editing {
+            updateSmartFolder(editing.id, search: request.search)
+        } else {
+            runAdvancedSearch(request.search)
+        }
     }
 
     /// Run an Advanced Search without saving it: it becomes the base scope, like an unsaved smart folder.

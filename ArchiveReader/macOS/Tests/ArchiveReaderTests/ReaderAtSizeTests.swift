@@ -475,6 +475,31 @@ final class ReaderAtSizeTests: XCTestCase {
         let health = repeated { _ = navigation.dataQuality }
         print("D7 synthetic health total=\(navigation.dataQuality.total) median \(ms(health.median)) max \(ms(health.max))")
 
+        // ── Advanced Search at this size (W40.fix-reader-advanced-many-rules): twelve rules added one by one,
+        // each counted as the form counts it; then a count the next edit cancels must stop early.
+        navigation.openAdvancedSearch()
+        let request = try XCTUnwrap(navigation.advancedSearchRequest)
+        var countSamples: [Double] = []
+        for k in 1...12 {
+            let id = request.draft.search.rules.insertRule(after: request.draft.search.rules.last?.id)
+            let i = try XCTUnwrap(request.draft.search.rules.firstIndex { $0.id == id })
+            request.draft.search.rules[i].field = .fileName
+            request.draft.search.rules[i].op = .doesNotContain
+            request.draft.search.rules[i].text = "zz\(k)"
+            let (n, t) = await timeAsync { await navigation.countMatches(request.search) }
+            countSamples.append(t)
+            XCTAssertEqual(n, rows.count, "rule \(k): no name has zz\(k), so every row still counts")
+        }
+        XCTAssertEqual(request.search.rules.count, 15, "all twelve rules held by the request")
+        let full = countSamples.sorted()[countSamples.count / 2]
+        let cancelled = Task { await navigation.countMatches(request.search) }
+        cancelled.cancel()
+        let (_, cancelledSeconds) = await timeAsync { await cancelled.value }
+        print("D7 advanced count rows=\(rows.count) 12 rules median \(ms(full)) max \(ms(countSamples.max() ?? 0)); "
+              + "cancelled \(ms(cancelledSeconds))")
+        XCTAssertLessThan(cancelledSeconds, max(0.05, full / 2), "a cancelled count stops early")
+        navigation.advancedSearchRequest = nil
+
         print(String(format: "D7 synthetic footprint with model %.0f MiB", footprintMiB()))
 
         // ── The table, as `AppKitTableView.makeNSView` builds it, minus the window.
