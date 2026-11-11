@@ -41,6 +41,9 @@ struct SidebarView: View {
                         }
                 }
                 .onMove { from, to in model.savedSearches.move(fromOffsets: from, toOffset: to) }
+                if let n = model.savedSearches.unreadableNotice {
+                    UnreadableSmartFoldersNotice(count: n) { model.savedSearches.dismissUnreadableNotice() }
+                }
             } header: {
                 HStack {
                     Text("Smart Folders")
@@ -110,5 +113,34 @@ struct SidebarItemRow: View {
                 Text("\(count)").foregroundStyle(.primary).font(.caption).monospacedDigit()
             }
         }
+    }
+}
+
+/// Says once that smart folders could not be read by this build (W40.reader-smart-folders-keep). They are kept,
+/// unread, beside the list (`SavedSearchStore.unreadableKey`), so nothing is lost; dismissing only hides this.
+struct UnreadableSmartFoldersNotice: View {
+    let count: Int
+    let dismiss: () -> Void
+
+    static func message(_ count: Int) -> String {
+        switch count {
+        case 0: return "Your Smart Folders could not be read by this version. They are kept, not deleted."
+        case 1: return "1 Smart Folder could not be read by this version. It is kept, not deleted."
+        default: return "\(count) Smart Folders could not be read by this version. They are kept, not deleted."
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+            Text(Self.message(count)).font(.caption).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            Button(action: dismiss) { Image(systemName: "xmark") }
+                .buttonStyle(.plain)
+                .help("Hide this notice")
+                .accessibilityLabel("Hide this notice")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ar.sidebar.smart.unreadable")
     }
 }

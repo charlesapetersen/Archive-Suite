@@ -11,7 +11,9 @@ struct SavedSearch: Codable, Identifiable, Equatable, Sendable {
     var search: AdvancedSearch
 }
 
-/// Persists saved searches in UserDefaults (app data, not the corpus).
+/// Persists saved searches in UserDefaults (app data, not the corpus). A change to `SavedSearch`, `AdvancedSearch`,
+/// `SearchRule` or the enums they hold keeps every `Tests/ArchiveReaderTests/Fixtures/saved-searches-*.json`
+/// loading, or ships a migration in the same commit (`SavedSearchFixtureTests`).
 @MainActor
 final class SavedSearchStore: ObservableObject {
     @Published private(set) var searches: [SavedSearch] = []
@@ -81,13 +83,49 @@ final class SavedSearchStore: ObservableObject {
         return "\(desired) \(n)"
     }
 
+    // MARK: Unreadable smart folders (W40.reader-smart-folders-keep)
+    //
+    // The next add, rename, move or delete saves the list this build could read over the stored one, so an entry
+    // it could not read would be lost then. Before that can happen, the whole stored list is kept byte for byte
+    // under `unreadableKey`, which is never overwritten while it holds data, and the sidebar says once how many
+    // smart folders could not be read. A later build (or a migration) can read them back from there.
+
+    static let unreadableKey = "savedSearches.unreadable"
+    static let unreadableCountKey = "savedSearches.unreadableCount"
+    static let unreadableSeenKey = "savedSearches.unreadableSeen"
+
+    /// How many smart folders could not be read, while the user has not yet dismissed the notice; nil when there
+    /// is nothing to tell. 0 means the stored list could not be read at all, so its size is unknown.
+    @Published private(set) var unreadableNotice: Int?
+
+    func dismissUnreadableNotice() {
+        defaults.set(true, forKey: Self.unreadableSeenKey)
+        unreadableNotice = nil
+    }
+
     private func load() {
-        // One entry at a time: a smart folder in a shape this build cannot read (one saved before the rule
-        // tree) is dropped alone instead of emptying the list.
-        if let data = defaults.data(forKey: key),
-           let arr = try? JSONDecoder().decode([Lossy].self, from: data) {
-            searches = arr.compactMap(\.value)
+        defer {
+            if defaults.data(forKey: Self.unreadableKey) != nil, !defaults.bool(forKey: Self.unreadableSeenKey) {
+                unreadableNotice = defaults.integer(forKey: Self.unreadableCountKey)
+            }
         }
+        guard let data = defaults.data(forKey: key) else { return }
+        // One entry at a time: a smart folder in a shape this build cannot read is dropped alone instead of
+        // emptying the list.
+        guard let arr = try? JSONDecoder().decode([Lossy].self, from: data) else {
+            keepUnreadable(data, count: 0)
+            return
+        }
+        searches = arr.compactMap(\.value)
+        let dropped = arr.count - searches.count
+        if dropped > 0 { keepUnreadable(data, count: dropped) }
+    }
+
+    private func keepUnreadable(_ data: Data, count: Int) {
+        guard defaults.data(forKey: Self.unreadableKey) == nil else { return }
+        defaults.set(data, forKey: Self.unreadableKey)
+        defaults.set(count, forKey: Self.unreadableCountKey)
+        defaults.removeObject(forKey: Self.unreadableSeenKey)
     }
     private struct Lossy: Decodable {
         let value: SavedSearch?

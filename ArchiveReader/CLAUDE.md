@@ -210,6 +210,11 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   stores its state as rules narrowed onto the open folder (`NavigationModel.effectiveSearch`), so what is saved
   is what the list shows. An Advanced Search run unsaved is the same scope. "Has none of these tags" exists only
   there — the filter bar keeps its no-NOT rule (owner, 2026-11-04).
+- **⛔ The owner's Smart Folders must survive every build** (owner, 2026-11-10). A change to `SavedSearch`,
+  `AdvancedSearch`, `SearchRule` or their enums keeps every `Tests/ArchiveReaderTests/Fixtures/saved-searches-*.json`
+  loading, or ships a migration in the same commit. Never regenerate or edit a fixture; a new format adds a new
+  one beside it (`SavedSearchFixtureTests`). An entry the build cannot read is kept under
+  `savedSearches.unreadable` and the sidebar says so once (W40.reader-smart-folders-keep).
 - **v1 stays sandboxed to one granted root.** Whole-Mac search is an unbuilt feature with a real cost (new code:
   walk N roots, merge, define exclusions; `FileAccessProvider` was never written) — **not** an entitlement or
   config toggle (corrected 2026-08-07, `W26.docs`; history in REFERENCE.md).

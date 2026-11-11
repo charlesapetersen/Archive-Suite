@@ -1,0 +1,1699 @@
+[
+  {
+    "id" : "00000000-0000-4000-8000-000000000001",
+    "name" : "Every operator",
+    "search" : {
+      "combine" : "all",
+      "rules" : [
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "text",
+          "id" : "00000000-0000-4000-8000-000000000101",
+          "op" : "allWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "budget \"Prop 13\" défi*",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "text",
+          "id" : "00000000-0000-4000-8000-000000000102",
+          "op" : "phrase",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "budget \"Prop 13\" défi*",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "text",
+          "id" : "00000000-0000-4000-8000-000000000103",
+          "op" : "anyWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "budget \"Prop 13\" défi*",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "text",
+          "id" : "00000000-0000-4000-8000-000000000104",
+          "op" : "noWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "budget \"Prop 13\" défi*",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ocrText",
+          "id" : "00000000-0000-4000-8000-000000000105",
+          "op" : "allWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Jerry Brown",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ocrText",
+          "id" : "00000000-0000-4000-8000-000000000106",
+          "op" : "phrase",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Jerry Brown",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ocrText",
+          "id" : "00000000-0000-4000-8000-000000000107",
+          "op" : "anyWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Jerry Brown",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ocrText",
+          "id" : "00000000-0000-4000-8000-000000000108",
+          "op" : "noWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Jerry Brown",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "fileName",
+          "id" : "00000000-0000-4000-8000-000000000109",
+          "op" : "contains",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Box 3 – memo",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "fileName",
+          "id" : "00000000-0000-4000-8000-000000000110",
+          "op" : "doesNotContain",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Box 3 – memo",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "fileName",
+          "id" : "00000000-0000-4000-8000-000000000111",
+          "op" : "beginsWith",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Box 3 – memo",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "fileName",
+          "id" : "00000000-0000-4000-8000-000000000112",
+          "op" : "endsWith",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "Box 3 – memo",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "tags",
+          "id" : "00000000-0000-4000-8000-000000000113",
+          "op" : "hasAll",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+            "Cold War",
+            "Économie",
+            "Press"
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "tags",
+          "id" : "00000000-0000-4000-8000-000000000114",
+          "op" : "hasAny",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+            "Cold War",
+            "Économie",
+            "Press"
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "tags",
+          "id" : "00000000-0000-4000-8000-000000000115",
+          "op" : "hasNone",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+            "Cold War",
+            "Économie",
+            "Press"
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "quality",
+          "id" : "00000000-0000-4000-8000-000000000116",
+          "op" : "is",
+          "qualities" : [
+            5,
+            0,
+            2
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "quality",
+          "id" : "00000000-0000-4000-8000-000000000117",
+          "op" : "isNot",
+          "qualities" : [
+            5,
+            0,
+            2
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000118",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "all",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000119",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "read",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000120",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000121",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "noReadState",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000122",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "all",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000123",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "read",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000124",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "readState",
+          "id" : "00000000-0000-4000-8000-000000000125",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "noReadState",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "folder",
+          "id" : "00000000-0000-4000-8000-000000000126",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "\/Archive\/Brown Papers\/Box 12\/",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "folder",
+          "id" : "00000000-0000-4000-8000-000000000127",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "\/Archive\/Brown Papers\/Box 12\/",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "needsAttention",
+          "id" : "00000000-0000-4000-8000-000000000128",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "needsAttention",
+          "id" : "00000000-0000-4000-8000-000000000129",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ambiguousDate",
+          "id" : "00000000-0000-4000-8000-000000000130",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ambiguousDate",
+          "id" : "00000000-0000-4000-8000-000000000131",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "flagged",
+          "id" : "00000000-0000-4000-8000-000000000132",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "flagged",
+          "id" : "00000000-0000-4000-8000-000000000133",
+          "op" : "isNot",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        }
+      ]
+    }
+  },
+  {
+    "id" : "00000000-0000-4000-8000-000000000002",
+    "name" : "Every date",
+    "search" : {
+      "combine" : "any",
+      "rules" : [
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000134",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975",
+          "text2" : "1980"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000135",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000136",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1980",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000137",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03",
+          "text2" : "1976-11"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000138",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000139",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1976-11",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000140",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03-14",
+          "text2" : "1975-12-31"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000141",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03-14",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000142",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-12-31",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000143",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1970s",
+          "text2" : "1990s"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000144",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1970s",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000145",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1990s",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000146",
+          "op" : "undated",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000147",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975",
+          "text2" : "1980"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000148",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000149",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1980",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000150",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03",
+          "text2" : "1976-11"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000151",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000152",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1976-11",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000153",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03-14",
+          "text2" : "1975-12-31"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000154",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03-14",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000155",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-12-31",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000156",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1970s",
+          "text2" : "1990s"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000157",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1970s",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000158",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1990s",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "own",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000159",
+          "op" : "undated",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000160",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975",
+          "text2" : "1980"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000161",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000162",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1980",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000163",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03",
+          "text2" : "1976-11"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000164",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000165",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1976-11",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000166",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03-14",
+          "text2" : "1975-12-31"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000167",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-03-14",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000168",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1975-12-31",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000169",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1970s",
+          "text2" : "1990s"
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000170",
+          "op" : "after",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1970s",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000171",
+          "op" : "before",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "1990s",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "sentWith",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000172",
+          "op" : "undated",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        }
+      ]
+    }
+  },
+  {
+    "id" : "00000000-0000-4000-8000-000000000003",
+    "name" : "Nested groups",
+    "search" : {
+      "combine" : "all",
+      "rules" : [
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "text",
+          "id" : "00000000-0000-4000-8000-000000000183",
+          "op" : "allWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "deficit",
+          "text2" : ""
+        },
+        {
+          "children" : [
+            {
+              "children" : [
+
+              ],
+              "combine" : "all",
+              "dateRole" : "either",
+              "field" : "tags",
+              "id" : "00000000-0000-4000-8000-000000000177",
+              "op" : "hasAny",
+              "qualities" : [
+
+              ],
+              "read" : "unread",
+              "tags" : [
+                "Reagan"
+              ],
+              "text" : "",
+              "text2" : ""
+            },
+            {
+              "children" : [
+                {
+                  "children" : [
+
+                  ],
+                  "combine" : "all",
+                  "dateRole" : "either",
+                  "field" : "ocrText",
+                  "id" : "00000000-0000-4000-8000-000000000174",
+                  "op" : "phrase",
+                  "qualities" : [
+
+                  ],
+                  "read" : "unread",
+                  "tags" : [
+
+                  ],
+                  "text" : "balanced budget",
+                  "text2" : ""
+                },
+                {
+                  "children" : [
+
+                  ],
+                  "combine" : "all",
+                  "dateRole" : "either",
+                  "field" : "quality",
+                  "id" : "00000000-0000-4000-8000-000000000175",
+                  "op" : "isNot",
+                  "qualities" : [
+                    1
+                  ],
+                  "read" : "unread",
+                  "tags" : [
+
+                  ],
+                  "text" : "",
+                  "text2" : ""
+                }
+              ],
+              "combine" : "all",
+              "dateRole" : "either",
+              "field" : "group",
+              "id" : "00000000-0000-4000-8000-000000000173",
+              "op" : "is",
+              "qualities" : [
+
+              ],
+              "read" : "unread",
+              "tags" : [
+
+              ],
+              "text" : "",
+              "text2" : ""
+            },
+            {
+              "children" : [
+
+              ],
+              "combine" : "all",
+              "dateRole" : "own",
+              "field" : "date",
+              "id" : "00000000-0000-4000-8000-000000000178",
+              "op" : "between",
+              "qualities" : [
+
+              ],
+              "read" : "unread",
+              "tags" : [
+
+              ],
+              "text" : "1981",
+              "text2" : "1989"
+            }
+          ],
+          "combine" : "any",
+          "dateRole" : "either",
+          "field" : "group",
+          "id" : "00000000-0000-4000-8000-000000000176",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "any",
+          "dateRole" : "either",
+          "field" : "group",
+          "id" : "00000000-0000-4000-8000-000000000179",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "folder",
+          "id" : "00000000-0000-4000-8000-000000000184",
+          "op" : "is",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "\/Archive\/Brown Papers",
+          "text2" : ""
+        }
+      ]
+    }
+  },
+  {
+    "id" : "00000000-0000-4000-8000-000000000004",
+    "name" : "Starter rows, unfilled",
+    "search" : {
+      "combine" : "all",
+      "rules" : [
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ocrText",
+          "id" : "00000000-0000-4000-8000-000000000180",
+          "op" : "allWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "tags",
+          "id" : "00000000-0000-4000-8000-000000000181",
+          "op" : "hasAll",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "date",
+          "id" : "00000000-0000-4000-8000-000000000182",
+          "op" : "between",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "",
+          "text2" : ""
+        }
+      ]
+    }
+  },
+  {
+    "id" : "00000000-0000-4000-8000-000000000005",
+    "name" : "No rules",
+    "search" : {
+      "combine" : "all",
+      "rules" : [
+
+      ]
+    }
+  },
+  {
+    "id" : "00000000-0000-4000-8000-000000000006",
+    "name" : "Proposition 13 — “taxes” ✓",
+    "search" : {
+      "combine" : "any",
+      "rules" : [
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "ocrText",
+          "id" : "00000000-0000-4000-8000-000000000185",
+          "op" : "allWords",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "proposition 13",
+          "text2" : ""
+        },
+        {
+          "children" : [
+
+          ],
+          "combine" : "all",
+          "dateRole" : "either",
+          "field" : "fileName",
+          "id" : "00000000-0000-4000-8000-000000000186",
+          "op" : "contains",
+          "qualities" : [
+
+          ],
+          "read" : "unread",
+          "tags" : [
+
+          ],
+          "text" : "prop13",
+          "text2" : ""
+        }
+      ]
+    }
+  }
+]
