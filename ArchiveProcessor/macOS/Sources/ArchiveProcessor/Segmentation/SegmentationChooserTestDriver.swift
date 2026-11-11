@@ -17,8 +17,8 @@ import SwiftUI
 ///   4. An approach that cannot run says why: the file's reason when unmeasured, the missing key or `claude`
 ///      otherwise, with the keys the wizard should offer. Manual always runs, at no cost.
 ///   5. Render guard: each row card draws non-blank pixels offscreen.
-///   6. With nothing saved, a Gemini key preselects Gemini only and no Gemini key saves nothing; a saved choice,
-///      even manual or an unknown value, is never overridden (W41.app-seg-default).
+///   6. With nothing saved, the settings solver's segmentation pick is saved (no key saves nothing; W46.settings-solver);
+///      a saved choice, even manual or an unknown value, is never overridden (W41.app-seg-default).
 @MainActor
 enum SegmentationChooserTestDriver {
     private static var didRun = false
@@ -73,7 +73,7 @@ enum SegmentationChooserTestDriver {
         // 2. Figures.
         let footnote = "Measured once on two boxes (363 pages) of one archive, 11 Oct 2026. Your material may differ."
         let claude = row(.claude, 1000)
-        eq("2 claude no checking", claude.rightWithNoChecking, "about 87% of pages")
+        eq("2 claude no checking", claude.rightWithNoChecking, "about 85% of pages")
         eq("2 claude to check @1000", claude.toCheck, "about 102 boundaries to check")
         eq("2 claude after checking", claude.rightAfterChecking, "about 97% of pages")
         eq("2 claude unshown", claude.unshownErrors, "about 1 in 120 pages")
@@ -83,13 +83,15 @@ enum SegmentationChooserTestDriver {
         eq("2 claude to check @0 (at least 1)", row(.claude, 0).toCheck, "about 1 boundary to check")
 
         let gemini = row(.gemini, 1000)
-        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 89% of pages")
+        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 87% of pages")
         eq("2 gemini to check", gemini.toCheck, "about 242 boundaries to check")
-        eq("2 gemini after checking", gemini.rightAfterChecking, "about 100% of pages")
-        eq("2 gemini zero is not a promise", gemini.unshownErrors, "none in 363 test pages")
+        eq("2 gemini after checking", gemini.rightAfterChecking, "about 98% of pages")
+        eq("2 gemini unshown", gemini.unshownErrors, "about 1 in 180 pages")
+        // Since the truth rescore (W46.seg-truth-rescore) ChatGPT is the approach with no unflagged error.
+        eq("2 zero is not a promise", row(.openai, 1000).unshownErrors, "none in 363 test pages")
 
         let mix = row(.mix, 1000)
-        eq("2 mix no checking", mix.rightWithNoChecking, "about 92% of pages")
+        eq("2 mix no checking", mix.rightWithNoChecking, "about 91% of pages")
         eq("2 mix to check", mix.toCheck, "about 102 boundaries to check")
         eq("2 mix after checking", mix.rightAfterChecking, "about 97% of pages")
         eq("2 mix unshown", mix.unshownErrors, "about 1 in 120 pages")
@@ -245,8 +247,8 @@ enum SegmentationChooserTestDriver {
         eq("7 local offers no key", local.missingKeys, [])
         eq("7 local no checking is the file's", local.rightWithNoChecking,
            localFig?.pagesExactNoReview.map { "about \(SegmentationRow.percent($0)) of pages" })
-        eq("7 local no checking", local.rightWithNoChecking, "about 79% of pages")
-        eq("7 local after checking", local.rightAfterChecking, "about 97% of pages")
+        eq("7 local no checking", local.rightWithNoChecking, "about 80% of pages")
+        eq("7 local after checking", local.rightAfterChecking, "about 99% of pages")
         eq("7 local cost", local.costLines, ["none: it runs on this Mac"])
         eq("7 local adds no dollars", local.apiDollars, 0)
         eq("7 local cost pane", local.costSummary, CostEstimate.money(0))
@@ -289,11 +291,26 @@ enum SegmentationChooserTestDriver {
         let gemOnly = SegmentationRoutes(hasGeminiKey: true)
         let noGemini = SegmentationRoutes(hasAnthropicKey: true, hasOpenAIKey: true, hasOpenRouterKey: true,
                                           hasClaudeCLI: true)
-        check("6 no Gemini key, nothing saved: saves nothing",
-              !SegmentationApproach.preselect(noGemini, defaults: d) && d.object(forKey: key) == nil)
-        eq("6 no Gemini key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
+        check("6 no key, nothing saved: saves nothing",
+              !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
+        eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
+        // The settings solver's pick (W46.settings-solver): ChatGPT by key leads at 90.9% unchecked, beyond the 3.2
+        // floor over Claude's 85.5%; with Gemini's key alone, Gemini 3.8 Flash.
+        check("6 no Gemini key, nothing saved: saves the solver's pick",
+              SegmentationApproach.preselect(noGemini, defaults: d))
+        eq("6 no Gemini key, nothing saved: openai", SegmentationApproach.stored(d), .openai)
+        d.removeObject(forKey: key)
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini", SegmentationApproach.stored(d), .gemini)
+        d.removeObject(forKey: key)
+        var gemPlan = gemOnly
+        gemPlan.hasClaudeCLI = true
+        SegmentationApproach.preselect(gemPlan, defaults: d)
+        eq("6 Gemini key and the Claude plan: a tie at 3.2, the plan wins on money", SegmentationApproach.stored(d), .claude)
+        for a in SegmentationApproach.allCases {
+            eq("6 \(a.rawValue) has a rule-table row", SettingsRouteTable.bundled?.stage("segmentation")?.routes
+                .contains { $0.appRoute.flatMap(SegmentationApproach.init(appRoute:)) == a }, true)
+        }
         for saved in [SegmentationApproach.manual, .claude, .glm] {
             d.set(saved.rawValue, forKey: key)
             check("6 saved \(saved.rawValue) not overridden", !SegmentationApproach.preselect(all, defaults: d)

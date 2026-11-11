@@ -21,7 +21,7 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     var id: String { rawValue }
 
     /// What a missing or unknown stored value reads as. Manual, because nothing proposes boundaries without a
-    /// key or plan; `preselect` saves Gemini over it once a Gemini key is known to be set.
+    /// key or plan; `preselect` saves the settings solver's pick over it once the keys are read.
     static let defaultApproach: SegmentationApproach = .manual
 
     var proposesBoundaries: Bool { self != .manual }
@@ -32,12 +32,38 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
             .flatMap(SegmentationApproach.init(rawValue:)) ?? defaultApproach
     }
 
-    /// The approach to start a user on who has saved no choice (W41.app-seg-default). Gemini 3.8 Flash only
-    /// was the best measured approach (segbench-results/options.md, owner's test boxes after the rescore: 87.3%
-    /// of pages right unchecked, 24.2 checks per 100 pages, 98.5% right after checking with 2 unflagged errors,
-    /// $3.61 per 1,000 pages), so it is the start whenever its key is set.
+    /// The approach to start a user on who has saved no choice: the settings solver's segmentation pick
+    /// (W46.settings-solver) for the keys and plans found, among the approaches the app runs, with nothing
+    /// downloaded (the 2B on this Mac waits for the user's yes). Manual when nothing else can run.
     static func preferredDefault(_ routes: SegmentationRoutes) -> SegmentationApproach {
-        routes.hasGeminiKey ? .gemini : defaultApproach
+        guard let table = SettingsRouteTable.bundled else { return defaultApproach }
+        var resources = SettingsResources(macMemoryGB: routes.memoryGB)
+        resources.downloadsAllowed = false
+        for (has, key) in [(routes.hasAnthropicKey, "anthropic"), (routes.hasGeminiKey, "gemini"),
+                           (routes.hasOpenAIKey, "openai"), (routes.hasOpenRouterKey, "openrouter")] where has {
+            resources.keys.insert(key)
+        }
+        if routes.claudeByPlan { resources.plans.insert("claude") }
+        if routes.chatGPTByPlan { resources.plans.insert("chatgpt") }
+        var answers = SettingsAnswers()
+        answers.appRoutesOnly = true
+        answers.stagesToSolve = ["segmentation"]
+        let solution = SettingsSolver(table: table, pairs: nil, resources: resources, answers: answers).solve()
+        return solution.pick("segmentation", "all")?.route?.appRoute.flatMap(Self.init(appRoute:)) ?? defaultApproach
+    }
+
+    /// The approach a rule-table row's `app_route` names (`gemini|gemini-3.8-flash`, `mix`, `manual`).
+    init?(appRoute: String) {
+        switch appRoute.split(separator: "|").first.map(String.init) ?? appRoute {
+        case "manual": self = .manual
+        case "anthropic": self = .claude
+        case "gemini": self = .gemini
+        case "openai": self = .openai
+        case "mix": self = .mix
+        case "openrouter": self = .glm
+        case "local": self = .local
+        default: return nil
+        }
     }
 
     /// Saves `preferredDefault` when no choice is saved yet. A saved choice, manual included, is never
