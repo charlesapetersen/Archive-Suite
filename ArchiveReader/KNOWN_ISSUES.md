@@ -30,7 +30,8 @@ Preview's page views are in the document window and the preview sheet: View ▸ 
 page of each page pair, never the OCR text page, for every open file under a heading that marks the file on view;
 the contact sheet keeps every PDF page. Both draw lazily from the on-disk `PDFThumbnailer` cache, decoded to their
 size, and turned as the reader turned the page; off-screen cells hold no bitmap. Each window remembers its sidebar.
-Limit: the cache renders a page's crop box without its own `/Rotate`, which Processor output never sets.
+Found on the way: `PDFThumbnailer` sized its canvas from the unturned crop box while PDFKit drew the page's own
+`/Rotate`, so a quarter-turned page came out mostly blank, in Copy Archive Link's pictures too; fixed, with a test.
 
 ## ✅ CLOSED (W40.reader-tiled-pages, 2026-11-08) — all PDF pages tiled, without window tabs
 

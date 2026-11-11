@@ -139,7 +139,8 @@ the page views; ⌘I is free.
   shortcut, off in the preview sheet (`PreviewSheet.swift:32`), and no thumbnail sidebar [R]. Pair *n* is image page
   2n plus text page 2n+1 (`Core/DocumentPagePairs.swift`), so thumbnails must show image pages, not text pages [R].
 
-**Items.** W40.reader-view-rotate (shipped 2026-11-11: `PageTurnStore`, turns in the library index), W40.reader-page-views.
+**Items.** W40.reader-view-rotate (shipped 2026-11-11: `PageTurnStore`, turns in the library index), W40.reader-page-views
+(shipped 2026-11-11: `PageThumbnailSidebar`, the contact sheet in `DocumentPageOverview.swift`, `PageThumbnails`).
 
 ## 5. Copy Cleaned for Prose (point 11)
 
