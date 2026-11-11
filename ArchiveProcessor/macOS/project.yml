@@ -45,6 +45,11 @@ targets:
       # The page-kind classifier's weights, which preselect each page's reader (W41.app-page-kind).
       - path: ../segbench-results/kind-classifier-model.json
         buildPhase: resources
+      # The settings rule table and the reading pair matrix the settings solver picks from (W46.settings-solver).
+      - path: ../segbench-results/settings-routes.json
+        buildPhase: resources
+      - path: ../segbench-results/ocr-pair-matrix.json
+        buildPhase: resources
     dependencies:
       - package: ArchiveCore
     settings:

@@ -88,6 +88,7 @@ struct ContentView: View {
             RotationRuleTestDriver.runIfRequested()          // $0 W46 rotation agreement rule + gateway route, no wire
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
+            SettingsSolverTestDriver.runIfRequested()        // $0 W46 settings solver on the profile cases
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
             SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
             SegmentationChatGPTTestDriver.runIfRequested()   // $0 W36 ChatGPT plan route: Sign in with ChatGPT, fake server
