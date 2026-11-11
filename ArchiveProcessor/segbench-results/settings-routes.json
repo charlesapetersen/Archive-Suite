@@ -849,7 +849,7 @@
     "id": "nes_answered",
     "label": "NES on answered pages, failures beside",
     "higher_is_better": true,
-    "figure": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten"
+    "figure": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten, and reflows (the reader joins the page's lines; its hand pages get the text page)"
    },
    "kinds": [
     "typewritten",
@@ -1040,6 +1040,19 @@
         "value": "60.5841902193579"
        }
       },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.975,
+       "pages": 20,
+       "pages_under": 4,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "apple-vision",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
+      },
       "public": {
        "basis": "[NES strict, NES answered, answered/n]",
        "truth": "public (independent of the routes)",
@@ -1196,6 +1209,19 @@
         "attribute": "routes.after",
         "value": "86.0386744265129"
        }
+      },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.33,
+       "pages": 20,
+       "pages_under": 15,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "xiaomi-ocr-0-bf16",
+        "attribute": "rows.reflows",
+        "value": "True"
+       }
       }
      },
      "cost": {
@@ -1329,6 +1355,19 @@
         "attribute": "routes.after",
         "value": "80.37089949082866"
        }
+      },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.3,
+       "pages": 19,
+       "pages_under": 12,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "paddleocr-vl1.6-bf16",
+        "attribute": "rows.reflows",
+        "value": "True"
+       }
       }
      },
      "cost": {
@@ -1460,6 +1499,19 @@
         "route": "lightonocr-3-4b-mlx8",
         "attribute": "routes.after",
         "value": "89.91019653035467"
+       }
+      },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.289,
+       "pages": 20,
+       "pages_under": 18,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "lightonocr-3-4b-mlx8",
+        "attribute": "rows.reflows",
+        "value": "True"
        }
       }
      },
@@ -1595,6 +1647,19 @@
         "attribute": "routes.after",
         "value": "88.06149008859128"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.881,
+       "pages": 20,
+       "pages_under": 4,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3.5-9b-mlx4",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -1728,6 +1793,19 @@
         "route": "qwen3-vl-8b-mlx4",
         "attribute": "routes.after",
         "value": "89.24411405673966"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.85,
+       "pages": 19,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3-vl-8b-mlx4",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       }
      },
@@ -1901,6 +1979,19 @@
         "value": "71.60722245288032"
        }
       },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.946,
+       "pages": 20,
+       "pages_under": 1,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "ppocrv6-kraken-blla",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
+      },
       "public_L1-L3": {
        "value": 76.82,
        "n": 240,
@@ -2032,6 +2123,19 @@
         "attribute": "routes.after",
         "value": "88.82517366137243"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.875,
+       "pages": 20,
+       "pages_under": 1,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3.6-35b-a3b",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -2147,6 +2251,19 @@
         "attribute": "routes.after",
         "value": "92.61108074708119"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.825,
+       "pages": 20,
+       "pages_under": 3,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3.6-27b",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -2259,6 +2376,19 @@
         "route": "qwen3-vl-235b",
         "attribute": "routes.after",
         "value": "91.59440632638676"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.863,
+       "pages": 20,
+       "pages_under": 4,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3-vl-235b",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       },
       "public": {
@@ -2426,6 +2556,19 @@
         "attribute": "routes.after",
         "value": "91.2521428689001"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.816,
+       "pages": 20,
+       "pages_under": 4,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3.8-flash",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -2542,6 +2685,19 @@
         "route": "gemini3.5-flash-lite",
         "attribute": "routes.after",
         "value": "91.96139224050691"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.863,
+       "pages": 20,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gemini3.5-flash-lite",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       }
      },
@@ -2661,6 +2817,19 @@
         "attribute": "routes.after",
         "value": "86.5519455987983"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.85,
+       "pages": 19,
+       "pages_under": 3,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gemini3.1-flash-lite",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -2778,6 +2947,19 @@
         "attribute": "routes.after",
         "value": "85.2024228542696"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.818,
+       "pages": 19,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gpt5.6-luna",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -2890,6 +3072,19 @@
         "route": "qwen3.5-397b",
         "attribute": "routes.after",
         "value": "90.83658715925219"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.863,
+       "pages": 20,
+       "pages_under": 3,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3.5-397b",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       }
      },
@@ -3007,6 +3202,19 @@
         "route": "gemini3.8-flash",
         "attribute": "routes.after",
         "value": "95.81102963099426"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.873,
+       "pages": 20,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gemini3.8-flash",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       },
       "public": {
@@ -3173,6 +3381,19 @@
         "route": "gemini3.7-flash-gw",
         "attribute": "routes.after",
         "value": "95.05355630985682"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.873,
+       "pages": 20,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gemini3.7-flash-gw",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       },
       "public_L1-L3": {
@@ -3406,6 +3627,19 @@
         "attribute": "routes.after",
         "value": "93.97538136517502"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.873,
+       "pages": 20,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gemini3.1-pro",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -3522,6 +3756,19 @@
         "route": "gemini3.5-flash",
         "attribute": "routes.after",
         "value": "92.68903351936957"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.871,
+       "pages": 20,
+       "pages_under": 3,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gemini3.5-flash",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       }
      },
@@ -3640,6 +3887,19 @@
         "attribute": "routes.after",
         "value": "89.12529760438555"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.836,
+       "pages": 20,
+       "pages_under": 3,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "gpt5.4-mini",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -3754,6 +4014,19 @@
         "attribute": "routes.after",
         "value": "92.19542619622187"
        }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.821,
+       "pages": 20,
+       "pages_under": 4,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "mistral-large4",
+        "attribute": "rows.reflows",
+        "value": "False"
+       }
       }
      },
      "cost": {
@@ -3866,6 +4139,19 @@
         "route": "mistral-ocr",
         "attribute": "routes.after",
         "value": "89.10237931036352"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.893,
+       "pages": 20,
+       "pages_under": 1,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "mistral-ocr",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       }
      },
@@ -3980,6 +4266,19 @@
         "route": "claude-sonnet5.5",
         "attribute": "routes.after",
         "value": "92.49943655098609"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.863,
+       "pages": 20,
+       "pages_under": 2,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "claude-sonnet5.5",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       }
      },
@@ -4310,6 +4609,19 @@
         "route": "qwen3.5-27b (FarmShare panel)",
         "attribute": "routes.after",
         "value": "92.2332419470262"
+       }
+      },
+      "reflows": {
+       "value": false,
+       "median_line_share": 0.754,
+       "pages": 20,
+       "pages_under": 8,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "qwen3.5-27b (FarmShare panel)",
+        "attribute": "rows.reflows",
+        "value": "False"
        }
       },
       "public_L1-L3": {
@@ -4749,6 +5061,19 @@
         "value": "91.76415902321719"
        }
       },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.121,
+       "pages": 20,
+       "pages_under": 20,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "infinity-parser2-pro",
+        "attribute": "rows.reflows",
+        "value": "True"
+       }
+      },
       "public_L1-L3": {
        "value": 89.3,
        "n": 240,
@@ -4973,6 +5298,19 @@
         "route": "lightonocr3-4b",
         "attribute": "routes.after",
         "value": "89.21090650255938"
+       }
+      },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.28,
+       "pages": 20,
+       "pages_under": 19,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "lightonocr3-4b",
+        "attribute": "rows.reflows",
+        "value": "True"
        }
       },
       "public_L1-L3": {
@@ -5204,6 +5542,19 @@
         "value": "80.22445975746339"
        }
       },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.459,
+       "pages": 20,
+       "pages_under": 11,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "paddleocr-vl1.6",
+        "attribute": "rows.reflows",
+        "value": "True"
+       }
+      },
       "public": {
        "basis": "[NES strict, NES answered, answered/n]",
        "truth": "public (independent of the routes)",
@@ -5411,6 +5762,19 @@
         "route": "xiaomi-ocr-0",
         "attribute": "routes.after",
         "value": "86.17791752578988"
+       }
+      },
+      "reflows": {
+       "value": true,
+       "median_line_share": 0.33,
+       "pages": 20,
+       "pages_under": 15,
+       "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/reader-keeps-lines.json",
+        "route": "xiaomi-ocr-0",
+        "attribute": "rows.reflows",
+        "value": "True"
        }
       },
       "public_L1-L3": {

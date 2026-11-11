@@ -33,8 +33,11 @@ calls 6 s a page the hand route's time, which is blla's detection alone [M] `pla
   page where under half of them anchor (F-placement §6.4) [M]. Fallback: `vision-own`.
 - Handwritten and mixed pages, switch on: `hand-blla-ctc`, the `conf` matcher pick (the higher mean CTC confidence of
   `s1` and `s8` per page), the 0.67 gate. Fallback per page: `text-page`, named in the run report. A reader flagged
-  `reflows` in stage 04's table (measured: LightOnOCR-3 4B) goes to `text-page` on every hand page, since the gate does
-  not rescue it (21.5% line pass, 8 of 20 pages gated) [M] `place-hands-lines.md`, `place-hands.md`.
+  `reflows` in stage 04's table goes to `text-page` on every hand page, since the gate does not rescue it (LightOnOCR-3
+  4B: 21.5% line pass, 8 of 20 pages gated) [M] `place-hands-lines.md`, `place-hands.md`. Measured for every hands
+  reader (W46.reader-keeps-lines): 7 of 28 reflow, their median page keeping 0.12 to 0.46 of blla's lines
+  (Infinity-Parser2-Pro, LightOnOCR-3 both builds, PaddleOCR-VL 1.6 both, Xiaomi-OCR-0 both); the other 21 keep
+  0.75 to 0.98, Qwen3.5 27B the closest [M] `reader-keeps-lines.md`.
 - Writer: the lab's SearchableWriter (one level run per line, font fitted, 0.25 em reserve) on every kind. One sloped
   run per line loses (−7.4, −10.7 to −4.2) [M] `place-geom.md`; per-word runs lose on owner hands (lab +8.4, +1.2 to
   +15.1) [M] `place-hands-lines.md`.
@@ -185,8 +188,8 @@ Decided on 2026-11-06 (section "Owner's calls (2026-11-06)" below); kept as the 
 - **W46.place-print-pp-lines** (medium, $0): the lab writer over PP-OCRv6 det lines on the 40 typed pages, line pass
   folded and unfolded, and the largest image side at which PP-OCRv6 det fits a 16 GB Mac. Done: a row beside
   `vision-lines-aligned`.
-- **W46.reader-keeps-lines** (small, $0, saved readings): for every stage 04 reader of hands, the reading's line count
-  against blla's detected lines on the 20 owner hand pages. Done: a `reflows` flag per reader row.
+- ~~**W46.reader-keeps-lines**~~ shipped 2026-11-11: a `reflows` flag on every stage 04 hands row
+  (`reader-keeps-lines.md`).
 - **W46.place-pdfa** (small, $0): the writer declares PDF/A-2b and writes complete ToUnicode maps; veraPDF passes.
 - **W46.place-header-carrier** (small, spec): the Processor's page-2 metadata header needs a carrier (XMP or Info) before
   a layer-only output; until then the text page stays as the header's home (F-placement §6.7.4).

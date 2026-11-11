@@ -4,7 +4,7 @@
 The schema is execution-plans/processing-review/13-stage-rules/00-index.md §"The table schema". Where the rows come from:
 
 - Reading (stage 04), single routes: computed here from the bench's own files (panel-data.json, ocr-hands-rescore.json,
-  ocr-scorers.json, ocr-ppocrv6-hands.json, and the Mac speed and memory tables of ocr-mac-local*.md). No figure is
+  ocr-scorers.json, ocr-ppocrv6-hands.json, reader-keeps-lines.json, and the Mac speed and memory tables of ocr-mac-local*.md). No figure is
   computed from other figures; values are rounded to two places from the raw value the `source` holds.
 - Every other row, the reading stage's cascade rows, and the stage objects the notes give: the JSON blocks of each
   stage note's section 4 (13-stage-rules/NN-*.md), each figure carrying its `source`. Stage headers a note gives only in
@@ -87,6 +87,7 @@ PD = "ArchiveOCRBench/data/panel-data.json"
 HR = "ArchiveProcessor/segbench-results/ocr-hands-rescore.json"
 SC = "ArchiveProcessor/segbench-results/ocr-scorers.json"
 PH = "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json"
+KL = "ArchiveProcessor/segbench-results/reader-keeps-lines.json"
 ML = "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md"
 M8 = "ArchiveProcessor/segbench-results/ocr-mac-local.md"
 
@@ -132,6 +133,7 @@ def reading_rows():
     ph = load(PH)
     l13 = {r["route"]: r for r in ph["public"]}
     ownhand = ph["owner_hand"]
+    keeps = {r["reading"]: r for r in load(KL)["rows"] if r["pages"]}
 
     def figs(hid=None, cid=None, hk=None, pk=None, lk=None, ohk=None):
         F = {}
@@ -154,6 +156,11 @@ def reading_rows():
                             "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)", "source": src(HR, hk, "routes.after", h["after"])}
         if ohk and ohk in ownhand:
             F["hands16"] = {"value": r2(ownhand[ohk]), "n": 16, "truth": "owner-96 after the hand sheet", "source": src(PH, ohk, "owner_hand", ownhand[ohk])}
+        k = keeps.get(F["hands16"]["source"]["route"]) if "hands16" in F else None
+        if k:  # W46.reader-keeps-lines: a reflowing reader's hand pages get the text page (05-placement.md)
+            F["reflows"] = {"value": k["reflows"], "median_line_share": k["median_ratio"], "pages": k["pages"], "pages_under": k["pages_under"],
+                            "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
+                            "source": src(KL, k["reading"], "rows.reflows", k["reflows"])}
         if lk and lk in l13:
             x = l13[lk]
             F["public_L1-L3"] = {"value": r2(x["nes"]), "n": x["n"], "strata": {k: r2(v) for k, v in x["strata"].items()}, "empty": x["empty"],
@@ -380,7 +387,7 @@ ORDER = [("01-reading-copy.md", "reading-copy"), ("02-ocr-input.md", "ocr-input"
 # The figure key each stage's metric is read from: "<kind>" means the key named for the kind being ranked.
 METRIC_FIGURE = {
  "reading-copy": "owner-heldout", "ocr-input": None, "layout": "<kind>", "marks": None, "capture": None,
- "reading": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten",
+ "reading": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten, and reflows (the reader joins the page's lines; its hand pages get the text page)",
  "placement": "<kind>", "segmentation": "test-boxes", "dating": "not_in_text", "entities": "sender", "kinds": "<kind>",
  "training-kit": "per row: each figure names its own metric",
 }

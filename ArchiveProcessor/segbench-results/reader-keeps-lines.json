@@ -1,0 +1,3843 @@
+{
+ "item": "W46.reader-keeps-lines",
+ "pages": [
+  "p007",
+  "p009",
+  "p015",
+  "p022",
+  "p031",
+  "p040",
+  "p045",
+  "p046",
+  "p047",
+  "p048",
+  "p049",
+  "p050",
+  "p051",
+  "p052",
+  "p053",
+  "p055",
+  "p056",
+  "p086",
+  "p094",
+  "p096"
+ ],
+ "reflow_below": 0.7,
+ "splits_at": 1.5,
+ "blla_lines": 590,
+ "truth_lines": 559,
+ "rows": [
+  {
+   "id": "infinity-parser2-pro-sherlock",
+   "name": "Infinity-Parser2-Pro 35B-A3B (your cluster)",
+   "reading": "infinity-parser2-pro",
+   "pages": 20,
+   "lines": 85,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.121,
+   "median_truth_ratio": 0.156,
+   "pages_under": 20,
+   "reflows": true,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 3,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.15
+    },
+    "p009": {
+     "lines": 15,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.273
+    },
+    "p015": {
+     "lines": 3,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.071
+    },
+    "p022": {
+     "lines": 2,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.048
+    },
+    "p031": {
+     "lines": 11,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.55
+    },
+    "p040": {
+     "lines": 1,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.032
+    },
+    "p045": {
+     "lines": 3,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.2
+    },
+    "p046": {
+     "lines": 4,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.235
+    },
+    "p047": {
+     "lines": 1,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.029
+    },
+    "p048": {
+     "lines": 4,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.093
+    },
+    "p049": {
+     "lines": 6,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.24
+    },
+    "p050": {
+     "lines": 3,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.075
+    },
+    "p051": {
+     "lines": 5,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.25
+    },
+    "p052": {
+     "lines": 6,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.231
+    },
+    "p053": {
+     "lines": 3,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.091
+    },
+    "p055": {
+     "lines": 6,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.25
+    },
+    "p056": {
+     "lines": 2,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.083
+    },
+    "p086": {
+     "lines": 2,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.065
+    },
+    "p094": {
+     "lines": 2,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 0.25
+    },
+    "p096": {
+     "lines": 3,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.075
+    }
+   }
+  },
+  {
+   "id": "lightonocr3-4b-farmshare",
+   "name": "LightOnOCR-3 4B (your cluster)",
+   "reading": "lightonocr3-4b",
+   "pages": 20,
+   "lines": 187,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.28,
+   "median_truth_ratio": 0.311,
+   "pages_under": 19,
+   "reflows": true,
+   "splits": false,
+   "line_pass": 21.5,
+   "per_page": {
+    "p007": {
+     "lines": 7,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.35
+    },
+    "p009": {
+     "lines": 34,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.618
+    },
+    "p015": {
+     "lines": 30,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.714
+    },
+    "p022": {
+     "lines": 13,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.31
+    },
+    "p031": {
+     "lines": 13,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.65
+    },
+    "p040": {
+     "lines": 4,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.129
+    },
+    "p045": {
+     "lines": 4,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.267
+    },
+    "p046": {
+     "lines": 5,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.294
+    },
+    "p047": {
+     "lines": 8,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.235
+    },
+    "p048": {
+     "lines": 10,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.233
+    },
+    "p049": {
+     "lines": 10,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.4
+    },
+    "p050": {
+     "lines": 4,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.1
+    },
+    "p051": {
+     "lines": 8,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.4
+    },
+    "p052": {
+     "lines": 10,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.385
+    },
+    "p053": {
+     "lines": 4,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.121
+    },
+    "p055": {
+     "lines": 8,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.333
+    },
+    "p056": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.208
+    },
+    "p086": {
+     "lines": 3,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.097
+    },
+    "p094": {
+     "lines": 2,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 0.25
+    },
+    "p096": {
+     "lines": 5,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.125
+    }
+   }
+  },
+  {
+   "id": "lightonocr-3-4b-mlx8",
+   "name": "LightOnOCR-3 4B 8-bit (Mac)",
+   "reading": "lightonocr-3-4b-mlx8",
+   "pages": 20,
+   "lines": 195,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.289,
+   "median_truth_ratio": 0.311,
+   "pages_under": 18,
+   "reflows": true,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 7,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.35
+    },
+    "p009": {
+     "lines": 36,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.655
+    },
+    "p015": {
+     "lines": 30,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.714
+    },
+    "p022": {
+     "lines": 13,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.31
+    },
+    "p031": {
+     "lines": 13,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.65
+    },
+    "p040": {
+     "lines": 4,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.129
+    },
+    "p045": {
+     "lines": 4,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.267
+    },
+    "p046": {
+     "lines": 15,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.882
+    },
+    "p047": {
+     "lines": 8,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.235
+    },
+    "p048": {
+     "lines": 10,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.233
+    },
+    "p049": {
+     "lines": 8,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.32
+    },
+    "p050": {
+     "lines": 4,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.1
+    },
+    "p051": {
+     "lines": 8,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.4
+    },
+    "p052": {
+     "lines": 7,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.269
+    },
+    "p053": {
+     "lines": 4,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.121
+    },
+    "p055": {
+     "lines": 8,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.333
+    },
+    "p056": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.208
+    },
+    "p086": {
+     "lines": 3,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.097
+    },
+    "p094": {
+     "lines": 3,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 0.375
+    },
+    "p096": {
+     "lines": 5,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.125
+    }
+   }
+  },
+  {
+   "id": "paddleocr-vl1.6-bf16",
+   "name": "PaddleOCR-VL 1.6 bf16 (Mac)",
+   "reading": "paddleocr-vl1.6-bf16",
+   "pages": 19,
+   "lines": 271,
+   "blla": 582,
+   "truth": 543,
+   "median_ratio": 0.3,
+   "median_truth_ratio": 0.467,
+   "pages_under": 12,
+   "reflows": true,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p009": {
+     "lines": 34,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.618
+    },
+    "p015": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.952
+    },
+    "p022": {
+     "lines": 12,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.286
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 4,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.129
+    },
+    "p045": {
+     "lines": 3,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.2
+    },
+    "p046": {
+     "lines": 15,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.882
+    },
+    "p047": {
+     "lines": 1,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.029
+    },
+    "p048": {
+     "lines": 10,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.233
+    },
+    "p049": {
+     "lines": 15,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.6
+    },
+    "p050": {
+     "lines": 31,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.775
+    },
+    "p051": {
+     "lines": 6,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.3
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 4,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.121
+    },
+    "p055": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.208
+    },
+    "p056": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.208
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p096": {
+     "lines": 4,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.1
+    }
+   }
+  },
+  {
+   "id": "xiaomi-ocr-0-bf16",
+   "name": "Xiaomi-OCR-0 bf16 (Mac)",
+   "reading": "xiaomi-ocr-0-bf16",
+   "pages": 20,
+   "lines": 253,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.33,
+   "median_truth_ratio": 0.343,
+   "pages_under": 15,
+   "reflows": true,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 7,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.35
+    },
+    "p009": {
+     "lines": 28,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.509
+    },
+    "p015": {
+     "lines": 31,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.738
+    },
+    "p022": {
+     "lines": 13,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.31
+    },
+    "p031": {
+     "lines": 13,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.65
+    },
+    "p040": {
+     "lines": 1,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.032
+    },
+    "p045": {
+     "lines": 3,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.2
+    },
+    "p046": {
+     "lines": 6,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.353
+    },
+    "p047": {
+     "lines": 9,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.265
+    },
+    "p048": {
+     "lines": 7,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.163
+    },
+    "p049": {
+     "lines": 9,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.36
+    },
+    "p050": {
+     "lines": 12,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.3
+    },
+    "p051": {
+     "lines": 5,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.25
+    },
+    "p052": {
+     "lines": 7,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.269
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 3,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.125
+    },
+    "p056": {
+     "lines": 3,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.125
+    },
+    "p086": {
+     "lines": 26,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.839
+    },
+    "p094": {
+     "lines": 15,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 1.875
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "xiaomi-ocr-0-sherlock",
+   "name": "Xiaomi-OCR-0 (your cluster)",
+   "reading": "xiaomi-ocr-0",
+   "pages": 20,
+   "lines": 253,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.33,
+   "median_truth_ratio": 0.343,
+   "pages_under": 15,
+   "reflows": true,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 7,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.35
+    },
+    "p009": {
+     "lines": 28,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.509
+    },
+    "p015": {
+     "lines": 31,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.738
+    },
+    "p022": {
+     "lines": 13,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.31
+    },
+    "p031": {
+     "lines": 13,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.65
+    },
+    "p040": {
+     "lines": 1,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.032
+    },
+    "p045": {
+     "lines": 3,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.2
+    },
+    "p046": {
+     "lines": 6,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.353
+    },
+    "p047": {
+     "lines": 9,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.265
+    },
+    "p048": {
+     "lines": 7,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.163
+    },
+    "p049": {
+     "lines": 10,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.4
+    },
+    "p050": {
+     "lines": 11,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.275
+    },
+    "p051": {
+     "lines": 5,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.25
+    },
+    "p052": {
+     "lines": 7,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.269
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 3,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.125
+    },
+    "p056": {
+     "lines": 3,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.125
+    },
+    "p086": {
+     "lines": 26,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.839
+    },
+    "p094": {
+     "lines": 15,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 1.875
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "paddleocr-vl1.6-sherlock",
+   "name": "PaddleOCR-VL 1.6 (your cluster)",
+   "reading": "paddleocr-vl1.6",
+   "pages": 20,
+   "lines": 291,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.459,
+   "median_truth_ratio": 0.471,
+   "pages_under": 11,
+   "reflows": true,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p009": {
+     "lines": 34,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.618
+    },
+    "p015": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.952
+    },
+    "p022": {
+     "lines": 12,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.286
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 4,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.129
+    },
+    "p045": {
+     "lines": 3,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.2
+    },
+    "p046": {
+     "lines": 15,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.882
+    },
+    "p047": {
+     "lines": 1,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.029
+    },
+    "p048": {
+     "lines": 10,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.233
+    },
+    "p049": {
+     "lines": 18,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.72
+    },
+    "p050": {
+     "lines": 31,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.775
+    },
+    "p051": {
+     "lines": 6,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.3
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 4,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.121
+    },
+    "p055": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.208
+    },
+    "p056": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.208
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 18,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.25
+    },
+    "p096": {
+     "lines": 3,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.075
+    }
+   }
+  },
+  {
+   "id": "qwen3.5-27b-farmshare",
+   "name": "Qwen3.5 27B (your cluster)",
+   "reading": "qwen3.5-27b (FarmShare panel)",
+   "pages": 20,
+   "lines": 390,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.754,
+   "median_truth_ratio": 0.843,
+   "pages_under": 8,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 38,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.691
+    },
+    "p015": {
+     "lines": 32,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.762
+    },
+    "p022": {
+     "lines": 13,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.31
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p045": {
+     "lines": 4,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.267
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 20,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.8
+    },
+    "p050": {
+     "lines": 36,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.9
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 10,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.417
+    },
+    "p056": {
+     "lines": 5,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.208
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 4,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.1
+    }
+   }
+  },
+  {
+   "id": "qwen3.8-flash",
+   "name": "Qwen3.8 Flash (OpenRouter)",
+   "reading": "qwen3.8-flash",
+   "pages": 20,
+   "lines": 467,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.816,
+   "median_truth_ratio": 0.956,
+   "pages_under": 4,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 56,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 1.018
+    },
+    "p015": {
+     "lines": 42,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.0
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 7,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.175
+    },
+    "p051": {
+     "lines": 8,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.4
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 18,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.75
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "gpt5.6-luna",
+   "name": "GPT-5.6 Luna (OpenRouter)",
+   "reading": "gpt5.6-luna",
+   "pages": 19,
+   "lines": 457,
+   "blla": 550,
+   "truth": 525,
+   "median_ratio": 0.818,
+   "median_truth_ratio": 0.964,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p009": {
+     "lines": 45,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.818
+    },
+    "p015": {
+     "lines": 52,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.238
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 16,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.067
+    },
+    "p046": {
+     "lines": 15,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.882
+    },
+    "p047": {
+     "lines": 24,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.706
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 31,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.775
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 17,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.708
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 4,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 0.5
+    }
+   }
+  },
+  {
+   "id": "mistral-large4",
+   "name": "Mistral Large 4",
+   "reading": "mistral-large4",
+   "pages": 20,
+   "lines": 471,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.821,
+   "median_truth_ratio": 0.932,
+   "pages_under": 4,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p009": {
+     "lines": 45,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.818
+    },
+    "p015": {
+     "lines": 45,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.071
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p045": {
+     "lines": 4,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 0.267
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 18,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.72
+    },
+    "p050": {
+     "lines": 33,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.825
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 10,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.417
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 15,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 1.875
+    },
+    "p096": {
+     "lines": 28,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.7
+    }
+   }
+  },
+  {
+   "id": "qwen3.6-27b",
+   "name": "Qwen3.6 27B (OpenRouter, hosted fp8)",
+   "reading": "qwen3.6-27b",
+   "pages": 20,
+   "lines": 468,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.825,
+   "median_truth_ratio": 0.951,
+   "pages_under": 3,
+   "reflows": false,
+   "splits": false,
+   "line_pass": 42.9,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 39,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.709
+    },
+    "p015": {
+     "lines": 46,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.095
+    },
+    "p022": {
+     "lines": 13,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.31
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 23,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.676
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 20,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.8
+    },
+    "p050": {
+     "lines": 36,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.9
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 19,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.792
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 29,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.725
+    }
+   }
+  },
+  {
+   "id": "gpt5.4-mini",
+   "name": "GPT-5.4 Mini",
+   "reading": "gpt5.4-mini",
+   "pages": 20,
+   "lines": 494,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.836,
+   "median_truth_ratio": 0.954,
+   "pages_under": 3,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 39,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.709
+    },
+    "p015": {
+     "lines": 50,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.19
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 23,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.676
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 38,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.95
+    },
+    "p051": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 16,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.667
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 29,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.725
+    }
+   }
+  },
+  {
+   "id": "qwen3-vl-8b-mlx4",
+   "name": "Qwen3-VL 8B 4-bit (Mac)",
+   "reading": "qwen3-vl-8b-mlx4",
+   "pages": 19,
+   "lines": 492,
+   "blla": 570,
+   "truth": 529,
+   "median_ratio": 0.85,
+   "median_truth_ratio": 0.96,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p009": {
+     "lines": 53,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.964
+    },
+    "p015": {
+     "lines": 42,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.0
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p040": {
+     "lines": 31,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 1.0
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 14,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.824
+    },
+    "p047": {
+     "lines": 23,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.676
+    },
+    "p048": {
+     "lines": 22,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.512
+    },
+    "p049": {
+     "lines": 21,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.84
+    },
+    "p050": {
+     "lines": 39,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.975
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 24,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.727
+    },
+    "p055": {
+     "lines": 18,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.75
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 26,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.839
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 28,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.7
+    }
+   }
+  },
+  {
+   "id": "gemini3.1-flash-lite",
+   "name": "Gemini 3.1 Flash-Lite",
+   "reading": "gemini3.1-flash-lite",
+   "pages": 19,
+   "lines": 435,
+   "blla": 557,
+   "truth": 534,
+   "median_ratio": 0.85,
+   "median_truth_ratio": 0.941,
+   "pages_under": 3,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 44,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.8
+    },
+    "p015": {
+     "lines": 41,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.976
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 31,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.775
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p055": {
+     "lines": 19,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.792
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 4,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.1
+    }
+   }
+  },
+  {
+   "id": "qwen3-vl-235b",
+   "name": "Qwen3-VL 235B (OpenRouter)",
+   "reading": "qwen3-vl-235b",
+   "pages": 20,
+   "lines": 490,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.863,
+   "median_truth_ratio": 0.942,
+   "pages_under": 4,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.7
+    },
+    "p009": {
+     "lines": 50,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.909
+    },
+    "p015": {
+     "lines": 41,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.976
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 17,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.68
+    },
+    "p050": {
+     "lines": 33,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.825
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 16,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.667
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p094": {
+     "lines": 17,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.125
+    },
+    "p096": {
+     "lines": 31,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.775
+    }
+   }
+  },
+  {
+   "id": "gemini3.5-flash-lite",
+   "name": "Gemini 3.5 Flash-Lite",
+   "reading": "gemini3.5-flash-lite",
+   "pages": 20,
+   "lines": 494,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.863,
+   "median_truth_ratio": 0.964,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p009": {
+     "lines": 47,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.855
+    },
+    "p015": {
+     "lines": 41,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.976
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 37,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.925
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 17,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.708
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "qwen3.5-397b",
+   "name": "Qwen3.5 397B (OpenRouter)",
+   "reading": "qwen3.5-397b",
+   "pages": 20,
+   "lines": 504,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.863,
+   "median_truth_ratio": 1.0,
+   "pages_under": 3,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 46,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.836
+    },
+    "p015": {
+     "lines": 47,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.119
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 13,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.65
+    },
+    "p040": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 23,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.676
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 37,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.925
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 19,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.792
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "claude-sonnet5.5",
+   "name": "Claude Sonnet 5.5 (your Claude plan)",
+   "reading": "claude-sonnet5.5",
+   "pages": 20,
+   "lines": 500,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.863,
+   "median_truth_ratio": 0.982,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p009": {
+     "lines": 47,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.855
+    },
+    "p015": {
+     "lines": 42,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.0
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 37,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.925
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 28,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.848
+    },
+    "p055": {
+     "lines": 19,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.792
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 17,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.125
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "gemini3.5-flash",
+   "name": "Gemini 3.5 Flash",
+   "reading": "gemini3.5-flash",
+   "pages": 20,
+   "lines": 488,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.871,
+   "median_truth_ratio": 0.925,
+   "pages_under": 3,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.7
+    },
+    "p009": {
+     "lines": 49,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.891
+    },
+    "p015": {
+     "lines": 45,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.071
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 37,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.925
+    },
+    "p051": {
+     "lines": 8,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.4
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 17,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.708
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "gemini3.8-flash",
+   "name": "Gemini 3.8 Flash",
+   "reading": "gemini3.8-flash",
+   "pages": 20,
+   "lines": 494,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.873,
+   "median_truth_ratio": 0.947,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": 41.3,
+   "per_page": {
+    "p007": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.7
+    },
+    "p009": {
+     "lines": 51,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.927
+    },
+    "p015": {
+     "lines": 42,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.0
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 20,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.465
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 37,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.925
+    },
+    "p051": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 17,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.708
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "gemini3.7-flash-gw",
+   "name": "Gemini 3.7 Flash (Stanford gateway)",
+   "reading": "gemini3.7-flash-gw",
+   "pages": 20,
+   "lines": 497,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.873,
+   "median_truth_ratio": 0.963,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.7
+    },
+    "p009": {
+     "lines": 51,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.927
+    },
+    "p015": {
+     "lines": 44,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.048
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.75
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 35,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.875
+    },
+    "p051": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 17,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.708
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "gemini3.1-pro",
+   "name": "Gemini 3.1 Pro",
+   "reading": "gemini3.1-pro",
+   "pages": 20,
+   "lines": 497,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.873,
+   "median_truth_ratio": 0.945,
+   "pages_under": 2,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.7
+    },
+    "p009": {
+     "lines": 49,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.891
+    },
+    "p015": {
+     "lines": 44,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.048
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 19,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.76
+    },
+    "p050": {
+     "lines": 38,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.95
+    },
+    "p051": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.8
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 17,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.708
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "qwen3.6-35b-a3b",
+   "name": "Qwen3.6 35B-A3B (OpenRouter)",
+   "reading": "qwen3.6-35b-a3b",
+   "pages": 20,
+   "lines": 536,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.875,
+   "median_truth_ratio": 0.964,
+   "pages_under": 1,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 47,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.855
+    },
+    "p015": {
+     "lines": 52,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.238
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 14,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.7
+    },
+    "p040": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 21,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.618
+    },
+    "p048": {
+     "lines": 51,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 1.186
+    },
+    "p049": {
+     "lines": 20,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.8
+    },
+    "p050": {
+     "lines": 35,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.875
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 18,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.75
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "qwen3.5-9b-mlx4",
+   "name": "Qwen3.5 9B 4-bit (Mac)",
+   "reading": "qwen3.5-9b-mlx4",
+   "pages": 20,
+   "lines": 473,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.881,
+   "median_truth_ratio": 1.0,
+   "pages_under": 4,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 15,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.75
+    },
+    "p009": {
+     "lines": 58,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 1.055
+    },
+    "p015": {
+     "lines": 48,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.143
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 27,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 1.35
+    },
+    "p040": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 15,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.882
+    },
+    "p047": {
+     "lines": 23,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.676
+    },
+    "p048": {
+     "lines": 21,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.488
+    },
+    "p049": {
+     "lines": 22,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.88
+    },
+    "p050": {
+     "lines": 5,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.125
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 18,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.75
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 28,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.903
+    },
+    "p094": {
+     "lines": 17,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.125
+    },
+    "p096": {
+     "lines": 5,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.125
+    }
+   }
+  },
+  {
+   "id": "mistral-ocr-4-1",
+   "name": "Mistral OCR 4.1 (vendor service)",
+   "reading": "mistral-ocr",
+   "pages": 20,
+   "lines": 548,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.893,
+   "median_truth_ratio": 1.0,
+   "pages_under": 1,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 31,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 1.55
+    },
+    "p009": {
+     "lines": 45,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.818
+    },
+    "p015": {
+     "lines": 38,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 0.905
+    },
+    "p022": {
+     "lines": 37,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.881
+    },
+    "p031": {
+     "lines": 19,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.95
+    },
+    "p040": {
+     "lines": 39,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 1.258
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 17,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 1.0
+    },
+    "p047": {
+     "lines": 23,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.676
+    },
+    "p048": {
+     "lines": 42,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.977
+    },
+    "p049": {
+     "lines": 22,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.88
+    },
+    "p050": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.75
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 29,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 1.208
+    },
+    "p056": {
+     "lines": 21,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 0.875
+    },
+    "p086": {
+     "lines": 27,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.871
+    },
+    "p094": {
+     "lines": 16,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 2.0
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "ppocrv6-kraken-blla",
+   "name": "kraken PP-OCRv6 medium on blla lines (Mac CPU)",
+   "reading": "ppocrv6-kraken-blla",
+   "pages": 20,
+   "lines": 536,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.946,
+   "median_truth_ratio": 1.0,
+   "pages_under": 1,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 18,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.9
+    },
+    "p009": {
+     "lines": 49,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.891
+    },
+    "p015": {
+     "lines": 42,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.0
+    },
+    "p022": {
+     "lines": 40,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.952
+    },
+    "p031": {
+     "lines": 16,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 0.8
+    },
+    "p040": {
+     "lines": 31,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 1.0
+    },
+    "p045": {
+     "lines": 15,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.0
+    },
+    "p046": {
+     "lines": 16,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.941
+    },
+    "p047": {
+     "lines": 27,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.794
+    },
+    "p048": {
+     "lines": 42,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 0.977
+    },
+    "p049": {
+     "lines": 22,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.88
+    },
+    "p050": {
+     "lines": 39,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.975
+    },
+    "p051": {
+     "lines": 17,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.85
+    },
+    "p052": {
+     "lines": 25,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 0.962
+    },
+    "p053": {
+     "lines": 32,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.97
+    },
+    "p055": {
+     "lines": 20,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 0.833
+    },
+    "p056": {
+     "lines": 24,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 1.0
+    },
+    "p086": {
+     "lines": 30,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.968
+    },
+    "p094": {
+     "lines": 1,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 0.125
+    },
+    "p096": {
+     "lines": 30,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.75
+    }
+   }
+  },
+  {
+   "id": "apple-vision",
+   "name": "Apple Vision (built in, macOS 27.2)",
+   "reading": "apple-vision",
+   "pages": 20,
+   "lines": 549,
+   "blla": 590,
+   "truth": 559,
+   "median_ratio": 0.975,
+   "median_truth_ratio": 0.963,
+   "pages_under": 4,
+   "reflows": false,
+   "splits": false,
+   "line_pass": null,
+   "per_page": {
+    "p007": {
+     "lines": 20,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 1.0
+    },
+    "p009": {
+     "lines": 51,
+     "blla": 55,
+     "truth": 53,
+     "ratio": 0.927
+    },
+    "p015": {
+     "lines": 45,
+     "blla": 42,
+     "truth": 53,
+     "ratio": 1.071
+    },
+    "p022": {
+     "lines": 19,
+     "blla": 42,
+     "truth": 40,
+     "ratio": 0.452
+    },
+    "p031": {
+     "lines": 20,
+     "blla": 20,
+     "truth": 30,
+     "ratio": 1.0
+    },
+    "p040": {
+     "lines": 22,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 0.71
+    },
+    "p045": {
+     "lines": 16,
+     "blla": 15,
+     "truth": 15,
+     "ratio": 1.067
+    },
+    "p046": {
+     "lines": 14,
+     "blla": 17,
+     "truth": 17,
+     "ratio": 0.824
+    },
+    "p047": {
+     "lines": 10,
+     "blla": 34,
+     "truth": 27,
+     "ratio": 0.294
+    },
+    "p048": {
+     "lines": 43,
+     "blla": 43,
+     "truth": 21,
+     "ratio": 1.0
+    },
+    "p049": {
+     "lines": 18,
+     "blla": 25,
+     "truth": 22,
+     "ratio": 0.72
+    },
+    "p050": {
+     "lines": 26,
+     "blla": 40,
+     "truth": 51,
+     "ratio": 0.65
+    },
+    "p051": {
+     "lines": 19,
+     "blla": 20,
+     "truth": 16,
+     "ratio": 0.95
+    },
+    "p052": {
+     "lines": 26,
+     "blla": 26,
+     "truth": 27,
+     "ratio": 1.0
+    },
+    "p053": {
+     "lines": 25,
+     "blla": 33,
+     "truth": 25,
+     "ratio": 0.758
+    },
+    "p055": {
+     "lines": 25,
+     "blla": 24,
+     "truth": 19,
+     "ratio": 1.042
+    },
+    "p056": {
+     "lines": 31,
+     "blla": 24,
+     "truth": 21,
+     "ratio": 1.292
+    },
+    "p086": {
+     "lines": 63,
+     "blla": 31,
+     "truth": 28,
+     "ratio": 2.032
+    },
+    "p094": {
+     "lines": 30,
+     "blla": 8,
+     "truth": 16,
+     "ratio": 3.75
+    },
+    "p096": {
+     "lines": 26,
+     "blla": 40,
+     "truth": 34,
+     "ratio": 0.65
+    }
+   }
+  }
+ ]
+}
