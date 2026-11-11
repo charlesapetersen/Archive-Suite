@@ -11,6 +11,14 @@
 // "is not hittable" / "seam must be drivable" — one harness geometry problem wearing four product-bug
 // costumes. The guest advertises 16 modes up to 3840×2400; it simply had not been asked for one.
 //
+// 1× ONLY (W40.vm-macos27-harness, measured 2026-11-10). The macOS 27.2 guest boots at 1920×1200 POINTS
+// backed by 3840×2400 PIXELS (2×, HiDPI); macOS 26 came up at 1×. The old point-size-only check read that
+// as "already 1920×1200 — nothing to do", so every screenshot doubled (the snapshot reference went
+// 300×180 → 600×360) and pixel checks that crop by point frames sampled the wrong place (contrast 1.0:1,
+// the transient recorder's "no watched section changed"). The guest lists a 1× 1920×1200 mode only
+// when asked for the low-resolution duplicates, so this asks for them and requires
+// pixelWidth == width; the current mode counts as "already there" only when it is 1× too.
+//
 // USAGE:  swift vm-set-display.swift [WIDTH] [HEIGHT]        (default 1920 1200)
 // Exits 0 when the display already meets the target or was switched successfully; non-zero otherwise,
 // with the reason on stderr — the callers WARN loudly rather than dying, because a too-small display
@@ -30,15 +38,23 @@ let wantH = args.count > 2 ? (Int(args[2]) ?? 1200) : 1200
 let display = CGMainDisplayID()
 guard display != 0 else { fail(2, "no main display — is a WindowServer session running in this guest?") }
 
-let curW = CGDisplayPixelsWide(display), curH = CGDisplayPixelsHigh(display)
-if curW >= wantW && curH >= wantH {
-    print("vm-set-display: already \(curW)×\(curH) (target \(wantW)×\(wantH)) — nothing to do")
+func describe(_ m: CGDisplayMode?) -> String {
+    guard let m else { return "?" }
+    return m.pixelWidth == m.width ? "\(m.width)×\(m.height)" : "\(m.width)×\(m.height)@\(m.pixelWidth / max(m.width, 1))x"
+}
+let current = CGDisplayCopyDisplayMode(display)
+let curW = current?.width ?? CGDisplayPixelsWide(display), curH = current?.height ?? CGDisplayPixelsHigh(display)
+let curIs1x = current.map { $0.pixelWidth == $0.width } ?? true
+if curW >= wantW && curH >= wantH && curIs1x {
+    print("vm-set-display: already \(describe(current)) (target \(wantW)×\(wantH) at 1×) — nothing to do")
     exit(0)
 }
 
-guard let modes = CGDisplayCopyAllDisplayModes(display, nil) as? [CGDisplayMode], !modes.isEmpty else {
-    fail(3, "display \(display) advertises no modes (currently \(curW)×\(curH))")
+let lowRes = [kCGDisplayShowDuplicateLowResolutionModes: kCFBooleanTrue] as CFDictionary
+guard let allModes = CGDisplayCopyAllDisplayModes(display, lowRes) as? [CGDisplayMode], !allModes.isEmpty else {
+    fail(3, "display \(display) advertises no modes (currently \(describe(current)))")
 }
+let modes = allModes.filter { $0.pixelWidth == $0.width && $0.pixelHeight == $0.height && $0.isUsableForDesktopGUI() }
 
 // Prefer the exact target; otherwise the largest mode that fits inside it (never overshoot the target —
 // an over-large screen is harmless but the caller asked for a specific geometry, and modes above the
@@ -46,9 +62,9 @@ guard let modes = CGDisplayCopyAllDisplayModes(display, nil) as? [CGDisplayMode]
 let chosen = modes.first { $0.width == wantW && $0.height == wantH }
     ?? modes.filter { $0.width <= wantW && $0.height <= wantH }
             .max { ($0.width * $0.height) < ($1.width * $1.height) }
-guard let mode = chosen, mode.width > curW || mode.height > curH else {
-    fail(4, "no mode ≥ current \(curW)×\(curH) and ≤ target \(wantW)×\(wantH); available: "
-          + modes.map { "\($0.width)×\($0.height)" }.joined(separator: " "))
+guard let mode = chosen, mode.width > curW || mode.height > curH || !curIs1x else {
+    fail(4, "no 1× mode ≥ current \(describe(current)) and ≤ target \(wantW)×\(wantH); available: "
+          + allModes.map(describe).joined(separator: " "))
 }
 
 var config: CGDisplayConfigRef?
@@ -67,5 +83,8 @@ guard done == .success else { fail(7, "CGCompleteDisplayConfiguration failed (\(
 // The WindowServer resizes asynchronously; give it a beat so a caller that immediately launches an app
 // sees the new geometry, then report what actually took effect (never just what we asked for).
 Thread.sleep(forTimeInterval: 2.0)
-print("vm-set-display: \(curW)×\(curH) → \(CGDisplayPixelsWide(display))×\(CGDisplayPixelsHigh(display))"
-      + " (asked \(mode.width)×\(mode.height), target \(wantW)×\(wantH))")
+let now = CGDisplayCopyDisplayMode(display)
+print("vm-set-display: \(describe(current)) → \(describe(now))"
+      + " (asked \(describe(mode)), target \(wantW)×\(wantH) at 1×)")
+// Report a switch that did not take as a failure, so the caller's WARN fires instead of a false OK.
+guard let now, now.pixelWidth == now.width, now.width >= mode.width else { fail(8, "the new mode did not take effect") }
