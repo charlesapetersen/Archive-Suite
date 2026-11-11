@@ -45,7 +45,11 @@ enum UITestLaunch {
     /// whether this run has a window at all.
     ///
     /// Always *prepend* these to a test's own arguments; never replace them.
-    static let deterministicWindowState = ["-ApplePersistenceIgnoreState", "YES"]
+    ///
+    /// `ar.infoVisible` is the Inspector's remembered visibility (W40.fix-reader-inspector-narrow): a test that
+    /// left it open opened every later launch with it, widening the window and turning the next test's toolbar
+    /// click into a close. Each launch starts with it closed; a test that wants it open opens it.
+    static let deterministicWindowState = ["-ApplePersistenceIgnoreState", "YES", "-ar.infoVisible", "NO"]
 
     /// `deterministicWindowState` followed by `extra` — for the one call site that must *assign*
     /// `launchArguments` (it relaunches a fresh app mid-test) rather than append to them.

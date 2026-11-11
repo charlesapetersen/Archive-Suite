@@ -95,4 +95,17 @@ final class NavigationWindowMinimumWidthTests: XCTestCase {
         XCTAssertEqual(NavigationWindowView.minimumWidth(sidebar: 210, inspector: 380),
                        210 + 380 + 2 * PanelDivider.width + NavigationWindowView.contentColumnMinWidth)
     }
+
+    /// The window is widened by what its content lacks, and left alone when it has enough. The window is never
+    /// ordered on screen.
+    func testAWindowNarrowerThanTheMinimumIsWidenedByTheDifference() {
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 900, height: 600),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: true)
+        let frame = window.frame
+        let grown = NavigationWindowView.widened(frame, toContentWidth: 1204, in: window)
+        XCTAssertEqual(grown.map { window.contentRect(forFrameRect: $0).width }, 1204)
+        XCTAssertEqual(grown?.minY, frame.minY)
+        XCTAssertEqual(grown?.height, frame.height)
+        XCTAssertNil(NavigationWindowView.widened(frame, toContentWidth: 900, in: window))
+    }
 }

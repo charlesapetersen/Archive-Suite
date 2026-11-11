@@ -2,13 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## ⚠️ OPEN (W40.fix-reader-inspector-narrow, 2026-11-11) — at the window's narrowest the Inspector runs past its edge
+## ✅ CLOSED (W40.fix-reader-inspector-narrow, 2026-11-11) — the window makes room for the Inspector
 
-At the navigation window's minimum width (900 pt) with the sidebar shown, the Inspector is laid out past the window's
-right edge, so its header's Close button is outside the window and cannot be clicked; ⌥⌘I and the toolbar button still
-hide it. Found in the VM (macOS 27.2): `NavigationUITests.testInspectorFollowsSelectionAndOptionCommandIToggles`
-fails at its Close click (line 32) on main both before and after W40.reader-commands-table, and the Inspector it
-leaves open (its visibility is remembered) makes `TagEntryUITests.testInspectorShowsTagsAfterReturnAndTab` fail next.
+At the navigation window's 900-pt minimum with the sidebar shown, the Inspector ran past the window's right edge and its
+Close button could not be clicked. The minimum now adds up the open panels and the content column's ~600 pt, and a narrower
+window is widened when the Inspector opens and put back when it closes. With both panels at their widest the minimum is
+1444 pt, more than a 1440-pt screen. UITest launches start with the Inspector closed (`-ar.infoVisible NO`).
 
 ## ✅ CLOSED (W40.reader-commands-table, 2026-11-11) — one command table; Edit Info is the Inspector on ⌥⌘I
 

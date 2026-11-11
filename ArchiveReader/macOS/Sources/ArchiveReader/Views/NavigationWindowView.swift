@@ -27,6 +27,9 @@ struct NavigationWindowView: View {
     /// The window's content size, so the preview sheet can be sized to fit inside it (W40.fix-reader-preview-sheet-oversize).
     @State private var contentSize: CGSize = .zero
     @State private var window: NSWindow?
+    /// The window's frame before it was widened for a panel, and the frame it was given, so closing the panel can
+    /// put it back (W40.fix-reader-inspector-narrow).
+    @State private var widening: (from: NSRect, to: NSRect)?
 
     init() { _model = StateObject(wrappedValue: NavigationModel()) }
     /// A model the caller made, so a render guard can host the window over throwaway defaults.
@@ -71,11 +74,14 @@ struct NavigationWindowView: View {
         }
         .frame(minWidth: minimumWidth, minHeight: 560)
         .background(WindowAccessor { found in
-            guard window !== found else { return }
-            window = found
-            Self.widen(found, toContentWidth: minimumWidth)
+            // Also called from `updateNSView`, where state must not change: the next turn of the run loop.
+            DispatchQueue.main.async {
+                guard window !== found else { return }
+                window = found
+                fitWindow(toMinimum: minimumWidth)
+            }
         })
-        .onChange(of: minimumWidth) { _, width in Self.widen(window, toContentWidth: width) }
+        .onChange(of: minimumWidth) { _, width in fitWindow(toMinimum: width) }
         .overlay(alignment: .top) { TitleBarBackdrop() }   // W40.fix-reader-titlebar-gradient
         .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
         .animation(.easeInOut(duration: 0.2), value: showingSidebar)
@@ -147,18 +153,35 @@ struct NavigationWindowView: View {
         Self.minimumWidth(sidebar: showingSidebar ? sidebarWidth : nil, inspector: model.showingEditor ? infoWidth : nil)
     }
 
-    /// A larger minimum does not move a window that is already narrower, so it is widened here (as Pages widens its
-    /// window for the Inspector), to the left as well where the screen's right edge is in the way.
-    static func widen(_ window: NSWindow?, toContentWidth width: CGFloat) {
+    /// A larger minimum does not move a window that is already narrower, so it is widened here, as Pages widens its
+    /// window for the Inspector; and when the panel closes it goes back to the frame it had, unless it has been
+    /// moved or resized since.
+    private func fitWindow(toMinimum width: CGFloat) {
         guard let window else { return }
-        let content = window.contentRect(forFrameRect: window.frame)
-        guard content.width < width - 0.5 else { return }
-        var frame = window.frame
-        frame.size.width += width - content.width
-        if let visible = window.screen?.visibleFrame, frame.maxX > visible.maxX {
-            frame.origin.x = max(visible.minX, visible.maxX - frame.width)
+        if let grown = Self.widened(window.frame, toContentWidth: width, in: window) {
+            let from = widening?.from ?? window.frame
+            window.setFrame(grown, display: true)
+            widening = (from, window.frame)
+        } else if let w = widening {
+            if window.frame != w.to { widening = nil }   // the reader has moved or resized it: theirs now
+            else if window.contentRect(forFrameRect: w.from).width >= width - 0.5 {
+                window.setFrame(w.from, display: true)
+                widening = nil
+            }
         }
-        window.setFrame(frame, display: true)
+    }
+
+    /// `frame` widened so its content is `width` wide, moved left where the screen's right edge is in the way;
+    /// `nil` when it is already wide enough.
+    static func widened(_ frame: NSRect, toContentWidth width: CGFloat, in window: NSWindow) -> NSRect? {
+        let content = window.contentRect(forFrameRect: frame)
+        guard content.width < width - 0.5 else { return nil }
+        var grown = frame
+        grown.size.width += width - content.width
+        if let visible = window.screen?.visibleFrame, grown.maxX > visible.maxX {
+            grown.origin.x = max(visible.minX, visible.maxX - grown.width)
+        }
+        return grown
     }
 
     /// The preview sheet's `DocumentViewerModel`, published to the SCENE so `ArchiveReaderCommands`'

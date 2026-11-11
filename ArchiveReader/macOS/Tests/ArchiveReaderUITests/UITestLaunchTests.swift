@@ -14,7 +14,7 @@ final class UITestLaunchTests: XCTestCase {
     /// The flag itself, spelled the way AppKit reads it. Written out literally rather than referencing
     /// the constant, so a typo in `UITestLaunch` cannot be "confirmed" by comparing it to itself.
     func testTheStateIgnoringFlagIsSpelledTheWayAppKitReadsIt() {
-        XCTAssertEqual(UITestLaunch.deterministicWindowState, ["-ApplePersistenceIgnoreState", "YES"],
+        XCTAssertEqual(UITestLaunch.deterministicWindowState, ["-ApplePersistenceIgnoreState", "YES", "-ar.infoVisible", "NO"],
                        "AppKit reads this as a user default; a different spelling silently does nothing "
                        + "and every window assertion in the bundle starts failing for the wrong reason")
     }
@@ -44,7 +44,7 @@ final class UITestLaunchTests: XCTestCase {
     /// flag must come FIRST and the caller's arguments must survive verbatim.
     func testAssignmentHelperPutsTheFlagFirstAndKeepsTheRest() {
         let composed = UITestLaunch.arguments(["-ARUITestRootPath", "/tmp/x"])
-        XCTAssertEqual(composed, ["-ApplePersistenceIgnoreState", "YES", "-ARUITestRootPath", "/tmp/x"])
+        XCTAssertEqual(composed, ["-ApplePersistenceIgnoreState", "YES", "-ar.infoVisible", "NO", "-ARUITestRootPath", "/tmp/x"])
     }
 
     /// Adversarial: the helper must not silently swallow an empty argument list into nothing, because a

@@ -16,6 +16,7 @@ final class NavigationUITests: FixtureUITestCase {
         let first = table.tableRows.element(boundBy: 0)
         XCTAssertTrue(first.waitForExistence(timeout: 5))
         visiblePoint(of: first).tap()
+        let closedWidth = app.windows["Archive Reader"].frame.width
         app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(app.sheets.count, 0, "the Inspector belongs in the right-hand column")
@@ -28,8 +29,15 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
         app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
-        app.buttons["ar.tagEditor.done"].click()
+        // W40.fix-reader-inspector-narrow: at the window's 900-pt minimum the Inspector ran past its right edge.
+        let close = app.buttons["ar.tagEditor.done"]
+        let window = app.windows["Archive Reader"].frame
+        XCTAssertLessThanOrEqual(close.frame.maxX, window.maxX + 1,
+                                 "Close ends at x=\(close.frame.maxX), past the window's edge at x=\(window.maxX)")
+        close.click()
         XCTAssertTrue(year.waitForNonExistence(timeout: 5))
+        // A window widened for the Inspector goes back when it closes.
+        XCTAssertEqual(app.windows["Archive Reader"].frame.width, closedWidth, accuracy: 1)
     }
 
     /// A departing field must commit to its original file, including when a filter removes that row.
