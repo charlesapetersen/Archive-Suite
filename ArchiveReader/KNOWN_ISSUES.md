@@ -359,8 +359,8 @@ shows the same chain in the running app. Evidence: `verification/evidence/reader
   (verify, two full fsyncs, audit: 30 ms for 1 file, 67 ms for 20) is unchanged and is now nearly all of it.
   Still on the whole-library path, correct and not budgeted: a change that adds or removes a row, a content change,
   a subtree read. Evidence: `verification/evidence/reader/W40.fix-reader-change-incremental.md`.
-- **An arrow key or ⇧-arrow: 105–158 ms busy whatever is selected** [152–246 ms]. `selectedFilesCache` filters
-  every displayed row (92 ms), and the inspector scans the library on every publish. → `W40.fix-reader-selection-at-size`.
+- ~~**An arrow key or ⇧-arrow: 105–158 ms busy whatever is selected**~~ — fixed by `W40.fix-reader-selection-at-size`
+  (2026-11-11): 0-7 ms at -O, with the inspector shown. Evidence: `verification/evidence/reader/W40.fix-reader-selection-at-size.md`.
 - **Next file in a document window with 5 open: 245 ms** [266 ms]. The panes' page copy and draw take most of it. →
   `W40.fix-reader-viewer-switch`.
 - **Memory: no leak in the model.** Over 200 edits and 200 file switches the footprint stops growing within 20 steps

@@ -79,6 +79,10 @@ W40.fix-reader-change-incremental (A), W40.fix-reader-selection-at-size (B), W40
 309 ms; a Reader write 4.5–7 ms after TagWriter; no memory growth over 200 edits. The library's row index also serves
 `libraryFiles(atPaths:)` now, which cause B's inspector scan was. Evidence:
 `verification/evidence/reader/W40.fix-reader-change-incremental.md`.
+**Cause B fixed, 2026-11-11** (W40.fix-reader-selection-at-size): an arrow key, ⇧-arrow and the preview arrow 0-7 ms
+main-busy at -O with Edit Info shown. The selection is found by the list's sort keys and followed change by change. A
+hidden inspector observes nothing, and the indexing count publishes apart from the model. Evidence:
+`verification/evidence/reader/W40.fix-reader-selection-at-size.md`.
 
 ## 2. Selection, the file on view, and keeping the place (points 10, 12, 13)
 
