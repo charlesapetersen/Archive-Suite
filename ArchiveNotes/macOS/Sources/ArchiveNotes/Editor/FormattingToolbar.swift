@@ -23,20 +23,24 @@ struct FormattingToolbar: View {
     private var inlineGroup: some View {
         Group {
             toggleButton(systemImage: "bold", active: context.state.isBold,
-                         identifier: "an.editor.toolbar.bold") {
+                         identifier: "an.editor.toolbar.bold",
+                         help: "Bold (⌘B)") {
                 context.toggleBold()
             }
             toggleButton(systemImage: "italic", active: context.state.isItalic,
-                         identifier: "an.editor.toolbar.italic") {
+                         identifier: "an.editor.toolbar.italic",
+                         help: "Italic (⌘I)") {
                 context.toggleItalic()
             }
             toggleButton(systemImage: "chevron.left.forwardslash.chevron.right",
                          active: context.state.isCode,
-                         identifier: "an.editor.toolbar.code") {
+                         identifier: "an.editor.toolbar.code",
+                         help: "Inline Code (⌥⌘C)") {
                 context.toggleInlineCode()
             }
             toggleButton(systemImage: "link", active: context.state.hasLink,
-                         identifier: "an.editor.toolbar.link") {
+                         identifier: "an.editor.toolbar.link",
+                         help: "Link (⌘K)") {
                 context.insertLink()
             }
         }
@@ -58,6 +62,7 @@ struct FormattingToolbar: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .help("Paragraph style: Body (⌥⌘0) or Heading 1–6 (⌥⌘1–⌥⌘6)")
         .accessibilityIdentifier("an.editor.toolbar.heading")
     }
 
@@ -74,22 +79,26 @@ struct FormattingToolbar: View {
         Group {
             toggleButton(systemImage: "list.bullet",
                          active: context.state.isUnorderedList,
-                         identifier: "an.editor.toolbar.bullet") {
+                         identifier: "an.editor.toolbar.bullet",
+                         help: "Bulleted List (⌥⌘U)") {
                 context.toggleUnorderedList()
             }
             toggleButton(systemImage: "list.number",
                          active: context.state.isOrderedList,
-                         identifier: "an.editor.toolbar.numbered") {
+                         identifier: "an.editor.toolbar.numbered",
+                         help: "Numbered List (⌥⌘O)") {
                 context.toggleOrderedList()
             }
             toggleButton(systemImage: "text.quote",
                          active: context.state.isBlockquote,
-                         identifier: "an.editor.toolbar.quote") {
+                         identifier: "an.editor.toolbar.quote",
+                         help: "Blockquote (⌥⌘Q)") {
                 context.toggleBlockquote()
             }
             toggleButton(systemImage: "curlybraces",
                          active: context.state.isCodeBlock,
-                         identifier: "an.editor.toolbar.codeblock") {
+                         identifier: "an.editor.toolbar.codeblock",
+                         help: "Code Block (⌥⌘K)") {
                 context.toggleCodeBlock()
             }
         }
@@ -100,6 +109,7 @@ struct FormattingToolbar: View {
     private func toggleButton(systemImage: String,
                                active: Bool,
                                identifier: String,
+                               help: String,
                                action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
@@ -108,6 +118,8 @@ struct FormattingToolbar: View {
         .buttonStyle(.borderless)
         .background(active ? Color.accentColor.opacity(0.15) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+        // The owner's notes-2 session (row 5): the icons had no names. The shortcut is the Format menu's.
+        .help(help)
         .accessibilityIdentifier(identifier)
     }
 }

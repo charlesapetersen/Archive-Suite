@@ -2444,12 +2444,22 @@ final class NotesGUITests: NotesFixtureUITestCase {
             let dateLines = before.split(separator: "\n").filter { $0.hasPrefix("date") }
             let toggle = mainWindow.descendants(matching: .any)["an.detail.roundup"].firstMatch
             XCTAssertTrue(toggle.waitForExistence(timeout: 10))
-            // The toggle says what it does where it is turned on (W40.fix-notes-small-fixes, notes-1 row 24).
-            let explanation = mainWindow.descendants(matching: .any)["an.detail.roundup.explanation"].firstMatch
-            XCTAssertTrue(explanation.waitForExistence(timeout: 5), "the Round-up toggle should explain itself")
+            // The toggle says what it does where it is turned on (W40.fix-notes-small-fixes, notes-1 row 24),
+            // but only on demand, from its ? button (W40.fix-notes-small-wins, notes-2 row 4).
+            XCTAssertFalse(app.descendants(matching: .any)["an.detail.roundup.explanation"].exists,
+                           "the explanation should not be shown at all times")
+            let help = mainWindow.descendants(matching: .any)["an.detail.roundup.help"].firstMatch
+            XCTAssertTrue(help.waitForExistence(timeout: 5), "the Round-up toggle should have a ? button")
+            help.click()
+            let explanation = app.descendants(matching: .any)["an.detail.roundup.explanation"].firstMatch
+            XCTAssertTrue(explanation.waitForExistence(timeout: 5), "the ? button should explain the toggle")
             let said = [explanation.label, explanation.value as? String ?? ""].joined(separator: " ")
-            XCTAssertTrue(said.contains("Round-up menu") && said.contains("note's date"),
-                          "the explanation should name the filter and the date offer: \(said)")
+            XCTAssertTrue(said.contains("Advanced Search") && said.contains("note's date"),
+                          "the explanation should name the search and the date offer: \(said)")
+            app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 5) {
+                !self.app.descendants(matching: .any)["an.detail.roundup.explanation"].exists
+            }, "Escape should close the explanation")
             toggle.click()
             XCTAssertTrue(pollUntil(timeout: 10) {
                 self.rawMarkdown(inItemDir: Self.idReader)?.contains("roundup: true") == true

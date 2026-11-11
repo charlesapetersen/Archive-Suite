@@ -29,6 +29,8 @@ final class RootFolderStore: ObservableObject {
     private let readerRoots: [URL]
     /// A pick waiting for the quit that makes it take effect.
     private var pendingBookmark: Data?
+    /// Run once the pending pick is written, as the app terminates: Restart and Switch's relaunch.
+    private var afterCommit: (@MainActor () -> Void)?
     private var terminateObserver: NSObjectProtocol?
     /// The pending pick was written, because the app is terminating.
     private(set) var committedPendingRoot = false
@@ -100,10 +102,12 @@ final class RootFolderStore: ObservableObject {
     /// Remember a user-picked store folder for the next launch, written only when the app actually
     /// terminates: a quit that is called off must not leave the pick to switch stores at some later quit.
     /// Does not change `root`: the running app keeps its store until it quits (see the type comment).
-    /// The bookmark is minted now, while the panel's grant is certainly live.
-    func rememberRootAtQuit(_ url: URL) throws {
+    /// The bookmark is minted now, while the panel's grant is certainly live. `then` runs after the pick is
+    /// written, so a relaunch it starts reads the new store, and never for a quit that is called off.
+    func rememberRootAtQuit(_ url: URL, then afterCommit: (@MainActor () -> Void)? = nil) throws {
         pendingBookmark = try url.bookmarkData(options: .withSecurityScope,
                                                includingResourceValuesForKeys: nil, relativeTo: nil)
+        self.afterCommit = afterCommit
         committedPendingRoot = false
         guard terminateObserver == nil else { return }
         terminateObserver = notificationCenter.addObserver(
@@ -116,6 +120,7 @@ final class RootFolderStore: ObservableObject {
     /// Forget a pick whose quit was called off.
     func discardPendingRoot() {
         pendingBookmark = nil
+        afterCommit = nil
         if let terminateObserver { notificationCenter.removeObserver(terminateObserver) }
         terminateObserver = nil
     }
@@ -126,6 +131,9 @@ final class RootFolderStore: ObservableObject {
         defaults.synchronize()   // the process is about to exit
         committedPendingRoot = true
         self.pendingBookmark = nil
+        let afterCommit = self.afterCommit
+        self.afterCommit = nil
+        afterCommit?()
     }
 
     // MARK: - Private

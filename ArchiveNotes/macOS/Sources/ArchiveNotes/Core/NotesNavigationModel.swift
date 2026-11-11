@@ -96,7 +96,25 @@ final class NotesNavigationModel: ObservableObject {
     private(set) var lastRecomputeApplySeconds: TimeInterval = 0
 
     /// Rows selected in the table. A single-row selection loads that item into the detail pane.
-    @Published var selection: Set<UUID> = []
+    @Published var selection: Set<UUID> = [] {
+        didSet {
+            guard selection != oldValue else { return }
+            pendingReopenID = nil   // a choice made before the items arrived wins over the reopen
+            guard let lastOpenStore else { return }
+            if let id = selectedItemID {
+                NotesAppSettings.setLastOpenItem(id, for: windowKind, into: lastOpenStore)
+            } else if selection.isEmpty {
+                NotesAppSettings.setLastOpenItem(nil, for: windowKind, into: lastOpenStore)
+            }
+        }
+    }
+
+    /// Where this window remembers the note it has open, so the next launch opens it again (owner, notes-2
+    /// row 6). `nil` ⟹ neither read nor written (tests, and UITests unless they name a scratch suite).
+    private let lastOpenStore: UserDefaults?
+    /// The note to reopen once the store's items arrive. Dropped by any selection made first, and when the
+    /// loaded store does not hold it.
+    private var pendingReopenID: UUID?
 
     /// Per-window view mode: when true the item pane shows the templates manager instead of the note
     /// list (the sidebar "Templates" row / a folder's "Template ▸ Manage…" toggles it). W6-S6.
@@ -184,11 +202,14 @@ final class NotesNavigationModel: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
 
-    init(model: NotesModel, defaultKind: ItemKindShell, persistingKindTo store: UserDefaults? = nil) {
+    init(model: NotesModel, defaultKind: ItemKindShell, persistingKindTo store: UserDefaults? = nil,
+         rememberingLastOpenIn lastOpenStore: UserDefaults? = nil) {
         self.model = model
         let windowKind: Item.Kind = (defaultKind == .extract) ? .extract : .note
         self.windowKind = windowKind
         self.kindPersistStore = store
+        self.lastOpenStore = lastOpenStore
+        self.pendingReopenID = lastOpenStore.flatMap { NotesAppSettings.lastOpenItem(for: windowKind, from: $0) }
         // Restore this window's last-shown kind (W7-S4); fall back to the window default when never set
         // (or when no store is injected). Setting `filter` in init does NOT fire `didSet`, so restoring
         // never re-persists.
@@ -199,6 +220,7 @@ final class NotesNavigationModel: ObservableObject {
         model.$allItems
             .sink { [weak self] items in
                 self?.recompute(items: items)
+                self?.reopenLastItem(in: items)
                 // An edit can change what a scope's text rules match; keep the old answers until the new arrive.
                 if self?.scope?.hasTextRules == true { self?.refreshScopeTextHits(clearing: false) }
             }
@@ -259,6 +281,19 @@ final class NotesNavigationModel: ObservableObject {
     var detailSummary: ItemSummary? {
         guard let id = detailItemID else { return nil }
         return model.allItems.first { $0.id == id }
+    }
+
+    /// Open the note this window had open when Notes last quit, once the store's items hold it. Selecting it is
+    /// enough: the editor loads the selection. An item of a kind the window no longer shows is left closed, as
+    /// it has no row to select. An empty item set is the store not yet read, so the reopen waits for it.
+    private func reopenLastItem(in items: [ItemSummary]) {
+        guard let id = pendingReopenID, !items.isEmpty else { return }
+        pendingReopenID = nil
+        guard selection.isEmpty, let item = items.first(where: { $0.id == id }) else { return }
+        switch (filter.kind, item.kind) {
+        case (.all, _), (.notes, .note), (.extracts, .extract): select(id)
+        default: break
+        }
     }
 
     /// Select a single item (context-menu "Open" / double-click). Loads it into the detail pane.

@@ -1,8 +1,9 @@
 import XCTest
+import AppKit
 
 /// W40.fix-notes-choose-store (ledger N-48) — File ▸ Choose Store Folder… adopts a store where it lies and
-/// the pick survives a relaunch: pick a folder holding a store, confirm, the app quits, launch it again,
-/// and the notes are read from the picked store.
+/// the pick survives a relaunch: pick a folder holding a store, confirm, the app restarts itself, and the
+/// notes are read from the picked store.
 ///
 /// The NSOpenPanel is the one step an XCUITest cannot drive, so `-ANUITestStorePickPath` stands in for the
 /// folder a person would pick (`NotesModel.storeFolderChooser`). `-ANUITestStoreBookmarkSuite` sends the
@@ -35,14 +36,22 @@ final class ChooseStoreFolderUITests: NotesFixtureUITestCase {
             choose.click()
 
             // The alert's button is reported twice (the alert and its window); either is the one control.
-            let confirm = app.buttons["Quit and Switch"].firstMatch
+            let confirm = app.buttons["Restart and Switch"].firstMatch
             XCTAssertTrue(confirm.waitForExistence(timeout: 10), "picking a store should ask before switching")
+            let pid = try XCTUnwrap(NSRunningApplication.runningApplications(
+                withBundleIdentifier: "com.archivenotes.app").first?.processIdentifier)
             confirm.click()
-            XCTAssertTrue(app.wait(for: .notRunning, timeout: 30), "confirming should quit the app")
 
-            app.launch()
+            // Restart and Switch (owner, notes-2 row 1): Notes quits and starts itself again, with no relaunch
+            // from the test. The new process carries this run's arguments, so it opens the scratch stores.
+            XCTAssertTrue(pollUntil(timeout: 30) {
+                NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app")
+                    .contains { $0.processIdentifier != pid && !$0.isTerminated }
+            }, "confirming should restart the app")
+            XCTAssertTrue(pollUntil(timeout: 30) { NSRunningApplication(processIdentifier: pid) == nil },
+                          "the old instance should have quit")
             app.activate()
-            XCTAssertTrue(mainWindow.waitForExistence(timeout: 15), "the window should come back after relaunch")
+            XCTAssertTrue(mainWindow.waitForExistence(timeout: 15), "the window should come back after the restart")
             let adopted = mainWindow.descendants(matching: .any)["an.cell.title.\(Self.adoptedNoteID)"]
             XCTAssertTrue(adopted.waitForExistence(timeout: 25),
                           "after the relaunch the list should show the note from the picked store")

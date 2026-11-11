@@ -108,15 +108,23 @@ final class StoreFolderChooserTests: XCTestCase {
                        "with nothing chosen the default store opens")
 
         let chooser = StoreFolderChooser(rootStore: first)
-        var quits = 0, confirmed: StoreFolderChooser.FolderCheck?
+        var quits = 0, relaunches = 0, confirmed: StoreFolderChooser.FolderCheck?
+        var pickWrittenAtRelaunch = false
         chooser.pickFolder = { copied }
         chooser.confirm = { _, check in confirmed = check; return true }
         chooser.report = { XCTFail("a successful pick shows no alert, got \($0)") }
         chooser.quit = { quits += 1; self.terminate() }
+        chooser.relaunch = {
+            relaunches += 1
+            pickWrittenAtRelaunch = self.defaults.data(forKey: "notesStoreRootBookmark") != nil
+        }
 
         XCTAssertEqual(chooser.choose(), .switching(copied))
         XCTAssertEqual(confirmed, .store)
         XCTAssertEqual(quits, 1, "the app quits so the next launch opens the new store")
+        // Restart and Switch (owner, notes-2 row 1): the app starts itself again, once the pick is written.
+        XCTAssertEqual(relaunches, 1, "the app restarts into the new store")
+        XCTAssertTrue(pickWrittenAtRelaunch, "the relaunch starts only after the pick is written")
         XCTAssertEqual(path(first.root), path(scratch.appendingPathComponent("default-store")),
                        "the running app keeps its store until it quits")
 
@@ -137,6 +145,7 @@ final class StoreFolderChooserTests: XCTestCase {
         chooser.pickFolder = { empty }
         chooser.confirm = { _, check in confirmed = check; return true }
         chooser.quit = { self.terminate() }
+        chooser.relaunch = {}
         XCTAssertEqual(chooser.choose(), .switching(empty))
         XCTAssertEqual(confirmed, .empty)
 
@@ -283,6 +292,7 @@ final class StoreFolderChooserTests: XCTestCase {
         chooser.confirm = { _, _ in true }
         chooser.report = { reported = $0 }
         chooser.quit = {}   // terminate returned: the quit was called off
+        chooser.relaunch = { XCTFail("a quit called off must not restart the app, nor a later ordinary quit") }
         XCTAssertEqual(chooser.choose(), .quitCancelled(copied))
         XCTAssertEqual(reported, .quitCancelled(copied), "the user is told the store did not change")
         terminate()   // a later, ordinary quit

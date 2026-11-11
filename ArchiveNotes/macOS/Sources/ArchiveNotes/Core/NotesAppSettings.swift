@@ -17,6 +17,8 @@ enum NotesLayoutSettingsKey {
     // last kind their segmented control showed, separately.
     static let noteWindowKind = "an.noteWindow.kindFilter"
     static let extractWindowKind = "an.extractWindow.kindFilter"
+    static let noteWindowLastOpen = "an.noteWindow.lastOpenItem"       // UUID string — reopened at launch
+    static let extractWindowLastOpen = "an.extractWindow.lastOpenItem"
     // Per-window hidden columns (W14.4): each window remembers its own hidden-column set so the
     // extract-only "sources" column can default hidden in the Note window (always blank there) while
     // staying visible in the Extracts window. `hiddenColumns` above stays as the pre-W14.4 global
@@ -193,6 +195,18 @@ enum NotesAppSettings {
     }
     static func setWindowKindFilter(_ kind: KindFilter, for windowKind: Item.Kind, into store: UserDefaults = .standard) {
         store.set(kind.rawValue, forKey: kindKey(windowKind))
+    }
+    /// The note a window had open when Notes quit, reopened at the next launch (owner, notes-2 row 6). Per window,
+    /// as `windowKindFilter` is; `nil` clears it.
+    static func lastOpenItem(for windowKind: Item.Kind, from store: UserDefaults = .standard) -> UUID? {
+        store.string(forKey: lastOpenKey(windowKind)).flatMap(UUID.init(uuidString:))
+    }
+    static func setLastOpenItem(_ id: UUID?, for windowKind: Item.Kind, into store: UserDefaults = .standard) {
+        if let id { store.set(id.uuidString, forKey: lastOpenKey(windowKind)) }
+        else { store.removeObject(forKey: lastOpenKey(windowKind)) }
+    }
+    private static func lastOpenKey(_ windowKind: Item.Kind) -> String {
+        windowKind == .extract ? NotesLayoutSettingsKey.extractWindowLastOpen : NotesLayoutSettingsKey.noteWindowLastOpen
     }
     private static func kindKey(_ windowKind: Item.Kind) -> String {
         windowKind == .extract ? NotesLayoutSettingsKey.extractWindowKind : NotesLayoutSettingsKey.noteWindowKind

@@ -10,7 +10,8 @@ import ArchiveCore
 /// turn into a notes store by a mis-click.
 ///
 /// The switch happens at the next launch (`RootFolderStore.rememberRoot`), so after the user confirms,
-/// the app quits through its normal path, which saves every open editor first (`NotesAppDelegate`).
+/// the app quits through its normal path, which saves every open editor first (`NotesAppDelegate`), and
+/// starts itself again in the chosen store (Restart and Switch; owner, notes-2 row 1).
 ///
 /// The panel, the confirmation, the outcome alert and the quit are seams, as in `ReaderRootChooser`:
 /// an `NSOpenPanel` or `NSAlert` opened from a unit-test host blocks the bundle with nobody to dismiss it.
@@ -130,6 +131,8 @@ final class StoreFolderChooser {
     }
     var report: @MainActor (Outcome) -> Void = { StoreFolderChooser.presentAlert(for: $0) }
     var quit: @MainActor () -> Void = { NSApp.terminate(nil) }
+    /// Run as the app terminates, after the pick is written.
+    var relaunch: @MainActor () -> Void = { StoreFolderChooser.relaunchApp() }
 
     init(rootStore: RootFolderStore) {
         self.rootStore = rootStore
@@ -152,14 +155,15 @@ final class StoreFolderChooser {
         if case let .refused(refusal) = check { return finish(.refused(picked, refusal)) }
         guard confirm(picked, check) else { return .cancelled }
         do {
-            try rootStore.rememberRootAtQuit(target)
+            try rootStore.rememberRootAtQuit(target, then: relaunch)
         } catch {
             NSLog("StoreFolderChooser: could not bookmark \(target.path): \(error)")
             return finish(.refused(picked, .cannotRemember))
         }
-        // The pick is written only once the quit is really happening (`willTerminate`). A successful quit
-        // never returns here; a return means the quit was called off (a failed save the user chose not
-        // to quit over), so the pick is dropped with it rather than switching at some later quit.
+        // The pick is written, and the relaunch started, only once the quit is really happening
+        // (`willTerminate`). A successful quit never returns here; a return means the quit was called off
+        // (a failed save the user chose not to quit over), so the pick is dropped with it rather than
+        // switching at some later quit.
         quit()
         if rootStore.committedPendingRoot { return .switching(picked) }
         rootStore.discardPendingRoot()
@@ -196,11 +200,28 @@ final class StoreFolderChooser {
         alert.messageText = check == .empty
             ? "Start a new store in “\(name)”?"
             : "Switch to the store in “\(name)”?"
-        alert.informativeText = "Archive Notes will save your open notes and quit. "
-            + "Open it again to work in the chosen store. The notes in the current store stay where they are."
-        alert.addButton(withTitle: "Quit and Switch")
+        alert.informativeText = "Archive Notes will save your open notes and restart in the chosen store. "
+            + "The notes in the current store stay where they are."
+        alert.addButton(withTitle: "Restart and Switch")
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// Start a new instance of Notes as this one terminates. It is asked for while this process still runs (the
+    /// old one is past saving, and the two never open the same store), so the launch is waited for briefly:
+    /// returning from `willTerminate` ends the process, and with it a request not yet delivered. The arguments
+    /// are passed on, so a UITest's relaunch opens its scratch store and never the owner's.
+    static func relaunchApp() {
+        guard !ArchiveTestHost.isUnitTestHost else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        configuration.arguments = Array(CommandLine.arguments.dropFirst())
+        let launched = DispatchSemaphore(value: 0)
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, error in
+            if let error { NSLog("StoreFolderChooser: could not restart Archive Notes: \(error)") }
+            launched.signal()
+        }
+        _ = launched.wait(timeout: .now() + 5)
     }
 
     static func presentAlert(for outcome: Outcome) {

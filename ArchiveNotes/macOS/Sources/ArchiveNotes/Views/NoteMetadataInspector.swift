@@ -44,6 +44,7 @@ struct NoteMetadataInspector: View {
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
     @State private var roundupYear: Int?
+    @State private var showsRoundupExplanation = false
 
     private enum DateRole: Hashable { case own, sentWith }
 
@@ -145,22 +146,35 @@ struct NoteMetadataInspector: View {
 
     /// What a round-up note is and what marking one does (`00-overview.md` §3.5).
     static let roundupExplanation = "For a note that gathers several loosely related documents, usually from one "
-        + "year. Marked, it can be found with the filter bar's Round-up menu, and when its linked PDFs share a "
-        + "year, Notes offers that year as the note's date."
+        + "year. Marked, it can be found with Advanced Search's Round-up note rule, and when its linked PDFs "
+        + "share a year, Notes offers that year as the note's date."
 
     private var roundupSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Toggle("Round-up note", isOn: Binding(get: { item.roundup }, set: { value in
-                let id = item.id
-                Task { await nav.setRoundup(value, for: id) }
-            }))
-            .help(Self.roundupExplanation)
-            .accessibilityIdentifier("an.detail.roundup")
-            // Said where it is turned on: the owner could not tell what the toggle did (notes-1, row 24).
-            Text(Self.roundupExplanation)
-                .font(.caption).foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("an.detail.roundup.explanation")
+            // Said where it is turned on (notes-1 row 24), but on demand: a tooltip and a ? button, not a
+            // paragraph shown at all times (owner, notes-2 row 4).
+            HStack(spacing: 4) {
+                Toggle("Round-up note", isOn: Binding(get: { item.roundup }, set: { value in
+                    let id = item.id
+                    Task { await nav.setRoundup(value, for: id) }
+                }))
+                .help(Self.roundupExplanation)
+                .accessibilityIdentifier("an.detail.roundup")
+                Button { showsRoundupExplanation.toggle() } label: {
+                    Image(systemName: "questionmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("What is a round-up note?")
+                .accessibilityLabel("What is a round-up note?")
+                .accessibilityIdentifier("an.detail.roundup.help")
+                .popover(isPresented: $showsRoundupExplanation, arrowEdge: .trailing) {
+                    Text(Self.roundupExplanation)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: 260, alignment: .leading)
+                        .padding(12)
+                        .accessibilityIdentifier("an.detail.roundup.explanation")
+                }
+            }
             if item.roundup, let year = roundupYear,
                item.date != String(year) || item.datePrecision != .year {
                 Text("Linked PDFs share the year \(String(year)).")

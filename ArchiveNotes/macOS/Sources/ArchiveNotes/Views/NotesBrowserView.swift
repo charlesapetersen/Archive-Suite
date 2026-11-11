@@ -49,7 +49,22 @@ struct NotesBrowserView: View {
         self._model = ObservedObject(wrappedValue: model)
         // `.standard` ⟹ this window's kind featuring is remembered across launches (W7-S4).
         self._nav = StateObject(wrappedValue: NotesNavigationModel(model: model, defaultKind: kind,
-                                                                   persistingKindTo: .standard))
+                                                                   persistingKindTo: .standard,
+                                                                   rememberingLastOpenIn: Self.lastOpenStore))
+    }
+
+    /// Where each window remembers its open note for the next launch. A UITest launch neither reads nor writes
+    /// the app's own key, or a note one test left open would be selected when the next test starts; a UITest
+    /// that checks the reopen names a throwaway suite with `-ANUITestLastOpenSuite`.
+    private static var lastOpenStore: UserDefaults? {
+#if DEBUG
+        if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
+            guard let suite = UserDefaults.standard.string(forKey: "ANUITestLastOpenSuite"), !suite.isEmpty
+            else { return nil }
+            return UserDefaults(suiteName: suite)
+        }
+#endif
+        return .standard
     }
 
     var body: some View {
