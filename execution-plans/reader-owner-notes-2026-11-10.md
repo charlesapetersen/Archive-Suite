@@ -59,6 +59,11 @@ the JPEG candidates) come to roughly 250-350 MB at 91k [I]. `CollationRanks` may
 (`Core/CollationRanks.swift:23`) [R]. The rest of the 921 MB of small allocations is unexplained: fragmentation from
 the repeated 91k-entry temporaries of cause A is the likely reading [I], a leak is not ruled out. The owner's
 2.4 GB rising to 4.5 GB over a session says something grows. Measure before fixing (W40.reader-scale-measure).
+**Measured, 2026-11-11** [M]: at 116k synthetic rows, 200 edits and 200 file switches plateau within 20–40 steps, and a
+quiet minute returns nothing. The growth is freed whole-library copies kept by the allocator, not a leak, and
+`CollationRanks` stays at the library's size. The chain's figures confirm causes A–C: `library.apply` takes 5.9 s per
+foreign change at -O. The views' memory (IOSurface) is not visible in the unit host. Evidence:
+`verification/evidence/reader/W40.reader-scale-measure.md`.
 
 **Advanced Search drops rules past about seven (owner, 2026-11-10, sent through the walkthrough).** No cap exists
 in the code [R]. Scrolling the rule list does not bring the rows back (owner, 2026-11-10), so they are lost, not hidden

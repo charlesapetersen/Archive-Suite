@@ -449,6 +449,8 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               (decorated: Int key columns, paths ranked only for full ties).
   CollationRanks.swift        localizedStandardCompare ranks cached across sorts, + UTF8Key (byte-
                               keyed hashing; String normalizes non-ASCII on every hash).
+  ReaderStages.swift          os_signpost intervals (`com.archivereader.app`/`Stages`) around the stages one
+                              change sets off, + the at-size lane's per-stage recorder (W40.reader-scale-measure).
   ArchiveFile.swift           A nav-row record (url identity + native-UTF-8 path/name + parsed tags).
   DuplicateNames.swift        Pure detection of rows sharing a base filename + containing-folder
                               disambiguator (display aid only; never writes).

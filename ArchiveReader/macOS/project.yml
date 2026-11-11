@@ -58,9 +58,11 @@ targets:
           CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReader.uitest.entitlements
         # Release uses the production entitlements: the sandbox, app-scoped bookmarks, user-selected
         # read-write, and user-selected.executable so a tag write does not stamp com.apple.quarantine
-        # (W40.fix-reader-tag-quarantine).
+        # (W40.fix-reader-tag-quarantine). Xcode injects get-task-allow into a locally signed build unless
+        # told not to; measured on the Release product (W40.reader-scale-measure), as the Processor found.
         Release:
           CODE_SIGN_ENTITLEMENTS: Sources/ArchiveReader/ArchiveReader.entitlements
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
   ArchiveReaderTests:
     type: bundle.unit-test

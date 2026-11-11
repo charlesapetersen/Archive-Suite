@@ -12,9 +12,11 @@ import ArchiveCore
 /// change (`execution-plans/reader-owner-notes-2026-11-10.md`, cause A), so this drives the real
 /// `NavigationModel` over a live library: an APFS clone of the 150k synthetic tree (115,999 listed rows),
 /// its real FSEvents `CorpusWatcher`, a scratch content index, and 10 saved smart folders, two with
-/// OCR-text rules. For each change it reports main-thread CPU time, main-thread stalls (a main-queue ping
-/// from a background thread, so blocking I/O counts too), the time until the list shows it and until the
-/// chain goes quiet, and the `ReaderStages` totals per stage.
+/// OCR-text rules. For each change it reports main-thread busy time (a background thread sends one main-queue
+/// ping at a time; every ping held over 4 ms is summed, so blocking I/O counts as well as CPU), the longest
+/// stall, the time until the list shows the change and until the chain goes quiet, and the `ReaderStages`
+/// totals per stage. Main-thread CPU time is not used: XCTest's waiter spins the main run loop while an
+/// async test awaits, which measured 990 ms of main-thread CPU per idle second.
 ///
 /// **Views are emulated, and said to be.** The unit host draws nothing, so what a mounted view would run
 /// is run by the lane at the moment SwiftUI would run it (once per main-queue turn after a publish): the
@@ -94,14 +96,12 @@ final class ReaderChainAtSizeTests: XCTestCase {
     private struct Chain {
         var visible: Double?       // trigger → the list (or viewer) shows the change
         var settled: Double        // trigger → the last stage of the chain ended
-        var mainCPU: Double        // main-thread CPU, idle polling subtracted
-        var stalled: Double        // main-queue ping time over 4 ms, summed
+        var busy: Double           // main-queue ping time over 4 ms, summed
         var longest: Double        // the longest main-queue ping
         var stages: [StageRecorder.Key: StageRecorder.Total]
     }
 
     private var meter: MainThreadMeter!
-    private var idleCPUPerSecond = 0.0
     private var indexer: ContentIndexer!
 
     /// Run `trigger`, wait for `visible`, then for the chain to go quiet: the index idle and no stage ending
@@ -112,7 +112,6 @@ final class ReaderChainAtSizeTests: XCTestCase {
         await pause(0.5)
         ReaderStages.recorder.reset(recording: true)
         meter.resetPings()
-        let cpu0 = meter.cpuSeconds()
         let start = now()
         trigger()
         var visibleAt: Double?
@@ -124,15 +123,13 @@ final class ReaderChainAtSizeTests: XCTestCase {
             if visibleAt != nil, indexer.progress == nil, Double(now() - lastEnd) / 1e9 >= quiet { break }
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
-        let wall = seconds(since: start)
-        let cpu = max(0, meter.cpuSeconds() - cpu0 - idleCPUPerSecond * wall)
         let pings = meter.pings()
         let snap = ReaderStages.recorder.snapshot()
         ReaderStages.recorder.reset(recording: false)
         let chain = Chain(visible: visibleAt, settled: Double(max(snap.lastEnd, start) - start) / 1e9,
-                          mainCPU: cpu, stalled: pings.stalled, longest: pings.longest, stages: snap.totals)
+                          busy: pings.stalled, longest: pings.longest, stages: snap.totals)
         print("CH chain \(label): visible \(visibleAt.map(ms) ?? "NEVER") settled \(ms(chain.settled)) "
-              + "main-CPU \(ms(chain.mainCPU)) main-stalled \(ms(chain.stalled)) longest-stall \(ms(chain.longest))")
+              + "main-busy \(ms(chain.busy)) longest-stall \(ms(chain.longest))")
         return chain
     }
 
@@ -146,9 +143,9 @@ final class ReaderChainAtSizeTests: XCTestCase {
     private func summarize(_ label: String, _ runs: [Chain]) {
         func median(_ xs: [Double]) -> Double { xs.sorted()[xs.count / 2] }
         print("CH summary \(label) runs=\(runs.count): visible median \(ms(median(runs.map { $0.visible ?? .infinity }))) "
-              + "settled median \(ms(median(runs.map(\.settled)))) main-CPU median \(ms(median(runs.map(\.mainCPU)))) "
+              + "settled median \(ms(median(runs.map(\.settled)))) main-busy median \(ms(median(runs.map(\.busy)))) "
               + "longest-stall median \(ms(median(runs.map(\.longest)))) max \(ms(runs.map(\.longest).max() ?? 0))")
-        printStages(label, runs.sorted { $0.mainCPU < $1.mainCPU }[runs.count / 2])
+        printStages(label, runs.sorted { $0.busy < $1.busy }[runs.count / 2])
     }
 
     // MARK: - Outside measurements (footprint, heap, leaks), run by the harness
@@ -257,13 +254,13 @@ final class ReaderChainAtSizeTests: XCTestCase {
         let views = ViewEmulation(navigation)
         views.attach()
 
-        // Idle polling cost, subtracted from each chain's main-thread CPU.
+        // The meter's floor: what an idle main thread reads.
         _ = await waitUntil(timeout: 600) { indexer.progress == nil }
         await pause(1)
-        let idle0 = meter.cpuSeconds(), idleStart = now()
+        meter.resetPings()
         await pause(3)
-        idleCPUPerSecond = (meter.cpuSeconds() - idle0) / seconds(since: idleStart)
-        print("CH idle main-thread CPU \(ms(idleCPUPerSecond)) per second (subtracted)")
+        let idle = meter.pings()
+        print("CH idle 3 s: main-busy \(ms(idle.stalled)) longest-stall \(ms(idle.longest))")
 
         // ── 1. One foreign tag change: another process flips Read/Unread on one listed file.
         var foreign: [Chain] = []
@@ -408,30 +405,13 @@ final class ReaderChainAtSizeTests: XCTestCase {
 
 // MARK: - Main-thread meter
 
-/// Main-thread CPU (thread_info on the main thread's port) and stalls (a background thread sends one
-/// main-queue ping at a time and times its return, so blocking I/O on main counts as well as CPU).
+/// Main-thread stalls: a background thread sends one main-queue ping at a time and times its return, so
+/// blocking I/O on main counts as well as CPU.
 final class MainThreadMeter: @unchecked Sendable {
-    private let port: thread_act_t
     private let lock = NSLock()
     private var running = false
     private var stalled: UInt64 = 0
     private var longest: UInt64 = 0
-
-    @MainActor init() { port = mach_thread_self() }
-
-    func cpuSeconds() -> Double {
-        var info = thread_basic_info()
-        var count = mach_msg_type_number_t(MemoryLayout<thread_basic_info_data_t>.size / MemoryLayout<integer_t>.size)
-        let status = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-                thread_info(port, thread_flavor_t(THREAD_BASIC_INFO), $0, &count)
-            }
-        }
-        guard status == KERN_SUCCESS else { return 0 }
-        let user = Double(info.user_time.seconds) + Double(info.user_time.microseconds) / 1e6
-        let system = Double(info.system_time.seconds) + Double(info.system_time.microseconds) / 1e6
-        return user + system
-    }
 
     func start() {
         lock.withLock { running = true }

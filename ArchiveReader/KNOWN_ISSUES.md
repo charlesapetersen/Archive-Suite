@@ -341,6 +341,31 @@ the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647
   the background clamp alone that costs ~6×, so a shipping change that moved discovery to `.utility` from a
   higher band would cost nothing, and one that let it fall to `.background` would cost everything.
 
+## 📏 MEASURED (`W40.reader-scale-measure`, 2026-11-11) — one change still costs the whole library: OPEN, S2
+
+The chain behind one change, timed end to end at 115,999 rows with 10 smart folders, live FSEvents, at -O (Debug in
+brackets). Harness: `ops/scale/run-reader-at-size.sh --only chain [--optimized]` (`ReaderChainAtSizeTests`); stages
+are `os_signpost` intervals (`ReaderStages`, subsystem `com.archivereader.app`, category `Stages`), so Instruments
+shows the same chain in the running app. Evidence: `verification/evidence/reader/W40.reader-scale-measure.md`.
+
+- **A foreign tag change on one file: visible after 6.9 s, 7.4 s of main-thread busy time, a 6.0 s stall** [10.7 s,
+  12.9 s, 7.2 s]. `ArchiveLibrary.apply` re-sorts every path by `localizedStandardCompare` on main (5.9 s); then all
+  10 smart folders are counted twice, row by row on main (1.2 s). → `W40.fix-reader-change-incremental`.
+- **A Reader write on 1 or 20 files in a smart folder: visible after 0.7–0.8 s, 1.5–1.8 s busy** [2.7–3.0 s, 5.7–6.3 s].
+  TagWriter's own share (verify, two full fsyncs, audit) is 26 ms for 1 file and 76 ms for 20, and stays. →
+  `W40.fix-reader-change-incremental`.
+- **An arrow key or ⇧-arrow: 105–158 ms busy whatever is selected** [152–246 ms]. `selectedFilesCache` filters
+  every displayed row (92 ms), and the inspector scans the library on every publish. → `W40.fix-reader-selection-at-size`.
+- **Next file in a document window with 5 open: 245 ms** [266 ms]. The panes' page copy and draw take most of it. →
+  `W40.fix-reader-viewer-switch`.
+- **Memory: no leak in the model.** Over 200 edits and 200 file switches the footprint stops growing within 20 steps
+  (+228 MB at -O, +72 and +142 MB in two Debug runs), and a quiet minute returns nothing. The growth is freed whole-library copies kept by
+  the allocator (about 370 MB of Malloc Small reclaimable). The views' memory (the owner's IOSurface 332 MB) cannot be
+  seen in the unit host, so it is measured in the VM for the viewer item.
+- **The owner's builds are now Release:** `ArchiveReader/launch.sh` builds and runs Release (-O; `--debug` for
+  Debug), since -O shows a change 1.5–4× sooner. The Reader's Release build had been carrying `get-task-allow`. It no
+  longer does. Notes and the DMG check: `W40.release-no-debug-entitlements`.
+
 ## 📏 MEASURED (`W40.d7`, 2026-10-15) — the Reader at corpus size: two S2 stalls, both fixed 2026-10-31
 
 Full numbers, method and caveats: `verification/evidence/reader/W40.d7-at-size.md`. Harness:
