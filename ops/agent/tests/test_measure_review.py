@@ -252,6 +252,7 @@ class Checks(Base):
         self.result("good.md", card=True)
         self.result("bad.md", card=False)
         self.result("data.json", card=False)
+        self.result("method.summary-section.md", card=False)
         self.assertEqual(mr.cards(mr.Env(type("A", (), {"repo": self.repo, "state": self.state, "plan": self.plan,
                                                         "now": NOW})())),
                          ["ArchiveProcessor/segbench-results/bad.md"])

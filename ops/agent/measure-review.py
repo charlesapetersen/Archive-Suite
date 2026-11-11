@@ -226,13 +226,14 @@ def done(env, sha):
 
 
 def cards(env, since=None):
-    """Result reports added or changed since `since` that carry no measurement card (root CLAUDE.md)."""
+    """Result reports added or changed since `since` that carry no measurement card (root CLAUDE.md). A
+    `*.summary-section.md` is a fragment its method script writes for SUMMARY.md, not a report (pass 13)."""
     since = since or last(env)["commit"]
     names = git(env, "diff", "--name-only", "--diff-filter=AM", "%s..%s" % (since, head(env)), "--",
                 "ArchiveProcessor/segbench-results").split()
     missing = []
     for rel in names:
-        if not rel.endswith(".md"):
+        if not rel.endswith(".md") or rel.endswith(".summary-section.md"):
             continue
         try:
             text = git(env, "show", "%s:%s" % (head(env), rel))
