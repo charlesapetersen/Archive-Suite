@@ -83,6 +83,7 @@ MIXED_ROUTE = RESULTS / "mixed-route.json"    # W46.mixed-route: mixed_route.py 
 MIXED_BANDS = RESULTS / "mixed-route-bands.json"   # W46.mixed-route-bands: mixed_route_bands.py report
 LAYOUT_ORDER_PP = RESULTS / "layout-order-pp.json"  # W46.layout-order-newspapers-pp: orderers on PP-DocLayoutV3's L9 regions
 LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid: Gemini 3.7 Flash's blocks in its order
+DEWARP_GUARD_REAL5 = RESULTS / "dewarp-guard-real5.json"  # W46.dewarp-guard: Apple Vision on Real5 Warping, raw/quad/UVDoc
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
@@ -1112,6 +1113,19 @@ def layout_photo(data):
             "gpu_hours": data["meta"]["gpu_hours_reading"], "caps": data["meta"]["caps"]}
 
 
+def dewarp_real5():
+    """W46.dewarp-guard's Real5 table: Apple Vision on the Warping folder's raw photograph, quad crop and UVDoc image,
+    and the own-sheet guard's pass count and guarded figure (an arm where the guard passes, raw where it does not)."""
+    if not DEWARP_GUARD_REAL5.exists():
+        return None
+    s = json.loads(DEWARP_GUARD_REAL5.read_text())["summary"]
+    o = s["ocr_warp_vision"]
+    return {"pages": o["pages"], "raw": o["raw_nes"],
+            "arms": {a: {k: o[a][k] for k in ("nes", "gain", "chrf_gain", "better", "worse", "guarded", "passing_n")}
+                     | {"lost_own": s["warp"][a]["lost_own"], "images_lost_own": s["warp"][a]["images_lost_own"]}
+                     for a in ("quad", "uvdoc")}}
+
+
 def region_chart_routes(data, kinds, op):
     """Crop routes on the exact panel-kind subsets, priced from all attempted crops of the 96 accuracy pages.
     Concurrent job spans combine all arms and sets, so no per-arm throughput is inferred from them.
@@ -1494,7 +1508,7 @@ def main():
              "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
              "vision_reread": vision_reread(), "vision_unfiltered": vision_unfiltered(), "rotation": rotation(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
-             "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}
+             "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "dewarp_real5": dewarp_real5(), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 

@@ -501,6 +501,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Pages</th><th>Whole page</th><th>DocLayout-YOLO, app sort</th><th>PP-DocLayoutV3</th><th>docling-layout-heron</th><th>Apple Vision document</th><th>DocLayout-YOLO, newspaper-ocr</th></tr></thead><tbody id="lp-rows"></tbody></table></div>
   </section>
 
+  <section class="panel" id="pub-dewarp-real5" hidden>
+    <div class="head"><h2>Dewarping Real5's warped photographs for Apple Vision</h2><span class="meta">Apple Vision NES % · Δ in NES points against the raw photograph, 95% page interval · free (W46.dewarp-guard)</span></div>
+    <p class="note" id="dr5-note"></p>
+    <div class="tbl"><table><thead><tr><th>Arm</th><th>NES</th><th>Δ NES</th><th>Δ chrF2</th><th>Pages better / worse</th><th>Own-sheet words removed (images)</th><th>Guard passes</th><th>Guarded Δ NES</th></tr></thead><tbody id="dr5-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-spec" hidden>
     <div class="head"><h2>Models built for the script</h2><span class="meta">NES %, failures as 0; paired differences in NES points</span></div>
     <div class="tbl"><table><thead><tr><th>Stratum</th><th>Model</th><th>Trained on a test source</th><th>Answered</th><th>NES</th><th>Second score</th><th>chrF</th><th>Minus Gemini (95%)</th><th>Minus Qwen (95%)</th></tr></thead><tbody id="pub-spec-rows"></tbody></table></div>
@@ -1304,6 +1310,15 @@ if (LPH) {
   const row = (k, arms) => '<tr><td>' + NAME[k] + '</td>' + ARMS.map(a => '<td>' + c(arms[a]) + '</td>').join('') + '</tr>';
   document.getElementById('lp-rows').innerHTML = [...Object.entries(LPH.real5), ...Object.entries(LPH.staged), ...Object.entries(LPH.bench)].map(([k, a]) => row(k, a)).join('');
   document.getElementById('lp-note').textContent = 'Four layout detectors, each at its shipped or maker setting, cut regions that GLM-OCR reads with W46.ocr-regions\' request; a page with no region read scores 0. Real5-OmniDocBench: the 155 English OmniDocBench v1.5 pages whose truth is plain text, photographed again in each condition; Δ is against the same arm on Scanning (Real5), against the raw photograph (after the quad or UVDoc), or against the whole page (bench pages). On Skew, DocLayout-YOLO keeps no region on 58 of 155 pages; a quad correction first restores most of it. The whole page is best everywhere except on newspapers. Reading took ' + LPH.gpu_hours + ' GPU-hours; ' + LPH.caps + ' crops hit the token cap. Detail: segbench-results/layout-photo.md.';
+}
+const DR5 = DATA.dewarp_real5;
+if (DR5) {
+  document.getElementById('pub-dewarp-real5').hidden = false;
+  const ci = x => (x[0] >= 0 ? '+' : '') + x[0].toFixed(1) + ' [' + x[1].toFixed(1) + ', ' + x[2].toFixed(1) + ']';
+  const NAME = {quad: 'Apple quad crop', uvdoc: 'UVDoc after the quad'};
+  document.getElementById('dr5-rows').innerHTML = '<tr><td>Raw photograph</td><td>' + DR5.raw.toFixed(1) + '</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td><td>–</td></tr>' +
+    Object.entries(DR5.arms).map(([a, e]) => '<tr><td>' + NAME[a] + '</td><td>' + e.nes.toFixed(1) + '</td><td>' + ci(e.gain) + '</td><td>' + ci(e.chrf_gain) + '</td><td>' + e.better + ' / ' + e.worse + '</td><td>' + e.lost_own + ' (' + e.images_lost_own + ')</td><td>' + e.passing_n + ' of ' + DR5.pages + '</td><td>' + ci(e.guarded) + '</td></tr>').join('');
+  document.getElementById('dr5-note').textContent = 'Real5-OmniDocBench Warping: the ' + DR5.pages + ' English OmniDocBench v1.5 pages with plain-text truth, photographed bent, read by Apple Vision (accurate, macOS 27.2) on the raw photograph, on Apple\'s quad crop and on UVDoc\'s image after the quad. The guard lets an arm through only when its lattice keeps every Vision word of the page\'s own sheet (inside Apple\'s quad or on a line the arm keeps); the guarded row reads the arm where the guard passes and the raw photograph where it does not. Detail: segbench-results/dewarp-guard.md.';
 }
 const curveCanvas = document.querySelector('#dif-curves canvas'), frontCanvas = document.querySelector('#dif-frontier canvas');
 let curveChart, frontChart;

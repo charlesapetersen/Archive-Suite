@@ -345,13 +345,170 @@ def cmd_guard96(a):
     print(json.dumps(summary, indent=1))
 
 
+# ---------------------------------------------------------------- Real5: the guard and the OCR arms
+PGR5 = REH / 'place-geom-real5'               # its pages.jsonl and Apple quads (read only)
+R5 = CACHE / 'real5'
+R5_TRUTH = REH / 'layout-photo/real5/truth'   # OmniDocBench v1.5 text, one file a page (W46.layout-photo)
+UVDOC_SRC = REH / 'enh-dewarp/src'            # UVDoc 4c9b82b5 with best_model.pkl, as W46.enh-dewarp ran it
+DEWARP_BIN = REH / 'segbench/bin/segbench-dewarp'
+R5_ARMS = ('quad', 'uvdoc')
+
+
+def r5_pages():
+    out = []
+    for x in (PGR5 / 'pages.jsonl').read_text().splitlines():
+        if x.strip():
+            r = json.loads(x)
+            r['image'] = str(R5 / 'images' / r['cond'] / f"{r['stem']}.jpg")
+            out.append(r)
+    return out
+
+
+def r5_arm_image(arm, r):
+    return Path(r['image']) if arm == 'raw' else R5 / 'arms' / arm / f"{r['id']}.jpg"
+
+
+def cmd_real5_fetch(a):
+    """Real5's Warping and Skew copies of place-geom-real5's 310 images, frozen as it froze them (Hugging Face,
+    Apache-2.0 images; the downloads are deleted once frozen). Run with torch-env's python (huggingface_hub)."""
+    import concurrent.futures as cf
+    import shutil
+    from huggingface_hub import hf_hub_download
+    from PIL import Image
+    import layout_photo as LP
+    Image.MAX_IMAGE_PIXELS = None
+    raw = R5 / 'download'
+
+    def one(r):
+        dest = Path(r['image'])
+        if not dest.exists():
+            got = Path(hf_hub_download('PaddlePaddle/Real5-OmniDocBench', r['source_file'], repo_type='dataset',
+                                       local_dir=raw))
+            with Image.open(got) as im:
+                LP.freeze(im, dest)
+            got.unlink()
+        return r['id']
+    ps = r5_pages()
+    with cf.ThreadPoolExecutor(8) as ex:
+        for n, _ in enumerate(ex.map(one, ps), 1):
+            if n % 50 == 0 or n == len(ps):
+                print(f'fetched {n}/{len(ps)}', flush=True)
+    shutil.rmtree(raw, ignore_errors=True)
+
+
+def r5_swift(mode, rows):
+    jobs = R5 / f'{mode}-jobs.tsv'
+    jobs.write_text(''.join('\t'.join(map(str, x)) + '\n' for x in rows))
+    subprocess.run([str(DEWARP_BIN), mode, str(jobs)], check=True)
+    jobs.unlink()
+
+
+def cmd_real5_prep(a):
+    """Vision's lines on each raw image (macOS today), place-geom-real5's Apple quad, the quad and UVDoc lattices on
+    all 310 images, and the two arms' images of the Warping folder with Vision's lines on them. Torch-env's python,
+    under heavy-run.py."""
+    import numpy as np
+    from PIL import Image
+    import dewarp_arms as A
+    import enh_dewarp as E
+    ps = r5_pages()
+    for d in ('lines/raw', 'grids/quad', 'grids/uvdoc', 'lines/quad', 'lines/uvdoc'):
+        (R5 / d).mkdir(parents=True, exist_ok=True)
+    r5_swift('lines', [(r['image'], R5 / 'lines/raw' / f"{r['id']}.json") for r in ps
+                       if not (R5 / 'lines/raw' / f"{r['id']}.json").exists()])
+    for n, r in enumerate(ps, 1):
+        todo = [arm for arm in R5_ARMS if not (R5 / 'grids' / arm / f"{r['id']}.npz").exists()
+                or (r['cond'] == 'warp' and not r5_arm_image(arm, r).exists())]
+        if todo:
+            with Image.open(r['image']) as im:
+                img = np.asarray(im.convert('RGB'))
+            quad = json.loads((PGR5 / 'quad' / f"{r['id']}.json").read_text())
+            for arm in todo:
+                out, g, found = A.quad_arm(img, quad) if arm == 'quad' else A.uvdoc_after_quad(img, quad, UVDOC_SRC)
+                np.savez(R5 / 'grids' / arm / f"{r['id']}.npz", grid=g, out_w=out.shape[1], out_h=out.shape[0],
+                         src_w=img.shape[1], src_h=img.shape[0], found=found)
+                if r['cond'] == 'warp':
+                    E.freeze(out, r5_arm_image(arm, r))
+        if n % 25 == 0 or n == len(ps):
+            print(f'prep {n}/{len(ps)}', flush=True)
+    for arm in R5_ARMS:
+        r5_swift('lines', [(r5_arm_image(arm, r), R5 / 'lines' / arm / f"{r['id']}.json") for r in ps
+                           if r['cond'] == 'warp' and not (R5 / 'lines' / arm / f"{r['id']}.json").exists()])
+
+
+def cmd_real5_report(a):
+    """The own-sheet guard on Real5's 310 images, and Vision's NES on the Warping folder's raw, quad and UVDoc arms,
+    with the guarded pipeline (an arm where its guard passes, raw where it does not). Needs ocr_panel_score's deps."""
+    import numpy as np
+    import enh_dewarp as E
+    import ocr_panel_score as S
+    ps = r5_pages()
+    rows = []
+    same_lines = 0
+    for r in ps:
+        raw = json.loads((R5 / 'lines/raw' / f"{r['id']}.json").read_text())
+        old = PGR5 / 'lines/raw' / f"{r['id']}.json"
+        if old.exists() and json.loads(old.read_text())['lines'] == raw['lines']:
+            same_lines += 1
+        words = word_table(raw['lines'])
+        quad = json.loads((PGR5 / 'quad' / f"{r['id']}.json").read_text())['corners']
+        centres = np.array([w[1] for w in words]).reshape(-1, 2)
+        row = {'id': r['id'], 'cond': r['cond'], 'stem': r['stem'], 'words': len(words), 'arms': {}}
+        for arm in R5_ARMS:
+            g = np.load(R5 / 'grids' / arm / f"{r['id']}.npz")['grid']
+            shown = E.covered(g, centres) if len(words) else np.zeros(0, bool)
+            own, neigh = split_lost(words, shown, quad)
+            row['arms'][arm] = {'lost': int((~shown).sum()), 'lost_own': len(own), 'lost_neighbour': len(neigh),
+                                'guard_all': bool(shown.all()), 'guard_own': not own}
+        if r['cond'] == 'warp':
+            tf = R5_TRUTH / f"{r['stem']}.txt"
+            truth = tf.read_text() if tf.exists() else None
+            row['truth'] = truth is not None
+            if truth is not None:
+                for arm in ('raw', *R5_ARMS):
+                    d = raw if arm == 'raw' else json.loads((R5 / 'lines' / arm / f"{r['id']}.json").read_text())
+                    sc = S.score(truth, '\n'.join(l['text'] for l in d['lines']))
+                    row.setdefault('nes', {})[arm] = sc['nes']
+                    row.setdefault('chrf', {})[arm] = sc['chrf']
+        rows.append(row)
+    summary = {'images': len(rows), 'raw_lines_same_as_place_geom_real5': same_lines}
+    for cond in ('warp', 'skew', 'all'):
+        rs = [x for x in rows if cond in ('all', x['cond'])]
+        s = {'images': len(rs)}
+        for arm in R5_ARMS:
+            A_ = [x['arms'][arm] for x in rs]
+            s[arm] = {k: sum(x[k] for x in A_) for k in ('lost', 'lost_own', 'lost_neighbour')}
+            s[arm] |= {'images_lost_own': sum(1 for x in A_ if x['lost_own']),
+                       'images_lost_neighbour': sum(1 for x in A_ if x['lost_neighbour']),
+                       'guard_all_pass': sum(x['guard_all'] for x in A_),
+                       'guard_own_pass': sum(x['guard_own'] for x in A_)}
+        summary[cond] = s
+    scored = [x for x in rows if x.get('nes')]
+    ocr = {'pages': len(scored), 'raw_nes': round(100 * statistics.mean(x['nes']['raw'] for x in scored), 1)}
+    for arm in R5_ARMS:
+        gain = [x['nes'][arm] - x['nes']['raw'] for x in scored]
+        cg = [x['chrf'][arm] - x['chrf']['raw'] for x in scored]
+        ocr[arm] = {'nes': round(100 * statistics.mean(x['nes'][arm] for x in scored), 1),
+                    'gain': mean_ci(gain), 'chrf_gain': mean_ci(cg),
+                    'better': sum(g > 0 for g in gain), 'worse': sum(g < 0 for g in gain),
+                    'guarded': mean_ci([g if x['arms'][arm]['guard_own'] else 0.0 for g, x in zip(gain, scored)]),
+                    'passing_only': mean_ci([g for g, x in zip(gain, scored) if x['arms'][arm]['guard_own']]),
+                    'passing_n': sum(1 for x in scored if x['arms'][arm]['guard_own'])}
+    summary['ocr_warp_vision'] = ocr
+    out = {'item': 'W46.dewarp-guard', 'step': 'Real5: the guard and the OCR arms', 'summary': summary, 'rows': rows}
+    (RESULTS / 'dewarp-guard-real5.json').write_text(json.dumps(out, indent=1) + '\n')
+    print(json.dumps(summary, indent=1))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='cmd', required=True)
-    for c in ('classify', 'class-report', 'guard96'):
+    cmds = {'classify': cmd_classify, 'class-report': cmd_class_report, 'guard96': cmd_guard96,
+            'real5-fetch': cmd_real5_fetch, 'real5-prep': cmd_real5_prep, 'real5-report': cmd_real5_report}
+    for c in cmds:
         sub.add_parser(c)
     a = p.parse_args()
-    {'classify': cmd_classify, 'class-report': cmd_class_report, 'guard96': cmd_guard96}[a.cmd](a)
+    cmds[a.cmd](a)
 
 
 if __name__ == '__main__':
