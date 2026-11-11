@@ -68,10 +68,10 @@ come from `build_figures.py`'s hand-entered rows with no measuring file behind t
  "metric": {"id": "sender_ed2_f1", "label": "sender found (ed2 F1), then recipient, then place by city", "higher_is_better": true},
  "kinds": ["correspondence-typed", "correspondence-handwritten", "non-correspondence"],
  "rules": [
-  {"id": "ent-correspondence-only", "text": "Runs on correspondence only; non-correspondence output is unmeasured.", "source": "ent-prompt-app.md Scope", "switch": null},
-  {"id": "ent-vision-hands", "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text.", "source": "ent-robust.md Reading (switch-off rule)", "switch": null},
-  {"id": "ent-evidence", "text": "Quoted in the document's own text: shown as read; unquoted: written and shown marked inferred; never shown as read without a quote.", "source": "ent-score.md Reading; G-entities.md §5; owner call 10 (14-owner-calls.md)", "switch": null},
-  {"id": "ent-run", "text": "On a cloud route names are extracted always and shown when the collection interview ranks names; on the Mac the local extractor runs only when names rank, on typed and printed correspondence.", "source": "owner call 11 (14-owner-calls.md)", "switch": {"id": "entities.enabled", "label": "Find senders, recipients and places", "default": false}}
+  {"id": "ent-correspondence-only", "text": "Runs on correspondence only; non-correspondence output is unmeasured.", "source": "ent-prompt-app.md §Measurement card", "switch": null},
+  {"id": "ent-vision-hands", "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text.", "source": "ent-robust.md §Reading", "switch": null},
+  {"id": "ent-evidence", "text": "Quoted in the document's own text: shown as read; unquoted: written and shown marked inferred; never shown as read without a quote.", "source": "ent-score.md §Reading; G-entities.md §5; 14-owner-calls.md §1. The owner's calls", "switch": null},
+  {"id": "ent-run", "text": "On a cloud route names are extracted always and shown when the collection interview ranks names; on the Mac the local extractor runs only when names rank, on typed and printed correspondence.", "source": "14-owner-calls.md §1. The owner's calls", "switch": {"id": "entities.enabled", "label": "Find senders, recipients and places", "default": false}}
  ],
  "fallback": "none"}
 ```

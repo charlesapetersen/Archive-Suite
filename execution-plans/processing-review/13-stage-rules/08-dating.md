@@ -223,7 +223,7 @@ JPEG original) or `reread-107` (the 107 whose year neither the ABBYY nor the Vis
   "figures": {
    "in_text": {"value": 95.0, "n": 119, "truth": "owner-tags", "source": {"file": "segbench-results/date-tagging.md", "route": "mlx-date-2b-8bit-nothink", "attribute": "year, in text", "value": "95.0%"}},
    "not_in_text": {"value": 38.9, "n": 131, "truth": "owner-tags", "source": {"file": "segbench-results/date-model.md", "route": "trained 2B, Mac 8-bit", "attribute": "inferred-year accuracy", "value": "51/131 (38.9%)"}},
-   "du_uncertain_unflagged": {"value": 100.0, "n": 50, "truth": "owner-tags", "source": {"file": "segbench-results/date-model.md", "route": "trained 2B, Mac 8-bit", "attribute": "owner-uncertain identified", "value": "none of the 50"}}},
+   "du_uncertain_unflagged": {"value": 100.0, "n": 50, "truth": "owner-tags", "derived": "none of the 50 marked Date Uncertain, so 50 of 50 unflagged", "source": {"file": "segbench-results/date-model.md", "route": "trained 2B, Mac 8-bit", "attribute": "owner-uncertain identified", "value": "none of the 50"}}},
   "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": {"file": "segbench-results/date-model.md", "route": "all", "attribute": "money", "value": "No money spent"}},
   "time": {"per_unit_s": 1.39, "measured": true, "measured_on": "this Mac, MLX", "source": {"file": "segbench-results/date-model.md", "route": "2.683 GB MLX build", "attribute": "seconds per document", "value": "about 1.39"}},
   "memory": {"peak_gb": 3.784, "measured_on": "MLX peak; 4.549 GB guard footprint", "source": {"file": "segbench-results/date-model.md", "route": "trained 2B, Mac 8-bit", "attribute": "Peak MLX memory", "value": "3.784 GB"}},

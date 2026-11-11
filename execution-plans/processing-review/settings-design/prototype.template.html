@@ -251,8 +251,12 @@ function readState() {
 // Why a route cannot be used with the resources given; empty when it can.
 function blockers(r) {
   const out = [], n = r.needs || {};
-  if (n.key && !n.key.some(k => state.keys[k])) { const names = n.key.map(k => ({gemini: "Gemini", openrouter: "OpenRouter", openai: "OpenAI", mistral: "Mistral"})[k]); out.push("needs " + (/^[AEIOU]/.test(names[0]) ? "an " : "a ") + names.join(" or ") + " key"); }
-  if (n.plan && !n.plan.every(p => state.plans[p])) out.push("needs the " + n.plan.map(p => ({claude: "Claude", chatgpt: "ChatGPT"})[p]).join(" and ") + " plan");
+  // settings-routes.json: any one key; every plan; a row with both runs with either the key or the plans
+  const hasKey = n.key && n.key.some(k => state.keys[k]), hasPlans = n.plan && n.plan.every(p => state.plans[p]);
+  if (!(n.key && n.plan && (hasKey || hasPlans))) {
+    if (n.key && !hasKey) { const names = n.key.map(k => ({gemini: "Gemini", openrouter: "OpenRouter", openai: "OpenAI", mistral: "Mistral", anthropic: "Anthropic", gateway: "Stanford gateway"})[k] || k); out.push("needs " + (/^[AEIOU]/.test(names[0]) ? "an " : "a ") + names.join(" or ") + " key"); }
+    if (n.plan && !hasPlans) out.push("needs the " + n.plan.map(p => ({claude: "Claude", chatgpt: "ChatGPT"})[p]).join(" and ") + " plan");
+  }
   if (n.cluster && !state.cluster && !(n.key && n.key.some(k => state.keys[k]))) out.push("needs a cluster");
   if (n.mac_gb != null && (r.peak_gb || 0) + 5 > state.macGb) out.push(`needs about ${Math.ceil((r.peak_gb || 0) + 5)} GB of memory (peak ${r.peak_gb} GB measured)`);
   if (n.mac_gb && state.macGb < n.mac_gb) out.push(`needs a ${n.mac_gb} GB Mac`);
@@ -288,7 +292,7 @@ function accuracy(stage, r) {
   if (stage === "ent") return 100 * (r.f1.sender + r.f1.recipient + r.f1.place) / 3;
 }
 function rows(stage) {
-  const list = F[stage].filter(r => !(stage === "date" && ["cluster-27b-image", "mac-8b-image"].includes(r.id)));
+  const list = F[stage].filter(r => !(stage === "date" && /-image(-mac)?$/.test(r.id))); // image passes are a step, not a tagger
   return list.map(r => ({r, acc: accuracy(stage, r), usd: money(stage, r), hrs: hoursFor(stage, r), blocked: blockers(r)}));
 }
 function wall(parts) { // Mac stages run one after another; cloud and plan calls overlap them; the cluster runs apart.
@@ -417,7 +421,8 @@ function chartHTML(s, sol, opts = {}) {
   }
   const table = opts.table ? `<div class="tablewrap"><table><tr><th>route</th><th>runs on</th><th class="num">${accLabel(s)}</th>${s === "ocr" ? '<th class="num">typed</th><th class="num">printed</th><th class="num">hands</th><th class="num">public 895</th>' : s === "seg" ? '<th class="num">no checking</th><th class="num">checks / 100</th><th class="num">after checking</th>' : ""}<th class="num">$ / 1,000</th><th class="num">this batch</th><th class="num">time</th><th>can you use it</th></tr>
       ${pts.slice().sort((a, b) => b.acc - a.acc).map(p => `<tr class="clickable ${p.r.id === chosen.r.id ? "chosen" : ""} ${p.blocked.length ? "infeasible" : ""}" data-id="${p.r.id}" data-stage="${s}"><td>${p.r.name}</td><td><span class="chip fam-${p.r.family}">${FAM[p.r.family]}</span></td><td class="num">${fmt.pct(p.acc)}</td>${s === "ocr" ? `<td class="num">${fmt.pct(p.r.nes.typewritten)}</td><td class="num">${fmt.pct(p.r.nes.printed)}</td><td class="num">${fmt.pct(p.r.nes.handwritten)}</td><td class="num">${fmt.pct(p.r.public895)}</td>` : s === "seg" ? `<td class="num">${fmt.pct(p.r.nocheck)}</td><td class="num">${p.r.checks_per_100}</td><td class="num">${fmt.pct(p.r.after)}</td>` : ""}<td class="num">${p.r.family === "cloud" ? fmt.usd(p.r.usd_1000) : p.r.family === "plan" ? "plan" : p.r.family === "cluster" ? "cluster" : "free"}</td><td class="num">${fmt.usd(p.usd)}</td><td class="num">${fmt.hrs(p.hrs)}</td><td>${p.blocked.length ? p.blocked.join("; ") : p.usd > state.ceiling ? "over the ceiling" : (p.hrs != null && p.hrs > state.hours) ? "over the time allowed" : "yes"}</td></tr>`).join("")}</table></div>` : "";
-  const casc = (s === "ocr" && opts.table) ? `<p class="small">Cascades (a first reader checked against a second, escalating on disagreement) sit between the points: for example ${F.cascades[5].label} reaches ${F.cascades[5].nes} at ${fmt.usd(F.cascades[5].usd_1000)} per 1,000 pages, and ${F.cascades[16].label} ${F.cascades[16].nes} at ${fmt.usd(F.cascades[16].usd_1000)} (96 pages). The app would offer the cascade as one more point on this line.</p>` : "";
+  const C1 = F.cascades.find(c => c.id === "casc-1-fail"), C5 = F.cascades.find(c => c.id === "casc-5-fail");
+  const casc = (s === "ocr" && opts.table && C1 && C5) ? `<p class="small">Cascades (a first reader checked against a second, escalating on disagreement) sit between the points: for example ${C1.label} reaches ${C1.nes} at ${fmt.usd(C1.usd_1000)} per 1,000 pages, and ${C5.label} ${C5.nes} at ${fmt.usd(C5.usd_1000)} (96 pages, chosen on half and scored on the other half). The app would offer the cascade as one more point on this line.</p>` : "";
   return `<svg class="frontier" viewBox="0 0 ${W} ${H}" role="img" aria-label="${STAGE_NAME[s]}: accuracy against cost">
         ${yt.map(v => `<line class="grid" x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end">${v}</text>`).join("")}
         <rect x="${L}" y="${T}" width="${freeW}" height="${H-T-B}" fill="var(--accent-soft)" opacity=".5"/><text x="${L+freeW/2}" y="${H-B+16}" text-anchor="middle">free</text>
@@ -481,7 +486,7 @@ function renderRules() {
     "Dating is the exact year on 250 owner-tagged documents; 'not in the text' is the 131 whose year the text layer did not carry. The Date Uncertain and false-year figures are owner-ruled on blind sheets.",
     "Entities are F1 at edit distance 2 on 138 correspondence documents against an owner-checked truth.",
     "Cloud times are typical call times, not a bench table (marked est.); Mac times are medians on an M3 Pro with 18 GB; cluster times are pages an hour on one L40S. Cluster money is shown at cloud GPU rates for comparison only.",
-    "Prices are list prices read on 2026-10-20; Gemini 3.8 Flash doubles on 1 January 2027. Built " + F.built + " from the bench's panel-data.json and result notes by build_figures.py.",
+    "Prices are list prices read on 2026-10-20; Gemini 3.8 Flash doubles on 1 January 2027. Built " + F.built + " by build_figures.py from the rule table settings-routes.json (built " + F.table_built + " from the bench's result files and the stage notes by settings_routes.py).",
   ].map(t => `<li>${t}</li>`).join("");
 }
 

@@ -122,7 +122,7 @@ segment figures conditional on each route's call at unsure gaps.
 {"id":"gemini3.7-flash-text","name":"Gemini 3.7 Flash, text-only windows (cheaper tier lead)","family":"cloud","app_route":null,"status":"measured","needs":{"key":["gateway"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
  "figures":{"dev-boxes":{"value":89.6,"n":551,"truth":"owner-dev","source":{"file":"seg-window-gateway.md","route":"Gemini 3.7, text only","attribute":"pages exact, K = 7","value":"89.6% (control 92.3%, -2.7, -9.5 to +1.6)"}},
   "tabme.boundary_f1":{"value":0.898,"n":503,"truth":"TABME++ document ids","source":{"file":"seg-tabme-gateway.md","route":"Gemini 3.7 Flash, text only","attribute":"boundary F1","value":"0.898"}}},
- "cost":{"usd_1000_list":null,"usd_1000_batch":null,"price_read":null,"source":{"file":"seg-window-gateway.md","route":"k7-t against k7-it","attribute":"cost for 187 windows","value":"$0.890 against $1.920 (46%)"}},
+ "cost":{"usd_1000_list":null,"usd_1000_batch":null,"price_read":null,"source":{"file":"seg-window-gateway.md","route":"k7-t against k7-it","attribute":"cost for 187 windows","value":"$0.890 against $1.920"}},
  "time":{"per_unit_s":4.6,"measured":true,"measured_on":"gateway, mean s a K = 7 call (6.7 with images)","source":{"file":"seg-window-gateway.md","route":"k7-t","attribute":"mean seconds","value":"4.6"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
  "caveats":["not run on the test boxes; a test-box run is needed before it ships (seg-window-gateway.md)","per-1,000-page cost not tabulated","one run, no Gemini rerun floor (P10-8)"],
