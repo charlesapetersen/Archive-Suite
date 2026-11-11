@@ -15017,3 +15017,22 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   a plain `python3`). Measured: the test fails on main and passes with the fix (torch-env Python); the whole file is
   61 tests OK, 4 skipped. Offline, $0; no rehearsal-cache scratch made.
   <!-- /W46.fix-freeze-guard-test -->
+- [x] **W46.p12-wording — measurement review pass 12's wording, cards and caveats [S]** · §Document processing review — W46 — SHIPPED 2026-11-11. Measurement review pass 12, P12-3, P12-4, P12-5, P12-8 and P12-9 (`execution-plans/processing-review/measure-reviews/2026-11-11.md`). Offline, $0.
+  P12-4, `ct-read.md` (regenerated from `ct_read.py report`, byte-identical before the edit): accession is not a tie
+  (−6, −10 to −2; Vision reads 2 of the 12 present); the folder-label cross-check is no check as measured (28 of 35
+  right, about 106 of 529 comparable reads expected misreads against 112 disagreements); the drafter-split cells favour
+  the strongest drafter; the paid arm confirms on the owner's cells (FLD-9); the card gives the truth's checks (0 of 20,
+  bound about 16%; 0 of 10, about 28%) and the 60 of 916 Red reads from another turn. P12-3, `item-fields-score.md`
+  (regenerated): the image prompt's 12 tag misses split (7 owner-checked where sheet and tag differ, 5 by year and 2 by
+  month, listed by piece; 1 a miss on the sheet too; 4 drafted), which date each truth is, the export's date not the
+  item field, FLD-6 for every route; the season note counts 2 drawn pairs, not the note's 1 (970b3b3a and ccdc0f60);
+  `stratified` now leaves 3.8's agreeing controls out of 3.8's census as its docstring says: only 3.8's stratified
+  cells move (title 0.65 to 0.59, publication 0.35 to 0.30, three lower bounds), no verdict. P12-5:
+  `place-curved-owner.md` (title, verdict, dewarp-guard paragraph, card), notes 01 (lines 85, 97) and 05 (§4 rows and
+  §6), W46.dewarp-guard's evidence line: "pages whose lines fan most", not bound or curled, with the tag splits.
+  P12-8: the invented places' split (6 → 0, 1 → 0, 7 → 1) in `ent-place-rule.md` (and its generator) and the
+  `gemini-tagging-place` caveat in note 09. P12-9: `settings_routes.py`'s label-floors source (seg-adapt-lora.md, call
+  7); a hand card for `seg-date-model.md` and CREST's +4.7 no longer "level"; 15-21 in `containers/00-plan.md`.
+  `settings-routes.json` regenerated, `--check` green (526 figures, 0 failures); the settings prototype rebuilt, no
+  change. No rehearsal-cache scratch made (the generators rewrite their usual cache outputs only).
+  <!-- /W46.p12-wording -->

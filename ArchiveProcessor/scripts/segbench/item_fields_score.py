@@ -48,9 +48,12 @@ the interval's upper bound, plus the truth error's upper bound on the drafted tr
 between.
 
 Publication date (FLD-6) is also scored against the owner's own year and month tags on each printed piece's first
-page, which the Zotero export's date would carry; the app's field is the document's date, the readers' the printed
-issue date. Documents with a page the drafters read sideways or upside down are scored apart. 3.8 against 3.7 is
-paired on the documents 3.8 answered (base only).
+page. The two owner truths are different dates: the item field is the printed issue date, the tag the document's date,
+and the app's call returns the document's date, the readers the printed issue date. W47.ct-zotero's export takes
+Zotero's `issued` from the owner's or the app's date, not the item field. The image prompt's misses against the tags
+are split by where his sheet stands (`tag_conflicts`), and the pieces whose sheet value differs from the tag while the
+reading equals the sheet are listed. Documents with a page the drafters read sideways or upside down are scored apart.
+3.8 against 3.7 is paired on the documents 3.8 answered (base only).
 """
 from __future__ import annotations
 
@@ -384,7 +387,7 @@ def pairs(route, family, pred, frows, field, which, skip):
     return out
 
 
-def stratified(pred, gem, frows, field, skip):
+def stratified(pred, gem, frows, field, skip, controls_out=False):
     """A route's precision over every pair it filled, from the owner's values (measurement review pass 11, P11-2).
     The pairs split in two: the ones the owner settled other than by the draw (the first sheet's kind crossings,
     disputes and controls, and the notes), known exactly, a census; and the rest, the pool the second sheet drew from
@@ -393,7 +396,10 @@ def stratified(pred, gem, frows, field, skip):
     pairs' there, so neither the hard-leaning census nor the draw weighs more than its share. The interval sets each
     part of the pool at its Wilson bounds (a part with no drawn pair the route filled, at 0 and 1): exact for the image
     prompt, whose filled pairs are all in one part, and conservative for a route that fills in both. The point leaves
-    out a part with no drawn pair (its pairs are in the interval only). None when the route filled nothing."""
+    out a part with no drawn pair (its pairs are in the interval only). None when the route filled nothing.
+    controls_out (Gemini 3.8): the controls drawn where it agrees with the truth are its false credit, not
+    owner-checked evidence for its own row (the module docstring), so they leave its census and count in the pool as
+    pairs no answer settled."""
     census, pool = [0, 0], {True: [0, 0, 0], False: [0, 0, 0]}   # pool: [route filled, of them drawn, drawn right]
     for t in frows:
         p = pred.get(t["id"])
@@ -405,6 +411,8 @@ def stratified(pred, gem, frows, field, skip):
             continue
         right = IF.filled(field, tv) and IF.field_match(field, pv, tv, "ed2")
         how = t["owner"].get(field)
+        if controls_out and how == "control":
+            how = None
         if how and how != DRAW:
             census[0] += right
             census[1] += 1
@@ -538,6 +546,53 @@ def tag_score(pred, frows, tags, skip):
     return dict(c)
 
 
+def tag_conflicts(pred, frows, tags, skip):
+    """The image prompt's misses against the owner's date tags (`tag_score`), split by where his sheet stands: the
+    owner-checked pieces whose sheet value differs from the tag while the reading equals the sheet (listed: piece, sheet
+    value, tag, by year or month), the owner-checked misses on the sheet too, and the drafted pieces where the truth and
+    the reading agree and both differ from the tag. Also every owner-checked tagged piece whose sheet differs from the
+    tag, whatever the reading."""
+    out = {"conflicts": [], "sheet miss": 0, "drafted agree": 0, "other": 0, "sheet differs": 0}
+    for t in frows:
+        if t["id"] in skip or t["label"]["kind"] not in PRINTED or t["id"] not in tags:
+            continue
+        y, m, _ = tags[t["id"]]
+        lab, how = t["label"]["publication_date"], t["owner"].get("publication_date")
+        on_tag = lambda v: bool(v) and v[0] == y and (m is None or v[1] == m)  # noqa: E731
+        if how and lab and not on_tag(lab):
+            out["sheet differs"] += 1
+        v = (pred.get(t["id"]) or {}).get("publication_date")
+        if not v or on_tag(v):
+            continue
+        eq = bool(lab) and IF.field_match("publication_date", v, lab, "ed2")
+        if how and eq and not on_tag(lab):
+            out["conflicts"].append({"doc": t["id"], "sheet": list(lab), "tag": [y, m],
+                                     "by": "year" if lab[0] != y else "month"})
+        elif how and not eq:
+            out["sheet miss"] += 1
+        elif not how and eq and not on_tag(lab):
+            out["drafted agree"] += 1
+        else:
+            out["other"] += 1
+    return out
+
+
+def season_year_only(frows, fixes, gem):
+    """Drawn publication dates the owner typed as a season or a two-month issue, which the hand reading folds to the
+    year alone, and of them the ones the image prompt read as a bare year, so right on the sheet."""
+    typed, right = [], []
+    for t in frows:
+        v = ((fixes.get(t["id"]) or {}).get("answer") or {}).get("publication_date")
+        v = typed("publication_date", v) if isinstance(v, str) else norm("publication_date", v)
+        if not v or t["owner"].get("publication_date") != DRAW or v[1] is not None:
+            continue
+        typed.append(t["id"])
+        g = (gem.get(t["id"]) or {}).get("publication_date")
+        if g and g[0] == v[0] and g[1] is None:
+            right.append(t["id"])
+    return {"typed": typed, "year-only right": right}
+
+
 def paired(P, frows, skip, which):
     """3.7's app call against 3.8's on the documents 3.8 answered: per field, both / only 3.7 / only 3.8 / neither
     right, where right is the ed2 match or both empty."""
@@ -641,7 +696,8 @@ def build():
                 scores[f"{rk}|{which}|{f}"] = IF.score(pairs(rk, fam, P[rk], frows, f, which, skip), f)
         for f in FIELDS:
             so, sd = scores[f"{rk}|owner|{f}"], scores[f"{rk}|drafted|{f}"]
-            strat[f"{rk}|{f}"] = st = stratified(P[rk], P["draft-gemini"], frows, f, skip)
+            strat[f"{rk}|{f}"] = st = stratified(P[rk], P["draft-gemini"], frows, f, skip,
+                                                 controls_out=rk == "app-gemini-3.8-flash")
             v = verdict(so, 0.0, sd, st) if fam and st else verdict(sd, err_hi)
             if fam and f in THIRD_FIELDS and third_open and v not in ("fill", "below the bar", "never filled"):
                 v = "waits on the third sheet"   # kind: 3 drawn pairs cannot carry its pool (P11-2)
@@ -695,6 +751,8 @@ def build():
                                                                  if ":third-" in n}), "draw_routes": draw_routes(P, frows, skip),
         "unasked_disputes": unasked_disputes(frows, skip), "third_sheet_open": third_open,
         "tags": {rk: tag_score(P[rk], frows, tags, skip) for rk, *_ in ROUTES},
+        "tag_conflicts": tag_conflicts(P["draft-gemini"], frows, tags, skip),
+        "season_year_only": season_year_only(frows, fixes, P["draft-gemini"]),
         "paired": {w: paired(P, frows, skip, w) for w in ("drafted", "owner")},
         "rule": {"floor": FLOOR, "lower": LOWER, "point": POINT}}
     json.dump(o, open(RESULTS.replace(".md", ".json"), "w"), indent=1, sort_keys=True)
@@ -729,7 +787,8 @@ def report(o):
          "W47.item-fields-third-score)", "",
          "Generated by `scripts/segbench/item_fields_score.py`; method in its header. Truth from "
          "W47.item-fields-retruth (`item-fields-retruth.md`) with the owner's answers and notes folded in; the "
-         "labels, notes and readings stay in the bench cache, and this page has counts only. Offline, $0.", ""]
+         "labels, notes and readings stay in the bench cache, and this page has counts only, apart from the "
+         "publication dates listed by piece under FLD-6. Offline, $0.", ""]
     L += ["## The fold", "",
           f"{c['answered']} of {c['questions']} sheet questions answered ({sc['first']} on the first sheet, "
           f"{sc['second']} on the second, a random draw from the image prompt's readings"
@@ -857,14 +916,41 @@ def report(o):
             L.append(f"| {SHORT[rk]} | {f} | " + " | ".join(f"{x[0]}/{x[1]}" if x else "-" for x in cells) + " |")
     L += ["", "## Publication date against the owner's date tags (FLD-6)", "",
           f"{c['owner_tags_printed']} of the {c['printed']} printed pieces carry the owner's year tag on their first "
-          "page. Right means the same year, and the same month where he tagged one; this is the date the Zotero "
-          "export's `date` would carry. The app's call returns the document's date, the image prompt the printed "
-          "issue date.", "", "| route | tagged pieces | filled | right | precision |", "|---|---|---|---|---|"]
+          "page. Right means the same year, and the same month where he tagged one. The two owner truths are two "
+          "different dates: the tag is the document's date, which the app's call returns; the item field, which the "
+          "image prompt and Luna read and the owner's sheets answer, is the printed issue date. W47.ct-zotero's "
+          "export takes Zotero's `issued` from the owner's or the app's date, not the item field, so no conflicting "
+          "date is written.", "", "| route | tagged pieces | filled | right | precision |", "|---|---|---|---|---|"]
     for rk, label, _f in ROUTES:
         t = o["tags"][rk]
         if t.get("docs"):
             L.append(f"| {label} | {t['docs']} | {t.get('filled', 0)} | {t.get('right', 0)} | "
                      f"{frac(t.get('right', 0), t.get('filled', 0))} |")
+    tg, tc = o["tags"], o["tag_conflicts"]
+    gst = o["stratified"].get("draft-gemini|publication_date")
+    conf = tc["conflicts"]
+    nby = collections.Counter(x["by"] for x in conf)
+    miss = len(conf) + tc["sheet miss"] + tc["drafted agree"] + tc["other"]
+    ymd = lambda v: "-".join([str(v[0])] + [f"{x:02d}" for x in v[1:] if x])  # noqa: E731
+    L += ["", "Against the tags, every route: "
+          + "; ".join(f"{SHORT[rk]} {frac(tg[rk].get('right', 0), tg[rk].get('filled', 0))}"
+                      for rk, *_ in ROUTES if tg[rk].get("filled"))
+          + (f". The image prompt's {f2(gst['precision'])} [{f2(gst['lo'])}, {f2(gst['hi'])}] above is its stratified "
+             "precision against the sheets' printed issue date; the figure here is against the document's date."
+             if gst else "."), "",
+          f"The image prompt's {miss} misses against the tags, read against the owner's sheets: on {len(conf)} the "
+          "owner-checked sheet value differs from his own tag and the reading equals the sheet "
+          f"({nby['year']} by year, {nby['month']} by month, listed below); {tc['sheet miss']} "
+          f"{'is a miss' if tc['sheet miss'] == 1 else 'are misses'} on the sheet too; {tc['drafted agree']} "
+          f"{'is a drafted piece' if tc['drafted agree'] == 1 else 'are drafted pieces'} where the truth and the "
+          "reading agree and both differ from the tag"
+          + (f"; {tc['other']} other" if tc["other"] else "") + ". In all, the sheet differs from the tag on "
+          f"{tc['sheet differs']} of the owner-checked tagged pieces, whatever the reading. The sheet gives the "
+          "printed issue date and the tag the document's date, so these are two dates, not one truth wrong; the tag "
+          f"figure counts the {len(conf)} listed against the reading only because it scores the other date.", "",
+          "| piece | sheet (printed issue date) | tag (document's date) | differs by |", "|---|---|---|---|"]
+    for x in conf:
+        L.append(f"| {x['doc']} | {ymd(x['sheet'])} | {ymd(x['tag'])} | {x['by']} |")
     L += ["", "## Gemini 3.7 on Vision text against Gemini 3.8 on ABBYY text, paired", "",
           f"On the {c['replies']['app-gemini-3.8-flash']} documents 3.8 answered (base only); right is the ed2 match "
           "or both empty.", "", "| field | truth | both right | only 3.7 | only 3.8 | neither |", "|---|---|---|---|---|---|"]
@@ -919,10 +1005,20 @@ def report(o):
           f"disputes he answered, an error of {frac(tot['answered'] - tot['judge right'], tot['answered'])} on that "
           "stratum beside the controls', so a few points of truth error per field beyond the controls' on the "
           "drafted truth (P11-6); it moves no verdict, since the rows judged on the drafted truth are ABBYY "
-          "records. The drafter-family rows are judged on the owner's values only.",
+          "records. The drafter-family rows are judged on the owner's values only. The fold reads a typed season or "
+          f"two-month issue as its year ({len(o['season_year_only']['typed'])} drawn publication dates were typed "
+          "so), which makes a year-only reading of such a piece right: the image prompt is right that way on "
+          f"{len(o['season_year_only']['year-only right'])} drawn "
+          f"pair{'' if len(o['season_year_only']['year-only right']) == 1 else 's'}"
+          + (f" ({', '.join(o['season_year_only']['year-only right'])})" if o["season_year_only"]["year-only right"]
+             else "")
+          + "".join(f"; {d} is also a month conflict with the owner's tag (FLD-6)"
+                    for d in o["season_year_only"]["year-only right"]
+                    if any(x["doc"] == d for x in o["tag_conflicts"]["conflicts"])) + ".",
           "- **Selection:** base by Gemini 3.8's format and ABBYY cues (inherited, FLD-3); clippings and handwritten "
           "by the owner's tags. The first sheet's owner-checked pairs are kind crossings, a seeded sample of "
-          "disputes per field, the 3.8-agreeing controls (left out of 3.8's pooled row) and the random controls, so "
+          "disputes per field, the 3.8-agreeing controls (left out of 3.8's pooled row, and out of its stratified "
+          "census, where they count in the pool as pairs no answer settled) and the random controls, so "
           "they lean toward the hard cases; the second sheet's are a seeded uniform draw (W47.item-fields-more-checks, "
           "seed 4750) from the rest, split by the image prompt's filling, chosen by no other route and no ABBYY "
           "text. The stratified figure counts each part at its own size.",

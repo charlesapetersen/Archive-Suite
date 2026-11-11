@@ -1990,6 +1990,17 @@
    "wrong_when_filled": 0
   }
  },
+ "season_year_only": {
+  "typed": [
+   "970b3b3a63351a6c",
+   "ccdc0f60db651afc",
+   "53e6be6ab3367031"
+  ],
+  "year-only right": [
+   "970b3b3a63351a6c",
+   "ccdc0f60db651afc"
+  ]
+ },
  "sheet": {
   "disputes": {
    "byline": {
@@ -2111,12 +2122,12 @@
  "stratified": {
   "app-gemini-3.8-flash|byline": {
    "census": [
-    8,
-    9
+    2,
+    3
    ],
    "filled": 36,
-   "hi": 0.8425830687205447,
-   "lo": 0.4580867401499804,
+   "hi": 0.8173060293636591,
+   "lo": 0.35038620296525325,
    "pool": {
     "image prompt empty": [
      3,
@@ -2124,21 +2135,21 @@
      0
     ],
     "image prompt filled": [
-     24,
+     30,
      11,
      7
     ]
    },
-   "precision": 0.6464646464646465
+   "precision": 0.5858585858585859
   },
   "app-gemini-3.8-flash|kind": {
    "census": [
-    20,
-    25
+    14,
+    19
    ],
    "filled": 143,
-   "hi": 0.9558597988644539,
-   "lo": 0.7312689743057674,
+   "hi": 0.9553932649913771,
+   "lo": 0.7193825679975032,
    "pool": {
     "image prompt empty": [
      0,
@@ -2146,21 +2157,21 @@
      0
     ],
     "image prompt filled": [
-     118,
+     124,
      16,
      15
     ]
    },
-   "precision": 0.9134615384615384
+   "precision": 0.9108391608391608
   },
   "app-gemini-3.8-flash|publication": {
    "census": [
-    10,
-    11
+    5,
+    6
    ],
    "filled": 34,
    "hi": 0.9219898137708488,
-   "lo": 0.6033149616686945,
+   "lo": 0.5593219096759062,
    "pool": {
     "image prompt empty": [
      8,
@@ -2168,7 +2179,7 @@
      0
     ],
     "image prompt filled": [
-     15,
+     20,
      9,
      9
     ]
@@ -2177,12 +2188,12 @@
   },
   "app-gemini-3.8-flash|publication_date": {
    "census": [
-    8,
-    12
+    3,
+    7
    ],
    "filled": 56,
-   "hi": 0.627316106131528,
-   "lo": 0.21316779817865797,
+   "hi": 0.5924395358281694,
+   "lo": 0.13621403388377953,
    "pool": {
     "image prompt empty": [
      21,
@@ -2190,21 +2201,21 @@
      1
     ],
     "image prompt filled": [
-     23,
+     28,
      12,
      4
     ]
    },
-   "precision": 0.3547619047619048
+   "precision": 0.29523809523809524
   },
   "app-gemini-3.8-flash|recipient_place": {
    "census": [
-    10,
-    12
+    4,
+    6
    ],
    "filled": 34,
    "hi": 0.8986528517553749,
-   "lo": 0.6283084893385694,
+   "lo": 0.5855142380151737,
    "pool": {
     "image prompt empty": [
      7,
@@ -2212,7 +2223,7 @@
      0
     ],
     "image prompt filled": [
-     15,
+     21,
      12,
      12
     ]
@@ -3060,6 +3071,105 @@
    "precision": 0.7466666666666667
   },
   "tagging|title": null
+ },
+ "tag_conflicts": {
+  "conflicts": [
+   {
+    "by": "year",
+    "doc": "9a3db62d4c88f78f",
+    "sheet": [
+     1967,
+     3,
+     7
+    ],
+    "tag": [
+     1965,
+     3
+    ]
+   },
+   {
+    "by": "year",
+    "doc": "78d4ccf6f37af029",
+    "sheet": [
+     1959,
+     8,
+     null
+    ],
+    "tag": [
+     1962,
+     4
+    ]
+   },
+   {
+    "by": "year",
+    "doc": "354c113d295bc062",
+    "sheet": [
+     1968,
+     3,
+     29
+    ],
+    "tag": [
+     1969,
+     null
+    ]
+   },
+   {
+    "by": "year",
+    "doc": "2507aff115dfd4d2",
+    "sheet": [
+     1969,
+     6,
+     18
+    ],
+    "tag": [
+     1968,
+     null
+    ]
+   },
+   {
+    "by": "month",
+    "doc": "ccdc0f60db651afc",
+    "sheet": [
+     1969,
+     null,
+     null
+    ],
+    "tag": [
+     1969,
+     8
+    ]
+   },
+   {
+    "by": "month",
+    "doc": "7c33135ffc7a4dfe",
+    "sheet": [
+     1975,
+     7,
+     28
+    ],
+    "tag": [
+     1975,
+     8
+    ]
+   },
+   {
+    "by": "year",
+    "doc": "ab20e83f94bff0dd",
+    "sheet": [
+     1975,
+     8,
+     null
+    ],
+    "tag": [
+     1972,
+     8
+    ]
+   }
+  ],
+  "drafted agree": 4,
+  "other": 0,
+  "sheet differs": 10,
+  "sheet miss": 1
  },
  "tags": {
   "app-gemini-3.8-flash": {
