@@ -840,8 +840,10 @@ def render(out: dict) -> str:
               "article-within-issue rule. Every cloud route merges them with or without the magazine rule (only g1's "
               "rule 10 states it; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and only the 2B "
               "trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps), so they are the "
-              "cloud models' own reading of those pages; the prompt change (W46.seg-magazine-rule-redo) is the first "
-              "thing to try and is unmeasured on these gaps. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's "
+              "cloud models' own reading of those pages. Prompt g2, g1 with rule 10 on the article-within-issue rule, "
+              "splits both on Gemini 3.7 through the gateway and takes that route's unflagged errors from 2 to 0 "
+              "(seg-magazine-rule.md, W46.seg-magazine-rule-redo); the app's 3.8 voter still sends g1, so the Gemini "
+              "figures here are g1's. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's "
               "3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) "
               "do not include it (W46.seg-offsets-label, from the cached answers).",
         selection="Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not "

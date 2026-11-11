@@ -465,9 +465,10 @@ def reading(out):
              f"merges {gir['false merges']} article gaps, against the teacher's "
              f"{obs[('teacher', 'IllustratedReview')]['false merges']} and the students' "
              f"{min(obs[(k, 'IllustratedReview')]['false merges'] for k in STUDENTS)}-"
-             f"{max(obs[(k, 'IllustratedReview')]['false merges'] for k in STUDENTS)}; that g1 still asks for the "
-             "full magazine issue (W46.seg-magazine-rule-redo) explains at most the excess over those, and its pages "
-             "exact there is no test of reading ability. ")
+             f"{max(obs[(k, 'IllustratedReview')]['false merges'] for k in STUDENTS)}; g1 asks for the full "
+             "magazine issue, and its pages exact there is no test of reading ability" +
+             (f" (prompt g2, on the article-within-issue rule, merges {mag['review']['g2']['false merges']} there: "
+              "seg-magazine-rule.md). " if (mag := magazine_redo()) else ". "))
     figures = [r["figures"] for r in out["offsets"]["rows"].values()]
     exact = [r["pages_exact_no_review"] for r in figures]
     flags = [r["flagged_per_100_pages"] for r in figures]
@@ -477,6 +478,12 @@ def reading(out):
                    f"{min(flags):.1f}–{max(flags):.1f}; the shipped 3.8 route's own offset range is unmeasured." +
                    (" Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: " + cause + "."
                     if newsletter_only(out["offsets"]) and cause else ""))
+
+
+def magazine_redo():
+    """W46.seg-magazine-rule-redo's g1-against-g2 record (seg-magazine-rule.json), or None before it exists."""
+    p = RESULTS / "seg-magazine-rule.json"
+    return json.loads(p.read_text()) if p.is_file() else None
 
 
 # The Stanton gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule (W46.seg-truth-sheet): the
@@ -501,7 +508,7 @@ def unflagged_note(off, nl):
     if same and next(iter(sets.values())) == NEWSLETTER_GAPS and cause:
         text += ("Every run's are the same pair, both a confident continue (0.98-0.99): " + cause + ". So the "
                  "route's 2.8 unflagged errors per 500 pages, here and in options.md, is the cloud models' own reading "
-                 "of those pages, which rule 10 agrees with rather than causes, and \"after checking 98.5%\" is the "
+                 "of those pages, which g1's rule 10 agrees with rather than causes, and \"after checking 98.5%\" is the "
                  "same at every offset because the same confident pair is wrong every time. ")
     return text + ("The other approaches' unflagged errors in options.md, from its cached test-box answers at their "
                    "frozen levels (W46.seg-offsets-label): GLM-5.3 Flash's 3 are the same pair and Stanton 144|145; "
@@ -577,10 +584,17 @@ def newsletter_cause(nl):
     ruled = [a for a in cloud if a["magazine_rule"]]
     if not (merged and local_splits and len(ruled) < len(cloud)):
         return None
-    return ("the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every "
+    text = ("the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every "
             "cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B "
-            "trained on the owner's corpus splits; the prompt change (W46.seg-magazine-rule-redo) is the first thing "
-            "to try and is unmeasured on these gaps")
+            "trained on the owner's corpus splits")
+    mag = magazine_redo()
+    if mag is None:
+        return text + "; the prompt change (W46.seg-magazine-rule-redo) is the first thing to try and is unmeasured"
+    g2 = {g["gap"]: g for g in mag["test"]["newsletter_gaps"]["g2"]}
+    said = [g2[g]["said"] for g in ("101|102", "102|103")]
+    return text + ("; prompt g2, which states the article-within-issue rule, " +
+                   ("splits both on Gemini 3.7 (seg-magazine-rule.md)" if said == ["new", "new"] else
+                    f"still says {' and '.join(said)} on Gemini 3.7 (seg-magazine-rule.md)"))
 
 
 def offset_spread(out):
@@ -728,9 +742,9 @@ def render(out) -> str:
               "Sign tests are sampling only.",
         scope=("Only the three owner boxes scored; the two test boxes' cloud offsets remain pending. "
                if out["offsets"] is None else "Three owner boxes and two test boxes. ") +
-              "It does not settle a prompt change for the article-within-issue "
-              "rule (g1 still says full magazine: W46.seg-magazine-rule-redo; no route has been run on these gaps "
-              "with a prompt that states the new rule), 3.8 against 3.7 on these boxes, the "
+              "Its Gemini rows are prompt g1, which still says full magazine; g2, on the article-within-issue rule, "
+              "is measured against them in seg-magazine-rule.md (W46.seg-magazine-rule-redo). It does not settle "
+              "3.8 against 3.7 on these boxes, the "
               "shipped 3.8 route's own offset range (the gateway serves only 3.7), or a level fitted for 3.7.")
     return "\n".join(L) + "\n"
 

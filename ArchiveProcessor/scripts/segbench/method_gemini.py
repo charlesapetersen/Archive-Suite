@@ -163,7 +163,7 @@ the cue is unambiguous, about 0.6 when you are close to guessing.
 from magazine_rule import RULE10_G1, RULE10_G2  # noqa: E402
 assert PROMPT.count(RULE10_G1) == 1, "prompt g1 changed"
 PROMPT_G2 = PROMPT.replace(RULE10_G1, RULE10_G2)
-PROMPTS = {"g1": PROMPT, "g2": PROMPT_G2}
+PROMPTS = {"g1": PROMPT, "g2": PROMPT_G2}   # a new Gemini arm sends g2 (seg-magazine-rule.md); g1 reproduces the caches
 
 
 # --- the request ------------------------------------------------------------------------------

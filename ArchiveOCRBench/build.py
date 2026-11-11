@@ -495,6 +495,18 @@ def seg_boxes_score():
             "sc0122": d["sc0122_owner"], "offsets": d["offsets"], "note": d["note"]}
 
 
+def seg_magazine_rule():
+    """W46.seg-magazine-rule-redo: Gemini 3.7's window prompt on the article-within-issue rule (g2) against g1."""
+    path = RESULTS / "seg-magazine-rule.json"
+    if not path.exists():
+        return None
+    d = json.loads(path.read_text())
+    return {"source": path.with_suffix(".md").name, "review": d["review"], "review_paired": d["review_paired"],
+            "test": {v: d["test"]["prompts"][v]["figures"] for v in ("g1", "g2")},
+            "test_paired": d["test"]["paired"], "verdict": d["verdict"],
+            "usd_per_1000_pages": d["gateway_g2"]["usd_per_1000_pages"]}
+
+
 def public_segmentation():
     """Separate public/easier boxes; their labels and scores never enter owner-box fitting."""
     root = RESULTS / "public-segmentation"
@@ -1415,6 +1427,7 @@ def main():
                          if (RESULTS / "seg-date-model-final.json").exists() else None,
              "seg_context": seg_context(), "seg_adapt_lora": seg_adapt_lora(), "seg_window_modality": seg_window_modality(), "seg_tabme": seg_tabme(),
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
+             "seg_magazine_rule": seg_magazine_rule(),
              "public": pub, "ocr_scorers": ocr_scorers(),
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
              "hands_icl": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-paid.json").read_text()).items()

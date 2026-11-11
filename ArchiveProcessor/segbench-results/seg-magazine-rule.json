@@ -1,0 +1,300 @@
+{
+ "tag": "W46.seg-magazine-rule-redo",
+ "screen": {
+  "Sasha": [],
+  "SC0122": [
+   139,
+   140,
+   141,
+   142,
+   192
+  ]
+ },
+ "review": {
+  "g1": {
+   "known gaps": 146,
+   "right": 104,
+   "gap accuracy": 0.7123287671232876,
+   "false splits": 2,
+   "false merges": 40,
+   "pages exact": 0.25170068027210885,
+   "resolved pages": 147,
+   "failed windows": 0
+  },
+  "g2": {
+   "known gaps": 146,
+   "right": 137,
+   "gap accuracy": 0.9383561643835616,
+   "false splits": 9,
+   "false merges": 0,
+   "pages exact": 0.8367346938775511,
+   "resolved pages": 147,
+   "failed windows": 0
+  }
+ },
+ "review_paired": {
+  "pair": "g2 vs g1",
+  "scope": "IllustratedReview",
+  "gaps": 146,
+  "only first right": 40,
+  "only second right": 7,
+  "difference points": 22.602739726027398,
+  "sign test p": 1.0709118214435875e-06
+ },
+ "test": {
+  "rule": "min",
+  "level": 0.965,
+  "prompts": {
+   "g1": {
+    "figures": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 94,
+     "pages_exact_no_review": 0.8515151515151516,
+     "flagged_per_100_pages": 25.895316804407713,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183
+    },
+    "by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 85,
+      "pages_exact_no_review": 0.8436213991769548,
+      "flagged_per_100_pages": 34.0,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 9,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 7.964601769911504,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "unflagged_gaps": {
+     "Stanton": [
+      {
+       "gap": "101|102",
+       "said": "continue",
+       "truth": "new",
+       "confidence": 0.98
+      },
+      {
+       "gap": "102|103",
+       "said": "continue",
+       "truth": "new",
+       "confidence": 0.98
+      }
+     ],
+     "RG165": []
+    }
+   },
+   "g2": {
+    "figures": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 92,
+     "pages_exact_no_review": 0.8878787878787879,
+     "flagged_per_100_pages": 25.34435261707989,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
+    },
+    "by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 81,
+      "pages_exact_no_review": 0.8806584362139918,
+      "flagged_per_100_pages": 32.4,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 11,
+      "pages_exact_no_review": 0.9080459770114943,
+      "flagged_per_100_pages": 9.734513274336283,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "unflagged_gaps": {
+     "Stanton": [],
+     "RG165": []
+    }
+   }
+  },
+  "newsletter_gaps": {
+   "g1": [
+    {
+     "gap": "101|102",
+     "truth": "new",
+     "said": "continue",
+     "confidence": 0.98,
+     "flagged": false
+    },
+    {
+     "gap": "102|103",
+     "truth": "new",
+     "said": "continue",
+     "confidence": 0.98,
+     "flagged": false
+    },
+    {
+     "gap": "103|104",
+     "truth": "continue",
+     "said": "continue",
+     "confidence": 0.99,
+     "flagged": false
+    },
+    {
+     "gap": "104|105",
+     "truth": "continue",
+     "said": "continue",
+     "confidence": 0.985,
+     "flagged": false
+    }
+   ],
+   "g2": [
+    {
+     "gap": "101|102",
+     "truth": "new",
+     "said": "new",
+     "confidence": 0.95,
+     "flagged": true
+    },
+    {
+     "gap": "102|103",
+     "truth": "new",
+     "said": "new",
+     "confidence": 0.98,
+     "flagged": false
+    },
+    {
+     "gap": "103|104",
+     "truth": "continue",
+     "said": "continue",
+     "confidence": 0.99,
+     "flagged": false
+    },
+    {
+     "gap": "104|105",
+     "truth": "continue",
+     "said": "continue",
+     "confidence": 0.985,
+     "flagged": false
+    }
+   ]
+  },
+  "paired": {
+   "pair": "g2 vs g1",
+   "scope": "Stanton+RG165",
+   "gaps": 315,
+   "only first right": 6,
+   "only second right": 3,
+   "difference points": 0.9523809523809523,
+   "sign test p": 0.5078125
+  },
+  "changed_gaps": [
+   {
+    "box": "Stanton",
+    "gap": "47|48",
+    "truth": "continue",
+    "g1": "continue",
+    "g2": "new"
+   },
+   {
+    "box": "Stanton",
+    "gap": "48|49",
+    "truth": "continue",
+    "g1": "continue",
+    "g2": "new"
+   },
+   {
+    "box": "Stanton",
+    "gap": "49|50",
+    "truth": "new",
+    "g1": "continue",
+    "g2": "new"
+   },
+   {
+    "box": "Stanton",
+    "gap": "101|102",
+    "truth": "new",
+    "g1": "continue",
+    "g2": "new"
+   },
+   {
+    "box": "Stanton",
+    "gap": "102|103",
+    "truth": "new",
+    "g1": "continue",
+    "g2": "new"
+   },
+   {
+    "box": "Stanton",
+    "gap": "108|109",
+    "truth": "continue",
+    "g1": "new",
+    "g2": "continue"
+   },
+   {
+    "box": "Stanton",
+    "gap": "241|242",
+    "truth": "continue",
+    "g1": "new",
+    "g2": "continue"
+   },
+   {
+    "box": "RG165",
+    "gap": "67|68",
+    "truth": "continue",
+    "g1": "continue",
+    "g2": "new"
+   },
+   {
+    "box": "RG165",
+    "gap": "85|86",
+    "truth": "new",
+    "g1": "continue",
+    "g2": "new"
+   }
+  ]
+ },
+ "gateway_g2": {
+  "calls": 173,
+  "spent_usd": 1.93203675,
+  "billed": {
+   "calls": 173,
+   "estimate": 1.886582,
+   "gateway_calls": 173,
+   "gateway": 1.886582,
+   "gateway_over_estimate": 1.0,
+   "charged": 1.886582
+  },
+  "billed_note": "the gateway's own figure $1.8866 on 173 of 173 calls, 1.00 times the estimate on them",
+  "retained_usd": 0.04545449999999995,
+  "retries": 1,
+  "invalid": 0,
+  "input_tokens": 2164618,
+  "output_tokens": 70165,
+  "usd_per_1000_pages": 3.7883073529411764
+ },
+ "verdict": {
+  "review_better": true,
+  "test_held": true,
+  "adopt_g2": true
+ },
+ "floor_points": 3.2
+}

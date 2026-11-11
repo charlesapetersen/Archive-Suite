@@ -29284,7 +29284,78 @@
     "RG165": []
    }
   },
-  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; that g1 still asks for the full magazine issue (W46.seg-magazine-rule-redo) explains at most the excess over those, and its pages exact there is no test of reading ability. Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B trained on the owner's corpus splits; the prompt change (W46.seg-magazine-rule-redo) is the first thing to try and is unmeasured on these gaps."
+  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B trained on the owner's corpus splits; prompt g2, which states the article-within-issue rule, splits both on Gemini 3.7 (seg-magazine-rule.md)."
+ },
+ "seg_magazine_rule": {
+  "source": "seg-magazine-rule.md",
+  "review": {
+   "g1": {
+    "known gaps": 146,
+    "right": 104,
+    "gap accuracy": 0.7123287671232876,
+    "false splits": 2,
+    "false merges": 40,
+    "pages exact": 0.25170068027210885,
+    "resolved pages": 147,
+    "failed windows": 0
+   },
+   "g2": {
+    "known gaps": 146,
+    "right": 137,
+    "gap accuracy": 0.9383561643835616,
+    "false splits": 9,
+    "false merges": 0,
+    "pages exact": 0.8367346938775511,
+    "resolved pages": 147,
+    "failed windows": 0
+   }
+  },
+  "review_paired": {
+   "pair": "g2 vs g1",
+   "scope": "IllustratedReview",
+   "gaps": 146,
+   "only first right": 40,
+   "only second right": 7,
+   "difference points": 22.602739726027398,
+   "sign test p": 1.0709118214435875e-06
+  },
+  "test": {
+   "g1": {
+    "pages": 363,
+    "gaps": 315,
+    "flagged": 94,
+    "pages_exact_no_review": 0.8515151515151516,
+    "flagged_per_100_pages": 25.895316804407713,
+    "pages_exact_after_review": 0.9848484848484849,
+    "unflagged_errors": 2,
+    "unflagged_errors_per_500_pages": 2.7548209366391183
+   },
+   "g2": {
+    "pages": 363,
+    "gaps": 315,
+    "flagged": 92,
+    "pages_exact_no_review": 0.8878787878787879,
+    "flagged_per_100_pages": 25.34435261707989,
+    "pages_exact_after_review": 1.0,
+    "unflagged_errors": 0,
+    "unflagged_errors_per_500_pages": 0.0
+   }
+  },
+  "test_paired": {
+   "pair": "g2 vs g1",
+   "scope": "Stanton+RG165",
+   "gaps": 315,
+   "only first right": 6,
+   "only second right": 3,
+   "difference points": 0.9523809523809523,
+   "sign test p": 0.5078125
+  },
+  "verdict": {
+   "review_better": true,
+   "test_held": true,
+   "adopt_g2": true
+  },
+  "usd_per_1000_pages": 3.7883073529411764
  },
  "public": {
   "rows": [

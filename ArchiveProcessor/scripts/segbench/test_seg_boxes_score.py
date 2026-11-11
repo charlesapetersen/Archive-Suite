@@ -214,25 +214,43 @@ class PartialReport(unittest.TestCase):
                       "by_box": {"Stanton": f}, "unflagged_gaps": {"Stanton": pair, "RG165": []}}
             for o in (0, 1, 2)}, "gemini38_o0": f, "gemini38_o0_by_box": {"Stanton": f},
             "gemini38_o0_unflagged_gaps": {"Stanton": pair, "RG165": []}}
+        out["newsletter_gaps"] = newsletter()
         full = B.render(out)
         self.assertIn("$4.00 | $5.00 | $6.00 | $4.00–$6.00 | $4.00", full)
         self.assertIn("$3.00 | $4.00 | $5.00 | $3.00–$5.00 | — |", full)
         self.assertIn("total experiment spend counts it once", full)
         self.assertIn("## Gemini 3.7 (gateway) at the shipped route's rule and level, three window offsets", full)
         self.assertIn("the shipped 3.8 route's own offset range is unmeasured", full)
-        self.assertIn("rule mismatch pending W46.seg-magazine-rule-redo", full)
+        self.assertIn("which every cloud route merges with or without the magazine rule", full)
         self.assertIn("same two confident Stanton gaps", full)
 
     def test_unflagged_note_only_names_the_newsletter_pair_when_every_run_has_exactly_it(self):
         pair = [{"gap": g} for g in ("101|102", "102|103")]
         off = {"rows": {f"o{o}": {"unflagged_gaps": {"Stanton": pair, "RG165": []}} for o in (0, 1, 2)},
                "gemini38_o0_unflagged_gaps": {"Stanton": pair, "RG165": []}}
+        nl = newsletter()
         self.assertTrue(B.newsletter_only(off))
-        self.assertIn("rule mismatch", B.unflagged_note(off))
+        self.assertIn("Every run's are the same pair", B.unflagged_note(off, nl))
         off["rows"]["o1"]["unflagged_gaps"]["RG165"] = [{"gap": "9|10"}]
         self.assertFalse(B.newsletter_only(off))
-        self.assertNotIn("rule mismatch", B.unflagged_note(off))
-        self.assertIn("3.7 o1: RG165 9|10, Stanton 101|102", B.unflagged_note(off))
+        self.assertNotIn("Every run's are the same pair", B.unflagged_note(off, nl))
+        self.assertIn("3.7 o1: RG165 9|10, Stanton 101|102", B.unflagged_note(off, nl))
+
+    def test_newsletter_cause_drops_when_a_cloud_route_splits_the_pair(self):
+        nl = newsletter()
+        self.assertIn("only the 2B trained on the owner's corpus splits", B.newsletter_cause(nl))
+        nl["approaches"][1]["gaps"]["101|102"]["said"] = "new"
+        self.assertIsNone(B.newsletter_cause(nl))
+
+
+def newsletter():
+    """newsletter_calls' shape: two cloud routes (one with the magazine rule) merge the pair, the 2B splits it."""
+    def gaps(said):
+        return {g: {"truth": "new", "said": said, "confidence": .98, "flagged": False} for g in ("101|102", "102|103")}
+    return {"approaches": [
+        {"id": "gemini", "label": "Gemini", "prompts": ["g1"], "magazine_rule": True, "gaps": gaps("continue")},
+        {"id": "claude", "label": "Claude", "prompts": ["w1"], "magazine_rule": False, "gaps": gaps("continue")},
+        {"id": "local", "label": "2B", "prompts": ["l1"], "magazine_rule": False, "gaps": gaps("new")}]}
 
 
 if __name__ == "__main__":

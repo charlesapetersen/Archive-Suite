@@ -205,7 +205,12 @@ footer p { font-size: 13px; }
     <div id="sbs-offsets" hidden>
       <h3>Gemini 3.7 (gateway) at the shipped route's rule and level, three window offsets (Stanton and RG 165)</h3>
       <div class="tbl"><table><thead><tr><th>Figure</th><th>3.7, offset 0</th><th>3.7, offset 1</th><th>3.7, offset 2</th><th>3.7 range</th><th>3.8, offset 0 (the app's figures)</th></tr></thead><tbody id="sbs-off-rows"></tbody></table></div>
-      <p class="note">The app's cloud voter is Gemini 3.8 Flash on the user's key, at a level fitted for 3.8; the gateway serves only 3.7, so this is 3.7's offset range at another model's level, and the shipped 3.8 route's own offset range is unmeasured. The two unflagged errors are the same at every offset and for 3.8: Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule. Every cloud route merges them with or without the magazine rule, which only the g1 prompt states (Claude and ChatGPT merge them but flag them, GLM-5.3 Flash accepts the merge), and only the 2B trained on the owner's corpus splits them; the prompt change (W46.seg-magazine-rule-redo) is the first thing to try and is unmeasured on these gaps. GLM-5.3 Flash's three unflagged errors include the same pair, Claude's three and the Mac 2B's one do not. Cost per 1,000 input pages counts each offset's windows and all attempts, including retained allowances, at the larger of returned gateway cost or list-token estimate; the settled row leaves out allowances retained for calls the gateway never billed. Shared windows count in each standalone offset; total experiment spend counts them once. The 3.8 cost is the older reference list estimate.</p>
+      <p class="note">The app's cloud voter is Gemini 3.8 Flash on the user's key, at a level fitted for 3.8; the gateway serves only 3.7, so this is 3.7's offset range at another model's level, and the shipped 3.8 route's own offset range is unmeasured. The two unflagged errors are the same at every offset and for 3.8: Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule. Every cloud route merges them with or without the magazine rule, which only the g1 prompt states (Claude and ChatGPT merge them but flag them, GLM-5.3 Flash accepts the merge), and only the 2B trained on the owner's corpus splits them; prompt g2, which states the article-within-issue rule, splits both on 3.7 (below). GLM-5.3 Flash's three unflagged errors include the same pair, Claude's three and the Mac 2B's one do not. Cost per 1,000 input pages counts each offset's windows and all attempts, including retained allowances, at the larger of returned gateway cost or list-token estimate; the settled row leaves out allowances retained for calls the gateway never billed. Shared windows count in each standalone offset; total experiment spend counts them once. The 3.8 cost is the older reference list estimate.</p>
+    </div>
+    <div id="sbs-magazine" hidden>
+      <h3>The Gemini prompt on the article-within-issue rule: g2 against g1 (Gemini 3.7, gateway)</h3>
+      <div class="tbl"><table><thead><tr><th>Figure</th><th>g1 (full magazine, what the app sends)</th><th>g2 (article within issue)</th></tr></thead><tbody id="sbs-mag-rows"></tbody></table></div>
+      <p class="note" id="sbs-mag-note"></p>
     </div>
     <p class="note" id="sbs-note"></p>
   </section>
@@ -839,6 +844,31 @@ if (sbs) {
         (sbs.offsets.gemini38_o0[k] == null ? '—' : f(sbs.offsets.gemini38_o0[k])) + '</td></tr>';
     }).join('');
     document.getElementById('sbs-offsets').hidden = false;
+  }
+  const mag = DATA.seg_magazine_rule;
+  if (mag) {
+    const rv = mag.review, t = mag.test;
+    const rows = [['Illustrated Review: gap accuracy', rv.g1['gap accuracy'], rv.g2['gap accuracy'], p1],
+                  ['Illustrated Review: false merges', rv.g1['false merges'], rv.g2['false merges'], String],
+                  ['Illustrated Review: false splits', rv.g1['false splits'], rv.g2['false splits'], String],
+                  ['Illustrated Review: pages in an exact document', rv.g1['pages exact'], rv.g2['pages exact'], p1],
+                  ['Stanton + RG 165: pages exact, no checking', t.g1.pages_exact_no_review, t.g2.pages_exact_no_review, p1],
+                  ['Stanton + RG 165: boundaries to check per 100 pages', t.g1.flagged_per_100_pages, t.g2.flagged_per_100_pages, v => v.toFixed(1)],
+                  ['Stanton + RG 165: pages right after checking', t.g1.pages_exact_after_review, t.g2.pages_exact_after_review, p1],
+                  ['Stanton + RG 165: unflagged errors per 500 pages', t.g1.unflagged_errors_per_500_pages, t.g2.unflagged_errors_per_500_pages, v => v.toFixed(1)]];
+    document.getElementById('sbs-mag-rows').innerHTML = rows.map(([n, a, b, f]) =>
+      '<tr><td>' + n + '</td><td>' + f(a) + '</td><td>' + f(b) + '</td></tr>').join('');
+    const rp = mag.review_paired, tp = mag.test_paired;
+    document.getElementById('sbs-mag-note').textContent = 'g2 is g1 with rule 10 rewritten on the owner\'s ' +
+      'article-within-issue rule (2026-10-29, with the advertisement rule of 2026-10-30); nothing else changes. On ' +
+      'the Illustrated Review it is right on ' + rp['only first right'] + ' gaps g1 gets wrong and wrong on ' +
+      rp['only second right'] + ' it gets right (sign test p ' + rp['sign test p'].toPrecision(2) + '). On the test ' +
+      'boxes it splits the two re-ruled newsletter gaps; elsewhere the paired decisions tie (' + tp['only first right'] +
+      ' against ' + tp['only second right'] + ', p ' + tp['sign test p'].toFixed(2) + '), so the gain beyond that pair is ' +
+      'run variation. Single runs, scored at the level fitted for 3.8 on g1. The bench now sends g2; the app\'s 3.8 ' +
+      'voter still sends g1, so the app\'s figures above are g1\'s. g2 costs $' + mag.usd_per_1000_pages.toFixed(2) +
+      ' per 1,000 pages. Source: ' + mag.source + '.';
+    document.getElementById('sbs-magazine').hidden = false;
   }
   document.getElementById('sbs-note').textContent = sbs.note + ' Source: ' + sbs.source + '.';
   document.getElementById('seg-boxes-score').hidden = false;

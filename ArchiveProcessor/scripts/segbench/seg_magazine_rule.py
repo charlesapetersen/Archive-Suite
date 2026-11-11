@@ -210,11 +210,28 @@ def test_boxes(js):
             "paired": KS.paired_row("g2 vs g1", "+".join(TEST), rights), "changed_gaps": changed}
 
 
+def screen():
+    """W46.seg-truth-sheet's masthead screen (ISSUE_SCREEN) over the cached Vision text of the locked boxes it did
+    not cover: {box: [photo numbers that hit]}."""
+    import re
+    import seg_truth_sheet as TS
+    with arm("g2") as (_, W, _, _):
+        out = {}
+        for b in ("Sasha", "SC0122"):
+            col = data.load(b, with_exif=False)
+            out[b] = [p.n for i, p in enumerate(col.pages) if re.search(TS.ISSUE_SCREEN, W.page_text(col, i) or "")]
+        return out
+
+
 def g2_cost(pages):
     with arm("g2") as (_, _, S, _):
         SB.check_reservations(S)
+        import gateway_gemini as GW
         calls = S.settled()
-        return {"calls": len(calls), "spent_usd": S.spent(), "billed_usd": S.settled_billed(),
+        return {"calls": len(calls), "spent_usd": S.spent(), "billed": S.settled_billed(),
+                "billed_note": GW.billed_note(calls, "estimate"),
+                "retained_usd": S.spent() - sum(r["charge"] for r in calls),
+                "retries": sum(r["event"] == "retry-approved" for r in S.effective_records()),
                 "invalid": sum(not r.get("valid") for r in calls),
                 "input_tokens": sum(r["usage"].get("prompt_tokens", 0) for r in calls),
                 "output_tokens": sum(r["usage"].get("completion_tokens", 0) for r in calls),
@@ -238,7 +255,7 @@ def cmd_score(_a):
     rev, paired_rev = review_box(js)
     test = test_boxes(js)
     pages = sum(len(data.load(b, with_exif=False).pages) for b in (REVIEW, *TEST))
-    out = {"tag": TAG, "review": rev, "review_paired": paired_rev, "test": test, "gateway_g2": g2_cost(pages),
+    out = {"tag": TAG, "screen": screen(), "review": rev, "review_paired": paired_rev, "test": test, "gateway_g2": g2_cost(pages),
            "verdict": verdict(rev, paired_rev, test), "floor_points": FLOOR}
     (RESULTS / "seg-magazine-rule.json").write_text(json.dumps(out, indent=1) + "\n")
     (RESULTS / "seg-magazine-rule.md").write_text(render(out))
@@ -307,26 +324,35 @@ def render(out) -> str:
           "## The call", "",
           f"Fixed before the g2 answers: g2 replaces g1 as the bench's Gemini prompt if the Illustrated Review gap "
           f"accuracy rises with p < 0.05 and the test boxes' pages exact, before and after checking, fall by no "
-          f"more than {out['floor_points']} points. Illustrated Review better: "
+          f"more than {out['floor_points']} points. Adopted means a new Gemini arm on the bench sends g2 "
+          f"(`method_gemini.PROMPTS['g2']`); the g1 results stay as measured, and g1 is what the app still sends. "
+          f"Illustrated Review better: "
           f"{'yes' if vd['review_better'] else 'no'}; test boxes held: {'yes' if vd['test_held'] else 'no'}; "
           f"**{'g2 adopted' if vd['adopt_g2'] else 'g1 kept'}**.", "",
           "## Gateway", "",
-          f"g2: {gw['calls']} settled calls, ${gw['spent_usd']:.4f} counted of the ${CAP:.2f} cap (gateway billed "
-          f"${gw['billed_usd']:.4f}), {gw['invalid']} invalid, {gw['input_tokens']:,} input and "
+          f"g2: {gw['calls']} settled calls, ${gw['spent_usd']:.4f} counted of the ${CAP:.2f} cap, including "
+          f"${gw['retained_usd']:.4f} retained for {gw['retries']} request the Mac's sleep cut off (retried once with "
+          f"`retry-once`); {gw['billed_note']}. {gw['invalid']} invalid, {gw['input_tokens']:,} input and "
           f"{gw['output_tokens']:,} output tokens, ${gw['usd_per_1000_pages']:.2f} per 1,000 pages.", "",
           "## Measurement card", "",
           "- **Truth.** The Illustrated Review: the owner's blind rulings on the article-within-issue rule "
           "(W46.seg-boxes-sir-article, locked), one issue on the fallback. Stanton: the owner re-ruled its newsletter "
           "issue's four gaps (W46.seg-truth-rescore); RG165 and the rest of Stanton are the 2026-10-05 truth, which "
           "the rule does not touch. No tested route drafted any of it.",
-          "- **Selection.** The boxes holding magazine issues (W46.seg-truth-sheet's screen found none outside "
-          "Stanton and the Illustrated Review), with RG165 as the test boxes' other half; chosen by box, never by a "
-          "route's answers or ABBYY text.",
+          "- **Selection.** The boxes holding magazine issues, with RG165 as the test boxes' other half; chosen by "
+          "box, never by a route's answers or ABBYY text. W46.seg-truth-sheet's masthead screen of the five original "
+          "boxes' Vision text found one issue run (Stanton 101-105). The same screen over the other locked boxes: "
+          + ", ".join(f"{b} {len(h)} hits" + (f" (photos {', '.join(map(str, h))})" if h else "")
+                      for b, h in out["screen"].items()) +
+          "; SC0122's are one article from one issue of a magazine (it runs over photos 140-144, the issue's pages 53-55) and a one-page "
+          "piece (192), each one document under either rule, so SC0122's rulings stand and g2 is not run there.",
           "- **Comparison.** One model, gateway, images, Vision text, windows, settings and scorer; only rule 10 "
           "differs. The test boxes are scored at the level fitted for 3.8 on g1, as the offsets section does.",
           f"- **Noise.** Single runs. The 1.4-{out['floor_points']}-point rerun floor is in pages exact "
           "(seg-boxes-score.md); a pages-exact gap inside it is a tie. Gap decisions are paired, with an exact "
-          "sign test on the discordant gaps.",
+          "sign test on the discordant gaps. On the test boxes the rule moves only the newsletter pair; the other "
+          f"{len(t['changed_gaps']) - 2} changed gaps lie outside any issue, and the paired decisions there are a "
+          "tie, so the no-checking gain beyond the pair is run variation, not the rule.",
           "- **Scope.** Gemini 3.7 on the gateway, not the app's 3.8 voter (the gateway does not serve 3.8) and not "
           "the ChatGPT voter's c1 (plan routes wait for the gateway). WindowPrompts.swift is unchanged: its engine "
           "fixture test replays the shipped model's answers to the shipped prompt. The whole-folder prompt wh2 is "
