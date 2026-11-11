@@ -472,6 +472,8 @@ final class NavigationModel: ObservableObject {
         let search: AdvancedSearch
         let rules: AdvancedSearch
         let context: RuleContext
+        /// The `library.filesRevision` its rows were counted at.
+        let filesRevision: UInt64
 
         func counts(_ file: ArchiveFile, excluded: [String]) -> Bool {
             !LibraryPresentation.isExcluded(file.path, by: excluded) && rules.matches(file, context)
@@ -485,8 +487,8 @@ final class NavigationModel: ObservableObject {
         let hits = await textHits(for: rules)
         var context = ruleContext(for: rules)
         context.textHits = hits
-        let basis = CountBasis(search: search, rules: rules, context: context)
         let files = library.files, excluded = excludedAbsolutePrefixes()
+        let basis = CountBasis(search: search, rules: rules, context: context, filesRevision: library.filesRevision)
         let count = await Task.detached(priority: .userInitiated) {
             ReaderStages.measure("model.countMatches.rows") {
                 files.reduce(0) { $0 + (basis.counts($1, excluded: excluded) ? 1 : 0) }
@@ -1277,8 +1279,12 @@ final class NavigationModel: ObservableObject {
                 guard let self else { return }
                 guard let result = await preparation.value, !preparation.isCancelled,
                       self.libraryRevision == revision else {
-                    // Superseded: a newer change follows, and must not wait on this one to patch.
-                    if self.libraryPreparation == preparation { self.libraryPreparation = nil }
+                    // Superseded unapplied: the change it was rebuilding for (signatures, counts, indexing) is
+                    // done by nothing else, so the next change must rebuild too, not patch.
+                    if self.libraryPreparation == preparation {
+                        self.libraryPreparation = nil
+                        self.presentedFilesRevision = nil
+                    }
                     return
                 }
                 self.libraryPreparation = nil
@@ -1317,7 +1323,7 @@ final class NavigationModel: ObservableObject {
         // The list must stand where the change set starts. A recompute in between (a filter, a sort, a
         // flag) already shows the new rows, and only the parts that do not read the list remain.
         if presentedFilesRevision == change.toRevision {
-            applyFacetChanges(changed, rows: Array(rows.values))
+            applyFacetChanges(changed, change: change)
             return true
         }
         guard presentedFilesRevision == change.fromRevision else { return false }
@@ -1405,7 +1411,7 @@ final class NavigationModel: ObservableObject {
         }
 
         presentedFilesRevision = change.toRevision
-        applyFacetChanges(changed, rows: Array(rows.values))
+        applyFacetChanges(changed, change: change)
 
         restoreSelectionIfNeeded()
         applyPendingRevealIfPossible()
@@ -1415,11 +1421,11 @@ final class NavigationModel: ObservableObject {
 
     /// What the changed rows' facets feed besides the list: the match signature, the smart-folder counts, and
     /// the subjects only if they moved.
-    private func applyFacetChanges(_ changed: [(ArchiveFile, ArchiveFile)], rows: [LibraryChangeSet.Row]) {
+    private func applyFacetChanges(_ changed: [(ArchiveFile, ArchiveFile)], change: LibraryChangeSet) {
         for (old, new) in changed {
             matchSig ^= LibraryChangeSignature.matchFacets(of: old) ^ LibraryChangeSignature.matchFacets(of: new)
         }
-        applyCountChanges(rows)
+        applyCountChanges(change)
         if changed.contains(where: { $0.0.subjects != $0.1.subjects }) { refreshSubjectsInBackground() }
     }
 
@@ -1589,9 +1595,10 @@ final class NavigationModel: ObservableObject {
 
     private var smartFolderCountGeneration = 0
     private var smartFolderBasis: [UUID: CountBasis] = [:]
-    /// True while `smartFolderCounts` counts the library as it is: the last refresh finished and every row change
-    /// since moved the counts itself.
+    /// True while `smartFolderCounts` counts the library at `smartFolderCountsRevision`: the last refresh
+    /// finished with every search counted at that one revision, and each row change since moved the counts.
     private var smartFolderCountsLive = false
+    private var smartFolderCountsRevision: UInt64 = 0
 
     /// Count each saved rule tree over the whole library, independently of the open scope and user filters.
     /// Text rules use the same index answers as the Advanced Search form. Keep the previous counts until
@@ -1615,18 +1622,26 @@ final class NavigationModel: ObservableObject {
             guard generation == self.smartFolderCountGeneration else { return }
             self.smartFolderCounts = counts
             self.smartFolderBasis = bases
-            self.smartFolderCountsLive = true
+            // Searches counted at different revisions (a change landed between them) are not one state to
+            // move from; the change's own pass, already queued, recounts.
+            let revisions = Set(bases.values.map(\.filesRevision))
+            self.smartFolderCountsRevision = revisions.first ?? self.library.filesRevision
+            self.smartFolderCountsLive = revisions.count <= 1
         }
     }
 
     /// Move each smart folder's count by the changed rows' difference, the rows before against the rows after.
     /// A count that is not live (a refresh running, the saved searches changed since) is refreshed instead,
     /// off the main actor.
-    private func applyCountChanges(_ rows: [LibraryChangeSet.Row]) {
+    private func applyCountChanges(_ change: LibraryChangeSet) {
         let searches = savedSearches.searches
         guard smartFolderCountsLive, searches.count == smartFolderBasis.count,
               searches.allSatisfy({ smartFolderBasis[$0.id]?.search == $0.search && smartFolderCounts[$0.id] != nil })
         else { refreshSmartFolderCounts(); return }
+        if smartFolderCountsRevision == change.toRevision { return }   // counted after the change already
+        guard smartFolderCountsRevision == change.fromRevision, let rows = change.rows?.values
+        else { refreshSmartFolderCounts(); return }
+        smartFolderCountsRevision = change.toRevision
         let excluded = excludedAbsolutePrefixes()
         var counts = smartFolderCounts
         ReaderStages.measure("model.countChanges") {
