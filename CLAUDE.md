@@ -280,7 +280,7 @@ environment and what may move to the backup:
   **Debug-only** `com.apple.security.cs.disable-library-validation` + `com.apple.security.get-task-allow`
   entitlements for app-hosted tests. Processor keeps strict validation with `ENABLE_DEBUG_DYLIB: NO` (Debug)
   and `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` (Release); see its guide §*Releasing*.
-  **⛔ Release must contain neither debug entitlement.** Full rationale and incident references:
+  **⛔ Release must contain neither debug entitlement** (`release/build-suite-dmg.sh` refuses an app that does). Full rationale and incident references:
   [`REFERENCE.md`](REFERENCE.md) §"Signing record"; `SUITE_TODO_DONE.md` §*Signing + TCC consent*.
 - **Never** hand‑edit a `.pbxproj` (edit `project.yml` + regenerate). **Never** write to a real corpus during dev/test — copy to the scratchpad first (Reader's Core Directive).
 

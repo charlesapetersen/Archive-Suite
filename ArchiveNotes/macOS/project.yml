@@ -48,9 +48,12 @@ targets:
         # override code path is #if DEBUG + launch-arg gated — inactive in normal Debug runs.
         Debug:
           CODE_SIGN_ENTITLEMENTS: Sources/ArchiveNotes/ArchiveNotes.uitest.entitlements
-        # Release uses the production entitlements (byte-identical to the original).
+        # Release uses the production entitlements (byte-identical to the original). Xcode injects
+        # get-task-allow into a locally signed build unless told not to; measured on the Release
+        # product (W40.release-no-debug-entitlements), as the Reader and Processor found.
         Release:
           CODE_SIGN_ENTITLEMENTS: Sources/ArchiveNotes/ArchiveNotes.entitlements
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
   ArchiveNotesTests:
     type: bundle.unit-test

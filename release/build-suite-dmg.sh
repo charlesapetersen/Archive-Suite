@@ -53,6 +53,15 @@ for a in "${APPS[@]}"; do
   IFS=: read -r projdir scheme appname <<<"$a"
   src="$ROOT/$projdir/build/rel/Build/Products/$REL/$appname"
   [ -d "$src" ] || { echo "✗ missing built app: $src"; exit 1; }
+  # A Release product must carry neither debug entitlement (root CLAUDE.md, Signing): Xcode injects
+  # get-task-allow unless CODE_SIGN_INJECT_BASE_ENTITLEMENTS is NO (W40.release-no-debug-entitlements).
+  ents="$(codesign -d --entitlements - --xml "$src" 2>/dev/null | tr -d '[:space:]')" \
+    || { echo "✗ cannot read the entitlements of $appname"; exit 1; }
+  for bad in com.apple.security.get-task-allow com.apple.security.cs.disable-library-validation; do
+    if grep -qF "<key>$bad</key><true/>" <<<"$ents"; then
+      echo "✗ $appname carries the debug entitlement $bad — refusing to package it"; exit 1
+    fi
+  done
   echo "  ⤷ staging $appname"
   cp -R "$src" "$STAGE/"
 done
