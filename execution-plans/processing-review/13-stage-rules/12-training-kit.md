@@ -49,7 +49,7 @@ rule is narrower and separate: `LocalSegmenter.refusal` refuses a model folder w
 prompt c1 and an anchor pages-exact score (`seg-kit-gate.md`) [M]. The threshold, the minimum support and the anchor
 margin were call 7.2, decided 2026-11-06: gap accuracy against the shipped 2B, a checker-enforced minimum known-gap
 count from the measured "needed" column (about 147 or 267 gaps, `seg-kit-gate.md`), two scored runs, and an anchor
-margin of 3.2 points on the public anchor. Until W46.kit-gate-rule enforces it, the solver shows the gate's verdict and
+margin of 3.2 points on the public anchor; W46.kit-gate-rule enforces it (minimum 267, the larger figure). The solver shows the gate's verdict and
 interval, and never shows an after-training segmentation row as selectable without a manifest that passed.
 
 Kind rules. Segmentation rows are per material, not per page kind: a trained student or continuation applies to the

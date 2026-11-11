@@ -5,7 +5,7 @@
                                                                         # Mac or node: the training set
   train_seg.py train --data DIR --model Qwen/Qwen3.5-4B --out DIR [--epochs 1] [--max-windows N]
   train_seg.py merge --adapter DIR --out DIR                            # base + LoRA -> one model vLLM can serve
-  train_seg.py check --run shipped=DIR --run NAME=DIR[,DIR] --candidate NAME --anchor-truth BOX.json
+  train_seg.py check --run shipped=DIR --run NAME=DIR[,DIR] --run NAME=DIR[,DIR] --candidate NAME --anchor-truth BOX.json
                      [--labels labels.jsonl] [--ruled FILE] [--weights DIR] [--data DIR] --out manifest.json
                                                                         # W46.kit-gate: the held-out gate + manifest
 
@@ -25,7 +25,9 @@ file of them is given), and on a locked public anchor box (pages in the exact do
 to 98%), with bootstrap intervals by folder and by document, paired against the shipped model. Held-out figures
 count every expected gap: expected, answered and missing, the strict accuracy (a missing answer is wrong) beside the
 answered-only one, and the paired difference over every gap the shipped run answered, the candidate's missing answers
-counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-gate-coverage). It writes the
+counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-gate-coverage). The acceptance rule
+(call 7.2, W46.kit-gate-rule): two scored runs, each passing; in each, the paired interval's low end above -3 points
+on at least 267 known held-out gaps, and anchor pages exact less than 3.2 points below the shipped run's. It writes the
 candidate's manifest (`archive-seg-manifest.json` beside the weights is what the app reads): prompt id, kit version,
 weights and training-data hashes, the scores, and the gate's verdict; it exits 1 when the gate fails. The app refuses a
 model whose manifest lacks the anchor score or names another prompt (`LocalSegmenter.refusal`). Sizes, from
@@ -195,7 +197,20 @@ def cmd_merge(a):
 
 KIT_VERSION = "seg-kit-1"
 PROMPT_ID = "c1"          # the app's id for the request these models are trained and scored on (`WindowVoter.catalog`)
+# The acceptance rule, as decided (14-owner-calls.md call 7.2, 2026-11-06; W46.kit-gate-rule). Gap accuracy, paired
+# against the shipped 2B: the low end of the paired held-out interval above -GATE_POINTS. No rerun floor has been
+# measured in gap accuracy, so the pages-exact floor is not reused as its tie unit (P7-4); rerun wobble is met by
+# scoring RUNS_NEEDED runs instead, each of which must pass.
 GATE_POINTS = 3.0         # a candidate may trail the shipped model by less than this on held-out gaps (kit_gate.py)
+# The support the 3-point interval needs: seg-kit-gate.md's "needed" column for gap accuracy is 147 (4B against the
+# 2B) and 267 (the 27B teacher against the 2B). A candidate's disagreement with the 2B is not known beforehand, so
+# the larger is the floor. Below it the interval is too wide to mean anything, and the gate refuses.
+MIN_KNOWN_GAPS = 267
+RUNS_NEEDED = 2
+# On the public anchor, a candidate may score below the shipped run in pages exact by less than this, in each run:
+# the top of the rerun floor measured in pages exact (SEG-10, 1.4-3.2 points a box). The shipped build's anchor is
+# Lincoln 33.07% (20.96 to 47.83), seg-kit-manifest-shipped.json.
+ANCHOR_MARGIN = 3.2
 BAR = 0.98                # the review load is counted to 98% of pages in the exact document
 DRAWS, CHECK_SEED = 2000, 46
 
@@ -379,16 +394,93 @@ def sha256_of(path):
     return h.hexdigest()
 
 
+def run_row(p, failed, cmp, labels, ruled, truth, rng):
+    """One run's figures: held-out against the tags and the rulings, and the anchor, paired against cmp (a shipped
+    run's per-gap P(new)) when given."""
+    row = {"failed_windows": failed}
+    if labels:
+        tags, own = heldout_groups(labels, ruled, p, cmp)
+        row["heldout_tags"] = gap_score(tags, rng, cmp is not None) if tags else None
+        row["heldout_ruled"] = gap_score(own, rng, cmp is not None) if own else None
+    unsure = [u["right"] for u in truth.get("unsure", ())]
+    ad = anchor_docs(truth["pages"], truth["box"], p, unsure)
+    sd = anchor_docs(truth["pages"], truth["box"], cmp, unsure) if cmp else None
+    row["anchor"] = anchor_score(ad, sd, rng) if ad else None
+    return row
+
+
+def support(held, paired):
+    """The known gaps the gate's held-out figure stands on: the paired gaps for a candidate scored against the shipped
+    run (the interval is over those), every expected gap for the shipped model itself."""
+    if held is None:
+        return 0
+    return held.get("paired_gaps", 0) if paired else held["expected_gaps"]
+
+
+def gate_basis(row, paired):
+    """Which held-out set the gate scores: the owner's rulings when they reach the minimum support (SEG-6: the tags
+    carry label noise), otherwise the tags; the rulings stay reported either way."""
+    own, tags = row.get("heldout_ruled"), row.get("heldout_tags")
+    if own is not None and (support(own, paired) >= MIN_KNOWN_GAPS or tags is None):
+        return "owner_ruled", own
+    return ("tags", tags) if tags is not None else (None, None)
+
+
+def run_reasons(row, paired, box, shipped_given):
+    """Why one scored run fails the gate (an empty list when it passes). Missing evidence is a reason, never a pass
+    (W46.kit-gate-coverage); so is support below MIN_KNOWN_GAPS (W46.kit-gate-rule)."""
+    reasons = []
+    if not row["anchor"]:
+        reasons.append(f"no anchor score: the run has no answer for every gap of {box}")
+    basis, held = gate_basis(row, paired)
+    if held is None:
+        reasons.append("no held-out score: no expected held-out gap (no --labels, or no held-out split)")
+    elif not held["answered_gaps"]:
+        reasons.append(f"no held-out score: the run answered none of the {held['expected_gaps']} expected held-out gaps")
+    if paired:
+        if not shipped_given:
+            reasons.append("no shipped reference: there is no shipped run to pair the candidate against")
+        elif held is not None and "difference_interval" not in held:
+            reasons.append(f"no paired held-out comparison: the shipped run answered none of the "
+                           f"{held['expected_gaps']} expected held-out gaps")
+        elif held is not None and held["difference_interval"][0] <= -GATE_POINTS:
+            reasons.append(f"on held-out gaps it may trail the shipped model by {GATE_POINTS:g} points or more "
+                           f"(difference {held['difference']}, interval {held['difference_interval']}, over "
+                           f"{held['paired_gaps']} gaps the shipped model answered, {held['paired_missing_gaps']} "
+                           f"of them unanswered by the candidate and counted wrong)")
+        if shipped_given and row["anchor"]:
+            d = row["anchor"].get("difference_from_shipped")
+            if d is None:
+                reasons.append(f"no paired anchor comparison: the shipped run has no answer for every gap of {box}")
+            elif d <= -ANCHOR_MARGIN:
+                reasons.append(f"on the anchor {box} it scores {d} points of pages exact against the shipped run, "
+                               f"{ANCHOR_MARGIN:g} or more below it")
+    if held is not None and held["answered_gaps"]:
+        n = support(held, paired)
+        if n < MIN_KNOWN_GAPS:
+            reasons.append(f"too few known held-out gaps: {n} ({basis.replace('_', '-')}"
+                           f"{', paired with the shipped run' if paired else ''}), and the gate needs at least "
+                           f"{MIN_KNOWN_GAPS} for its {GATE_POINTS:g}-point interval to mean anything")
+    return reasons
+
+
 def cmd_check(a):
     """Score base, shipped and candidate on the held-out collections (against the tags, and against the owner's
-    rulings where given) and on a locked public anchor box, then write the candidate's manifest. Reads answers only."""
+    rulings where given) and on a locked public anchor box, then write the candidate's manifest. Reads answers only.
+    A name given in several --run flags has several scored runs; the candidate needs RUNS_NEEDED of them, and each
+    must pass. Candidate run i is paired with shipped run i (the last shipped run when there are fewer)."""
     runs = {}
     for spec in a.run:
         name, _, dirs = spec.partition("=")
-        runs[name] = run_votes(dirs.split(","))
+        dirs = tuple(dirs.split(","))
+        seen = {os.path.realpath(x) for d, _ in runs.get(name, ()) for x in d}
+        if seen & {os.path.realpath(x) for x in dirs}:
+            raise SystemExit(f"--run {name}={','.join(dirs)} shares a directory with another run of {name}, given twice: "
+                             f"a second scored run is a second set of answers, not the same directories again")
+        runs.setdefault(name, []).append((dirs, run_votes(dirs)))
     if a.candidate not in runs:
         raise SystemExit(f"--candidate {a.candidate} has no --run")
-    shipped = runs.get(a.shipped)
+    shipped = [v for _, v in runs.get(a.shipped, ())]
     rng = random.Random(CHECK_SEED)
     labels = [json.loads(l) for l in Path(a.labels).read_text().splitlines()] if a.labels else []
     ruled = {}
@@ -400,40 +492,23 @@ def cmd_check(a):
     truth = json.loads(Path(a.anchor_truth).read_text())
     box = truth["box"]
     report = {"models": {}}
-    for name, (p, failed) in runs.items():
-        row = {"failed_windows": failed}
-        cmp = shipped[0] if shipped and name != a.shipped else None
-        if labels:
-            tags, own = heldout_groups(labels, ruled, p, cmp)
-            row["heldout_tags"] = gap_score(tags, rng, cmp is not None) if tags else None
-            row["heldout_ruled"] = gap_score(own, rng, cmp is not None) if own else None
-        unsure = [u["right"] for u in truth.get("unsure", ())]
-        ad = anchor_docs(truth["pages"], box, p, unsure)
-        sd = anchor_docs(truth["pages"], box, cmp, unsure) if cmp else None
-        row["anchor"] = anchor_score(ad, sd, rng) if ad else None
-        report["models"][name] = row
-    cand = report["models"][a.candidate]
+    for name, rs in runs.items():
+        rows = []
+        for i, (dirs, (p, failed)) in enumerate(rs):
+            cmp = shipped[min(i, len(shipped) - 1)][0] if shipped and name != a.shipped else None
+            rows.append({"dirs": list(dirs), **run_row(p, failed, cmp, labels, ruled, truth, rng)})
+        report["models"][name] = rows
+    paired = a.candidate != a.shipped
+    cand_runs = report["models"][a.candidate]
     reasons = []
-    if not cand["anchor"]:
-        reasons.append(f"no anchor score: the run has no answer for every gap of {box}")
-    held = cand.get("heldout_ruled") or cand.get("heldout_tags")
-    # W46.kit-gate-coverage: fail closed. Missing evidence is a reason, never a pass: a candidate other than the
-    # shipped model needs the shipped run and a paired interval over the gaps that run answered.
-    if held is None:
-        reasons.append("no held-out score: no expected held-out gap (no --labels, or no held-out split)")
-    elif not held["answered_gaps"]:
-        reasons.append(f"no held-out score: the run answered none of the {held['expected_gaps']} expected held-out gaps")
-    if a.candidate != a.shipped:
-        if shipped is None:
-            reasons.append(f"no shipped reference: there is no --run {a.shipped} to pair the candidate against")
-        elif held is not None and "difference_interval" not in held:
-            reasons.append(f"no paired held-out comparison: the shipped run answered none of the "
-                           f"{held['expected_gaps']} expected held-out gaps")
-        elif held is not None and held["difference_interval"][0] <= -GATE_POINTS:
-            reasons.append(f"on held-out gaps it may trail the shipped model by {GATE_POINTS:g} points or more "
-                           f"(difference {held['difference']}, interval {held['difference_interval']}, over "
-                           f"{held['paired_gaps']} gaps the shipped model answered, {held['paired_missing_gaps']} "
-                           f"of them unanswered by the candidate and counted wrong)")
+    if len(cand_runs) < RUNS_NEEDED:
+        reasons.append(f"{len(cand_runs)} scored run; the gate needs {RUNS_NEEDED}, each passing, because its "
+                       f"intervals cover sampling the held-out set and not a model's own rerun wobble")
+    for i, row in enumerate(cand_runs):
+        row["gate_scored_on"] = gate_basis(row, paired)[0]
+        row["gate_reasons"] = run_reasons(row, paired, box, bool(shipped))
+        reasons += [(f"run {i + 1}: " if len(cand_runs) > 1 else "") + r for r in row["gate_reasons"]]
+    cand = cand_runs[0]
     manifest = {
         "kit_version": KIT_VERSION, "prompt_id": PROMPT_ID, "bench_request": "method_local.request (o1), 1024 px",
         "model": a.candidate, "base_build": a.base_build,
@@ -443,14 +518,20 @@ def cmd_check(a):
                     if a.adapter else None),
         "training_data": ({"sha256": sha256_of(Path(a.data) / "train.jsonl"),
                            "rule": json.loads((Path(a.data) / "data.json").read_text()).get("rule")} if a.data else None),
-        "heldout": {"tags": cand.get("heldout_tags"), "owner_ruled": cand.get("heldout_ruled")},
+        "heldout": {"tags": cand.get("heldout_tags"), "owner_ruled": cand.get("heldout_ruled"),
+                    "gate_scored_on": cand["gate_scored_on"]},
         "anchor": None if not cand["anchor"] else {"box": box, "truth_sha256": sha256_of(a.anchor_truth), **cand["anchor"]},
         "review_load_at_98": None if not cand["anchor"] else cand["anchor"]["review_load_per_100_pages"],
+        "scored_runs": len(cand_runs),
         "mac": json.loads(Path(a.mac).read_text()) if a.mac else None, "note": a.note,
-        "gate": {"rule": f"an anchor score, a held-out score, and for a candidate other than the shipped model a "
-                         f"paired held-out interval against the shipped run, over every gap that run answered with "
-                         f"the candidate's missing answers counted wrong, whose low end is above -{GATE_POINTS:g} "
-                         f"points (proposed, W46.kit-gate; coverage, W46.kit-gate-coverage)",
+        "gate": {"rule": f"{RUNS_NEEDED} scored runs, each with an anchor score and a held-out score on at least "
+                         f"{MIN_KNOWN_GAPS} known gaps (the owner's rulings when they reach that, else the tags); "
+                         f"for a candidate other than the shipped model, in each run, a paired held-out gap-accuracy "
+                         f"interval against the shipped run, over every gap that run answered with the candidate's "
+                         f"missing answers counted wrong, whose low end is above -{GATE_POINTS:g} points, and anchor "
+                         f"pages exact less than {ANCHOR_MARGIN:g} points below the shipped run's (decided, "
+                         f"call 7.2, W46.kit-gate-rule; coverage, W46.kit-gate-coverage). The heldout and anchor "
+                         f"blocks are run 1's; every run is under compared",
                  "passed": not reasons, "reasons": reasons},
         "compared": report["models"], "made": time.strftime("%Y-%m-%dT%H:%M:%S")}
     out = Path(a.out)
@@ -475,7 +556,7 @@ def main():
     p.add_argument("--max-len", type=int, default=16384); p.add_argument("--save-every", type=int, default=0)
     p = sub.add_parser("merge"); p.add_argument("--adapter", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("check")
-    p.add_argument("--run", action="append", required=True, help="NAME=DIR[,DIR]: cluster_seg.py run dirs (answers.jsonl)")
+    p.add_argument("--run", action="append", required=True, help="NAME=DIR[,DIR]: one scored run, its cluster_seg.py run dirs (answers.jsonl); repeat a NAME for a second run")
     p.add_argument("--candidate", required=True); p.add_argument("--shipped", default="shipped")
     p.add_argument("--anchor-truth", required=True, help="a locked public box, segbench-results/public-segmentation/<box>.json")
     p.add_argument("--labels", help="corpus_pairs.py labels.jsonl (held-out gaps and their tags)")

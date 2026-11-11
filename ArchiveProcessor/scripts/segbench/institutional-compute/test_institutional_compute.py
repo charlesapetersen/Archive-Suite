@@ -1150,20 +1150,38 @@ class Check(unittest.TestCase):
         res = {"pages": [{"page": n, "kind": "document"} for n in nums], "boundaries": bounds}
         return json.dumps({"collection": col, "window": nums, "status": "ok", "result": json.dumps(res)}) + "\n"
 
-    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=()):
+    FILL = 270          # filler held-out gaps both runs get right: past train_seg.MIN_KNOWN_GAPS (267)
+
+    @classmethod
+    def filler(cls, n):
+        """n extra held-out gaps, all tagged "cont", in folders of ten (F0, F1, ...): their labels, and the answers a
+        run that gets every one right gives."""
+        labels, text = [], ""
+        for f in range((n + 9) // 10):
+            k = min(10, n - 10 * f)
+            labels += [{"folder_id": f"F{f}", "n": m, "split": "holdout", "tag": "cont"} for m in range(1, k + 1)]
+            text += cls.answer(f"F{f}", list(range(1, k + 2)), set())
+        return labels, text
+
+    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=(), fill=FILL, runs=2, second=None):
+        """Shipped and ``runs`` candidate runs; ``second`` gives run 2's (held, anchor) calls when they differ."""
         truth = {"box": "Anchor", "pages": [{"n": n, "label": "New" if n in (1, 3, 5) else "Cont"} for n in range(1, 7)],
                  "unsure": [{"id": f"u{n}", "left": n - 1, "right": n} for n in unsure]}
         (tmp / "anchor.json").write_text(json.dumps(truth))
         labels = [{"folder_id": "f1", "n": n, "split": "holdout", "tag": "new" if n == 2 else "cont"} for n in (1, 2, 3)]
         labels.append({"folder_id": "f2", "n": 1, "split": "train", "tag": "new"})
-        (tmp / "labels.jsonl").write_text("".join(json.dumps(g) + "\n" for g in labels))
-        for name, held, anchor in (("shipped", {2}, {2, 4}), ("cand", cand_new, anchor_new)):
+        flabels, ftext = self.filler(fill)
+        (tmp / "labels.jsonl").write_text("".join(json.dumps(g) + "\n" for g in labels + flabels))
+        specs = [("shipped", {2}, {2, 4})] + [(f"cand{i + 1}", *((second if i and second else (cand_new, anchor_new))))
+                                              for i in range(runs)]
+        for name, held, anchor in specs:
             d = tmp / name
             d.mkdir(exist_ok=True)
-            (d / "answers.jsonl").write_text(self.answer("f1", [1, 2, 3, 4], held)
+            (d / "answers.jsonl").write_text(self.answer("f1", [1, 2, 3, 4], held) + ftext
                                              + (self.answer("Anchor", list(range(1, 7)), anchor) if anchor is not None else ""))
+        cand = [x for i in range(runs) for x in ("--run", f"cand={tmp / f'cand{i + 1}'}")]
         return subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
-                               "--run", f"cand={tmp / 'cand'}", "--candidate", "cand", "--anchor-truth",
+                               *cand, "--candidate", "cand", "--anchor-truth",
                                str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
                                "--out", str(tmp / "m.json"), *extra], capture_output=True, text=True)
 
@@ -1174,13 +1192,13 @@ class Check(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
             m = json.loads((tmp / "m.json").read_text())
             self.assertEqual(m["prompt_id"], "c1")
-            self.assertEqual(m["heldout"]["tags"]["expected_gaps"], 3)  # held-out gaps only, never the train split
+            self.assertEqual(m["heldout"]["tags"]["expected_gaps"], 3 + self.FILL)  # held-out only, never the train split
             self.assertEqual(m["heldout"]["tags"]["accuracy"], 100.0)
             self.assertEqual(m["anchor"]["pages_exact"], 100.0)
             self.assertEqual(m["anchor"]["documents"], 3)
             self.assertTrue(m["gate"]["passed"])
             # Wrong on every held-out gap, and on the anchor's two boundaries: the gate fails, exit 1, with reasons.
-            r = self.run_check(tmp, {1, 3}, set())
+            r = self.run_check(tmp, {1, 3}, set(), fill=0)
             self.assertEqual(r.returncode, 1)
             m = json.loads((tmp / "m.json").read_text())
             self.assertEqual(m["heldout"]["tags"]["accuracy"], 0.0)
@@ -1204,27 +1222,30 @@ class Check(unittest.TestCase):
             a = json.loads((tmp / "m.json").read_text())["anchor"]
             self.assertEqual((a["gap_accuracy"], a["unscored_gaps"], a["documents"]), (80.0, 0, 3))
 
-    def coverage_check(self, tmp, cand, shipped):
+    def coverage_check(self, tmp, cand, shipped, fill=0):
         """W46.kit-gate-coverage's synthetic set: a complete three-page anchor (New, Cont, New) that both runs get
         right, and two expected held-out gaps, H1|2 (new) and H2|3 (cont), in folders H1 and H2. ``cand`` and
         ``shipped`` give each run's held-out calls as {folder: "new"|"continue"}; a folder left out is unanswered,
-        and ``shipped`` None means no shipped run at all."""
+        and ``shipped`` None means no shipped run at all. The candidate has two identical scored runs, and ``fill``
+        filler gaps every run gets right (`filler`)."""
         truth = {"box": "Anchor", "pages": [{"n": n, "label": l} for n, l in ((1, "New"), (2, "Cont"), (3, "New"))]}
         (tmp / "anchor.json").write_text(json.dumps(truth))
         labels = [{"folder_id": "H1", "n": 1, "split": "holdout", "tag": "new"},
                   {"folder_id": "H2", "n": 2, "split": "holdout", "tag": "cont"}]
-        (tmp / "labels.jsonl").write_text("".join(json.dumps(g) + "\n" for g in labels))
-        runs = [("cand", cand)] + ([("shipped", shipped)] if shipped is not None else [])
+        flabels, ftext = self.filler(fill)
+        (tmp / "labels.jsonl").write_text("".join(json.dumps(g) + "\n" for g in labels + flabels))
+        runs = [("cand", cand), ("cand2", cand)] + ([("shipped", shipped)] if shipped is not None else [])
         for name, calls in runs:
             d = tmp / name
             d.mkdir(exist_ok=True)
-            text = self.answer("Anchor", [1, 2, 3], {2})
+            text = self.answer("Anchor", [1, 2, 3], {2}) + ftext
             for col, n in (("H1", 1), ("H2", 2)):
                 if col in calls:
                     text += self.answer(col, [n, n + 1], {n} if calls[col] == "new" else set())
             (d / "answers.jsonl").write_text(text)
         r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check",
-                            *[x for name, _ in runs for x in ("--run", f"{name}={tmp / name}")], "--candidate", "cand",
+                            *[x for name, _ in runs for x in ("--run", f"{name.removesuffix('2')}={tmp / name}")],
+                            "--candidate", "cand",
                             "--anchor-truth", str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
                             "--out", str(tmp / "m.json")], capture_output=True, text=True)
         return r, json.loads((tmp / "m.json").read_text())
@@ -1269,14 +1290,103 @@ class Check(unittest.TestCase):
     def test_complete_paired_comparison_passes(self):
         right = {"H1": "new", "H2": "continue"}
         with tempfile.TemporaryDirectory() as t:
-            r, m = self.coverage_check(Path(t), right, right)
+            r, m = self.coverage_check(Path(t), right, right, fill=self.FILL)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             h = m["heldout"]["tags"]
-            self.assertEqual((h["expected_gaps"], h["answered_gaps"], h["missing_gaps"], h["paired_gaps"]), (2, 2, 0, 2))
+            n = 2 + self.FILL
+            self.assertEqual((h["expected_gaps"], h["answered_gaps"], h["missing_gaps"], h["paired_gaps"]), (n, n, 0, n))
             self.assertEqual((h["accuracy"], h["difference"], h["difference_interval"]), (100.0, 0.0, [0.0, 0.0]))
             self.assertEqual(m["anchor"]["difference_from_shipped"], 0.0)
             self.assertTrue(m["gate"]["passed"])
             self.assertEqual(m["gate"]["reasons"], [])
+
+    def test_tiny_support_fails_the_gate(self):
+        # W46.kit-gate-rule's regression: a candidate that matches the shipped run on every gap, in both runs, with a
+        # perfect anchor, passed the proposed rule on 2 paired gaps. Below 267 known gaps the gate refuses.
+        right = {"H1": "new", "H2": "continue"}
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), right, right)
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertEqual(m["heldout"]["tags"]["difference_interval"], [0.0, 0.0])
+            self.assertFalse(m["gate"]["passed"])
+            self.assertEqual(m["gate"]["reasons"], [f"run {i}: too few known held-out gaps: 2 (tags, paired with the "
+                                                    "shipped run), and the gate needs at least 267 for its 3-point "
+                                                    "interval to mean anything" for i in (1, 2)])
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), right, right, fill=264)    # 266 paired gaps, one short
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertIn("too few known held-out gaps: 266", " ".join(m["gate"]["reasons"]))
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), right, right, fill=265)    # exactly 267 passes
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_two_scored_runs_each_passing(self):
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            r = self.run_check(tmp, {2}, {2, 4}, runs=1)
+            self.assertEqual(r.returncode, 1)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual(m["scored_runs"], 1)
+            self.assertEqual(len(m["gate"]["reasons"]), 1)
+            self.assertIn("1 scored run; the gate needs 2", m["gate"]["reasons"][0])
+            # Run 1 passes; run 2 misses an anchor boundary, so it alone fails the gate.
+            r = self.run_check(tmp, {2}, {2, 4}, second=({2}, {2}))
+            self.assertEqual(r.returncode, 1)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual(m["scored_runs"], 2)
+            self.assertEqual(m["compared"]["cand"][0]["gate_reasons"], [])
+            self.assertEqual(len(m["gate"]["reasons"]), 1)
+            self.assertTrue(m["gate"]["reasons"][0].startswith("run 2: on the anchor"), m["gate"]["reasons"])
+            # The same directories given twice are one run, refused outright.
+            d = str(tmp / "cand1")
+            r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
+                                "--run", f"cand={d}", "--run", f"cand={d}", "--candidate", "cand", "--anchor-truth",
+                                str(tmp / "anchor.json"), "--out", str(tmp / "m2.json")], capture_output=True, text=True)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("given twice", r.stderr)
+            self.assertFalse((tmp / "m2.json").exists())
+
+    def test_anchor_margin(self):
+        # Held-out identical to the shipped run; on the anchor the candidate misses the 4|5 boundary, so pages 3-6
+        # leave the exact document: 33.33% against 100%, past the 3.2-point margin. The held-out interval passes.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            r = self.run_check(tmp, {2}, {2})
+            self.assertEqual(r.returncode, 1)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual(m["anchor"]["difference_from_shipped"], -66.67)
+            self.assertEqual(m["heldout"]["tags"]["difference_interval"], [0.0, 0.0])
+            self.assertEqual(len(m["gate"]["reasons"]), 2)
+            self.assertTrue(all("3.2 or more below it" in x for x in m["gate"]["reasons"]))
+            # The shipped run without anchor answers: no paired anchor comparison, a reason, not a pass.
+            (tmp / "shipped/answers.jsonl").write_text(self.answer("f1", [1, 2, 3, 4], {2}) + self.filler(self.FILL)[1])
+            r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
+                                "--run", f"cand={tmp / 'cand1'}", "--run", f"cand={tmp / 'cand2'}", "--candidate", "cand",
+                                "--anchor-truth", str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
+                                "--out", str(tmp / "m.json")], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 1)
+            self.assertIn("no paired anchor comparison", " ".join(json.loads((tmp / "m.json").read_text())["gate"]["reasons"]))
+
+    def test_rulings_below_the_support_fall_back_to_the_tags(self):
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            (tmp / "ruled.csv").write_text("f1,1,same\nf1,2,new\nf1,3,same\n")
+            r = self.run_check(tmp, {2}, {2, 4}, "--ruled", str(tmp / "ruled.csv"))
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual((m["heldout"]["gate_scored_on"], m["heldout"]["owner_ruled"]["expected_gaps"]), ("tags", 3))
+            # With no tags to fall back on, the three rulings are scored and are too few.
+            labels = [json.loads(l) for l in (tmp / "labels.jsonl").read_text().splitlines()]
+            (tmp / "labels.jsonl").write_text("".join(json.dumps({**g, "tag": None}) + "\n" for g in labels))
+            r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
+                                "--run", f"cand={tmp / 'cand1'}", "--run", f"cand={tmp / 'cand2'}", "--candidate", "cand",
+                                "--anchor-truth", str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
+                                "--ruled", str(tmp / "ruled.csv"), "--out", str(tmp / "m.json")],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 1)
+            m = json.loads((tmp / "m.json").read_text())
+            self.assertEqual(m["heldout"]["gate_scored_on"], "owner_ruled")
+            self.assertIn("too few known held-out gaps: 3 (owner-ruled", " ".join(m["gate"]["reasons"]))
 
     def test_data_trains_only_whole_agreed_training_windows(self):
         # The kit's first step: a training window whose every gap the rule keeps, never a held-out one.

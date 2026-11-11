@@ -182,7 +182,8 @@ Before a trained student is used, score it with the held-out gate (W46.kit-gate)
 
 ```bash
 python3 train_seg.py check --run shipped=RUNS/shipped-holdout,RUNS/shipped-anchor \
-    --run mine=RUNS/mine-holdout,RUNS/mine-anchor --candidate mine \
+    --run mine=RUNS/mine-holdout,RUNS/mine-anchor --run mine=RUNS/mine-holdout-2,RUNS/mine-anchor-2 \
+    --candidate mine \
     --anchor-truth segbench-results/public-segmentation/lincoln.json --labels labels.jsonl \
     --weights /path/to/the/mac/build --data /scratch/$USER/training --out archive-seg-manifest.json
 ```
@@ -192,7 +193,11 @@ anchor, writes the manifest and exits 1 if the gate fails. Every expected held-o
 expected, answered and missing gaps, the strict accuracy (an unanswered gap is wrong) beside the answered-only one, and
 the paired difference over every gap the shipped run answered, with the candidate's unanswered gaps counted wrong. A
 candidate with no shipped run, or no gap the shipped run answered, fails rather than passing unpaired
-(W46.kit-gate-coverage). Put `archive-seg-manifest.json` beside the weights the
+(W46.kit-gate-coverage). The candidate passes only with **two scored runs** (a `--run` per run, under the same
+name: two separate `submit.sh seg` jobs of the same model), and in each: the low end of the paired held-out
+gap-accuracy interval above -3 points; **at least 267 known held-out gaps** behind it (your rulings when you have that
+many, else your tags; fewer are refused, since the interval would be too wide to mean anything); and anchor pages
+exact less than 3.2 points below the shipped model's (W46.kit-gate-rule). Put `archive-seg-manifest.json` beside the weights the
 app loads: Archive Processor refuses a model of yours without one, without an anchor score, or for another
 prompt. Separating 3 points of pages-exact needs about 1,850 held-out gaps on the 2026-10-31 truth (`segbench-results/seg-kit-gate.md`, which `kit_gate.py report` recomputes).
 
