@@ -58,7 +58,7 @@ CACHE = REH / 'colour-dropout'
 SAMPLE = REH / 'reader-sample'
 UIUC = Path.home() / 'Desktop/Google Drive/Archival Photos JPEGS/UIUC'
 OWNER = 'uiuc-00156'
-BIN = REH / 'segbench/bin/segbench-dewarp'
+BIN = Path(os.environ.get('CD_VISION_BIN', REH / 'segbench/bin/segbench-dewarp'))
 PANEL_IMAGES = REH / 'ocr-panel-local/images'          # ocr_panel.CACHE: the 96's frozen 2,400 px raw images
 STAMPS, CONTROLS, PER_COLL, SEED = 40, 20, 5, 1110
 SIDE = 2400
@@ -410,7 +410,15 @@ def truth(key):
     if key.startswith('p') and key[1:].isdigit():
         return (P.TRUTH / 'truth' / (key + '.txt')).read_text(), []
     d = draft(key)
-    return (d['text'], [t for _, t in d['marks'] if t]) if d else (None, [])
+    checked = CACHE / 'truth' / (key + '.txt')     # colour_dropout_sheet.py fold: the owner's answers applied
+    text = checked.read_text() if checked.exists() else d['text'] if d else None
+    return (text, [t for _, t in d['marks'] if t]) if d else (None, [])
+
+
+def truth_state():
+    """'owner-checked' once the sheet's answers are folded for every stamped page, else 'draft'."""
+    stamps, _ = keys()
+    return 'owner-checked' if all((CACHE / 'truth' / (k + '.txt')).exists() for k in stamps) else 'draft'
 
 
 def reading(reader, kind, key):
@@ -473,16 +481,21 @@ def page_rows():
             fires = gate[k]['fires'] if st == '96' else None
             drop = reading(reader, 'dropout', k) if (st != '96' or fires or reader == 'apple-vision') else None
             if drop is None:
-                if st == '96' and reader != 'apple-vision' and not fires:
-                    drop = raw        # the gate does not fire: the input is raw, the reading raw's
+                if st == '96' and ((reader != 'apple-vision' and not fires) or gate[k]['channel'] is None):
+                    drop = raw        # nothing dropped (the gate does not fire, or no coloured mark): raw's reading
                 else:
                     continue          # not read yet
             mark = reading(reader, 'mark', k) if (st != '96' or fires) else ''
             route = drop + ('\n' + mark if mark else '')
             body = bag(t) - bag('\n'.join(marks))
+            mw, mr = bag('\n'.join(marks)), bag(mark or '')
             r = {'reader': reader, 'set': st, 'page': k, 'fires': fires, 'marks': len(marks),
                  'marked': bool(draft(k)['marks']) if st != '96' else None,
-                 'body_words': sum(body.values())}
+                 'body_words': sum(body.values()),
+                 # the mark's own text, read from the mark layer: the drafted mark words found, and the words read
+                 # there that are no mark word (the layer also holds coloured print, letterheads, rules)
+                 'mark_words': sum(mw.values()), 'mark_found': sum((mw & mr).values()),
+                 'mark_extra': sum((mr - mw).values())}
             for arm, text in (('raw', raw), ('dropout', drop), ('route', route)):
                 s = S.score(t, text)
                 r[arm] = round(s['nes'], 5)
@@ -522,7 +535,7 @@ def chart_rows(rows):
         rr = {r['page']: r for r in rows if r['reader'] == reader and r['set'] == '96'}
         if len(rr) != len(panel_pages()):
             continue
-        arms = [('gated', lambda r: r['route'] if r['fires'] else r['raw'])]
+        arms = [('gated', lambda r: r['dropout'] if r['fires'] else r['raw'])]
         if reader == 'apple-vision':
             arms.insert(0, ('ungated', lambda r: r['dropout']))
         groups = {'the 96': list(rr), **{f'kind:{k}': [p for p in rr if kind[p] == k] for k in sorted(set(kind[p] for p in rr))}}
@@ -531,8 +544,8 @@ def chart_rows(rows):
                 row = {'route': reader, 'arm': arm, 'group': g, 'n': len(ps), 'ok': len(ps),
                        'nes': round(sum(f(rr[p]) for p in ps) / len(ps), 5)}
                 if reader != 'apple-vision':
-                    row['cost'] = round(sum(reply_cost('raw', p) + (reply_cost('dropout', p) + reply_cost('mark', p)
-                                                                    if rr[p]['fires'] else 0) for p in ps), 6)
+                    row['cost'] = round(sum(reply_cost('raw', p) + (reply_cost('dropout', p) if rr[p]['fires'] else 0)
+                                            for p in ps), 6)
                 out.append(row)
     return out
 
@@ -567,10 +580,12 @@ def report():
             summ[f'{reader}|{st}|dropout'] = summary(rr, 'dropout')
             if st == '96':
                 fired = [r for r in rr if r['fires']]
-                summ[f'{reader}|96-gated|route'] = summary(
-                    [{**r, 'route': r['route'] if r['fires'] else r['raw'],
-                      'route_body_missed': r['route_body_missed'] if r['fires'] else r['raw_body_missed']} for r in rr], 'route')
-                summ[f'{reader}|96-fired|route'] = summary(fired, 'route')
+                for arm in ('dropout', 'route'):
+                    summ[f'{reader}|96-gated|{arm}'] = summary(
+                        [{**r, arm: r[arm] if r['fires'] else r['raw'],
+                          arm + '_body_missed': r[arm + '_body_missed'] if r['fires'] else r['raw_body_missed']}
+                         for r in rr], arm)
+                    summ[f'{reader}|96-fired|{arm}'] = summary(fired, arm)
     stamp_v = [r for r in rows if r['reader'] == 'apple-vision' and r['set'] == 'stamp' and r.get('raw_lines_under') is not None]
     lines = {arm: (sum(r[arm + '_lines_under'] for r in stamp_v), sum(r[arm + '_words_under'] for r in stamp_v))
              for arm in ('raw', 'dropout')}
@@ -592,9 +607,146 @@ def report():
            'gateway': {'model': G.MODEL, 'route': G.LABEL, 'calls': len(led), 'cost_estimate': round(spent, 4),
                        'billed': G.billed_note(led), 'cap': CAP},
            'chart_rows': chart_rows(rows), 'pages': rows}
+    out['truth_state'] = truth_state()
     BENCH.write_text(json.dumps(out, indent=1) + '\n')
+    REPORT.write_text(markdown(out))
     print(json.dumps({k: v for k, v in summ.items() if v}, indent=0)[:4000])
     print('lines under the mark', lines, 'drafts with marks', with_marks, 'owner', owner)
+
+
+SETS = [('stamp', 'stamp class, all 40'), ('stamp-marked', 'stamp class, a coloured mark in the draft'),
+        ('stamp-unmarked', 'stamp class, no coloured mark in the draft'), ('control', 'controls, 20'),
+        ('96', "the owner's 96, dropout wherever a mark exists (ungated)"),
+        ('96-gated', "the owner's 96, the gate"), ('96-fired', 'the 96, the pages the gate fires on')]
+FLOOR = 0.49      # Gemini 3.7 Flash's rerun floor on the 96, twice its rerun range (ocr-rerun-noise.md)
+VISION_NOTE = ('The cached `segbench-dewarp` binary (built 2026-10-31) read less text on macOS 27.2 than the bench\'s '
+               'segbench-ocr on the same frozen images: on 53 of the 96 its NES was more than 5 points off, and its mean '
+               'on the 96 was 60.0 against the bench\'s 83.1. Built again from the same `dewarp.swift`, it gives the '
+               'bench\'s text character for character (checked on p001, p004, p005 and p006), and every Vision figure '
+               'here is from the rebuild; the cached binary was replaced with it (the old one kept beside it).')
+
+
+def wins(summ, reader):
+    """Dropout helps a reader when it beats raw beyond its paired interval (and Gemini's rerun floor) on the marked
+    stamp pages, with no harm on the controls or the 96 (interval reaching 0, or the floor)."""
+    m = summ.get(f'{reader}|stamp-marked|dropout')
+    floor = FLOOR if reader != 'apple-vision' else 0
+    if not m or m['lo'] <= 0 or m['delta'] <= floor:
+        return False
+    return all(summ.get(f'{reader}|{s}|dropout') is None or summ[f'{reader}|{s}|dropout']['hi'] >= -floor
+               for s in ('control', '96-gated'))
+
+
+def markdown(out):
+    summ = out['summary']
+    L = ['# W46.ocr-input-colour-dropout — a stamp in a second ink, dropped from the OCR input only', '',
+         "Owner, 2026-11-10 (point 6): \"UIUC 156\" tests how well the readers resolve a red stamp. The OCR input here "
+         'is one colour channel of the raw image, the one in which the mark is lightest (`colour_dropout.py`), the same '
+         'size as raw, so it is an R02.2 OCR input; the reading copy is untouched. `ocr_colour_dropout.py` made '
+         f'everything below; the truth of the 60 selected pages is **{out["truth_state"]}**.', '']
+    verdicts = {r: wins(summ, r) for r in READERS}
+    L += ['## Verdict', '']
+    for r, name in READERS.items():
+        m, c, g = (summ.get(f'{r}|{s}|dropout') for s in ('stamp-marked', 'control', '96-gated'))
+        a = summ.get(f'{r}|stamp|dropout')
+        L.append(f'- **{name}: {"dropout helps" if verdicts[r] else "dropout does not help"}.** All 40 stamp-class '
+                 f'pages {a["raw"]} → {a["dropout"]} NES ({a["delta"]:+} [{a["lo"]:+}, {a["hi"]:+}]); the '
+                 f'{m["n"]} with a drafted coloured mark {m["delta"]:+} [{m["lo"]:+}, {m["hi"]:+}]; controls '
+                 f'{c["delta"]:+} [{c["lo"]:+}, {c["hi"]:+}]; the 96 with the gate {g["delta"]:+} '
+                 f'[{g["lo"]:+}, {g["hi"]:+}]. Words of the text under the marks missed: {a["body_missed_raw"]}% raw, '
+                 f'{a["body_missed_dropout"]}% dropout.')
+    o = out['owner_page'].get('apple-vision', {})
+    og = out['owner_page'].get('gemini3.7-flash-gw', {})
+    L += ['', f'UIUC 00156 itself: Vision {100 * o.get("raw", 0):.1f} → {100 * o.get("dropout", 0):.1f} NES, its lines '
+          f'under the mark {o.get("raw_lines_under")} → {o.get("dropout_lines_under")} holding {o.get("raw_words_under")} → '
+          f'{o.get("dropout_words_under")} words, body words missed {o.get("raw_body_missed")} → '
+          f'{o.get("dropout_body_missed")} of {o.get("body_words")}; Gemini {100 * og.get("raw", 0):.1f} → '
+          f'{100 * og.get("dropout", 0):.1f}. One page is the case that raised the question, not evidence for a rule.', '']
+    if any(verdicts.values()):
+        L += ['Dropout wins for at least one reader with no harm measured: the proposed R02 change and the '
+              'W46.settings switch are a question in the Daemon Report (a Phase 4 rule is the owner\'s call).', '']
+    else:
+        L += ['No R02 change is proposed: R02.1 (nothing applied before OCR) stands, and W46.settings gains no switch.', '']
+    v = {s: summ[f'apple-vision|{s}|dropout'] for s in ('stamp-marked', 'stamp-unmarked', 'control')}
+    gm = {s: summ[f'gemini3.7-flash-gw|{s}|dropout'] for s in ('stamp', 'stamp-unmarked', 'control')}
+    L += ['**Reading it.** Where a real coloured mark lies over the text, dropout probably helps Vision: '
+          f'{v["stamp-marked"]["delta"]:+} [{v["stamp-marked"]["lo"]:+}, {v["stamp-marked"]["hi"]:+}] on the 16, with '
+          f'fewer words of the text under the mark missed ({v["stamp-marked"]["body_missed_raw"]}% → '
+          f'{v["stamp-marked"]["body_missed_dropout"]}%), short of the paired interval. But the cue cannot tell a stamp '
+          'from coloured print, and on the coloured-print pages it fires on Vision ties '
+          f'({v["stamp-unmarked"]["delta"]:+}) while Gemini loses {gm["stamp-unmarked"]["delta"]:+} (coloured printed '
+          'words go faint in the channel and Gemini leaves them out). Gemini already reads through the stamps: '
+          f'{gm["stamp"]["body_missed_raw"]}% of the text under the marks missed on raw. The gate fires on no control (they '
+          'are their own class); dropout applied to them anyway costs Vision '
+          f'{v["control"]["delta"]:+} and Gemini {gm["control"]["delta"]:+}, so dropout without a gate is harmful, and this '
+          'gate fires on 1 of the 96, which no reader reads differently. A route worth having would need a cue that '
+          'separates stamps from coloured print, and an owner-checked truth for the borderline Vision gain; both are '
+          'filed behind W46.nice-to-have.', '']
+    L += ['## Every set, per reader', '',
+          'NES ×100 against the truth, paired Δ dropout − raw with its 95% bootstrap interval (ocr_panel_score.paired), '
+          f'pages moved more than {100 * HELP:.0f} points either way, and the words of the truth\'s text (the marks\' own '
+          'words taken out) that the reading misses. "route Δ" is dropout followed by the mark layer\'s reading as page '
+          'text, against raw: reported to show that it is not how the mark should be kept (below).', '',
+          '| reader | set | n | raw | dropout | Δ [95%] | helped / harmed | text missed raw → dropout | route Δ |',
+          '|---|---|---|---|---|---|---|---|---|']
+    for r, name in READERS.items():
+        for s, label in SETS:
+            d, rt = summ.get(f'{r}|{s}|dropout'), summ.get(f'{r}|{s}|route')
+            if not d:
+                continue
+            L.append(f'| {name} | {label} | {d["n"]} | {d["raw"]} | {d["dropout"]} | {d["delta"]:+} [{d["lo"]:+}, '
+                     f'{d["hi"]:+}] | {d["helped"]} / {d["harmed"]} | {d["body_missed_raw"]}% → {d["body_missed_dropout"]}% '
+                     + (f'| {rt["delta"]:+} |' if rt else '| — |'))
+    lu = out['lines_under_mark']
+    L += ['', '## Vision\'s lines under the mark (40 stamp-class pages)', '',
+          f'Lines whose box the mark layer covers by at least {100 * UNDER:.0f}%: raw {lu["raw"][0]} lines holding '
+          f'{lu["raw"][1]} words ({lu["raw"][1] / max(1, lu["raw"][0]):.1f} a line), dropout {lu["dropout"][0]} lines '
+          f'holding {lu["dropout"][1]} words ({lu["dropout"][1] / max(1, lu["dropout"][0]):.1f} a line). More words on '
+          'longer lines are what the stamp had broken or hidden; the lines are also the placement stage\'s geometry '
+          '(05-placement.md), so dropout for Vision\'s lines alone is one of the filed follow-ups.', '']
+    L += ['## The mark kept as a mark', '',
+          'The mark layer (`colour_dropout.mark_layer`: the mark\'s colour excess, dark on white) read with the panel '
+          'prompt. Of the drafted marks\' words on the 40 stamp-class pages, those found in the layer\'s reading, and the '
+          'words read there that are no mark word (the layer also holds coloured print, letterheads and rules):', '']
+    for r, name in READERS.items():
+        rr = [p for p in out['pages'] if p['reader'] == r and p['set'] == 'stamp']
+        L.append(f'- {name}: {sum(p["mark_found"] for p in rr)} of {sum(p["mark_words"] for p in rr)} mark words, '
+                 f'{sum(p["mark_extra"] for p in rr)} other words.')
+    gw = out['gateway']
+    L += ['', '## Selection', '',
+          f'By colour only, never by a reader: `colour_dropout.cue` on {out["surveyed"]} originals (the 5,000-file Reader '
+          'sample\'s JPEG originals, its UIUC pages from their HEIC originals, and UIUC 00156). Stamp class: a mark of one '
+          'hue (peak share ≥ CONC) over dark text (share of the mark on ink ≥ STAMP_OVER), the dark text most of the '
+          f'ink; {out["pool"]["stamp"]} pages, the 40 with the most text under the most mark drawn, at most {PER_COLL} per '
+          f'collection, 00156 forced in. Control class: the coloured ink is the text; {out["pool"]["control"]} pages, 20 '
+          f'drawn. The draft lists a coloured mark on {out["drafts_with_marks"]["stamp"]} of the 40 stamp-class pages; '
+          'the rest are coloured print (letterheads, coloured type, rules), which the cue cannot tell from a stamp, so '
+          'the gate as an app would apply it is all 40. Of the 96, the gate fires on '
+          f'{len(out["gate96"]["fires"])} ({", ".join(out["gate96"]["fires"])}) and {out["gate96"]["any_mark"]} have a '
+          'coloured mark at all (the ungated arm). Thresholds: `' + json.dumps(out['thresholds']) + '`.', '',
+          '## Measurement card', '',
+          '- **Truth.** The 96: the owner\'s truth. The 60: Gemini 3.7 Flash\'s draft through the gateway (medium '
+          'reasoning, the raw and the dropout image both, the panel prompt with each coloured mark listed apart), '
+          'the same family as one scored reader, so Gemini\'s figures lean its way on both arms; the owner has not '
+          'checked it. `colour_dropout_sheet.py` builds the boxed sheet for the disputed places under the mark (blind), '
+          'filed as its own item. The draft saw the dropout image, which could favour a dropout reading where the two '
+          'disagree.',
+          '- **Selection.** By the colour cue alone (above); no reader chose a page. The marked/unmarked split uses the '
+          'draft\'s marks list, so it is the drafter\'s, and is said where it is used.',
+          '- **Comparison.** Same images, sizes and settings per reader: Vision accurate with language correction, '
+          'en-US; Gemini through the gateway at temperature 0, low reasoning, the panel prompt. Raw on the 96 for Gemini '
+          'is W46.fix-ocr-scorers-paid\'s reading of the same frozen image. The dropout input is the plain channel, as '
+          'the owner\'s note measured it.',
+          f'- **Noise.** Paired bootstrap intervals over pages; Vision is deterministic (no rerun floor); Gemini\'s rerun '
+          f'floor on the 96 is {FLOOR} points (ocr-rerun-noise.md), applied as a tie bound. n is 40, 16, 24, 20 and 96.',
+          '- **Scope.** One dropout method (a single plain channel, chosen by the mark\'s hue), one cue, two readers. '
+          'It does not settle a masked dropout (whitening only the mark\'s pixels), dropout for placement only '
+          '(Vision\'s lines from dropout, the reader\'s text from raw), or pages outside the Reader sample\'s collections.',
+          '', '## Cost and tools', '',
+          f'Gateway: {gw["calls"]} calls of {gw["model"]}, ${gw["cost_estimate"]:.2f} estimated ({gw["billed"]}), against '
+          f'this item\'s ${gw["cap"]:.2f} cap and the $7 rule. Vision and the cue: $0, on this Mac under the heavy lock.',
+          '', VISION_NOTE, '']
+    return '\n'.join(L)
 
 
 def main():

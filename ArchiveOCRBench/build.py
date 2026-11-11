@@ -1437,7 +1437,7 @@ def main():
     # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows. Its cascades are built from the routes
     # an app user could run; the later gateway reading of Gemini 3.7 Flash and the late Mac readers are left out of them.
     app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES | LATE_MAC_ROUTES
-                  and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-"))]
+                  and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-", "colour-"))]
     # ocr-pages.csv now holds every whole-page route (W46.ocr-rescore-offline); the difficulty fit keeps the 28 routes
     # and the FarmShare Qwen run it was built on, so its figures do not move with the headline table's additions.
     diff = difficulty.analyse({r["id"]: r["std"] for r in routes}, {r["id"]: r["name"] for r in routes},

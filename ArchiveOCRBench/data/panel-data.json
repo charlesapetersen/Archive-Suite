@@ -1373,6 +1373,27 @@
    "std": 3.62
   },
   {
+   "id": "colour-apple-vision-ungated",
+   "name": "Apple Vision (macOS 27.2) \u00b7 colour dropout on every marked page",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "colour-apple-vision-gated",
+   "name": "Apple Vision (macOS 27.2) \u00b7 colour dropout, stamp gate",
+   "batch": null,
+   "panel": "local",
+   "std": 0.0
+  },
+  {
+   "id": "colour-gemini3.7-flash-gw-gated",
+   "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 colour dropout, stamp gate",
+   "batch": null,
+   "panel": "cloud",
+   "std": 3.92
+  },
+  {
    "id": "gw-regions-pp-doclayoutv3",
    "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) \u00b7 PP-DocLayoutV3 regions",
    "panel": "cloud",
@@ -2056,6 +2077,21 @@
      96,
      96
     ],
+    "colour-apple-vision-ungated": [
+     82.6,
+     96,
+     96
+    ],
+    "colour-apple-vision-gated": [
+     83.0,
+     96,
+     96
+    ],
+    "colour-gemini3.7-flash-gw-gated": [
+     96.73,
+     96,
+     96
+    ],
     "gw-regions-pp-doclayoutv3": [
      84.84,
      95,
@@ -2661,6 +2697,21 @@
     ],
     "enh-gemini3.7-flash-gw-docres-deshadow": [
      98.79,
+     50,
+     50
+    ],
+    "colour-apple-vision-ungated": [
+     91.94,
+     50,
+     50
+    ],
+    "colour-apple-vision-gated": [
+     92.17,
+     50,
+     50
+    ],
+    "colour-gemini3.7-flash-gw-gated": [
+     98.8,
      50,
      50
     ],
@@ -3272,6 +3323,21 @@
      28,
      28
     ],
+    "colour-apple-vision-ungated": [
+     80.66,
+     28,
+     28
+    ],
+    "colour-apple-vision-gated": [
+     80.54,
+     28,
+     28
+    ],
+    "colour-gemini3.7-flash-gw-gated": [
+     94.91,
+     28,
+     28
+    ],
     "gw-regions-pp-doclayoutv3": [
      81.07,
      28,
@@ -3877,6 +3943,21 @@
     ],
     "enh-gemini3.7-flash-gw-docres-deshadow": [
      95.32,
+     16,
+     16
+    ],
+    "colour-apple-vision-ungated": [
+     59.82,
+     16,
+     16
+    ],
+    "colour-apple-vision-gated": [
+     60.18,
+     16,
+     16
+    ],
+    "colour-gemini3.7-flash-gw-gated": [
+     95.05,
      16,
      16
     ],

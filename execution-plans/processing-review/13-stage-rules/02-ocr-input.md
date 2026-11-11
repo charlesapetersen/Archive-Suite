@@ -10,6 +10,8 @@ The stage would apply binarisation, shading or show-through removal, restoration
 
 No, for the five readers measured. The reason is measured: on the owner's 96 truth pages, five enhancement methods (shading division, GCDRNet, the SBB binariser, DocRes appearance, DocRes deshadow) gave no gain beyond noise to Apple Vision, PP-OCRv6, Qwen3-VL 8B, GLM-OCR or Gemini 3.7 Flash, and several lost (section 4) [M, `enh-ocr-input.md`]. No switch: the owner's switch (on or off) governs the reading copy's content-preserving preparation, which is stage 01. This stage has no switch and no route.
 
+Colour dropout (a stamp in a second ink faded by taking one colour channel; W46.ocr-input-colour-dropout, 2026-11-11) does not change this: on 40 stamp-class pages chosen by a colour cue it ties for Vision (+0.7, -1.3 to +3.1) and loses for Gemini 3.7 Flash (-7.2, -12.6 to -2.7), with a probable Vision gain only where the gateway draft lists a real coloured mark (+3.4, -0.1 to +8.4, 16 pages), which the cue cannot separate from coloured print; R02.1 stands [M, `ocr-colour-dropout.md`, draft truth].
+
 What remains open is coverage, not a choice: the null is tight for Vision and Gemini and wide for the small laptop reader (ENH-3), the 96 hold no page Vision reads as empty, the public strata were not run (OCR-7), and routes outside the five were not tried. These are items (section 8), not decisions.
 
 ## 3. The rule for the settings layer

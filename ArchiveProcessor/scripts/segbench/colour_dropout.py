@@ -138,10 +138,8 @@ def channel(rgb, mark=None):
 
 
 def dropout(rgb, ch):
-    """The OCR input: channel `ch` as it is, a grey RGB image of the same size. The plain channel, as the owner's
-    note measured it on UIUC 00156; dividing it by paper first (a brighter image) was tried on 00156 alone before the
-    run and lost 48 of its 157 words under the stamp in Vision, so it was not used. The channel is chosen on
-    paper-normalised values (channel())."""
+    """The OCR input: channel `ch` as it is, a grey RGB image of the same size: the plain channel, as the owner's note
+    measured it on UIUC 00156. The channel is chosen on paper-normalised values (channel())."""
     g = np.ascontiguousarray(rgb[..., ch])
     return np.repeat(g[..., None], 3, -1)
 
@@ -149,8 +147,8 @@ def dropout(rgb, ch):
 def mark_layer(rgb, ch):
     """The mark alone, dark on white, same size: what a reader reads as the mark's own text. The mark's colour
     excess, channel `ch` over the brighter of the other two (paper-normalised): paper and black ink are near zero,
-    the mark's ink is high. Scaled so the 99.9th percentile of the excess is full black. A hard mask of saturated
-    pixels was tried first and read nothing on UIUC 00156 (the mask breaks into speckle at full size)."""
+    the mark's ink is high. Scaled so the 99.9th percentile of the excess is full black. (A hard mask of saturated
+    pixels breaks into speckle at full size.)"""
     n = normalised(rgb)
     others = np.delete(n, ch, axis=-1).max(-1)
     excess = np.clip(n[..., ch] - others, 0, None)
