@@ -56,11 +56,38 @@ final class DocumentViewerModel: ObservableObject {
     /// "does not write zoom to defaults" and "has no find bar" are different facts about a viewer; a future
     /// non-persisting viewer that DOES render a find bar would silently inherit the wrong answer.
     let supportsFind: Bool
-    /// The preview sheet has reading panes but no all-pages overview.
+    /// Whether the viewer offers the page views (W40.reader-page-views: the document window and the preview
+    /// sheet both do; `false` is kept for tests of a viewer without them).
     let supportsPageOverview: Bool
+    /// The contact sheet is showing in place of the reading panes. Every move to a page ends it.
     @Published private(set) var showingAllPages = false
+    /// Whether file switches feed the DEBUG switch probe: the document window's, which the probe measures.
+    private let reportsSwitches: Bool
+    /// The thumbnail sidebar is showing beside the reading panes. Unlike the contact sheet it stays up while
+    /// the reader moves around; the window remembers it.
+    @Published var showingThumbnails = false
+    /// The page counts of the open files, for the page views.
+    let pageCounts = OpenFilePageCounts()
 
-    var canShowAllPages: Bool { supportsPageOverview && (current?.pageCount ?? 0) > 1 }
+    /// Preview's three page views, ⌥⌘1 / ⌥⌘2 / ⌥⌘6 (`ReaderCommand.singlePage`, `.thumbnails`, `.contactSheet`).
+    enum PageView: Sendable, Equatable { case single, thumbnails, contactSheet }
+
+    var pageView: PageView { showingAllPages ? .contactSheet : (showingThumbnails ? .thumbnails : .single) }
+
+    /// The contact sheet is worth showing when there is more than one page to lay out: several files, or a
+    /// file with more than one page.
+    var canShowAllPages: Bool { supportsPageOverview && (urls.count > 1 || (current?.pageCount ?? 0) > 1) }
+    var canShowThumbnails: Bool { supportsPageOverview && !urls.isEmpty }
+
+    func setPageView(_ view: PageView) {
+        switch view {
+        case .single: showingThumbnails = false; setShowingAllPages(false)
+        case .thumbnails:
+            guard canShowThumbnails else { return }
+            showingThumbnails = true; setShowingAllPages(false)
+        case .contactSheet: setShowingAllPages(true)
+        }
+    }
 
     func setShowingAllPages(_ show: Bool) {
         showingAllPages = show && canShowAllPages
@@ -71,13 +98,31 @@ final class DocumentViewerModel: ObservableObject {
         }
     }
 
-    /// A tile names a physical PDF page, including OCR pages and an odd trailing scan.
-    func openTiledPage(_ page: Int) {
-        guard let current, page >= 1, page <= current.pageCount else { return }
+    /// A tile names a physical PDF page of the file on view, including OCR pages and an odd trailing scan.
+    func openTiledPage(_ page: Int) { openTiledPage(file: index, page: page) }
+
+    /// A tile names a physical PDF page of one of the open files. A page past the end of its file changes nothing.
+    func openTiledPage(file: Int, page: Int) {
+        guard urls.indices.contains(file), page >= 1 else { return }
+        if file != index {
+            guard let count = pageCounts.count(urls[file].path), page <= count else { return }
+            prepareFindForManualCycle()
+            index = file                     // didSet → loadCurrent()
+        }
+        guard let current, page <= current.pageCount else { return }
         prepareFindForManualCycle()
         // Tiles depict PDF pages. Show exactly the clicked page without changing the saved JPEG preference.
         imageSource = .pdf
         goToPDFPage(page)
+    }
+
+    /// A thumbnail names a page pair (its image page) of one of the open files.
+    func openThumbnail(file: Int, pair target: Int) {
+        guard urls.indices.contains(file), target >= 0 else { return }
+        showingAllPages = false
+        prepareFindForManualCycle()
+        if file != index { index = file }    // didSet → loadCurrent() → pair 0
+        setPair(target)
     }
     /// Shared renderer for the page-link payload. `nil` is an explicit degradation seam for tests;
     /// production uses the app-owned cache actor below.
@@ -105,7 +150,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// `persists: false` → preview mode: fit-to-pane default, zoom changes don't write to UserDefaults.
     /// `supportsFind: false` → the view renders no find bar, so the find commands stay disabled.
-    init(persists: Bool = true, supportsFind: Bool = true, supportsPageOverview: Bool = true,
+    init(persists: Bool = true, supportsFind: Bool = true, supportsPageOverview: Bool = true, reportsSwitches: Bool = true,
          imageSourcePreferences: DocumentImageSourcePreferences = DocumentImageSourcePreferences(),
          pageTurns: PageTurnStore = .shared,
          thumbnailer: PDFThumbnailer? = ArchiveTestHost.isUnitTestHost ? nil : ArchiveLinkThumbnailer.shared) {
@@ -113,6 +158,7 @@ final class DocumentViewerModel: ObservableObject {
         rightController = PDFPaneController(key: "right", persists: persists)
         self.supportsFind = supportsFind
         self.supportsPageOverview = supportsPageOverview
+        self.reportsSwitches = reportsSwitches
         self.imageSourcePreferences = imageSourcePreferences
         self.pageTurns = pageTurns
         self.persistsImageSource = persists
@@ -150,6 +196,7 @@ final class DocumentViewerModel: ObservableObject {
     /// `showing` opens on that file of the selection, if it is one (W40.reader-selection-current); else the first.
     func load(_ selection: DocumentSelection, showing path: String? = nil) {
         urls = selection.filePaths.map { URL(fileURLWithPath: $0) }
+        pageCounts.retain(selection.filePaths)
         pinsJPEGPartnerFromLink = selection.pinsJPEGPartner
         linkedJPEGRelativePath = selection.jpegRelativePath
         index = path.flatMap { selection.filePaths.firstIndex(of: $0) } ?? 0
@@ -656,7 +703,7 @@ final class DocumentViewerModel: ObservableObject {
         guard urls.indices.contains(index) else { current = nil; loadError = nil; loaded = nil; return }
         let url = urls[index]
         #if DEBUG
-        if supportsPageOverview {   // the document window, not the preview
+        if reportsSwitches {   // the document window, not the preview
             ViewerSwitchProbe.shared?.switchStarted(bitmapReady: imagePrefetcher.image(path: url.path, pageIndex: 0) != nil)
         }
         #endif
@@ -667,6 +714,7 @@ final class DocumentViewerModel: ObservableObject {
             if let page = outgoing.page, let partner = outgoing.partner { neighbours.keep(jpeg: page, partner) }
         }
         ReaderStages.measure("viewer.loadDocument") { loadDocument(url) }
+        if let current { pageCounts.set(current.pageCount, for: url.path) }
         ReaderStages.measure("viewer.jpegPartner") { refreshJPEGPartner() }
         prepareNeighbours()
     }

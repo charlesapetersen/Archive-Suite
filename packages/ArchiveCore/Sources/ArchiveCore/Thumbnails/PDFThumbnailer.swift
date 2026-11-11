@@ -68,7 +68,9 @@ public actor PDFThumbnailer {
             return data
         }
 
-        // Render
+        // Render — unless the caller has gone (a page view's cell scrolled away), so a fast scroll through
+        // the Reader's thumbnails never leaves a queue of renders nobody will show.
+        guard !Task.isCancelled else { return nil }
         guard let data = renderPage(fileURL: fileURL, page: page, spec: spec) else {
             return nil
         }

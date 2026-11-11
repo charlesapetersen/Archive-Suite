@@ -19,6 +19,7 @@ struct DocumentWindowView: View {
 
     @AppStorage("ar.doc.infoWidth") private var infoWidth = 380.0
     @AppStorage("ar.doc.infoVisible") private var infoVisible = false
+    @AppStorage("ar.doc.thumbnailsVisible") private var thumbnailsVisible = false
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @FocusState private var findFocused: Bool
     @State private var didConfigureWindow = false
@@ -32,6 +33,12 @@ struct DocumentWindowView: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            // View ▸ Thumbnails (W40.reader-page-views). The contact sheet shows every page itself, so the
+            // sidebar steps aside while it is up.
+            if model.showingThumbnails, !model.showingAllPages, model.current != nil {
+                PageThumbnailSidebar(model: model, pages: model.pageCounts, idPrefix: "ar.doc")
+                Divider()
+            }
             VStack(spacing: 0) {
                 if model.showingFind { findBar; Divider() }
                 if let note = model.formatNote { formatBanner(note); Divider() }
@@ -62,12 +69,14 @@ struct DocumentWindowView: View {
         // W40.fix-reader-menus-follow-window: the Tags menu acts on this window's open file.
         .focusedSceneValue(\.documentTagActions, DocumentTagActions(router: router, viewer: model))
         .onChange(of: model.showingTagEditor) { _, visible in infoVisible = visible }
+        .onChange(of: model.showingThumbnails) { _, visible in thumbnailsVisible = visible }
         .onChange(of: findFocused) { model.findFieldFocused = findFocused }
         .onReceive(linkContext.$target.combineLatest(linkContext.$jpegPartnerIndex)) { target, index in
             model.updateArchiveContext(target: target, index: index)
         }
         .onAppear {
             model.showingTagEditor = infoVisible
+            model.showingThumbnails = thumbnailsVisible
             fraction = defaultFraction
             if let selection { model.load(selection) }
             prefetchImagePages()
@@ -108,13 +117,10 @@ struct DocumentWindowView: View {
             ContentUnavailableView(model.loadError ?? "No document",
                                    systemImage: "doc.questionmark",
                                    description: Text(model.loadError == nil ? "Select files in the navigation window." : ""))
-        } else if model.showingAllPages, let path = model.currentFilePath, let document = model.current {
-            DocumentPageOverview(path: path, pageCount: document.pageCount,
-                                 selectedPage: model.focusedPageNumber) { page in
-                model.openTiledPage(page)
+        } else if model.showingAllPages {
+            DocumentPageOverview(model: model, pages: model.pageCounts, idPrefix: "ar.doc") {
                 DispatchQueue.main.async { model.focusPane(model.focusedPane) }
             }
-            .id(path)
         } else {
             GeometryReader { geo in
                 let total = geo.size.width
@@ -268,15 +274,7 @@ struct DocumentWindowView: View {
 
             Divider()
 
-            Button {
-                model.setShowingAllPages(!model.showingAllPages)
-            } label: {
-                Label(model.showingAllPages ? "Read Selected Page" : "All Pages Tiled",
-                      systemImage: model.showingAllPages ? "doc.text.image" : "square.grid.2x2")
-            }
-            .disabled(!model.canShowAllPages)
-            .help(model.showingAllPages ? "Return to the selected scan and OCR text" : "View every PDF page as a numbered tile; click a tile to read it")
-            .accessibilityIdentifier("ar.doc.allPages")
+            PageViewButtons(model: model, idPrefix: "ar.doc")
 
             if !model.showingAllPages {
                 imageSourceSwitch

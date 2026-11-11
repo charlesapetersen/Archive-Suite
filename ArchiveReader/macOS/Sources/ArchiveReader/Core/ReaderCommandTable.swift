@@ -85,7 +85,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     case previewPreviousFile, previewNextFile, previewPreviousPage, previewNextPage, previewDone
     // The list's bare keys
     case listNextUnread, listPreviousUnread, listMarkReadAndNext, listPreview
-    // Held for W40.reader-page-views. Preview's view keys ⌥⌘1 / ⌥⌘2 / ⌥⌘6 are free as they are.
+    // Preview's page views, on Preview's keys ⌥⌘1 / ⌥⌘2 / ⌥⌘6 (W40.reader-page-views).
     case singlePage, thumbnails, contactSheet
 
     var context: CommandContext {
@@ -100,10 +100,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
 
     /// Held for a later item: in the table so no other command takes the key, but bound nowhere yet.
     var reserved: Bool {
-        switch self {
-        case .singlePage, .thumbnails, .contactSheet: return true
-        default: return false
-        }
+        false
     }
 
     /// The menu (or button) name. A Show/Hide pair is named by its Show half; `title(showing:)` gives the other.
@@ -277,6 +274,9 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return "Turn the image page a quarter turn left, in this view only — the file is not changed"
         case .rotateRight: return "Turn the image page a quarter turn right, in this view only — the file is not changed"
         case .resetRotation: return "Show the image page as it is in the file"
+        case .singlePage: return "Show the page alone, without thumbnails"
+        case .thumbnails: return "Show a thumbnail of each scan of the open files beside the page"
+        case .contactSheet: return "Show every PDF page of the open files as a numbered tile"
         case .previewPreviousFile: return "Previous file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewNextFile: return "Next file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewPreviousPage: return "Previous page in the selection"

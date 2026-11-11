@@ -30,9 +30,11 @@ struct PreviewSheet: View {
     /// `DocumentWindowView`), and publishing the model to the scene enables every `.disabled(doc == nil)`
     /// item in the Document menu. Without the flag, `Find…`/`Find Next`/`Find Previous` look live here and
     /// do nothing (`W26.previewzoom-fu1`). ⌘O opens the full viewer, which does have find.
-    @StateObject private var model = DocumentViewerModel(persists: false, supportsFind: false, supportsPageOverview: false)
+    @StateObject private var model = DocumentViewerModel(persists: false, supportsFind: false, reportsSwitches: false)
     /// The image pages drawn ahead of time, so the image arrives with the text (W40.fix-reader-preview-image-speed).
     @ObservedObject private var prefetcher = PreviewImagePrefetcher.shared
+    /// The sheet remembers its own thumbnail sidebar, apart from the document window's.
+    @AppStorage("ar.preview.thumbnailsVisible") private var thumbnailsVisible = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,11 +48,13 @@ struct PreviewSheet: View {
         .accessibilityIdentifier("ar.preview.content")
         .archiveLinkCopyError(model: model)
         .onAppear {
+            model.showingThumbnails = thumbnailsVisible
             model.load(selection)
             published = model            // → the nav window publishes it to the scene while we are up
             DispatchQueue.main.async { model.leftController.focus() }
         }
         .onDisappear { published = nil; nav.endFileOnView(by: model) }
+        .onChange(of: model.showingThumbnails) { _, visible in thumbnailsVisible = visible }
         // ↑/↓ browse the underlying file list: move the nav selection, then re-load the preview to match. After
         // ⇧↑/⇧↓ it opens on the row just added (the cursor), not on the run's first file.
         .onChange(of: nav.selection) { model.load(nav.documentSelection(), showing: nav.selectionCursorPath) }
@@ -91,6 +95,8 @@ struct PreviewSheet: View {
                 .keyboardShortcut(.previewNextPage)
                 .disabled(!model.canGoNext)
                 .help(ReaderCommand.previewNextPage.help)
+            // View ▸ Thumbnails and Contact Sheet (⌥⌘2 / ⌥⌘6) reach this sheet's published model too.
+            PageViewButtons(model: model, idPrefix: "ar.preview").labelStyle(.iconOnly)
             // Rotate Left / Right are Document menu items (⌃⌘L / ⌃⌘R), which reach this sheet's published model.
             Button { model.rotateLeft() } label: { Image(systemName: "rotate.left") }
                 .disabled(!model.canRotate)
@@ -144,32 +150,48 @@ struct PreviewSheet: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             HStack(spacing: 0) {
-                // `.id(pageIdentity)` — a fresh PDFView per displayed pair/document (DV-3). Needed for the
-                // image pane in particular: `updateNSView`'s reuse check compares page text, which is nil
-                // on every image page, so without this the pane keeps showing the previous scan.
-                // The file's path is in the identity too: browsing with ↑/↓ reloads the model on pair 0 of
-                // document 0 each time, so `pageIdentity` alone repeats, and a placeholder for the new file
-                // must never land on a view still showing the old one.
-                PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane",
-                            placeholder: imagePlaceholder, turns: model.imageTurns)
-                    .id("\(model.currentFilePath ?? "")#\(model.pageIdentity)#\(model.imageTurns)")
-                    .frame(maxWidth: .infinity)
-                Divider()
-                if model.hasTextPage {
-                    PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.preview.textPane")
-                        .id(model.pageIdentity)
-                        .frame(maxWidth: .infinity)
-                } else if let text = model.embeddedText {
-                    ExtractedTextPane(text: text, scale: model.textScale, controller: model.textController,
-                                      id: "ar.preview.textPane")
-                } else {
-                    ContentUnavailableView("No OCR text page", systemImage: "text.slash",
-                                           description: Text(model.pairCount > 1
-                                                             ? "This scan has no OCR text page."
-                                                             : "This document has a single page."))
-                        .frame(maxWidth: .infinity)
-                        .accessibilityIdentifier("ar.preview.noText")
+                if model.showingThumbnails, !model.showingAllPages {
+                    PageThumbnailSidebar(model: model, pages: model.pageCounts, idPrefix: "ar.preview")
+                    Divider()
                 }
+                if model.showingAllPages {
+                    DocumentPageOverview(model: model, pages: model.pageCounts, idPrefix: "ar.preview") {
+                        DispatchQueue.main.async { model.focusPane(model.focusedPane) }
+                    }
+                } else {
+                    readingPanes
+                }
+            }
+        }
+    }
+
+    private var readingPanes: some View {
+        HStack(spacing: 0) {
+            // `.id(pageIdentity)` — a fresh PDFView per displayed pair/document (DV-3). Needed for the
+            // image pane in particular: `updateNSView`'s reuse check compares page text, which is nil
+            // on every image page, so without this the pane keeps showing the previous scan.
+            // The file's path is in the identity too: browsing with ↑/↓ reloads the model on pair 0 of
+            // document 0 each time, so `pageIdentity` alone repeats, and a placeholder for the new file
+            // must never land on a view still showing the old one.
+            PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane",
+                        placeholder: imagePlaceholder, turns: model.imageTurns)
+                .id("\(model.currentFilePath ?? "")#\(model.pageIdentity)#\(model.imageTurns)")
+                .frame(maxWidth: .infinity)
+            Divider()
+            if model.hasTextPage {
+                PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.preview.textPane")
+                    .id(model.pageIdentity)
+                    .frame(maxWidth: .infinity)
+            } else if let text = model.embeddedText {
+                ExtractedTextPane(text: text, scale: model.textScale, controller: model.textController,
+                                  id: "ar.preview.textPane")
+            } else {
+                ContentUnavailableView("No OCR text page", systemImage: "text.slash",
+                                       description: Text(model.pairCount > 1
+                                                         ? "This scan has no OCR text page."
+                                                         : "This document has a single page."))
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("ar.preview.noText")
             }
         }
     }

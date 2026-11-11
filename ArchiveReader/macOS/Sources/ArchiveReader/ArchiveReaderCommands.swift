@@ -71,11 +71,26 @@ struct ArchiveReaderCommands: Commands {
             }
             .keyboardShortcut(.showInspector)
             .disabled(nav == nil && !(docTags?.canTag ?? false))
+            // Preview's page views, on its keys (W40.reader-page-views), in the document window and the preview
+            // sheet alike: one is checked at a time. Choosing the checked one again leaves only the contact
+            // sheet, which returns to the page it was opened from.
             if let doc, doc.supportsPageOverview {
-                Toggle("All Pages Tiled", isOn: Binding(
+                Divider()
+                Toggle(ReaderCommand.singlePage.title, isOn: Binding(
+                    get: { doc.pageView == .single }, set: { _ in doc.setPageView(.single) }
+                ))
+                .keyboardShortcut(.singlePage)
+                Toggle(ReaderCommand.thumbnails.title, isOn: Binding(
+                    get: { doc.pageView == .thumbnails }, set: { _ in doc.setPageView(.thumbnails) }
+                ))
+                .keyboardShortcut(.thumbnails)
+                .disabled(!doc.canShowThumbnails)
+                Toggle(ReaderCommand.contactSheet.title, isOn: Binding(
                     get: { doc.showingAllPages }, set: { doc.setShowingAllPages($0) }
                 ))
+                .keyboardShortcut(.contactSheet)
                 .disabled(!doc.canShowAllPages)
+                Divider()
             }
             // The source switch applies to the reading panes; tiles always depict PDF pages.
             if let doc {
