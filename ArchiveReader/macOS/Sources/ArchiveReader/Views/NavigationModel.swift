@@ -89,8 +89,8 @@ final class NavigationModel: ObservableObject {
         }
     }
     /// What the library window's inspector edits (W40.fix-reader-selection-at-size): the selection's paths, frozen
-    /// while it is hidden, so a hidden inspector is not rebuilt for every arrow key and a draft it holds survives
-    /// ⌘I. `generation` is its identity, and changes only when the set of paths does, not their order.
+    /// while it is hidden, so a hidden inspector is not rebuilt for every arrow key, and a draft it holds survives
+    /// ⌘I when the selection has not changed meanwhile. `generation` is its identity, and changes only when the set of paths does, not their order.
     private(set) var inspectorTarget = InspectorTarget()
     struct InspectorTarget: Equatable { var paths: [String] = []; var generation = 0 }
     @Published var showingPreview = false
@@ -1226,10 +1226,37 @@ final class NavigationModel: ObservableObject {
     private func refreshSelectionCache() {
         let sel = selection
         selectedFilesCache = ReaderStages.measure("model.selectionCache") {
-            guard !sel.isEmpty else { return [] }
-            if let positions = displayedPositions(of: sel) { return positions.sorted().map { displayed[$0] } }
-            return displayed.filter { sel.contains($0.id) }
+            guard !sel.isEmpty else { selectionPositions = nil; return [] }
+            let positions = followedSelectionPositions(sel)
+                ?? displayedPositions(of: sel)?.sorted()
+                ?? displayed.indices.filter { sel.contains(displayed[$0].id) }
+            selectionPositions = SelectionPositions(order: displayedOrderGeneration, ids: sel, positions: positions)
+            return positions.map { displayed[$0] }
         }
+    }
+
+    /// Where the selection's rows stand in `displayed`, ascending, while the list keeps its order: a selection
+    /// change is then resolved from what it added and removed, so ⇧-arrow with 500 selected looks up one row,
+    /// not 501 (W40.fix-reader-selection-at-size). A row replaced in place keeps its position, and the cache
+    /// reads every row from `displayed`, so it always holds the list's current values.
+    private struct SelectionPositions { var order: Int; var ids: Set<ArchiveFile.ID>; var positions: [Int] }
+    private var selectionPositions: SelectionPositions?
+
+    /// The selection's positions, from the last ones and the rows added and removed since; nil when the list
+    /// changed order since, or the change is too large to be worth following.
+    private func followedSelectionPositions(_ sel: Set<ArchiveFile.ID>) -> [Int]? {
+        guard let last = selectionPositions, last.order == displayedOrderGeneration,
+              abs(last.ids.count - sel.count) <= 64 else { return nil }
+        let removed = last.ids.subtracting(sel), added = sel.subtracting(last.ids)
+        guard removed.count + added.count <= 64 else { return nil }
+        var positions = removed.isEmpty ? last.positions : last.positions.filter { !removed.contains(displayed[$0].id) }
+        guard let found = added.isEmpty ? [] : displayedPositions(of: added) else { return nil }
+        for i in found {
+            var lo = 0, hi = positions.count
+            while lo < hi { let mid = (lo + hi) / 2; if positions[mid] < i { lo = mid + 1 } else { hi = mid } }
+            positions.insert(i, at: lo)
+        }
+        return positions
     }
 
     /// Up to this many selected rows are found in the list one by one; more, and one pass over it is cheaper.
@@ -2483,7 +2510,8 @@ final class NavigationModel: ObservableObject {
         guard !displayed.isEmpty else { return }
         let next: ArchiveFile.ID = ReaderStages.measure("model.moveSelectionInList.find") {
             let sel = selection
-            let positions = displayedPositions(of: sel)
+            let positions = selectionPositions.flatMap { $0.order == displayedOrderGeneration && $0.ids == sel ? $0.positions : nil }
+                ?? displayedPositions(of: sel)
                 ?? displayed.indices.filter { sel.contains(displayed[$0].id) }
             let anchor = delta < 0 ? (positions.min() ?? 0) : (positions.max() ?? -1)
             return displayed[max(0, min(displayed.count - 1, anchor + delta))].id

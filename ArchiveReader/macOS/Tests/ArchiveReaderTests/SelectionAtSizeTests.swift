@@ -53,6 +53,28 @@ final class SelectionAtSizeTests: XCTestCase {
         }
     }
 
+    /// The cache follows each change from the last one; whatever the path, it must equal a scan of the list.
+    func testTheFollowedSelectionAlwaysEqualsAScanOfTheList() throws {
+        let model = try settledModel(files: 40)
+        var rng = SystemRandomNumberGenerator()
+        func oracle() -> [String] { model.displayed.filter { model.selection.contains($0.id) }.map(\.path) }
+        for step in 0..<300 {
+            if step == 150 { resort(model, [ARSortDescriptor(field: .name, ascending: false)]) }
+            let ids = model.displayed.map(\.id)
+            var sel = model.selection
+            switch Int.random(in: 0..<6, using: &rng) {
+            case 0: sel = [ids.randomElement(using: &rng)!]                                   // an arrow key
+            case 1: sel.insert(ids.randomElement(using: &rng)!)                               // ⇧-arrow, ⌘-click
+            case 2: if let gone = sel.randomElement(using: &rng) { sel.remove(gone) }
+            case 3: sel = Set(ids.shuffled(using: &rng).prefix(Int.random(in: 0...30, using: &rng)))  // a big change
+            case 4: sel.insert(URL(fileURLWithPath: "/nowhere/\(step).pdf"))                  // not in the list
+            default: sel = []
+            }
+            model.selection = sel
+            XCTAssertEqual(model.selectedFiles.map(\.path), oracle(), "step \(step)")
+        }
+    }
+
     func testARowTheListDoesNotShowIsLeftOutAsTheScanLeftItOut() throws {
         let model = try settledModel(files: 6)
         let listed = model.displayed

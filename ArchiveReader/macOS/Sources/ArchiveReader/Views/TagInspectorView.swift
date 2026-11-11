@@ -57,10 +57,12 @@ struct TagInspectorView: View, Equatable {
 @MainActor
 final class InspectorFeed: ObservableObject {
     private var subscription: AnyCancellable?
+    private weak var followed: NavigationModel?
 
     func follow(_ model: NavigationModel, visible: Bool) {
-        guard visible else { subscription = nil; return }
-        guard subscription == nil else { return }
+        guard visible else { subscription = nil; followed = nil; return }
+        guard subscription == nil || followed !== model else { return }
+        followed = model
         subscription = model.objectWillChange.sink { [weak self] _ in
             MainActor.assumeIsolated { self?.objectWillChange.send() }
         }

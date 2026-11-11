@@ -56,6 +56,7 @@ struct TagEditorView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear { feed.follow(model, visible: isVisible) }
+        .onChange(of: ObjectIdentifier(model)) { feed.follow(model, visible: isVisible) }   // a new library window
         .onChange(of: isVisible) { _, visible in
             feed.follow(model, visible: visible)
             if !visible {
