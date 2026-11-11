@@ -199,4 +199,65 @@ struct NotesTrashTests {
         #expect(!exists(dir(env, "items", a)))
         #expect(env.model.trashedNotes.isEmpty)
     }
+
+    /// W40.fix-notes-delete-redo (notes-2 row 17): Redo after the Undo of a delete moves the note to the Trash
+    /// again, with no placement left behind, and the next Undo brings it home once more.
+    @Test("Undo puts a deleted note back, Redo deletes it again, and Undo again restores it")
+    func undoRedoUndoOfDelete() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let a = try await makeNote(env, "Alpha")
+        let f1 = try await env.org.createFolder(name: "F1", parent: nil, kind: .normal).id
+        try await env.org.addMembership(item: a, folder: f1)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        try #require(await env.nav.confirmDeletion(.init(itemId: a, folderId: f1, title: "Alpha")))
+        undo.beginUndoGrouping()
+        env.nav.registerUndoOfDelete(a, title: "Alpha", with: undo)
+        undo.endUndoGrouping()
+        #expect(undo.undoActionName == "Delete Note")
+
+        undo.undo()
+        await env.nav.deleteHistorySettled()
+        #expect(exists(dir(env, "items", a)), "Undo brought the note home")
+        #expect(env.org.foldersContaining(item: a) == [f1])
+        #expect(undo.canRedo, "Redo is offered after the Undo")
+        #expect(undo.redoActionName == "Delete Note")
+
+        undo.redo()
+        await env.nav.deleteHistorySettled()
+        #expect(!exists(dir(env, "items", a)), "Redo deleted the note again")
+        #expect(exists(dir(env, "Trash", a)), "into the store's Trash, never gone")
+        #expect(env.org.foldersContaining(item: a).isEmpty, "with no placement left on a trashed note")
+        #expect(!env.model.allItems.contains { $0.id == a })
+        #expect(Set(try #require(env.model.trashedNotes.first { $0.id == a }).formerFolderIds) == [f1],
+                "the Trash still knows where it came from")
+        #expect(undo.canUndo)
+
+        undo.undo()
+        await env.nav.deleteHistorySettled()
+        #expect(exists(dir(env, "items", a)), "the second Undo brought it home again")
+        #expect(env.org.foldersContaining(item: a) == [f1])
+        #expect(undo.canRedo)
+    }
+
+    @Test("a Redo whose Undo could not bring the note back deletes nothing")
+    func redoAfterFailedPutBackDoesNothing() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let a = try await makeNote(env, "Alpha")
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        try #require(await env.nav.confirmDeletion(.init(itemId: a, folderId: nil, title: "Alpha", allInstances: true)))
+        undo.beginUndoGrouping()
+        env.nav.registerUndoOfDelete(a, title: "Alpha", with: undo)
+        undo.endUndoGrouping()
+        // The Trash view put it back first, so the Undo finds nothing to bring home.
+        #expect(await env.model.putBack([a]) == [a])
+
+        undo.undo()
+        await env.nav.deleteHistorySettled()
+        undo.redo()
+        await env.nav.deleteHistorySettled()
+        #expect(exists(dir(env, "items", a)), "the note the Undo did not restore stays in the library")
+        #expect(!exists(dir(env, "Trash", a)))
+    }
 }

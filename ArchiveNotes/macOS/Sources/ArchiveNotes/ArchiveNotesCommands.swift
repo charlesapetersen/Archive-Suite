@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Format menu for the editor, dispatched via FocusedValue to the active editor's FormattingContext.
@@ -180,6 +181,48 @@ extension FocusedValues {
     var advancedSearchAction: AdvancedSearchAction? {
         get { self[AdvancedSearchActionKey.self] }
         set { self[AdvancedSearchActionKey.self] = newValue }
+    }
+}
+
+/// Edit ▸ Delete Note… (⌘⌫, as in Finder; W40.fix-notes-delete-redo, notes-2 row 16): the selected row, through
+/// the same confirmation as the row menu's Delete…. The menu sees ⌘⌫ before a text view does, so in the editor or a
+/// text field the key keeps its own meaning, deleting to the start of the line; outside the note list it does nothing.
+struct DeleteCommands: Commands {
+    @FocusedValue(\.deleteItemAction) private var deleteItem
+
+    var body: some Commands {
+        CommandGroup(after: .pasteboard) {
+            Button("Delete Note\u{2026}") { perform() }
+                .keyboardShortcut(.delete, modifiers: .command)
+                .disabled(deleteItem == nil)
+        }
+    }
+
+    private func perform() {
+        let responder = NSApp.keyWindow?.firstResponder
+        if let text = responder as? NSTextView {
+            text.doCommand(by: #selector(NSResponder.deleteToBeginningOfLine(_:)))
+            return
+        }
+        // Only the note list's own selection: with the sidebar, a sheet's control or the inspector focused,
+        // the selected row is not what ⌘⌫ is aimed at.
+        guard responder is ContextMenuTableView else { NSSound.beep(); return }
+        deleteItem?.perform()
+    }
+}
+
+struct DeleteItemAction {
+    let perform: @MainActor () -> Void
+}
+
+struct DeleteItemActionKey: FocusedValueKey {
+    typealias Value = DeleteItemAction
+}
+
+extension FocusedValues {
+    var deleteItemAction: DeleteItemAction? {
+        get { self[DeleteItemActionKey.self] }
+        set { self[DeleteItemActionKey.self] = newValue }
     }
 }
 

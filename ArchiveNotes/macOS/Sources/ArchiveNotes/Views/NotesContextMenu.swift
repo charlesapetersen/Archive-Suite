@@ -91,7 +91,9 @@ enum NotesItemContextMenu {
 
             menu.addItem(.separator())
 
-            let delete = NSMenuItem(title: "Delete…", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
+            // Shows ⌘⌫, Edit ▸ Delete Note…'s key (W40.fix-notes-delete-redo).
+            let delete = NSMenuItem(title: "Delete…", action: #selector(NotesMenuAction.fire), keyEquivalent: "\u{8}")
+            delete.keyEquivalentModifierMask = .command
             let deleteAction = NotesMenuAction { nav.requestDeleteItem(id) }
             delete.target = deleteAction
             delete.representedObject = deleteAction

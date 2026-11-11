@@ -2292,6 +2292,56 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "the Trash should then be empty")
     }
 
+    /// W40.fix-notes-delete-redo (notes-2 rows 16, 17) — ⌘⌫ deletes the selected note through the same
+    /// confirmation, and after Edit ▸ Undo, Edit ▸ Redo moves it to the Trash again.
+    func testG22_CommandDeleteAndRedo() throws {
+        try withFixture { try runG22_CommandDeleteAndRedo() }
+    }
+
+    private func runG22_CommandDeleteAndRedo() throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
+        let id = Self.idPlain
+        let readingPair = [Self.folderReading, id]
+        XCTAssertTrue((organizationMemberships() ?? []).contains(readingPair), "fixture note should start in Reading")
+        let trashDir = Self.fixturePath + "/Trash/" + id.lowercased()
+
+        let row = selectItem(uuid: id)
+        _ = pollUntil(timeout: 8) { app.activate(); return row.isHittable }
+        // No second click: on a selected row it would start editing the title, where ⌘⌫ edits the text.
+        app.typeKey(.delete, modifierFlags: .command)
+        let confirm = app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 8), "⌘⌫ should ask for the delete confirmation")
+        confirm.click()
+        XCTAssertTrue(pollUntil(timeout: 15) { !itemDirs().contains(id) }, "the note should leave items/")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trashDir), "it should wait in the store's Trash")
+
+        func editMenuItem(_ prefix: String) -> XCUIElement {
+            app.activate()
+            let edit = app.menuBars.menuBarItems["Edit"]
+            edit.click()
+            let item = edit.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", prefix)).firstMatch
+            XCTAssertTrue(item.waitForExistence(timeout: 5), "Edit ▸ \(prefix) should be in the menu")
+            XCTAssertTrue(item.isEnabled, "Edit ▸ \(prefix) should be enabled (title: \(item.title))")
+            return item
+        }
+
+        editMenuItem("Undo").click()
+        XCTAssertTrue(pollUntil(timeout: 15) { itemDirs().contains(id) }, "Undo should bring the note back")
+        XCTAssertTrue(pollUntil(timeout: 8) { (organizationMemberships() ?? []).contains(readingPair) },
+                      "Undo should file the note in Reading again")
+
+        editMenuItem("Redo").click()
+        XCTAssertTrue(pollUntil(timeout: 15) { !itemDirs().contains(id) }, "Redo should delete the note again")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: trashDir), "into the store's Trash")
+        XCTAssertFalse((organizationMemberships() ?? []).contains { $0[1] == id },
+                       "Redo should leave no folder placement on the trashed note")
+
+        editMenuItem("Undo").click()
+        XCTAssertTrue(pollUntil(timeout: 15) { itemDirs().contains(id) }, "a second Undo should bring it back")
+        XCTAssertTrue(pollUntil(timeout: 8) { (organizationMemberships() ?? []).contains(readingPair) },
+                      "and file it in Reading again")
+    }
+
     // MARK: - G12 / G13 / G14 — the W14.4 (b/d) + W14.3 checks that sat on the owner's manual list
     //
     // Each of these shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour

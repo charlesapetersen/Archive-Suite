@@ -78,6 +78,7 @@ struct ArchiveNotesApp: App {
             ExtractCommands()
             LayoutCommands()
             AdvancedSearchCommands()
+            DeleteCommands()
             // Edit ▸ Find (⌘F, ⌘G, ⇧⌘G, ⌘E) and the Mac's other text commands, sent to the editor's find bar
             // (`EditorTextView.usesFindBar`); Notes had no Find until W40.fix-suite-shortcuts.
             TextEditingCommands()

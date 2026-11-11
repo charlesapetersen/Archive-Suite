@@ -125,6 +125,9 @@ final class NotesNavigationModel: ObservableObject {
     /// batched folder-delete variant lives on the shared tree, since folder structure is shared.)
     @Published var pendingDeletion: PendingDeletion?
 
+    /// Whether an Undo's Put Back brought the note home, read by the Redo that follows it.
+    final class DeleteHistoryStep { var happened = false }
+
     /// The item + folder whose removal would delete the item's sole remaining instance (§3.6).
     struct PendingDeletion: Identifiable, Equatable {
         let id = UUID()
@@ -637,6 +640,62 @@ final class NotesNavigationModel: ObservableObject {
 
     /// Dismiss the confirmation without deleting anything (the default / Cancel path).
     func cancelPendingDeletion() { pendingDeletion = nil }
+
+    /// The note Edit ▸ Delete… (⌘⌫) asks to delete: the one selected row of the note list, or nil when the
+    /// list is not showing or holds no single selection (W40.fix-notes-delete-redo, notes-2 row 16).
+    var deletableSelection: UUID? {
+        guard paneMode == .notes, selection.count == 1 else { return nil }
+        return selection.first
+    }
+
+    // MARK: Undo and Redo of a delete (W40.fix-notes-delete-undo, W40.fix-notes-delete-redo)
+
+    /// Edit ▸ Undo after a delete that reached the Trash: Put Back. Each step registers its opposite while
+    /// the manager is undoing or redoing, so it lands on the other stack, and the steps run one after
+    /// another, so a quick Undo-Redo-Undo cannot put a note back before it reached the Trash.
+    func registerUndoOfDelete(_ itemId: UUID, title: String, with undo: UndoManager) {
+        // The manager is held weakly: it keeps these handlers, so a strong capture would never be freed.
+        undo.registerUndo(withTarget: model) { [weak self, weak undo] model in
+            guard let self, let undo else { return }
+            let putBack = DeleteHistoryStep()
+            self.registerRedoOfDelete(itemId, title: title, with: undo, ifPutBack: putBack)
+            self.enqueueDeleteHistory {
+                putBack.happened = await model.putBack([itemId]).contains(itemId)
+            }
+        }
+        undo.setActionName("Delete Note")
+    }
+
+    /// Edit ▸ Redo after that Undo: the note goes to the Trash again (notes-2 row 17), through the same
+    /// guarded delete as a confirmed one — every placement Put Back made is removed first, so the note
+    /// never reaches the Trash still filed, including a folder it was added to after the Undo, as Finder's
+    /// Redo of a Move to Trash does. Only a note this Undo actually brought back is deleted.
+    private func registerRedoOfDelete(_ itemId: UUID, title: String, with undo: UndoManager,
+                                      ifPutBack putBack: DeleteHistoryStep) {
+        undo.registerUndo(withTarget: model) { [weak self, weak undo] _ in
+            guard let self, let undo else { return }
+            self.registerUndoOfDelete(itemId, title: title, with: undo)
+            self.enqueueDeleteHistory {
+                guard putBack.happened else { return }
+                await self.confirmDeletion(PendingDeletion(itemId: itemId, folderId: nil, title: title,
+                                                           allInstances: true))
+            }
+        }
+        undo.setActionName("Delete Note")
+    }
+
+    private var deleteHistoryTail: Task<Void, Never>?
+
+    private func enqueueDeleteHistory(_ step: @escaping @MainActor () async -> Void) {
+        let previous = deleteHistoryTail
+        deleteHistoryTail = Task { @MainActor in
+            await previous?.value
+            await step()
+        }
+    }
+
+    /// Waits for the queued Undo and Redo steps of deletes to finish (tests).
+    func deleteHistorySettled() async { await deleteHistoryTail?.value }
 
     /// **Replicate** items into `target` (⌥-drag / "Add to Folder…"): add a membership, leaving every
     /// existing membership intact — the DevonThink replicant (one file, K places). Refuses a non-normal

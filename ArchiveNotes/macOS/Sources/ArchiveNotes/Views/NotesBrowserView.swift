@@ -117,6 +117,9 @@ struct NotesBrowserView: View {
         .focusedSceneValue(\.newItemAction, NewItemAction(perform: { newItem(kind: $0, from: .folderDefault) },
                                                            newTemplate: { showNewTemplate() }))
         .focusedSceneValue(\.advancedSearchAction, AdvancedSearchAction(open: { openAdvancedSearch() }))
+        .focusedSceneValue(\.deleteItemAction, nav.deletableSelection.map { id in
+            DeleteItemAction(perform: { nav.requestDeleteItem(id) })
+        })
         .sheet(item: $nav.advancedSearchRequest) { request in
             NotesAdvancedSearchSheet(nav: nav, request: request)
         }
@@ -151,14 +154,11 @@ struct NotesBrowserView: View {
             // pendingDeletion = nil) the instant a button is tapped, before this async Task runs.
             Button("Delete Note", role: .destructive) {
                 Task {
-                    // Edit ▸ Undo puts the note back, only once it is really in the Trash
-                    // (W40.fix-notes-delete-undo). The window's manager, which the note table answers to.
+                    // Edit ▸ Undo puts the note back, only once it is really in the Trash, and Redo deletes
+                    // it again (W40.fix-notes-delete-undo, -redo). The window's manager, which the note
+                    // table answers to.
                     guard await nav.confirmDeletion(pending), let undo = window?.undoManager ?? undoManager else { return }
-                    let id = pending.itemId
-                    undo.registerUndo(withTarget: model) { model in
-                        Task { @MainActor in await model.putBack([id]) }
-                    }
-                    undo.setActionName("Delete Note")
+                    nav.registerUndoOfDelete(pending.itemId, title: pending.title, with: undo)
                 }
             }
                 .accessibilityIdentifier("an.dialog.deleteLastInstance.confirm")
