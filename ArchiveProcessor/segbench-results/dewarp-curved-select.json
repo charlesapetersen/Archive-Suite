@@ -1,0 +1,2716 @@
+{
+ "item": "W46.dewarp-curved-select",
+ "uvdoc": "UVDoc 4c9b82b5 best_model.pkl, after Apple quad, CPU, torch-env",
+ "sets": {
+  "curved bound or curled": {
+   "pages": 24,
+   "guard_pass": 12,
+   "lines": 1095,
+   "route": {
+    "pass": 71.6,
+    "cut": 0,
+    "broken": 117,
+    "ends_moved": 0
+   },
+   "uvdoc": {
+    "pass": 66.6,
+    "cut": 199,
+    "broken": 89,
+    "ends_moved": 95,
+    "pooled_delta": [
+     -5.0,
+     -16.9,
+     8.0
+    ],
+    "page_delta": [
+     -3.0,
+     -12.6,
+     6.0
+    ],
+    "better": 10,
+    "worse": 11
+   },
+   "guarded": {
+    "pass": 74.8,
+    "cut": 2,
+    "broken": 113,
+    "ends_moved": 21,
+    "pooled_delta": [
+     3.2,
+     0.4,
+     7.7
+    ],
+    "page_delta": [
+     4.6,
+     0.6,
+     9.1
+    ],
+    "better": 7,
+    "worse": 2
+   },
+   "passing_only": {
+    "pages": 12,
+    "route": 74.8,
+    "uvdoc": 85.8,
+    "pooled_delta": [
+     11.0,
+     2.9,
+     18.2
+    ]
+   }
+  },
+  "their flat pairs": {
+   "pages": 24,
+   "guard_pass": 10,
+   "lines": 851,
+   "route": {
+    "pass": 93.5,
+    "cut": 0,
+    "broken": 25,
+    "ends_moved": 0
+   },
+   "uvdoc": {
+    "pass": 89.7,
+    "cut": 27,
+    "broken": 35,
+    "ends_moved": 51,
+    "pooled_delta": [
+     -3.9,
+     -7.0,
+     0.0
+    ],
+    "page_delta": [
+     -4.5,
+     -8.6,
+     -0.7
+    ],
+    "better": 2,
+    "worse": 12
+   },
+   "guarded": {
+    "pass": 94.6,
+    "cut": 0,
+    "broken": 17,
+    "ends_moved": 13,
+    "pooled_delta": [
+     1.1,
+     -0.6,
+     3.8
+    ],
+    "page_delta": [
+     0.6,
+     -1.3,
+     2.9
+    ],
+    "better": 2,
+    "worse": 1
+   },
+   "passing_only": {
+    "pages": 10,
+    "route": 93.5,
+    "uvdoc": 96.6,
+    "pooled_delta": [
+     3.1,
+     -1.9,
+     9.3
+    ]
+   }
+  },
+  "curved, classed flat": {
+   "pages": 8,
+   "guard_pass": 1,
+   "lines": 221,
+   "route": {
+    "pass": 87.8,
+    "cut": 0,
+    "broken": 13,
+    "ends_moved": 0
+   },
+   "uvdoc": {
+    "pass": 84.6,
+    "cut": 11,
+    "broken": 12,
+    "ends_moved": 3,
+    "pooled_delta": [
+     -3.2,
+     -6.6,
+     0.0
+    ],
+    "page_delta": [
+     -11.6,
+     -39.1,
+     7.1
+    ],
+    "better": 2,
+    "worse": 6
+   },
+   "guarded": {
+    "pass": 87.3,
+    "cut": 7,
+    "broken": 11,
+    "ends_moved": 0,
+    "pooled_delta": [
+     -0.5,
+     -1.2,
+     0.0
+    ],
+    "page_delta": [
+     -0.2,
+     -0.7,
+     0.0
+    ],
+    "better": 0,
+    "worse": 1
+   },
+   "passing_only": {
+    "pages": 1,
+    "route": 82.7,
+    "uvdoc": 80.8,
+    "pooled_delta": [
+     -1.9,
+     -1.9,
+     -1.9
+    ]
+   }
+  },
+  "all 64": {
+   "pages": 64,
+   "guard_pass": 28,
+   "lines": 2448,
+   "route": {
+    "pass": 83.5,
+    "cut": 0,
+    "broken": 165,
+    "ends_moved": 0
+   },
+   "uvdoc": {
+    "pass": 78.4,
+    "cut": 246,
+    "broken": 164,
+    "ends_moved": 180,
+    "pooled_delta": [
+     -5.0,
+     -10.6,
+     0.5
+    ],
+    "page_delta": [
+     -5.8,
+     -10.8,
+     -1.1
+    ],
+    "better": 14,
+    "worse": 35
+   },
+   "guarded": {
+    "pass": 84.9,
+    "cut": 9,
+    "broken": 159,
+    "ends_moved": 40,
+    "pooled_delta": [
+     1.4,
+     -0.1,
+     3.3
+    ],
+    "page_delta": [
+     1.6,
+     -0.2,
+     3.6
+    ],
+    "better": 9,
+    "worse": 7
+   },
+   "passing_only": {
+    "pages": 28,
+    "route": 86.5,
+    "uvdoc": 90.5,
+    "pooled_delta": [
+     4.1,
+     -0.2,
+     9.0
+    ]
+   }
+  }
+ },
+ "pair_gap": {
+  "route": {
+   "pairs": 24,
+   "mean": [
+    -19.2,
+    -25.0,
+    -13.3
+   ]
+  },
+  "guarded": {
+   "pairs": 24,
+   "mean": [
+    -15.1,
+    -21.1,
+    -8.6
+   ]
+  },
+  "uvdoc": {
+   "pairs": 24,
+   "mean": [
+    -17.6,
+    -28.3,
+    -7.9
+   ]
+  }
+ },
+ "owner_pages": {
+  "uiuc-00233": {
+   "class": "bound",
+   "guard_pass": false,
+   "lost_own": 8,
+   "lost_neighbour": 0,
+   "route_copy": "deskew",
+   "route": "21/27",
+   "uvdoc": "26/27",
+   "guarded": "21/27"
+  },
+  "uiuc-00149": {
+   "class": "curled",
+   "guard_pass": false,
+   "lost_own": 12,
+   "lost_neighbour": 0,
+   "route_copy": "deskew",
+   "route": "33/33",
+   "uvdoc": "24/33",
+   "guarded": "33/33"
+  }
+ },
+ "rows": [
+  {
+   "key": "uiuc-00233",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 8,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 27,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 27,
+     "pass": 26,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 27,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00149",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 12,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 33,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 33,
+     "pass": 24,
+     "broken": 3,
+     "cut": 4,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 33,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03370",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 5,
+   "lost_neighbour": 4,
+   "arms": {
+    "route": {
+     "n": 4,
+     "pass": 3,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 4,
+     "pass": 4,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 4,
+     "pass": 3,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02046",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 3,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 1,
+     "pass": 0,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01262",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 296,
+   "lost_neighbour": 71,
+   "arms": {
+    "route": {
+     "n": 159,
+     "pass": 133,
+     "broken": 18,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 159,
+     "pass": 85,
+     "broken": 12,
+     "cut": 54,
+     "ends_moved": 21,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 159,
+     "pass": 133,
+     "broken": 18,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01776",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 5,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 143,
+     "pass": 90,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 143,
+     "pass": 123,
+     "broken": 10,
+     "cut": 1,
+     "ends_moved": 26,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 143,
+     "pass": 90,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01403",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 2,
+   "lost_neighbour": 11,
+   "arms": {
+    "route": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 26,
+     "pass": 17,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03050",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 273,
+   "lost_neighbour": 3,
+   "arms": {
+    "route": {
+     "n": 148,
+     "pass": 82,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 148,
+     "pass": 68,
+     "broken": 29,
+     "cut": 38,
+     "ends_moved": 4,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 148,
+     "pass": 82,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01517",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 5,
+   "lost_neighbour": 9,
+   "arms": {
+    "route": {
+     "n": 21,
+     "pass": 17,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 21,
+     "pass": 11,
+     "broken": 2,
+     "cut": 5,
+     "ends_moved": 9,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 21,
+     "pass": 17,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03048",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 90,
+   "lost_neighbour": 8,
+   "arms": {
+    "route": {
+     "n": 105,
+     "pass": 73,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 105,
+     "pass": 58,
+     "broken": 6,
+     "cut": 29,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 105,
+     "pass": 73,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01665",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 10,
+   "arms": {
+    "route": {
+     "n": 33,
+     "pass": 18,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 33,
+     "pass": 27,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 2,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 33,
+     "pass": 27,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 2,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03335",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 24,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 24,
+     "pass": 18,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 8,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 24,
+     "pass": 18,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 8,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01668",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 34,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 34,
+     "pass": 31,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 3,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 34,
+     "pass": 31,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 3,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00676",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 3,
+   "arms": {
+    "route": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 25,
+     "pass": 19,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 25,
+     "pass": 19,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00395",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 11,
+   "lost_neighbour": 3,
+   "arms": {
+    "route": {
+     "n": 10,
+     "pass": 6,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 10,
+     "pass": 4,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 3,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 10,
+     "pass": 6,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01319",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 3,
+   "arms": {
+    "route": {
+     "n": 31,
+     "pass": 20,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 31,
+     "pass": 28,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 31,
+     "pass": 28,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00185",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 2,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 18,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 18,
+     "pass": 11,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 8,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 18,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01667",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 42,
+   "arms": {
+    "route": {
+     "n": 35,
+     "pass": 21,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 35,
+     "pass": 26,
+     "broken": 5,
+     "cut": 1,
+     "ends_moved": 6,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 35,
+     "pass": 26,
+     "broken": 5,
+     "cut": 1,
+     "ends_moved": 6,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01717",
+   "group": "curved",
+   "pair": null,
+   "class": "curled",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 1,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 36,
+     "pass": 23,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 36,
+     "pass": 32,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 36,
+     "pass": 23,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00573",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 5,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 18,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 18,
+     "pass": 16,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 18,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00571",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 7,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 38,
+     "pass": 37,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02141",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 74,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 36,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 36,
+     "pass": 9,
+     "broken": 0,
+     "cut": 25,
+     "ends_moved": 3,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 36,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00806",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 7,
+   "lost_neighbour": 1,
+   "arms": {
+    "route": {
+     "n": 37,
+     "pass": 34,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 37,
+     "pass": 33,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 37,
+     "pass": 34,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01421",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 35,
+   "arms": {
+    "route": {
+     "n": 52,
+     "pass": 43,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 52,
+     "pass": 42,
+     "broken": 2,
+     "cut": 7,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 52,
+     "pass": 42,
+     "broken": 2,
+     "cut": 7,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00053",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03051",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 79,
+   "lost_neighbour": 111,
+   "arms": {
+    "route": {
+     "n": 42,
+     "pass": 29,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 42,
+     "pass": 6,
+     "broken": 0,
+     "cut": 36,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 42,
+     "pass": 29,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01511",
+   "group": "curved",
+   "pair": null,
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 1,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 45,
+     "pass": 40,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 45,
+     "pass": 38,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 45,
+     "pass": 40,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03303",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 1,
+   "arms": {
+    "route": {
+     "n": 24,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00122",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 11,
+     "pass": 11,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 11,
+     "pass": 11,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 11,
+     "pass": 11,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01716",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 15,
+     "pass": 10,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 15,
+     "pass": 10,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 2,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 15,
+     "pass": 10,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 2,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01335",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 28,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 28,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 28,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02883",
+   "group": "curved",
+   "pair": null,
+   "class": "bound",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 34,
+     "pass": 34,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 34,
+     "pass": 33,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 34,
+     "pass": 33,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00254",
+   "group": "flat",
+   "pair": "uiuc-00233",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 1,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00032",
+   "group": "flat",
+   "pair": "uiuc-00149",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 4,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 38,
+     "pass": 33,
+     "broken": 3,
+     "cut": 2,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03372",
+   "group": "flat",
+   "pair": "s03370",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 26,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 26,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 26,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02115",
+   "group": "flat",
+   "pair": "s02046",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 23,
+     "pass": 23,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 23,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 5,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 23,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 5,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01245",
+   "group": "flat",
+   "pair": "s01262",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 10,
+     "pass": 10,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 10,
+     "pass": 10,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 10,
+     "pass": 10,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02009",
+   "group": "flat",
+   "pair": "s01776",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 2,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 52,
+     "pass": 48,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 52,
+     "pass": 46,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 6,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 52,
+     "pass": 48,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01401",
+   "group": "flat",
+   "pair": "s01403",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 5,
+   "lost_neighbour": 38,
+   "arms": {
+    "route": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 24,
+     "pass": 17,
+     "broken": 1,
+     "cut": 6,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03044",
+   "group": "flat",
+   "pair": "s03050",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 35,
+   "lost_neighbour": 88,
+   "arms": {
+    "route": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 40,
+     "pass": 36,
+     "broken": 0,
+     "cut": 4,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01520",
+   "group": "flat",
+   "pair": "s01517",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 5,
+   "lost_neighbour": 1,
+   "arms": {
+    "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 17,
+     "pass": 11,
+     "broken": 1,
+     "cut": 4,
+     "ends_moved": 5,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02488",
+   "group": "flat",
+   "pair": "s03048",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01629",
+   "group": "flat",
+   "pair": "s01665",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 4,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 27,
+     "pass": 20,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 27,
+     "pass": 20,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 3,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 27,
+     "pass": 20,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03297",
+   "group": "flat",
+   "pair": "s03335",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 1,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 32,
+     "pass": 32,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 32,
+     "pass": 31,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 32,
+     "pass": 32,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01650",
+   "group": "flat",
+   "pair": "s01668",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 1,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00747",
+   "group": "flat",
+   "pair": "s00676",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 3,
+   "lost_neighbour": 1,
+   "arms": {
+    "route": {
+     "n": 33,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 33,
+     "pass": 23,
+     "broken": 5,
+     "cut": 2,
+     "ends_moved": 4,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 33,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00002",
+   "group": "flat",
+   "pair": "uiuc-00395",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 1,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01323",
+   "group": "flat",
+   "pair": "s01319",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 29,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 29,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 29,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00214",
+   "group": "flat",
+   "pair": "s00185",
+   "class": "curled",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 8,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 26,
+     "pass": 19,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 26,
+     "pass": 15,
+     "broken": 3,
+     "cut": 3,
+     "ends_moved": 3,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 26,
+     "pass": 19,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01646",
+   "group": "flat",
+   "pair": "s01667",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 3,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 24,
+     "pass": 21,
+     "broken": 0,
+     "cut": 3,
+     "ends_moved": 5,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01721",
+   "group": "flat",
+   "pair": "s01717",
+   "class": "bound",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 7,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 42,
+     "pass": 37,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00591",
+   "group": "flat",
+   "pair": "s00573",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00515",
+   "group": "flat",
+   "pair": "s00571",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 1,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 28,
+     "pass": 22,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02113",
+   "group": "flat",
+   "pair": "s02141",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 17,
+     "pass": 15,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 12,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 17,
+     "pass": 15,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 12,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00862",
+   "group": "flat",
+   "pair": "s00806",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 14,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 14,
+     "pass": 12,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 14,
+     "pass": 12,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01418",
+   "group": "flat",
+   "pair": "s01421",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 108,
+     "pass": 101,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 108,
+     "pass": 96,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 1,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 108,
+     "pass": 96,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 1,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00052",
+   "group": "flat",
+   "pair": "s00053",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 45,
+     "pass": 35,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 45,
+     "pass": 45,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 45,
+     "pass": 45,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02736",
+   "group": "flat",
+   "pair": "s03051",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01515",
+   "group": "flat",
+   "pair": "s01511",
+   "class": "curled",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 3,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 28,
+     "pass": 18,
+     "broken": 7,
+     "cut": 3,
+     "ends_moved": 23,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03281",
+   "group": "flat",
+   "pair": "s03303",
+   "class": "bound",
+   "lines_bent": true,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00126",
+   "group": "flat",
+   "pair": "s00122",
+   "class": "curled",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02026",
+   "group": "flat",
+   "pair": "s01716",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 15,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 156,
+     "pass": 150,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 156,
+     "pass": 140,
+     "broken": 9,
+     "cut": 4,
+     "ends_moved": 10,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 156,
+     "pass": 150,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01327",
+   "group": "flat",
+   "pair": "s01335",
+   "class": "curled",
+   "lines_bent": true,
+   "route": "raw",
+   "quad_found": true,
+   "guard_pass": true,
+   "lost_own": 0,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 42,
+     "pass": 41,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 42,
+     "pass": 41,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02881",
+   "group": "flat",
+   "pair": "s02883",
+   "class": "flat",
+   "lines_bent": false,
+   "route": "deskew",
+   "quad_found": true,
+   "guard_pass": false,
+   "lost_own": 6,
+   "lost_neighbour": 0,
+   "arms": {
+    "route": {
+     "n": 24,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "uvdoc": {
+     "n": 24,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    },
+    "guarded": {
+     "n": 24,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0,
+     "unplaced": 0
+    }
+   }
+  }
+ ]
+}
