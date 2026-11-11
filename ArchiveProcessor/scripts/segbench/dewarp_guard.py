@@ -222,13 +222,136 @@ def cmd_class_report(a):
     print(json.dumps({x: out[x] for x in ('unparsed', 'tally', 'gaps', 'billed')}, indent=1))
 
 
+# ---------------------------------------------------------------- the 96: own-sheet losses and the guard
+GUARD_ARMS = ('quad', 'uvdoc', 'docres')
+READERS = {'apple-vision': ('enh-dewarp-pages.csv', None), 'gemini3.7-flash-gw': ('enh-dewarp-gateway.csv', None),
+           'qwen3.6-27b': ('enh-dewarp-cluster.csv', 'qwen3.6-27b')}
+
+
+def word_table(raw_lines):
+    """Every word Vision read on the raw image: (line index, centre, its single token or None)."""
+    import ocr_panel_score as S
+    import numpy as np
+    out = []
+    for li, line in enumerate(raw_lines):
+        for w in line['words']:
+            t = S.tokens(w['text'])
+            out.append((li, np.float64(w['quad']).mean(0), t[0] if len(t) == 1 else None))
+    return out
+
+
+def aligned(words, truth_tokens):
+    """Indices of the words that align to the truth's word sequence (enh_dewarp.truth_words' rule, as indices)."""
+    import difflib
+    single = [i for i, w in enumerate(words) if w[2] is not None]
+    sm = difflib.SequenceMatcher(None, [words[i][2] for i in single], truth_tokens, autojunk=False)
+    return [single[b.a + k] for b in sm.get_matching_blocks() for k in range(b.size)]
+
+
+def split_lost(words, shown, quad):
+    """Each word the arm's image does not show, as own sheet or neighbour (place_geom.lost_words' rule): own when its
+    centre lies inside Apple's quad or another word of its Vision line is shown (a line cut through)."""
+    import numpy as np
+    from enh_dewarp import inside
+    lines_shown = {words[i][0] for i in range(len(words)) if shown[i]}
+    poly = np.float64(quad)
+    own = [i for i in range(len(words)) if not shown[i]
+           and (inside(poly, words[i][1][None])[0] or words[i][0] in lines_shown)]
+    neigh = [i for i in range(len(words)) if not shown[i] and i not in set(own)]
+    return own, neigh
+
+
+def nes_by_reader():
+    """{reader: {(arm, page): nes}} from the committed enh-dewarp per-page files (no reading is redone)."""
+    import csv
+    out = {}
+    for reader, (f, keep) in READERS.items():
+        d = {}
+        for r in csv.DictReader((RESULTS / f).open()):
+            if keep and r.get('reader') != keep:
+                continue
+            if r.get('ok', 'True') != 'True' or r.get('nes') in (None, ''):
+                continue
+            d[(r['arm'], r['page'])] = float(r['nes'])
+        out[reader] = d
+    return out
+
+
+def mean_ci(xs, draws=DRAWS, seed=SEED):
+    if not xs:
+        return None
+    rng = random.Random(seed)
+    ms = sorted(statistics.mean(rng.choice(xs) for _ in xs) for _ in range(draws))
+    return [round(100 * statistics.mean(xs), 1), round(100 * ms[int(0.025 * draws)], 1),
+            round(100 * ms[int(0.975 * draws) - 1], 1)]
+
+
+def cmd_guard96(a):
+    import numpy as np
+    import ocr_panel as P
+    import ocr_panel_score as S
+    import enh_dewarp as E
+    pages = []
+    for r in P.rows():
+        p = r['page']
+        if p in P.AGREEMENT:
+            continue
+        raw, _ = E.load_lines('raw', p)
+        words = word_table(raw['lines'])
+        truth = (P.TRUTH / 'truth' / (p + '.txt')).read_text()
+        tw = set(aligned(words, S.tokens(S.normal(truth))))
+        quad = json.loads((E.CACHE / 'quad' / (p + '.json')).read_text())['corners']
+        centres = np.array([w[1] for w in words]).reshape(-1, 2)
+        row = {'page': p, 'source': 'original' if r['source'] == 'original' else 'pdf image', 'kind': r['kind'],
+               'words': len(words), 'truth_words': len(tw),
+               'in_quad': int(E.inside(np.float64(quad), centres).sum()) if len(words) else 0, 'arms': {}}
+        for arm in GUARD_ARMS:
+            g = np.load(E.CACHE / 'grids' / arm / (p + '.npz'))['grid']
+            shown = E.covered(g, centres) if len(words) else np.zeros(0, bool)
+            own, neigh = split_lost(words, shown, quad)
+            row['arms'][arm] = {
+                'lost': int((~shown).sum()), 'lost_own': len(own), 'lost_neighbour': len(neigh),
+                'truth_lost': sum(1 for i in tw if not shown[i]),
+                'truth_lost_own': sum(1 for i in own if i in tw), 'truth_lost_neighbour': sum(1 for i in neigh if i in tw),
+                'guard_all': bool(shown.all()), 'guard_own': not own}
+        pages.append(row)
+    nes = nes_by_reader()
+    summary = {}
+    for scope, keep in (('originals', lambda r: r['source'] == 'original'), ('all96', lambda r: True)):
+        rs = [r for r in pages if keep(r)]
+        s = {'pages': len(rs)}
+        for arm in GUARD_ARMS:
+            A = [r['arms'][arm] for r in rs]
+            t = {k: sum(x[k] for x in A) for k in ('lost', 'lost_own', 'lost_neighbour', 'truth_lost', 'truth_lost_own',
+                                                     'truth_lost_neighbour')}
+            t |= {f'pages_{k}': sum(1 for x in A if x[k]) for k in ('lost_own', 'lost_neighbour', 'truth_lost_own',
+                                                                   'truth_lost_neighbour')}
+            t |= {'guard_all_pass': sum(x['guard_all'] for x in A), 'guard_own_pass': sum(x['guard_own'] for x in A)}
+            # NES gain over raw: every page, and only the pages the own-sheet guard lets through (the rest stay raw)
+            for reader, d in nes.items():
+                both = [r for r in rs if (arm, r['page']) in d and ('raw', r['page']) in d]
+                gain = {r['page']: d[(arm, r['page'])] - d[('raw', r['page'])] for r in both}
+                t[f'gain.{reader}'] = {'n': len(gain), 'every_page': mean_ci(list(gain.values())),
+                                       'guarded': mean_ci([gain[r['page']] if r['arms'][arm]['guard_own'] else 0.0
+                                                           for r in both]),
+                                       'passing_only': mean_ci([gain[r['page']] for r in both
+                                                                if r['arms'][arm]['guard_own']]),
+                                       'passing_n': sum(1 for r in both if r['arms'][arm]['guard_own'])}
+            s[arm] = t
+        summary[scope] = s
+    out = {'item': 'W46.dewarp-guard', 'step': 'ENH-4 split and the guard on the 96', 'summary': summary,
+           'pages': pages}
+    (RESULTS / 'dewarp-guard-96.json').write_text(json.dumps(out, indent=1) + '\n')
+    print(json.dumps(summary, indent=1))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest='cmd', required=True)
-    for c in ('classify', 'class-report'):
+    for c in ('classify', 'class-report', 'guard96'):
         sub.add_parser(c)
     a = p.parse_args()
-    {'classify': cmd_classify, 'class-report': cmd_class_report}[a.cmd](a)
+    {'classify': cmd_classify, 'class-report': cmd_class_report, 'guard96': cmd_guard96}[a.cmd](a)
 
 
 if __name__ == '__main__':

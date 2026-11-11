@@ -1,0 +1,4280 @@
+{
+ "item": "W46.dewarp-guard",
+ "step": "ENH-4 split and the guard on the 96",
+ "summary": {
+  "originals": {
+   "pages": 63,
+   "quad": {
+    "lost": 265,
+    "lost_own": 42,
+    "lost_neighbour": 223,
+    "truth_lost": 44,
+    "truth_lost_own": 19,
+    "truth_lost_neighbour": 25,
+    "pages_lost_own": 9,
+    "pages_lost_neighbour": 19,
+    "pages_truth_lost_own": 4,
+    "pages_truth_lost_neighbour": 8,
+    "guard_all_pass": 41,
+    "guard_own_pass": 54,
+    "gain.apple-vision": {
+     "n": 63,
+     "every_page": [
+      -1.4,
+      -4.1,
+      1.6
+     ],
+     "guarded": [
+      -0.2,
+      -2.5,
+      2.5
+     ],
+     "passing_only": [
+      -0.2,
+      -3.0,
+      2.9
+     ],
+     "passing_n": 54
+    },
+    "gain.gemini3.7-flash-gw": {
+     "n": 63,
+     "every_page": [
+      -0.3,
+      -1.5,
+      1.4
+     ],
+     "guarded": [
+      0.2,
+      -0.8,
+      1.7
+     ],
+     "passing_only": [
+      0.2,
+      -0.9,
+      1.9
+     ],
+     "passing_n": 54
+    },
+    "gain.qwen3.6-27b": {
+     "n": 63,
+     "every_page": [
+      0.3,
+      -2.5,
+      2.7
+     ],
+     "guarded": [
+      -0.0,
+      -2.6,
+      2.2
+     ],
+     "passing_only": [
+      -0.0,
+      -2.9,
+      2.5
+     ],
+     "passing_n": 54
+    }
+   },
+   "uvdoc": {
+    "lost": 544,
+    "lost_own": 297,
+    "lost_neighbour": 247,
+    "truth_lost": 170,
+    "truth_lost_own": 138,
+    "truth_lost_neighbour": 32,
+    "pages_lost_own": 39,
+    "pages_lost_neighbour": 20,
+    "pages_truth_lost_own": 27,
+    "pages_truth_lost_neighbour": 9,
+    "guard_all_pass": 19,
+    "guard_own_pass": 24,
+    "gain.apple-vision": {
+     "n": 63,
+     "every_page": [
+      -1.7,
+      -5.2,
+      1.6
+     ],
+     "guarded": [
+      0.1,
+      -2.0,
+      2.7
+     ],
+     "passing_only": [
+      0.1,
+      -5.3,
+      7.2
+     ],
+     "passing_n": 24
+    },
+    "gain.gemini3.7-flash-gw": {
+     "n": 63,
+     "every_page": [
+      -2.5,
+      -5.3,
+      -0.0
+     ],
+     "guarded": [
+      0.4,
+      -0.6,
+      2.0
+     ],
+     "passing_only": [
+      1.1,
+      -1.5,
+      5.3
+     ],
+     "passing_n": 24
+    },
+    "gain.qwen3.6-27b": {
+     "n": 62,
+     "every_page": [
+      -1.4,
+      -4.8,
+      1.6
+     ],
+     "guarded": [
+      -0.5,
+      -3.2,
+      1.6
+     ],
+     "passing_only": [
+      -1.4,
+      -8.4,
+      4.7
+     ],
+     "passing_n": 23
+    }
+   },
+   "docres": {
+    "lost": 1754,
+    "lost_own": 1542,
+    "lost_neighbour": 212,
+    "truth_lost": 1081,
+    "truth_lost_own": 1054,
+    "truth_lost_neighbour": 27,
+    "pages_lost_own": 43,
+    "pages_lost_neighbour": 20,
+    "pages_truth_lost_own": 37,
+    "pages_truth_lost_neighbour": 8,
+    "guard_all_pass": 15,
+    "guard_own_pass": 20,
+    "gain.apple-vision": {
+     "n": 63,
+     "every_page": [
+      -9.3,
+      -15.2,
+      -3.8
+     ],
+     "guarded": [
+      0.0,
+      -1.7,
+      2.3
+     ],
+     "passing_only": [
+      0.1,
+      -5.1,
+      7.5
+     ],
+     "passing_n": 20
+    },
+    "gain.gemini3.7-flash-gw": {
+     "n": 59,
+     "every_page": [
+      -6.3,
+      -11.2,
+      -2.2
+     ],
+     "guarded": [
+      0.4,
+      -0.4,
+      1.7
+     ],
+     "passing_only": [
+      1.3,
+      -1.1,
+      5.0
+     ],
+     "passing_n": 20
+    },
+    "gain.qwen3.6-27b": {
+     "n": 62,
+     "every_page": [
+      -9.7,
+      -16.7,
+      -3.5
+     ],
+     "guarded": [
+      -0.4,
+      -3.0,
+      1.6
+     ],
+     "passing_only": [
+      -1.3,
+      -8.9,
+      5.5
+     ],
+     "passing_n": 20
+    }
+   }
+  },
+  "all96": {
+   "pages": 96,
+   "quad": {
+    "lost": 265,
+    "lost_own": 42,
+    "lost_neighbour": 223,
+    "truth_lost": 44,
+    "truth_lost_own": 19,
+    "truth_lost_neighbour": 25,
+    "pages_lost_own": 9,
+    "pages_lost_neighbour": 19,
+    "pages_truth_lost_own": 4,
+    "pages_truth_lost_neighbour": 8,
+    "guard_all_pass": 74,
+    "guard_own_pass": 87,
+    "gain.apple-vision": {
+     "n": 96,
+     "every_page": [
+      -1.1,
+      -3.1,
+      1.1
+     ],
+     "guarded": [
+      -0.3,
+      -2.1,
+      1.7
+     ],
+     "passing_only": [
+      -0.4,
+      -2.3,
+      1.8
+     ],
+     "passing_n": 87
+    },
+    "gain.gemini3.7-flash-gw": {
+     "n": 96,
+     "every_page": [
+      -0.2,
+      -1.0,
+      0.9
+     ],
+     "guarded": [
+      0.1,
+      -0.5,
+      1.1
+     ],
+     "passing_only": [
+      0.1,
+      -0.6,
+      1.2
+     ],
+     "passing_n": 87
+    },
+    "gain.qwen3.6-27b": {
+     "n": 96,
+     "every_page": [
+      -0.3,
+      -2.3,
+      1.5
+     ],
+     "guarded": [
+      -0.5,
+      -2.4,
+      1.2
+     ],
+     "passing_only": [
+      -0.5,
+      -2.7,
+      1.3
+     ],
+     "passing_n": 87
+    }
+   },
+   "uvdoc": {
+    "lost": 923,
+    "lost_own": 676,
+    "lost_neighbour": 247,
+    "truth_lost": 429,
+    "truth_lost_own": 397,
+    "truth_lost_neighbour": 32,
+    "pages_lost_own": 56,
+    "pages_lost_neighbour": 20,
+    "pages_truth_lost_own": 41,
+    "pages_truth_lost_neighbour": 9,
+    "guard_all_pass": 35,
+    "guard_own_pass": 40,
+    "gain.apple-vision": {
+     "n": 96,
+     "every_page": [
+      -2.4,
+      -5.0,
+      -0.0
+     ],
+     "guarded": [
+      0.1,
+      -1.4,
+      1.9
+     ],
+     "passing_only": [
+      0.2,
+      -3.5,
+      4.5
+     ],
+     "passing_n": 40
+    },
+    "gain.gemini3.7-flash-gw": {
+     "n": 96,
+     "every_page": [
+      -2.6,
+      -4.6,
+      -0.7
+     ],
+     "guarded": [
+      0.3,
+      -0.4,
+      1.3
+     ],
+     "passing_only": [
+      0.6,
+      -0.9,
+      3.0
+     ],
+     "passing_n": 40
+    },
+    "gain.qwen3.6-27b": {
+     "n": 95,
+     "every_page": [
+      -2.4,
+      -5.3,
+      0.0
+     ],
+     "guarded": [
+      -0.9,
+      -2.9,
+      0.9
+     ],
+     "passing_only": [
+      -2.1,
+      -7.5,
+      2.0
+     ],
+     "passing_n": 39
+    }
+   },
+   "docres": {
+    "lost": 5547,
+    "lost_own": 5335,
+    "lost_neighbour": 212,
+    "truth_lost": 4132,
+    "truth_lost_own": 4105,
+    "truth_lost_neighbour": 27,
+    "pages_lost_own": 75,
+    "pages_lost_neighbour": 20,
+    "pages_truth_lost_own": 68,
+    "pages_truth_lost_neighbour": 8,
+    "guard_all_pass": 16,
+    "guard_own_pass": 21,
+    "gain.apple-vision": {
+     "n": 96,
+     "every_page": [
+      -13.6,
+      -18.9,
+      -8.4
+     ],
+     "guarded": [
+      0.0,
+      -1.1,
+      1.6
+     ],
+     "passing_only": [
+      0.2,
+      -4.8,
+      7.5
+     ],
+     "passing_n": 21
+    },
+    "gain.gemini3.7-flash-gw": {
+     "n": 89,
+     "every_page": [
+      -10.0,
+      -15.1,
+      -5.7
+     ],
+     "guarded": [
+      0.3,
+      -0.2,
+      1.1
+     ],
+     "passing_only": [
+      1.2,
+      -0.9,
+      4.7
+     ],
+     "passing_n": 21
+    },
+    "gain.qwen3.6-27b": {
+     "n": 94,
+     "every_page": [
+      -12.2,
+      -18.2,
+      -6.7
+     ],
+     "guarded": [
+      -0.3,
+      -1.9,
+      1.2
+     ],
+     "passing_only": [
+      -1.2,
+      -8.6,
+      5.3
+     ],
+     "passing_n": 21
+    }
+   }
+  }
+ },
+ "pages": [
+  {
+   "page": "p001",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 296,
+   "truth_words": 291,
+   "in_quad": 296,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 3,
+     "lost_own": 3,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p002",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 137,
+   "truth_words": 135,
+   "in_quad": 137,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p003",
+   "source": "original",
+   "kind": "printed",
+   "words": 540,
+   "truth_words": 528,
+   "in_quad": 540,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 539,
+     "lost_own": 539,
+     "lost_neighbour": 0,
+     "truth_lost": 527,
+     "truth_lost_own": 527,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p004",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 287,
+   "truth_words": 270,
+   "in_quad": 287,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p005",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 536,
+   "truth_words": 525,
+   "in_quad": 536,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 11,
+     "lost_own": 11,
+     "lost_neighbour": 0,
+     "truth_lost": 11,
+     "truth_lost_own": 11,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p006",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 46,
+   "truth_words": 40,
+   "in_quad": 46,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p007",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 53,
+   "truth_words": 24,
+   "in_quad": 46,
+   "arms": {
+    "quad": {
+     "lost": 7,
+     "lost_own": 1,
+     "lost_neighbour": 6,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 11,
+     "lost_own": 5,
+     "lost_neighbour": 6,
+     "truth_lost": 4,
+     "truth_lost_own": 3,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 8,
+     "lost_own": 2,
+     "lost_neighbour": 6,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p008",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 613,
+   "truth_words": 497,
+   "in_quad": 613,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 24,
+     "lost_own": 24,
+     "lost_neighbour": 0,
+     "truth_lost": 18,
+     "truth_lost_own": 18,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p009",
+   "source": "original",
+   "kind": "mixed",
+   "words": 161,
+   "truth_words": 98,
+   "in_quad": 161,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 123,
+     "lost_own": 123,
+     "lost_neighbour": 0,
+     "truth_lost": 87,
+     "truth_lost_own": 87,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p010",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 559,
+   "truth_words": 385,
+   "in_quad": 559,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 127,
+     "lost_own": 127,
+     "lost_neighbour": 0,
+     "truth_lost": 79,
+     "truth_lost_own": 79,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 115,
+     "lost_own": 115,
+     "lost_neighbour": 0,
+     "truth_lost": 75,
+     "truth_lost_own": 75,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p011",
+   "source": "original",
+   "kind": "printed",
+   "words": 75,
+   "truth_words": 65,
+   "in_quad": 62,
+   "arms": {
+    "quad": {
+     "lost": 13,
+     "lost_own": 6,
+     "lost_neighbour": 7,
+     "truth_lost": 12,
+     "truth_lost_own": 6,
+     "truth_lost_neighbour": 6,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 46,
+     "lost_own": 33,
+     "lost_neighbour": 13,
+     "truth_lost": 42,
+     "truth_lost_own": 30,
+     "truth_lost_neighbour": 12,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 64,
+     "lost_own": 51,
+     "lost_neighbour": 13,
+     "truth_lost": 56,
+     "truth_lost_own": 44,
+     "truth_lost_neighbour": 12,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p012",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 399,
+   "truth_words": 390,
+   "in_quad": 387,
+   "arms": {
+    "quad": {
+     "lost": 12,
+     "lost_own": 9,
+     "lost_neighbour": 3,
+     "truth_lost": 8,
+     "truth_lost_own": 8,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 20,
+     "lost_own": 17,
+     "lost_neighbour": 3,
+     "truth_lost": 15,
+     "truth_lost_own": 15,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 3,
+     "lost_own": 0,
+     "lost_neighbour": 3,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p013",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 352,
+   "truth_words": 310,
+   "in_quad": 352,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 28,
+     "lost_own": 28,
+     "lost_neighbour": 0,
+     "truth_lost": 9,
+     "truth_lost_own": 9,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 42,
+     "lost_own": 42,
+     "lost_neighbour": 0,
+     "truth_lost": 34,
+     "truth_lost_own": 34,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p014",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 192,
+   "truth_words": 191,
+   "in_quad": 192,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 11,
+     "lost_own": 11,
+     "lost_neighbour": 0,
+     "truth_lost": 10,
+     "truth_lost_own": 10,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p015",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 206,
+   "truth_words": 175,
+   "in_quad": 206,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 6,
+     "lost_own": 6,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 9,
+     "lost_own": 9,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p016",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 170,
+   "truth_words": 170,
+   "in_quad": 170,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p017",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 243,
+   "truth_words": 224,
+   "in_quad": 243,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 3,
+     "lost_own": 3,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p018",
+   "source": "original",
+   "kind": "printed",
+   "words": 239,
+   "truth_words": 148,
+   "in_quad": 225,
+   "arms": {
+    "quad": {
+     "lost": 14,
+     "lost_own": 0,
+     "lost_neighbour": 14,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 23,
+     "lost_own": 9,
+     "lost_neighbour": 14,
+     "truth_lost": 6,
+     "truth_lost_own": 6,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 25,
+     "lost_own": 11,
+     "lost_neighbour": 14,
+     "truth_lost": 7,
+     "truth_lost_own": 7,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p019",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 127,
+   "truth_words": 117,
+   "in_quad": 127,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 16,
+     "lost_own": 16,
+     "lost_neighbour": 0,
+     "truth_lost": 12,
+     "truth_lost_own": 12,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 44,
+     "lost_own": 44,
+     "lost_neighbour": 0,
+     "truth_lost": 37,
+     "truth_lost_own": 37,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p020",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 257,
+   "truth_words": 167,
+   "in_quad": 257,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p021",
+   "source": "original",
+   "kind": "printed",
+   "words": 378,
+   "truth_words": 369,
+   "in_quad": 378,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p022",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 116,
+   "truth_words": 92,
+   "in_quad": 114,
+   "arms": {
+    "quad": {
+     "lost": 2,
+     "lost_own": 0,
+     "lost_neighbour": 2,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 3,
+     "lost_own": 1,
+     "lost_neighbour": 2,
+     "truth_lost": 2,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 7,
+     "lost_own": 5,
+     "lost_neighbour": 2,
+     "truth_lost": 6,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p023",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 208,
+   "truth_words": 186,
+   "in_quad": 208,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p024",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 138,
+   "truth_words": 60,
+   "in_quad": 138,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 19,
+     "lost_own": 19,
+     "lost_neighbour": 0,
+     "truth_lost": 13,
+     "truth_lost_own": 13,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p025",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 70,
+   "truth_words": 49,
+   "in_quad": 70,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 3,
+     "lost_own": 3,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p026",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 430,
+   "truth_words": 415,
+   "in_quad": 430,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p027",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 233,
+   "truth_words": 219,
+   "in_quad": 233,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 10,
+     "lost_own": 10,
+     "lost_neighbour": 0,
+     "truth_lost": 3,
+     "truth_lost_own": 3,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p028",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 205,
+   "truth_words": 199,
+   "in_quad": 205,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 5,
+     "lost_own": 5,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p029",
+   "source": "original",
+   "kind": "printed",
+   "words": 308,
+   "truth_words": 306,
+   "in_quad": 308,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p030",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 265,
+   "truth_words": 255,
+   "in_quad": 262,
+   "arms": {
+    "quad": {
+     "lost": 3,
+     "lost_own": 0,
+     "lost_neighbour": 3,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 3,
+     "lost_own": 0,
+     "lost_neighbour": 3,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 11,
+     "lost_own": 8,
+     "lost_neighbour": 3,
+     "truth_lost": 6,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p031",
+   "source": "original",
+   "kind": "mixed",
+   "words": 48,
+   "truth_words": 37,
+   "in_quad": 48,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 7,
+     "lost_own": 7,
+     "lost_neighbour": 0,
+     "truth_lost": 6,
+     "truth_lost_own": 6,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p032",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 330,
+   "truth_words": 320,
+   "in_quad": 328,
+   "arms": {
+    "quad": {
+     "lost": 2,
+     "lost_own": 0,
+     "lost_neighbour": 2,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 3,
+     "lost_own": 1,
+     "lost_neighbour": 2,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 3,
+     "lost_own": 1,
+     "lost_neighbour": 2,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p033",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 405,
+   "truth_words": 391,
+   "in_quad": 405,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p034",
+   "source": "original",
+   "kind": "printed",
+   "words": 25,
+   "truth_words": 13,
+   "in_quad": 10,
+   "arms": {
+    "quad": {
+     "lost": 15,
+     "lost_own": 0,
+     "lost_neighbour": 15,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 15,
+     "lost_own": 0,
+     "lost_neighbour": 15,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 15,
+     "lost_own": 0,
+     "lost_neighbour": 15,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p035",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 327,
+   "truth_words": 308,
+   "in_quad": 313,
+   "arms": {
+    "quad": {
+     "lost": 14,
+     "lost_own": 0,
+     "lost_neighbour": 14,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 15,
+     "lost_own": 1,
+     "lost_neighbour": 14,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 15,
+     "lost_own": 1,
+     "lost_neighbour": 14,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p036",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 382,
+   "truth_words": 316,
+   "in_quad": 377,
+   "arms": {
+    "quad": {
+     "lost": 5,
+     "lost_own": 5,
+     "lost_neighbour": 0,
+     "truth_lost": 4,
+     "truth_lost_own": 4,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 10,
+     "lost_own": 10,
+     "lost_neighbour": 0,
+     "truth_lost": 9,
+     "truth_lost_own": 9,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 18,
+     "lost_own": 18,
+     "lost_neighbour": 0,
+     "truth_lost": 12,
+     "truth_lost_own": 12,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p037",
+   "source": "original",
+   "kind": "printed",
+   "words": 508,
+   "truth_words": 493,
+   "in_quad": 508,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p039",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 316,
+   "truth_words": 311,
+   "in_quad": 316,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p040",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 126,
+   "truth_words": 83,
+   "in_quad": 126,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 6,
+     "lost_own": 6,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p041",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 393,
+   "truth_words": 344,
+   "in_quad": 393,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p042",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 818,
+   "truth_words": 782,
+   "in_quad": 818,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 760,
+     "lost_own": 760,
+     "lost_neighbour": 0,
+     "truth_lost": 729,
+     "truth_lost_own": 729,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p043",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 844,
+   "truth_words": 473,
+   "in_quad": 844,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 844,
+     "lost_own": 844,
+     "lost_neighbour": 0,
+     "truth_lost": 473,
+     "truth_lost_own": 473,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p044",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 692,
+   "truth_words": 572,
+   "in_quad": 692,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 547,
+     "lost_own": 547,
+     "lost_neighbour": 0,
+     "truth_lost": 435,
+     "truth_lost_own": 435,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p045",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 108,
+   "truth_words": 84,
+   "in_quad": 108,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 7,
+     "lost_own": 7,
+     "lost_neighbour": 0,
+     "truth_lost": 6,
+     "truth_lost_own": 6,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p046",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 56,
+   "truth_words": 34,
+   "in_quad": 51,
+   "arms": {
+    "quad": {
+     "lost": 5,
+     "lost_own": 0,
+     "lost_neighbour": 5,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 6,
+     "lost_own": 1,
+     "lost_neighbour": 5,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 6,
+     "lost_own": 1,
+     "lost_neighbour": 5,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p047",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 33,
+   "truth_words": 8,
+   "in_quad": 33,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p048",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 108,
+   "truth_words": 37,
+   "in_quad": 96,
+   "arms": {
+    "quad": {
+     "lost": 12,
+     "lost_own": 10,
+     "lost_neighbour": 2,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 42,
+     "lost_own": 30,
+     "lost_neighbour": 12,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 42,
+     "lost_own": 30,
+     "lost_neighbour": 12,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p049",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 40,
+   "truth_words": 8,
+   "in_quad": 40,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 40,
+     "lost_own": 40,
+     "lost_neighbour": 0,
+     "truth_lost": 8,
+     "truth_lost_own": 8,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p050",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 110,
+   "truth_words": 15,
+   "in_quad": 110,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 110,
+     "lost_own": 110,
+     "lost_neighbour": 0,
+     "truth_lost": 15,
+     "truth_lost_own": 15,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p051",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 93,
+   "truth_words": 45,
+   "in_quad": 93,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 6,
+     "lost_own": 6,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p052",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 161,
+   "truth_words": 102,
+   "in_quad": 161,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 36,
+     "lost_own": 36,
+     "lost_neighbour": 0,
+     "truth_lost": 16,
+     "truth_lost_own": 16,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p053",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 147,
+   "truth_words": 74,
+   "in_quad": 147,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 145,
+     "lost_own": 145,
+     "lost_neighbour": 0,
+     "truth_lost": 73,
+     "truth_lost_own": 73,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p054",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 119,
+   "truth_words": 11,
+   "in_quad": 119,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 9,
+     "lost_own": 9,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 23,
+     "lost_own": 23,
+     "lost_neighbour": 0,
+     "truth_lost": 4,
+     "truth_lost_own": 4,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p055",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 100,
+   "truth_words": 49,
+   "in_quad": 97,
+   "arms": {
+    "quad": {
+     "lost": 3,
+     "lost_own": 1,
+     "lost_neighbour": 2,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 11,
+     "lost_own": 8,
+     "lost_neighbour": 3,
+     "truth_lost": 3,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 11,
+     "lost_own": 8,
+     "lost_neighbour": 3,
+     "truth_lost": 4,
+     "truth_lost_own": 3,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p056",
+   "source": "original",
+   "kind": "handwritten",
+   "words": 117,
+   "truth_words": 48,
+   "in_quad": 117,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 5,
+     "lost_own": 5,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 114,
+     "lost_own": 114,
+     "lost_neighbour": 0,
+     "truth_lost": 47,
+     "truth_lost_own": 47,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p057",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 85,
+   "truth_words": 24,
+   "in_quad": 85,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p058",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 328,
+   "truth_words": 294,
+   "in_quad": 328,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p059",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 102,
+   "truth_words": 100,
+   "in_quad": 102,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 3,
+     "lost_own": 3,
+     "lost_neighbour": 0,
+     "truth_lost": 3,
+     "truth_lost_own": 3,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p060",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 208,
+   "truth_words": 205,
+   "in_quad": 208,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p061",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 390,
+   "truth_words": 382,
+   "in_quad": 390,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 5,
+     "lost_own": 5,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 9,
+     "lost_own": 9,
+     "lost_neighbour": 0,
+     "truth_lost": 9,
+     "truth_lost_own": 9,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p062",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 523,
+   "truth_words": 378,
+   "in_quad": 523,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 66,
+     "lost_own": 66,
+     "lost_neighbour": 0,
+     "truth_lost": 57,
+     "truth_lost_own": 57,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p063",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 590,
+   "truth_words": 587,
+   "in_quad": 590,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 6,
+     "lost_own": 6,
+     "lost_neighbour": 0,
+     "truth_lost": 6,
+     "truth_lost_own": 6,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p064",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 135,
+   "truth_words": 123,
+   "in_quad": 135,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 6,
+     "lost_own": 6,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 24,
+     "lost_own": 24,
+     "lost_neighbour": 0,
+     "truth_lost": 18,
+     "truth_lost_own": 18,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p065",
+   "source": "original",
+   "kind": "printed",
+   "words": 57,
+   "truth_words": 31,
+   "in_quad": 53,
+   "arms": {
+    "quad": {
+     "lost": 4,
+     "lost_own": 0,
+     "lost_neighbour": 4,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 4,
+     "lost_own": 0,
+     "lost_neighbour": 4,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 4,
+     "lost_own": 0,
+     "lost_neighbour": 4,
+     "truth_lost": 1,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 1,
+     "guard_all": false,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p066",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 77,
+   "truth_words": 44,
+   "in_quad": 73,
+   "arms": {
+    "quad": {
+     "lost": 4,
+     "lost_own": 0,
+     "lost_neighbour": 4,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 5,
+     "lost_own": 1,
+     "lost_neighbour": 4,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 7,
+     "lost_own": 3,
+     "lost_neighbour": 4,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p067",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 79,
+   "truth_words": 79,
+   "in_quad": 79,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 5,
+     "lost_own": 5,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p068",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 329,
+   "truth_words": 321,
+   "in_quad": 329,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p069",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 140,
+   "truth_words": 122,
+   "in_quad": 133,
+   "arms": {
+    "quad": {
+     "lost": 7,
+     "lost_own": 7,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 16,
+     "lost_own": 9,
+     "lost_neighbour": 7,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 17,
+     "lost_own": 10,
+     "lost_neighbour": 7,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p070",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 345,
+   "truth_words": 313,
+   "in_quad": 344,
+   "arms": {
+    "quad": {
+     "lost": 1,
+     "lost_own": 0,
+     "lost_neighbour": 1,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 0,
+     "lost_neighbour": 1,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 1,
+     "lost_own": 0,
+     "lost_neighbour": 1,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p071",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 532,
+   "truth_words": 521,
+   "in_quad": 529,
+   "arms": {
+    "quad": {
+     "lost": 3,
+     "lost_own": 0,
+     "lost_neighbour": 3,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 8,
+     "lost_own": 5,
+     "lost_neighbour": 3,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 10,
+     "lost_own": 7,
+     "lost_neighbour": 3,
+     "truth_lost": 7,
+     "truth_lost_own": 7,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p072",
+   "source": "original",
+   "kind": "printed",
+   "words": 1063,
+   "truth_words": 1031,
+   "in_quad": 1059,
+   "arms": {
+    "quad": {
+     "lost": 4,
+     "lost_own": 0,
+     "lost_neighbour": 4,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 12,
+     "lost_own": 8,
+     "lost_neighbour": 4,
+     "truth_lost": 4,
+     "truth_lost_own": 4,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 73,
+     "lost_own": 69,
+     "lost_neighbour": 4,
+     "truth_lost": 69,
+     "truth_lost_own": 69,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p073",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 81,
+   "truth_words": 72,
+   "in_quad": 81,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p074",
+   "source": "original",
+   "kind": "printed",
+   "words": 450,
+   "truth_words": 447,
+   "in_quad": 450,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p075",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 252,
+   "truth_words": 205,
+   "in_quad": 252,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 44,
+     "lost_own": 44,
+     "lost_neighbour": 0,
+     "truth_lost": 40,
+     "truth_lost_own": 40,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 61,
+     "lost_own": 61,
+     "lost_neighbour": 0,
+     "truth_lost": 55,
+     "truth_lost_own": 55,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p076",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 485,
+   "truth_words": 434,
+   "in_quad": 485,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 30,
+     "lost_own": 30,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 30,
+     "lost_own": 30,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p077",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 318,
+   "truth_words": 305,
+   "in_quad": 318,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 318,
+     "lost_own": 318,
+     "lost_neighbour": 0,
+     "truth_lost": 305,
+     "truth_lost_own": 305,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p078",
+   "source": "original",
+   "kind": "printed",
+   "words": 929,
+   "truth_words": 909,
+   "in_quad": 929,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p079",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 277,
+   "truth_words": 268,
+   "in_quad": 277,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p080",
+   "source": "original",
+   "kind": "printed",
+   "words": 698,
+   "truth_words": 247,
+   "in_quad": 652,
+   "arms": {
+    "quad": {
+     "lost": 46,
+     "lost_own": 2,
+     "lost_neighbour": 44,
+     "truth_lost": 5,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 97,
+     "lost_own": 53,
+     "lost_neighbour": 44,
+     "truth_lost": 21,
+     "truth_lost_own": 16,
+     "truth_lost_neighbour": 5,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 33,
+     "lost_own": 24,
+     "lost_neighbour": 9,
+     "truth_lost": 3,
+     "truth_lost_own": 3,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p081",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 247,
+   "truth_words": 100,
+   "in_quad": 247,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 58,
+     "lost_own": 58,
+     "lost_neighbour": 0,
+     "truth_lost": 37,
+     "truth_lost_own": 37,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 59,
+     "lost_own": 59,
+     "lost_neighbour": 0,
+     "truth_lost": 43,
+     "truth_lost_own": 43,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p082",
+   "source": "original",
+   "kind": "printed",
+   "words": 142,
+   "truth_words": 49,
+   "in_quad": 54,
+   "arms": {
+    "quad": {
+     "lost": 88,
+     "lost_own": 0,
+     "lost_neighbour": 88,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 88,
+     "lost_own": 0,
+     "lost_neighbour": 88,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 88,
+     "lost_own": 0,
+     "lost_neighbour": 88,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p083",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 633,
+   "truth_words": 299,
+   "in_quad": 633,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 74,
+     "lost_own": 74,
+     "lost_neighbour": 0,
+     "truth_lost": 38,
+     "truth_lost_own": 38,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p084",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 574,
+   "truth_words": 546,
+   "in_quad": 574,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 6,
+     "lost_own": 6,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 574,
+     "lost_own": 574,
+     "lost_neighbour": 0,
+     "truth_lost": 546,
+     "truth_lost_own": 546,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p085",
+   "source": "pdf image",
+   "kind": "printed",
+   "words": 319,
+   "truth_words": 292,
+   "in_quad": 319,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 64,
+     "lost_own": 64,
+     "lost_neighbour": 0,
+     "truth_lost": 61,
+     "truth_lost_own": 61,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 75,
+     "lost_own": 75,
+     "lost_neighbour": 0,
+     "truth_lost": 71,
+     "truth_lost_own": 71,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p087",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 630,
+   "truth_words": 613,
+   "in_quad": 630,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 10,
+     "lost_own": 10,
+     "lost_neighbour": 0,
+     "truth_lost": 8,
+     "truth_lost_own": 8,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 42,
+     "lost_own": 42,
+     "lost_neighbour": 0,
+     "truth_lost": 38,
+     "truth_lost_own": 38,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p088",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 443,
+   "truth_words": 404,
+   "in_quad": 443,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 5,
+     "lost_own": 5,
+     "lost_neighbour": 0,
+     "truth_lost": 5,
+     "truth_lost_own": 5,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 19,
+     "lost_own": 19,
+     "lost_neighbour": 0,
+     "truth_lost": 19,
+     "truth_lost_own": 19,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p089",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 297,
+   "truth_words": 292,
+   "in_quad": 297,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 4,
+     "truth_lost_own": 4,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p090",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 520,
+   "truth_words": 473,
+   "in_quad": 520,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 17,
+     "lost_own": 17,
+     "lost_neighbour": 0,
+     "truth_lost": 16,
+     "truth_lost_own": 16,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p091",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 676,
+   "truth_words": 590,
+   "in_quad": 676,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 20,
+     "lost_own": 20,
+     "lost_neighbour": 0,
+     "truth_lost": 18,
+     "truth_lost_own": 18,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p092",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 359,
+   "truth_words": 291,
+   "in_quad": 359,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 2,
+     "lost_own": 2,
+     "lost_neighbour": 0,
+     "truth_lost": 1,
+     "truth_lost_own": 1,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 8,
+     "lost_own": 8,
+     "lost_neighbour": 0,
+     "truth_lost": 2,
+     "truth_lost_own": 2,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p093",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 413,
+   "truth_words": 333,
+   "in_quad": 413,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 23,
+     "lost_own": 23,
+     "lost_neighbour": 0,
+     "truth_lost": 20,
+     "truth_lost_own": 20,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p095",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 396,
+   "truth_words": 389,
+   "in_quad": 396,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 9,
+     "lost_own": 9,
+     "lost_neighbour": 0,
+     "truth_lost": 4,
+     "truth_lost_own": 4,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p097",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 322,
+   "truth_words": 318,
+   "in_quad": 322,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    }
+   }
+  },
+  {
+   "page": "p098",
+   "source": "pdf image",
+   "kind": "typewritten",
+   "words": 155,
+   "truth_words": 145,
+   "in_quad": 155,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 11,
+     "lost_own": 11,
+     "lost_neighbour": 0,
+     "truth_lost": 8,
+     "truth_lost_own": 8,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p099",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 259,
+   "truth_words": 245,
+   "in_quad": 259,
+   "arms": {
+    "quad": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "uvdoc": {
+     "lost": 0,
+     "lost_own": 0,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": true,
+     "guard_own": true
+    },
+    "docres": {
+     "lost": 16,
+     "lost_own": 16,
+     "lost_neighbour": 0,
+     "truth_lost": 12,
+     "truth_lost_own": 12,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  },
+  {
+   "page": "p100",
+   "source": "original",
+   "kind": "typewritten",
+   "words": 200,
+   "truth_words": 118,
+   "in_quad": 199,
+   "arms": {
+    "quad": {
+     "lost": 1,
+     "lost_own": 1,
+     "lost_neighbour": 0,
+     "truth_lost": 0,
+     "truth_lost_own": 0,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "uvdoc": {
+     "lost": 13,
+     "lost_own": 13,
+     "lost_neighbour": 0,
+     "truth_lost": 11,
+     "truth_lost_own": 11,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    },
+    "docres": {
+     "lost": 4,
+     "lost_own": 4,
+     "lost_neighbour": 0,
+     "truth_lost": 4,
+     "truth_lost_own": 4,
+     "truth_lost_neighbour": 0,
+     "guard_all": false,
+     "guard_own": false
+    }
+   }
+  }
+ ]
+}
