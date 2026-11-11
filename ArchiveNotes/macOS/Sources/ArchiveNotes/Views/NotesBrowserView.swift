@@ -88,7 +88,7 @@ struct NotesBrowserView: View {
                 PanelDivider(size: $inspectorWidth, panelBefore: false,
                              range: NotesLayoutSettings.inspectorWidthRange, label: "Inspector width",
                              id: "an.divider.inspector")
-                NoteInspectorPanel(nav: nav)
+                NoteInspectorPanel(nav: nav, selectedTemplateID: selectedTemplateID)
                     .frame(width: inspectorWidth)
             }
         }
@@ -623,6 +623,8 @@ private struct DetailPane: View {
 /// selection in the same pass as the editor; with nothing or several items selected it says so, as the header does.
 private struct NoteInspectorPanel: View {
     @ObservedObject var nav: NotesNavigationModel
+    /// The template the templates manager has selected, whose inspector shows in templates mode.
+    let selectedTemplateID: UUID?
     /// With a mouse, macOS shows always-on ("legacy") scroll bars, and the scroll bar sat over the right edge of the
     /// fields, where the Locations rows' remove buttons are: a click there hit the scroll bar (VM run 4).
     @State private var scrollerStyle = NSScroller.preferredScrollerStyle
@@ -633,8 +635,21 @@ private struct NoteInspectorPanel: View {
                 // No identifier of its own: as the panel's one child, the scroll area takes the panel's `an.inspector`.
                 ScrollView {
                     NoteMetadataInspector(nav: nav, item: summary)
-                        .padding(.trailing, scrollerStyle == .legacy
-                                 ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0)
+                        .padding(.trailing, scrollerTrailing)
+                }
+            } else if nav.showingTemplates,
+                      let template = nav.model.templates.first(where: { $0.id == selectedTemplateID }) {
+                // A template's folders and the fields its notes start with (W40.fix-notes-template-fields).
+                ScrollView {
+                    TemplateInspector(model: nav.model, template: template)
+                        .padding(.trailing, scrollerTrailing)
+                }
+            } else if nav.paneMode == .notes, nav.selection.isEmpty, !nav.detailSwitchPending,
+                      let folder = selectedFolder {
+                // With no note selected, the folder's template, where a user looks for it (notes-2 row 18).
+                ScrollView {
+                    FolderTemplateInspector(model: nav.model, folder: folder) { nav.showingTemplates = true }
+                        .padding(.trailing, scrollerTrailing)
                 }
             } else {
                 Text(placeholder)
@@ -653,7 +668,18 @@ private struct NoteInspectorPanel: View {
         .accessibilityIdentifier("an.inspector")
     }
 
+    private var scrollerTrailing: CGFloat {
+        scrollerStyle == .legacy ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+    }
+
+    /// The normal folder the sidebar has selected, if any (a smart folder or All Notes has no template).
+    private var selectedFolder: NotesFolderNode? {
+        guard nav.model.selectedSmartId == nil, let id = nav.model.selectedFolderId else { return nil }
+        return nav.model.assignableFolders.first { $0.node.id == id }?.node
+    }
+
     private var placeholder: String {
+        if nav.showingTemplates { return nav.model.templates.isEmpty ? "No templates yet" : "No template selected" }
         if nav.paneMode != .notes { return "No details to show" }
         return nav.selection.count > 1 ? "\(nav.selection.count) items selected" : "No note selected"
     }

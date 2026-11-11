@@ -403,7 +403,7 @@ struct NotesFolderTreeView: View {
     /// template↔folder lives only in `template_assignments`). A ✓ marks the folder's own assignment;
     /// child folders inherit via the nearest-ancestor resolver, not shown here.
     @ViewBuilder private func templateAssignmentMenu(_ node: NotesFolderNode) -> some View {
-        let assigned = assignedTemplateId(node.id)
+        let assigned = model.assignedTemplateID(node.id)
         Menu("Template") {
             Button { Task { await model.assignTemplate(nil, to: node.id) } } label: {
                 checkableLabel("None", checked: assigned == nil)
@@ -424,11 +424,6 @@ struct NotesFolderTreeView: View {
     /// A menu label that shows a ✓ only when `checked` (no empty SF Symbol when unchecked).
     @ViewBuilder private func checkableLabel(_ title: String, checked: Bool) -> some View {
         Label { Text(title) } icon: { if checked { Image(systemName: "checkmark") } }
-    }
-
-    /// The template assigned directly to `folderId` (not inherited); nil if none.
-    private func assignedTemplateId(_ folderId: UUID) -> UUID? {
-        model.organization.assignments.first { $0.folderId == folderId }?.templateId
     }
 
     /// Enter the per-window templates-manager mode and reflect it in the sidebar selection.

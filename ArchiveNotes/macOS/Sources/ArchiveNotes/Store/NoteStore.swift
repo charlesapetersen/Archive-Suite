@@ -539,7 +539,7 @@ actor NoteStore {
         for dir in dirs {
             guard let id = UUID(uuidString: dir.lastPathComponent),
                   let item = try? loadEntry(id, in: dir) else { continue }
-            result.append(Template(id: item.id, name: item.title, kind: item.kind))
+            result.append(Template(item))
         }
         return result.sorted {
             $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending

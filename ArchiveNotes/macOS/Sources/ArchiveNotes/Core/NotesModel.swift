@@ -834,6 +834,79 @@ final class NotesModel: ObservableObject {
         } catch { report(error, "rename the template") }
     }
 
+    // The fields a note made from a template starts with (W40.fix-notes-template-fields, notes-2 row 18), set in
+    // the template's inspector. They are normalized as a note's are, so `newItem` copies values a note could hold.
+    // A template's file gets no Finder tags: only notes are mirrored.
+
+    @discardableResult
+    func setTemplateDate(_ date: String?, precision: Item.DatePrecision?, for id: UUID) async -> Bool {
+        let n = Item.normalizedDate(date, precision: precision)
+        return await mutateTemplate(id, "set the template's date") { item in
+            item.date = n.date
+            item.datePrecision = n.precision
+            if n.date == nil { item.dateUncertain = false }
+        }
+    }
+
+    @discardableResult
+    func setTemplateDateUncertain(_ uncertain: Bool, for id: UUID) async -> Bool {
+        await mutateTemplate(id, "set the template's date uncertainty") { $0.dateUncertain = $0.date != nil && uncertain }
+    }
+
+    @discardableResult
+    func setTemplateQuality(_ quality: Int?, for id: UUID) async -> Bool {
+        let canonical = quality.flatMap { (1...3).contains($0) ? $0 : nil }
+        return await mutateTemplate(id, "set the template's quality") { $0.quality = canonical }
+    }
+
+    @discardableResult
+    func setTemplateTags(_ tags: [String], for id: UUID) async -> Bool {
+        let tags = NotesTagVocabulary.normalizedSubjects(tags)
+        return await mutateTemplate(id, "set the template's tags") { $0.tags = tags }
+    }
+
+    @discardableResult
+    func setTemplateAuthors(_ authors: [String], for id: UUID) async -> Bool {
+        let canonical = authors.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        return await mutateTemplate(id, "set the template's authors") { $0.authors = canonical }
+    }
+
+    /// One atomic fresh-load edit of a template's front matter, as `renameTemplate` does it (W23.h2).
+    private func mutateTemplate(_ id: UUID, _ action: String,
+                                _ mutate: @Sendable (inout Item) -> Void) async -> Bool {
+        guard let noteStore else { return false }
+        do {
+            _ = try await noteStore.withTemplate(id) { item in
+                mutate(&item)
+                item.modified = Date()
+            }
+            await reloadTemplates()
+            return true
+        } catch { report(error, action); return false }
+    }
+
+    /// The folders assigned `templateId` directly, in sidebar order. A subfolder of one inherits it unless it
+    /// has its own (§16.4), so these are the places to change it.
+    func foldersAssigned(_ templateId: UUID) -> [NotesFolderNode] {
+        let ids = Set(organization.assignments.filter { $0.templateId == templateId }.map(\.folderId))
+        return assignableFolders.map(\.node).filter { ids.contains($0.id) }
+    }
+
+    /// Every normal folder, depth-first in sidebar order with its depth — what a template can be assigned to.
+    var assignableFolders: [(node: NotesFolderNode, depth: Int)] {
+        var result: [(node: NotesFolderNode, depth: Int)] = []
+        func walk(_ nodes: [NotesFolderNode], _ depth: Int) {
+            for n in nodes { result.append((n, depth)); walk(n.children, depth + 1) }
+        }
+        walk(normalTree, 0)
+        return result
+    }
+
+    /// The template assigned directly to `folderId` (not inherited); nil if none.
+    func assignedTemplateID(_ folderId: UUID) -> UUID? {
+        organization.assignments.first { $0.folderId == folderId }?.templateId
+    }
+
     /// Delete a template (to Trash) and clear every folder assignment that pointed at it (batched, §6).
     ///
     /// **The trash goes FIRST, and the assignments are only cleared once it succeeded (W23.m13).** The
@@ -891,8 +964,17 @@ final class NotesModel: ObservableObject {
                                                     : OrganizationStore.inboxFolderId)
         do {
             let ref = try await noteStore.create(item)
-            let tx = try await reconcileFacetProjection(
-                from: ItemTransaction(ownedDateFacetTokens: [], item: item, ref: ref), noteStore: noteStore)
+            var created = ItemTransaction(ownedDateFacetTokens: [], item: item, ref: ref)
+            // A template's tags are subjects like any note's: mirror them as the tag bar does, through the same
+            // journalled transaction, so the new note's Finder tags match its front matter from the start
+            // (W40.fix-notes-template-fields). A failed mirror keeps the journal; the next tag edit retries it.
+            if !item.tags.isEmpty {
+                created = try await noteStore.withItem(item.id, projectSubjects: Self.projectSubjectTags) { _ in }
+                if let failure = created.subjectProjectionError {
+                    report(NoteStore.StoreError.writeFailed(failure), "project the note's tags (retry the tag edit)")
+                }
+            }
+            let tx = try await reconcileFacetProjection(from: created, noteStore: noteStore)
             try await organization.addMembership(item: item.id, folder: target)
             // W9.e2-zotero: upsert the new row inline, as createExtract does. Nothing watches the store,
             // so without it the new note stayed out of every list until the next launch's index build.

@@ -14,6 +14,24 @@ struct Template: Sendable, Equatable, Identifiable {
     /// note | extract — "New from template" only offers templates matching the active window's default
     /// kind (06-viewers §6).
     var kind: Item.Kind
+    // The fields a note made from it starts with, edited in the template's inspector
+    // (W40.fix-notes-template-fields, notes-2 row 18). `NotesModel.newItem` copies them from the backing item.
+    var date: String? = nil
+    var datePrecision: Item.DatePrecision? = nil
+    var dateUncertain = false
+    var quality: Int? = nil
+    var tags: [String] = []
+    var authors: [String] = []
+
+    init(id: UUID, name: String, kind: Item.Kind) {
+        (self.id, self.name, self.kind) = (id, name, kind)
+    }
+
+    init(_ item: Item) {
+        self.init(id: item.id, name: item.title, kind: item.kind)
+        (date, datePrecision, dateUncertain) = (item.date, item.datePrecision, item.dateUncertain)
+        (quality, tags, authors) = (item.quality, item.tags, item.authors)
+    }
 }
 
 /// Pure nearest-ancestor template resolution + dangling-assignment detection (06-viewers §6, §16.4).

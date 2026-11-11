@@ -353,6 +353,97 @@ struct NotesModelTemplateTests {
         #expect(env.model.allItems.contains { $0.id == newID && $0.title == "Interview" })
     }
 
+    // MARK: W40.fix-notes-template-fields — fields set in the template's inspector
+
+    @Test("template fields set through the model persist normalized, list on the Template, and a new note starts with them")
+    func templateFieldsCarryIntoNewNote() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "Letter", kind: .note))
+        #expect(await env.model.setTemplateDate("1968-3", precision: .month, for: tid))
+        #expect(await env.model.setTemplateDateUncertain(true, for: tid))
+        #expect(await env.model.setTemplateQuality(2, for: tid))
+        #expect(await env.model.setTemplateTags(["labor", " ", "labor"], for: tid))
+        #expect(await env.model.setTemplateAuthors([" Ada Lovelace ", "", "C. Babbage"], for: tid))
+
+        let stored = try await env.store.loadTemplate(tid)
+        #expect(stored.date == "1968-03" && stored.datePrecision == .month && stored.dateUncertain)
+        #expect(stored.quality == 2)
+        #expect(stored.tags == NotesTagVocabulary.normalizedSubjects(["labor"]))
+        #expect(stored.authors == ["Ada Lovelace", "C. Babbage"])
+        // The inspector binds to the listed projection, so it must carry the same values.
+        let listed = try #require(env.model.templates.first { $0.id == tid })
+        #expect(listed.date == "1968-03" && listed.datePrecision == .month && listed.dateUncertain)
+        #expect(listed.quality == 2 && listed.tags == stored.tags && listed.authors == stored.authors)
+
+        let folder = try await env.org.createFolder(name: "Letters").id
+        let newID = try #require(await env.model.newItem(kind: .note, in: folder, from: tid))
+        let note = try await env.store.load(newID)
+        #expect(note.date == "1968-03" && note.datePrecision == .month && note.dateUncertain)
+        #expect(note.quality == 2 && note.tags == stored.tags && note.authors == stored.authors)
+    }
+
+    @Test("an out-of-range quality is unrated; clearing a template's date clears its uncertainty")
+    func templateFieldEdges() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "T", kind: .note))
+        await env.model.setTemplateQuality(7, for: tid)
+        #expect(try await env.store.loadTemplate(tid).quality == nil)
+        // No date: uncertainty cannot be stored on its own.
+        await env.model.setTemplateDateUncertain(true, for: tid)
+        #expect(try await env.store.loadTemplate(tid).dateUncertain == false)
+        await env.model.setTemplateDate("1960", precision: .decade, for: tid)
+        await env.model.setTemplateDateUncertain(true, for: tid)
+        #expect(try await env.store.loadTemplate(tid).dateUncertain == true)
+        await env.model.setTemplateDate(nil, precision: nil, for: tid)
+        let cleared = try await env.store.loadTemplate(tid)
+        #expect(cleared.date == nil && cleared.datePrecision == nil && cleared.dateUncertain == false)
+    }
+
+    @Test("a note made from a tagged template gets its subjects, date and Q tags in Finder; the template file gets none")
+    func newNoteFromTemplateMirrorsTags() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "Tagged", kind: .note))
+        await env.model.setTemplateTags(["labor", "oral history"], for: tid)
+        await env.model.setTemplateDate("1968", precision: .year, for: tid)
+        await env.model.setTemplateQuality(3, for: tid)
+
+        let newID = try #require(await env.model.newItem(kind: .note, in: nil, from: tid))
+        let note = try await env.store.load(newID)
+        let url = try await env.store.mdURL(for: newID)
+        let tags = Set(try url.resourceValues(forKeys: [.tagNamesKey]).tagNames ?? [])
+        let subjects = Set(note.tags.map { NotesTagVocabulary.titleCased($0) })
+        #expect(subjects.count == 2 && subjects.isSubset(of: tags))
+        #expect(Set(NotesTagVocabulary.dateFacetTokens(for: note)).isSubset(of: tags))
+        #expect(tags.contains("Q3"))
+
+        let tplFiles = try FileManager.default.contentsOfDirectory(
+            at: await env.store.templateDir(tid), includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "md" }
+        #expect(tplFiles.count == 1)
+        for file in tplFiles {
+            #expect((try file.resourceValues(forKeys: [.tagNamesKey]).tagNames ?? []).isEmpty)
+        }
+    }
+
+    @Test("foldersAssigned lists the template's own folders in sidebar order; assignableFolders nests by depth")
+    func foldersAssignedOrder() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "T", kind: .note))
+        let other = try #require(await env.model.createTemplate(name: "U", kind: .note))
+        let a = try await env.org.createFolder(name: "A").id
+        let child = try await env.org.createFolder(name: "Child", parent: a).id
+        let b = try await env.org.createFolder(name: "B").id
+        env.model.rebuild()
+        await env.model.assignTemplate(tid, to: b)
+        await env.model.assignTemplate(tid, to: child)
+        await env.model.assignTemplate(other, to: a)
+        #expect(env.model.foldersAssigned(tid).map(\.id) == [child, b])
+        #expect(env.model.foldersAssigned(other).map(\.id) == [a])
+        #expect(env.model.assignedTemplateID(child) == tid)
+        let depths = Dictionary(uniqueKeysWithValues: env.model.assignableFolders.map { ($0.node.id, $0.depth) })
+        #expect(depths[a] == 0 && depths[child] == 1 && depths[b] == 0)
+    }
+
     @Test("blank new note is filed in Inbox; blank new extract in Extracts (§16.6)")
     func blankNewItemDefaultFolders() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }

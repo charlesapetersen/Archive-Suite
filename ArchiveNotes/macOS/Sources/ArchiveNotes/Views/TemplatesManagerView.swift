@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The per-window **templates manager** (06-viewers §6): shown in the item pane when the sidebar
 /// "Templates" row (or a folder's "Template ▸ Manage…") is active. Lists every template (both kinds,
-/// with a kind glyph) and offers New / Duplicate / Rename / Delete via `NotesModel`'s template actions.
+/// with a kind glyph) and offers New / Duplicate / Rename / Assign to Folder / Delete via `NotesModel`'s template
+/// actions; the selected template's folders and fields are in the inspector (`TemplateInspector`).
 /// A name is edited in its row, as a note's title is in the list: Return or a double-click on the row,
 /// Rename… or the pencil starts it; Return or a click elsewhere saves, Escape leaves the name as it was
 /// (W40.fix-notes-templates, notes-1 row 42).
@@ -128,6 +129,9 @@ struct TemplatesManagerView: View {
         }
         Button("Rename…") { beginRename(t.id) }
         Divider()
+        // Assigning from the template as well as from the folder (W40.fix-notes-template-fields, notes-2 row 18).
+        TemplateFolderMenu(model: model, templateID: t.id, title: "Assign to Folder")
+        Divider()
         Button("Delete", role: .destructive) { deleteID = t.id }
     }
 
@@ -150,7 +154,8 @@ struct TemplatesManagerView: View {
             Button { if let id = selected { deleteID = id } } label: { Image(systemName: "trash") }
                 .help("Delete").disabled(selected == nil)
             Spacer()
-            Text(selected == nil ? "Select a template to edit its body." : "Body edits save automatically.")
+            Text(selected == nil ? "Select a template to edit it."
+                                 : "Its folders and fields are in the inspector. Edits save automatically.")
                 .font(.callout).foregroundStyle(.primary)
         }
         .buttonStyle(.borderless)
@@ -162,7 +167,7 @@ struct TemplatesManagerView: View {
         VStack(spacing: 6) {
             Image(systemName: "square.on.square").font(.title).foregroundStyle(.tertiary)
             Text("No templates yet").foregroundStyle(.primary)
-            Text("Create one with +, then assign it to a folder via its “Template ▸” menu.")
+            Text("Create one with +. Assign it to a folder in its inspector, or choose it in a folder’s inspector or its right-click Template menu.")
                 .font(.callout).foregroundStyle(.primary).multilineTextAlignment(.center)
         }
         .padding()
