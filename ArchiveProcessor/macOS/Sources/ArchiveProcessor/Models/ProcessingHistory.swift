@@ -84,7 +84,8 @@ struct RunHistorySnapshot {
         let imageCount = max(0, fileCount - pdfFileCount)
         let pdfPages = pdfPageCount > 0 ? CostEstimator.estimateDirectPDFPages(
             pageCount: pdfPageCount, model: model, imageScale: imageScale, rotationMode: rotationMode,
-            useGateway: gatewayConfig != nil, imageTokenProvider: imageTokenProvider) : nil
+            useGateway: gatewayConfig != nil, imageTokenProvider: imageTokenProvider,
+            gatewayRotation: gatewayRotation) : nil
         guard imageCount > 0 else {
             return CostEstimator.runTotal(images: nil, directPDFPages: pdfPages, batch: batchMode)
         }
@@ -101,9 +102,15 @@ struct RunHistorySnapshot {
             rotationMode: rotationMode,
             useGateway: gatewayConfig != nil,
             imageTokenProvider: imageTokenProvider,
-            visionTextOnly: visionTextModel != nil
+            visionTextOnly: visionTextModel != nil,
+            gatewayRotation: gatewayRotation
         )
         return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode)
+    }
+
+    /// The run's rotation calls went to the gateway's model (W46.rotation-default).
+    private var gatewayRotation: Bool {
+        !preOCRedInput && LLMRotationDetector.callsGateway(mode: rotationMode, gateway: gatewayConfig, usesLocalAgent: false)
     }
 
     /// Page total for the multi-page PDFs a run re-OCRs. A PDF that can no longer be read counts as 2

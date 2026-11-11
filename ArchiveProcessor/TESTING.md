@@ -141,7 +141,7 @@ Per the project convention, **every setting has a `?` help popover and grays out
 - [ ] **Provider** dropdown lists Anthropic / Gemini / Mistral / OpenAI / OpenRouter (Apple Vision, the API Gateway and the Local CLI Agent are chosen in the **OCR backend** picker); **Model** dropdown updates to that provider's built-ins (Gemini defaults to `gemini-3.8-flash`, OpenAI to `gpt-5-nano`).
 - [ ] **Thinking level** (Low/High) shows only for models that support it; grayed/hidden otherwise.
 - [ ] **API keys**: one field per provider (Anthropic, Gemini, Mistral, OpenAI, OpenRouter, plus Gateway when **Use gateway** is on); entering a key persists to Keychain; masked; not echoed.
-- [ ] **Use gateway** toggle: ON reveals base URL / model ID / Gateway key and **grays out** batch (unsupported on gateway path); **Detect rotation** stays enabled, but an LLM rotation mode falls back to local Vision on this path; OFF hides them.
+- [ ] **Use gateway** toggle: ON reveals base URL / model ID / Gateway key and **grays out** batch (unsupported on gateway path); **Detect rotation** stays enabled; a remote gateway's rotation calls ask Gemini 3.7 Flash, a model on this Mac falls back to local Vision; OFF hides them.
 - [ ] **Manage custom models…** adds an extra Anthropic/Gemini model ID; it then appears in the Model dropdown; persists across relaunch.
 - [ ] **Input resolution** control present + `?` popover; **Batch** toggle present + `?`; **Rotation mode** present + `?`.
 - [ ] **Tagging options** + **Live-capture mode** (Stage for later / Process live) present + `?`.
@@ -349,6 +349,8 @@ existing scratch, key-free, no-network execution remains unchanged.
   tests for bulk/resume provenance, layout reading, segmentation, cluster profiles, memory-based presets and
   Slurm submission. Run `python3 -m unittest test_institutional_compute` from the kit with its requirements
   installed. Both profiles dry-run without setup, Slurm or downloads, including paths containing spaces.
+- **`test-rotation-rule.sh`** — W46.rotation-default: the agreement rule's verdicts, which backends call the gateway's rotation model and with what request (injected transport, no wire), the bundled PP-LCNet loading, the unsure page in the result, summary and history, and the gateway rotation estimates. Key-free.
+- **`test-rotation-lcnet.sh`** — W46.rotation-default: the app's `RotationLCNet` against the bench's PaddleX answers on W46.rotation-routes' turns (fails under 98% equal), plus the free rule's counts. Free, headless; SKIPs without the bench cache.
 - **`test-ocr-cascade.sh`** — W41.app-ocr-cascade: the cheap-first cascade through the real `performOCRCall` over an
   injected transport (`OCRCASCADE_TEST`): which failures escalate (cut off, unparsable, 500) and which never spend a
   second call (key errors, rate limits, overload, timeouts, transport, success), the `secondReader` record, cost and

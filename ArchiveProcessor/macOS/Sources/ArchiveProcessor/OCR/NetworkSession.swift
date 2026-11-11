@@ -165,7 +165,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[LocalModelsTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[InstitutionalComputeImportTestDriver.envKey]))
+                flag: ProcessInfo.processInfo.environment[InstitutionalComputeImportTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[RotationRuleTestDriver.envKey]))
         else { return nil }
         return stub
 #else

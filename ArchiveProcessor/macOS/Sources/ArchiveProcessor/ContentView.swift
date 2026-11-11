@@ -85,6 +85,7 @@ struct ContentView: View {
             LocalModelsTestDriver.runIfRequested()           // $0 W41 local open-weight model route, no wire
             OCRPageGuidanceTestDriver.runIfRequested()       // $0 W41 picker note: which model reads which pages
             OCRPageKindTestDriver.runIfRequested()           // $0 W41 page kind → its reader, no wire
+            RotationRuleTestDriver.runIfRequested()          // $0 W46 rotation agreement rule + gateway route, no wire
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage

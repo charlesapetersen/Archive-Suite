@@ -56,6 +56,14 @@ enum LLMRotationDetector {
         usesGateway && !usesLocalAgent && !gatewayIsLocal
     }
 
+    /// Whether a run in `mode` sends rotation calls to the gateway's model, as `OCRProcessor.detectRotation` decides:
+    /// what the cost and time estimates price (W46.rotation-default).
+    static func callsGateway(mode: RotationMode, gateway: GatewayConfig?, usesLocalAgent: Bool) -> Bool {
+        mode != .off && mode != .localVision
+            && hasMeasuredRoute(usesGateway: gateway != nil, usesLocalAgent: usesLocalAgent,
+                                gatewayIsLocal: gateway?.isLocalModel == true)
+    }
+
     static func detectCorrection(
         imageURL: URL,
         provider: LLMProvider,
@@ -113,8 +121,18 @@ enum LLMRotationDetector {
         case .appleVision, .openrouter: letter = nil   // OpenRouter: no rotation route measured
         }
         }
-        guard let ch = letter?.uppercased().first, let idx = labels.firstIndex(of: String(ch)) else { return nil }
+        guard let label = letter.flatMap(parseLabel), let idx = labels.firstIndex(of: label) else { return nil }
         return order[idx]
+    }
+
+    /// The reply's label when the reply IS one label (bold, quotes, a full stop and "Image" allowed), else nil: a
+    /// reply that reasons first ("A close look shows D") must not be read as its first character. Every one of the
+    /// 1,787 gateway replies W46.rotation-routes scored was a bare letter, so this reads them all the same.
+    static func parseLabel(_ reply: String) -> String? {
+        var t = reply.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        t = t.trimmingCharacters(in: CharacterSet(charactersIn: "*_`'\".:()[] "))
+        if t.hasPrefix("IMAGE ") { t = String(t.dropFirst(6)) }
+        return ["A", "B", "C", "D"].contains(t) ? t : nil
     }
 
     private static func askGemini(images: [(label: String, base64: String)], apiKey: String) async -> String? {

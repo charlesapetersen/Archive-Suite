@@ -30,7 +30,9 @@ enum RotationLCNet {
     }
     private static let loaded = Loaded()
     // Prediction is blocking work; it stays off Swift's cooperative pool like Vision's (VisionQueue).
-    private static let queue = VisionQueue(name: "ArchiveProcessor.RotationLCNet", width: 2)
+    // Width 1: each page holds a full-resolution 8-bit copy while it is resized (about 190 MB for a 6000 x 8000 scan),
+    // and the prediction itself takes about 20 ms.
+    private static let queue = VisionQueue(name: "ArchiveProcessor.RotationLCNet", width: 1)
 
     /// Whether the bundled model loads (false in a build without it).
     static var isAvailable: Bool { loaded.model != nil }
@@ -64,6 +66,14 @@ enum RotationLCNet {
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let pw = props[kCGImagePropertyPixelWidth] as? Int, let ph = props[kCGImagePropertyPixelHeight] as? Int,
               pw > 0, ph > 0 else { return nil }
+        // An upright image decodes lazily straight into the one pixel buffer `input` draws; only an EXIF-turned one
+        // takes the thumbnailer's oriented full-size copy first.
+        let orientation = (props[kCGImagePropertyOrientation] as? UInt32) ?? 1
+        if orientation == 1 {
+            guard let image = CGImageSourceCreateImageAtIndex(
+                source, 0, [kCGImageSourceShouldCacheImmediately: false] as CFDictionary) else { return nil }
+            return input(from: image)
+        }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceThumbnailMaxPixelSize: max(pw, ph),

@@ -958,9 +958,8 @@ struct SettingsView: View {
 
     /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
     private var gatewayRotation: Bool {
-        !useAppleVision && !useLocalAgent && rotationMode != .off && rotationMode != .localVision
-            && LLMRotationDetector.hasMeasuredRoute(usesGateway: useGateway && GatewayConfig.fromDefaults() != nil,
-                                                    usesLocalAgent: false, gatewayIsLocal: gatewayLocalModel)
+        !useAppleVision && LLMRotationDetector.callsGateway(
+            mode: rotationMode, gateway: useGateway ? GatewayConfig.fromDefaults() : nil, usesLocalAgent: useLocalAgent)
     }
 
     @ViewBuilder private var rotationSection: some View {

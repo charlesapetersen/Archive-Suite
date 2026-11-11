@@ -289,9 +289,8 @@ struct OCRView: View {
 
     /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
     private var gatewayRotation: Bool {
-        !useAppleVision && !useLocalAgent && rotationMode != .off && rotationMode != .localVision
-            && LLMRotationDetector.hasMeasuredRoute(usesGateway: currentGatewayConfig != nil, usesLocalAgent: false,
-                                                    gatewayIsLocal: currentGatewayConfig?.isLocalModel == true)
+        !useAppleVision && LLMRotationDetector.callsGateway(mode: rotationMode, gateway: currentGatewayConfig,
+                                                            usesLocalAgent: useLocalAgent)
     }
 
     private var gatewayHasCosts: Bool {

@@ -1861,7 +1861,7 @@ extension OCRProcessor {
                 }
             }
             let (v, p) = await (vision, lcnet)
-            return await agreementVerdict(vision: v, lcnet: p, cloud: cloud)
+            return await agreementVerdict(vision: v, lcnet: p, cloud: cloud, lcnetLoaded: RotationLCNet.isAvailable)
         case .llmSingle, .llmMajority:
             // Backends with no multi-image comparative-rotation path skip straight to local Vision.
             if LLMRotationDetector.hasRoute(
@@ -1883,9 +1883,12 @@ extension OCRProcessor {
     /// gateway's comparative call), Vision's answer standing in when that call fails, as W46.rotation-routes scored
     /// "agree, else llmSingle (Vision if it abstains)". With no cloud route the page is left as it is (0, not the
     /// OCR model's guess) and marked unsure. PP-LCNet alone never turns a page: it flips right-to-left scripts.
-    nonisolated static func agreementVerdict(vision: Int?, lcnet: Int?,
-                                             cloud: (@Sendable () async -> Int?)?) async -> RotationVerdict {
+    /// A build whose PP-LCNet does not load (`lcnetLoaded` false) runs Vision alone rather than leaving every page:
+    /// each page is still marked unsure, since nothing checked it.
+    nonisolated static func agreementVerdict(vision: Int?, lcnet: Int?, cloud: (@Sendable () async -> Int?)?,
+                                             lcnetLoaded: Bool = true) async -> RotationVerdict {
         if let vision, vision == lcnet { return RotationVerdict(correction: vision) }
+        if !lcnetLoaded, cloud == nil { return RotationVerdict(correction: vision ?? 0, unsure: true) }
         if let cloud {
             if let c = await cloud() { return RotationVerdict(correction: c) }
             if let vision { return RotationVerdict(correction: vision) }
@@ -1895,7 +1898,7 @@ extension OCRProcessor {
 
     /// Replace a result's rotation with the detected correction when the result has text and
     /// a correction was found; otherwise return the result unchanged. An unsure verdict is recorded on the page.
-    private nonisolated static func mergeRotation(into result: OCRResult, verdict: RotationVerdict) -> OCRResult {
+    nonisolated static func mergeRotation(into result: OCRResult, verdict: RotationVerdict) -> OCRResult {
         guard result.text != nil, let rot = verdict.correction else { return result }
         var merged = result.with(classification: result.classification, rotationDegrees: rot)
         merged.rotationUnsure = verdict.unsure ? true : nil
