@@ -82,6 +82,69 @@ def _norm(s):
     return re.sub(r"\s+", "", s or "").lower()
 
 
+def _norm_text(s):
+    """_norm without hyphens, for finding a quote in a text: a line-end break ("bureau-\\ncrats") is not in a
+    model's quote, and a real hyphen that falls at a line end ("March-\\nApril") is."""
+    return re.sub(r"[-­‐‑]", "", _norm(s))
+
+
+def _quote_in(quote, text):
+    """Whether the quote is in the text. A quote the model shortened with "..." passes when every part is in the
+    text, in order."""
+    t, at = _norm_text(text), 0
+    for part in (p for p in (_norm_text(p) for p in re.split(r"\.\.\.|…", quote)) if p):
+        at = t.find(part, at)
+        if at < 0:
+            return False
+        at += len(part)
+    return True
+
+
+# Letters OCR puts for a digit ("196L", "19gS"), after _norm's lowercasing. Never a digit for a digit: "1938" for
+# 1988 is a different year as written, whatever the scan did.
+OCR_DIGIT = {"0": "o", "1": "il|!]", "2": "z", "5": "s$", "6": "gb", "8": "b", "9": "gq"}
+_MONTH = (r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|"
+          r"oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b\.?")
+_MONTH_NOT_MAY = _MONTH.replace("may|", "")
+_YY_END = r"(?! ?\d|[\d'’]|s\b)"    # not "1958" or "19 23", not "the 80's" or "'80s"
+
+
+def _damaged(ys, s):
+    """Whether s (a _norm'ed quote) carries the four-digit year ys with OCR letters for some of its digits: one
+    letter anywhere, or two when the first two digits are printed. The run is not part of a longer number."""
+    for i in range(len(s) - 3):
+        if (i and s[i - 1].isdigit()) or (i + 4 < len(s) and s[i + 4].isdigit()):
+            continue
+        w = s[i:i + 4]
+        subs = [k for k in range(4) if w[k] != ys[k]]
+        if subs and all(w[k] in OCR_DIGIT.get(ys[k], "") for k in subs) and (
+                len(subs) == 1 or (len(subs) == 2 and w[:2] == ys[:2])):
+            return True
+    return False
+
+
+def year_in_quote(year, quote):
+    """How a quote carries the year, or None. "four digits"; "two digits", only inside a date form (9/24/58,
+    20.2.76, 27 Oct 82, Dec. 70, '40, 1983-84), in any century, since the quote cannot say which; "ocr damage"
+    (196L for 1961). Bare digits, "May 13" or "the 80's" carry no year. W46.date-evidence-check."""
+    ys, s = str(year), _norm(quote)
+    if ys in s:
+        return "four digits"
+    q, yy = re.sub(r"\s+", " ", quote or "").lower(), ys[2:]
+    forms = [rf"(?<!\d)\d{{1,2}} ?[/.-] ?\d{{1,2}} ?[/.-] ?'?{yy}{_YY_END}",            # 9/24/58, 12.9-81
+             rf"(?<!\d)\d{{1,2}}(?:st|nd|rd|th)? ?{_MONTH},? ?['’]?{yy}{_YY_END}",  # 27 Oct 82, 20 Mar. '40
+             rf"{_MONTH} ?\d{{1,2}}(?:st|nd|rd|th)?, ?['’]?{yy}{_YY_END}",          # May 13, 72 (the comma is needed)
+             rf"(?<![\d'’])['’‘]{yy}{_YY_END}",                                      # '40, Dec. '70
+             rf"(?<!\d){ys[:2]}\d\d ?[-–/] ?{yy}{_YY_END}"]                             # 1983-84
+    if int(yy) > 31:
+        forms.append(rf"{_MONTH_NOT_MAY},? ?{yy}{_YY_END}")                          # Dec. 70: not a day, not "May 40"
+    if any(re.search(f, q) for f in forms):
+        return "two digits"
+    if _damaged(ys, s):
+        return "ocr damage"
+    return None
+
+
 def evidence_check(year, evidence, context):
     """Whether a reply's cited evidence supports the year it gives.
 
@@ -91,30 +154,34 @@ def evidence_check(year, evidence, context):
     context: {id: text} of every document the model was given, "self" included.
 
     Returns (verdict, reason). verdict is "valid", "unsupported" (evidence given but it fails) or "none" (no
-    evidence). A right year with failed evidence is unsupported, which is CiteVQA's attribution hallucination."""
+    evidence). A right year with failed evidence is unsupported, which is CiteVQA's attribution hallucination.
+    The quote is found spacing-, case- and hyphen-tolerantly, "..." elisions allowed, and carries the year as
+    `year_in_quote` reads it; a valid reason names how when it is not four digits ("(two digits)", "(ocr damage)")."""
     if not evidence:
         return "none", "no evidence cited"
     if year is None:
         return "unsupported", "no year to support"
-    ys = str(year)
     if "region" in evidence and "quote" not in evidence:
         reg = evidence.get("region") or ""
-        if not DATE_RX.search(reg):
+        how = year_in_quote(year, reg)
+        if not (DATE_RX.search(reg) or how):
             return "unsupported", "cited region has no date string"
-        if ys not in reg:
+        if not how:
             return "unsupported", "cited region's date is not the year given"
-        return "valid", "cited region carries the year"
+        return "valid", "cited region carries the year" + ("" if how == "four digits" else f" ({how})")
     nb = evidence.get("neighbour", "self")
     if nb not in context:
         return "unsupported", "cited document is not in the context given"
     quote = evidence.get("quote") or ""
     if not quote.strip():
         return "unsupported", "no quote"
-    if _norm(quote) not in _norm(context[nb]):
+    if not _quote_in(quote, context[nb]):
         return "unsupported", "quote is not in the cited document's text"
-    if ys not in _norm(quote):
+    how = year_in_quote(year, quote)
+    if not how:
         return "unsupported", "quote does not carry the year given"
-    return "valid", "quote found in the cited document and carries the year"
+    return "valid", "quote found in the cited document and carries the year" + ("" if how == "four digits"
+                                                                                  else f" ({how})")
 
 
 def winkler(lo, hi, y, alpha):

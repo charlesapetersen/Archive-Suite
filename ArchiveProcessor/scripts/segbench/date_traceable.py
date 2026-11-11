@@ -937,8 +937,9 @@ def findings(out):
          f"{tp['evidence'].get('valid', 0)} valid, {tp['evidence'].get('unsupported', 0)} unsupported, "
          f"{tp['right_unsupported']} of them with the right year. Reading the failures, most are a quote that does not "
          f"carry the year as four digits, often because the model read through OCR damage (\"27 April I 96I4\", \"feb, 2 4 , >964\", "
-         f"\"September 22, 19gS\") or a two-digit date, and the checker, which wants the four digits in the quote, "
-         f"refuses them. The rest quote text that is not in the cited document. {tp.get('short_evidence', 0)} of 300 "
+         f"\"September 22, 19gS\") or a two-digit date, and the checker, which wanted the four digits in the quote, "
+         f"refused them (the figures here; W46.date-evidence-check widened it, date-evidence-check.md). The rest quote "
+         f"text that is not in the cited document. {tp.get('short_evidence', 0)} of 300 "
          f"replies wrote the citation as {{\"self\": quote}} rather than the asked shape and were read as the same "
          f"citation. Conformal intervals reach about 90% coverage, but the widths (decades on the pipelines) come "
          f"from a few far-wrong rule picks (1800 from a figure, 2026 from a capture footer), not from honest uncertainty."]

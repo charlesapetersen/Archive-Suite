@@ -81,6 +81,55 @@ class Evidence(unittest.TestCase):
         self.assertEqual(S.evidence_check(1962, {"region": "RECEIVED JUN 5 1962"}, self.CTX)[0], "valid")
         self.assertEqual(S.evidence_check(1962, {"region": "RECEIVED"}, self.CTX)[0], "unsupported")
         self.assertEqual(S.evidence_check(1962, {"region": "Jun 5 1963"}, self.CTX)[0], "unsupported")
+        self.assertEqual(S.evidence_check(1962, {"region": "RECD 6/5/62"}, self.CTX)[1],
+                         "cited region carries the year (two digits)")
+
+
+class YearInQuote(unittest.TestCase):
+    """W46.date-evidence-check: the quotes the 27B's refused right years cited, and the ones that must stay out."""
+
+    def test_two_digit_date_forms(self):
+        for y, q in ((1958, "9/24/58"), (1987, "8-3-87"), (1976, "20.2.76"), (1981, "12.9-81"), (1982, "27 Oct 82"),
+                     (1940, "20 Mar. '40"), (1970, "Dec. 70"), (1984, "ANNUAL REPORT FOR 1983-84"),
+                     (1972, "May 13, 72"), (1940, "in '40"), (1968, "9-16-68,43"), (1982, "1 / 31 / 82")):
+            self.assertEqual(S.year_in_quote(y, q), "two digits", q)
+
+    def test_ocr_damage(self):
+        for y, q in ((1961, "June 29, 196L"), (1965, "September 22, 19gS"), (1964, "l964"), (1950, "195O")):
+            self.assertEqual(S.year_in_quote(y, q), "ocr damage", q)
+
+    def test_four_digits(self):
+        self.assertEqual(S.year_in_quote(1962, "June 3, 1 9 6 2"), "four digits")
+
+    def test_refused(self):
+        for y, q in ((1988, "MONDAY, APRIL 25, 1938"),      # a digit for a digit is another year
+                     (1972, "CLEVELAND, May 13"),           # a day, not a year
+                     (1940, "May 40"), (1913, "May 13"),
+                     (1985, "10/25"), (1982, "Things are different in the 80's."), (1980, "the '80s"),
+                     (1945, "Marshall 45"),                  # a word that starts like a month
+                     (1958, "12-31-57"), (1924, "19 23"), (1919, "June 20, 19 23"), (1919, "6/5/19 64"), (1960, "196"), (1961, "2196l"),     # damage inside a longer number
+                     (1965, "1sgs"),                         # two letters need the first two digits printed
+                     (1984, "1983-85"), (1968, "Vol. 9, No. 68"), (1950, "Some people would bar President Truman")):
+            self.assertIsNone(S.year_in_quote(y, q), q)
+
+    def test_two_digits_take_any_century(self):
+        self.assertEqual(S.year_in_quote(1858, "9/24/58"), "two digits")
+
+
+class QuoteFound(unittest.TestCase):
+    CTX = {"self": "federal bureau-\ncrats are acting. March-\nApril 1979 issue ... DATE: May 2, 1947 end"}
+
+    def test_line_end_hyphen_and_real_hyphen(self):
+        self.assertEqual(S.evidence_check(1979, {"quote": "bureaucrats are acting. March-April 1979"}, self.CTX)[0],
+                         "valid")
+
+    def test_elision_in_order(self):
+        self.assertEqual(S.evidence_check(1947, {"quote": "federal bureaucrats ... DATE: May 2, 1947"}, self.CTX)[0],
+                         "valid")
+        self.assertEqual(S.evidence_check(1947, {"quote": "DATE: May 2, 1947 ... federal bureaucrats"}, self.CTX)[0],
+                         "unsupported")
+        self.assertEqual(S.evidence_check(1947, {"quote": "federal clerks ... May 2, 1947"}, self.CTX)[0],
+                         "unsupported")
 
 
 class Conformal(unittest.TestCase):

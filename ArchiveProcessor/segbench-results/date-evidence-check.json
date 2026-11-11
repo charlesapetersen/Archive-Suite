@@ -1,0 +1,2399 @@
+{
+ "replies": 296,
+ "old": {
+  "valid": 216,
+  "unsupported": 80,
+  "none": 0,
+  "right_unsupported": 49,
+  "wrong_valid": 49
+ },
+ "new": {
+  "valid": 243,
+  "unsupported": 53,
+  "none": 0,
+  "right_unsupported": 28,
+  "wrong_valid": 55
+ },
+ "flipped": 27,
+ "flipped_how": {
+  "two digits": 26,
+  "ocr damage": 1
+ },
+ "flipped_wrong_year": 6,
+ "left_reasons": {
+  "quote does not carry the year given": 47,
+  "quote is not in the cited document's text": 5,
+  "cited document is not in the context given": 1
+ },
+ "left_right_year": 28,
+ "rows": [
+  {
+   "id": "o:00f507fb4a16013b",
+   "y": 1980,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:00f777adf5a45b02",
+   "y": 1977,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:00fa67e70f2d871d",
+   "y": 1981,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:016dda146abc7e6d",
+   "y": 1928,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:023de06a3da4eb78",
+   "y": 1955,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:02a504d9b6daf2c6",
+   "y": 1957,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:0451297dde4d2f0f",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:046a6a421bde8e2a",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:053414bceebd5543",
+   "y": 1980,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:08bc5bd82f622e99",
+   "y": 1967,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:0ac5baf6870f85ff",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:0e0329ab8640a2a4",
+   "y": 1968,
+   "right": false,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:0ecdc402f38bf243",
+   "y": 1925,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:1064c06a84de65f5",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:11c411735dfde58e",
+   "y": 1983,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:12ccb023f6403088",
+   "y": 1956,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:12fde09b9dfe2f65",
+   "y": 1917,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:13ae55e09a375bbb",
+   "y": 1969,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:144249c059766cfc",
+   "y": 1965,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:14587881c36a3d0b",
+   "y": 1959,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:145bf38eeafb1aa1",
+   "y": 1975,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:14c2f807ba8f0f22",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:1540ddb59e42000e",
+   "y": 1990,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:1713e6a6e655c022",
+   "y": 1959,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:174dd30c941d6e5b",
+   "y": 1969,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:177d988274ebffa7",
+   "y": 1977,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:179b1120358233d3",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:17b1357fcf0b9208",
+   "y": 1972,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:187071f4992251bd",
+   "y": 1978,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:19b972ffddbaa48f",
+   "y": 1970,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:1a64df0a516bd656",
+   "y": 1975,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:1a7d38ca78af8bd7",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:1c52cc103cca82bf",
+   "y": 1973,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:1cbc0d3a2e6e6fa8",
+   "y": 1975,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:1ea708561bca3529",
+   "y": 1960,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:21623ac40535bcbf",
+   "y": 1961,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:2316cb8e6738fa7c",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:232835e326b4a79c",
+   "y": 1955,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:2345674c9a2cd898",
+   "y": 1956,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:236b8122508a1590",
+   "y": 1968,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:23aee1692966306c",
+   "y": 1959,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:24e2bb1fdc303670",
+   "y": 1971,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:2507aff115dfd4d2",
+   "y": 1969,
+   "right": false,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:2756bd7019d99822",
+   "y": 1970,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:27dfa6ca7f27b8cc",
+   "y": 1982,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:2806f6aa85f30e42",
+   "y": 1959,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:28102e895f9918d0",
+   "y": 1937,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:28808738cd85fbf2",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:28cf66082188ce71",
+   "y": 1957,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:297a953adbbce1d7",
+   "y": 1962,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:2a5a9b3247ca8fa9",
+   "y": 1970,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:2d56ec023f7136e3",
+   "y": 1982,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:3182fba9c918b3b6",
+   "y": 1960,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:31dd4cc19f126e6b",
+   "y": 1970,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:3274e188a6a5077b",
+   "y": 1958,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:32b4228ec98c65f7",
+   "y": 1956,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:32c539d9fdd78e8f",
+   "y": 1992,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3346174052bedbd7",
+   "y": 1973,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:3420db3d37f3464f",
+   "y": 1969,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:34ad3bf1112fd93c",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:34b968f7860398ef",
+   "y": 1984,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3527b15b0ef9dcee",
+   "y": 1964,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:354c113d295bc062",
+   "y": 1968,
+   "right": false,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:356a8e5a28490459",
+   "y": 1964,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3846b1232f5cff80",
+   "y": 1981,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:386c41ec1d2bd0d7",
+   "y": 1972,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:38ba04140091ed6e",
+   "y": 1958,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:3a2b0336b7043cb2",
+   "y": 1981,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3a52ef94e328fbb3",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3a60a7e4b3065ce8",
+   "y": 1968,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:3afd053a22758906",
+   "y": 1975,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3d4bdf0a45e68317",
+   "y": 1945,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3e2c0af2e8e31e51",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:3f29210a9713bccb",
+   "y": 1973,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:406e716de3d3a441",
+   "y": 1973,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:438627f51475a30c",
+   "y": 1961,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote is not in the cited document's text"
+  },
+  {
+   "id": "o:43a0fe73a893e4c9",
+   "y": 1934,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4410e6acae02c30d",
+   "y": 1967,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:442177443ac5ce01",
+   "y": 1971,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:45ff2122a8910a7c",
+   "y": 1973,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:46376c7262f7f2b3",
+   "y": 1982,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:466582ad50257d99",
+   "y": 1919,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:476132854e6ae9c4",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:47864253a41b4fb2",
+   "y": 1985,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:479b21b4d983b158",
+   "y": 1940,
+   "right": false,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:47dab39b6d9b4344",
+   "y": 1973,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:48c79d79608caa44",
+   "y": 1968,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:492a5ec91467fe03",
+   "y": 1987,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:49f6bce663f511a5",
+   "y": 1975,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4c1764ee5408868b",
+   "y": 1959,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4c2c3b1c5b37d284",
+   "y": 1976,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4c91df4fab47624f",
+   "y": 1968,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4cadf8f14115ca3b",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4d92ef45658f752f",
+   "y": 1954,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4e359903ed9f3276",
+   "y": 1993,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4f5542a206190c27",
+   "y": 1967,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4f6523420742b8c1",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4fa70145d1dc45e1",
+   "y": 1965,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4fd613c6156b28e2",
+   "y": 1995,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:4fdf33429c748f16",
+   "y": 1928,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5099db726ae10d47",
+   "y": 1967,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:52131dfda43d05ae",
+   "y": 1992,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5231c9a5424c20eb",
+   "y": 1974,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5337068b4e6c5b05",
+   "y": 1915,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5355e4074a75485b",
+   "y": 1992,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:537304c04ee3cd1d",
+   "y": 1919,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:53cc81513e0bbcb4",
+   "y": 1979,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:54d4ca78a2ac7f5f",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:54eef7b04dd0a2dc",
+   "y": 1972,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:560f2d8e4ad0f01f",
+   "y": 1969,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:57e5e3c6643deadf",
+   "y": 1965,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:57e62dcfb29deb09",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:59089c5953da87ed",
+   "y": 1965,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5a1658505beb829d",
+   "y": 1910,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5c0a6879cccb128c",
+   "y": 1959,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5c1a4b6acfebe045",
+   "y": 1958,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5e5904a9536b3d31",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5f2a2469666c66c7",
+   "y": 1951,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:5f9d01101b8dcb5c",
+   "y": 1968,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:5fc8ee643a8a31ca",
+   "y": 1964,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:614aa4d3c6148dd9",
+   "y": 1931,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:620f1b588ca9a257",
+   "y": 1952,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:620f46908d9606fd",
+   "y": 1959,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:6530a7f734842209",
+   "y": 1980,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:668749bbdc64776d",
+   "y": 1984,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote is not in the cited document's text"
+  },
+  {
+   "id": "o:66bb9064bf4e3786",
+   "y": 1969,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:683b6afbb0ff381a",
+   "y": 1980,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote is not in the cited document's text"
+  },
+  {
+   "id": "o:68651e104c973ad9",
+   "y": 1978,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:68d5dff58bdb967e",
+   "y": 1963,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:69d338c488d1b113",
+   "y": 1979,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:6d38558aaf517f03",
+   "y": 1974,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:6f2aa9f273ad44d2",
+   "y": 1975,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:6f6a3e6ec9f4ae65",
+   "y": 1961,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:6fcb11ccae9f872e",
+   "y": 1953,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:7027e78edadc8045",
+   "y": 1903,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:70ddda5d6fcfe82e",
+   "y": 1979,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:723df4da10d243e3",
+   "y": 1959,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:740e37975565580e",
+   "y": 1955,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:76e83f42825abfc9",
+   "y": 1984,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:78abf161b8ad53af",
+   "y": 1979,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:78d4ccf6f37af029",
+   "y": 1939,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:797a7126ed58590d",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:7a8922c8262cc26c",
+   "y": 1982,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:7b697139c0117a16",
+   "y": 1977,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:7b99301240e3ae5c",
+   "y": 1984,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:7ce9ced7df5b1adf",
+   "y": 1978,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:7da94cbd12848a27",
+   "y": 1983,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:7de26cdabe6ac6c0",
+   "y": 1976,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:7e28dfe201b62b3d",
+   "y": 1939,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8012cef582d347fb",
+   "y": 1982,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:82541ae9308a3c26",
+   "y": 1954,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:825dfd43938244a5",
+   "y": 1958,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:82d22da61db02809",
+   "y": 1983,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:830c3fb4b004893c",
+   "y": 1983,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:83addc67f195ba27",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8497e0c5109707ef",
+   "y": 1956,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:84c565170db6c1c2",
+   "y": 1922,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:84fd3c4664f962f3",
+   "y": 1970,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8583cd06a8ef34eb",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8630fd8cb8b10b51",
+   "y": 1959,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:8653ebb15ceb296e",
+   "y": 1933,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote is not in the cited document's text"
+  },
+  {
+   "id": "o:86c4ddf3f7fb9371",
+   "y": 1950,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8714855c2a0a9ffa",
+   "y": 1981,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:87191818935c9a17",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:88379fd7ddd2c531",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8919d97d7ae4c56c",
+   "y": 1977,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:892124741e581d89",
+   "y": 1972,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:897eea50fa53a7b3",
+   "y": 1989,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8991114f68d4ba4d",
+   "y": 1958,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8998cb5ae0d48e35",
+   "y": 1967,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:8abffb5b5485a158",
+   "y": 1978,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8c5952438ab5e832",
+   "y": 1970,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8d3f41034f4fdb44",
+   "y": 1983,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:8f82ff7807211fb9",
+   "y": 1978,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:925cb04892f4be7c",
+   "y": 1971,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:92dd508d50a4f54d",
+   "y": 1981,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:952140959eef6e8e",
+   "y": 1978,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:959afee3af24726e",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:95be93921e244629",
+   "y": 1938,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:968bbbcf3d68f5ad",
+   "y": 1922,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:970834a2d76daa02",
+   "y": 1973,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:983a22ab818859c0",
+   "y": 1975,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:998fa5bed7f602dd",
+   "y": 1970,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:9a3db62d4c88f78f",
+   "y": 1967,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:9a60f1394cc42f25",
+   "y": 1949,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:9a73f1b3b4b8d971",
+   "y": 1966,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:9b7cfa07ddb9c9cc",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:9d9fdd475611b4fa",
+   "y": 1987,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:9f15a6512f00f2ad",
+   "y": 1959,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:9f5c7a28e555f8f1",
+   "y": 1973,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a0619a08e667ff06",
+   "y": 1976,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:a0ee40615657b993",
+   "y": 1984,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a2b5ef22e907df7d",
+   "y": 1984,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a4491de45f1ddfee",
+   "y": 1961,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a472f87514130c6e",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a5c8a37844c861b2",
+   "y": 1922,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a6f45d566d626195",
+   "y": 1906,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a75e166aacb34483",
+   "y": 1981,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:a82f4f7652f4ba2b",
+   "y": 1914,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:a9a1fde653b7faad",
+   "y": 1940,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:aae768e8636d54c5",
+   "y": 1957,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ab7b55b94b4fb0db",
+   "y": 1985,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:aed598dd362a6bf4",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:b08c276eef342275",
+   "y": 1972,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:b0e15214c84a6523",
+   "y": 1951,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:b2e6721f6ae64cd0",
+   "y": 1940,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:b4098143183d4040",
+   "y": 1979,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:b496e2be4f673405",
+   "y": 1973,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:b63540a59231a55e",
+   "y": 1974,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:b653b0746becf704",
+   "y": 1950,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:b7665005e541c746",
+   "y": 1956,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:b82a7f0d28b422bb",
+   "y": 1976,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:b8550e5aa7a067a7",
+   "y": 1922,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ba1c9f1e08689c1e",
+   "y": 1979,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ba73a601e703e292",
+   "y": 1967,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:bb15eb97ea131bb3",
+   "y": 1934,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:bc52c9d5789d0239",
+   "y": 1973,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:bcd0098d0767f2be",
+   "y": 1958,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:bd222d2795491a84",
+   "y": 1968,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:bd7c421971dd9ff1",
+   "y": 1956,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:be3f9b45b72d7000",
+   "y": 1956,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:c267d49a961908ee",
+   "y": 1994,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:c334aee8e42355ef",
+   "y": 1968,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:c44195f2051ce413",
+   "y": 1982,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:c575a9873a12960e",
+   "y": 1977,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:c7e61db8a99e0fe2",
+   "y": 1960,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:c8ae869cfd1693f2",
+   "y": 1967,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:c9c27daea4ac71d6",
+   "y": 1972,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:ca3ad14cee17ed4c",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:cb29352b498fbb1b",
+   "y": 1984,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:cbc5ef061686d5a0",
+   "y": 1918,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:cc5b5e4982e0bd22",
+   "y": 1981,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ccb26c4e00798908",
+   "y": 1932,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:cced745eb6083dfa",
+   "y": 1960,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:cd23c2eb2f3e812f",
+   "y": 1986,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:cd5e76208b5f3266",
+   "y": 1970,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:cde550ccb80f4eed",
+   "y": 1918,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:cea59fcba2e93f3b",
+   "y": 1970,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d0d7a60ccdd9bb0a",
+   "y": 1979,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:d240aa36dbf9f6cf",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d2995ce784528fa5",
+   "y": 1999,
+   "right": false,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:d324b84043220344",
+   "y": 1971,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:d447d9e37bfe0837",
+   "y": 1960,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d6584ed4cd6d5989",
+   "y": 1971,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d6890ffe3c3e69b0",
+   "y": 1970,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d7989e2c589149f6",
+   "y": 1906,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d7c48270083fbf13",
+   "y": 1990,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d8dbefa4ce44b077",
+   "y": 1981,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d8e264b3f5aaa6e2",
+   "y": 1953,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d92f7f81aafbad9d",
+   "y": 1979,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:d9511f9d049ca1e9",
+   "y": 1968,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:dab171d0e4bf6c45",
+   "y": 1972,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "cited document is not in the context given"
+  },
+  {
+   "id": "o:db1350e10f09105b",
+   "y": 1967,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:db3da49a3817dd1e",
+   "y": 1964,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:dbc7fcd17a52c999",
+   "y": 1923,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:dd66e89679461503",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ddc4a0f353ff638b",
+   "y": 1958,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:df0e7b33724446ff",
+   "y": 1926,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:e00199f738bc763d",
+   "y": 1962,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e005e1299b915ef0",
+   "y": 1950,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e05d89ab85dfe6ff",
+   "y": 1975,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e13e6e59ffb505c8",
+   "y": 1983,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e38390a54fae610a",
+   "y": 1999,
+   "right": false,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:e61b12d3d90d0b59",
+   "y": 1966,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e78f16a562e85d6e",
+   "y": 1969,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e8548a6cb3a8f397",
+   "y": 1968,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e89d2455ccb00698",
+   "y": 1968,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e95f44242a726c74",
+   "y": 1990,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e9905957f386960c",
+   "y": 1983,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:e9aedcaf42fdd735",
+   "y": 1900,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ea47ee06efb9d8e5",
+   "y": 1981,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (two digits)"
+  },
+  {
+   "id": "o:ea99330d3b05fa72",
+   "y": 1940,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:eabff5ca4ae736bb",
+   "y": 1967,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:eaede43bd13e0a74",
+   "y": 1917,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ebe59def435be3d6",
+   "y": 1988,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:ec4e0e2e6b604c76",
+   "y": 1961,
+   "right": true,
+   "old": "unsupported",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year (ocr damage)"
+  },
+  {
+   "id": "o:ed51c18ca60b770f",
+   "y": 1964,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ed52bbb05b031881",
+   "y": 1983,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:edd1e829021aeff2",
+   "y": 1968,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ee6136808b4e292a",
+   "y": 1961,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:eea261eb4778bf6d",
+   "y": 1982,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:eea32dd702cc97cc",
+   "y": 1948,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:ef6436a8e0e1f95b",
+   "y": 1955,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:f1064e0c4762e9f5",
+   "y": 1975,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:f1ef811af2782140",
+   "y": 1985,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:f2422daab429f8a3",
+   "y": 1980,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote is not in the cited document's text"
+  },
+  {
+   "id": "o:f2deb79e1c77571b",
+   "y": 1977,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:f4402090b201f09a",
+   "y": 1925,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:f666d3d494eb74e5",
+   "y": 1960,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:f757a03099401012",
+   "y": 1938,
+   "right": false,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:f7d0a450d5b735bf",
+   "y": 1982,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:fb0e9fdd858b7428",
+   "y": 1975,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:fbff1dd0cbf5b025",
+   "y": 1942,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:fd6f1b03a17b30a0",
+   "y": 1982,
+   "right": true,
+   "old": "unsupported",
+   "new": "unsupported",
+   "reason": "quote does not carry the year given"
+  },
+  {
+   "id": "o:fe131bb92efba8b7",
+   "y": 1936,
+   "right": true,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  },
+  {
+   "id": "o:fe184eda2546d747",
+   "y": 1967,
+   "right": false,
+   "old": "valid",
+   "new": "valid",
+   "reason": "quote found in the cited document and carries the year"
+  }
+ ]
+}

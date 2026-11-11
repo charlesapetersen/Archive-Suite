@@ -357,7 +357,8 @@ report `not_in_text` redefined from the image pass, the false-year rate on the u
 8.2 `W46.date-image-intext` [S, about $0.35, I]: the image pass on the 119 in-text documents; how often it changes the
 year, finds a second-role date or adds evidence. Settles 7.3.
 8.3 `W46.date-evidence-check` [S, $0]: the checker accepts OCR-damaged four-digit years and two-digit dates in a quote,
-re-scored on cached replies. Until it is done, failed estimates stay hidden (owner call 9).
+re-scored on cached replies. Until it is done, failed estimates stay hidden (owner call 9). Shipped 2026-11-11: on the 27B's 296 Vision-text trace-neigh replies, valid 216 to 243, right years refused 49
+to 28; the rest quote no date or another year as written (`segbench-results/date-evidence-check.md`).
 8.4 `W46.date-mac-27b` [S, $0]: the 27B 4-bit image pass and trace prompt on a 32 GB Mac, seconds and peak memory.
 Fills the 32 and 64 GB tiers.
 8.5 Re-run the Vision-text dating arms on macOS 27.2 [S, $0, Mac], under W46.vision-27-swap's conditions (P8-1).
