@@ -122,6 +122,9 @@ private struct ProcessingHistoryRow: View {
             if let n = run.kindRoutedPages, n > 0 {
                 Text("· \(n) read by the reader their kind chose")
             }
+            if let n = run.rotationUnsurePages, n > 0 {
+                Text("· \(n) left unturned, rotation unsure")
+            }
         }
         .font(.caption).foregroundStyle(.primary)
     }

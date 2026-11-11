@@ -77,7 +77,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.textColumns) private var textColumns: Int = 1
     @AppStorage(DefaultsKeys.writeLogFile) private var writeLogEnabled: Bool = false
     @AppStorage(DefaultsKeys.ocrWorkerCount) private var ocrWorkerCount: Int = 4
-    @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
+    @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.standard.rawValue
     @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
 
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
@@ -156,7 +156,7 @@ struct SettingsView: View {
         let approach = SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach
         return SegmentationRow.make(approach, options: options, pageCount: 1000, routes: segmentationRoutes)
     }
-    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
+    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .standard }
 
     /// The steppers below must offer exactly the range the run-time clamps enforce, so both read one
     /// declaration rather than repeating `0.5...20` / `1...12` (W16.cfg6-fu3).
@@ -288,12 +288,13 @@ struct SettingsView: View {
                     preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
                     contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
                     rotationMode: rotationMode, useGateway: useGateway,
-                    imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil)
+                    imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation)
                 let time = TimeEstimator.estimate(
                     fileCount: 1000, model: model, rotationMode: rotationMode,
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
-                    preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount)
+                    preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount,
+                    gatewayRotation: gatewayRotation)
 
                 Divider().padding(.vertical, 2)
                 Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
@@ -955,6 +956,13 @@ struct SettingsView: View {
         .onChange(of: ocrWorkerCount) { _, _ in SessionProcessingConfig.normalizeSizingDefaults() }
     }
 
+    /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
+    private var gatewayRotation: Bool {
+        !useAppleVision && !useLocalAgent && rotationMode != .off && rotationMode != .localVision
+            && LLMRotationDetector.hasMeasuredRoute(usesGateway: useGateway && GatewayConfig.fromDefaults() != nil,
+                                                    usesLocalAgent: false, gatewayIsLocal: gatewayLocalModel)
+    }
+
     @ViewBuilder private var rotationSection: some View {
         Section {
             Picker(selection: $rotationModeRaw) {
@@ -962,16 +970,23 @@ struct SettingsView: View {
             } label: {
                 HStack {
                     Text("Detect rotation")
-                    HelpButton(text: "\(rotationMode.detail)\n\nTime impact: Off / Local Vision add no LLM time. Single (default) makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
+                    HelpButton(text: "\(rotationMode.detail)\n\nTime impact: Off, Local Vision and the two local checks add no LLM time; the recommended mode calls the gateway on about 1 page in 10. Single makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
                 }
             }
             .disabled(preOCRedInput)
             if rotationMode.orderings > 0, !preOCRedInput, !LLMRotationDetector.hasRoute(
                 provider: useAppleVision ? .appleVision : selectedProvider,
-                usesGateway: useGateway && GatewayConfig.fromDefaults() != nil, usesLocalAgent: useLocalAgent) {
+                usesGateway: useGateway && GatewayConfig.fromDefaults() != nil, usesLocalAgent: useLocalAgent,
+                gatewayIsLocal: gatewayLocalModel) {
                 Text("This OCR backend has no LLM rotation check, so pages are checked with Local Vision instead.")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("ap.settings.rotationFallback")
+            }
+            if rotationMode == .agreement, !preOCRedInput, !gatewayRotation {
+                // W46.rotation-default: the agreement rule asks a model only through the gateway (the one measured).
+                Text("With no remote API gateway, a page the two local checks disagree on is left as it is and counted in the run’s summary.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ap.settings.rotationUnsure")
             }
             Toggle(isOn: $reviewRotation) {
                 HStack {

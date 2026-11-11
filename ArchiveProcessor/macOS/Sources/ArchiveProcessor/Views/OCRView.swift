@@ -28,8 +28,8 @@ struct OCRView: View {
     /// Which keys / `claude` the segmentation approaches can use; read on appear and on a key change, never
     /// while rendering.
     @State private var segmentationRoutes = SegmentationRoutes.none
-    @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.llmSingle.rawValue
-    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .llmSingle }
+    @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.standard.rawValue
+    private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .standard }
     @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
     @AppStorage(DefaultsKeys.ocrWorkerCount) private var ocrWorkerCount: Int = 4
     /// Derived for compatibility with existing pipeline flags.
@@ -245,7 +245,8 @@ struct OCRView: View {
             rotationMode: rotationMode,
             useGateway: useGateway || useAppleVision,
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil,
-            visionTextOnly: useAppleVision && visionUseLLMJudgment
+            visionTextOnly: useAppleVision && visionUseLLMJudgment,
+            gatewayRotation: gatewayRotation
         ).addingOCR(readersDelta)
     }
 
@@ -255,7 +256,7 @@ struct OCRView: View {
         return CostEstimator.estimateDirectPDFPages(
             pageCount: droppedPDFPageCount, model: effectiveModel, imageScale: imageScale / 100.0,
             rotationMode: rotationMode, useGateway: useGateway || useAppleVision,
-            imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil)
+            imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation)
     }
 
     /// The pages the segmentation approach would segment: the image files. A multi-page PDF is rebuilt page by
@@ -282,7 +283,15 @@ struct OCRView: View {
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount,
             localSecondsPerPage: currentGatewayConfig.flatMap {
-                $0.isLocalModel ? LocalModelRoute.secondsPerPage(modelID: $0.modelID) : nil })
+                $0.isLocalModel ? LocalModelRoute.secondsPerPage(modelID: $0.modelID) : nil },
+            gatewayRotation: gatewayRotation)
+    }
+
+    /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
+    private var gatewayRotation: Bool {
+        !useAppleVision && !useLocalAgent && rotationMode != .off && rotationMode != .localVision
+            && LLMRotationDetector.hasMeasuredRoute(usesGateway: currentGatewayConfig != nil, usesLocalAgent: false,
+                                                    gatewayIsLocal: currentGatewayConfig?.isLocalModel == true)
     }
 
     private var gatewayHasCosts: Bool {

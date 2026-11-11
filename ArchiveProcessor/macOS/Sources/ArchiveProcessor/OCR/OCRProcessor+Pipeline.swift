@@ -854,7 +854,8 @@ extension OCRProcessor {
         guard let snapshot = activeRunHistory else { return }
         ProcessingHistoryStore.shared.record(snapshot.makeRun(
             succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader },
-            pageReaders: jobs.compactMap { $0.result?.pageReader }))
+            pageReaders: jobs.compactMap { $0.result?.pageReader },
+            rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count))
         activeRunHistory = nil
     }
 
@@ -862,9 +863,11 @@ extension OCRProcessor {
     func runDoneMessage(succeeded: Int, failed: Int) -> String {
         let secondRead = jobs.filter { $0.result?.secondReader != nil }.count
         let routed = jobs.filter { $0.result?.pageReader?.isRouted == true }.count
+        let unsure = jobs.filter { $0.result?.rotationUnsure == true }.count
         return "Done. \(succeeded) succeeded, \(failed) failed."
             + (secondRead == 0 ? "" : " \(secondRead) \(secondRead == 1 ? "page" : "pages") read by a second reader.")
             + (routed == 0 ? "" : " \(routed) \(routed == 1 ? "page" : "pages") read by the reader \(routed == 1 ? "its" : "their") kind chose.")
+            + (unsure == 0 ? "" : " \(unsure) \(unsure == 1 ? "page" : "pages") left unturned, rotation unsure.")
     }
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)

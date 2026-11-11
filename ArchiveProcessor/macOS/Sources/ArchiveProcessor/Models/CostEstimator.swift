@@ -82,6 +82,13 @@ struct CostEstimator {
     // on a fixed cheap model (gemini-2.5-flash-lite for Gemini, claude-sonnet-4-6 for Anthropic,
     // gpt-5.4-mini for OpenAI); Gateway/Mistral fall back to free local Vision.
     static let estimatedRotationPromptTokens: Double = 90
+    /// One comparative call to Gemini 3.7 Flash through the gateway, at list: W46.rotation-routes' llmSingle row,
+    /// $0.0037 a page (an estimate; the gateway returns no bill per call).
+    static let gatewayRotationCallCost = 0.0037
+    /// Gateway rotation calls a page: the orderings for the LLM modes, the escalated share for the agreement rule.
+    static func gatewayRotationCalls(_ mode: RotationMode) -> Double {
+        mode == .agreement ? RotationMode.agreementEscalationShare : Double(mode.orderings)
+    }
     static let estimatedRotationOutputTokens: Double = 5
     static func estimatedRotationCandidateTokens(for provider: LLMProvider) -> Double {
         switch provider {                       // per 800px candidate image
@@ -118,7 +125,10 @@ struct CostEstimator {
         /// Apple Vision supplied the OCR text locally; `model` prices only the following text-only
         /// classification/tagging/collection calls. This is intentionally a separate flag rather than
         /// treating Vision as an image-token provider, which would make it easy to bill image OCR again.
-        visionTextOnly: Bool = false
+        visionTextOnly: Bool = false,
+        /// The run's rotation calls go to a remote gateway's `LLMRotationDetector.gatewayModel` (not a model on this
+        /// Mac, not Apple Vision): priced at the measured per-call figure (W46.rotation-default).
+        gatewayRotation: Bool = false
     ) -> CostEstimate {
         // Apple Vision is an in-process macOS framework. It never calls a provider and the V1 backend
         // exposes only transcription / source-tag copying, so every estimated dollar component is $0.
@@ -180,7 +190,9 @@ struct CostEstimator {
         // Rotation cost (LLM modes only; free for Gateway/Mistral/local Vision/off; none for pre-OCRed).
         var rotationCost: Double = 0
         let rotCalls = rotationMode.orderings
-        if rotCalls > 0, !preOCRedInput, !visionTextOnly, !useGateway,
+        if gatewayRotation, !preOCRedInput {
+            rotationCost = Double(fileCount) * gatewayRotationCalls(rotationMode) * gatewayRotationCallCost
+        } else if rotCalls > 0, !preOCRedInput, !visionTextOnly, !useGateway,
            let (rIn, rOut) = rotationModelCost(for: model.provider) {
             let inputPerCall = 4 * estimatedRotationCandidateTokens(for: model.provider) + estimatedRotationPromptTokens
             let calls = Double(fileCount) * Double(rotCalls)
@@ -209,12 +221,13 @@ struct CostEstimator {
         imageScale: Double = 1.0,
         rotationMode: RotationMode = .off,
         useGateway: Bool = false,
-        imageTokenProvider: LLMProvider? = nil
+        imageTokenProvider: LLMProvider? = nil,
+        gatewayRotation: Bool = false
     ) -> CostEstimate {
         estimate(fileCount: pageCount, model: model, enableTagging: false,
                  sendPreviousImage: false, contextCharCount: 0, imageScale: imageScale,
                  rotationMode: rotationMode, useGateway: useGateway,
-                 imageTokenProvider: imageTokenProvider)
+                 imageTokenProvider: imageTokenProvider, gatewayRotation: gatewayRotation)
     }
 
     /// Whole-run total: the image subset at its batch or standard rate plus direct PDF pages at standard.

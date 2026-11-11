@@ -387,6 +387,7 @@ extension OCRProcessor {
                 classification: existingResult.classification,
                 rotationDegrees: newRot
             )
+            jobs[item.fileIndex].result?.rotationUnsure = nil   // the user turned it: settled (W46.rotation-default)
             if let result = jobs[item.fileIndex].result,
                let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
                let model = currentModel {

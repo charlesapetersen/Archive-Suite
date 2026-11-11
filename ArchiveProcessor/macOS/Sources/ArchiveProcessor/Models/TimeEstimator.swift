@@ -35,6 +35,7 @@ struct TimeEstimator {
     static let ttftSeconds: Double = 0.45            // time to first token, incl. ~2048px image prefill
     static let outputTokensPerSecond: Double = 140   // generation rate
     static let rotationAskSeconds: Double = 3.0      // one 4-image comparison (upload-bound), ~measured
+    static let gatewayRotationAskSeconds: Double = 5.79   // Gemini 3.7 Flash via the gateway (W46.rotation-routes)
 
     static let tagParallelWorkers: Double = 6
 
@@ -65,7 +66,8 @@ struct TimeEstimator {
         preOCRedInput: Bool = false,
         useGateway: Bool = false,
         ocrWorkers: Int = 4,
-        localSecondsPerPage: Double? = nil
+        localSecondsPerPage: Double? = nil,
+        gatewayRotation: Bool = false
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
@@ -91,7 +93,10 @@ struct TimeEstimator {
         var rotation = 0.0
         let rotCalls = rotationMode.orderings
         // Mistral and OpenRouter have no LLM rotation route; local Vision does it (`LLMRotationDetector`).
-        if rotCalls > 0, !preOCRedInput, !useGateway, model.provider != .mistral, model.provider != .openrouter {
+        if gatewayRotation, !preOCRedInput {
+            // The gateway's Gemini 3.7 Flash call, measured at 5.79 s a page (W46.rotation-routes).
+            rotation = ceil(n / w) * CostEstimator.gatewayRotationCalls(rotationMode) * gatewayRotationAskSeconds
+        } else if rotCalls > 0, !preOCRedInput, !useGateway, model.provider != .mistral, model.provider != .openrouter {
             let rotSpeed = model.provider == .anthropic ? 1.6 : 1.0   // gemini rotation uses flash-lite
             rotation = ceil(n / w) * Double(rotCalls) * (rotationAskSeconds * rotSpeed)
         }

@@ -1258,7 +1258,7 @@ extension OCRProcessor {
                         previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
                         customPrompt: fallbackPrompt, imageScale: fallbackScale,
                         visionSettings: ocrRun.visionSettings)
-                    let correction = await Self.detectRotation(
+                    let verdict = await Self.detectRotation(
                         imageURL: entry.url, provider: model.provider, apiKey: apiKey,
                         mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
                     )
@@ -1268,7 +1268,7 @@ extension OCRProcessor {
                     // any page left without text under a Stop is held back, not only an exhausted one.
                     let abandoned = Task.isCancelled && read.text == nil
                     return (entry.index, entry.url, entry.jobID,
-                            Self.mergeRotation(into: read, correction: correction), abandoned)
+                            Self.mergeRotation(into: read, verdict: verdict), abandoned)
                 }
                 return true
             }
@@ -1821,10 +1821,17 @@ extension OCRProcessor {
 
         // Override rotation with the detected correction when OCR produced text and a
         // correction was found; otherwise keep the LLM prompt's parsed rotation.
-        var merged = mergeRotation(into: resolved, correction: await rotationCorrection)
+        var merged = mergeRotation(into: resolved, verdict: await rotationCorrection)
         if let routed { merged.pageReader = routed.record }
         return merged
     }
+    /// What rotation detection decided for a page: the clockwise correction (nil = keep the OCR model's own guess),
+    /// and whether the agreement rule left the page as it is because its detectors did not settle it.
+    struct RotationVerdict: Sendable, Equatable {
+        var correction: Int?
+        var unsure = false
+    }
+
     /// Detect the clockwise correction for an image per the run's rotation mode, with LLM
     /// modes falling back to local Vision when unavailable. Runs off the main actor.
     nonisolated static func detectRotation(
@@ -1834,31 +1841,65 @@ extension OCRProcessor {
         mode: RotationMode,
         gatewayConfig: GatewayConfig?,
         localAgent: LocalAgentConfig? = nil
-    ) async -> Int? {
+    ) async -> RotationVerdict {
         switch mode {
         case .off:
-            return nil
+            return RotationVerdict(correction: nil)
         case .localVision:
-            return await RotationDetector.detectCorrection(imageURL: imageURL)
+            return RotationVerdict(correction: await RotationDetector.detectCorrection(imageURL: imageURL))
+        case .agreement:
+            async let vision = RotationDetector.detectCorrection(imageURL: imageURL)
+            async let lcnet = RotationLCNet.detectCorrection(imageURL: imageURL)
+            let measured = LLMRotationDetector.hasMeasuredRoute(
+                usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil,
+                gatewayIsLocal: gatewayConfig?.isLocalModel == true)
+            var cloud: (@Sendable () async -> Int?)?
+            if measured {
+                cloud = {
+                    await LLMRotationDetector.detectCorrection(
+                        imageURL: imageURL, provider: provider, apiKey: apiKey, orderings: 1, gatewayConfig: gatewayConfig)
+                }
+            }
+            let (v, p) = await (vision, lcnet)
+            return await agreementVerdict(vision: v, lcnet: p, cloud: cloud)
         case .llmSingle, .llmMajority:
             // Backends with no multi-image comparative-rotation path skip straight to local Vision.
             if LLMRotationDetector.hasRoute(
-                   provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil),
+                   provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil,
+                   gatewayIsLocal: gatewayConfig?.isLocalModel == true),
                let c = await LLMRotationDetector.detectCorrection(
                    imageURL: imageURL, provider: provider, apiKey: apiKey,
                    orderings: mode.orderings, gatewayConfig: gatewayConfig
                ) {
-                return c
+                return RotationVerdict(correction: c)
             }
             // Fall back to local Vision if the LLM path is unavailable or fails.
-            return await RotationDetector.detectCorrection(imageURL: imageURL)
+            return RotationVerdict(correction: await RotationDetector.detectCorrection(imageURL: imageURL))
         }
     }
+
+    /// The agreement rule (W46.rotation-default; Phase 4, `13-stage-rules/01-reading-copy.md`): Vision and PP-LCNet
+    /// agreeing settle the page. Otherwise, or when Vision abstains, the measured cloud route answers (`cloud`, the
+    /// gateway's comparative call), Vision's answer standing in when that call fails, as W46.rotation-routes scored
+    /// "agree, else llmSingle (Vision if it abstains)". With no cloud route the page is left as it is (0, not the
+    /// OCR model's guess) and marked unsure. PP-LCNet alone never turns a page: it flips right-to-left scripts.
+    nonisolated static func agreementVerdict(vision: Int?, lcnet: Int?,
+                                             cloud: (@Sendable () async -> Int?)?) async -> RotationVerdict {
+        if let vision, vision == lcnet { return RotationVerdict(correction: vision) }
+        if let cloud {
+            if let c = await cloud() { return RotationVerdict(correction: c) }
+            if let vision { return RotationVerdict(correction: vision) }
+        }
+        return RotationVerdict(correction: 0, unsure: true)
+    }
+
     /// Replace a result's rotation with the detected correction when the result has text and
-    /// a correction was found; otherwise return the result unchanged.
-    private nonisolated static func mergeRotation(into result: OCRResult, correction: Int?) -> OCRResult {
-        guard result.text != nil, let rot = correction else { return result }
-        return result.with(classification: result.classification, rotationDegrees: rot)
+    /// a correction was found; otherwise return the result unchanged. An unsure verdict is recorded on the page.
+    private nonisolated static func mergeRotation(into result: OCRResult, verdict: RotationVerdict) -> OCRResult {
+        guard result.text != nil, let rot = verdict.correction else { return result }
+        var merged = result.with(classification: result.classification, rotationDegrees: rot)
+        merged.rotationUnsure = verdict.unsure ? true : nil
+        return merged
     }
     private func isRetryableError(_ result: OCRResult?) -> Bool {
         guard let result = result, result.text == nil,

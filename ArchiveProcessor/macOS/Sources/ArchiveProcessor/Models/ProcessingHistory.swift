@@ -40,6 +40,8 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     /// Pages read by the reader their kind chose, or the user chose, instead of the run's model (W41.app-page-kind).
     /// Optional so an older record still decodes.
     var kindRoutedPages: Int? = nil
+    /// Pages the agreement rule left as they were, rotation unsure (W46.rotation-default). Optional, as above.
+    var rotationUnsurePages: Int? = nil
 }
 
 /// Parameters captured at the START of a Process-Files run so the pipeline's completion tails can
@@ -133,7 +135,8 @@ struct RunHistorySnapshot {
     /// `secondReaders` are the run's pages a second reader read; their own estimated cost is added to the run's.
     /// `pageReaders` are the run's per-page reader records (W41.app-page-kind); a page read by another model than the
     /// run's adds that model's page price less the run model's.
-    func makeRun(succeeded: Int, secondReaders: [SecondReader] = [], pageReaders: [PageReaderRecord] = []) -> ProcessingRun {
+    func makeRun(succeeded: Int, secondReaders: [SecondReader] = [], pageReaders: [PageReaderRecord] = [],
+                 rotationUnsure: Int = 0) -> ProcessingRun {
         let ok = max(0, min(succeeded, fileCount))
         let secondReaderCost = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
         let routed = pageReaders.filter(\.isRouted)
@@ -149,7 +152,8 @@ struct RunHistorySnapshot {
             modeLabel: modeLabel,
             cost: max(0, estimatedCost + secondReaderCost + routedCost),
             secondReaderPages: secondReaders.isEmpty ? nil : secondReaders.count,
-            kindRoutedPages: routed.isEmpty ? nil : routed.count
+            kindRoutedPages: routed.isEmpty ? nil : routed.count,
+            rotationUnsurePages: rotationUnsure > 0 ? rotationUnsure : nil
         )
     }
 }

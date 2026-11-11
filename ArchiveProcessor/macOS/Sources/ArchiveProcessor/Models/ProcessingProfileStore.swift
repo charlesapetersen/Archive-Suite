@@ -103,7 +103,7 @@ final class ProcessingProfileStore: ObservableObject, @unchecked Sendable {
         .init(key: DefaultsKeys.mergeDocuments, def: .bool(false)),
         .init(key: DefaultsKeys.writeLogFile, def: .bool(false)),
 
-        .init(key: DefaultsKeys.rotationModeRaw, def: .string(RotationMode.llmSingle.rawValue)),
+        .init(key: DefaultsKeys.rotationModeRaw, def: .string(RotationMode.standard.rawValue)),
         .init(key: DefaultsKeys.reviewRotation, def: .bool(false)),
 
         .init(key: DefaultsKeys.taggingModeRaw, def: .string(TaggingMode.automatic.rawValue)),

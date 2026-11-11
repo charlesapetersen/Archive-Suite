@@ -220,7 +220,7 @@ struct SessionProcessingConfig: Sendable {
     /// static. Same rule — an OCR call with no run snapshot reads the setting as it is *now* rather
     /// than whatever a previous run or a test driver last stored in a global.
     static func defaultRotationMode(_ d: UserDefaults = .standard) -> RotationMode {
-        RotationMode(rawValue: d.string(forKey: DefaultsKeys.rotationModeRaw) ?? "") ?? .llmSingle
+        RotationMode(rawValue: d.string(forKey: DefaultsKeys.rotationModeRaw) ?? "") ?? .standard
     }
 
     /// Read the app's shared settings into a config snapshot.

@@ -73,7 +73,7 @@ class OCRProcessor: ObservableObject {
     /// `MacOSTagger.stampUnread` global this property's `didSet` used to arm.
     var taggingMode: TaggingMode = .automatic
     /// How image rotation is detected. Set from the UI before a run.
-    var rotationMode: RotationMode = .llmSingle
+    var rotationMode: RotationMode = .standard
     /// The next run's per-page readers (W41.app-page-kind), set by the file list just before Start; frozen into the
     /// run's config and cleared there. Ignored by batch runs, the gateway and the Local Agent.
     var pageReaders: PageReaderPlan = .empty

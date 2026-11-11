@@ -131,19 +131,26 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
 
 // MARK: - Rotation Mode
 
-/// How the app detects the rotation needed to make each scanned image upright.
+/// How the app detects the rotation needed to make each scanned image upright. The default is the agreement rule
+/// Phase 4 chose (W46.rotation-default, `execution-plans/processing-review/13-stage-rules/01-reading-copy.md`); the
+/// figures are W46.rotation-heldout's, on 119 owner pages no detector was tuned on (`segbench-results/rotation-routes.md`).
 enum RotationMode: String, CaseIterable, Identifiable, Codable {
     case off               // No rotation correction
-    case localVision       // Free, local macOS Vision (99% exact on the 96-page rotation benchmark)
+    case localVision       // Free, local macOS Vision alone
+    case agreement         // Vision checked by PP-LCNet; a disagreement goes to the gateway's model, else is flagged
     case llmSingle         // One LLM "which-of-4-is-upright" comparative call
     case llmMajority       // Three comparative calls, majority vote; a tie takes the first ordering's answer
+
+    /// What a fresh install runs, and what an unset or unknown stored value reads as.
+    static let standard: RotationMode = .agreement
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .off: return "Off"
-        case .localVision: return "Local (fast, free)"
+        case .localVision: return "Local Vision only"
+        case .agreement: return "Local, checked (recommended)"
         case .llmSingle: return "LLM comparative"
         case .llmMajority: return "LLM comparative ×3"
         }
@@ -152,13 +159,15 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
     var detail: String {
         switch self {
         case .off: return "Do not correct rotation."
-        case .localVision: return "On-device macOS Vision. Free and fast; 99% exact on the 96-page benchmark. Ambiguous text keeps the OCR model’s rotation guess."
-        case .llmSingle: return "Shows the model all four rotations and asks which is upright — one extra cheap API call per image."
+        case .localVision: return "On-device macOS Vision alone. Free and fast; wrong on 6 of 119 held-out pages. Ambiguous text keeps the OCR model’s rotation guess."
+        case .agreement: return "Vision’s answer is checked by a second on-device model (PP-LCNet). When they agree the page is turned; when they disagree, or Vision finds no text, a remote API gateway asks Gemini 3.7 Flash once (about 1 page in 10), and otherwise the page is left as it is and counted as unsure. On this Mac alone: wrong on 5 of 119 held-out pages, 14 left. With the gateway: wrong on 7 of 119, mostly near-blank covers. For charters, and Arabic, Hebrew or Chinese pages, choose LLM comparative: the local models leave most of those."
+        case .llmSingle: return "Shows the model all four rotations and asks which is upright — one extra cheap API call per image. The route for charters and non-Latin scripts."
         case .llmMajority: return "Repeats the comparison three times and takes the majority vote; three extra cheap API calls per image."
         }
     }
 
-    /// Number of shuffled orderings to vote over (LLM modes only).
+    /// Number of shuffled orderings to vote over (LLM modes only; the agreement rule's call is one ordering, made
+    /// only on the pages the local models do not settle).
     var orderings: Int {
         switch self {
         case .llmMajority: return 3
@@ -166,6 +175,10 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
         default: return 0
         }
     }
+
+    /// The share of pages the agreement rule sends to the gateway's model: the held-out owner pages' 45 of 476 turns
+    /// (W46.rotation-heldout). The estimators price and time that share of one call.
+    static let agreementEscalationShare = 45.0 / 476.0
 }
 
 // MARK: - Models
@@ -531,6 +544,9 @@ struct OCRResult: Codable {
     /// page that was never read (a Gemini 500 then a 402 on the only second reader) from a real refusal
     /// (`OCRFailureCode.requestFailed`). `nil` on every other result.
     let readingCodes: [String]?
+    /// W46.rotation-default — the agreement rule left this page as it is: Vision and PP-LCNet disagreed, or Vision
+    /// found no text, and no cloud route was set. `nil` = rotation was settled (or not checked).
+    var rotationUnsure: Bool? = nil
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
@@ -567,11 +583,13 @@ struct OCRResult: Codable {
     /// W37: the enclosure proposal survives ONLY an unchanged classification (a rotation-only fix). A
     /// reclassified page is a changed boundary, and a relation is never carried across one.
     func with(classification: DocumentClassification?, rotationDegrees: Int) -> OCRResult {
-        OCRResult(text: text, classification: classification, rotationDegrees: rotationDegrees,
+        var copy = OCRResult(text: text, classification: classification, rotationDegrees: rotationDegrees,
                   errorMessage: errorMessage, errorCode: errorCode,
                   enclosure: classification == self.classification ? enclosure : nil,
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
                   secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes)
+        copy.rotationUnsure = rotationUnsure
+        return copy
     }
 }
 
