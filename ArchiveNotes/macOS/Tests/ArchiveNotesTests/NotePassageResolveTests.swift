@@ -24,7 +24,7 @@ struct NotePassageResolveTests {
                          date: String? = nil, precision: Item.DatePrecision? = nil) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: id, title: title, kind: kind, date: date, datePrecision: precision,
-                           dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                           dateUncertain: false, sortDate: nil, quality: nil,
                            created: t, modified: t, mtime: 0, managedTags: [])
     }
 

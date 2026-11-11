@@ -3,20 +3,17 @@ import SwiftUI
 /// The inspector for the template selected in the templates manager (W40.fix-notes-template-fields, notes-2 row 18:
 /// the owner could not see how to assign a template to a folder, and the inspector showed nothing for a template).
 /// It holds the folders the template is assigned to, with a menu to assign it to another, and the fields a note made
-/// from it starts with: date, quality, tags and authors. Each field applies as a note's does (on Return or on leaving
+/// from it starts with: date, quality and tags. Each field applies as a note's does (on Return or on leaving
 /// it), through `NotesModel`'s template setters; a template's own file gets no Finder tags.
 struct TemplateInspector: View {
     @ObservedObject var model: NotesModel
     let template: Template
 
     @State private var dateText = ""
-    /// Which template the date and authors text belong to and what was last applied, as in `NoteMetadataInspector`,
+    /// Which template the date text belongs to and what was last applied, as in `NoteMetadataInspector`,
     /// so leaving a field writes only a real edit, and only to the template it was typed for.
     @State private var dateApplied: (id: UUID?, text: String, stored: String?) = (nil, "", nil)
     @FocusState private var dateFocused: Bool
-    @State private var authorsText = ""
-    @State private var authorsApplied: (id: UUID?, authors: [String]) = (nil, [])
-    @FocusState private var authorsFocused: Bool
     @State private var tagDraft = ""
 
     static let fieldsExplanation = "A new note made from this template starts with these, and with its body. "
@@ -36,25 +33,18 @@ struct TemplateInspector: View {
             qualitySection
             Divider()
             tagsSection
-            Divider()
-            authorsSection
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .onAppear { seed() }
-        .onChange(of: template.id) { applyDate(); applyAuthors(); seed() }
+        .onChange(of: template.id) { applyDate(); seed() }
         .onChange(of: dateFocused) { was, _ in if was { applyDate() } }
-        .onChange(of: authorsFocused) { was, _ in if was { applyAuthors() } }
         // A value saved elsewhere (the other window's inspector) shows here, unless this field holds an edit.
         .onChange(of: template.date) {
             guard !dateFocused, dateText == dateApplied.text else { return }
             seedDate()
         }
-        .onChange(of: template.authors) {
-            guard !authorsFocused, composedAuthors == authorsApplied.authors else { return }
-            seedAuthors()
-        }
-        .onDisappear { applyDate(); applyAuthors() }
+        .onDisappear { applyDate() }
     }
 
     // MARK: Folders
@@ -148,33 +138,14 @@ struct TemplateInspector: View {
         }
     }
 
-    private var authorsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Authors").font(.subheadline)
-            TextField("One author per line", text: $authorsText, axis: .vertical)
-                .lineLimit(2...4)
-                .textFieldStyle(.roundedBorder)
-                .focused($authorsFocused)
-                .onSubmit { applyAuthors() }
-                .help("One author per line. Applies when you leave the field; empty it for none.")
-                .accessibilityLabel("Template authors")
-                .accessibilityIdentifier("an.template.authors")
-        }
-    }
-
     // MARK: State ⇄ store
 
-    private func seed() { seedDate(); seedAuthors() }
+    private func seed() { seedDate() }
 
     private func seedDate() {
         dateText = DateFieldEntry.seedText(storedDate: template.date, precision: template.datePrecision,
                                            active: nil).text
         dateApplied = (template.id, dateText, template.date)
-    }
-
-    private func seedAuthors() {
-        authorsText = template.authors.joined(separator: "\n")
-        authorsApplied = (template.id, template.authors)
     }
 
     private func applyDate() {
@@ -187,18 +158,6 @@ struct TemplateInspector: View {
         Task { await model.setTemplateDate(date, precision: precision, for: id) }
     }
 
-    private var composedAuthors: [String] {
-        authorsText.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
-    private func applyAuthors() {
-        let value = composedAuthors
-        guard let id = authorsApplied.id, value != authorsApplied.authors else { return }
-        authorsApplied.authors = value
-        Task { await model.setTemplateAuthors(value, for: id) }
-    }
 }
 
 /// A menu of every folder, indented as in the sidebar, that assigns `templateID` to the folder chosen; a ✓ marks the

@@ -28,7 +28,7 @@ struct NotesReopenLastItemTests {
     private func sum(_ title: String, kind: Item.Kind = .note, id: UUID = UUID()) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: id, title: title, kind: kind, date: nil, datePrecision: nil,
-                           dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                           dateUncertain: false, sortDate: nil, quality: nil,
                            created: t, modified: t, mtime: 0, managedTags: [])
     }
     private func window(_ model: NotesModel, _ defaults: UserDefaults?,

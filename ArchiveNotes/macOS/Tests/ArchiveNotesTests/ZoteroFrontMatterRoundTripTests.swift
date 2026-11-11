@@ -145,7 +145,6 @@ final class ZoteroFrontMatterRoundTripTests: XCTestCase {
             id: UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")!,
             kind: .note,
             title: "Round-trip zotero",
-            authors: [],
             date: nil,
             datePrecision: nil,
             dateUncertain: false,
@@ -268,7 +267,7 @@ final class ZoteroFrontMatterRoundTripTests: XCTestCase {
 
     func testEmptyZoteroNotEmitted() {
         let item = Item(
-            id: UUID(), kind: .note, title: "No refs", authors: [], date: nil,
+            id: UUID(), kind: .note, title: "No refs", date: nil,
             datePrecision: nil, dateUncertain: false, quality: nil, tags: [],
             zotero: [], roundup: false, created: Date(), modified: Date(),
             schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil

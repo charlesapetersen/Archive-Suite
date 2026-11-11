@@ -102,7 +102,7 @@ enum ZoteroAutoFillReferenceResolver {
 }
 
 /// View-model backing the "Auto-fill from Zotero" confirmation sheet
-/// (00-overview §D.5). Because auto-fill overwrites `authors`/`date`/`title`,
+/// (00-overview §D.5). Because auto-fill overwrites `date`/`title`,
 /// the confirmation step is mandatory: the user reviews per-field changes,
 /// toggles which to apply, and **only on confirm** is anything written.
 ///

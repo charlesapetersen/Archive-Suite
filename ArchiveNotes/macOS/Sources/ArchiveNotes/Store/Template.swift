@@ -21,7 +21,6 @@ struct Template: Sendable, Equatable, Identifiable {
     var dateUncertain = false
     var quality: Int? = nil
     var tags: [String] = []
-    var authors: [String] = []
 
     init(id: UUID, name: String, kind: Item.Kind) {
         (self.id, self.name, self.kind) = (id, name, kind)
@@ -30,7 +29,7 @@ struct Template: Sendable, Equatable, Identifiable {
     init(_ item: Item) {
         self.init(id: item.id, name: item.title, kind: item.kind)
         (date, datePrecision, dateUncertain) = (item.date, item.datePrecision, item.dateUncertain)
-        (quality, tags, authors) = (item.quality, item.tags, item.authors)
+        (quality, tags) = (item.quality, item.tags)
     }
 }
 

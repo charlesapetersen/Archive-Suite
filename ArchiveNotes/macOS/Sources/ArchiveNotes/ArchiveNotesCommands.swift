@@ -239,8 +239,8 @@ extension FocusedValues {
 ///
 /// Each other part of the window shows and hides here too (W40.notes-window-panes; owner, notes-2 row 22), so the
 /// filters, the list and the note text can be all there is: the Folders pane (⌃⌘S, the toolbar's left button), the
-/// note's header (title, date, authors), its formatting bar and its tag bar. Hiding the header or the tag bar loses
-/// nothing: the list renames a note, the inspector shows its dates and authors, and with the bar hidden its tags.
+/// note's header (title, date), its formatting bar and its tag bar. Hiding the header or the tag bar loses
+/// nothing: the list renames a note, the inspector shows its dates, and with the bar hidden its tags.
 struct LayoutCommands: Commands {
     @AppStorage(NotesLayoutSettingsKey.layoutMode) private var layoutMode: NotesLayoutMode = .sideBySide
     @AppStorage(NotesLayoutSettingsKey.showInspector) private var showingInspector = true

@@ -26,7 +26,7 @@ struct FailedSaveCloseTests {
         let org = OrganizationStore(index: index)
         try await org.load(storeRoot: root)
         let store = NoteStore(root: root)
-        let item = Item(id: UUID(), kind: .note, title: "Field notes", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Field notes", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: "Original paragraph.")
@@ -380,7 +380,7 @@ struct FailedSaveQuitTests {
         try await org.load(storeRoot: root)
         let store = NoteStore(root: root)
         let model = NotesModel(organization: org, index: index, noteStore: store)
-        let item = Item(id: UUID(), kind: .note, title: "Quit note", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Quit note", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: "Before.")

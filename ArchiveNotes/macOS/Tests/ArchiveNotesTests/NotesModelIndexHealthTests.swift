@@ -36,12 +36,12 @@ struct NotesModelIndexHealthTests {
 
     private func summary(_ title: String) -> ItemSummary {
         ItemSummary(id: UUID(), title: title, kind: .note, date: nil, datePrecision: nil,
-                    dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                    dateUncertain: false, sortDate: nil, quality: nil,
                     created: Date(), modified: Date(), mtime: 1, managedTags: [])
     }
 
     private func makeItem(_ title: String) -> Item {
-        Item(id: UUID(), kind: .note, title: title, authors: [], date: nil, datePrecision: nil,
+        Item(id: UUID(), kind: .note, title: title, date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(), modified: Date(), schema: 1, blocks: [],
              unknownFrontMatter: [], trailingBodyRaw: nil)

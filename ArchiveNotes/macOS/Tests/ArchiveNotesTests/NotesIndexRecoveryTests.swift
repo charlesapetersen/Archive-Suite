@@ -29,8 +29,8 @@ import Foundation
     }
 
     private func makeRow(id: UUID, title: String, body: String) -> NoteIndexRow {
-        NoteIndexRow(id: id, mtime: 1, title: title, kind: .note, tags: "", authors: "",
-                     authorsJSON: "[]", body: body, date: nil, datePrecision: nil,
+        NoteIndexRow(id: id, mtime: 1, title: title, kind: .note, tags: "",
+                     body: body, date: nil, datePrecision: nil,
                      dateUncertain: false, sortDate: nil, quality: nil, created: Date(),
                      modified: Date(), managedTags: "[]", sourceCount: 0)
     }

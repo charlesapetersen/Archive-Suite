@@ -182,7 +182,7 @@ private func mooreCSL() -> [String: Any] {
 /// A minimal empty note so every auto-fill field is a fresh (non-replacement) change.
 private func emptyNote() -> Item {
     Item(
-        id: UUID(), kind: .note, title: "", authors: [], date: nil,
+        id: UUID(), kind: .note, title: "", date: nil,
         datePrecision: nil, dateUncertain: false, quality: nil, tags: [],
         zotero: [], roundup: false, created: Date(), modified: Date(),
         schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil
@@ -215,18 +215,16 @@ private func makeStubClient(timeout: TimeInterval = 1.5) -> ZoteroClient {
         // Real transport round-trip: CSL parsed off the wire.
         let csl = try await client.fetchCSL(ref)
         #expect(csl.mappedTitle == "Oral History")
-        #expect(csl.mappedAuthors == ["Gordon E. Moore"])
         let (date, precision) = csl.mappedDate()
         #expect(date == "2001")
         #expect(precision == .year)
 
-        // Auto-fill diff onto an empty note → title/authors/date all proposed.
+        // Auto-fill diff onto an empty note → title/date proposed; its authors are not (notes have none).
         let plan = AutoFillPlan.make(from: csl, item: emptyNote())
         #expect(plan.proposedTitle == "Oral History")
-        #expect(plan.proposedAuthors == ["Gordon E. Moore"])
         #expect(plan.proposedDate == "2001")
         #expect(plan.proposedDatePrecision == .year)
-        #expect(Set(plan.changes.map(\.field)) == [.title, .authors, .date])
+        #expect(Set(plan.changes.map(\.field)) == [.title, .date])
 
         // Formatted citation: HTML stripped by the real client path.
         let citation = try await client.fetchCitation(ref)

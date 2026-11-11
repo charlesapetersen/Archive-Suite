@@ -16,7 +16,6 @@ struct Item: Sendable, Equatable, Identifiable {
     var id: UUID
     var kind: Kind
     var title: String
-    var authors: [String]
     var date: String?
     var datePrecision: DatePrecision?
     var dateUncertain: Bool

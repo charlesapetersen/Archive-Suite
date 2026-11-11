@@ -13,7 +13,6 @@ final class ItemSortDateTests: XCTestCase {
             id: UUID(),
             kind: .note,
             title: "",
-            authors: [],
             date: date,
             datePrecision: precision,
             dateUncertain: false,

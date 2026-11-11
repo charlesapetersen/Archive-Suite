@@ -47,7 +47,7 @@ final class NotesWindowPanesRenderTests: XCTestCase {
     private func host(inInspector: Bool, width: CGFloat) -> NSHostingView<some View> {
         let t = Date(timeIntervalSince1970: 0)
         let item = ItemSummary(id: UUID(), title: "Memo", kind: .note, date: nil, datePrecision: nil,
-                               dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                               dateUncertain: false, sortDate: nil, quality: nil,
                                created: t, modified: t, mtime: 0, managedTags: ["Labor", "Strikes"])
         let host = NSHostingView(rootView: NoteTagBar(model: model, item: item, inInspector: inInspector)
             .frame(width: width, alignment: .topLeading)

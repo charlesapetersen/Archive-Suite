@@ -37,7 +37,7 @@ struct DisplayCalendarToggleTests {
     }
 
     private func makeNote(_ env: Env) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: "Letter", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Letter", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -267,13 +267,13 @@ struct DisplayCalendarToggleTests {
     private func summary(date: String?, precision: Item.DatePrecision? = .day, calendar: DisplayCalendar?,
                          sentWith: ArchiveDate? = nil) -> ItemSummary {
         ItemSummary(id: UUID(), title: "t", kind: .note, date: date, datePrecision: precision,
-                    dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                    dateUncertain: false, sortDate: nil, quality: nil,
                     created: Date(), modified: Date(), mtime: 0, managedTags: [],
                     sentWith: sentWith, displayCalendar: calendar)
     }
 
     private func bareItem() -> Item {
-        Item(id: UUID(), kind: .note, title: "t", authors: [], date: "1752-09-13", datePrecision: .day,
+        Item(id: UUID(), kind: .note, title: "t", date: "1752-09-13", datePrecision: .day,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0), schema: 1,
              blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)

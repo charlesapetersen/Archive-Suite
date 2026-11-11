@@ -301,7 +301,7 @@ final class NotesNavigationModel: ObservableObject {
         selection = id.map { [$0] } ?? []
     }
 
-    // MARK: Metadata edits (front-matter authors/date + front-matter-backed Quality mirror)
+    // MARK: Metadata edits (front-matter date + front-matter-backed Quality mirror)
 
     /// Set the date + precision for `id`, forwarding to the shared model (§16.1). The metadata inspector
     /// composes the canonical string for the chosen precision; the model normalizes + persists + re-indexes.
@@ -335,15 +335,8 @@ final class NotesNavigationModel: ObservableObject {
         await model.setRoundup(roundup, for: id)
     }
 
-    /// Set manually entered authors; they remain front-matter only.
-    @discardableResult
-    func setAuthors(_ authors: [String], for id: UUID) async -> Bool {
-        await model.setAuthors(authors, for: id)
-    }
-
     /// Set 0...3 Quality for `id`. The model persists front matter and mirrors valid Q1...Q3 plus the
-    /// date's existing Year/Month/Day/Decade facets onto this note's own `.md`; authors stay front
-    /// matter only.
+    /// date's existing Year/Month/Day/Decade facets onto this note's own `.md`.
     func setQuality(_ quality: Int?, for id: UUID) async {
         await model.setQuality(quality, for: id)
     }

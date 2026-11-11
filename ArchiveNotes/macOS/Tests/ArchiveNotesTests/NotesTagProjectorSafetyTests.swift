@@ -61,7 +61,7 @@ struct NotesTagProjectorSafetyTests {
 
     private func makeItem(tags: [String], quality: Int? = nil) -> Item {
         Item(
-            id: UUID(), kind: .note, title: "Test", authors: [],
+            id: UUID(), kind: .note, title: "Test",
             date: nil, datePrecision: nil, dateUncertain: false, quality: quality,
             tags: tags, zotero: [], roundup: false,
             created: Date(), modified: Date(), schema: 1,

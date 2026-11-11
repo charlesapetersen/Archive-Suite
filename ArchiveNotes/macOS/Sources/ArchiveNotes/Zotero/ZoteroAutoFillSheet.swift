@@ -15,7 +15,7 @@ struct ZoteroAutoFillSheet: View {
                 // descendant, hiding the individual confirmation controls from accessibility clients.
                 .accessibilityIdentifier("an.zotero.autofill.sheet")
             if model.plan.changes.isEmpty {
-                Text("The note's title, authors, and date already match Zotero. Applying will refresh its citation.")
+                Text("The note's title and date already match Zotero. Applying will refresh its citation.")
                     .foregroundStyle(.primary)
             } else {
                 Text("Choose which metadata changes to apply. Empty fields are selected; replacements require opt-in.")
@@ -75,7 +75,6 @@ private extension AutoFillField {
     var displayName: String {
         switch self {
         case .title: "Title"
-        case .authors: "Authors"
         case .date: "Date"
         }
     }

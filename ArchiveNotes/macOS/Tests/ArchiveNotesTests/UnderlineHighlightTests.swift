@@ -173,7 +173,7 @@ struct UnderlineHighlightTests {
     }
 
     @Test func searchIndexHasNoTags() {
-        let item = Item(id: UUID(), kind: .note, title: "N", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "N", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [],
@@ -237,7 +237,7 @@ struct UnderlineHighlightTests {
         try await org.load(storeRoot: root)
         let store = NoteStore(root: root)
         let model = NotesModel(organization: org, index: index, noteStore: store)
-        let item = Item(id: UUID(), kind: .note, title: "N", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "N", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: "Read this part and that part.")

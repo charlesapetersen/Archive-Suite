@@ -42,7 +42,7 @@ struct FrontMatterDateWriteTests {
     /// Create + persist a bare note in the scratch store, returning its id.
     @discardableResult
     private func makeNote(_ env: Env, title: String = "Note") async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: title, authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: title, date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -240,10 +240,10 @@ struct FrontMatterDateWriteTests {
         #expect(e.sortDate! < l.sortDate!)                   // 1968 (uncertain) still precedes 1980
     }
 
-    @Test("editing the date preserves quality + tags + authors + body")
+    @Test("editing the date preserves quality + tags + body")
     func preservesOtherFields() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
-        let item = Item(id: UUID(), kind: .note, title: "Keep", authors: ["Auth"], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Keep", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: 3, tags: ["Subject"],
                         zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
                         blocks: [], unknownFrontMatter: [], trailingBodyRaw: "Body")
@@ -253,7 +253,6 @@ struct FrontMatterDateWriteTests {
         #expect(r.date == "1970-05" && r.datePrecision == .month)   // changed…
         #expect(r.quality == 3)                                     // …rest untouched
         #expect(r.tags == ["Subject"])
-        #expect(r.authors == ["Auth"])
         #expect(r.title == "Keep")
         #expect(r.trailingBodyRaw == "Body")
     }

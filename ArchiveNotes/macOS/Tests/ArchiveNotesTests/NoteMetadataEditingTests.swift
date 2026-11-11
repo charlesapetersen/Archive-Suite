@@ -24,7 +24,7 @@ extension NotesTagProjectorSafetyTests {
         try await org.load(storeRoot: root)
         let store = NoteStore(root: root)
         let model = NotesModel(organization: org, index: index, noteStore: store)
-        let item = Item(id: UUID(), kind: .note, title: "Original", authors: ["Keep Author"], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Original", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: "Keep body\n")
@@ -61,7 +61,7 @@ extension NotesTagProjectorSafetyTests {
             #expect(try after.resourceValues(forKeys: [.labelNumberKey]).labelNumber == 6)
             let saved = try await env.store.load(env.id)
             #expect(saved.title == "Renamed Note" && saved.id == env.id)
-            #expect(saved.trailingBodyRaw == "Keep body\n" && saved.authors == ["Keep Author"])
+            #expect(saved.trailingBodyRaw == "Keep body\n")
             #expect(env.model.allItems.first(where: { $0.id == env.id })?.title == "Renamed Note")
             #expect(await env.model.renameNote(env.id, to: " \n ") == false)
             #expect(try await env.store.load(env.id) == saved, "blank title is a no-write")
@@ -120,33 +120,6 @@ extension NotesTagProjectorSafetyTests {
         }
     }
 
-    @Test("manual author edits persist, update FTS, and stay independent between notes and extracts")
-    func authorEditsPersistAndIndexIndependently() async throws {
-        try await withMetadataScratch { env in
-            #expect(await env.model.setAuthors([" Ada Lovelace ", "", "Grace Hopper "], for: env.id))
-            let note = try await env.store.load(env.id)
-            #expect(note.authors == ["Ada Lovelace", "Grace Hopper"])
-            #expect(await env.index.search("Lovelace") == [env.id])
-            #expect(try await metadataTags(env).isEmpty, "authors remain front-matter only")
-
-            var extract = note
-            extract.id = UUID()
-            extract.kind = .extract
-            extract.title = "Independent extract"
-            extract.authors = ["Extract Original"]
-            _ = try await env.store.create(extract)
-
-            #expect(await env.model.setAuthors(["  ExtractAuthorMarker  "], for: extract.id))
-            #expect(try await env.store.load(extract.id).authors == ["ExtractAuthorMarker"])
-            #expect(try await env.store.load(env.id).authors == ["Ada Lovelace", "Grace Hopper"])
-            #expect(await env.index.search("ExtractAuthorMarker") == [extract.id])
-
-            #expect(await env.model.setAuthors(["  ", "\n"], for: extract.id))
-            #expect(try await env.store.load(extract.id).authors.isEmpty)
-            #expect(await env.index.search("ExtractAuthorMarker").isEmpty)
-        }
-    }
-
     @Test("Copy Link writes the selected note or extract as a plain-text deep link")
     func copyOpenLinkWritesPlainTextURL() async throws {
         try await withMetadataScratch { env in
@@ -201,11 +174,10 @@ extension NotesTagProjectorSafetyTests {
             async let second = env.model.addTag("Second", to: env.id)
             async let rename = env.model.renameNote(env.id, to: "Concurrent Title")
             async let body: Void = env.model.setBody("Concurrent body\n", for: env.id)
-            async let authors = env.model.setAuthors(["Concurrent Author"], for: env.id)
-            let results = await (first, second, rename, body, authors)
-            #expect(results.0 && results.1 && results.2 && results.4)
+            let results = await (first, second, rename, body)
+            #expect(results.0 && results.1 && results.2)
             let item = try await env.store.load(env.id)
-            #expect(Set(item.tags) == ["First", "Second"] && item.authors == ["Concurrent Author"])
+            #expect(Set(item.tags) == ["First", "Second"])
             #expect(item.title == "Concurrent Title" && item.trailingBodyRaw == "Concurrent body\n")
             #expect(try await metadataTags(env) == ["First", "Second"])
         }

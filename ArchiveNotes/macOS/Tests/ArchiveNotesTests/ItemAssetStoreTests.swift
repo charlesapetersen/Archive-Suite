@@ -19,7 +19,7 @@ struct ItemAssetStoreTests {
 
     private func makeItem(title: String = "Asset Host") -> Item {
         Item(
-            id: UUID(), kind: .note, title: title, authors: ["Author A"], date: "1980",
+            id: UUID(), kind: .note, title: title, date: "1980",
             datePrecision: .year, dateUncertain: false, quality: nil, tags: ["test"], zotero: [],
             roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
             unknownFrontMatter: [], trailingBodyRaw: nil

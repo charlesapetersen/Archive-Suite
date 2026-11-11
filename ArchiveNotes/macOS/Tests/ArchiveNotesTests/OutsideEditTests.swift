@@ -23,7 +23,7 @@ struct OutsideEditTests {
         let org = OrganizationStore(index: index)
         try await org.load(storeRoot: root)
         let store = NoteStore(root: root)
-        let item = Item(id: UUID(), kind: .note, title: "Original", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Original", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: "Original paragraph.")
@@ -151,13 +151,13 @@ struct OutsideEditTests {
         let editor = editor(env)
         await editor.select(env.item.id)
         var outside = try await env.store.load(env.item.id)
-        outside.authors = ["Outside Author"]
+        outside.quality = 2
         outside.unknownFrontMatter = [UnknownKey(key: "external_key", rawLines: ["external_key: preserved"])]
         try Data(FrontMatterCodec.encode(outside).utf8).write(to: env.file)
         editor.markdown = "Typed paragraph."
         await editor.flushPending()
         let saved = try await env.store.load(env.item.id)
-        #expect(saved.authors == ["Outside Author"])
+        #expect(saved.quality == 2)
         #expect(saved.unknownFrontMatter == outside.unknownFrontMatter)
         #expect(saved.trailingBodyRaw == "Typed paragraph.")
         #expect(await env.store.allItemIDs().count == 1)

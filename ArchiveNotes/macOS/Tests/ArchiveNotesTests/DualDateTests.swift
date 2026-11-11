@@ -33,7 +33,7 @@ struct DualDateTests {
     private func item(date: String? = nil, precision: Item.DatePrecision? = nil,
                       sentWith: ArchiveDate? = nil, sentWithUncertain: Bool = false,
                       tags: [String] = []) -> Item {
-        Item(id: UUID(), kind: .note, title: "Enclosure", authors: [], date: date,
+        Item(id: UUID(), kind: .note, title: "Enclosure", date: date,
              datePrecision: precision, dateUncertain: false, quality: nil, tags: tags, zotero: [],
              roundup: false, created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0),
              schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil,
@@ -42,7 +42,7 @@ struct DualDateTests {
 
     private func summary(_ item: Item) -> ItemSummary {
         ItemSummary(id: item.id, title: item.title, kind: item.kind, date: item.date,
-                    datePrecision: item.datePrecision, dateUncertain: item.dateUncertain, authors: [],
+                    datePrecision: item.datePrecision, dateUncertain: item.dateUncertain,
                     sortDate: item.sortDate, quality: nil, created: item.created, modified: item.modified,
                     mtime: 0, managedTags: [], sentWith: item.sentWith,
                     sentWithUncertain: item.sentWithUncertain)

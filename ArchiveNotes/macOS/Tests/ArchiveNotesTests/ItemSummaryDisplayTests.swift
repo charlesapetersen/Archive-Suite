@@ -9,7 +9,7 @@ struct ItemSummaryDisplayTests {
                      quality: Int? = nil, managedTags: [String] = []) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: UUID(), title: "T", kind: .note, date: date, datePrecision: precision,
-                           dateUncertain: uncertain, authors: [], sortDate: nil, quality: quality,
+                           dateUncertain: uncertain, sortDate: nil, quality: quality,
                            created: t, modified: t, mtime: 0, managedTags: managedTags)
     }
 

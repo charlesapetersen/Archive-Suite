@@ -28,7 +28,6 @@ enum FrontMatterCodec {
             id: id,
             kind: Item.Kind(rawValue: fields.kind ?? "note") ?? .note,
             title: fields.title ?? "",
-            authors: fields.authors,
             date: fields.date,
             datePrecision: fields.datePrecision.flatMap(Item.DatePrecision.init(rawValue:)),
             dateUncertain: fields.dateUncertain,
@@ -58,10 +57,6 @@ enum FrontMatterCodec {
         lines.append("id: \(item.id.uuidString.lowercased())")
         lines.append("kind: \(item.kind.rawValue)")
         lines.append("title: \(quoteScalar(item.title))")
-
-        if !item.authors.isEmpty {
-            lines.append("authors: \(emitFlowList(item.authors))")
-        }
 
         if let date = item.date {
             lines.append("date: \(quoteScalar(date))")
@@ -210,7 +205,6 @@ enum FrontMatterCodec {
         var id: String?
         var kind: String?
         var title: String?
-        var authors: [String] = []
         var date: String?
         var datePrecision: String?
         var dateUncertain: Bool = false
@@ -228,7 +222,7 @@ enum FrontMatterCodec {
     }
 
     private static let knownKeys: Set<String> = [
-        "schema", "id", "kind", "title", "authors", "date",
+        "schema", "id", "kind", "title", "date",
         "date_precision", "date_uncertain", "additional_dates", "quality", "tags",
         "roundup", "zotero", "created", "modified", displayCalendarKey
     ]
@@ -287,11 +281,6 @@ enum FrontMatterCodec {
             case "title":
                 fields.title = unquoteScalar(valuePart)
                 i += 1
-
-            case "authors":
-                let (list, consumed) = parseList(valuePart, lines: lines, from: i)
-                fields.authors = list
-                i += consumed
 
             case "date":
                 fields.date = unquoteScalar(valuePart)
@@ -627,7 +616,7 @@ enum FrontMatterCodec {
         if s.contains(",") || s.contains("[") || s.contains("]") { return true }
         // A quote char anywhere in an UNquoted flow element is treated as a delimiter by
         // `parseFlowList` (it toggles in-single/in-double state mid-stream), which drops a
-        // single-quote (e.g. author "O'Brien" → "OBrien") or merges elements across a stray
+        // single-quote (e.g. a tag "O'Brien" → "OBrien") or merges elements across a stray
         // double-quote. Double-quoting the element (quoteFlowElement escapes `\` and `"`) makes
         // the parser treat both quote kinds as literal content. (Found by NotesFrontMatterTests fuzz.)
         if s.contains("\"") || s.contains("'") { return true }

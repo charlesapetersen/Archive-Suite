@@ -13,11 +13,11 @@ struct NotesAdvancedSearchTests {
 
     private func item(_ title: String, kind: Item.Kind = .note, quality: Int? = nil, sortDate: Int? = nil,
                       date: String? = nil, precision: Item.DatePrecision? = nil,
-                      tags: [String] = [], authors: [String] = [], uncertain: Bool = false, roundup: Bool = false,
+                      tags: [String] = [], uncertain: Bool = false, roundup: Bool = false,
                       sentWith: ArchiveDate? = nil, id: UUID = UUID()) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: id, title: title, kind: kind, date: date, datePrecision: precision,
-                           dateUncertain: uncertain, authors: authors, sortDate: sortDate, quality: quality,
+                           dateUncertain: uncertain, sortDate: sortDate, quality: quality,
                            created: t, modified: t, mtime: 0, managedTags: tags, roundup: roundup,
                            sentWith: sentWith)
     }
@@ -45,17 +45,16 @@ struct NotesAdvancedSearchTests {
         #expect(!rule(.date) { $0.text = "not a date" }.isActive)
     }
 
-    @Test func titleAndAuthorOperators() {
-        let a = item("Moore on Intel culture", authors: ["Gordon Moore", "Arthur Rock"])
+    @Test func titleOperators() {
+        let a = item("Moore on Intel culture")
         func title(_ op: RuleOperator, _ t: String) -> Bool { hit(search(.all, rule(.title, op) { $0.text = t }), a) }
         #expect(title(.contains, "intel"))
         #expect(!title(.doesNotContain, "INTEL"))
         #expect(title(.beginsWith, "moore"))
         #expect(!title(.beginsWith, "intel"))
         #expect(title(.endsWith, "Culture"))
-        #expect(hit(search(.all, rule(.authors) { $0.text = "rock" }), a))
-        #expect(!hit(search(.all, rule(.authors, .doesNotContain) { $0.text = "moore" }), a))
-        #expect(hit(search(.all, rule(.authors, .doesNotContain) { $0.text = "Noyce" }), a))
+        // Notes have no authors (W40.notes-remove-authors): there is no Authors rule to offer.
+        #expect(NotesRuleField(rawValue: "authors") == nil)
     }
 
     @Test func tagOperatorsIgnoreCase() {
@@ -215,8 +214,8 @@ struct NotesAdvancedSearchTests {
 
     private func row(_ id: UUID, title: String, body: String, tags: String = "") -> NoteIndexRow {
         let t = Date(timeIntervalSince1970: 0)
-        return NoteIndexRow(id: id, mtime: 0, title: title, kind: .note, tags: tags, authors: "",
-                            authorsJSON: "[]", body: body, date: nil, datePrecision: nil,
+        return NoteIndexRow(id: id, mtime: 0, title: title, kind: .note, tags: tags,
+                            body: body, date: nil, datePrecision: nil,
                             dateUncertain: false, sortDate: nil, quality: nil, created: t,
                             modified: t, managedTags: "[]", sourceCount: 0)
     }

@@ -9,7 +9,7 @@ struct NotesSortTests {
                      quality: Int? = nil) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: UUID(), title: title, kind: kind, date: nil, datePrecision: nil,
-                           dateUncertain: false, authors: [], sortDate: sortDate, quality: quality,
+                           dateUncertain: false, sortDate: sortDate, quality: quality,
                            created: t, modified: t, mtime: 0, managedTags: [])
     }
     private func desc(_ f: NoteSortField, _ asc: Bool) -> [NoteSortDescriptor] {
@@ -68,10 +68,10 @@ struct NotesSortTests {
         // Two items identical except id → deterministic order by uuidString (never .orderedSame).
         let t = Date(timeIntervalSince1970: 0)
         let a = ItemSummary(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, title: "same",
-                            kind: .note, date: nil, datePrecision: nil, dateUncertain: false, authors: [],
+                            kind: .note, date: nil, datePrecision: nil, dateUncertain: false,
                             sortDate: 19700000, quality: nil, created: t, modified: t, mtime: 0, managedTags: [])
         let b = ItemSummary(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, title: "same",
-                            kind: .note, date: nil, datePrecision: nil, dateUncertain: false, authors: [],
+                            kind: .note, date: nil, datePrecision: nil, dateUncertain: false,
                             sortDate: 19700000, quality: nil, created: t, modified: t, mtime: 0, managedTags: [])
         let out1 = NotesSort.sorted([a, b], by: NotesSort.default).map(\.id)
         let out2 = NotesSort.sorted([b, a], by: NotesSort.default).map(\.id)

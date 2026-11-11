@@ -124,7 +124,7 @@ final class NotesFilterTests: XCTestCase {
                       quality: Int? = nil, tags: [String] = [], id: UUID = UUID()) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: id, title: title, kind: kind, date: nil, datePrecision: nil,
-                           dateUncertain: false, authors: [], sortDate: sortDate, quality: quality,
+                           dateUncertain: false, sortDate: sortDate, quality: quality,
                            created: t, modified: t, mtime: 0, managedTags: tags)
     }
 

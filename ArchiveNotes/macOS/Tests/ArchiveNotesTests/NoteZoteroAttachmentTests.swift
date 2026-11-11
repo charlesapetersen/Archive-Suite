@@ -16,7 +16,7 @@ struct NoteZoteroAttachmentTests {
         let store = NoteStore(root: root)
         let model = NotesModel(organization: organization, index: index, noteStore: store)
         defer { Task { await index.close(); try? FileManager.default.removeItem(at: root) } }
-        let item = Item(id: UUID(), kind: .note, title: "Keep title", authors: ["Keep author"],
+        let item = Item(id: UUID(), kind: .note, title: "Keep title",
                         date: nil, datePrecision: nil, dateUncertain: false, quality: nil, tags: [],
                         zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
                         blocks: [], unknownFrontMatter: [], trailingBodyRaw: "Keep body\n")
@@ -34,7 +34,7 @@ struct NoteZoteroAttachmentTests {
             #expect(results.0 && results.1)
             let saved = try await store.load(item.id)
             #expect(saved.zotero == [ref])
-            #expect(saved.title == item.title && saved.authors == item.authors)
+            #expect(saved.title == item.title)
             #expect(saved.trailingBodyRaw == item.trailingBodyRaw)
             #expect(saved.blocks.isEmpty)
             #expect(model.allItems.contains(where: { $0.id == item.id }))

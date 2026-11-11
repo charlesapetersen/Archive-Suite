@@ -57,13 +57,13 @@ struct HardDeleteWindowTests {
 
     /// Create a real on-disk note and seed the shared item source; returns its id.
     private func makeItem(_ env: Env, _ title: String) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: title, authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: title, date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)
         _ = try await env.store.create(item)
         env.model.replaceItems([ItemSummary(id: item.id, title: item.title, kind: item.kind, date: nil,
-                                            datePrecision: nil, dateUncertain: false, authors: [],
+                                            datePrecision: nil, dateUncertain: false,
                                             sortDate: nil, quality: nil, created: item.created,
                                             modified: item.modified, mtime: 0, managedTags: [])])
         return item.id

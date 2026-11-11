@@ -41,7 +41,7 @@ final class StoreFolderChooserTests: XCTestCase {
     private func makeStore(_ name: String, noteTitle: String) async throws -> URL {
         let root = try folder(name)
         _ = try RootMarker.ensure(at: root, kind: .notes, name: name)
-        let item = Item(id: UUID(), kind: .note, title: noteTitle, authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: noteTitle, date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)

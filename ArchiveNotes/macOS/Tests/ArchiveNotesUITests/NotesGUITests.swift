@@ -373,8 +373,8 @@ class NotesFixtureUITestCase: XCTestCase {
     /// In the VM's window the day row sits below the pane's fold, so a click there landed outside the
     /// field and the year field kept keyboard focus ("Neither element nor any descendant has keyboard focus").
     /// An element half under the fold still reports hittable, but its centre, where `click()` lands, is
-    /// on the editor toolbar below: the Extracts window's authors Clear did nothing that way
-    /// (W40.fix-notes-extract-authors-clear). Pass `window` for a window other than the note window.
+    /// on the editor toolbar below: the Extracts window's (since removed) authors Clear did nothing
+    /// that way (W40.fix-notes-extract-authors-clear). Pass `window` for a window other than the note window.
     func revealInMetadataScroll(_ element: XCUIElement, in window: XCUIElement? = nil,
                                 file: StaticString = #filePath, line: UInt = #line) {
         let scroll = (window ?? mainWindow).descendants(matching: .any)["an.inspector"].firstMatch
@@ -1907,9 +1907,8 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         openAutoFillSheet()
         XCTAssertTrue(sheet.waitForExistence(timeout: 10), "the command should be repeatable after Cancel")
-        let authorsToggle = app.descendants(matching: .any)["an.zotero.autofill.field.authors"].firstMatch
-        XCTAssertTrue(authorsToggle.waitForExistence(timeout: 5), "the empty authors proposal should be reviewable")
-        authorsToggle.click()  // prove an explicit rejection leaves the existing empty field untouched
+        XCTAssertFalse(app.descendants(matching: .any)["an.zotero.autofill.field.authors"].firstMatch.exists,
+                       "Zotero's authors are not proposed: notes have no authors (W40.notes-remove-authors)")
         let apply = app.descendants(matching: .any)["an.zotero.autofill.apply"].firstMatch
         XCTAssertTrue(apply.waitForExistence(timeout: 5), "the confirmation sheet should offer Apply")
         apply.click()
@@ -1924,8 +1923,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         }, "Apply should write only the selected date and the citation fetched using the configured style")
         XCTAssertTrue(after.contains("title: My First Note"),
                       "unselected replacement title must remain untouched")
-        XCTAssertFalse(after.contains("authors: [Ada Lovelace]"),
-                       "an explicitly unselected authors proposal must remain untouched")
+        XCTAssertFalse(after.contains("authors:"), "auto-fill writes no authors")
     }
 
     /// B2: actual inspector controls, persisted front matter, per-note clipboard dedup, loading/error

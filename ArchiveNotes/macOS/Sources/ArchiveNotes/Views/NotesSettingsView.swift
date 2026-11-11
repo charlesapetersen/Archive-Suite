@@ -34,7 +34,7 @@ struct NotesSettingsView: View {
                 Text("Zotero")
             } footer: {
                 Text("Reads item metadata over Zotero's local API or Better BibTeX to auto-fill a "
-                   + "note's author/date/title and a formatted citation. Attaching a link and opening "
+                   + "note's date/title and a formatted citation. Attaching a link and opening "
                    + "a citation in Zotero work even when Zotero isn't running.")
                     .font(.footnote)
                     .foregroundStyle(.primary)

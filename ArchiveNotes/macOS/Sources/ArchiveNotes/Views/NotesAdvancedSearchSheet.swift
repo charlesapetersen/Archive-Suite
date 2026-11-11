@@ -255,13 +255,13 @@ private struct NotesRuleValueView: View {
 
     var body: some View {
         switch rule.field {
-        case .text, .noteText, .title, .authors:
+        case .text, .noteText, .title:
             TextField(rule.op == .phrase ? "phrase" : (rule.field.isText ? "words" : "text"), text: $rule.text)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 160, maxWidth: .infinity)
                 .help(rule.field.isText
                       ? "Words separated by spaces; end a word with * to match its beginning (budg* finds budget)"
-                      : (rule.field == .title ? "Part of the title" : "Part of an author's name"))
+                      : "Part of the title")
                 .accessibilityIdentifier("an.advanced.rule.text")
         case .tags:
             // Chips and the suite's tag field (W40.fix-notes-tag-fields; owner session notes-2 row 24). The rule
@@ -337,7 +337,6 @@ extension NotesRuleField {
         case .text: return "Any text"
         case .noteText: return "Note text"
         case .title: return "Title"
-        case .authors: return "Authors"
         case .tags: return "Tags"
         case .kind: return "Kind"
         case .quality: return "Quality"

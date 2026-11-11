@@ -4,54 +4,26 @@ import XCTest
 /// Most of that part is already driven elsewhere in this bundle: delete + the delete-last-instance guard
 /// (`testG8_…`, `testG19_…`), tag editing with the Finder-tag projection following (`testG17_…`), the
 /// inline quality edit (`testW9D4_…`) and the empty states (`testW9D8_…`). This class covers the two
-/// behaviours nothing drove yet: manual authors (B8) and the row context menu's "Open" (D2).
+/// behaviours nothing drove yet: the row context menu's "Open" (D2), and B8, once manual authors and now that
+/// notes have none.
 ///
 /// Scratch fixture only. Each check puts the fixture back the way it found it, because the container and
 /// fixture are shared by every class in a VM run and this one sorts before `NotesGUITests`.
 final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
 
-    /// B8 — authors typed in the inspector, with no Zotero involved, reach front matter for a note AND an
-    /// extract, and keyword search finds the note by that author.
-    func testE2_ManualAuthorsPersistForNoteAndExtractAndAreSearchable() throws {
+    /// B8 was manual authors; notes have none now (W40.notes-remove-authors, owner's Notes session 2 row 14). The
+    /// inspector of a note and of an extract shows its date field and no authors field.
+    func testE2_InspectorHasNoAuthorsField() throws {
         try withFixture {
-            try requireCanonicalScratchFixtureForStoreWrites()
             selectItem(uuid: Self.idPlain)
-            setAuthors("Zenobia Quartermaine", in: mainWindow)
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                (self.rawMarkdown(inItemDir: Self.idPlain) ?? "").contains("authors: [Zenobia Quartermaine]")
-            }, "leaving the authors field should write the note's authors to front matter")
-
-            let search = mainWindow.textFields["an.filter.search"]
-            XCTAssertTrue(search.waitForExistence(timeout: 10))
-            search.click()
-            search.typeText("Quartermaine")
-            XCTAssertTrue(pollUntil(timeout: 15) { self.visibleNotes() == [Self.idPlain] },
-                          "searching the new author should find only that note")
-            mainWindow.buttons["an.filter.searchClear"].click()
-            XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes().count == 3 },
-                          "clearing the search should bring back every fixture note")
-
+            assertNoAuthorsField(in: mainWindow)
             // The extract lives in the Extracts window, which the note window's list never shows.
             let win = openExtractsWindow()
             let extractCell = win.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
             XCTAssertTrue(extractCell.waitForExistence(timeout: 15), "the fixture extract should be listed")
             extractCell.click()
-            setAuthors("Ignatius Fenwick", in: win)
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                (self.rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("authors: [Ignatius Fenwick]")
-            }, "leaving the authors field should write the extract's authors to front matter")
-
-            // Put both back so the later checks see the fixture as generated.
-            setAuthors("", in: win)
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                !(self.rawMarkdown(inItemDir: Self.idExtract) ?? "").contains("Ignatius Fenwick")
-            }, "emptying the authors field should remove the extract's authors")
+            assertNoAuthorsField(in: win)
             closeExtractsWindow(win)
-            selectItem(uuid: Self.idPlain)
-            setAuthors("", in: mainWindow)
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                !(self.rawMarkdown(inItemDir: Self.idPlain) ?? "").contains("authors:")
-            }, "emptying the authors field should remove the note's authors line")
         }
     }
 
@@ -87,16 +59,11 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
         })
     }
 
-    private func setAuthors(_ name: String, in window: XCUIElement) {
-        let field = window.descendants(matching: .any)["an.detail.authors"].firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 10), "the authors field should be in the inspector")
-        revealInMetadataScroll(field, in: window)
-        field.click()
-        app.typeKey("a", modifierFlags: .command)
-        app.typeText(name.isEmpty ? XCUIKeyboardKey.delete.rawValue : name)
-        XCTAssertFalse(window.buttons["an.detail.authors.set"].exists || window.buttons["an.detail.authors.clear"].exists,
-                       "the authors field applies as edited: no Set or Clear button (W40.fix-suite-no-set-clear)")
-        app.typeKey(.tab, modifierFlags: [])   // leaving the field applies it
+    private func assertNoAuthorsField(in window: XCUIElement) {
+        XCTAssertTrue(window.descendants(matching: .any)["an.detail.date.field"].firstMatch.waitForExistence(timeout: 10),
+                      "the inspector should show the item's date field")
+        XCTAssertFalse(window.descendants(matching: .any)["an.detail.authors"].firstMatch.exists,
+                       "the inspector should have no authors field")
     }
 
     private func openExtractsWindow() -> XCUIElement {

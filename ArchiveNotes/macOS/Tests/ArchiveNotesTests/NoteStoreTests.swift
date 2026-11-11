@@ -17,7 +17,6 @@ struct NoteStoreTests {
             id: UUID(),
             kind: kind,
             title: title,
-            authors: ["Author A"],
             date: "1980",
             datePrecision: .year,
             dateUncertain: false,
@@ -119,7 +118,6 @@ struct NoteStoreTests {
         #expect(loaded.id == item.id)
         #expect(loaded.title == "Round Trip")
         #expect(loaded.kind == .note)
-        #expect(loaded.authors == ["Author A"])
         #expect(loaded.tags == ["test"])
     }
 

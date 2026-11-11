@@ -64,7 +64,7 @@ struct NotesTrashFailureTests {
 
     /// Write a real note to the scratch store and return its id.
     private func addNote(_ title: String, to env: Env) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: title, authors: [], date: "1980",
+        let item = Item(id: UUID(), kind: .note, title: title, date: "1980",
                         datePrecision: .year, dateUncertain: false, quality: nil, tags: [],
                         zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
                         blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)

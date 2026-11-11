@@ -25,7 +25,7 @@ final class NotesTableTruncationTests: XCTestCase {
             id: UUID(), title: "Memorandum to the Governor regarding the 1978 budget and its consequences "
                 + "for local government finance, county services, school districts, with attachments",
             kind: .note, date: "1965-11-17", datePrecision: .day, dateUncertain: false,
-            authors: [], sortDate: 19651117, quality: 2, created: stamp, modified: stamp, mtime: 0,
+            sortDate: 19651117, quality: 2, created: stamp, modified: stamp, mtime: 0,
             managedTags: ["Department of Finance", "Correspondence", "Governor's Office", "Budget"],
             sentWith: ArchiveDate(year: 1966))
         model.replaceItems([item])

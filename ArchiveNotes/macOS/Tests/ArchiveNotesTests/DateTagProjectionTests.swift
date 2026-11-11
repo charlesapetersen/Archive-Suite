@@ -29,7 +29,7 @@ struct DateTagProjectionTests {
     }
 
     private func makeNote(_ env: Env, tags: [String] = []) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: "Date note", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Date note", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: tags, zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -94,7 +94,7 @@ struct DateTagProjectionTests {
             ("1968-13", .month), ("10", .year), ("10000", .year), ("10", .decade), ("10000", .decade)
         ]
         for (date, precision) in invalidDates {
-            let item = Item(id: UUID(), kind: .note, title: "Malformed", authors: [], date: date,
+            let item = Item(id: UUID(), kind: .note, title: "Malformed", date: date,
                             datePrecision: precision, dateUncertain: false, quality: nil, tags: [], zotero: [],
                             roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                             unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -138,7 +138,7 @@ struct DateTagProjectionTests {
     @Test("a matching third-party date token is not adopted or removed")
     func externalMatchingDateTokenSurvivesClear() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
-        let item = Item(id: UUID(), kind: .note, title: "External date", authors: [], date: "1968",
+        let item = Item(id: UUID(), kind: .note, title: "External date", date: "1968",
                         datePrecision: .year, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -156,7 +156,7 @@ struct DateTagProjectionTests {
     @Test("template-derived dates project when the item is created")
     func templateDerivedDateProjectsOnCreation() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
-        let template = Item(id: UUID(), kind: .note, title: "Dated template", authors: [], date: "1971-04-05",
+        let template = Item(id: UUID(), kind: .note, title: "Dated template", date: "1971-04-05",
                             datePrecision: .day, dateUncertain: false, quality: nil, tags: [], zotero: [],
                             roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                             unknownFrontMatter: [], trailingBodyRaw: nil)

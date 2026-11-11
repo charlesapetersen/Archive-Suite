@@ -227,7 +227,7 @@ struct DateFieldCalendarEntryTests {
         let model = NotesModel(organization: org, index: index, noteStore: store)
 
         func note() async throws -> UUID {
-            let item = Item(id: UUID(), kind: .note, title: "Letter", authors: [], date: nil,
+            let item = Item(id: UUID(), kind: .note, title: "Letter", date: nil,
                             datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                             roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                             unknownFrontMatter: [], trailingBodyRaw: nil)

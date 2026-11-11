@@ -26,7 +26,6 @@ struct NotesFrontMatterTests {
             id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
             kind: .extract,
             title: "A Title: With Colon & \"Quotes\"",
-            authors: ["Ada Lovelace", "Alan Turing"],
             date: "1968-03-25",
             datePrecision: .day,
             dateUncertain: true,
@@ -121,7 +120,6 @@ struct NotesFrontMatterTests {
         #expect(item.title == "Minimal")
         #expect(item.kind == .note)
         #expect(item.schema == 1)
-        #expect(item.authors.isEmpty)
         #expect(item.tags.isEmpty)
         #expect(item.zotero.isEmpty)
         #expect(item.quality == nil)
@@ -162,7 +160,7 @@ struct NotesFrontMatterTests {
         #expect(try FrontMatterCodec.decode(tabbed).title == "Tabbed")
         // Edge regular-space DOES survive (encode quotes it).
         let spaced = Item(id: UUID(uuidString: uuid)!, kind: .note, title: "  Spaced  ",
-                          authors: [], date: nil, datePrecision: nil, dateUncertain: false,
+                          date: nil, datePrecision: nil, dateUncertain: false,
                           quality: nil, tags: [], zotero: [], roundup: false,
                           created: Date(timeIntervalSince1970: 1), modified: Date(timeIntervalSince1970: 1),
                           schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -212,7 +210,7 @@ struct NotesFrontMatterTests {
         }
     }
 
-    /// Family C — well-formed but fuzzy `Item`s (tricky titles/tags/authors/dates + unknown keys).
+    /// Family C — well-formed but fuzzy `Item`s (tricky titles/tags/dates + unknown keys).
     /// The well-formed path must be byte-idempotent and never invent or drop a known field.
     @Test
     func fuzzWellFormedItemsRoundTripLosslessly() throws {
@@ -227,7 +225,6 @@ struct NotesFrontMatterTests {
             #expect(item2.title == item.title)
             #expect(item2.kind == item.kind)
             #expect(item2.tags == item.tags)
-            #expect(item2.authors == item.authors)
             #expect(item2.quality == item.quality)
             #expect(item2.unknownFrontMatter.count == item.unknownFrontMatter.count)
         }
@@ -271,7 +268,7 @@ struct NotesFrontMatterTests {
             .trimmingCharacters(in: .whitespaces)
     }
 
-    /// A non-empty, whitespace-trimmed token for tags/authors (empty/edge-whitespace tokens are
+    /// A non-empty, whitespace-trimmed token for tags (empty/edge-whitespace tokens are
     /// dropped or trimmed by the flow-list parser, so they don't belong in a round-trip fixture).
     private func fuzzyToken(using rng: inout SeededGenerator) -> String? {
         let t = fuzzyString(maxLen: 16, using: &rng, allowNewlines: false)
@@ -316,7 +313,6 @@ struct NotesFrontMatterTests {
     /// A well-formed random `Item` whose fields all round-trip by construction.
     private func randomItem(using rng: inout SeededGenerator) -> Item {
         let tags = (0..<Int.random(in: 0...4, using: &rng)).compactMap { _ in fuzzyToken(using: &rng) }
-        let authors = (0..<Int.random(in: 0...3, using: &rng)).compactMap { _ in fuzzyToken(using: &rng) }
         let hasDate = Bool.random(using: &rng)
         let precisions: [Item.DatePrecision] = [.decade, .year, .month, .day]
         let unknownCount = Int.random(in: 0...2, using: &rng)
@@ -328,7 +324,6 @@ struct NotesFrontMatterTests {
             id: UUID(),
             kind: Bool.random(using: &rng) ? .note : .extract,
             title: fuzzyTitle(using: &rng),
-            authors: authors,
             date: hasDate ? "1970-06-15" : nil,
             datePrecision: hasDate ? precisions.randomElement(using: &rng) : nil,
             dateUncertain: Bool.random(using: &rng),

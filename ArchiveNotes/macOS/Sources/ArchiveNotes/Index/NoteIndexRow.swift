@@ -9,8 +9,6 @@ struct NoteIndexRow: Sendable {
     let title: String
     let kind: Item.Kind
     let tags: String          // space-joined for FTS
-    let authors: String       // space-joined for FTS
-    let authorsJSON: String   // JSON array for the items table
     let body: String          // markdown body text
     let date: String?
     let datePrecision: Item.DatePrecision?
@@ -45,15 +43,12 @@ extension NoteIndexRow {
         let fullBody = InlineTagStyle.strippingTags(item.trailingBodyRaw.map { $0 + "\n" + bodyText } ?? bodyText)
         let encoder = JSONEncoder()
         let tagsJSON = (try? encoder.encode(item.tags)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-        let authorsJSON = (try? encoder.encode(item.authors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         self.init(
             id: item.id,
             mtime: mtime,
             title: item.title,
             kind: item.kind,
             tags: item.tags.joined(separator: " "),
-            authors: item.authors.joined(separator: " "),
-            authorsJSON: authorsJSON,
             body: fullBody,
             date: item.date,
             datePrecision: item.datePrecision,
@@ -81,7 +76,6 @@ struct ItemSummary: Sendable, Identifiable {
     let date: String?
     let datePrecision: Item.DatePrecision?
     let dateUncertain: Bool
-    let authors: [String]
     let sortDate: Int?
     let quality: Int?
     let created: Date
@@ -107,7 +101,7 @@ extension ItemSummary {
     init(item: Item, mtime: Double) {
         self.init(id: item.id, title: item.title, kind: item.kind, date: item.date,
                   datePrecision: item.datePrecision, dateUncertain: item.dateUncertain,
-                  authors: item.authors, sortDate: item.sortDate, quality: item.quality,
+                  sortDate: item.sortDate, quality: item.quality,
                   created: item.created, modified: item.modified, mtime: mtime,
                   managedTags: item.tags, sourceNoteCount: item.blocks.distinctSourceNoteCount,
                   roundup: item.roundup, sentWith: item.sentWith,

@@ -496,7 +496,7 @@ final class VisualReviewUITests: NotesFixtureUITestCase {
         let items = URL(fileURLWithPath: Self.canonicalFixturePath).appendingPathComponent("items")
         let stamp = "2026-07-14T09:00:00Z"
         func front(_ id: String, _ title: String, tags: [String]) -> String {
-            "---\nschema: 1\nid: \(id)\nkind: note\ntitle: \"\(title)\"\nauthors: [Gordon E. Moore, Robert N. Noyce]\n"
+            "---\nschema: 1\nid: \(id)\nkind: note\ntitle: \"\(title)\"\n"
                 + "date: 1968-07\ndate_precision: month\ndate_uncertain: false\nquality: 2\n"
                 + "tags: [\(tags.joined(separator: ", "))]\nroundup: false\ncreated: \(stamp)\nmodified: \(stamp)\n---\n"
         }

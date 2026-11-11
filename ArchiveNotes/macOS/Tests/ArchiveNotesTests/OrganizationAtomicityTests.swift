@@ -59,7 +59,7 @@ struct OrganizationAtomicityTests {
     }
 
     private func makeItem(_ title: String, kind: Item.Kind = .note) -> Item {
-        Item(id: UUID(), kind: kind, title: title, authors: [], date: nil, datePrecision: nil,
+        Item(id: UUID(), kind: kind, title: title, date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(), modified: Date(), schema: 1, blocks: [],
              unknownFrontMatter: [], trailingBodyRaw: nil)

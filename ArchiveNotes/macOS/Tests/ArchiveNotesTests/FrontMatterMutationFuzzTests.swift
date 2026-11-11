@@ -43,7 +43,6 @@ struct FrontMatterMutationFuzzTests {
             #expect(back.id == item.id, "iteration \(i)")
             #expect(back.title == item.title, "iteration \(i): title \(item.title.debugDescription) → \(back.title.debugDescription)")
             #expect(back.tags == item.tags, "iteration \(i): tags \(item.tags.debugDescription) → \(back.tags.debugDescription)")
-            #expect(back.authors == item.authors, "iteration \(i): authors \(item.authors.debugDescription) → \(back.authors.debugDescription)")
             #expect(back.zotero.map(\.citation) == item.zotero.map(\.citation), "iteration \(i): citation")
             #expect(back.sentWith == item.sentWith && back.blocks.count == item.blocks.count, "iteration \(i)")
         }
@@ -255,11 +254,15 @@ enum NoteFuzz {
             return Block(kind: kind, source: source, markdown: lines.joined(separator: "\n") + "\n",
                          unknownHeaderFields: [])
         }
+        let kind: Item.Kind = rng.chance(0.5) ? .note : .extract
+        let title = token(&rng, tricky: tricky)
+        // Notes have no authors any more (W40.notes-remove-authors); the draws they took are still made, so the
+        // seeded runs cover the same files as before. A shifted stream found W40.notes-dup-additional-dates.
+        _ = (0..<rng.int(0...3)).map { _ in token(&rng, tricky: tricky) }
         return Item(
             id: UUID(),
-            kind: rng.chance(0.5) ? .note : .extract,
-            title: token(&rng, tricky: tricky),
-            authors: (0..<rng.int(0...3)).map { _ in token(&rng, tricky: tricky) },
+            kind: kind,
+            title: title,
             date: date, datePrecision: precision, dateUncertain: date != nil && rng.chance(0.3),
             quality: rng.chance(0.5) ? rng.int(1...3) : nil,
             tags: Array(Set((0..<rng.int(0...4)).map { _ in token(&rng, tricky: tricky) })).sorted(),
@@ -318,7 +321,6 @@ enum NoteFuzz {
         #expect(a.id == b.id, "id — \(ctx)")
         #expect(a.kind == b.kind, "kind — \(ctx)")
         #expect(a.title == b.title, "title — \(ctx)")
-        #expect(a.authors == b.authors, "authors — \(ctx)")
         #expect(a.date == b.date && a.datePrecision == b.datePrecision && a.dateUncertain == b.dateUncertain, "date — \(ctx)")
         #expect(a.quality == b.quality, "quality — \(ctx)")
         #expect(a.tags == b.tags, "tags — \(ctx)")

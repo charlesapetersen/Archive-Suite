@@ -38,7 +38,7 @@ struct NotesModelBodyTests {
     @discardableResult
     private func makeNote(_ env: Env, title: String = "Note",
                           body: String? = nil, blocks: [Block] = []) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: title, authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: title, date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: blocks,
                         unknownFrontMatter: [], trailingBodyRaw: body)
@@ -204,7 +204,7 @@ struct NotesModelBodyTests {
     func editorWriteBackKeepsBothBlocksOnDisk() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let src = UUID()
-        let item = Item(id: UUID(), kind: .note, title: "WriteBack", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "WriteBack", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)

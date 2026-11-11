@@ -16,13 +16,12 @@ import Foundation
 import ArchiveCore
 
 enum NotesRuleField: String, Codable, Sendable, CaseIterable {
-    /// Title, tags, authors and body: the columns the filter bar's search box searches.
+    /// Title, tags and body: the columns the filter bar's search box searches.
     case text
     /// The note's body alone (the index's `body` column).
     case noteText
     /// The title as a substring, not through the index.
     case title
-    case authors
     case tags
     case kind
     case quality
@@ -39,7 +38,7 @@ enum NotesRuleField: String, Codable, Sendable, CaseIterable {
     /// become tags or a date.
     var textKind: Int {
         switch self {
-        case .text, .noteText, .title, .authors: return 0
+        case .text, .noteText, .title: return 0
         case .tags: return 1
         case .date: return 2
         default: return 3
@@ -51,7 +50,6 @@ enum NotesRuleField: String, Codable, Sendable, CaseIterable {
         switch self {
         case .text, .noteText: return [.allWords, .phrase, .anyWords, .noWords]
         case .title: return [.contains, .doesNotContain, .beginsWith, .endsWith]
-        case .authors: return [.contains, .doesNotContain]
         case .tags: return [.hasAll, .hasAny, .hasNone]
         case .date: return [.between, .after, .before, .undated]
         case .kind, .quality, .uncertainDate, .folder, .roundup: return [.is, .isNot]
@@ -65,7 +63,7 @@ struct NotesSearchRule: Codable, Equatable, Identifiable, Sendable {
     var id = UUID()
     var field: NotesRuleField
     var op: RuleOperator
-    /// Words or phrase (text fields), the title or author text, tags separated by commas, the "from" or only date.
+    /// Words or phrase (text fields), the title text, tags separated by commas, the "from" or only date.
     var text: String = ""
     /// The "to" date of `between`.
     var text2: String = ""
@@ -119,7 +117,7 @@ struct NotesSearchRule: Codable, Equatable, Identifiable, Sendable {
     var isActive: Bool {
         switch field {
         case .text, .noteText: return !AdvancedSearchText.words(text).isEmpty
-        case .title, .authors: return !text.trimmingCharacters(in: .whitespaces).isEmpty
+        case .title: return !text.trimmingCharacters(in: .whitespaces).isEmpty
         case .tags: return !tagList.isEmpty
         case .quality: return !qualities.isEmpty
         case .date: return op == .undated || dateBounds != nil
@@ -239,10 +237,6 @@ struct NotesAdvancedSearch: Codable, Equatable, Sendable {
             case .endsWith: return item.title.range(of: q, options: opts.union([.anchored, .backwards])) != nil
             default: return item.title.range(of: q, options: opts) != nil
             }
-        case .authors:
-            let q = rule.text.trimmingCharacters(in: .whitespaces)
-            let found = item.authors.contains { $0.range(of: q, options: .caseInsensitive) != nil }
-            return rule.op == .doesNotContain ? !found : found
         case .tags:
             let have = Set(item.managedTags.map { $0.lowercased() })
             let wanted = rule.tagList.map { $0.lowercased() }

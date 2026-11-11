@@ -4,14 +4,6 @@ import Foundation
 
 extension ZoteroCSLItem {
 
-    /// Authors mapped to the front-matter `authors` list: literal name when present,
-    /// else "given family". Whitespace-trimmed; fully-empty names dropped.
-    var mappedAuthors: [String] {
-        (author ?? [])
-            .map { $0.displayName.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-    }
-
     /// Title mapped to the front-matter `title` (trimmed); nil when absent/empty.
     var mappedTitle: String? {
         guard let t = title?.trimmingCharacters(in: .whitespaces), !t.isEmpty else { return nil }
@@ -60,7 +52,7 @@ extension ZoteroCSLItem {
 
 /// A front-matter field the auto-fill action can populate from Zotero.
 enum AutoFillField: String, CaseIterable, Sendable, Hashable {
-    case title, authors, date
+    case title, date
 }
 
 /// The set of proposed front-matter changes from a fetched Zotero CSL item,
@@ -84,7 +76,6 @@ struct AutoFillPlan: Equatable, Sendable {
     }
 
     var proposedTitle: String?
-    var proposedAuthors: [String]?
     var proposedDate: String?
     var proposedDatePrecision: Item.DatePrecision?
     var changes: [FieldChange]
@@ -109,15 +100,6 @@ struct AutoFillPlan: Equatable, Sendable {
                 isReplacement: !item.title.isEmpty))
         }
 
-        let authors = csl.mappedAuthors
-        if !authors.isEmpty, authors != item.authors {
-            changes.append(FieldChange(
-                field: .authors,
-                currentDisplay: item.authors.joined(separator: ", "),
-                proposedDisplay: authors.joined(separator: ", "),
-                isReplacement: !item.authors.isEmpty))
-        }
-
         let (date, precision) = csl.mappedDate()
         if let date, date != item.date {
             changes.append(FieldChange(
@@ -129,7 +111,6 @@ struct AutoFillPlan: Equatable, Sendable {
 
         return AutoFillPlan(
             proposedTitle: title,
-            proposedAuthors: authors.isEmpty ? nil : authors,
             proposedDate: date,
             proposedDatePrecision: precision,
             changes: changes)
@@ -142,9 +123,6 @@ struct AutoFillPlan: Equatable, Sendable {
         var out = item
         if selected.contains(.title), let title = proposedTitle {
             out.title = title
-        }
-        if selected.contains(.authors), let authors = proposedAuthors {
-            out.authors = authors
         }
         if selected.contains(.date), let date = proposedDate {
             out.date = date

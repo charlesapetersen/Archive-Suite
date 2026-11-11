@@ -61,7 +61,7 @@ struct NotesFilterBar: View {
             Button { nav.openAdvancedSearch() } label: {
                 Image(systemName: "line.3.horizontal.decrease.circle")
             }
-            .help("Advanced Search: rules for text, title, authors, tags, kind, quality, dates and folders (⇧⌥⌘F)")
+            .help("Advanced Search: rules for text, title, tags, kind, quality, dates and folders (⇧⌥⌘F)")
             .accessibilityLabel("Advanced Search")
             .accessibilityIdentifier("an.filter.advanced")
 

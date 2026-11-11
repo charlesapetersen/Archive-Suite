@@ -9,7 +9,6 @@ struct ZoteroAutoFillTests {
 
     private func makeItem(
         title: String = "",
-        authors: [String] = [],
         date: String? = nil,
         precision: Item.DatePrecision? = nil,
         dateUncertain: Bool = false,
@@ -20,7 +19,6 @@ struct ZoteroAutoFillTests {
             id: UUID(),
             kind: .note,
             title: title,
-            authors: authors,
             date: date,
             datePrecision: precision,
             dateUncertain: dateUncertain,
@@ -166,28 +164,16 @@ struct ZoteroAutoFillTests {
         #expect(precision == .year)
     }
 
-    // MARK: - Author mapping
+    // MARK: - Authors
 
-    @Test("given/family authors joined as 'given family'")
-    func authorsGivenFamily() {
-        let item = csl(authors: [.init(family: "Moore", given: "Gordon E.", literal: nil)])
-        #expect(item.mappedAuthors == ["Gordon E. Moore"])
-    }
-
-    @Test("literal author preserved verbatim")
-    func authorsLiteral() {
-        let item = csl(authors: [.init(family: nil, given: nil, literal: "Martin Luther King Jr.")])
-        #expect(item.mappedAuthors == ["Martin Luther King Jr."])
-    }
-
-    @Test("empty / whitespace-only author names are dropped and trimmed")
-    func authorsDropEmpty() {
-        let item = csl(authors: [
-            .init(family: "Moore", given: "", literal: nil),   // → "Moore" (leading space trimmed)
-            .init(family: nil, given: nil, literal: "   "),     // → dropped
-            .init(family: "Noyce", given: "Robert", literal: nil),
-        ])
-        #expect(item.mappedAuthors == ["Moore", "Robert Noyce"])
+    /// Notes have no authors (W40.notes-remove-authors): Zotero's authors stay in its citation and are never
+    /// offered as a field.
+    @Test("Zotero's authors are not proposed")
+    func authorsNotProposed() {
+        let plan = AutoFillPlan.make(
+            from: csl(authors: [.init(family: "Moore", given: "Gordon E.", literal: nil)]), item: makeItem())
+        #expect(plan.isEmpty)
+        #expect(AutoFillField.allCases == [.title, .date])
     }
 
     // MARK: - Title mapping
@@ -203,13 +189,13 @@ struct ZoteroAutoFillTests {
 
     @Test("empty note → every field is a fill (default-selected)")
     func planFillEmpty() {
-        let item = makeItem()  // empty title/authors/date
+        let item = makeItem()  // empty title/date
         let plan = AutoFillPlan.make(
             from: csl(title: "Oral History",
                       authors: [.init(family: "Moore", given: "Gordon E.", literal: nil)],
                       dateParts: [[2001]]),
             item: item)
-        #expect(plan.changes.count == 3)
+        #expect(plan.changes.count == 2)
         #expect(plan.changes.allSatisfy { $0.defaultSelected })
         #expect(plan.defaultSelection == Set(AutoFillField.allCases))
         #expect(plan.changes.allSatisfy { !$0.isReplacement })
@@ -217,13 +203,13 @@ struct ZoteroAutoFillTests {
 
     @Test("non-empty note → replacements are NOT default-selected")
     func planReplaceNotDefault() {
-        let item = makeItem(title: "My title", authors: ["Someone"], date: "1999", precision: .year)
+        let item = makeItem(title: "My title", date: "1999", precision: .year)
         let plan = AutoFillPlan.make(
             from: csl(title: "Oral History",
                       authors: [.init(family: "Moore", given: "Gordon E.", literal: nil)],
                       dateParts: [[2001]]),
             item: item)
-        #expect(plan.changes.count == 3)
+        #expect(plan.changes.count == 2)
         #expect(plan.changes.allSatisfy { $0.isReplacement })
         #expect(plan.defaultSelection.isEmpty)
         // Display strings show current vs proposed.
@@ -234,7 +220,7 @@ struct ZoteroAutoFillTests {
 
     @Test("identical proposed values are not offered as changes")
     func planNoOpFields() {
-        let item = makeItem(title: "Oral History", authors: ["Gordon E. Moore"], date: "2001", precision: .year)
+        let item = makeItem(title: "Oral History", date: "2001", precision: .year)
         let plan = AutoFillPlan.make(
             from: csl(title: "Oral History",
                       authors: [.init(family: "Moore", given: "Gordon E.", literal: nil)],
@@ -256,18 +242,16 @@ struct ZoteroAutoFillTests {
             item: item)
         let out = plan.apply(selected: [.title, .date], to: item)
         #expect(out.title == "Oral History")
-        #expect(out.authors == [])           // not selected → untouched
         #expect(out.date == "2001-03")
         #expect(out.datePrecision == .month)
     }
 
     @Test("apply with empty selection is a no-op copy")
     func planApplyNothing() {
-        let item = makeItem(title: "Keep", authors: ["Keep A"])
+        let item = makeItem(title: "Keep")
         let plan = AutoFillPlan.make(from: csl(title: "New", dateParts: [[2001]]), item: item)
         let out = plan.apply(selected: [], to: item)
         #expect(out.title == "Keep")
-        #expect(out.authors == ["Keep A"])
         #expect(out.date == nil)
     }
 
@@ -291,7 +275,7 @@ struct ZoteroAutoFillTests {
             fetchedAt: when,
             save: { saved in await recorder.record(saved) })
 
-        // Default selection fills all three empty fields.
+        // Default selection fills both empty fields.
         #expect(model.selected == Set(AutoFillField.allCases))
 
         try await model.confirm()
@@ -301,7 +285,6 @@ struct ZoteroAutoFillTests {
         #expect(saved.count == 1)
         let out = try #require(saved.first)
         #expect(out.title == "Oral History")
-        #expect(out.authors == ["Gordon E. Moore"])
         #expect(out.date == "2001")
         #expect(out.datePrecision == .year)
         // The matching ref is stamped with citation + fetchedAt (the durable survivor).
@@ -400,7 +383,7 @@ struct ZoteroAutoFillTests {
         let when = Date(timeIntervalSince1970: 2_000)
 
         // citation: nil = the citation fetch failed this time (offline / style error), even though
-        // CSL metadata for author/date/title came through.
+        // CSL metadata for date/title came through.
         let model = ZoteroAutoFillModel(
             item: item,
             csl: csl(title: "Oral History"),

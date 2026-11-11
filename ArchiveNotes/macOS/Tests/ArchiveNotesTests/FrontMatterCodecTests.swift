@@ -12,7 +12,6 @@ final class FrontMatterCodecTests: XCTestCase {
         id: 7f3a9c21-4b2e-4d1a-9c33-8e5f0a1b2c3d
         kind: note
         title: Moore on Intel culture
-        authors: [Gordon E. Moore]
         date: 1968
         date_precision: year
         date_uncertain: false
@@ -63,7 +62,6 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(item.id, UUID(uuidString: "7f3a9c21-4b2e-4d1a-9c33-8e5f0a1b2c3d"))
         XCTAssertEqual(item.kind, .note)
         XCTAssertEqual(item.title, "Moore on Intel culture")
-        XCTAssertEqual(item.authors, ["Gordon E. Moore"])
         XCTAssertEqual(item.date, "1968")
         XCTAssertEqual(item.datePrecision, .year)
         XCTAssertEqual(item.dateUncertain, false)
@@ -90,13 +88,23 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertNil(item.blocks[1].source)
     }
 
+    /// Notes have no authors (W40.notes-remove-authors): an `authors:` line in a file is no longer a field. It is
+    /// kept verbatim as any unknown key is, and the encoder never writes one of its own.
+    func testAuthorsLineIsAnUnknownKey() throws {
+        let text = minimalFixture.replacingOccurrences(of: "title:", with: "authors: [Gordon E. Moore]\ntitle:")
+        let item = try FrontMatterCodec.decode(text)
+        XCTAssertEqual(item.unknownFrontMatter, [UnknownKey(key: "authors", rawLines: ["authors: [Gordon E. Moore]"])])
+        var plain = item
+        plain.unknownFrontMatter = []
+        XCTAssertFalse(FrontMatterCodec.encode(plain).contains("authors"))
+    }
+
     func testDecodeMinimal() throws {
         let item = try FrontMatterCodec.decode(minimalFixture)
 
         XCTAssertEqual(item.id, UUID(uuidString: "00000000-0000-0000-0000-000000000001"))
         XCTAssertEqual(item.kind, .note)
         XCTAssertEqual(item.title, "Untitled")
-        XCTAssertTrue(item.authors.isEmpty)
         XCTAssertNil(item.date)
         XCTAssertNil(item.datePrecision)
         XCTAssertNil(item.quality)
@@ -212,7 +220,6 @@ final class FrontMatterCodecTests: XCTestCase {
             id: UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")!,
             kind: .note,
             title: "Round-trip test: with colon",
-            authors: ["Alice", "Bob"],
             date: "1968-03",
             datePrecision: .month,
             dateUncertain: true,
@@ -239,7 +246,6 @@ final class FrontMatterCodecTests: XCTestCase {
         XCTAssertEqual(decoded.id, item.id)
         XCTAssertEqual(decoded.kind, item.kind)
         XCTAssertEqual(decoded.title, item.title)
-        XCTAssertEqual(decoded.authors, item.authors)
         XCTAssertEqual(decoded.date, item.date)
         XCTAssertEqual(decoded.datePrecision, item.datePrecision)
         XCTAssertEqual(decoded.dateUncertain, item.dateUncertain)
@@ -383,17 +389,17 @@ final class FrontMatterCodecTests: XCTestCase {
         for title in ["Draft ", " Draft", " Draft "] {
             var modified = item
             modified.title = title
-            modified.authors = [title]
+            modified.tags = [title]
             let encoded = FrontMatterCodec.encode(modified)
             XCTAssertTrue(encoded.contains("title: \"\(title)\""), "unquoted: \(title.debugDescription)")
             let roundTripped = try FrontMatterCodec.decode(encoded)
             XCTAssertEqual(roundTripped.title, title)
-            XCTAssertEqual(roundTripped.authors, [title])
+            XCTAssertEqual(roundTripped.tags, [title])
         }
         // Whitespace OUTSIDE a flow element's quotes is still layout, not content.
         let handWritten = minimalFixture.replacingOccurrences(
-            of: "title:", with: "authors: [  \" A\" ,  B  , 'C '  ]\ntitle:")
-        XCTAssertEqual(try FrontMatterCodec.decode(handWritten).authors, [" A", "B", "C "])
+            of: "title:", with: "tags: [  \" A\" ,  B  , 'C '  ]\ntitle:")
+        XCTAssertEqual(try FrontMatterCodec.decode(handWritten).tags, [" A", "B", "C "])
     }
 
     func testEmptyTitleQuoted() throws {
@@ -472,7 +478,7 @@ final class FrontMatterCodecTests: XCTestCase {
         let ref = Date(timeIntervalSinceReferenceDate: 804_070_200)
         let item = Item(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000c1")!,
-            kind: .note, title: "No trailing newline", authors: [],
+            kind: .note, title: "No trailing newline",
             date: nil, datePrecision: nil, dateUncertain: false, quality: nil,
             tags: [], zotero: [], roundup: false, created: ref, modified: ref, schema: 1,
             blocks: [
@@ -508,7 +514,7 @@ final class FrontMatterCodecTests: XCTestCase {
         let ref = Date(timeIntervalSinceReferenceDate: 804_070_200)
         let item = Item(
             id: UUID(uuidString: "00000000-0000-0000-0000-0000000000c2")!,
-            kind: .note, title: "Prose only", authors: [],
+            kind: .note, title: "Prose only",
             date: nil, datePrecision: nil, dateUncertain: false, quality: nil,
             tags: [], zotero: [], roundup: false, created: ref, modified: ref, schema: 1,
             blocks: [], unknownFrontMatter: [],

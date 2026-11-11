@@ -638,10 +638,6 @@ private struct DetailPane: View {
                 HStack(spacing: 10) {
                     ItemHeaderDates(item: item, calendarsEnabled: calendarsEnabled)
                     if item.quality != nil { Text(item.qualityStars).foregroundStyle(.yellow) }
-                    if !item.authors.isEmpty {
-                        Label(item.authors.joined(separator: ", "), systemImage: "person")
-                            .lineLimit(1)
-                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.primary)

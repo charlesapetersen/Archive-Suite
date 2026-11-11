@@ -39,7 +39,7 @@ struct NotesTrashTests {
     }
 
     private func makeNote(_ env: Env, _ title: String) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: title, authors: [], date: nil, datePrecision: nil,
+        let item = Item(id: UUID(), kind: .note, title: title, date: nil, datePrecision: nil,
                         dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
                         created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)

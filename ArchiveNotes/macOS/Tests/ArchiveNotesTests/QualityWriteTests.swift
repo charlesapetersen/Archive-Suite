@@ -63,7 +63,7 @@ struct QualityWriteTests {
 
     @discardableResult
     private func makeNote(_ env: Env, tags: [String] = []) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: "Note", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Note", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: tags, zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -131,7 +131,7 @@ struct QualityWriteTests {
     @Test("editing quality preserves the rest of the front-matter + body")
     func preservesOtherFields() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
-        let item = Item(id: UUID(), kind: .note, title: "Keep Me", authors: ["A. Author"], date: "1968",
+        let item = Item(id: UUID(), kind: .note, title: "Keep Me", date: "1968",
                         datePrecision: .year, dateUncertain: true, quality: nil, tags: ["Subject"],
                         zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
                         blocks: [], unknownFrontMatter: [], trailingBodyRaw: "Body text")
@@ -140,7 +140,6 @@ struct QualityWriteTests {
         let r = try await env.store.load(item.id)
         #expect(r.quality == 3)                       // the one field we changed…
         #expect(r.title == "Keep Me")                 // …and everything else round-trips untouched
-        #expect(r.authors == ["A. Author"])
         #expect(r.date == "1968" && r.datePrecision == .year && r.dateUncertain == true)
         #expect(r.tags == ["Subject"])
         #expect(r.trailingBodyRaw == "Body text")

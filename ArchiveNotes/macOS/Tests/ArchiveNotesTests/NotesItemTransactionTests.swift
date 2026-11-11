@@ -64,7 +64,7 @@ struct NotesItemTransactionTests {
                                   title: String = "Note",
                                   body: String? = nil,
                                   blocks: [Block] = []) -> Item {
-        Item(id: id, kind: kind, title: title, authors: [], date: nil, datePrecision: nil,
+        Item(id: id, kind: kind, title: title, date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(), modified: Date(), schema: 1, blocks: blocks,
              unknownFrontMatter: [], trailingBodyRaw: body)

@@ -266,7 +266,7 @@ struct EditorBindingTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let noteStore = NoteStore(root: root)
         let item = Item(
-            id: UUID(), kind: .extract, title: "Extract host", authors: [], date: "1980", datePrecision: .year,
+            id: UUID(), kind: .extract, title: "Extract host", date: "1980", datePrecision: .year,
             dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false, created: Date(),
             modified: Date(), schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil
         )
@@ -333,7 +333,7 @@ struct EditorBindingTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let noteStore = NoteStore(root: root)
         let item = Item(
-            id: UUID(), kind: .note, title: "Thumb host", authors: [], date: "1980", datePrecision: .year,
+            id: UUID(), kind: .note, title: "Thumb host", date: "1980", datePrecision: .year,
             dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false, created: Date(),
             modified: Date(), schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil
         )

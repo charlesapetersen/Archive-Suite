@@ -42,7 +42,7 @@ struct NotesReplicationTests {
     }
 
     private func makeItem(_ title: String) -> Item {
-        Item(id: UUID(), kind: .note, title: title, authors: [], date: nil, datePrecision: nil,
+        Item(id: UUID(), kind: .note, title: title, date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(), modified: Date(), schema: 1, blocks: [],
              unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -50,7 +50,7 @@ struct NotesReplicationTests {
 
     private func summary(_ item: Item) -> ItemSummary {
         ItemSummary(id: item.id, title: item.title, kind: item.kind, date: nil, datePrecision: nil,
-                    dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                    dateUncertain: false, sortDate: nil, quality: nil,
                     created: item.created, modified: item.modified, mtime: 0, managedTags: [])
     }
 

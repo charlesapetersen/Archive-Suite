@@ -6,7 +6,7 @@ import XCTest
 final class NoteTagSuggestionsTests: XCTestCase {
     private func summary(_ tags: [String]) -> ItemSummary {
         ItemSummary(id: UUID(), title: "T", kind: .note, date: nil, datePrecision: nil, dateUncertain: false,
-                    authors: [], sortDate: nil, quality: nil, created: Date(), modified: Date(), mtime: 0,
+                    sortDate: nil, quality: nil, created: Date(), modified: Date(), mtime: 0,
                     managedTags: tags)
     }
 

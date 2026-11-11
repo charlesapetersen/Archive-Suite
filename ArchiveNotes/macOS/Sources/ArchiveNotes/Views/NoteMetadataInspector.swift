@@ -2,10 +2,9 @@ import SwiftUI
 import ArchiveCore
 
 /// The **inspector panel**'s fields for the selected note/extract (W40.notes-detail-layout): Round-up or
-/// Sources, authors, document DATE (one typed field + a "date uncertain" toggle), QUALITY, the item's
+/// Sources, document DATE (one typed field + a "date uncertain" toggle), QUALITY, the item's
 /// folder locations and Zotero. These fields use front matter through `NotesNavigationModel` →
-/// `NotesModel`; authors remain front-matter only, while the model mirrors valid Quality values as Q1...Q3
-/// on this note's own `.md`. Tags are edited in the tag bar under the note (`NoteTagBar`), or above these
+/// `NotesModel`; the model mirrors valid Quality values as Q1...Q3 on this note's own `.md`. Tags are edited in the tag bar under the note (`NoteTagBar`), or above these
 /// fields while that bar is hidden (`NoteInspectorPanel`).
 ///
 /// Adapted from Reader's `InlineEditCells.DateCell` + `TagEditorView.dateSection`/`prioritySection`,
@@ -37,10 +36,6 @@ struct NoteMetadataInspector: View {
     @State private var dateApplied = AppliedText()
     @State private var swApplied = AppliedText()
     @FocusState private var focusedDate: DateRole?
-    @State private var authorsText = ""
-    /// Which item the authors text belongs to and the list last applied there, as for the dates.
-    @State private var authorsApplied: (id: UUID?, authors: [String]) = (nil, [])
-    @FocusState private var authorsFocused: Bool
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
     @State private var roundupYear: Int?
@@ -82,8 +77,6 @@ struct NoteMetadataInspector: View {
                 roundupSection
                 Divider()
             }
-            authorsSection
-            Divider()
             dateSection
             Divider()
             qualitySection
@@ -99,7 +92,6 @@ struct NoteMetadataInspector: View {
         .onAppear { seed(from: item) }
         .onChange(of: item.id) {   // re-seed only on selection change (WYSIWYG typing)…
             applyDates()           // …after a field still being typed in reaches its own item
-            applyAuthors()
             seed(from: item)
         }
         // …or when the calendar the fields are typed in changes (the stored date does not).
@@ -117,13 +109,7 @@ struct NoteMetadataInspector: View {
             if old == .own { applyDate() }
             if old == .sentWith { applySentWith() }
         }
-        .onChange(of: authorsFocused) { wasFocused, _ in if wasFocused { applyAuthors() } }
-        // Authors filled elsewhere (Zotero) show here, unless the field holds text not applied yet.
-        .onChange(of: item.authors) {
-            guard !authorsFocused, composedAuthors == authorsApplied.authors else { return }
-            seedAuthors(from: item)
-        }
-        .onDisappear { applyDates(); applyAuthors() }
+        .onDisappear { applyDates() }
         .task(id: SourceLoadKey(id: item.id, mtime: item.mtime)) {
             extractSources = nil
             extractSourcesFailed = false
@@ -239,25 +225,6 @@ struct NoteMetadataInspector: View {
             return (live.title.isEmpty ? "Untitled note" : live.title, false)
         }
         return (source.snapshotLabel ?? "Unknown source note", true)
-    }
-
-    // MARK: Authors
-
-    @ViewBuilder private var authorsSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Authors").font(.subheadline.bold())
-                .accessibilityIdentifier("an.detail.authors.heading")
-            // Applies on leaving the field and clears when emptied: no Set or Clear button (owner, notes-1
-            // row 25). A submit (Return, where the field does not take it as a new line) applies too.
-            TextField("One author per line", text: $authorsText, axis: .vertical)
-                .lineLimit(2...4)
-                .textFieldStyle(.roundedBorder)
-                .focused($authorsFocused)
-                .onSubmit { applyAuthors() }
-                .help("One author per line. Applies when you leave the field; empty it to remove the authors.")
-                .accessibilityLabel("Authors")
-                .accessibilityIdentifier("an.detail.authors")
-        }
     }
 
     // MARK: Date
@@ -398,9 +365,8 @@ struct NoteMetadataInspector: View {
 
     // MARK: State ⇄ store
 
-    /// Seed local fields from the selected item's stored authors and date (no write — see the type doc).
+    /// Seed local fields from the selected item's stored dates (no write — see the type doc).
     private func seed(from item: ItemSummary) {
-        seedAuthors(from: item)
         seedDates(from: item)
     }
 
@@ -463,25 +429,6 @@ struct NoteMetadataInspector: View {
             guard hadDate else { return }   // emptying an empty field is not an edit
         }
         Task { await nav.setSentWith(date, precision: precision, for: id) }
-    }
-
-    private var composedAuthors: [String] {
-        authorsText.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
-
-    private func seedAuthors(from item: ItemSummary) {
-        authorsText = item.authors.joined(separator: "\n")
-        authorsApplied = (item.id, item.authors)
-    }
-
-    /// Apply the typed authors to the item they were typed for, if they changed since last applied.
-    private func applyAuthors() {
-        let value = composedAuthors
-        guard let id = authorsApplied.id, value != authorsApplied.authors else { return }
-        authorsApplied.authors = value
-        Task { await nav.setAuthors(value, for: id) }
     }
 
     // Bindings whose setters fire ONLY on user interaction (not on the programmatic `seed`), so

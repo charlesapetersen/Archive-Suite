@@ -147,7 +147,7 @@ struct ZoteroPasteTests {
     }
 
     private func item(id: UUID, blocks: [Block]) -> Item {
-        Item(id: id, kind: .note, title: "Scratch", authors: [], date: nil, datePrecision: nil,
+        Item(id: id, kind: .note, title: "Scratch", date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0), schema: 1,
              blocks: blocks, unknownFrontMatter: [], trailingBodyRaw: nil)

@@ -14,7 +14,7 @@ import Foundation
 
     private func summary(kind: Item.Kind, sources: Int = 0) -> ItemSummary {
         ItemSummary(id: UUID(), title: "t", kind: kind, date: nil, datePrecision: nil,
-                    dateUncertain: false, authors: [], sortDate: nil, quality: nil,
+                    dateUncertain: false, sortDate: nil, quality: nil,
                     created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0),
                     mtime: 0, managedTags: [], sourceNoteCount: sources)
     }
@@ -28,7 +28,7 @@ import Foundation
     }
 
     private func item(kind: Item.Kind, blocks: [Block]) -> Item {
-        Item(id: UUID(), kind: kind, title: "", authors: [], date: nil, datePrecision: nil,
+        Item(id: UUID(), kind: kind, title: "", date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(timeIntervalSince1970: 0), modified: Date(timeIntervalSince1970: 0),
              schema: 1, blocks: blocks, unknownFrontMatter: [], trailingBodyRaw: nil)

@@ -50,7 +50,6 @@ final class TemplateInspectorRenderTests: XCTestCase {
         let created = await model.createTemplate(name: "Letter", kind: .note)
         let tid = try XCTUnwrap(created)
         await model.setTemplateDate("1968-03", precision: .month, for: tid)
-        await model.setTemplateAuthors(["Ada Lovelace"], for: tid)
         await model.addTemplateTag("labor", to: tid)
         let folder = try await org.createFolder(name: "Correspondence").id
         model.rebuild()
@@ -67,9 +66,10 @@ final class TemplateInspectorRenderTests: XCTestCase {
 
         let texts = views(NSTextField.self, in: host).map(\.stringValue)
         XCTAssertTrue(texts.contains("1968-03"), "the date field is seeded with the stored date, saw \(texts)")
-        XCTAssertTrue(texts.contains("Ada Lovelace"), "the authors field is seeded, saw \(texts)")
+        XCTAssertFalse(views(NSTextField.self, in: host).contains { $0.placeholderString == "One author per line" },
+                       "a template has no authors field (W40.notes-remove-authors)")
         XCTAssertGreaterThan(try inkedPixels(host), 500, "the inspector draws")
-        XCTAssertGreaterThan(host.fittingSize.height, 250, "folders and four fields stack, saw \(host.fittingSize.height)")
+        XCTAssertGreaterThan(host.fittingSize.height, 250, "folders and three fields stack, saw \(host.fittingSize.height)")
     }
 
     func testFolderInspectorDrawsTheFolderTemplateChoice() async throws {

@@ -25,7 +25,7 @@ struct NotesNavigationModelTests {
     private func sum(_ title: String, kind: Item.Kind, sortDate: Int? = nil, id: UUID = UUID()) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: id, title: title, kind: kind, date: nil, datePrecision: nil,
-                           dateUncertain: false, authors: [], sortDate: sortDate, quality: nil,
+                           dateUncertain: false, sortDate: sortDate, quality: nil,
                            created: t, modified: t, mtime: 0, managedTags: [])
     }
 
@@ -433,13 +433,13 @@ struct NotesNavigationModelTests {
                       id: UUID = UUID()) -> ItemSummary {
         let t = Date(timeIntervalSince1970: 0)
         return ItemSummary(id: id, title: title, kind: kind, date: nil, datePrecision: nil,
-                           dateUncertain: false, authors: [], sortDate: sortDate, quality: quality,
+                           dateUncertain: false, sortDate: sortDate, quality: quality,
                            created: t, modified: t, mtime: 0, managedTags: [])
     }
     private func row(_ id: UUID, title: String, body: String, kind: Item.Kind = .note) -> NoteIndexRow {
         let t = Date(timeIntervalSince1970: 0)
-        return NoteIndexRow(id: id, mtime: 0, title: title, kind: kind, tags: "", authors: "",
-                            authorsJSON: "[]", body: body, date: nil, datePrecision: nil,
+        return NoteIndexRow(id: id, mtime: 0, title: title, kind: kind, tags: "",
+                            body: body, date: nil, datePrecision: nil,
                             dateUncertain: false, sortDate: nil, quality: nil, created: t,
                             modified: t, managedTags: "[]", sourceCount: 0)
     }

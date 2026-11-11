@@ -7,7 +7,7 @@ import ArchiveCore
 /// deleting this DB loses nothing (it re-indexes on next launch).
 ///
 /// Forked from Reader's `ContentIndex`, adapted for UUID-keyed items with prose-tuned
-/// BM25 weights (title=10, tags=6, authors=4, body=1) per §16.5 of the overview.
+/// BM25 weights (title=10, tags=6, body=1) per §16.5 of the overview.
 ///
 /// An `actor` so the SQLite connection is confined to one isolation domain (safe under Swift 6);
 /// indexing runs off the main actor while the UI stays responsive.
@@ -65,7 +65,6 @@ actor NotesIndex {
                 date TEXT,
                 date_precision TEXT,
                 date_uncertain INTEGER,
-                authors TEXT,
                 sort_date INTEGER,
                 quality INTEGER,
                 created REAL,
@@ -110,8 +109,17 @@ actor NotesIndex {
             try exec("UPDATE items SET mtime = -1;")
         }
 
+        // W40.notes-remove-authors: notes have no authors any more. Both tables are rebuildable caches, so a DB
+        // from before drops the column and its FTS table, and every row is re-read from its `.md` (mtime -1, as
+        // for `display_calendar` above), which refills the new FTS table. The folders tables are untouched.
+        if itemsHasColumn("authors") {
+            try exec("ALTER TABLE items DROP COLUMN authors;")
+            try exec("DROP TABLE IF EXISTS fts;")
+            try exec("UPDATE items SET mtime = -1;")
+        }
+
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
-        try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(title, tags, authors, body, id UNINDEXED);")
+        try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(title, tags, body, id UNINDEXED);")
 
         // Organizational tables (app-owned durable data — NOT pruned by mtime).
         try exec("""
@@ -288,21 +296,21 @@ actor NotesIndex {
             try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
             try run("""
                 UPDATE items SET mtime=?, title=?, kind=?, date=?, date_precision=?,
-                    date_uncertain=?, authors=?, sort_date=?, quality=?, created=?,
+                    date_uncertain=?, sort_date=?, quality=?, created=?,
                     modified=?, managed_tags=?, source_count=?, roundup=?, sent_with=?,
                     sent_with_uncertain=?, display_calendar=? WHERE rowid=?;
                 """) { stmt in
                 self.bindItemColumns(stmt, row, startIndex: 1)
-                sqlite3_bind_int64(stmt, 18, rowid)
+                sqlite3_bind_int64(stmt, 17, rowid)
             }
             try insertFTS(rowid: rowid, row: row)
         } else {
             // Insert new row.
             try run("""
                 INSERT INTO items(id, mtime, title, kind, date, date_precision,
-                    date_uncertain, authors, sort_date, quality, created, modified, managed_tags,
+                    date_uncertain, sort_date, quality, created, modified, managed_tags,
                     source_count, roundup, sent_with, sent_with_uncertain, display_calendar)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """) { stmt in
                 self.bindText(stmt, 1, idStr)
                 self.bindItemColumns(stmt, row, startIndex: 2)
@@ -319,35 +327,32 @@ actor NotesIndex {
         if let d = row.date { bindText(stmt, s + 3, d) } else { sqlite3_bind_null(stmt, s + 3) }
         if let dp = row.datePrecision { bindText(stmt, s + 4, dp.rawValue) } else { sqlite3_bind_null(stmt, s + 4) }
         sqlite3_bind_int(stmt, s + 5, row.dateUncertain ? 1 : 0)
-        bindText(stmt, s + 6, row.authorsJSON)
-        if let sd = row.sortDate { sqlite3_bind_int(stmt, s + 7, Int32(sd)) } else { sqlite3_bind_null(stmt, s + 7) }
-        if let q = row.quality { sqlite3_bind_int(stmt, s + 8, Int32(q)) } else { sqlite3_bind_null(stmt, s + 8) }
-        sqlite3_bind_double(stmt, s + 9, row.created.timeIntervalSince1970)
-        sqlite3_bind_double(stmt, s + 10, row.modified.timeIntervalSince1970)
-        bindText(stmt, s + 11, row.managedTags)
-        sqlite3_bind_int(stmt, s + 12, Int32(row.sourceCount))
-        sqlite3_bind_int(stmt, s + 13, row.roundup ? 1 : 0)
-        if let sent = row.sentWith { bindText(stmt, s + 14, sent.wireValue) } else { sqlite3_bind_null(stmt, s + 14) }
-        sqlite3_bind_int(stmt, s + 15, row.sentWithUncertain ? 1 : 0)
-        if let cal = row.displayCalendar { bindText(stmt, s + 16, cal.rawValue) } else { sqlite3_bind_null(stmt, s + 16) }
+        if let sd = row.sortDate { sqlite3_bind_int(stmt, s + 6, Int32(sd)) } else { sqlite3_bind_null(stmt, s + 6) }
+        if let q = row.quality { sqlite3_bind_int(stmt, s + 7, Int32(q)) } else { sqlite3_bind_null(stmt, s + 7) }
+        sqlite3_bind_double(stmt, s + 8, row.created.timeIntervalSince1970)
+        sqlite3_bind_double(stmt, s + 9, row.modified.timeIntervalSince1970)
+        bindText(stmt, s + 10, row.managedTags)
+        sqlite3_bind_int(stmt, s + 11, Int32(row.sourceCount))
+        sqlite3_bind_int(stmt, s + 12, row.roundup ? 1 : 0)
+        if let sent = row.sentWith { bindText(stmt, s + 13, sent.wireValue) } else { sqlite3_bind_null(stmt, s + 13) }
+        sqlite3_bind_int(stmt, s + 14, row.sentWithUncertain ? 1 : 0)
+        if let cal = row.displayCalendar { bindText(stmt, s + 15, cal.rawValue) } else { sqlite3_bind_null(stmt, s + 15) }
     }
 
     private func insertFTS(rowid: Int64, row: NoteIndexRow) throws {
-        try run("INSERT INTO fts(rowid, title, tags, authors, body, id) VALUES(?, ?, ?, ?, ?, ?);") { stmt in
+        try run("INSERT INTO fts(rowid, title, tags, body, id) VALUES(?, ?, ?, ?, ?);") { stmt in
             sqlite3_bind_int64(stmt, 1, rowid)
             self.bindText(stmt, 2, row.title)
             self.bindText(stmt, 3, row.tags)
-            self.bindText(stmt, 4, row.authors)
-            self.bindText(stmt, 5, row.body)
-            self.bindText(stmt, 6, row.id.uuidString)
+            self.bindText(stmt, 4, row.body)
+            self.bindText(stmt, 5, row.id.uuidString)
         }
     }
 
     // MARK: - Search
 
     /// Full-text search -> matching item UUIDs in **bm25 relevance order** (best match first).
-    /// Column weights (FTS5 column order: title, tags, authors, body): title=10, tags=6,
-    /// authors=4, body=1 — prose-tuned per §16.5.
+    /// Column weights (FTS5 column order: title, tags, body): title=10, tags=6, body=1 — prose-tuned per §16.5.
     func search(_ query: String, limit: Int? = nil) -> [UUID] {
         search(expression: ftsMatchExpression(query), limit: limit)
     }
@@ -357,8 +362,8 @@ actor NotesIndex {
     func search(expression match: String, limit: Int? = nil) -> [UUID] {
         guard !match.isEmpty else { return [] }
         let sql = limit == nil
-            ? "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 4.0, 1.0);"
-            : "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 4.0, 1.0) LIMIT ?;"
+            ? "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 1.0);"
+            : "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 1.0) LIMIT ?;"
         guard let stmt = prepare(sql) else { return [] }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, match)
@@ -377,7 +382,7 @@ actor NotesIndex {
     /// Load an ItemSummary for a specific UUID from the items table.
     func summary(for id: UUID) -> ItemSummary? {
         guard let stmt = prepare("""
-            SELECT id, title, kind, date, date_precision, date_uncertain, authors,
+            SELECT id, title, kind, date, date_precision, date_uncertain,
                    sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup,
                    sent_with, sent_with_uncertain, display_calendar
             FROM items WHERE id = ?;
@@ -393,7 +398,7 @@ actor NotesIndex {
     /// (`NotesSort`); rows that fail to decode (corrupt UUID) are skipped rather than aborting.
     func allSummaries() -> [ItemSummary] {
         guard let stmt = prepare("""
-            SELECT id, title, kind, date, date_precision, date_uncertain, authors,
+            SELECT id, title, kind, date, date_precision, date_uncertain,
                    sort_date, quality, created, modified, mtime, managed_tags, source_count, roundup,
                    sent_with, sent_with_uncertain, display_calendar
             FROM items;
@@ -807,32 +812,30 @@ actor NotesIndex {
             sqlite3_column_text(stmt, 4).map { String(cString: $0) }
         let datePrecision = dpStr.flatMap { Item.DatePrecision(rawValue: $0) }
         let dateUncertain = sqlite3_column_int(stmt, 5) != 0
-        let authorsJSON = sqlite3_column_text(stmt, 6).map { String(cString: $0) } ?? "[]"
-        let authors = (try? JSONDecoder().decode([String].self, from: Data(authorsJSON.utf8))) ?? []
-        let sortDate: Int? = sqlite3_column_type(stmt, 7) == SQLITE_NULL ? nil :
+        let sortDate: Int? = sqlite3_column_type(stmt, 6) == SQLITE_NULL ? nil :
+            Int(sqlite3_column_int(stmt, 6))
+        let quality: Int? = sqlite3_column_type(stmt, 7) == SQLITE_NULL ? nil :
             Int(sqlite3_column_int(stmt, 7))
-        let quality: Int? = sqlite3_column_type(stmt, 8) == SQLITE_NULL ? nil :
-            Int(sqlite3_column_int(stmt, 8))
-        let created = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 9))
-        let modified = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 10))
-        let mtime = sqlite3_column_double(stmt, 11)
-        let tagsJSON = sqlite3_column_text(stmt, 12).map { String(cString: $0) } ?? "[]"
+        let created = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8))
+        let modified = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 9))
+        let mtime = sqlite3_column_double(stmt, 10)
+        let tagsJSON = sqlite3_column_text(stmt, 11).map { String(cString: $0) } ?? "[]"
         let managedTags = (try? JSONDecoder().decode([String].self, from: Data(tagsJSON.utf8))) ?? []
-        let sourceCount = Int(sqlite3_column_int(stmt, 13))
+        let sourceCount = Int(sqlite3_column_int(stmt, 12))
         // A wire value that no longer parses (hand-edited cache) reads as no sent-with date; the next
         // re-index from the authoritative `.md` repairs it.
-        let sentWith: ArchiveDate? = sqlite3_column_type(stmt, 15) == SQLITE_NULL ? nil :
-            sqlite3_column_text(stmt, 15).flatMap { ArchiveDate.parse(wireValue: String(cString: $0)) }
+        let sentWith: ArchiveDate? = sqlite3_column_type(stmt, 14) == SQLITE_NULL ? nil :
+            sqlite3_column_text(stmt, 14).flatMap { ArchiveDate.parse(wireValue: String(cString: $0)) }
 
         return ItemSummary(id: uuid, title: title, kind: kind, date: date,
                            datePrecision: datePrecision, dateUncertain: dateUncertain,
-                           authors: authors, sortDate: sortDate, quality: quality,
+                           sortDate: sortDate, quality: quality,
                            created: created, modified: modified, mtime: mtime,
                            managedTags: managedTags, sourceNoteCount: sourceCount,
-                           roundup: sqlite3_column_int(stmt, 14) != 0,
+                           roundup: sqlite3_column_int(stmt, 13) != 0,
                            sentWith: sentWith,
-                           sentWithUncertain: sentWith != nil && sqlite3_column_int(stmt, 16) != 0,
-                           displayCalendar: sqlite3_column_text(stmt, 17)
+                           sentWithUncertain: sentWith != nil && sqlite3_column_int(stmt, 15) != 0,
+                           displayCalendar: sqlite3_column_text(stmt, 16)
                                .flatMap { DisplayCalendar(rawValue: String(cString: $0)) })
     }
 

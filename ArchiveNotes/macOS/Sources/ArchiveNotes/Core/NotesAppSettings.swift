@@ -34,7 +34,7 @@ enum NotesLayoutSettingsKey {
     /// The item list's height in the stacked layout (W48.notes-stacked-layout).
     static let listHeight = "an.listHeight"
     /// The note pane's parts that View menu items show or hide (W40.notes-window-panes; notes-2 row 22), shared by
-    /// both windows: the formatting bar above the editor, the title/date/authors header, the tag bar under it.
+    /// both windows: the formatting bar above the editor, the title/date header, the tag bar under it.
     /// Hidden, the note's title and tags are still edited in the inspector.
     static let showFormattingBar = "an.showFormattingBar"
     static let showNoteHeader = "an.showNoteHeader"

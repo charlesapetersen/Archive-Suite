@@ -117,7 +117,7 @@ struct EditorTerminateFlushTests {
 
     @discardableResult
     private func makeNote(_ env: Env, body: String?) async throws -> UUID {
-        let item = Item(id: UUID(), kind: .note, title: "Note", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Note", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [],
                         roundup: false, created: Date(), modified: Date(), schema: 1, blocks: [],
                         unknownFrontMatter: [], trailingBodyRaw: body)

@@ -877,12 +877,6 @@ final class NotesModel: ObservableObject {
         }
     }
 
-    @discardableResult
-    func setTemplateAuthors(_ authors: [String], for id: UUID) async -> Bool {
-        let canonical = authors.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-        return await mutateTemplate(id, "set the template's authors") { $0.authors = canonical }
-    }
-
     /// One atomic fresh-load edit of a template's front matter, as `renameTemplate` does it (W23.h2).
     private func mutateTemplate(_ id: UUID, _ action: String,
                                 _ mutate: @Sendable (inout Item) -> Void) async -> Bool {
@@ -955,7 +949,7 @@ final class NotesModel: ObservableObject {
 
     /// Create a new item of `kind` in `folderId` (`nil` ⟹ the system default: Inbox for a note,
     /// Extracts for an extract, §16.6), instantiated from `templateId` when given: the template's
-    /// front-matter defaults (title/date/quality/tags/authors/roundup) + body are cloned into a fresh
+    /// front-matter defaults (title/date/quality/tags/roundup) + body are cloned into a fresh
     /// item (new UUID, fresh created/modified). Returns the new item id (nil on failure / no store).
     @discardableResult
     func newItem(kind: Item.Kind, in folderId: UUID?, from templateId: UUID?) async -> UUID? {
@@ -1010,7 +1004,7 @@ final class NotesModel: ObservableObject {
     /// A fresh, empty item shell (schema 1) — a blank new item or a new template.
     private func blankItem(kind: Item.Kind, title: String) -> Item {
         let now = Date()
-        return Item(id: UUID(), kind: kind, title: title, authors: [], date: nil,
+        return Item(id: UUID(), kind: kind, title: title, date: nil,
                     datePrecision: nil, dateUncertain: false, quality: nil, tags: [],
                     zotero: [], roundup: false, created: now, modified: now, schema: 1,
                     blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)
@@ -1228,7 +1222,7 @@ final class NotesModel: ObservableObject {
         }
     }
 
-    /// Round-up is ordinary-note metadata, persisted through the same fresh-load transaction as authors.
+    /// Round-up is ordinary-note metadata, persisted through the same fresh-load transaction as the other fields.
     @discardableResult
     func setRoundup(_ roundup: Bool, for id: UUID) async -> Bool {
         guard let noteStore else { return false }
@@ -1236,15 +1230,6 @@ final class NotesModel: ObservableObject {
             guard try await noteStore.load(id).kind == .note else { return false }
             return await mutateItem(id, "set round-up status") { $0.roundup = roundup }
         } catch { report(error, "set round-up status"); return false }
-    }
-
-    /// Set manually entered authors in front matter only. Empty/whitespace-only entries are omitted;
-    /// order and duplicate names are preserved. Authors are not projected to Finder tags.
-    @discardableResult
-    func setAuthors(_ authors: [String], for id: UUID) async -> Bool {
-        let canonical = authors.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return await mutateItem(id, "set the authors") { $0.authors = canonical }
     }
 
     /// Set the quality rating on the canonical 0...3 scale. `nil`, 0, and invalid inputs are unrated;
@@ -1506,7 +1491,6 @@ final class NotesModel: ObservableObject {
         guard resolved.id == base.id else { throw ZoteroAutoFillSaveError.itemMismatch }
 
         let applyTitle = resolved.title != base.title
-        let applyAuthors = resolved.authors != base.authors
         let applyDate = resolved.date != base.date || resolved.datePrecision != base.datePrecision
         let refreshedRef = target.noteFrontMatter
             ? resolved.zotero.first(where: { $0.selectLink == target.selectLink })
@@ -1533,7 +1517,6 @@ final class NotesModel: ObservableObject {
                 throw ZoteroAutoFillSaveError.referenceRemoved
             }
             if applyTitle { item.title = resolved.title }
-            if applyAuthors { item.authors = resolved.authors }
             if applyDate {
                 item.date = resolved.date
                 item.datePrecision = resolved.datePrecision

@@ -149,7 +149,7 @@ struct SystemFolderIntegrityTests {
         let noteStore = NoteStore(root: env.root)
         let model = NotesModel(organization: env.org, index: env.index, noteStore: noteStore)
 
-        let item = Item(id: UUID(), kind: .note, title: "Only copy", authors: [], date: nil,
+        let item = Item(id: UUID(), kind: .note, title: "Only copy", date: nil,
                         datePrecision: nil, dateUncertain: false, quality: nil, tags: [],
                         zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
                         blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)

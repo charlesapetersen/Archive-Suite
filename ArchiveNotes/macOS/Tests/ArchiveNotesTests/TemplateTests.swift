@@ -112,7 +112,7 @@ struct NoteStoreTemplateTests {
     }
 
     private func makeItem(_ title: String, kind: Item.Kind = .note, body: String? = nil) -> Item {
-        Item(id: UUID(), kind: kind, title: title, authors: [], date: nil, datePrecision: nil,
+        Item(id: UUID(), kind: kind, title: title, date: nil, datePrecision: nil,
              dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(), modified: Date(), schema: 1, blocks: [],
              unknownFrontMatter: [], trailingBodyRaw: body)
@@ -199,7 +199,7 @@ struct NotesModelTemplateTests {
 
     private func templateItem(_ title: String, kind: Item.Kind = .note, date: String? = nil,
                               quality: Int? = nil, tags: [String] = [], body: String? = nil) -> Item {
-        Item(id: UUID(), kind: kind, title: title, authors: [], date: date,
+        Item(id: UUID(), kind: kind, title: title, date: date,
              datePrecision: date == nil ? nil : .year, dateUncertain: false, quality: quality,
              tags: tags, zotero: [], roundup: false, created: Date(), modified: Date(), schema: 1,
              blocks: [], unknownFrontMatter: [], trailingBodyRaw: body)
@@ -365,23 +365,21 @@ struct NotesModelTemplateTests {
         #expect(await env.model.addTemplateTag("labor", to: tid))
         #expect(await env.model.addTemplateTag("labor", to: tid))      // already there: still one
         #expect(await env.model.addTemplateTag(" ", to: tid) == false)  // blank: nothing written
-        #expect(await env.model.setTemplateAuthors([" Ada Lovelace ", "", "C. Babbage"], for: tid))
 
         let stored = try await env.store.loadTemplate(tid)
         #expect(stored.date == "1968-03" && stored.datePrecision == .month && stored.dateUncertain)
         #expect(stored.quality == 2)
         #expect(stored.tags == NotesTagVocabulary.normalizedSubjects(["labor"]))
-        #expect(stored.authors == ["Ada Lovelace", "C. Babbage"])
         // The inspector binds to the listed projection, so it must carry the same values.
         let listed = try #require(env.model.templates.first { $0.id == tid })
         #expect(listed.date == "1968-03" && listed.datePrecision == .month && listed.dateUncertain)
-        #expect(listed.quality == 2 && listed.tags == stored.tags && listed.authors == stored.authors)
+        #expect(listed.quality == 2 && listed.tags == stored.tags)
 
         let folder = try await env.org.createFolder(name: "Letters").id
         let newID = try #require(await env.model.newItem(kind: .note, in: folder, from: tid))
         let note = try await env.store.load(newID)
         #expect(note.date == "1968-03" && note.datePrecision == .month && note.dateUncertain)
-        #expect(note.quality == 2 && note.tags == stored.tags && note.authors == stored.authors)
+        #expect(note.quality == 2 && note.tags == stored.tags)
     }
 
     @Test("template tag edits are deltas: two adds made from one stale list both land, and a removal keeps the rest")
@@ -404,7 +402,7 @@ struct NotesModelTemplateTests {
         let tid = try #require(await env.model.createTemplate(name: "Gone", kind: .note))
         await env.model.deleteTemplate(tid)
         env.model.statusMessage = nil
-        #expect(await env.model.setTemplateAuthors(["Someone"], for: tid) == false)
+        #expect(await env.model.setTemplateQuality(2, for: tid) == false)
         #expect(env.model.statusMessage == nil)
     }
 

@@ -293,7 +293,6 @@ struct ExtractBuilder {
         let item = Item(id: id,
                         kind: .extract,
                         title: Self.defaultTitle(fromFirstLineOf: blocks, fallbackDate: when),
-                        authors: [],
                         date: date,
                         datePrecision: precision,
                         dateUncertain: false,

@@ -167,7 +167,7 @@ final class ChipsOverdrawnUITests: NotesFixtureUITestCase {
         let items = URL(fileURLWithPath: canonicalFixturePath).appendingPathComponent("items")
         let link = "archivereader://reveal?root=\(corpusRootGUID)&rel=sample.pdf&jpeg="
         var body = "---\nschema: 1\nid: \(id)\nkind: note\ntitle: \"\(title)\"\n"
-            + "authors: [Gordon E. Moore, Robert N. Noyce]\ndate: 1968-07\ndate_precision: month\n"
+            + "date: 1968-07\ndate_precision: month\n"
             + "date_uncertain: false\nquality: 2\ntags: [\(tags.joined(separator: ", "))]\nroundup: false\n"
             + "created: 2026-07-14T09:00:00Z\nmodified: 2026-07-14T09:00:00Z\n---\n"
         for k in 1...24 {

@@ -7,7 +7,7 @@ import ArchiveCore
 @Suite("Round-up notes (W9.d6)")
 struct RoundupTests {
     private func note() -> Item {
-        Item(id: UUID(), kind: .note, title: "RoundupSearchMarker", authors: ["Keep Author"], date: nil,
+        Item(id: UUID(), kind: .note, title: "RoundupSearchMarker", date: nil,
              datePrecision: nil, dateUncertain: false, quality: nil, tags: [], zotero: [], roundup: false,
              created: Date(), modified: Date(), schema: 1, blocks: [],
              unknownFrontMatter: [UnknownKey(key: "future_key", rawLines: ["future_key: preserve"])], trailingBodyRaw: "Keep body\n")
@@ -29,7 +29,7 @@ struct RoundupTests {
         #expect(await model.setRoundup(true, for: item.id))
         let saved = try await store.load(item.id)
         #expect(saved.roundup && saved.date == nil)
-        #expect(saved.trailingBodyRaw == item.trailingBodyRaw && saved.authors == item.authors)
+        #expect(saved.trailingBodyRaw == item.trailingBodyRaw)
         #expect(saved.unknownFrontMatter == item.unknownFrontMatter)
         let summary = try #require(await index.summary(for: item.id))
         #expect(summary.roundup)
@@ -94,7 +94,6 @@ struct RoundupTests {
         try await index.upsertBatch([row])
         #expect(await index.summary(for: item.id)?.roundup == true)
         #expect(await index.existingMTimes()[item.id.uuidString] == ref.mtime)
-        #expect(await index.allSummaries().first?.authors == item.authors)
         await index.close()
     }
 

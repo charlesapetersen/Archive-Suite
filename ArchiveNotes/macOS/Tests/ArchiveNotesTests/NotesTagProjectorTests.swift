@@ -51,7 +51,6 @@ struct NotesTagProjectorTests {
             id: UUID(),
             kind: .note,
             title: "Test",
-            authors: [],
             date: nil,
             datePrecision: nil,
             dateUncertain: false,

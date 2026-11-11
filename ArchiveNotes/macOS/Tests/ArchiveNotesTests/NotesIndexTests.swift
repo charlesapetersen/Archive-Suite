@@ -68,8 +68,6 @@ import Foundation
         title: String = "Untitled",
         kind: Item.Kind = .note,
         tags: String = "",
-        authors: String = "",
-        authorsJSON: String = "[]",
         body: String = "",
         date: String? = nil,
         datePrecision: Item.DatePrecision? = nil,
@@ -82,7 +80,7 @@ import Foundation
         sourceCount: Int = 0
     ) -> NoteIndexRow {
         NoteIndexRow(id: id, mtime: mtime, title: title, kind: kind, tags: tags,
-                     authors: authors, authorsJSON: authorsJSON, body: body, date: date,
+                     body: body, date: date,
                      datePrecision: datePrecision, dateUncertain: dateUncertain,
                      sortDate: sortDate, quality: quality, created: created,
                      modified: modified, managedTags: managedTags, sourceCount: sourceCount)
@@ -111,25 +109,49 @@ import Foundation
         #expect(results.first == titleHit, "Title hit (weight 10) should outrank body hit (weight 1)")
     }
 
-    @Test func tagsOutrankAuthorsOutrankBody() async throws {
+    @Test func tagsOutrankBody() async throws {
         let (index, tmp) = try await makeScratchIndex()
         defer { cleanup(tmp) }
 
         let tagHit = UUID()
-        let authorHit = UUID()
         let bodyHit = UUID()
 
         try await index.upsertBatch([
             makeRow(id: bodyHit, title: "Note A", body: "Economics of trade"),
-            makeRow(id: authorHit, title: "Note B", authors: "Economics Department"),
             makeRow(id: tagHit, title: "Note C", tags: "Economics"),
         ])
 
         let results = await index.search("Economics")
-        #expect(results.count == 3)
-        #expect(results[0] == tagHit, "Tags (weight 6) should outrank authors (weight 4)")
-        #expect(results[1] == authorHit, "Authors (weight 4) should outrank body (weight 1)")
-        #expect(results[2] == bodyHit, "Body (weight 1) should be last")
+        #expect(results.count == 2)
+        #expect(results[0] == tagHit, "Tags (weight 6) should outrank body (weight 1)")
+        #expect(results[1] == bodyHit, "Body (weight 1) should be last")
+    }
+
+    /// W40.notes-remove-authors: a cache from before drops `items.authors` and its four-column FTS table, and
+    /// marks every row for a re-read from its `.md` (mtime -1), which refills the new table. Folders are kept.
+    @Test func cacheWithAuthorsColumnIsRebuiltWithoutIt() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+        let id = UUID()
+        let folder = VFolder(id: UUID(), name: "Kept", parentId: nil, sortOrder: 0, kind: .normal, queryJSON: nil)
+        try await index.insertFolder(folder)
+        try await index.upsertBatch([makeRow(id: id, mtime: 5, title: "Before")])
+        try await index.executeForTesting("ALTER TABLE items ADD COLUMN authors TEXT;")
+        try await index.executeForTesting("DROP TABLE fts;")
+        try await index.executeForTesting("CREATE VIRTUAL TABLE fts USING fts5(title, tags, authors, body, id UNINDEXED);")
+        try await index.executeForTesting("INSERT INTO fts(title, tags, authors, body, id) VALUES('Before', '', 'Moore', '', '\(id.uuidString)');")
+        await index.close()
+
+        let reopened = NotesIndex(url: tmp.appendingPathComponent("test-index.sqlite3"))
+        try await reopened.open()
+        #expect(await reopened.existingMTimes()[id.uuidString] == -1, "every row is re-read from its file")
+        #expect(try await reopened.allFolders().contains(folder))
+        #expect(await reopened.search("Moore").isEmpty)
+        await #expect(throws: (any Error).self) { try await reopened.executeForTesting("SELECT authors FROM items;") }
+        try await reopened.upsertBatch([makeRow(id: id, mtime: 10, title: "After")])
+        #expect(await reopened.search("After") == [id])
+        #expect(await reopened.summary(for: id)?.title == "After")
+        await reopened.close()
     }
 
     // MARK: - Sanitizer safety
@@ -318,7 +340,6 @@ import Foundation
 
         try await index.upsertBatch([
             makeRow(id: id, title: "Test Summary", kind: .extract, tags: "History Archives",
-                    authors: "Smith Jones", authorsJSON: "[\"Smith\",\"Jones\"]",
                     date: "1920-03", datePrecision: .month,
                     dateUncertain: true, sortDate: 19200300, quality: 3,
                     created: now, modified: now, managedTags: tagsJSON)
@@ -332,7 +353,6 @@ import Foundation
         #expect(summary?.date == "1920-03")
         #expect(summary?.datePrecision == .month)
         #expect(summary?.dateUncertain == true)
-        #expect(summary?.authors == ["Smith", "Jones"])
         #expect(summary?.sortDate == 19200300)
         #expect(summary?.quality == 3)
         #expect(summary?.managedTags == ["History", "Archives"])
