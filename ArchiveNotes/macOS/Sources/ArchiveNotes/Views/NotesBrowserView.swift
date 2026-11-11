@@ -100,6 +100,7 @@ struct NotesBrowserView: View {
         // Stacked, the list's floor and the note's must both fit (W48.notes-stacked-layout); since the note's fields
         // moved to the inspector that is less than the side-by-side floor, which then holds (W40.notes-detail-layout).
         .frame(minHeight: max(560, layoutMode == .stacked ? NotesLayoutSettings.stackedMinHeight : 0))
+        .overlay(alignment: .top) { TitleBarBackdrop() }   // W40.fix-notes-titlebar-label
         .animation(.easeInOut(duration: 0.18), value: showingTree)
         // Open the inspector in one layout pass. Animating the shell repeatedly resizes/reflows TextKit and
         // triggers its resize scroll restoration, making the note move rapidly (especially when stacked).
@@ -190,6 +191,9 @@ struct NotesBrowserView: View {
                   systemImage: nav.windowKind == .extract ? "quote.opening" : "doc.text")
                 .labelStyle(.titleAndIcon)
                 .font(.headline)
+                // A bare label ran to the edge of the toolbar's pill on macOS 26+ (notes-2 row 3); the inset gives it
+                // the room a button's own padding gives the sidebar button beside it.
+                .padding(.horizontal, 8)
                 .help(nav.windowKind == .extract ? "The Extracts window" : "The Notes window")
                 .accessibilityIdentifier("an.toolbar.windowKind")
         }
@@ -380,6 +384,25 @@ struct NotesBrowserView: View {
             }
             window.setFrame(frame, display: true)
         }
+    }
+}
+
+/// One even background behind the window title, as in the Reader (W40.fix-notes-titlebar-label; notes-2 row 3, after
+/// W40.fix-reader-titlebar-gradient). On macOS 27 the title bar is see-through and the folder list's sidebar material
+/// runs up under it, so "Archive Notes" sat half on grey and half on the window's white. This fills the window's top
+/// safe-area inset (the title bar) with the window background, over the content and under the title, traffic lights
+/// and toolbar. On macOS 26, whose bar is opaque, nothing shows.
+private struct TitleBarBackdrop: View {
+    var body: some View {
+        // The reader respects the safe area, so its proxy reports the inset (one that ignores it reports none); the colour is
+        // then drawn that far above the content, over the title bar.
+        GeometryReader { g in
+            Color(nsColor: .windowBackgroundColor)
+                .frame(width: g.size.width, height: g.safeAreaInsets.top)
+                .offset(y: -g.safeAreaInsets.top)
+        }
+        .allowsHitTesting(false)   // the title bar still drags the window
+        .accessibilityHidden(true)
     }
 }
 
