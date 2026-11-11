@@ -167,14 +167,17 @@ chosen and scored on the same pages, is a caveat. Costs are `difficulty.md`'s "$
 ]
 ```
 
-Not in the table: 23 of the 53 headline routes have no row (panel-data.json `headline`, answered NES; prices
+Not in the table: 18 of the 53 headline routes have no row (W46.ocr-rows-omitted, 2026-11-11, added five: the four cheap
+hosted routes and `churro-3b-farmshare`; each of the 18 below has its stated reason) (panel-data.json `headline`, answered NES; prices
 `routes.std`; cluster pages an hour `farmshare.truth`). "Dominated" means a row in the same family scores higher on
 the 96 and costs no more (hosted) or reads more pages an hour (cluster).
 - `qwen3.5-27b` (hosted, 95.86, 5th): 14 of 96 pages lost to transport errors, strict 81.73, so its answered figure
-  rests on 82 pages; held out until a rerun answers the 96 (item 10) [I].
-- Cheap hosted routes not copied when the rows were generated, priced under every hosted row (item 10): `gemma4-31b`
-  93.76 ($0.38), `qwen3.5-9b` 93.38 ($0.25), `gemma4-26b-a4b` 92.38 ($0.41), `mistral-small-24b` 91.45 ($0.32). Until
-  then a price cap under $0.60 finds no hosted row.
+  rests on 82 pages; held out until a rerun answers the 96. The rerun is a paid hosted run (about $0.17 at its $1.80
+  per 1,000 list), so it waits behind the paid-benchmarking hold in `execution-plans/paid-runs-deferred.md` (W43.sweep)
+  [I].
+- Rows since W46.ocr-rows-omitted: the cheap hosted routes, priced under every other hosted row, `gemma4-31b` 93.76
+  ($0.38), `qwen3.5-9b` 93.38 ($0.25), `gemma4-26b-a4b` 92.38 ($0.41), `mistral-small-24b` 91.45 ($0.32), all 96
+  only. A price cap under $0.60 now finds a hosted row.
 - Dominated hosted routes: `qwen3-vl-8b` 93.85 ($1.49) and `qwen3-vl-30b-a3b` 91.79 ($0.98) by `qwen3.8-flash` 95.11
   ($0.60); `qwen3.5-35b-a3b` 92.82 ($0.83) by the same (it is `casc-5-fail`'s second stage); `mistral-medium3.5`
   90.94 ($7.29) by `mistral-large4` 93.25 ($2.69).
@@ -182,14 +185,21 @@ the 96 and costs no more (hosted) or reads more pages an hour (cluster).
   `qwen3.5-122b-a10b-farmshare` 94.67 (4 GPUs, 729.4), `ling3-flash-vl-farmshare` 93.81 (4 GPUs, 76.6),
   `qwen3-vl-8b-farmshare` 93.56 (1,105.5), `qwen3.8-27b-sherlock` 93.48 (2,886.8), `qwen3.8-27b-farmshare` 93.17
   (1,063.2), `glm-ocr-farmshare` 92.05 (3,463.2; its layout role is note 03's), `qwen3.5-4b-farmshare` 91.94
-  (1,936.7), `churro-3b-farmshare` 91.07 (1,251.0; OCR-15), `nemotron-parse-2-sherlock` 86.87 (1,061.3),
+  (1,936.7), `nemotron-parse-2-sherlock` 86.87 (1,061.3),
   `unlimited-ocr-sherlock` 85.46 (202.8).
 - Dominated by `paddleocr-vl1.6-sherlock` (90.89, 12,327.9 pages an hour): `lightonocr3-0.8b-farmshare` 88.04
   (5,527.3), `ppocrv6-medium-farmshare` 77.17 (8,106.9; its Mac form is `ppocrv6-kraken-blla`).
 - Superseded: `paddleocr-vl1.5-farmshare`, 93.53 answered but 84.67 strict with 9 caps, by 1.6 (strict 88.98).
 - `granite-docling-258m-mlx` 77.39: no public figure anywhere (P5-1).
 
-Domination is judged on the 96 overall only; a dominated route may lead on a public stratum, which item 10 checks.
+Domination is judged on the 96 overall only. Item 10's check of the public strata (ocr-scorers.json, public895, NES
+strict; each dominated route against every row's public figures in its family and against all rows): one dominated
+route leads, `churro-3b-farmshare`, now a row. It is the best cluster route on seven strata of the 440 (L5 62.78
+against LightOnOCR-3 4B 58.90, L6 69.45 against Infinity-Parser2-Pro 54.46, L7 53.85 against Xiaomi-OCR-0 43.93, L8
+92.61, N1 69.19, N3 84.70, N4 57.88), and on L8 and N4 above Gemini 3.7 Flash's 89.83 and 48.65; it was trained on
+CHURRO-DS, the source of those strata, so its row carries OCR-15 until item 8 counts the overlap. The other near miss:
+`ling3-flash-vl-farmshare` N5 82.29 against `qwen3.6-35b-a3b-farmshare` 82.12, 0.17 apart, under the floor, so no
+row (four GPUs, 76.6 pages an hour). The dominated hosted routes have no public run of their own.
 
 R6, commercial document services: none found worth a row. On 25 of the 96 Azure Document Intelligence read 89.6,
 AWS Textract 86.6 and Transkribus Text Titan I 82.5, each under Mistral OCR 4.1's 92.5 on the same pages (Azure -2.9,
@@ -386,7 +396,9 @@ dropped (`ocr-panel-cloud.md`); GPT-5.6 Luna was read through OpenRouter instead
 10. **`W46.ocr-rows-omitted`** [XS · $0]: rows for the cheap hosted routes listed under "Not in the table"
     (`gemma4-31b`, `qwen3.5-9b`, `gemma4-26b-a4b`, `mistral-small-24b`), a check that no dominated route leads on a
     public stratum, and a rerun of `qwen3.5-27b` on the 96 that answers the pages its transport errors lost (its list
-    price $1.80 per 1,000); done when each has a row or a stated reason. Waits on the generator item.
+    price $1.80 per 1,000); done when each has a row or a stated reason. Waits on the generator item. Done
+    2026-11-11: five rows (the four and `churro-3b-farmshare`), the strata check under "Not in the table", the
+    rerun deferred as paid (`paid-runs-deferred.md`).
 11. **Gaps already known, not refiled:** Gemini 3.8 Flash and the other hosted rows on the 455 (W43.sweep, held);
     Infinity-Parser2-Pro's licence and kit status (C-ocr §8).
 
@@ -417,7 +429,10 @@ ties against the best feasible route only, cheaper then faster, as 7.7 recommend
   labelled conditional (OCR-1).
 - Without Gemini (open weights only): `qwen3.6-27b` 95.38 ($1.94) against `qwen3.8-flash` 95.11 ($0.60, -0.08,
   -1.62 to +1.64, a tie), so `qwen3.8-flash`; its 3 refusals go to a fallback. `qwen3.5-27b` (95.86 answered on 82
-  pages) has no row until item 10 reruns it; it would then be the best feasible here.
+  pages) has no row until its rerun (paid, deferred to W43.sweep); it would then be the best feasible here.
+- A price cap from $0.25 to under $0.60 per 1,000: `qwen3.5-9b` 93.38 ($0.25). Where the cap reaches $0.38 the best
+  feasible is `gemma4-31b` 93.76, 0.38 above it and under the 0.49 floor [pair not measured], so the tie rule still
+  gives the cheaper `qwen3.5-9b`.
 - Early modern and non-Latin strata: `gemini3.8-flash` on the 440's strata (L5 63.17, L6 72.87, L7 57.95, N1 74.66,
   N3 88.79, N4 46.14); forms, newspapers, N2, N5, N6: no OpenRouter row has a figure.
 
@@ -435,6 +450,8 @@ ties against the best feasible route only, cheaper then faster, as 7.7 recommend
 - Handwritten: under 7.3's recommendation `infinity-parser2-pro-sherlock` (L1-L3 89.3; two GPUs).
 - Newspapers: `qwen3.5-27b-farmshare` (L9 95.84). Forms: `qwen3.5-27b-farmshare` (L4 69.98) against
   `qwen3.6-27b-farmshare` (69.29), pair not measured. N6: `xiaomi-ocr-0-sherlock` 78.67 and Infinity 78.26.
+- Early modern hands and non-Latin strata of the 440 (L5-L8, N1, N3, N4): `churro-3b-farmshare` (L6 69.45, N3 84.70),
+  labelled with OCR-15 (trained on CHURRO-DS) and its research-only licence.
 
 **5. Any of these plus a coding agent.** The kit's same-hand kraken PP-OCRv6 fine-tune is an after-training row (note
 12): +2.6 (+1.7 to +3.4) at 160 lines on MPS on one public hand, worse on 3 of 4 owner Shils pages; corrected lines in the

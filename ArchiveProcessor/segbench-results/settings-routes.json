@@ -3117,6 +3117,473 @@
      "conditions": []
     },
     {
+     "id": "gemma4-31b",
+     "name": "Gemma 4 31B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.76,
+       "n": "92/95 answered, p081 apart",
+       "strict": 90.8,
+       "failures": {
+        "model": 3,
+        "cap": 3
+       },
+       "vs_qwen3.6-27b": "-2.19 (-4.15 to -0.6, n 91)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-31b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.76"
+       }
+      },
+      "typewritten": {
+       "value": 94.74,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-31b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "94.74"
+       }
+      },
+      "printed": {
+       "value": 83.29,
+       "answered": 26,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-31b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "83.29"
+       }
+      },
+      "handwritten": {
+       "value": 90.98,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-31b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "90.98"
+       }
+      },
+      "hands16": {
+       "value": 90.98,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "90.82 to 91.12",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "gemma4-31b",
+        "attribute": "routes.after",
+        "value": "90.98179247274747"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.38,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "gemma4-31b",
+       "attribute": "routes.std",
+       "value": "0.38"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only; 3 of 95 ran to the token cap"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": []
+    },
+    {
+     "id": "qwen3.5-9b",
+     "name": "Qwen3.5 9B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.38,
+       "n": "91/95 answered, p081 apart",
+       "strict": 89.45,
+       "failures": {
+        "model": 4,
+        "cap": 4
+       },
+       "vs_qwen3.6-27b": "-1.81 (-3.36 to -0.55, n 90)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.38"
+       }
+      },
+      "typewritten": {
+       "value": 89.63,
+       "answered": 47,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "89.63"
+       }
+      },
+      "printed": {
+       "value": 89.65,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "89.65"
+       }
+      },
+      "handwritten": {
+       "value": 91.0,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "91.0"
+       }
+      },
+      "hands16": {
+       "value": 91.0,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "90.75 to 91.03",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3.5-9b",
+        "attribute": "routes.after",
+        "value": "91.002885450361"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.25,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.5-9b",
+       "attribute": "routes.std",
+       "value": "0.25"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only; 4 of 95 ran to the token cap",
+      "the hosted build; the Mac row qwen3.5-9b-mlx4 is 4-bit (93.32)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": []
+    },
+    {
+     "id": "gemma4-26b-a4b",
+     "name": "Gemma 4 26B-A4B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 92.38,
+       "n": "86/95 answered, p081 apart",
+       "strict": 83.62,
+       "failures": {
+        "transport": 1,
+        "model": 8,
+        "cap": 8
+       },
+       "vs_qwen3.6-27b": "-4.15 (-5.69 to -2.8, n 85)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-26b-a4b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "92.38"
+       }
+      },
+      "typewritten": {
+       "value": 89.7,
+       "answered": 47,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-26b-a4b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "89.7"
+       }
+      },
+      "printed": {
+       "value": 71.59,
+       "answered": 22,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-26b-a4b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "71.59"
+       }
+      },
+      "handwritten": {
+       "value": 86.75,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemma4-26b-a4b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "86.75"
+       }
+      },
+      "hands16": {
+       "value": 86.75,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "86.61 to 86.85",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "gemma4-26b-a4b",
+        "attribute": "routes.after",
+        "value": "86.74795246868943"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.41,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "gemma4-26b-a4b",
+       "attribute": "routes.std",
+       "value": "0.41"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only; 8 of 95 ran to the token cap and 1 lost to a transport error, strict 83.62"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": []
+    },
+    {
+     "id": "mistral-small-24b",
+     "name": "Mistral Small 24B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 91.45,
+       "n": "93/95 answered, p081 apart",
+       "strict": 89.53,
+       "failures": {
+        "model": 2,
+        "cap": 2
+       },
+       "vs_qwen3.6-27b": "-3.99 (-6.32 to -2.09, n 92)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-small-24b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "91.45"
+       }
+      },
+      "typewritten": {
+       "value": 93.53,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-small-24b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.53"
+       }
+      },
+      "printed": {
+       "value": 89.33,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-small-24b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "89.33"
+       }
+      },
+      "handwritten": {
+       "value": 79.9,
+       "answered": 15,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-small-24b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "79.9"
+       }
+      },
+      "hands16": {
+       "value": 79.9,
+       "n": 16,
+       "failed": 1,
+       "unresolved_range": "79.67 to 79.98",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "mistral-small-24b",
+        "attribute": "routes.after",
+        "value": "79.90122140620318"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.32,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "mistral-small-24b",
+       "attribute": "routes.std",
+       "value": "0.32"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only; 2 of 95 ran to the token cap",
+      "handwritten 79.90 strict, 15 of 16 answered: not a hands reader"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": []
+    },
+    {
      "id": "gemini3.8-flash",
      "name": "Gemini 3.8 Flash",
      "family": "cloud",
@@ -6025,6 +6492,180 @@
      },
      "caveats": [
       "96 only in the scorer tables"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": []
+    },
+    {
+     "id": "churro-3b-farmshare",
+     "name": "CHURRO-3B (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 91.07,
+       "n": "93/95 answered, p081 apart",
+       "strict": 89.16,
+       "failures": {
+        "model": 2,
+        "cap": 2
+       },
+       "vs_qwen3.6-27b": "-4.25 (-6.21 to -2.42, n 92)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "churro-3b-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "91.07"
+       }
+      },
+      "typewritten": {
+       "value": 90.99,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "churro-3b-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "90.99"
+       }
+      },
+      "printed": {
+       "value": 88.4,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "churro-3b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "88.4"
+       }
+      },
+      "handwritten": {
+       "value": 87.48,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "churro-3b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "87.48"
+       }
+      },
+      "hands16": {
+       "value": 87.6,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "87.47 to 87.71",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "fs-churro",
+        "attribute": "routes.after",
+        "value": "87.5964942521885"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L5": [
+        62.78,
+        68.8,
+        "73/80"
+       ],
+       "L6": [
+        69.45,
+        72.15,
+        "77/80"
+       ],
+       "L7": [
+        53.85,
+        62.44,
+        "69/80"
+       ],
+       "L8": [
+        92.61,
+        93.79,
+        "79/80"
+       ],
+       "N1": [
+        69.19,
+        83.87,
+        "33/40"
+       ],
+       "N3": [
+        84.7,
+        84.7,
+        "40/40"
+       ],
+       "N4": [
+        57.88,
+        72.35,
+        "32/40"
+       ],
+       "all": [
+        69.92,
+        76.34,
+        "403/440"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "fs-churro (FarmShare churro)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L5': 0.6278, 'L6': 0.6945, 'L7': 0.5385, 'L8': 0.9261, 'N1': 0.6919, 'N3': 0.847, 'N4': 0.5788, 'all': 0.6992}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "churro-3b-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 79.94
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 1251.0,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "churro-1855420",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "1251.0"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [
+      "trained on CHURRO-DS, the source of the 440's strata it leads (L5-L8, N1, N3, N4); image-hash overlap with the 895 not checked (OCR-15, W46.ocr-churro-overlap)",
+      "public: the 440 only",
+      "weights Qwen research licence, CHURRO-DS research use only (C-ocr.md); acceptable in a user's own kit, stated",
+      "on the 96 it is dominated: 91.07 answered against qwen3.5-9b-sherlock 95.13, and slower (1,251.0 pages an hour)"
      ],
      "kind_rules": [],
      "fallback": null,
