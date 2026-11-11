@@ -1,0 +1,969 @@
+{
+ "item": "W46.dewarp-guard",
+ "step": "P12-5 classing",
+ "model": "gemini-3.7-flash",
+ "route": "https://aiapi-prod.stanford.edu/v1",
+ "prompt_sha": "8f765f18e0a9d3fe",
+ "unparsed": [],
+ "tally": {
+  "curved": {
+   "page": {
+    "bound": 16,
+    "curled": 8,
+    "flat": 8
+   },
+   "lines_bent": {
+    "true": 17,
+    "false": 15
+   },
+   "perspective": {
+    "strong": 0,
+    "mild": 28,
+    "none": 4
+   },
+   "display_type": {
+    "true": 3,
+    "false": 29
+   },
+   "handwritten": {
+    "mostly": 5,
+    "some": 8,
+    "none": 19
+   }
+  },
+  "flat": {
+   "page": {
+    "bound": 8,
+    "curled": 11,
+    "flat": 13
+   },
+   "lines_bent": {
+    "true": 10,
+    "false": 22
+   },
+   "perspective": {
+    "strong": 0,
+    "mild": 31,
+    "none": 1
+   },
+   "display_type": {
+    "true": 0,
+    "false": 32
+   },
+   "handwritten": {
+    "mostly": 3,
+    "some": 8,
+    "none": 21
+   }
+  }
+ },
+ "gaps": {
+  "all": {
+   "pairs": 32,
+   "curved": [
+    978,
+    1316,
+    74.3
+   ],
+   "flat": [
+    1065,
+    1132,
+    94.1
+   ],
+   "diff": [
+    -19.8,
+    -26.2,
+    -12.8
+   ],
+   "paired": [
+    -16.8,
+    -21.7,
+    -12.1
+   ],
+   "worse": 25
+  },
+  "bound_or_curled": {
+   "pairs": 24,
+   "curved": [
+    784,
+    1095,
+    71.6
+   ],
+   "flat": [
+    796,
+    851,
+    93.5
+   ],
+   "diff": [
+    -21.9,
+    -29.0,
+    -14.0
+   ],
+   "paired": [
+    -19.2,
+    -25.0,
+    -13.3
+   ],
+   "worse": 19
+  },
+  "bound_or_curled_flat_pair_flat": {
+   "pairs": 9,
+   "curved": [
+    183,
+    236,
+    77.5
+   ],
+   "flat": [
+    346,
+    375,
+    92.3
+   ],
+   "diff": [
+    -14.7,
+    -27.1,
+    -0.7
+   ],
+   "paired": [
+    -16.0,
+    -25.7,
+    -5.5
+   ],
+   "worse": 6
+  },
+  "not_bound_or_curled": {
+   "pairs": 8,
+   "curved": [
+    194,
+    221,
+    87.8
+   ],
+   "flat": [
+    269,
+    281,
+    95.7
+   ],
+   "diff": [
+    -7.9,
+    -14.4,
+    -1.9
+   ],
+   "paired": [
+    -9.5,
+    -14.9,
+    -4.2
+   ],
+   "worse": 6
+  },
+  "bent_and_lines_bent_flat_pair_straight": {
+   "pairs": 9,
+   "curved": [
+    364,
+    466,
+    78.1
+   ],
+   "flat": [
+    239,
+    257,
+    93.0
+   ],
+   "diff": [
+    -14.9,
+    -26.0,
+    -4.2
+   ],
+   "paired": [
+    -14.0,
+    -22.0,
+    -4.8
+   ],
+   "worse": 6
+  },
+  "lines_bent": {
+   "pairs": 17,
+   "curved": [
+    655,
+    924,
+    70.9
+   ],
+   "flat": [
+    481,
+    520,
+    92.5
+   ],
+   "diff": [
+    -21.6,
+    -30.0,
+    -12.6
+   ],
+   "paired": [
+    -18.3,
+    -25.4,
+    -11.4
+   ],
+   "worse": 13
+  },
+  "bound_or_curled_no_display_no_hand": {
+   "pairs": 11,
+   "curved": [
+    405,
+    561,
+    72.2
+   ],
+   "flat": [
+    319,
+    334,
+    95.5
+   ],
+   "diff": [
+    -23.3,
+    -34.6,
+    -11.7
+   ],
+   "paired": [
+    -20.4,
+    -29.3,
+    -10.6
+   ],
+   "worse": 9
+  },
+  "strong_perspective_not_bent": null,
+  "display_type": {
+   "pairs": 3,
+   "curved": [
+    33,
+    47,
+    70.2
+   ],
+   "flat": [
+    75,
+    76,
+    98.7
+   ],
+   "diff": [
+    -28.5,
+    -30.7,
+    0.0
+   ],
+   "paired": [
+    -17.4,
+    -31.0,
+    0.0
+   ],
+   "worse": 2
+  }
+ },
+ "billed": {
+  "calls": 64,
+  "estimate": 0.095693,
+  "gateway_calls": 64,
+  "gateway": 0.095701,
+  "gateway_over_estimate": 1.0001,
+  "charged": 0.095706
+ },
+ "pages": {
+  "uiuc-00233": {
+   "group": "curved",
+   "pair": null,
+   "cue": 9.222,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Bound volume page showing gutter shadow and faint bleed-through text."
+  },
+  "uiuc-00149": {
+   "group": "curved",
+   "pair": null,
+   "cue": 2.96,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Top of the document curves slightly away toward the background."
+  },
+  "s03370": {
+   "group": "curved",
+   "pair": null,
+   "cue": 41.116,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "none",
+   "display_type": true,
+   "handwritten": "none",
+   "note": "Magazine cover lying on a wooden surface."
+  },
+  "s02046": {
+   "group": "curved",
+   "pair": null,
+   "cue": 21.648,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": true,
+   "handwritten": "none",
+   "note": "cover of an annual report with hole punches on the left edge"
+  },
+  "s01262": {
+   "group": "curved",
+   "pair": null,
+   "cue": 15.821,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Wavy loose page corner-folded with copyright notice sticker at bottom."
+  },
+  "s01776": {
+   "group": "curved",
+   "pair": null,
+   "cue": 12.386,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Bound publication page with slight gutter curve and printed signature."
+  },
+  "s01403": {
+   "group": "curved",
+   "pair": null,
+   "cue": 11.851,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Multiple typed index cards and notes laid flat on a surface"
+  },
+  "s03050": {
+   "group": "curved",
+   "pair": null,
+   "cue": 11.061,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Bound volume page with curved text lines near the gutter and a large callout quote."
+  },
+  "s01517": {
+   "group": "curved",
+   "pair": null,
+   "cue": 10.685,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Letter with red handwritten annotations and signature, showing creases and curled edges."
+  },
+  "s03048": {
+   "group": "curved",
+   "pair": null,
+   "cue": 10.607,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "hand holding bottom of bound page with spine visible on the right"
+  },
+  "s01665": {
+   "group": "curved",
+   "pair": null,
+   "cue": 10.163,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Open book page held by thumb showing page 59 with chapter heading."
+  },
+  "s03335": {
+   "group": "curved",
+   "pair": null,
+   "cue": 10.104,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page with curved top section and minor perspective distortion."
+  },
+  "s01668": {
+   "group": "curved",
+   "pair": null,
+   "cue": 9.952,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Book page held open with a finger at the bottom edge"
+  },
+  "s00676": {
+   "group": "curved",
+   "pair": null,
+   "cue": 9.103,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "handwritten draft on paper held by hand with a paperclip at top"
+  },
+  "uiuc-00395": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.897,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "handwritten list on loose paper with curled top corner over typed document"
+  },
+  "s01319": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.868,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Folded brochure page held open by fingers at the bottom."
+  },
+  "s00185": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.763,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "Handwritten notes in blue ink on lined notebook paper."
+  },
+  "s01667": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.761,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "open book showing page 83 with slight gutter curve"
+  },
+  "s01717": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.664,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page in a ring binder shot at a slight angle."
+  },
+  "s00573": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.571,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "Yellow lined paper with handwritten notes in black ink."
+  },
+  "s00571": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.352,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "archival photocopy with annotations in ink in the margins"
+  },
+  "s02141": {
+   "group": "curved",
+   "pair": null,
+   "cue": 8.092,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Thumb holding down the bottom edge of the page in a bound document."
+  },
+  "s00806": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.872,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Typewritten letter with handwritten marginalia/annotations at the top."
+  },
+  "s01421": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.848,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "none",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Archival document with pink handwritten letters at top and copyright strip below."
+  },
+  "s00053": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.754,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Finger visible holding bottom edge of page in bound document."
+  },
+  "s03051": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.732,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": true,
+   "handwritten": "none",
+   "note": "hand holding bottom of bound volume table of contents page"
+  },
+  "s01511": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.683,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Typewritten letter with handwritten annotations and addresses in margins"
+  },
+  "s03303": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.625,
+   "page": "bound",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Finger visible holding the left edge of the page."
+  },
+  "s00122": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.361,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page in a bound volume with faint text visible on the lower half."
+  },
+  "s01716": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.326,
+   "page": "bound",
+   "lines_bent": false,
+   "perspective": "none",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "Lined notebook page with handwritten notes in a three-ring binder."
+  },
+  "s01335": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.291,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page in a bound document curving slightly at the gutter."
+  },
+  "s02883": {
+   "group": "curved",
+   "pair": null,
+   "cue": 7.229,
+   "page": "bound",
+   "lines_bent": false,
+   "perspective": "none",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "fingers holding open a bound booklet"
+  },
+  "uiuc-00254": {
+   "group": "flat",
+   "pair": "uiuc-00233",
+   "cue": 0.996,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page with bleed-through text from underneath."
+  },
+  "uiuc-00032": {
+   "group": "flat",
+   "pair": "uiuc-00149",
+   "cue": 1.016,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "none",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Typewritten memo with handwritten archival filing notes at the top left."
+  },
+  "s03372": {
+   "group": "flat",
+   "pair": "s03370",
+   "cue": 0.916,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten document with slight perspective distortion."
+  },
+  "s02115": {
+   "group": "flat",
+   "pair": "s02046",
+   "cue": 0.752,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typed interview transcript with bleed-through text visible from the reverse side."
+  },
+  "s01245": {
+   "group": "flat",
+   "pair": "s01262",
+   "cue": 0.532,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "typewritten loose sheet with corner lifted and faint bleed-through text"
+  },
+  "s02009": {
+   "group": "flat",
+   "pair": "s01776",
+   "cue": 0.53,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": null
+  },
+  "s01401": {
+   "group": "flat",
+   "pair": "s01403",
+   "cue": 0.502,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Two typed index cards with archival annotations and folded corner."
+  },
+  "s03044": {
+   "group": "flat",
+   "pair": "s03050",
+   "cue": 1.144,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Vintage General Electric advertisement in an open bound publication held by hand."
+  },
+  "s01520": {
+   "group": "flat",
+   "pair": "s01517",
+   "cue": 1.17,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "Handwritten cursive letter with red pen underline, with visible horizontal fold creases."
+  },
+  "s02488": {
+   "group": "flat",
+   "pair": "s03048",
+   "cue": 0.486,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Typewritten page with minor handwritten annotation, showing show-through text from below."
+  },
+  "s01629": {
+   "group": "flat",
+   "pair": "s01665",
+   "cue": 1.1,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "Grid-lined notebook page with handwritten notes in green and purple ink."
+  },
+  "s03297": {
+   "group": "flat",
+   "pair": "s03335",
+   "cue": 1.012,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page with top-left corner curled up, resting in a folder"
+  },
+  "s01650": {
+   "group": "flat",
+   "pair": "s01668",
+   "cue": 1.017,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Bound volume page showing gutter shadow on the left and typed transcript text."
+  },
+  "s00747": {
+   "group": "flat",
+   "pair": "s00676",
+   "cue": 0.378,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "typewritten syllabus page curving toward the left spine"
+  },
+  "uiuc-00002": {
+   "group": "flat",
+   "pair": "uiuc-00395",
+   "cue": 0.797,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Letterhead with visible bleed-through text from the back"
+  },
+  "s01323": {
+   "group": "flat",
+   "pair": "s01319",
+   "cue": 0.333,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Typewritten letter with signature and handwritten initials."
+  },
+  "s00214": {
+   "group": "flat",
+   "pair": "s00185",
+   "cue": 0.938,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "mostly",
+   "note": "Letterhead with extensive handwritten text on wrinkled paper."
+  },
+  "s01646": {
+   "group": "flat",
+   "pair": "s01667",
+   "cue": 0.873,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Bound volume page with curved left margin near gutter."
+  },
+  "s01721": {
+   "group": "flat",
+   "pair": "s01717",
+   "cue": 0.952,
+   "page": "bound",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "hand holding back upper page"
+  },
+  "s00591": {
+   "group": "flat",
+   "pair": "s00573",
+   "cue": 1.02,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page with text bleeding through from underlying sheet in a stack"
+  },
+  "s00515": {
+   "group": "flat",
+   "pair": "s00571",
+   "cue": 0.594,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten draft with multiple strikethrough corrections and footnote"
+  },
+  "s02113": {
+   "group": "flat",
+   "pair": "s02141",
+   "cue": 0.714,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Translucent sheet showing text from the page beneath."
+  },
+  "s00862": {
+   "group": "flat",
+   "pair": "s00806",
+   "cue": 0.22,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten archival letter page with red stamped text visible on left edge."
+  },
+  "s01418": {
+   "group": "flat",
+   "pair": "s01421",
+   "cue": 0.798,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "archival document page with handwritten annotations at the top"
+  },
+  "s00052": {
+   "group": "flat",
+   "pair": "s00053",
+   "cue": 0.61,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "typewritten report page photographed on a dark surface"
+  },
+  "s02736": {
+   "group": "flat",
+   "pair": "s03051",
+   "cue": 0.528,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page with curled top-left edge."
+  },
+  "s01515": {
+   "group": "flat",
+   "pair": "s01511",
+   "cue": 0.391,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Typewritten page with text bleed-through and top-left corner curled up."
+  },
+  "s03281": {
+   "group": "flat",
+   "pair": "s03303",
+   "cue": 0.957,
+   "page": "bound",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Typewritten page in bound volume with yellow highlighting and minor handwritten corrections."
+  },
+  "s00126": {
+   "group": "flat",
+   "pair": "s00122",
+   "cue": 1.12,
+   "page": "curled",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Hole-punched typed sheet with visible edge curling at the top left."
+  },
+  "s02026": {
+   "group": "flat",
+   "pair": "s01716",
+   "cue": 0.927,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Photocopy or fax page of a printed magazine article with an illustration."
+  },
+  "s01327": {
+   "group": "flat",
+   "pair": "s01335",
+   "cue": 0.612,
+   "page": "curled",
+   "lines_bent": true,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "none",
+   "note": "Top left corner curled upwards"
+  },
+  "s02881": {
+   "group": "flat",
+   "pair": "s02883",
+   "cue": 0.989,
+   "page": "flat",
+   "lines_bent": false,
+   "perspective": "mild",
+   "display_type": false,
+   "handwritten": "some",
+   "note": "Semi-transparent overlay paper over another typed document with handwriting at top."
+  }
+ }
+}
