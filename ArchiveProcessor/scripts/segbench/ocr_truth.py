@@ -352,7 +352,8 @@ def vision_words(path: Path) -> int:
     if not out.exists():
         jobs = path.with_suffix(".jobs.tsv")
         jobs.write_text(f"{path}\t{out}\n")
-        sh([str(OCR_BIN), str(jobs)], timeout=300)
+        import vision_guard
+        vision_guard.run(OCR_BIN, jobs, check=False, capture_output=True, text=True, timeout=300)
         jobs.unlink(missing_ok=True)
     return len(re.findall(r"[A-Za-z0-9]{2,}", out.read_text())) if out.exists() else 0
 

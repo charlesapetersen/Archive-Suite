@@ -210,7 +210,8 @@ def vision():
     (RUN / 'readings/apple-vision').mkdir(parents=True, exist_ok=True)
     rows = [json.loads(x) for x in (RUN / 'chaos20.jsonl').read_text().splitlines()]
     tsv.write_text(''.join(f"{r['image']}\t{RUN / 'readings/apple-vision' / (r['id'] + '.txt')}\n" for r in rows))
-    subprocess.run([str(P.T.OCR_BIN), str(tsv)], check=True)
+    import vision_guard
+    vision_guard.run(P.T.OCR_BIN, tsv)
 
 
 def verdict(reading_words: list[str], original: str, altered: str, expected: int = 0) -> str:

@@ -208,14 +208,15 @@ def cmd_sanity():
     jobs = C.CACHE / 'sample' / 'vision-jobs.tsv'
     jobs.write_text(''.join(f"{r['image']}\t{VISION / (safe(r['source'] + ':' + r['page_id']) + '.txt')}\n"
                             for r in rows))
-    subprocess.run([str(OCR_BIN), str(jobs)], check=True)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import vision_guard
+    vision_guard.run(OCR_BIN, jobs)
     missing = [r['source'] + ':' + r['page_id'] for r in rows
                if not (VISION / (safe(r['source'] + ':' + r['page_id']) + '.txt')).is_file()]
     if missing:
         raise SystemExit(f'Vision sanity outputs missing: {missing[:5]}')
     # Scored with the panel's scorer, which needs regex/rapidfuzz/sacrebleu (run this under uv, as the
     # reports are: uv run --with regex --with rapidfuzz --with 'sacrebleu==2.5.1' python sample.py sanity).
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     import ocr_panel_score as S
     by = collections.defaultdict(list)
     for r in rows:

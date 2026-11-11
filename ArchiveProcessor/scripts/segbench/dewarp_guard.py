@@ -399,7 +399,8 @@ def cmd_real5_fetch(a):
 def r5_swift(mode, rows):
     jobs = R5 / f'{mode}-jobs.tsv'
     jobs.write_text(''.join('\t'.join(map(str, x)) + '\n' for x in rows))
-    subprocess.run([str(DEWARP_BIN), mode, str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(DEWARP_BIN, jobs, mode)
     jobs.unlink()
 
 

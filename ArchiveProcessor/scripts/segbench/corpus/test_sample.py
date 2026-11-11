@@ -3,7 +3,11 @@
 import collections
 import unittest
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import sample as S
+import vision_guard  # noqa: F401  (patched below)
 
 
 def pool(spec):
@@ -28,7 +32,7 @@ class Draw(unittest.TestCase):
             flags = cache / 'flagged.jsonl'; flags.write_text('previous review\n')
             with mock.patch.object(C, 'CACHE', root), \
                     mock.patch.multiple(S, DRAW=cache / 'draw.jsonl', VISION=cache / 'vision'), \
-                    mock.patch.object(S.subprocess, 'run') as run:
+                    mock.patch('vision_guard.run') as run:
                 run.side_effect = subprocess.CalledProcessError(1, 'vision')
                 with self.assertRaises(subprocess.CalledProcessError):
                     S.cmd_sanity()
@@ -42,7 +46,7 @@ class Draw(unittest.TestCase):
                 scorer = types.SimpleNamespace(score=lambda *args: {'nes': 0})
                 with mock.patch.dict('sys.modules', ocr_panel_score=scorer):
                     S.cmd_sanity()
-                run.assert_called_with([str(S.OCR_BIN), str(cache / 'vision-jobs.tsv')], check=True)
+                run.assert_called_with(S.OCR_BIN, cache / 'vision-jobs.tsv')
                 self.assertEqual(C.read_jsonl(flags), [])
 
     def test_freeze_extends_but_refuses_changed_or_missing_old_page(self):

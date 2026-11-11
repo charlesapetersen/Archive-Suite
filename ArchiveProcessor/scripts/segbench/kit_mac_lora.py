@@ -78,7 +78,8 @@ def vision_texts(jpegs):
         jobs = OUT / "ocr-jobs.tsv"
         jobs.write_text("".join(f"{j}\t{d}\n" for j, d in todo))
         print(f"Vision OCR: {len(todo)} pages", flush=True)
-        subprocess.run([str(OCR_BIN), str(jobs)], check=False)
+        import vision_guard
+        vision_guard.run(OCR_BIN, jobs, check=False)
     return {j: d.read_text(encoding="utf-8") if d.exists() else "" for j, d in dest.items()}
 
 

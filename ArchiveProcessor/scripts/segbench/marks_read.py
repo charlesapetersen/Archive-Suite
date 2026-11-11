@@ -112,7 +112,8 @@ def read_vision():
     jobs = WORK / "vision-jobs.tsv"
     jobs.write_text("".join(f"{c}\t{out / (c.stem + '.txt')}\n" for c in sorted(CROPS.glob("*.png"))))
     t0 = time.time()
-    subprocess.run([str(OCR_BIN), str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(OCR_BIN, jobs)
     print(f"vision: {time.time() - t0:.1f} s")
 
 

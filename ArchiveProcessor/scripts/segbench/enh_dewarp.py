@@ -182,7 +182,8 @@ def arm_image(arm, page):
 def swift(mode, rows):
     jobs = CACHE / f'{mode}-jobs.tsv'
     jobs.write_text(''.join('\t'.join(map(str, r)) + '\n' for r in rows))
-    subprocess.run([str(BIN), mode, str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(BIN, jobs, mode)
 
 
 def freeze(img, dest):

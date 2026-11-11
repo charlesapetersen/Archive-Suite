@@ -104,7 +104,8 @@ def cmd_fetch(a):
 def swift(mode, rows):
     jobs = CACHE / f'{mode}-jobs.tsv'
     jobs.write_text(''.join('\t'.join(map(str, r)) + '\n' for r in rows))
-    subprocess.run([str(DEWARP_BIN), mode, str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(DEWARP_BIN, jobs, mode)
     jobs.unlink()
 
 

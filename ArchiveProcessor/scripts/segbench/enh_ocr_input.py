@@ -342,7 +342,8 @@ def vision():
     if rows:
         jobs = CACHE / 'lines-jobs.tsv'
         jobs.write_text(''.join(f'{a}\t{b}\n' for a, b in rows))
-        subprocess.run([str(BIN), 'lines', str(jobs)], check=True)
+        import vision_guard
+        vision_guard.run(BIN, jobs, 'lines')
     print(len(rows), 'images read')
 
 

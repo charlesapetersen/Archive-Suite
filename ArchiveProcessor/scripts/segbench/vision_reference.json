@@ -1,0 +1,60 @@
+{
+ "os_build": "26B123",
+ "machine": "arm64",
+ "line_slack": 1,
+ "word_slack": 0.03,
+ "images": {
+  "p004": "81b8dfb31169e6d5",
+  "p014": "ce5067b0d95cccd3",
+  "p035": "9ef0da180101beb2",
+  "p068": "e713a1d99fc4c78d"
+ },
+ "tools": {
+  "segbench-ocr": {
+   "p004": {
+    "lines": 27,
+    "words": 281,
+    "sha256_16": "bceb419c177627a7"
+   },
+   "p014": {
+    "lines": 23,
+    "words": 192,
+    "sha256_16": "fbb7bfaf72041324"
+   },
+   "p035": {
+    "lines": 32,
+    "words": 325,
+    "sha256_16": "ca19431b09909395"
+   },
+   "p068": {
+    "lines": 44,
+    "words": 327,
+    "sha256_16": "a956d6290d8a5d6e"
+   }
+  },
+  "segbench-ocr sha256_16": "0bbde609a30d3f23",
+  "segbench-dewarp lines": {
+   "p004": {
+    "lines": 27,
+    "words": 281,
+    "sha256_16": "bceb419c177627a7"
+   },
+   "p014": {
+    "lines": 23,
+    "words": 192,
+    "sha256_16": "fbb7bfaf72041324"
+   },
+   "p035": {
+    "lines": 32,
+    "words": 325,
+    "sha256_16": "ca19431b09909395"
+   },
+   "p068": {
+    "lines": 44,
+    "words": 327,
+    "sha256_16": "a956d6290d8a5d6e"
+   }
+  },
+  "segbench-dewarp lines sha256_16": "8c0741beaa66c9b4"
+ }
+}

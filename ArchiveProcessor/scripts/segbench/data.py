@@ -223,7 +223,8 @@ def run_ocr(names=None) -> dict[str, int]:
         for c in cols.values():
             for p in c.pages:
                 fh.write(f"{p.path}\t{ocr_cache_path(c.name, p.n)}\n")
-    subprocess.run([str(tool), str(jobs)], check=False)
+    import vision_guard
+    vision_guard.run(tool, jobs, check=False)
     return {c.name: sum(ocr_cache_path(c.name, p.n).exists() for p in c.pages) for c in cols.values()}
 
 

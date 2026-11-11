@@ -89,7 +89,8 @@ def whole_vision():
     jobs = WORK / "vision-jobs.tsv"
     jobs.write_text("".join(f"{D.IMAGES / (p + '.jpg')}\t{out / (p + '.txt')}\n" for p in ids))
     t0 = time.time()
-    subprocess.run([str(R.OCR_BIN), str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(R.OCR_BIN, jobs)
     (WORK / "whole" / "vision-wall.json").write_text(json.dumps(dict(pages=len(ids), wall_s=round(time.time() - t0, 1))))
     print(f"vision: {time.time() - t0:.1f} s for {len(ids)} pages")
 

@@ -268,7 +268,8 @@ def vision():
         jobs.write_text(''.join(f'{a}\t{b}\n' for a, b in rows))
         for _, b in rows:
             b.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run([str(BIN), 'lines', str(jobs)], check=True)
+        import vision_guard
+        vision_guard.run(BIN, jobs, 'lines')
     print(len(rows), 'images read')
 
 

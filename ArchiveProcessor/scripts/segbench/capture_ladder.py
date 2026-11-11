@@ -163,7 +163,8 @@ def swift(mode, rows):
     WORK.mkdir(parents=True, exist_ok=True)
     jobs = WORK / f'{mode}-jobs.tsv'
     jobs.write_text(''.join(f'{s}\t{d}\n' for s, d in rows))
-    subprocess.run([str(BIN), mode, str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(BIN, jobs, mode)
 
 
 def cmd_vision(a):

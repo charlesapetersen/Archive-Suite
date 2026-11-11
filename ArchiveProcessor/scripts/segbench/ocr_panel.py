@@ -463,7 +463,8 @@ def vision():
     for j in m['jobs']:
         paths.append(str(CACHE / 'images' / (j['id'] + '.jpg')) + '\t' + str(CACHE / 'vision' / (j['id'] + '.txt')))
     jobs = CACHE / 'vision-jobs.tsv'; jobs.write_text('\n'.join(paths) + '\n')
-    subprocess.run([str(T.OCR_BIN), str(jobs)], check=True)
+    import vision_guard
+    vision_guard.run(T.OCR_BIN, jobs)
 
 
 def main():

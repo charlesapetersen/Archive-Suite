@@ -176,7 +176,8 @@ def vision():
     tsv.write_text(''.join(f"{RUN / 'images' / (j['id'] + '.jpg')}\t{RUN / 'vision' / (j['id'] + '.txt')}\n"
                            for j in jobs if not (RUN / 'vision' / (j['id'] + '.txt')).exists()))
     (RUN / 'vision').mkdir(parents=True, exist_ok=True)
-    subprocess.run([str(P.T.OCR_BIN), str(tsv)], check=True)
+    import vision_guard
+    vision_guard.run(P.T.OCR_BIN, tsv)
 
 
 def report():

@@ -60,7 +60,8 @@ def run(binary, mode, rows, name):
     jobs = OUT.parent / f'.vision-reread-{name}-jobs.tsv'
     jobs.write_text(''.join(f'{s}\t{d}\n' for s, d in rows))
     try:
-        subprocess.run([str(binary), *([mode] if mode else []), str(jobs)], check=True)
+        import vision_guard
+        vision_guard.run(binary, jobs, mode)
     finally:
         jobs.unlink()
 
