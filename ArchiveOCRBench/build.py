@@ -68,6 +68,7 @@ TRUTH_BIAS_SCORE = RESULTS / "ocr-truth-bias-score.json"  # W46.fix-ocr-truth-bi
 CHAOS = RESULTS / "chaos-probe.json"  # W46.fix-ocr-scorers: chaos_probe.py score, the altered-word probe
 DEWARP = RESULTS / "enh-dewarp.json"  # W46.enh-dewarp: enh_dewarp.py report, crop or dewarp against raw, by reader
 VISION_REREAD = RESULTS / "vision-27-reread.json"  # W46.vision-27-reread: Apple Vision on macOS 27.2 against 26.6
+VISION_UNFILTERED = RESULTS / "ocr-vision-unfiltered.json"  # W46.ocr-vision-unfiltered: its failure rate on owner pages
 ROTATION = RESULTS / "rotation-routes.json"  # W46.rotation-routes: every rotation route on the same turned pages
 CAPTURE = RESULTS / "capture-ladder.json"  # W46.capture-ladder: capture_ladder.py report, capture defects by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
@@ -1298,6 +1299,19 @@ def vision_reread():
             "panel": cell(d["panel"]["original · scored"]), "public": cell(d["bench"]["all"])}
 
 
+def vision_unfiltered():
+    """W46.ocr-vision-unfiltered: Apple Vision's failure rate on owner pages drawn without the 96's 20-word filter, one
+    page per document, against the owner's answer to "does this page have text?"."""
+    if not VISION_UNFILTERED.exists():
+        return None
+    d = json.loads(VISION_UNFILTERED.read_text())
+    t = d["tally"]["drawn"]
+    if "fail_on_text_page" not in t:
+        return None
+    return {"os": d["meta"]["os"], "pages": t["pages"], "answers": t["answers"], "fail": t["fail_on_text_page"],
+            "empty": t["empty_on_has_text"], "under_min": t["vision_under_min"]}
+
+
 def main():
     check = "--check" in sys.argv[1:]
     inputs = json.loads(INPUTS.read_text())
@@ -1478,7 +1492,7 @@ def main():
                                if (RESULTS / "ocr-ppocrv6-hands-qwen.json").exists() else None,
              "dewarp": dewarp, "enh_ocr": enh_ocr, "enh_marks": enh_marks(),
              "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
-             "vision_reread": vision_reread(), "rotation": rotation(),
+             "vision_reread": vision_reread(), "vision_unfiltered": vision_unfiltered(), "rotation": rotation(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "logprob": logprob(), "postcorrect": postcorrect()}
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))

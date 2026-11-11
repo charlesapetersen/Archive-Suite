@@ -55584,6 +55584,41 @@
    "hi": 3.1
   }
  },
+ "vision_unfiltered": {
+  "os": "27.2",
+  "pages": 200,
+  "answers": {
+   "a page of text": 181,
+   "a few words": 19
+  },
+  "fail": {
+   "k": 1,
+   "n": 181,
+   "pct": 0.6,
+   "ci95": [
+    0.1,
+    3.1
+   ]
+  },
+  "empty": {
+   "k": 0,
+   "n": 200,
+   "pct": 0.0,
+   "ci95": [
+    0.0,
+    1.9
+   ]
+  },
+  "under_min": {
+   "k": 10,
+   "n": 200,
+   "pct": 5.0,
+   "ci95": [
+    2.7,
+    9.0
+   ]
+  }
+ },
  "rotation": {
   "groups": {
    "all": "all pages",

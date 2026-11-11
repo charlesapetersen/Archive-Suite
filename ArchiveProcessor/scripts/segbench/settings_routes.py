@@ -202,7 +202,7 @@ def reading_rows():
         cost("apple-vision"),
         {"per_unit_s": 0.21, "measured": True, "measured_on": "kind classifier's Vision text-lines step; not a like-for-like reading wall (P11-4)", "source": src("ArchiveProcessor/segbench-results/kind-classifier.md", "Vision text lines (accurate) + ink periodicity", "s_page", 0.21)},
         {"peak_gb": None, "measured_on": "runs in the OS", "source": None},
-        ["every figure is the macOS 27.2 reading (vision-27-reread.md)", "the 96 were drawn through a 20-word Vision filter: no owner page Vision reads as empty is in them (P8-3, ocr-truth.md)",
+        ["every figure is the macOS 27.2 reading (vision-27-reread.md)", "the 96 were drawn through a 20-word Vision filter (P8-3, ocr-truth.md); on 200 owner pages drawn without it, one per document, Vision reads under 20 words on 1 of the 181 pages of text (0.6%, 95% 0.1-3.1%) and nothing on none of the 200 with text (ocr-vision-unfiltered.md)",
          "public: Latin-script pages of the 440 only (L5-L8), 305 of 320 answered; empty on 15 of 80 L7 pages (P8-2)", "on 27.2 a few handwritten pages vary run to run, up to 3.7 NES a page (vision-27-reread.md Noise)"],
         ["non-Latin scripts: not measured (the bench ran Vision on the 320 Latin-script pages of the 440 only); figure absent, not zero"], None)
     for rid, nm, f, cav, kr in [
