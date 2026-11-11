@@ -13,7 +13,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 36 · works 7 · broken 0 · unreachable 0 · fixed-pending-recheck 9` (works: N-14, N-34, N-41, N-45, N-49, N-51, N-52; fixed-pending-recheck: N-07, N-11, N-12, N-16, N-22, N-26, N-35, N-44, N-50). Updated by owner session notes-1, 2026-11-05 (N-41 to `works`; N-11, N-12, N-26, N-44 to `broken`); N-16 to `fixed-pending-recheck` by W40.fix-notes-list-rename; N-26 by W40.fix-notes-folder-drag; N-44 by W40.fix-notes-zotero-fetch; N-07, N-22, N-35, N-50 by W40.fix-notes-small-fixes. N-11 by W40.g2-notes-2 (2026-11-06), after `W40.fix-notes-new-note` left it `broken`; N-44's status line also corrected to its history. The owner's recheck of all nine is [`sessions/notes-2.md`](sessions/notes-2.md).
+- **Count:** `unproven 28 · works 22 · broken 0 · unreachable 0 · fixed-pending-recheck 2` (works: N-04, N-07, N-11, N-12, N-14, N-16, N-17, N-20, N-21, N-29, N-32, N-34, N-35, N-36, N-41, N-43, N-44, N-45, N-49, N-50, N-51, N-52; fixed-pending-recheck: N-19, N-26). Updated by `W40.g2-notes-2-ledger` from the owner's Notes session 2, 2026-11-06 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)) and what it left on disk ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)): of the nine rows waiting for that recheck, seven to `works`, N-26 to `broken`, and N-22 back to `unproven`; N-04, N-17, N-20, N-21, N-29, N-32, N-36 and N-43 to `works`; N-19 to `broken`. N-26 back to `fixed-pending-recheck` by W40.fix-notes-folder-drag-again (2026-11-08), N-19 by W40.fix-notes-date-cell-erase (2026-11-08, reconciled 2026-11-10).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
@@ -152,10 +152,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   checks that its bytes, tags and mtime are unchanged. Nearest: `ArchiveNotesTests/NotesTagProjectorTests.outsideItemDirRejected`
   and `ArchiveNotesTests/NotesTagProjectorSafetyTests.scratchPathPredicate` (the projector's guards), plus
   `ArchiveNotesTests/ReaderLinkContainmentTests` (resolution cannot escape the root).
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-11-06 · owner session notes-2 · [`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md): after 55 minutes of Notes on a 5,000-PDF clone (source blocks pasted, Preview, Reveal in the Reader and in Finder, thumbnails), no file under the archive had a modification or status-change time after the session began; the only file added was the root marker, written by the Reader at setup.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — runtime evidence added; stays `unproven`: there is still no real-path test for the negative promise.
 - **Notes:** **Drift.**
   - The promise holds by code discipline, not by the OS. The app has `files.user-selected.read-write`
     (`ArchiveNotes.entitlements`), and the Reader-root bookmark is minted without
@@ -191,10 +192,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   Finder projection back through `tagNamesKey`); `ArchiveNotesTests/QualityWriteTests.projectsCanonicalQualityTagLosslessly`;
   `ArchiveNotesTests/DateTagProjectionTests.externalMatchingDateTokenSurvivesClear`. The two unit tests drive
   `NotesModel` against a scratch `NoteStore`.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): Reveal in Finder, and the Finder tags matched. Read from the session store afterwards ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)): each note's subjects, its own date (`1959`, `2025`) and its sent-with date (`Sent With 1961-03`) were Finder tags on its `.md`, and its authors were not. No Quality was set, so the `Q` tokens and a hand-applied matching tag were not shown.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works`: the owner saw the Finder tags match, and the store agrees.
 - **Notes:** **Drift.**
   - "A matching tag someone else wrote is never adopted or removed" holds for date facets, which have an exact
     ownership ledger. It does not hold for Quality. The facet projection treats `Q1`–`Q3` as always owned
@@ -287,14 +289,15 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   only. `ArchiveNotesUITests/NotesW7ChecksUITests.testS4_EachWindowFeaturesItsKindAndBothUnionsThem` drives the
   real kind control in the running app and relaunches it without the harness's kind pins, so the real
   `persistingKindTo: .standard` path restores the remembered choice.
-- **Runtime evidence:** 2026-11-04 · the completing commit of `W40.notes-w7-gui-checks` · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): at launch the Note window lists the three notes and not the extract, the Extracts window the extract and no note; Both in the Note window lists all four and the Extracts window's list stays as it was; relaunched without the pins, the Note window comes back on Both and the Extracts window on Extracts. VM runs 3, 5 and 7 (twice).
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** 2026-11-04 · the completing commit of `W40.notes-w7-gui-checks` · [`evidence/notes/W40.notes-w7-gui-checks.md`](evidence/notes/W40.notes-w7-gui-checks.md): at launch the Note window lists the three notes and not the extract, the Extracts window the extract and no note; Both in the Note window lists all four and the Extracts window's list stays as it was; relaunched without the pins, the Note window comes back on Both and the Extracts window on Extracts. VM runs 3, 5 and 7 (twice). 2026-11-06 · owner session notes-2, task 5 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the scope control, read All · Notes · Extracts, switched as promised.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-04 W40.notes-w7-gui-checks — runtime evidence for each window's kind, Both and the remembered choice across a relaunch; `works`. Not
     driven: the built-in defaults on a store that never chose (`NotesNavigationModelTests` only), since the
     harness pins the kinds at every first launch.
   - 2026-11-05 W40.fix-notes-small-fixes — `works` → `fixed-pending-recheck` (owner session notes-1, row 36): the kind control reads All, Notes, Extracts (it was Notes, Extracts, Both; `KindFilter.both` is now `.all`, stored as `all`). The UITests that drove "Both" drive "All".
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: the owner switched the scope control between All, Notes and Extracts. He did not notice the toolbar's label naming the window (rows 2-3: `W40.fix-notes-titlebar-label`, which is about the label, not this row's promise).
 - **Notes:** the folder scope (`NotesModel.selectedFolderId`) lives on the shared model, not per window. See the
   N-11 note. The promise draft records no W9.e2 result.
 
@@ -423,12 +426,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   and `NotesAppSettingsTests.listHeightClampsLikeTheWidths` (unit). `ArchiveNotesUITests/StackedLayoutUITests.testStackedDividerDragsClampsAndSurvivesRelaunch`
   and `.testStackedOrderIsListThenNoteAndFocusCrossesTheDivider` (VM); `StackedLayoutVerifyUITests.testDividerGivesWayToAShorterWindowAndComesBack`
   (VM, the re-check's own).
-- **Runtime evidence:** VM at `655effca`: the list stopped at 220 pt and at 440 pt (990 pt window) and did not move past either; cut to the 759 pt minimum the list gave way to 220 pt with a 146 pt editor, and came back to 440 pt when the window grew again; the Extracts window's divider clamps the same; order table, divider, editor; Tab 18 presses stacked, 22 side by side. [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** VM at `655effca`: the list stopped at 220 pt and at 440 pt (990 pt window) and did not move past either; cut to the 759 pt minimum the list gave way to 220 pt with a 146 pt editor, and came back to 440 pt when the window grew again; the Extracts window's divider clamps the same; order table, divider, editor; Tab 18 presses stacked, 22 side by side. [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md). 2026-11-06 · owner session notes-2, task 5 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): in View ▸ List Above Note the owner dragged the divider up and down as far as he liked, with no note against it.
+- **Status:** `works`
 - **History:**
   - 2026-10-29 W48.notes-stacked-layout — row written, `unproven`.
   - 2026-10-30 W48.notes-stacked-layout-verify — `works`. Increment and decrement are proven by the unit test only (XCUITest has no splitter action); [`evidence/notes/W48.notes-stacked-layout-verify.md`](evidence/notes/W48.notes-stacked-layout-verify.md).
   - 2026-11-05 W40.fix-notes-small-fixes — `works` → `fixed-pending-recheck` (owner session notes-1, row 45: "I should be able to drag the divider more up and down"): the list's floor is 160 pt (was 220) and the fixed 440 pt maximum is gone, so going down only the note's 480 pt floor stops it.
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: the owner's recheck of the wider range (notes-2, task 5).
 
 ### N-51 · The layout choice is remembered
 
@@ -464,12 +468,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - **Template filter:** `model.templates(matching: nav.windowKind)` (`Core/NotesModel.swift:546`).
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testTemplateNewFromTemplateCreatesNoteWithTemplateBody`
   (the toolbar menu, the file on disk and the row in the list); `ArchiveNotesUITests/NotesGUITests.testG1_CreateNoteWritesNewItemFile`.
-- **Runtime evidence:** none.
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, tasks 1, 4 and 6 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): ⌘N from the menu bar made a note, ⌥⌘N an extract; a note made from a template in a folder came out a note, not an extract (kind `note` in its front matter, [`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 owner session notes-1 — `unproven` → `broken`: ⌘N is not in the menu bar and does nothing ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 5; it is bound only inside the toolbar's New menu); the toolbar's New offered only New Extract in what the owner read as the Notes window (rows 38-39). Fix items `W40.fix-notes-new-note`.
   - 2026-11-06 W40.g2-notes-2 — `broken` → `fixed-pending-recheck`: `W40.fix-notes-new-note` (2026-11-05) put File ▸ New Note (⌘N) and New Extract (⌥⌘N) in the menu bar, named each window's kind in its toolbar and made the toolbar's New offer both kinds, but left this row `broken`. The owner's recheck is [`sessions/notes-2.md`](sessions/notes-2.md) task 1.
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: ⌘N and ⌥⌘N worked for the owner, and New from Template made the right kind. He did not notice the toolbar's window label (rows 2-3, `W40.fix-notes-titlebar-label`).
 - **Notes:**
   - ⌘N is a `.keyboardShortcut` on a button inside the toolbar `Menu`. G1 presses ⌘N but falls back to clicking
     the menu if nothing appears, so a G1 pass does not show that ⌘N works.
@@ -507,8 +512,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   toolbar reach, but they skip `FormattingContext`. Also `ArchiveNotesTests/MarkdownBridgeTests.orderedListRenumbersFromFirst`
   and `ArchiveNotesTests/EditorBindingTests.textViewFindBarEnabled`. No test presses Tab, Shift-Tab, Return or
   Backspace in a list.
-- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened. [`evidence/notes/W40.fix-notes-editor-lines.md`](evidence/notes/W40.fix-notes-editor-lines.md): Return, Backspace and Bulleted List typed in the VM, across a reselect and a relaunch (`EditorLinesUITests`).
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** [`evidence/notes/W40.d9-writing.md`](evidence/notes/W40.d9-writing.md): text typed with `typeText` into the styled editor saves; but each Return typed there is saved as one newline, so typed paragraphs merge into one when the note is reopened. [`evidence/notes/W40.fix-notes-editor-lines.md`](evidence/notes/W40.fix-notes-editor-lines.md): Return, Backspace and Bulleted List typed in the VM, across a reselect and a relaunch (`EditorLinesUITests`). 2026-11-06 · owner session notes-2, tasks 1 and 6 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): typing, blank lines and Backspace joining lines, a heading, a bulleted list, a link, and bold with its trailing space were all as left after clicking away and back and after ⌘Q and a relaunch; ⌘F found text in a note. Not shown: Tab and Shift-Tab in a list, a blockquote, a code block, ordered-list renumbering.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d9 — `unproven` → `broken`: typed paragraph breaks are lost on reopen; filed `W40.fix-notes-return-paragraph` (S2).
@@ -517,6 +522,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `broken`: Return would not add blank lines and Backspace would not join lines, coming back after reselecting the note; Bulleted List showed nothing; a bold run ending in a space saved as literal `\*\*Day \*\*` ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) rows 8, 10, 11). Fix items `W40.fix-notes-editor-lines`, `W40.fix-notes-bold-space`.
   - 2026-11-05 W40.fix-notes-editor-lines — `broken` → `fixed-pending-recheck` (rows 8 and 10; row 11 is `W40.fix-notes-bold-space`): Return and Backspace on the empty last line raised and did nothing; one typed Return is now a line break and every count of Returns reopens as typed; list items draw their bullets and numbers. Promise-test change (rule 4): `WritingJourneyUITests` types two Returns for its paragraph-break checks, since one Return is a line break now, not a paragraph. Recheck: the next Notes guided session (`W40.g2-notes-2`).
   - 2026-11-05 W40.fix-notes-bold-space — stays `fixed-pending-recheck` (row 11): bold, italic and bold italic write spaces at a run's edges outside the delimiters (`MarkdownBridge.wrapEmphasis`), so a bold "Day " saves as `**Day** ` and reopens bold; `FormattingActionTests.emphasisEndingInSpaceRoundTrips` and two neighbours check save, reopen and a second save. Unit tests only; recheck `W40.g2-notes-2`.
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: the owner's recheck of rows 8, 10 and 11 of session 1 went as promised. He asks for underline and highlight (row 7, `W40.notes-underline-highlight`) and tooltips on the formatting controls (row 5, `W40.fix-notes-small-wins`); neither is in this row's promise.
 - **Notes:** **Drift.**
   - There is no indent or outdent button on the toolbar and no Indent/Outdent item in the Format menu.
     `indentList` and `outdentList` are reached only from Tab and Shift-Tab, and `outdentList` also from Return or
@@ -645,8 +651,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   third-party tags and label survive); `ArchiveNotesTests/NoteStoreTests.saveRetitle`.
 - **Runtime evidence:** VM, 2026-11-05: `ArchiveNotesUITests/ListRenameUITests` (Return rename of a seeded note and
   a double-click rename of a new one: still selected, title still listed after another note is selected; the
-  header title renamed by a click, Escape a no-write), with G17 and W7 S3 green beside it.
-- **Status:** `fixed-pending-recheck`
+  header title renamed by a click, Escape a no-write), with G17 and W7 S3 green beside it. 2026-11-06 · owner
+  session notes-2, task 1 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): titled in the note's
+  header and renamed in the list, the note stayed selected, and the title was still in the list after clicking
+  another note and coming back.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 owner session notes-1 rows 6, 9, 14; W40.fix-notes-list-rename — `fixed-pending-recheck`. Row 14
@@ -654,6 +663,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
     selection) and is fixed; row 6 (header title) added. Row 9 (the title gone from the list after a deselect,
     the `.md` correct) did NOT reproduce in the VM on the old code, by Return, by a click away, or with body
     typing around the rename; moved rows now reload their cells, but its cause is unproven. notes-2 rechecks it.
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: the owner's recheck of rows 6 and 14 went
+    as promised, and row 9 (the title gone after a deselect) did not happen again.
 - **Notes:** the W9.e2 result named no rename test; `W9.b3` says G17 drives all three rename routes VM-green.
   The rejected-rename restore (`NoteTitleTextField.swift:69-73`, guarded on the same rename id and item id) has
   no test that forces `renameNote` to return false. Double-click on a single row always renames; the browser's
@@ -681,12 +692,15 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   via `tagNamesKey`); `ArchiveNotesTests/NoteTagSuggestionsTests`;
   `ArchiveNotesTests/NotesTagProjectorSafetyTests.subjectProjectionRetry` (failure keeps removal ownership across a
   restart and an identical retry); `.subjectEditsRespectFacets`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): tags added under the note by typing, one by taking a suggestion, and edited in the list's Tags cell; the Finder tags matched, and the store's `.md` files carry them ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). No mirror write failed, so Retry was not shown.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 W40.fix-notes-tag-entry — owner session notes-1 row 26 ("Tags don't autocomplete. Pressing return
     should add them"): the field is now the Reader's shared one; testG17 green in the VM. Status left for notes-2.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works` on the owner's session 2. Tags in the list do not wrap
+    as in the Reader, and the bar under the note should run the area's width (rows 12-13,
+    `W40.suite-reader-notes-consistency`); neither is in this row's promise.
 - **Notes:** **Drift:** the in-app Retry is per-session view state (`@State failedEdits` in
   `NoteTagBar.swift`), so it is gone after a relaunch. What survives a relaunch is the
   pending-subjects journal beside the `.md` (`NoteStore.swift:180-206`): the user has to make the same edit
@@ -732,10 +746,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   The uncertain flag goes through `setDateUncertain` (`Core/NotesModel.swift:896`).
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testDateRowWarnsAndDropsImpossibleDayButKeepsValidMonthEnd`;
   `ArchiveNotesTests/FrontMatterDateWriteTests.impossibleDayDowngrades`; `.uncertainSortsByValue`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the inspector's typed date field at each precision ("great", owner), and `date: 1959` with `date_uncertain: true` in the store ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). But the list's Date cell erases the date when it is double-clicked and left unchanged (row 11, B). 2026-11-08 · `W40.fix-notes-date-cell-erase` (4ec1caff): `InspectorPanelUITests.testDateAndTagsEditInTheList` seeds a real date, blurs the cell unchanged, and the date stays visible with the Markdown byte-identical, on the macOS 27.2 off-screen VM.
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `broken`: with the owner watching, double-clicking a date in the list, changing nothing and clicking away cleared the date (row 11, B). The cell is the second route to this date (W40.notes-detail-layout; Edit Date in the row's menu is the same editor). Fix item `W40.fix-notes-date-cell-erase` (S2, Tier-2). The inspector's field worked.
+  - W40.g2-notes-2-ledger (reconciled 2026-11-10) — `broken` → `fixed-pending-recheck`: `W40.fix-notes-date-cell-erase` shipped (4ec1caff) without moving this row; the cell now commits only an actual edit. Recheck by hand in the next Notes session.
 - **Notes:** `W23.l4-fu` names the off-screen UITest for the 2026-02-31 warning; W40.fix-notes-date-entry
   rewrote it for the typed field (Return applies; February 31 warns and saves the month; a bare year is a
   year; an emptied field clears).
@@ -756,10 +772,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   (`Core/NotesTagVocabulary.swift:45`), via `dateFacetTokens` (`:39`) in the facet projection.
 - **Real-path test:** `ArchiveNotesTests/DualDateTests.projectsSentWithLosslessly` (model write → `.md` Finder
   tokens); `.filterMatchesEitherRole`; `.sortFallback`. No UITest drives the Sent with fields.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): a sent-with date set by typing; in the store it is `additional_dates: sent_with 1961-03` with the Finder tag `Sent With 1961-03` ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). The sort fallback and a date filter matching it were not shown.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works`. The owner wants the sent-with date demoted below the own date across the suite, and a column of its own (rows 10, 25: `W40.suite-date-design`); that will change this row's promise.
 - **Notes:** the W9.e2 result named none. The entry point is in the inspector, as `W24.cal1-validator` says.
   When the item has no own date, the inspector says the list is sorted by the sent-with date (`:398-404`).
 
@@ -776,14 +793,16 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   (no subject projection) → index upsert.
 - **Real-path test:** `ArchiveNotesUITests/NotesE2NoteLifecycleTests.testE2_ManualAuthorsPersistForNoteAndExtractAndAreSearchable`;
   `ArchiveNotesTests/NotesTagProjectorSafetyTests.authorEditsPersistAndIndexIndependently`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 3 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): an author typed into the inspector with no button; the store holds `authors: [Jay Caspian Kang]` and `authors: [David Riesman]` in front matter and neither as a Finder tag ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). Search by author and an extract's authors were not shown.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 W40.fix-notes-delete-undo — a delete now goes to the store's `Trash/`, shown in the sidebar, with
     Put Back and Edit ▸ Undo (`NotesGUITests.testG21_DeleteUndoAndTrashPutBack`); Empty Trash goes on to the Finder's Trash.
   - 2026-11-06 W40.fix-suite-no-set-clear — the Set and Clear buttons are gone: the field applies on leaving it, to
     the item it was typed for, and clears when emptied; the UITest types, tabs out and empties the field.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works` on the owner's session 2. The owner does not want an
+    author field (row 14): `W40.notes-remove-authors` removes it, and this row with it.
 - **Notes:** the W9.e2 result is `W9.e2-notes`: the new `NotesE2NoteLifecycleTests` sets authors on a note and an
   extract, checks the front matter, finds them by keyword search and clears them. Its red was a test bug, fixed by
   adding the ids `an.detail.authors.set`/`.clear`. Checkpoint `e59e3bd`. Code confirms "front matter only":
@@ -806,11 +825,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testW9_RoundupInspectorAndFilter` (toggle writes
   `roundup: true` without touching the date; the filter picker narrows the list);
   `ArchiveNotesTests/RoundupTests.toggleAndSavedQuery`; `.sourceYears`.
-- **Runtime evidence:** none
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, tasks 1, 3 and 5 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the explanation under the toggle "reads well", and the filter bar's Round-up choice is there (the owner thinks it is not needed, row 19). No note was made a round-up, so the year offer and the filter narrowing were not shown.
+- **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 W40.fix-notes-small-fixes — `unproven` → `fixed-pending-recheck` (owner session notes-1, row 24: "It's not clear what 'Round-up note' does"): the toggle has a line under it and a tooltip saying what a round-up note is, that the filter bar's Round-up menu finds it, and that Notes offers the linked PDFs' shared year as its date (`NoteMetadataInspector.roundupExplanation`); `testW9_RoundupInspectorAndFilter` checks the line.
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `unproven`: the fix's recheck passed (the owner understood the explanation; he wants it in a tooltip or a ? button instead, row 4, `W40.fix-notes-small-wins`), but the rest of the promise was never shown, so the row goes back to where it was before the fix. The Round-up filter may go (row 19, `W40.notes-window-panes`).
 - **Notes:** the W9.e2 result named none. The year offer reads each linked PDF's Finder tags read-only, under
   roots that are already granted. Any missing, undated, non-PDF or ungranted source suppresses the offer
   (`RoundupYearSuggestion.swift:12-40`). No UITest drives the "Use YYYY" button.
@@ -924,7 +944,10 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   under W40.vm-macos27-notes once its harness dependency is repaired.
   Earlier VM 2026-11-05 (W40.fix-notes-folder-drag): the folder and drag UI tests pass, and the
   screen video shows the app's outline on the row under a held note; the DEBUG seam
-  `an.sidebar.test.dropTarget` shows none left after each drop.
+  `an.sidebar.test.dropTarget` shows none left after each drop. 2026-11-06 · owner session notes-2, task 4
+  ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the session store's three folders are all at
+  the top level ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)),
+  as row 15 says; a note dragged slowly across the folder list landed where the highlight was.
 - **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
@@ -982,10 +1005,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes`;
   `.testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`;
   `ArchiveNotesTests/NotesReplicationTests.confirmAfterConcurrentReplicateKeepsFile`.
-- **Runtime evidence:** none
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 4 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): a scratch note deleted, brought back with Edit ▸ Undo, deleted again, found in the sidebar's Trash and put back; the store's `Trash/` was empty afterwards ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). Redo after the Undo did not delete it again (row 17, A, the pack's known limit: `W40.fix-notes-delete-redo`).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — runtime evidence for delete, Undo, the Trash and Put Back; stays `unproven`: removing a replicant, the last-instance question and Cancel were not reported on. The owner wants Delete on ⌘⌫ (row 16, `W40.fix-notes-delete-redo`).
 - **Notes:** the W9.e2 result is `W9.e2-notes`: note delete and the delete-last-instance guard,
   `NotesGUITests.testG8_…` and `.testG19_…` (already on main). On the source conflict, the code moves the whole
   `<uuid>/` folder to the Trash (`NoteStore.swift:415-430`, never `removeItem`), so §3.6/§16.1 ("deletes the
@@ -1012,12 +1036,14 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testTemplateNewFromTemplateCreatesNoteWithTemplateBody`;
   `.testTemplateBodyEditPersistsAndReloads`; `ArchiveNotesTests/NotesModelTemplateTests.newFromTemplate`;
   `ArchiveNotesUITests/TemplatesUITests` (File ▸ New Template…, rename in the row).
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 4 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): File ▸ New Template… (Notes), assigned to a folder from the folder's right-click Template ▸ menu once the session pointed to it, and a note created from it in that folder, kind `note` ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). Duplicate, Delete, editing the body and inheritance by a child folder were not shown, and renaming in the list was not reported on.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-05 W40.fix-notes-templates — notes-1 rows 35, 41, 42: File ▸ New Template… added, and a template is
     renamed in its row (Return, double-click, Rename…; the Rename sheet is gone). VM green; status left for notes-2.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works` on the owner's session 2. He could not find how to
+    assign a template, and a template carries no fields such as a date (row 18, A: `W40.fix-notes-template-fields`).
 - **Notes:** the W9.e2 result is `W9.e2-zotero`: `testTemplateBodyEditPersistsAndReloads` and the new
   `testTemplateNewFromTemplateCreatesNoteWithTemplateBody`, 5/5 run (which found the N-11 index bug).
   `newItem` sets the new item's kind to the window's (or the row's) kind, not the template's
@@ -1099,10 +1125,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2SearchTests.testE2_KeywordSearchAndQualityTagDateFiltersNarrowTheList`;
   `ArchiveNotesTests/NotesNavigationModelTests.qualityAndDateFacetsNarrowDisplayed` and
   `.clearUserFiltersResetsFacetsKeepsKind`, `.clearDateFilterKeepsOtherFacets`, `.hasUserFiltersCoversEveryFacet`; `ArchiveNotesTests/NotesFilterTests.testTagsAllVsAny` (predicate only).
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 5 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): the list narrowed by a year and a tag; the date's own ⓧ cleared only the year, and Clear All cleared the bar. The ★ toggles were not reported on.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works` on the owner's session 2. The tag field is far too small and does not autocomplete (row 20, `W40.fix-notes-tag-fields`); Clear All leaves an Advanced Search in effect (row 26, `W40.fix-notes-clear-all-advanced`); the bar should match the Reader's (row 21, `W40.suite-reader-notes-consistency`).
 - **Notes:** `W9.e2-search` (`NotesE2SearchTests`): Quality 3, the intel tag and 1960–1970 each narrowed the
   list, and Clear restored it. That run's tag check used fixture tags written in lower case by
   `ArchiveNotes/scripts/make-notes-fixture.sh:159,183`. Tags entered in the app are stored title-cased, and the
@@ -1124,10 +1151,11 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2SearchTests.testE2_SmartFolderFromFacetAndKeywordScopesTheList`;
   `ArchiveNotesUITests/NotesGUITests.testW9D9_SmartFolderShowsSavedQueryCount`;
   `ArchiveNotesTests/NotesNavigationModelTests.smartFolderBadgeCountsSavedQueryAndRefreshesOnItemsAndMembership`.
-- **Runtime evidence:** none
+- **Runtime evidence:** 2026-11-06 · owner session notes-2, task 5 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): an Advanced Search (W40.notes-advanced-search) saved with Save as Smart Folder… and reopened with Edit Smart Folder… to change a rule, both working; the store keeps it as smart folder "Silicon Valley" ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). The count badge was not reported on.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-06 W40.g2-notes-2-ledger — runtime evidence for saving and editing a smart folder from Advanced Search; stays `unproven`: the filter bar's own Save as Smart Folder and the live count were not shown. Edit ▸ Advanced Search… was not in the menu bar for the owner and ⇧⌥⌘F did nothing (row 23, `W40.fix-notes-advanced-search-menu`, to reproduce); its tag rule neither autocompletes nor makes chips (row 24, `W40.fix-notes-tag-fields`).
 - **Notes:** `W9.e2-search` added the smart-folder test to `NotesE2SearchTests` (tag-saved and keyword-saved
   folders, `kind: smart` in `organization.json`, scoping), and `testW9D9_…` was already on main. Source conflict
   confirmed in code: `currentUserFilter` (`Core/NotesNavigationModel.swift:269`) folds the live keyword into
@@ -1178,12 +1206,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `showInlineImagesOnceWritten` (`Editor/MarkdownEditorView.swift:640-650`).
 - **Real-path test:** `ArchiveNotesUITests/NotesE2PasteTests.testE2_PastedPageLinkShowsARenderedThumbnail`;
   `ArchiveNotesTests/SourceBlockThumbnailRendererTests.rendersInkyPageToPNG` and `.skipsRenamedCandidate`.
-- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): the block pasted from the real Reader stored `assets/p3-thumb.png`, and the thumbnail drew the page. 2 of 2 VM runs.
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): the block pasted from the real Reader stored `assets/p3-thumb.png`, and the thumbnail drew the page. 2 of 2 VM runs. 2026-11-06 · owner session notes-2, task 2 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): two page links past page 2 of *00114 Young papers.pdf*, copied from the Reader and pasted with Paste as Source Block(s); the task asked whether each thumbnail was its page and small enough for the note, and the owner noted nothing against either.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — thumbnail drawn for a link pasted from the real Reader; stays `unproven`: that paste carried Reader's own thumbnail payload, so the link-only render was not isolated.
   - 2026-11-05 W40.fix-notes-small-fixes — `unproven` → `fixed-pending-recheck` (owner session notes-1, row 19: "they're currently as big as the preview"): a page thumbnail (`p<N>-thumb` / `doc-thumb`, `SourceBlockPaster.isThumbnailAsset`) is drawn at most 140 × 180 pt, against 400 × 300 for other inline images and the 400 × 500 preview popover (`InlineImageAttachment.maxSourceThumbnailSize`; `SourceThumbnailSizeTests`).
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: the owner's recheck of the size (notes-2, task 2). Whether the thumbnail came from the link alone or from the Reader's payload was not isolated (see 2026-10-15).
 - **Notes:** in `W9.e2-paste`, `testE2_PastedPageLinkShowsARenderedThumbnail` failed first: a fresh chip showed
   "Missing" until the note was reloaded. It was fixed in the same item (`showInlineImagesOnceWritten`) and then
   passed. A thumbnail embedded in a Reader UTI payload skips the renderer. It is size-capped at 5 MB of base64
@@ -1204,11 +1233,12 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   drives the same `onReveal` closure through a DEBUG seam rather than the chip button, and under a UITest launch
   the URL is recorded, not opened. `ArchiveNotesUITests/NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`
   reaches Preview, also through the seam (`an.editor.test.preview`).
-- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): Reveal on a block pasted from the real Reader brought Reader forward and opened `pages.pdf` at "page 2 of 3", the pair holding the linked PDF page 3. Driven through the `an.editor.test.reveal` seam (same `onReveal` closure), with `-ANUITestRealWorkspaceOpen` so the URL went to the OS. 2 of 2 VM runs.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): Reveal on a block pasted from the real Reader brought Reader forward and opened `pages.pdf` at "page 2 of 3", the pair holding the linked PDF page 3. Driven through the `an.editor.test.reveal` seam (same `onReveal` closure), with `-ANUITestRealWorkspaceOpen` so the URL went to the OS. 2 of 2 VM runs. 2026-11-06 · owner session notes-2, task 2 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): clicking each of two blocks' Reveal opened the Reader at that block's own page (page 7 or later of 12), and Preview showed the page once the archive folder was chosen in Notes; before that it showed the access message, which was right ([screenshot](sessions/notes-2-returned/notes-2-preview-access.png)).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — Reveal reaches the real Reader at the page; stays `unproven`: Preview was not driven, and Reveal with Reader not running was not covered.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works`: the owner clicked the chip buttons himself. Reveal with the Reader not running was again not covered.
 - **Notes:** W9.e2 had no Reveal result. Preview showing the PDF is part of
   `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover` (`W9.e2-paste`). Clicking the chip buttons
   and a real Reader launch (G6) are left to the owner per §17. Notes only hands Reader the URL. Whether Reader
@@ -1415,12 +1445,13 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG16_NoteZoteroAttachmentChipsAndClipboardDedup`;
   `ArchiveNotesUITests/NotesGUITests.testG11_ZoteroChipDispatchesSelectLink`;
   `ArchiveNotesTests/ZoteroClipboardDetectTests.dedupCanonical`.
-- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): a note-level attachment fetched its citation from the real Zotero 10.0.6 local API (APA: `Lovelace, A. (1843). Notes on the Analytical Engine (W40.d10 seed). Richard and John E. Taylor.`), and the chip's open raised Zotero with the item selected. 2 of 2 VM runs.
-- **Status:** `unproven`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): a note-level attachment fetched its citation from the real Zotero 10.0.6 local API (APA: `Lovelace, A. (1843). Notes on the Analytical Engine (W40.d10 seed). Richard and John E. Taylor.`), and the chip's open raised Zotero with the item selected. 2 of 2 VM runs. 2026-11-06 · owner session notes-2, task 7 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): a `zotero://select/…` link for a real item in the owner's own Zotero, attached with Note ▸ Attach Zotero Link…, showed a citation (author, title, date) on its chip, not the item key. The clipboard offer and Zotero not running were not shown.
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — real Zotero citation and Open in Zotero shown; stays `unproven`: the clipboard offer and Zotero-not-running were not driven against the real Zotero.
   - 2026-11-05 W40.fix-notes-zotero-fetch — stays `unproven`. The owner's session (notes-1 row 50) saw the item key ("GL2HWVUW") on the chip: every fetch failed on his Mac (see N-44), and a block attached through Note ▸ Attach Zotero Link… never fetched at all (the drift below). A block now fetches its citation after it is inserted (`FormattingContext.insertZoteroBlock` → `Coordinator.fillPendingCitation`); a failed inspector chip shows the reason under it (`an.zotero.failure.<key>`). G15 and G16 check both through the DEBUG transport.
+  - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works`: the block chip fetched its citation from the owner's own Zotero. He asks that a pasted Zotero link be recognised instead of needing Attach, and for keys for both Zotero commands (row 27, `W40.fix-notes-zotero-paste`).
 - **Notes:** **Drift (fixed 2026-11-05, kept for the record):** the citation fetch, spinner and Retry exist only on the note-level inspector path. A
   block attached through Note ▸ Attach Zotero Link… (or the clipboard banner's Attach) shows `ref.citation ??
   itemKey` (`Editor/EditorFormatting.swift:217-218`). Nothing fetches a citation for it except Auto-fill (N-44):
@@ -1446,14 +1477,15 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG15_AutoFillFromZoteroShowsDiffCancelNoOpAndWritesAcceptedFields`;
   `ArchiveNotesTests/ZoteroAutoFillTests.modelCancelWritesNothing`, `.planFillEmpty` and
   `.attachedReferenceResolverRejectsAmbiguousNote`.
-- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): against the real Zotero, Note ▸ Auto-fill from Zotero… crashes Notes (SIGABRT in `ZoteroClient.fetchCSLviaLocalAPI`; Zotero returns `csljson` as a string holding an array). 2 of 2 VM runs, plus the crash report.
-- **Status:** `fixed-pending-recheck`
+- **Runtime evidence:** [`evidence/notes/W40.d10-integrations.md`](evidence/notes/W40.d10-integrations.md): against the real Zotero, Note ▸ Auto-fill from Zotero… crashes Notes (SIGABRT in `ZoteroClient.fetchCSLviaLocalAPI`; Zotero returns `csljson` as a string holding an array). 2 of 2 VM runs, plus the crash report. 2026-11-06 · owner session notes-2, task 7 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): against the owner's own Zotero, Note ▸ Auto-fill from Zotero… worked once it was live. It stayed greyed at first, with nothing saying why, and came live after the session's suggestions (reselect the note; check for a second Zotero link or an extract); which one it was was not said (row 28, A).
+- **Status:** `works`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — reproduced against the real Zotero; `broken`, filed `W40.fix-notes-zotero-csljson-crash` (S2).
   - 2026-10-31 W40.fix-notes-zotero-csljson-crash — `broken` → `fixed-pending-recheck`: `ZoteroClient.fetchCSLviaLocalAPI` reads the string holding a CSL array (and an object or array), never hands an unvalidated value to `data(withJSONObject:)`, and `CSLDate` decodes numeric-string date parts; `ZoteroLocalAPIShapeTests` carries Zotero's measured body, the DEBUG UI-test transport answers in that shape, and `testD10_2_AutoFillFromRealZotero` no longer expects the failure. VM: the real-Zotero journey step passed (sheet opened; Apply wrote `date: 1843` and the APA citation).
   - 2026-11-05 owner session notes-1 — `fixed-pending-recheck` → `broken`: Auto-fill from Zotero failed with "ClientError error 0" (`.unavailable`) while Zotero's local API answered 200 from a shell at the same moment ([`sessions/notes-1-returned.md`](sessions/notes-1-returned.md) row 51). Fix item `W40.fix-notes-zotero-fetch`.
   - 2026-11-05 W40.fix-notes-zotero-fetch — `broken` → `fixed-pending-recheck`. Cause: the probe asked Better BibTeX for `item.search ""` (every item) and then `items?limit=1`, each limited to 1.5 s, which a large library (the owner's: 190 MB, with Better BibTeX) does not meet, and every fetch threw `.unavailable` from that cached verdict without asking for the item. Fetches now ask the local API for the item by key (10 s), fall back to BBT only on a 403/404/unreadable answer, and never consult the probe; the probe is `GET /api/` then BBT `api.ready`. Errors are sentences that say what to check. The sandbox's `network.client` was already in the signed Debug app. VM: `testD10_1` and `testD10_2` passed against the real Zotero 10.0.6. Recheck: Auto-fill and the chip against the owner's own Zotero.
+  - 2026-11-06 W40.g2-notes-2-ledger — `fixed-pending-recheck` → `works`: both worked against the owner's Zotero. A greyed Auto-fill should say why (row 28, `W40.fix-notes-zotero-paste`). The per-field choices and Apply changing only what was ticked were not reported on separately.
 - **Notes:** `W9.e2-zotero` ran `testG15_AutoFill…` (attach → Cancel writes nothing → Apply writes only the
   accepted date plus the configured-style citation) through the DEBUG in-process transport. There are two
   `testG15_…` tests; this row means the AutoFill one. A citation fetch that fails does not block Auto-fill
