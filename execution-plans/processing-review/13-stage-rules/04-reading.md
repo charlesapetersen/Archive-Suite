@@ -38,15 +38,17 @@ owner, walkthrough 2026-11-11, W46.pairs-redecide-owner-ok: floor only, as `12-s
 route 0.49 points (twice Gemini 3.7 Flash's rerun range of 0.24, lent to every hosted route without its own rerun); a
 local greedy route 0.00, so any paired gap separates two of them (Qwen3-VL 8B 4-bit byte-identical across two runs 15 days
 apart); per kind twice the kind's own range (handwritten hosted 0.60, twice 0.30, `ocr-ppocrv6-hands-paid.md` Noise);
-on the 895 there is no floor and the paired interval alone decides (R-3).
+on the 895 there is no floor, so a pick there takes the stratum's leader and the interval makes no tie either (the
+owner's "the interval makes no tie", applied to the 895 picks by W46.pairs-redecide); the interval (R-3, the matrix's
+895 `tie` flag) decides only whether a stratum route earns a row, as Ling3 Flash VL's N5 pair did.
 The bench pairs every reading row that has per-page scores with every other (`ocr-pair-matrix.md`, W46.ocr-pair-matrix
 and W46.pair-matrix-cover): on the 96 over all pages, per kind (typewritten, printed, handwritten, each with its kind
 floor: 0.42, 0.24, 0.60 hosted, a Mac pair 0.00) and on hands16; on the 895 per stratum and pooled L1-L3. The
 solver reads each tie from the pair's entry; `settings_routes.py --check` fails when a row with per-page scores has
 none. The rows without per-page scores (Apple FM 27, the PP-OCRv6 kraken blla route, the kraken specialists, the
 cascades) keep the floor alone and "pair not measured". A tie goes to the cheaper, then the faster route
-(`12-settings-design.md` §3.3); the picks below are re-decided from the matrix under the floor-only rule in
-W46.pairs-redecide.
+(`12-settings-design.md` §3.3); the picks in section 9 were re-decided from the matrix under the floor-only rule
+(W46.pairs-redecide), each naming its pair entry.
 
 **Kind rules.**
 - Handwritten pages are ranked on `hands16` and, where the route read them, the public L1-L3 (independent truth);
@@ -93,9 +95,9 @@ replaced (under 20 Vision words) include 4 handwritten pages Vision could not re
 **Fields for the table.** `metric`: {"id": "nes_answered", "label": "NES on answered pages, failures beside",
 "higher_is_better": true}. `kinds`: typewritten, printed, handwritten, mixed (2 pages, never ranked), forms (L4),
 newspapers (L9), clippings (no figure), nonlatin (N1-N6), early_modern_hands (L2, L5-L7), early_print (L8).
-`noise`: {"metric": "nes", "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted
-0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie
-in ocr-pair-matrix.json", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"}. `fallback`: "fail-and-flag (CascadeExhausted)".
+`noise`: the table's `noise.reading`, written by `settings_routes.py`: on the 96 a paired gap under the floor only
+(hosted 0.49, local greedy 0.00, per kind 0.42, 0.24, 0.60 hosted; the interval shown, no tie); on the 895 the
+stratum's leader for a pick, the interval only for a row; each pair's entry in `ocr-pair-matrix.json`. `fallback`: "fail-and-flag (CascadeExhausted)".
 
 ## 4. Table rows
 
@@ -299,8 +301,10 @@ per-kind and per-stratum arrays; cost `openrouter_equivalent_usd_1000`, `gpu_hou
 
 - A Mac reader of 27B class measured on a 32 GB or 64 GB Mac (NES on the 96 within the tie rule of Qwen3.6 27B fp8's
   95.31 on FarmShare, with peak memory) adds a 32 or 64 GB pick; until then those tiers pick from the 16 GB rows.
-- A paired matrix between every pair of routes the solver compares replaces the single-baseline pairing; any pick
-  stated below as "pair not measured" is then re-decided.
+- A paired matrix between every pair of routes the solver compares replaced the single-baseline pairing
+  (W46.ocr-pair-matrix, W46.pair-matrix-cover), and section 9's picks were re-decided from it (W46.pairs-redecide;
+  Infinity-Parser2-Pro's cluster hand pick is no longer pending: pooled L1-L3 settles it). A new reading row reruns
+  `ocr_pair_matrix.py` and re-decides the picks it could change.
 - Gemini 3.8 Flash read on L1-L4, L9, N2, N5 and N6 (W43.sweep) would let the hand and forms rules rank it on
   independent truth; a third-family route beating 95.81 on the 16 or 89.3 on L1-L3 by the tie rule changes the hands
   pick.
@@ -416,33 +420,46 @@ dropped (`ocr-panel-cloud.md`); GPT-5.6 Luna was read through OpenRouter instead
 
 The solver's expected picks from the rows, by the rule above (answered NES when a fallback is on, strict when off;
 ties against the best feasible route only, cheaper then faster, as 7.7 recommends). Figures from section 4's rows.
+Re-decided from the pair matrix under the owner's floor-only rule (W46.pairs-redecide, 2026-11-11): each pick names
+its entry in `ocr-pair-matrix.json` as `set/group/score`, the gap a minus b with its 95% interval and n. A pair of Mac
+routes has the floor 0.00, so any paired gap separates two of them; on the 895 a pick takes the stratum's leader.
 
 **1. Laptop, open weights (16, 32 and 64 GB the same until item 3).**
-- Typewritten, no download: `apple-vision` (92.18 strict); with downloads, `qwen3.5-9b-mlx4` (93.32) and
-  `paddleocr-vl1.6-bf16` (93.69) [pair not measured; the 0.37 gap is under the floor, so the faster PaddleOCR-VL,
-  4.8 s against 37.6 s].
-- Printed: `qwen3.5-9b-mlx4` (92.78; Qwen3-VL 8B 91.69).
-- Handwritten: `lightonocr-3-4b-mlx8` (hands16 89.91; Qwen3-VL 8B 89.24, gap 0.67 over the 0.60 hand floor, pair not
-  measured).
-- All kinds, cascade off: `qwen3.5-9b-mlx4` (strict 91.95 against Qwen3-VL 8B 89.68); loop fallback on:
-  `qwen3-vl-8b-mlx4` (answered 93.62 against 92.93) [pair not measured].
-- Free cascade: `casc-free-fail` (split half 92.67 against the single route's 91.89) once a Mac escalation stage exists.
+- Typewritten, no download: `apple-vision` (92.18 strict, the free default of owner call 4). With downloads:
+  `paddleocr-vl1.6-bf16` (93.69), the leader; `qwen3.5-9b-mlx4` (93.32) trails it by −0.37 [−6.12, +5.08] (n 50,
+  owner96/typewritten/strict), over the Mac floor 0.00, so not a tie.
+- Printed: `qwen3.5-9b-mlx4` (92.78): over Qwen3-VL 8B +1.09 [−5.39, +9.36] and over LightOnOCR-3 4B +5.00 [−0.20,
+  +10.88] (n 27, owner96/printed/strict), Mac pairs, no tie.
+- Handwritten: `lightonocr-3-4b-mlx8` (hands16 89.91), the leader: over Qwen3-VL 8B +0.67 [−1.89, +2.92] and over
+  Qwen3.5 9B +1.85 [−0.00, +3.58] (n 16, owner96/hands16/strict), Mac pairs with the floor 0.00 (not the 0.60 hand
+  floor, which is a hosted floor), so no tie.
+- All kinds, cascade off (strict): `qwen3.5-9b-mlx4` (91.95), over Qwen3-VL 8B +2.27 [−1.98, +6.97] and PaddleOCR-VL
+  +3.02 [−0.94, +7.24] (n 95, owner96/all/strict). Loop fallback on (answered): `qwen3-vl-8b-mlx4` (93.62), Qwen3.5 9B
+  minus it −0.59 [−2.34, +0.88] (n 90, owner96/all/answered), a Mac pair, no tie, so the speeds (40.8 against 37.6 s a
+  page, P11-4) do not enter.
+- Free cascade: `casc-free-fail` (split half 92.67 against the single route's 91.89) once a Mac escalation stage exists
+  (no per-page scores: pair not measured, floor alone).
 - Forms, newspapers, non-Latin, early modern hands: no Mac row has its own public figure; under 7.5's recommendation
   `xiaomi-ocr-0-bf16` shows Xiaomi-OCR-0's L4 52.2, L9 95.17, N2 27.06, N6 78.67. Early modern hands on Latin
   scripts: the kraken specialists where installed (L6 72.64 German handwriting; L5 65.59 CATMuS; L7 46.42 TRIDIS).
 - Never: `apple-fm-27`.
 
 **2. Cheap API (OpenRouter key).**
-- All kinds: best feasible `gemini3.1-pro` 96.85 ($21.92), tied by `gemini3.8-flash` 96.47 (R-6), cheaper, so
-  `gemini3.8-flash` ($3.22; batch $1.61).
-- Handwritten: `gemini3.8-flash` (95.81; no tie partner on an OpenRouter key: Gemini 3.1 Pro +1.84, +0.03 to +4.27),
-  labelled conditional (OCR-1).
-- Without Gemini (open weights only): `qwen3.6-27b` 95.38 ($1.94) against `qwen3.8-flash` 95.11 ($0.60, -0.08,
-  -1.62 to +1.64, a tie), so `qwen3.8-flash`; its 3 refusals go to a fallback. `qwen3.5-27b` (95.86 answered on 82
-  pages) has no row until its rerun (paid, deferred to W43.sweep); it would then be the best feasible here.
+- All kinds: best feasible `gemini3.1-pro` 96.85 ($21.92); `gemini3.8-flash` 96.47 minus it −0.38 [−2.17, +0.90]
+  (n 93, owner96/all/answered), under the 0.49 floor, a tie, cheaper, so `gemini3.8-flash` ($3.22; batch $1.61).
+- Handwritten: `gemini3.8-flash` (hands16 95.81), the leader: over Gemini 3.1 Pro +1.84 [+0.04, +4.25] (n 16,
+  owner96/hands16/strict), over the 0.60 floor; labelled conditional (OCR-1).
+- Without Gemini (open weights only): `qwen3.6-27b` 95.38 ($1.94) is best; `qwen3.8-flash` 95.11 ($0.60) minus it
+  −0.08 [−1.62, +1.64] (n 91, owner96/all/answered), a tie, so `qwen3.8-flash`; its 3 refusals go to a fallback. With
+  no fallback (strict) it is −2.27 [−6.77, +1.90] (n 95), no tie, so `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16
+  92.61); `mistral-large4` ties it, −0.42 [−1.45, +0.68] (n 16, owner96/hands16/strict), but costs more ($2.69), and
+  every other OpenRouter route trails beyond the 0.60 floor (Qwen3-VL 235B −1.02, Qwen3.8 Flash −1.36). `qwen3.5-27b`
+  (95.86 answered on 82 pages) has no row until its rerun (paid, deferred to W43.sweep); it would then be the best
+  feasible here.
 - A price cap from $0.25 to under $0.60 per 1,000: `qwen3.5-9b` 93.38 ($0.25). Where the cap reaches $0.38 the best
-  feasible is `gemma4-31b` 93.76, 0.38 above it and under the 0.49 floor [pair not measured], so the tie rule still
-  gives the cheaper `qwen3.5-9b`.
+  feasible is `gemma4-31b` 93.76; `qwen3.5-9b` minus it +0.41 [−1.71, +2.66] (n 88, owner96/all/answered), under the
+  0.49 floor, so the cheaper `qwen3.5-9b` still. Under $0.38 `mistral-small-24b` ($0.32) trails `qwen3.5-9b` by
+  −2.65 [−5.02, −0.48] (n 89).
 - Early modern and non-Latin strata: `gemini3.8-flash` on the 440's strata (L5 63.17, L6 72.87, L7 57.95, N1 74.66,
   N3 88.79, N4 46.14); forms, newspapers, N2, N5, N6: no OpenRouter row has a figure.
 
@@ -453,15 +470,29 @@ ties against the best feasible route only, cheaper then faster, as 7.7 recommend
 - ChatGPT plan only: no measured row; the sheet says so.
 
 **4. A cluster.**
-- All kinds: `qwen3.5-27b-farmshare` 95.38 is best; `qwen3.6-27b-farmshare` 95.31 and `qwen3.5-9b-sherlock` 95.13
-  sit under the 0.49 floor of it (pair not measured) and every one ties the bench baseline; free, so the fastest, `qwen3.5-9b-sherlock` (3,898.9 pages an hour), with its
-  missing public figure shown; if a public figure is required, `qwen3.6-35b-a3b-farmshare` (3,327 pages an hour; 895
-  63.9).
-- Handwritten: under 7.3's recommendation `infinity-parser2-pro-sherlock` (L1-L3 89.3; two GPUs).
-- Newspapers: `qwen3.5-27b-farmshare` (L9 95.84). Forms: `qwen3.5-27b-farmshare` (L4 69.98) against
-  `qwen3.6-27b-farmshare` (69.29), pair not measured. N6: `xiaomi-ocr-0-sherlock` 78.67 and Infinity 78.26.
+- All kinds: `qwen3.5-27b-farmshare` 95.38 is best; `qwen3.6-27b-farmshare` 95.31 minus it −0.07 [−0.71, +0.47]
+  (n 95, owner96/all/answered), under the 0.49 floor, a tie; free, so the faster, `qwen3.6-27b-farmshare` (1,054.7
+  pages an hour against 1,025.6; 895 63.26 strict). Not tied: `qwen3.5-9b-sherlock` (95.13), −0.76 [−1.53, −0.09]
+  against the leader and −0.66 [−1.36, −0.04] against `qwen3.6-27b-farmshare` (n 93; strict −2.25 and −2.19, n 95),
+  so the earlier "fastest of the free ties" pick goes; `qwen3.6-35b-a3b-farmshare` (94.56), −0.83 [−2.00, +0.06]
+  (n 95). Strict gives the same pick (every 27B page answered).
+- Handwritten: `infinity-parser2-pro-sherlock` (L1-L3 89.3; two GPUs), the leader of pooled L1-L3 over every other
+  cluster route, +3.09 [+1.57, +4.64] against LightOnOCR-3 4B to +13.37 against PaddleOCR-VL (n 240,
+  public895/L1-L3/strict; +3.32 [+1.99, +4.83] against `qwen3.6-27b-farmshare`). On hands16 it ties
+  `qwen3.5-27b-farmshare`, −0.47 [−1.87, +0.89] (n 16, floor 0.60), and on the pre-sheet `handwritten` group trails
+  `qwen3.6-27b-farmshare` by −1.04 [−3.02, +0.71]; the independent truth of the 240 decides (kind rule, OCR-1).
+- Newspapers: `qwen3.5-27b-farmshare` (L9 95.84), the leader of public895/L9/strict; Xiaomi-OCR-0 −0.66 [−3.01, +1.50]
+  and `qwen3.6-27b-farmshare` −2.28 [−7.75, +2.22] behind (n 15). Descriptive: 15 pages of about one collection
+  (P13-7), so the card says so.
+- Forms: `qwen3.5-27b-farmshare` (L4 69.98), the leader of public895/L4/strict; `qwen3.6-27b-farmshare` −0.69
+  [−6.71, +5.37], `qwen3.6-35b-a3b-farmshare` −2.87 [−8.33, +2.76], Infinity −3.07 [−7.90, +1.83] (n 80). Their
+  intervals hold 0, which on the 895 makes no tie for a pick (§3), so the leader stands.
+- N6: `xiaomi-ocr-0-sherlock` 78.67, Infinity −0.41 [−4.34, +3.22] (n 40, public895/N6/strict); Xiaomi is also the
+  faster (9,322.5 pages an hour against 1,206.0 on two GPUs), so the pick holds under any floor.
 - Early modern hands and non-Latin strata of the 440 (L5-L8, N1, N3, N4): `churro-3b-farmshare` (L6 69.45, N3 84.70),
-  labelled with OCR-15 (trained on CHURRO-DS) and its research-only licence.
+  the leader on each of the seven strata; its smallest leads are L8 +2.95 [−0.03, +4.94] over Infinity and N4 +12.07
+  [−0.55, +24.12] over `qwen3.6-27b-farmshare` (n 80, 40, public895/<stratum>/strict). Labelled with OCR-15 (trained on
+  CHURRO-DS) and its research-only licence.
 
 **5. Any of these plus a coding agent.** The kit's same-hand kraken PP-OCRv6 fine-tune is an after-training row (note
 12): +2.6 (+1.7 to +3.4) at 160 lines on MPS on one public hand, worse on 3 of 4 owner Shils pages; corrected lines in the

@@ -37,7 +37,8 @@ applies, twice Gemini 3.7 Flash's per-kind rerun range: typewritten 0.42 (0.21),
 hands16 0.60 (0.30); a pair of Mac routes stays 0.00 in every group. The paired interval is shown beside the figure
 and makes no tie; each entry keeps it as `interval_holds_0`, and the floor test as `under_floor`. **On the 895 there
 is no floor and the interval alone decides** (R-3), so there `tie` is `interval_holds_0`. The settings solver reads
-a tie from the pair's entry here; the table's `noise.reading` names this file. The first build (W46.ocr-pair-matrix)
+a tie on the 96 from the pair's entry here; on the 895 a pick takes the stratum's leader and the 895 `tie` decides only
+whether a stratum route earns a row (W46.pairs-redecide, 04-reading §3); the table's `noise.reading` names this file. The first build (W46.ocr-pair-matrix)
 also counted an interval that holds 0 as a tie on the 96; the figures are unchanged, only that flag.
 
 On the 96 the leaders separate. On answered NES the four (Gemini 3.1 Pro 96.85, Gemini 3.7 Flash 96.76, Claude

@@ -11,7 +11,10 @@ Conventions: answers are the general and collection interviews' (`12-settings-de
 owner's 96 (typewritten 50, printed 28, handwritten 16) unless named; ceiling none, hours 8, preference "best
 measured", priorities reading, finding documents, dates, names unless named; ties under each stage's `noise.tie` go to
 the cheaper route, judged against the best feasible route only, faster wins among equal cost, no chaining (note 04 call
-7.7). A pick names the row id in the stage note's section 4.
+7.7). For reading the tie is the floor alone (owner, 2026-11-11): the pair's paired gap in `ocr-pair-matrix.json` under
+its floor (0.49 hosted or cluster, 0.00 between Mac routes, per kind 0.42, 0.24, 0.60), the interval shown but making
+no tie; on the 895 a pick takes the stratum's leader. A pick names the row id in the stage note's section 4; a reading
+pick also names its pair entry (W46.pairs-redecide).
 
 ## A. Skipped interviews (owner call 3)
 
@@ -53,9 +56,11 @@ hollow with the reason "stays on the Mac"; picks as B1.
 
 ## C. Cheap API: an OpenRouter key, no Gemini key
 
-- Reading: `qwen3.8-flash` ($0.60; 95.11 answered) over `qwen3.6-27b` (95.38, $1.94), a tie by the 0.49 floor,
-  cheaper wins; its 3 refusals go to the cascade row that escalates to `qwen3.6-27b`. Handwritten: pending a hands
-  figure for an OpenRouter route without Gemini (note 04 §9); until then the sheet shows the gap.
+- Reading: `qwen3.8-flash` ($0.60; 95.11 answered) over `qwen3.6-27b` (95.38, $1.94), a tie by the 0.49 floor
+  (−0.08 [−1.62, +1.64], n 91, owner96/all/answered), cheaper wins; its 3 refusals go to the cascade row that escalates
+  to `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16 92.61); `mistral-large4` ties it (−0.42 [−1.45, +0.68], n 16,
+  owner96/hands16/strict, floor 0.60) at $2.69, dearer, and every other OpenRouter route without Gemini trails beyond
+  the floor (note 04 §9 profile 2). Not pending: every OpenRouter route has a hands16 figure.
 - Segmentation: `glm5.3-flash` (80.6%, $1.16) ties the 2B (80.3%) and the 2B wins on cost when the Mac has 16 GB;
   GLM when it does not.
 - Dating: steps 1 and 4 `gemini3.7-flash-trace-neigh` only if the key reaches Gemini, else the Mac route of B1 (no
@@ -73,8 +78,11 @@ on documents with no year in the text ($2.75 per 1,000, 5.3 s), step 4 `gemini3.
 ranked. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
 
 **D2. A Gemini key, ceiling $1 for 1,000 pages, hours 24 (batch prices).** Reading `gemini3.8-flash` at the batch price
-($1.61) is over the ceiling, so `qwen3.8-flash` through the key if the key reaches it, else the free Mac pick with the
-card's "What a better figure would need" naming Gemini and the $0.61 shortfall. Segmentation the 2B or `manual`.
+($1.61) is over the ceiling; two Gemini rows fit, `gemini3.5-flash-lite` ($0.79 batch; 95.17 answered) and
+`gemini3.1-flash-lite` ($0.58; 94.59). The best feasible is `gemini3.5-flash-lite`; `gemini3.1-flash-lite` minus it is
+−0.56 [−2.77, +1.09] (n 92, owner96/all/answered; strict −1.57 [−4.67, +0.78], n 95), over the 0.49 floor, so no tie
+and `gemini3.5-flash-lite` is picked. The card's "What a better figure would need" names `gemini3.8-flash` (96.47) and
+the $0.61 shortfall. Segmentation the 2B or `manual`.
 
 **D3. The Claude plan only.** Reading `claude-sonnet5.5` (96.48, no money, the plan's window share by `usage.md`);
 handwritten 92.50 labelled a drafter family. Segmentation `claude-sonnet5.5` (85.5%, 10.2 checks). Dating and entities:
@@ -89,10 +97,15 @@ at 3.2 points, the plan route wins on money.
 
 ## E. A cluster (Sherlock), no key
 
-- Reading: `qwen3.5-9b-sherlock` (95.13; 3,899 pages an hour) as the fastest of the free ties with
-  `qwen3.5-27b-farmshare` (95.38) and `qwen3.6-27b-farmshare` (95.31), its missing public figure shown; handwritten
-  `infinity-parser2-pro-sherlock` (L1-L3 89.3; two GPUs) pending its pair; newspapers `qwen3.5-27b-farmshare`
-  (L9 95.84) read on `pp-doclayoutv3` regions for small readers (kind rule), whole page for 27B-class readers.
+- Reading: `qwen3.6-27b-farmshare` (95.31; 1,054.7 pages an hour), which ties the best, `qwen3.5-27b-farmshare`
+  (95.38; 1,025.6), at −0.07 [−0.71, +0.47] (n 95, owner96/all/answered) and is the faster. `qwen3.5-9b-sherlock` does
+  not tie either 27B (−0.76 [−1.53, −0.09] and −0.66 [−1.36, −0.04], n 93), nor does `qwen3.6-35b-a3b-farmshare`
+  (−0.83 [−2.00, +0.06], n 95). Handwritten `infinity-parser2-pro-sherlock` (L1-L3 89.3; two GPUs), the pooled L1-L3
+  leader over every other cluster route (+3.09 to +13.37, n 240, public895/L1-L3/strict). Newspapers
+  `qwen3.5-27b-farmshare` (L9 95.84, the leader of public895/L9; descriptive, 15 pages, P13-7) read on
+  `pp-doclayoutv3` regions for small readers (kind rule), whole page for 27B-class readers. Forms
+  `qwen3.5-27b-farmshare` (L4 69.98, the leader of public895/L4; its rivals' intervals hold 0, which makes no tie).
+  N6 `xiaomi-ocr-0-sherlock`; L5-L8, N1, N3, N4 `churro-3b-farmshare` (note 04 §9 profile 4).
 - Segmentation: `seg-qwen3.5-2b-bf16-cluster` (80.3%; the fastest of three ties); review rule disagreement with the
   teacher as partner.
 - Dating: steps 1 and 4 `qwen3.6-27b-trace-neigh-vision` (56.5 not in text, 93.3 in text), step 2 `qwen3.6-27b-image`.
@@ -120,14 +133,18 @@ at 3.2 points, the plan route wins on money.
 4. **Hours that nothing meets** (a 10,000-page batch on a 16 GB Mac in 1 hour): the sheet falls back to the cheapest
    feasible per stage and says which limit to relax and by how much (the prototype's fallback; `12-settings-design.md`
    §3.3).
-5. **A tie chain:** Gemini 3.8 ties Qwen3.6 27B, which ties Qwen3.8 Flash; the solver judges each against the best
-   feasible route only, so Qwen3.8 Flash is picked only if it ties Gemini 3.8 directly (it does not: 95.11 against
-   96.47 is beyond the 0.49 floor).
+5. **A tie chain:** the rows restricted to `qwen3.5-397b` (94.06, $2.02), `qwen3-vl-235b` (94.01, $1.22) and
+   `qwen3.5-9b` (93.38, $0.25), all answered. Qwen3.5 397B minus Qwen3-VL 235B is +0.05 and Qwen3-VL 235B minus
+   Qwen3.5 9B +0.47, both under the 0.49 floor, but Qwen3.5 397B minus Qwen3.5 9B is +0.53 (owner96/all/answered):
+   judged against the best feasible route only, the pick is `qwen3-vl-235b`, never `qwen3.5-9b`. (The earlier chain,
+   Gemini 3.8 Flash through Qwen3.6 27B to Qwen3.8 Flash, is not a chain under the matrix: Gemini 3.8 Flash minus
+   Qwen3.6 27B is +1.00 [−1.26, +2.95], and Qwen3.8 Flash minus Gemini 3.8 Flash −1.11 [−3.08, +1.13], both over the
+   floor.)
 6. **A kind with no figure for the chosen route** (forms on an OpenRouter-only key): the card shows "no figure" for that
    kind and the row's overall figure, never a borrowed one.
 
 ## Pending figures that skip tests
 
 `W46.place-hands-cost` (B1 hand placement fit), `W46.ocr-mac-27b` and `W46.date-mac-27b` (B2), the cascade rows' Mac
-memory per tier (B1 cascade), `W46.date-route-pipeline` (C and D dating rows measured end to end), the OpenRouter
-hands figure (C), Infinity-Parser2-Pro's pair (E).
+memory per tier (B1 cascade), `W46.date-route-pipeline` (C and D dating rows measured end to end). No
+reading figure is pending: C's OpenRouter hands pick and E's Infinity-Parser2-Pro pair are decided (W46.pairs-redecide).

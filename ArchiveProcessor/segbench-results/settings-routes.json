@@ -22,7 +22,7 @@
   },
   "reading": {
    "metric": "nes",
-   "tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 the interval across 0; NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
+   "tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
    "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"
   },
   "placement": {
