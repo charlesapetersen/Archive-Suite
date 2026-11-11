@@ -83,6 +83,11 @@ W40.fix-reader-change-incremental (A), W40.fix-reader-selection-at-size (B), W40
 main-busy at -O with Edit Info shown. The selection is found by the list's sort keys and followed change by change. A
 hidden inspector observes nothing, and the indexing count publishes apart from the model. Evidence:
 `verification/evidence/reader/W40.fix-reader-selection-at-size.md`.
+**Cause C fixed, 2026-11-11** (W40.fix-reader-viewer-switch): a file switch 30 ms main-busy at -O, visible in a median
+32 ms. `page.copy()` does not decode (measured), and PDFKit draws tiles off the main thread (sampled in the VM), so the
+wait was blank pixels: the image pages either side are drawn ahead and the neighbours opened off main. Views are still
+rebuilt per page (no memory growth over 200 switches in the VM). Evidence:
+`verification/evidence/reader/W40.fix-reader-viewer-switch.md`.
 
 ## 2. Selection, the file on view, and keeping the place (points 10, 12, 13)
 

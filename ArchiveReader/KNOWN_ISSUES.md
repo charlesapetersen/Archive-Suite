@@ -341,7 +341,7 @@ the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647
   the background clamp alone that costs ~6×, so a shipping change that moved discovery to `.utility` from a
   higher band would cost nothing, and one that let it fall to `.background` would cost everything.
 
-## 📏 MEASURED (`W40.reader-scale-measure`, 2026-11-11) — one change still costs the whole library: tag changes FIXED (`W40.fix-reader-change-incremental`), selection and viewer OPEN, S2
+## 📏 MEASURED (`W40.reader-scale-measure`, 2026-11-11) — one change still costs the whole library: tag changes, selection and the document window's file switch FIXED, S2
 
 The chain behind one change, timed end to end at 115,999 rows with 10 smart folders, live FSEvents, at -O (Debug in
 brackets). Harness: `ops/scale/run-reader-at-size.sh --only chain [--optimized]` (`ReaderChainAtSizeTests`); stages
@@ -361,14 +361,20 @@ shows the same chain in the running app. Evidence: `verification/evidence/reader
   a subtree read. Evidence: `verification/evidence/reader/W40.fix-reader-change-incremental.md`.
 - ~~**An arrow key or ⇧-arrow: 105–158 ms busy whatever is selected**~~ — fixed by `W40.fix-reader-selection-at-size`
   (2026-11-11): 0-7 ms at -O, with the inspector shown. Evidence: `verification/evidence/reader/W40.fix-reader-selection-at-size.md`.
-- **Next file in a document window with 5 open: 245 ms** [266 ms]. The panes' page copy and draw take most of it. →
-  `W40.fix-reader-viewer-switch`.
+- ~~**Next file in a document window with 5 open: 245 ms**~~ — fixed by `W40.fix-reader-viewer-switch` (2026-11-11):
+  30 ms main-busy and visible in a median 32 ms at -O. The 245 ms was the lane drawing the page on the main actor;
+  sampled in the VM with real PDFViews, PDFKit draws tiles on its own queue, so the real cost was 150–500 ms of blank
+  page. The image page of the open file and both neighbours is now drawn ahead and shown until PDFKit's tiles land,
+  and the neighbours (and their JPEG originals) are opened off the main actor. A jump to a file that is not a
+  neighbour still waits about 200 ms for its pixels, with the main thread free. Evidence:
+  `verification/evidence/reader/W40.fix-reader-viewer-switch.md`.
 - **Memory: no leak in the model.** Over 200 edits and 200 file switches the footprint stops growing within 20 steps
   (+228 MB at -O, +72 and +142 MB in two Debug runs), and a quiet minute returns nothing. The growth is freed whole-library copies kept by
   the allocator (about 370 MB of Malloc Small reclaimable). ✅ Since `W40.fix-reader-change-incremental` (rows patched
   in place; `ArchiveFile` shares its fields, so a whole-list copy is a pointer per row) the same run ends where it
-  started (484 against 485 MiB). The views' memory (the owner's IOSurface 332 MB) cannot be
-  seen in the unit host, so it is measured in the VM for the viewer item.
+  started (484 against 485 MiB). The views' memory, measured in the VM with real PDFViews on the real sample
+  (`W40.fix-reader-viewer-switch`): 200 switches with 5 open end within 29 MiB of their start, so a fresh PDFView per
+  page does not accumulate IOSurface; the owner's 332 MB at 6 h 19 min is not reproduced by switching alone.
 - **The owner's builds are now Release:** `ArchiveReader/launch.sh` builds and runs Release (-O; `--debug` for
   Debug), since -O shows a change 1.5–4× sooner. The Reader's Release build had been carrying `get-task-allow`. It no
   longer does. Notes and the DMG check: `W40.release-no-debug-entitlements`.
