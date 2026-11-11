@@ -101,5 +101,66 @@ class Compare(unittest.TestCase):
             T.struck("p077", "which I think believe has")  # the record follows the corrected text, never the old
 
 
+
+class PrepareSource(unittest.TestCase):
+    """W46.prepare-jpeg-pairs: the exact name first, then the pairs.tsv JPEG if it matches the PDF, else the PDF."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        import shutil
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        for d in ("corpus/F", "jpegs/A", "jpegs/B"):
+            (self.tmp / d).mkdir(parents=True)
+        for f in ("corpus/F/1.pdf", "corpus/F/2.pdf", "corpus/F/3.pdf", "jpegs/A/1.JPG", "jpegs/B/x 2.JPG"):
+            (self.tmp / f).write_bytes(b"x")
+        self.corr = {}
+        self.calls = []
+
+        def extract(kind, src, out, pdf=None):
+            self.calls.append((kind, src.name))
+            out.write_bytes(b"x")
+            meta = {"taken": "2019:01:01", "camera": None, "rotated": 0, "width": 10, "height": 20}
+            if kind == "original":
+                meta["orient_corr"] = self.corr.get(src.name, 0.9)
+            return meta
+
+        for k, v in {"CORPUS": self.tmp / "corpus", "ORIGINALS": self.tmp / "jpegs", "CACHE": self.tmp / "cache",
+                     "extract": extract, "sharpness": lambda _p: 1.0, "vision_words": lambda _p: 50}.items():
+            p = mock.patch.object(T, k, v)
+            p.start()
+            self.addCleanup(p.stop)
+        self.originals = {"1": ["A/1.JPG"], "3": ["A/3.JPG", "B/3.JPG"]}
+        self.pairs = {"F/1.pdf": ("B/x 2.JPG", "number"), "F/2.pdf": ("B/x 2.JPG", "number")}
+
+    def test_exact_name_first(self):
+        rec = T.prepare("F", "1.pdf", [], self.originals, self.pairs)
+        self.assertEqual((rec["source"], rec["source_method"], rec["source_path"]), ("original", "name", "A/1.JPG"))
+
+    def test_paired_jpeg_kept(self):
+        rec = T.prepare("F", "2.pdf", [], self.originals, self.pairs)
+        self.assertEqual((rec["source"], rec["source_method"], rec["source_path"]),
+                         ("original", "pairs.tsv number", "B/x 2.JPG"))
+        self.assertNotIn("pair_rejected", rec)
+
+    def test_paired_jpeg_below_min_corr_falls_back_to_pdf(self):
+        self.corr["x 2.JPG"] = T.MIN_CORR - 0.01
+        rec = T.prepare("F", "2.pdf", [], self.originals, self.pairs)
+        self.assertTrue(rec["source"].startswith("pdf image (no original; pair below MIN_CORR"))
+        self.assertIsNone(rec["source_method"])
+        self.assertEqual((rec["source_path"], rec["pair_rejected"], rec["pair_method"]),
+                         ("F/2.pdf", "B/x 2.JPG", "pairs.tsv number"))
+        self.assertEqual([k for k, _ in self.calls], ["original", "pdf image (no original; pair below MIN_CORR)"])
+
+    def test_name_match_skips_min_corr(self):
+        self.corr["1.JPG"] = 0.1   # an exact-name original is taken as before, whatever its correlation
+        self.assertEqual(T.prepare("F", "1.pdf", [], self.originals, self.pairs)["source_method"], "name")
+
+    def test_two_name_matches_and_no_pair(self):
+        rec = T.prepare("F", "3.pdf", [], self.originals, self.pairs)
+        self.assertEqual((rec["source"], rec["source_method"]), ("pdf image (2 originals)", None))
+
 if __name__ == "__main__":
     unittest.main()

@@ -38,7 +38,11 @@ THE DRAW RULE — written before the draw was run, and not changed after (seed `
     photo attributes are least represented so far is kept (the sum, over pixel tertile, sharpness tertile,
     year-taken tertile and camera, of the pages already drawn sharing that value; ties at random).
   * The image: the original photograph in ``ORIGINALS`` with the PDF's file name (any extension), when
-    exactly one exists; otherwise the image inside the PDF, and the row says why. EXIF orientation applied.
+    exactly one exists; else the JPEG corpus_pairs.py pairs it with in ``pairs.tsv``, kept only when
+    ``orient_like_pdf`` matches it to the PDF's page at MIN_CORR or more (W46.prepare-jpeg-pairs, owner
+    2026-11-11: JPEG originals whenever one exists); otherwise the image inside the PDF, and the row says why.
+    Each row's ``source_method`` says how its original was found ("name" or "pairs.tsv <method>"). EXIF
+    orientation applied. A page already prepared keeps the image it was made with (past sets are not re-drawn).
     (W46.truth-jpeg-upgrade, 2026-10-29: 15 of those PDF images were since replaced in pages/ by their JPEG
     originals, found by corpus_pairs.py or named by the owner; truth_jpeg_upgrade.py, jpeg-upgrade.json.)
   * Photo attributes, measured from the file: pixel size (long side), sharpness (variance of a Laplacian on
@@ -202,12 +206,36 @@ def sh(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
-def source_of(folder, name, originals):
+MIN_CORR = 0.65   # orient_like_pdf of a pairs.tsv JPEG against its PDF: true pairs measure 0.69-0.98
+_PAIRS = None
+
+
+def jpeg_pairs() -> dict[str, tuple[str, str]]:
+    """'folder/name.pdf' -> (JPEG path under ORIGINALS, pairing method), from corpus-pairs/pairs.tsv; empty
+    when the file has not been built."""
+    global _PAIRS
+    if _PAIRS is None:
+        import corpus_pairs as CP
+        path, _PAIRS = Path(CP.CACHE) / "pairs.tsv", {}
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines()[1:]:
+                p, j, m = line.split("\t")[:3]
+                if j and m != "none":
+                    _PAIRS[p] = (j, m)
+    return _PAIRS
+
+
+def source_of(folder, name, originals, pairs=None):
+    """(kind, path, method): the original by the PDF's exact name first, then its pairs.tsv JPEG (still to be
+    checked against the PDF by ``prepare``), else the PDF itself."""
     stem = Path(name).stem
     m = originals.get(stem, [])
     if len(m) == 1:
-        return "original", ORIGINALS / m[0]
-    return ("pdf image (no original)" if not m else f"pdf image ({len(m)} originals)"), CORPUS / folder / name
+        return "original", ORIGINALS / m[0], "name"
+    pair = (jpeg_pairs() if pairs is None else pairs).get(f"{folder}/{name}")
+    if pair:
+        return "original", ORIGINALS / pair[0], f"pairs.tsv {pair[1]}"
+    return ("pdf image (no original)" if not m else f"pdf image ({len(m)} originals)"), CORPUS / folder / name, None
 
 
 def pdf_page(pdf: Path):
@@ -327,8 +355,8 @@ def vision_words(path: Path) -> int:
     return len(re.findall(r"[A-Za-z0-9]{2,}", out.read_text())) if out.exists() else 0
 
 
-def prepare(folder, name, tags, originals) -> dict:
-    """Copy one page to scratch and measure it; cached by its corpus path."""
+def prepare(folder, name, tags, originals, pairs=None) -> dict:
+    """Copy one page to scratch and measure it; cached by its corpus path. ``pairs`` defaults to jpeg_pairs()."""
     key = hashlib.sha256(f"{folder}/{name}".encode()).hexdigest()[:16]
     mpath = CACHE / "prep" / f"{key}.json"
     if mpath.exists():
@@ -336,10 +364,19 @@ def prepare(folder, name, tags, originals) -> dict:
         if "error" not in rec:
             return rec
     mpath.parent.mkdir(parents=True, exist_ok=True)
-    kind, src = source_of(folder, name, originals)
+    kind, src, method = source_of(folder, name, originals, pairs)
     img = CACHE / "prep" / f"{key}.jpg"
+    rejected = None
     try:
         meta = extract(kind, src, img, CORPUS / folder / name)
+        if method and method != "name" and meta["orient_corr"] < MIN_CORR:
+            # not shown to be the PDF's page: the PDF's own image instead, and the row says so
+            rejected = {"pair_rejected": str(src.relative_to(ORIGINALS)), "pair_method": method,
+                        "pair_corr": meta["orient_corr"]}
+            n = len(originals.get(Path(name).stem, []))
+            kind, src, method = (f"pdf image ({n} originals; pair below MIN_CORR)" if n else
+                                 "pdf image (no original; pair below MIN_CORR)"), CORPUS / folder / name, None
+            meta = extract(kind, src, img, CORPUS / folder / name)
     except Exception as e:  # noqa: BLE001 — recorded, the page is passed over
         rec = {"key": key, "error": str(e)[:300]}
     else:
@@ -349,8 +386,8 @@ def prepare(folder, name, tags, originals) -> dict:
         else:
             year = time.localtime(src.stat().st_mtime).tm_year
             meta["taken_from"] = "mtime"
-        rec = {"key": key, "folder": folder, "name": name, "tags": tags, "source": kind,
-               "source_path": str(src.relative_to(ORIGINALS if kind == "original" else CORPUS)),
+        rec = {"key": key, "folder": folder, "name": name, "tags": tags, "source": kind, "source_method": method,
+               "source_path": str(src.relative_to(ORIGINALS if kind == "original" else CORPUS)), **(rejected or {}),
                "long_side": max(meta["width"], meta["height"]), "year_taken": year,
                "sharpness": round(sharpness(img), 1), "words": vision_words(img), **meta}
     mpath.write_text(json.dumps(rec))
