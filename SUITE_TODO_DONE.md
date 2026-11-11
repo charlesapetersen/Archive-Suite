@@ -14911,3 +14911,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   (245 XCTest + 1159 Swift Testing), including existing render guards, with no new source warnings.
   No item-owned rehearsal cache was created; only disposable /tmp logs/screenshots and the standard reusable VM fixture/DerivedData were used. $0.
   <!-- /W40.fix-notes-advanced-search-menu -->
+- [x] **W40.fix-notes-tag-fields — The tag fields in the filter bar and Advanced Search are big enough, autocomplete, and show chips [S · S3]** · §W40 · SHIPPED 2026-11-10 (this commit; checkpoint 1 earlier) (lane: notes) (uses: build,vm)
+  Owner's Notes guided session 2, 2026-11-06 (`verification/sessions/notes-2-returned.md`, rows 20, 24). Both fields
+  are now `NoteTagChipsField`: the tag bar's `SubjectEntryField` (autocompletes from the tags on notes; Return or a
+  comma adds; keeps the keyboard), 170 pt wide, with the chosen tags as removable chips in a `FlowLayout` so they wrap
+  instead of squeezing the field. The filter bar's tags moved to their own full-width row. Suggestions list each
+  spelling a note has (the filter bar matches a tag's spelling exactly). Advanced Search keeps the rule's tags as
+  comma-separated text, read and written distinct in any case. Verified: Notes unit bundle 248/248 (new
+  `NoteTagChipsFieldLayoutTests` headless layout guard + a suggestions test), no new source warnings; in the macOS 27.2
+  VM `NotesAdvancedSearchUITests` 2/2 (updated to type the tag a key at a time, as the tag bar's test does, since a
+  synthesized burst times out while the completion list opens, and to assert the chip) and `NotesE2SearchTests` 2/2
+  (filter-bar tag facet); the filled-sheet screenshot shows the chip and the count following it. No rehearsal cache
+  scratch created. $0.
+  <!-- /W40.fix-notes-tag-fields -->

@@ -95,8 +95,11 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
             app.menuItems["has any of"].click()
             let tags = sheet.textFields.matching(identifier: "an.advanced.rule.tags").firstMatch
             tags.click()
-            tags.typeText("silicon valley\r")
-            // Return makes the tag a chip (W40.fix-notes-tag-fields), in the spelling the notes have.
+            // The field autocompletes (W40.fix-notes-tag-fields): type a key at a time, as the tag bar's test does,
+            // since synthesizing a burst while the completion list opens times out. Return makes the tag a chip.
+            for ch in "silicon valley" { app.typeText(String(ch)); Thread.sleep(forTimeInterval: 0.1) }
+            Thread.sleep(forTimeInterval: 0.5)
+            app.typeKey(.return, modifierFlags: [])
             let chip = sheet.descendants(matching: .any).matching(NSPredicate(
                 format: "identifier BEGINSWITH[c] %@", "an.advanced.rule.tagChip.silicon valley")).firstMatch
             XCTAssertTrue(chip.waitForExistence(timeout: 5), "the tag should show as a chip")

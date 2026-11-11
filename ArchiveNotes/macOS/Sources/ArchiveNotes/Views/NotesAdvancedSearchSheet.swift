@@ -245,11 +245,14 @@ private struct NotesRuleValueView: View {
     /// A tags row's tags, chips one way and its comma-separated text the other; a tag already there in another
     /// case is not added again, as the rule matches tags in any case.
     private var tagsBinding: Binding<[String]> {
-        Binding(get: { rule.tagList }, set: { new in
+        func distinct(_ tags: [String]) -> [String] {
             var seen = Set<String>()
-            rule.text = new.filter { seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
-        })
+            return tags.filter { seen.insert($0.lowercased()).inserted }
+        }
+        // Distinct on reading too, as the chips are keyed by tag and a saved rule's text may repeat one.
+        return Binding(get: { distinct(rule.tagList) }, set: { rule.text = distinct($0).joined(separator: ", ") })
     }
+
     var body: some View {
         switch rule.field {
         case .text, .noteText, .title, .authors:
