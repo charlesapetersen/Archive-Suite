@@ -164,6 +164,7 @@ struct AppKitTableView: NSViewRepresentable {
         coordinator.tableView = tableView
         coordinator.observeScrolling(of: scrollView)
         tableView.onUserInput = { [weak coordinator] in coordinator?.parent.model.userMovedInList() }
+        tableView.onExtendSelection = { [weak coordinator] in coordinator?.parent.model.extendSelectionInList($0) }
         scrollView.onScrollWheel = tableView.onUserInput
         coordinator.columnFitter = Self.fitColumns(of: tableView)
 
@@ -176,6 +177,9 @@ struct AppKitTableView: NSViewRepresentable {
         // forwards it to the coordinator here.
         dataSource.onSortDescriptorsChange = { [weak coordinator] descriptors in
             coordinator?.applyHeaderSort(descriptors)
+        }
+        dataSource.rowViewProvider = { [weak coordinator] tv, _, itemID in
+            coordinator?.makeRowView(tableView: tv, itemID: itemID.base as? ArchiveFile.ID) ?? ListRowView()
         }
         coordinator.dataSource = dataSource
         tableView.delegate = coordinator
@@ -212,7 +216,8 @@ struct AppKitTableView: NSViewRepresentable {
         var rowsChanged = false
         if coordinator.lastDisplayedGeneration != gen {
             coordinator.lastDisplayedGeneration = gen
-            if coordinator.showRows(model.displayed, orderGeneration: model.displayedOrderGeneration) {
+            if coordinator.showRows(model.displayed, orderGeneration: model.displayedOrderGeneration,
+                                    keepingPlace: model.displayedKeepsPlace) {
                 rowsChanged = true
             } else {
                 // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
@@ -271,6 +276,8 @@ struct AppKitTableView: NSViewRepresentable {
         if rowsChanged || coordinator.lastPushedSelection != selection {
             coordinator.syncSelection(selection)
         }
+        if rowsChanged { coordinator.remarkFileOnView() }
+        coordinator.markFileOnView(model.fileOnViewPath)
 
         // Sort descriptors
         let modelDescs = sortDescriptorsFromModel()
@@ -373,8 +380,9 @@ struct AppKitTableView: NSViewRepresentable {
         @discardableResult
         /// `orderGeneration` is the model's `displayedOrderGeneration`. While it is the one the snapshot was
         /// last checked at, the rows were only replaced in place, so comparing every id (79 ms at 116k rows,
-        /// W40.reader-scale-measure) is skipped. nil always compares.
-        func showRows(_ files: [ArchiveFile], orderGeneration: Int? = nil) -> Bool {
+        /// W40.reader-scale-measure) is skipped. nil always compares. `keepingPlace`: rows left or came in a list
+        /// that kept its order, and the rows that stay keep their place on screen (`keepPlace`).
+        func showRows(_ files: [ArchiveFile], orderGeneration: Int? = nil, keepingPlace: Bool = false) -> Bool {
             let sameOrder = orderGeneration != nil && orderGeneration == checkedOrderGeneration
                 && files.count == currentSnapshotIDs.count
             let idsChanged = !sameOrder && (files.count != currentSnapshotIDs.count
@@ -389,9 +397,40 @@ struct AppKitTableView: NSViewRepresentable {
                 return false
             }
             rows = files
-            if idsChanged { applySnapshot(files.map(\.id), animated: false) }
+            if idsChanged {
+                let place = keepingPlace ? visiblePlace() : []
+                applySnapshot(files.map(\.id), animated: false)
+                keepPlace(place)
+            }
             checkedOrderGeneration = orderGeneration
             return idsChanged
+        }
+
+        /// The rows on screen, top first, each with how far below the top of the visible area it starts.
+        private func visiblePlace() -> [(id: ArchiveFile.ID, offset: CGFloat)] {
+            guard let tableView, let clip = tableView.enclosingScrollView?.contentView else { return [] }
+            let visible = tableView.rows(in: clip.bounds)
+            guard visible.location != NSNotFound else { return [] }
+            return (visible.location..<min(NSMaxRange(visible), currentSnapshotIDs.count)).map {
+                (currentSnapshotIDs[$0], tableView.rect(ofRow: $0).minY - clip.bounds.minY)
+            }
+        }
+
+        /// Point 12 of the owner's notes of 2026-11-10 (W40.reader-selection-current): when rows leave, the first row
+        /// that was on screen and is still listed holds the list in place, so the rows around the ones that left do
+        /// not jump: it stays where it was, or, when the rows above it on screen left, it moves up to where the first
+        /// of them was, as the rows below a row that left close up. Nothing stays: the scroll is left as it is.
+        private func keepPlace(_ place: [(id: ArchiveFile.ID, offset: CGFloat)]) {
+            guard let tableView, let scrollView = tableView.enclosingScrollView, let offset = place.first?.offset,
+                  let row = place.lazy.compactMap({ self.rowByID[$0.id] }).first
+            else { return }
+            let clip = scrollView.contentView
+            var bounds = clip.bounds
+            bounds.origin.y = tableView.rect(ofRow: row).minY - offset
+            let origin = clip.constrainBoundsRect(bounds).origin
+            guard origin != clip.bounds.origin else { return }
+            clip.scroll(to: origin)
+            scrollView.reflectScrolledClipView(clip)
         }
 
         /// The `displayedOrderGeneration` at which the snapshot last matched the model's rows.
@@ -460,7 +499,50 @@ struct AppKitTableView: NSViewRepresentable {
             defer { isUpdatingSelection = false; lastPushedSelection = sel }
             var indexSet = IndexSet()
             for id in sel { if let i = rowByID[id] { indexSet.insert(i) } }
-            tableView.selectRowIndexes(indexSet, byExtendingSelection: false)
+            // The cursor goes in last, so the table's last selected row is the model's cursor and a plain arrow
+            // moves on from it (W40.reader-selection-current).
+            if indexSet.count > 1, let cursor = parent.model.selectionCursor.flatMap({ rowByID[$0] }), indexSet.contains(cursor) {
+                tableView.selectRowIndexes(indexSet.subtracting(IndexSet(integer: cursor)), byExtendingSelection: false)
+                tableView.selectRowIndexes(IndexSet(integer: cursor), byExtendingSelection: true)
+            } else {
+                tableView.selectRowIndexes(indexSet, byExtendingSelection: false)
+            }
+        }
+
+        // MARK: The file on view (W40.reader-selection-current)
+
+        /// The path the rows were last marked for.
+        private var markedOnView: String?
+
+        /// The rows moved under the row views: mark them again.
+        func remarkFileOnView() {
+            let path = markedOnView
+            markedOnView = nil
+            markFileOnView(path)
+        }
+
+        /// Mark the row showing `path` "on view", and unmark the rest, on the row views the table holds now; a row
+        /// view made later is marked as it is made (`makeRowView`).
+        func markFileOnView(_ path: String?) {
+            guard path != markedOnView, let tableView else { return }
+            markedOnView = path
+            let ids = currentSnapshotIDs
+            tableView.enumerateAvailableRowViews { rowView, row in
+                (rowView as? ListRowView)?.isOnView = path != nil && row < ids.count && self.isOnView(ids[row], path)
+            }
+        }
+
+        private func isOnView(_ id: ArchiveFile.ID, _ path: String?) -> Bool {
+            guard let path else { return false }
+            return file(for: id)?.path == path
+        }
+
+        /// The diffable data source's row view provider: the table asks it, not the delegate.
+        func makeRowView(tableView: NSTableView, itemID: ArchiveFile.ID?) -> NSTableRowView {
+            let rowView = tableView.makeView(withIdentifier: ListRowView.reuseID, owner: nil) as? ListRowView ?? ListRowView()
+            rowView.identifier = ListRowView.reuseID
+            rowView.isOnView = itemID.map { isOnView($0, markedOnView) } ?? false
+            return rowView
         }
 
         // MARK: Cell factory
@@ -809,6 +891,12 @@ struct AppKitTableView: NSViewRepresentable {
             }
             lastPushedSelection = newSel
             parent.selection = newSel
+            // The cursor is the row the table last selected; the other end, the selected row farthest from it.
+            let last = tableView.selectedRow
+            let cursor = last >= 0 && last < currentSnapshotIDs.count && indices.contains(last) ? last : nil
+            let otherEnd = cursor.flatMap { c in [indices.first, indices.last].compactMap { $0 }.max { abs($0 - c) < abs($1 - c) } }
+            parent.model.noteSelectionEnds(cursor: cursor.map { currentSnapshotIDs[$0] },
+                                           otherEnd: otherEnd.map { currentSnapshotIDs[$0] })
         }
 
         /// Applies a header-click sort to the model. Invoked from `SortableDiffableDataSource`'s forwarded
@@ -945,6 +1033,54 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
     // calls it — which left header-click sorting dead even though the method existed.
     @objc func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
         onSortDescriptorsChange?(tableView.sortDescriptors)
+    }
+}
+
+// MARK: - Row marked "on view"
+
+/// A list row that can be marked as the file on view in the preview sheet or the frontmost document window
+/// (W40.reader-selection-current): an outline inside the row, over the selection highlight or the plain row, so
+/// among several selected rows the one being read stands out. White on the active selection, the label colour on
+/// an inactive one (the list is inactive while the sheet or a document window has the keyboard), the accent colour
+/// on an unselected row. VoiceOver hears "on view" as the row's label.
+final class ListRowView: NSTableRowView {
+    static let reuseID = NSUserInterfaceItemIdentifier("ar.row")
+    static let outlineWidth: CGFloat = 2
+
+    var isOnView = false {
+        didSet {
+            guard isOnView != oldValue else { return }
+            setAccessibilityLabel(isOnView ? "on view" : nil)
+            needsDisplay = true
+        }
+    }
+
+    /// The system's highlight colour for the row's state, painted by the row view itself: the colours AppKit uses
+    /// for a plain-style table, so nothing changes on screen, but it is drawn where `cacheDisplay` sees it, so the
+    /// render guard measures the outline against the real highlight (`SelectedRowContrastTests` found that headless
+    /// rendering leaves the system's own highlight out).
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard isSelected else { return }
+        (isEmphasized ? NSColor.selectedContentBackgroundColor : .unemphasizedSelectedContentBackgroundColor).setFill()
+        bounds.fill()
+    }
+
+    override var isSelected: Bool { didSet { if isOnView, isSelected != oldValue { needsDisplay = true } } }
+    override var isEmphasized: Bool { didSet { if isOnView, isEmphasized != oldValue { needsDisplay = true } } }
+
+    /// The outline's colour in the row's current state.
+    var outlineColor: NSColor {
+        guard isSelected else { return .controlAccentColor }
+        return isEmphasized ? .alternateSelectedControlTextColor : .labelColor
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard isOnView else { return }
+        let inset = Self.outlineWidth / 2 + 0.5
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: inset, dy: inset), xRadius: 4, yRadius: 4)
+        path.lineWidth = Self.outlineWidth
+        effectiveAppearance.performAsCurrentDrawingAppearance { outlineColor.setStroke(); path.stroke() }
     }
 }
 
@@ -1532,9 +1668,26 @@ final class ContextMenuTableView: NSTableView {
         return cell
     }
 
+    /// ⇧↑/⇧↓ go to the model, which extends from the anchor it keeps, so the list and the preview sheet extend
+    /// the same run (W40.reader-selection-current). The table's own anchor is private and is lost whenever the
+    /// model sets the selection.
+    var onExtendSelection: ((Int) -> Void)?
+
     override func keyDown(with event: NSEvent) {
         onUserInput?()   // Page Down, Home and End move the list without changing the selection
+        if let delta = Self.extendDelta(event), let onExtendSelection { onExtendSelection(delta); return }
         super.keyDown(with: event)
+    }
+
+    /// -1 for ⇧↑, 1 for ⇧↓, nil for any other key or modifier.
+    static func extendDelta(_ event: NSEvent) -> Int? {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.numericPad, .function])
+        guard modifiers == .shift else { return nil }
+        switch event.specialKey {
+        case .upArrow?: return -1
+        case .downArrow?: return 1
+        default: return nil
+        }
     }
 
     override func mouseDown(with event: NSEvent) {

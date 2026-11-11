@@ -143,11 +143,12 @@ final class DocumentViewerModel: ObservableObject {
     enum Pane: Sendable, Equatable { case left, right }
     @Published var focusedPane: Pane = .left
 
-    func load(_ selection: DocumentSelection) {
+    /// `showing` opens on that file of the selection, if it is one (W40.reader-selection-current); else the first.
+    func load(_ selection: DocumentSelection, showing path: String? = nil) {
         urls = selection.filePaths.map { URL(fileURLWithPath: $0) }
         pinsJPEGPartnerFromLink = selection.pinsJPEGPartner
         linkedJPEGRelativePath = selection.jpegRelativePath
-        index = 0
+        index = path.flatMap { selection.filePaths.firstIndex(of: $0) } ?? 0
         focusedPane = .left
         loadCurrent()
     }

@@ -77,8 +77,24 @@ final class NavigationModel: ObservableObject {
     @Published var filterSearchText = ""
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>() {
-        didSet { schedulePersistSelection(); if !patchingSelection { refreshSelectionCache() } }
+        didSet {
+            followSelectionEnds()
+            schedulePersistSelection(); if !patchingSelection { refreshSelectionCache() }
+        }
     }
+    /// The two ends of the selection, as an `NSTableView` has them (W40.reader-selection-current): ⇧↑/⇧↓ select
+    /// the rows from the anchor to the cursor, and move the cursor. One row selected is both. An end that leaves
+    /// the selection is forgotten, and the selection's first and last rows stand in for it.
+    private(set) var selectionAnchor: ArchiveFile.ID?
+    private(set) var selectionCursor: ArchiveFile.ID?
+    /// The file the preview sheet or the frontmost document window shows, which the list marks "on view"
+    /// among the selected rows (W40.reader-selection-current). Whoever reported it last owns it; only the owner
+    /// takes it back, so a closing window cannot clear the file another one shows.
+    @Published private(set) var fileOnViewPath: String?
+    private var fileOnViewOwner: ObjectIdentifier?
+    /// Whether the last change to `displayed` was a row patch that keeps the list's order (a tag change), so the
+    /// table holds the surviving rows where they were on screen rather than where the scroll offset falls.
+    private(set) var displayedKeepsPlace = false
     /// Set while a row patch prunes the selection, which then patches the selection cache itself.
     private var patchingSelection = false
     @Published var fullTextQuery = ""
@@ -924,6 +940,7 @@ final class NavigationModel: ObservableObject {
         if causes != emptyListCauses { emptyListCauses = causes }
         lastSortMarks = marks
         displayed = result.displayed
+        displayedKeepsPlace = false
         displayedGeneration += 1
         displayedOrderGeneration += 1
         _tagCloudCache = nil
@@ -1545,7 +1562,15 @@ final class NavigationModel: ObservableObject {
         }
         guard !list.isEmpty else { return false }   // the empty list's explanation needs the whole rebuild
 
+        // Every selected row left: the next row stays selected in their place, the previous at the end, so the arrow
+        // keys carry on from there (owner, 2026-11-10, W40.reader-selection-current). Found in the list as it stood.
+        let successor = selection.isEmpty || !selection.isSubset(of: left) ? nil
+            : Self.rowAfterLeaving(selection, in: displayed, left: left,
+                                   oldRows: Dictionary(changed.map { ($0.0.id, $0.0) }, uniquingKeysWith: { a, _ in a }),
+                                   position: position(of:in:))
+
         displayed = list
+        displayedKeepsPlace = true
         displayedGeneration += 1
         if orderChanged || membershipChanged { displayedOrderGeneration += 1 }
         if membershipChanged {
@@ -1556,13 +1581,15 @@ final class NavigationModel: ObservableObject {
         if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
 
         // The selection: a row that left goes, and the cache takes the changed rows' new values.
+        let changedIDs = Set(changed.map(\.1.id))
         if !left.isEmpty, !selection.isDisjoint(with: left) {
-            patchingSelection = true
-            selection.subtract(left)
+            patchingSelection = successor == nil
+            selection = successor.map { [$0] } ?? selection.subtracting(left)   // a successor's cache is built anew
             patchingSelection = false
         }
-        let changedIDs = Set(changed.map(\.1.id))
-        if selection.isEmpty {
+        if successor != nil {
+            // `refreshSelectionCache` ran against the new list.
+        } else if selection.isEmpty {
             if !selectedFilesCache.isEmpty { selectedFilesCache = [] }
         } else if !selection.isDisjoint(with: changedIDs) || !left.isEmpty {
             let shownNow = changed.map(\.1).filter { selection.contains($0.id) && !left.contains($0.id)
@@ -1581,6 +1608,20 @@ final class NavigationModel: ObservableObject {
         applyPendingRevealIfPossible()
         if membershipChanged { reapplyPendingTopRow() }
         return true
+    }
+
+    /// The row that takes the selection's place when every selected row leaves the list: the first row after the
+    /// last of them that stays, else the last row before the first of them that stays (W40.reader-selection-current).
+    /// `list` is the list before the change, `oldRows` the selected rows as they were in it; nil if none is found.
+    static func rowAfterLeaving(_ selection: Set<ArchiveFile.ID>, in list: [ArchiveFile], left: Set<ArchiveFile.ID>,
+                                oldRows: [ArchiveFile.ID: ArchiveFile],
+                                position: (ArchiveFile, [ArchiveFile]) -> Int?) -> ArchiveFile.ID? {
+        let positions = selection.compactMap { oldRows[$0].flatMap { position($0, list) } }
+        guard let first = positions.min(), let last = positions.max() else { return nil }
+        if last + 1 < list.count, let after = list[(last + 1)...].first(where: { !left.contains($0.id) }) {
+            return after.id
+        }
+        return list[..<first].last { !left.contains($0.id) }?.id
     }
 
     /// What the changed rows' facets feed besides the list: the match signature, the smart-folder counts, and
@@ -2572,14 +2613,83 @@ final class NavigationModel: ObservableObject {
     func moveSelectionInList(_ delta: Int) {
         guard !displayed.isEmpty else { return }
         let next: ArchiveFile.ID = ReaderStages.measure("model.moveSelectionInList.find") {
-            let sel = selection
-            let positions = selectionPositions.flatMap { $0.order == displayedOrderGeneration && $0.ids == sel ? $0.positions : nil }
-                ?? displayedPositions(of: sel)
-                ?? displayed.indices.filter { sel.contains(displayed[$0].id) }
+            let positions = currentSelectionPositions()
             let anchor = delta < 0 ? (positions.min() ?? 0) : (positions.max() ?? -1)
             return displayed[max(0, min(displayed.count - 1, anchor + delta))].id
         }
         selection = [next]
+        requestScroll(to: next)
+    }
+
+    /// ⇧↑/⇧↓, in the list and in the preview sheet alike (W40.reader-selection-current): move the cursor one row
+    /// and select every row from the anchor to it, so going back past the anchor shrinks the run and then grows
+    /// it the other way, as an `NSTableView` does. With nothing selected it is a plain move.
+    func extendSelectionInList(_ delta: Int) {
+        guard !displayed.isEmpty else { return }
+        let positions = currentSelectionPositions()
+        guard let first = positions.first, let last = positions.last else { moveSelectionInList(delta); return }
+        // A missing end: the run grows away from the anchor, so the anchor is the end the arrow points away from.
+        let anchor = selectionAnchor.flatMap(position(ofListed:)) ?? (delta > 0 ? first : last)
+        let from = selectionCursor.flatMap(position(ofListed:)) ?? (anchor == first ? last : first)
+        let cursor = max(0, min(displayed.count - 1, from + delta))
+        let anchorID = displayed[anchor].id, cursorID = displayed[cursor].id
+        selection = Set(displayed[min(anchor, cursor)...max(anchor, cursor)].lazy.map(\.id))
+        selectionAnchor = anchorID
+        selectionCursor = cursorID
+        requestScroll(to: cursorID)
+    }
+
+    /// The list reports the ends after the user changed its selection (`tableViewSelectionDidChange`): the
+    /// cursor is the row it last selected; the anchor stays while it is still selected and is not the cursor,
+    /// else the selected row farthest from the cursor takes its place.
+    func noteSelectionEnds(cursor: ArchiveFile.ID?, otherEnd: ArchiveFile.ID?) {
+        guard selection.count > 1 else { return }       // one row is both ends already (`followSelectionEnds`)
+        if let cursor, selection.contains(cursor) { selectionCursor = cursor }
+        if selectionAnchor == nil || selectionAnchor == selectionCursor, let otherEnd, selection.contains(otherEnd) {
+            selectionAnchor = otherEnd
+        }
+    }
+
+    private func followSelectionEnds() {
+        if selection.count == 1 {
+            selectionAnchor = selection.first; selectionCursor = selectionAnchor
+            return
+        }
+        if let a = selectionAnchor, !selection.contains(a) { selectionAnchor = nil }
+        if let c = selectionCursor, !selection.contains(c) { selectionCursor = nil }
+    }
+
+    /// The selection's positions in `displayed`, ascending.
+    private func currentSelectionPositions() -> [Int] {
+        let sel = selection
+        return selectionPositions.flatMap { $0.order == displayedOrderGeneration && $0.ids == sel ? $0.positions : nil }
+            ?? displayedPositions(of: sel)
+            ?? displayed.indices.filter { sel.contains(displayed[$0].id) }
+    }
+
+    private func position(ofListed id: ArchiveFile.ID) -> Int? {
+        displayedPositions(of: [id])?.first ?? displayed.firstIndex { $0.id == id }
+    }
+
+    // MARK: The file on view (W40.reader-selection-current)
+
+    /// The preview sheet or a document window now shows `path` (nil: nothing loaded).
+    func noteFileOnView(_ path: String?, by owner: AnyObject) {
+        fileOnViewOwner = ObjectIdentifier(owner)
+        if fileOnViewPath != path { fileOnViewPath = path }
+    }
+
+    /// `owner` closed. Nothing is on view any more, unless someone else has reported since.
+    func endFileOnView(by owner: AnyObject) {
+        guard fileOnViewOwner == ObjectIdentifier(owner) else { return }
+        fileOnViewOwner = nil
+        if fileOnViewPath != nil { fileOnViewPath = nil }
+    }
+
+    /// The cursor's path, which the preview sheet opens on after ⇧↑/⇧↓ so the row just added is the one shown.
+    var selectionCursorPath: String? {
+        guard let cursor = selectionCursor else { return nil }
+        return selectedFiles.first { $0.id == cursor }?.path
     }
 
     /// Reveal (and select) the chosen files in Finder. Read-only — opens Finder pointing at the files;

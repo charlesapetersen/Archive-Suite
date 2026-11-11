@@ -49,9 +49,12 @@ struct PreviewSheet: View {
             published = model            // → the nav window publishes it to the scene while we are up
             DispatchQueue.main.async { model.leftController.focus() }
         }
-        .onDisappear { published = nil }
-        // ↑/↓ browse the underlying file list: move the nav selection, then re-load the preview to match.
-        .onChange(of: nav.selection) { model.load(nav.documentSelection()) }
+        .onDisappear { published = nil; nav.endFileOnView(by: model) }
+        // ↑/↓ browse the underlying file list: move the nav selection, then re-load the preview to match. After
+        // ⇧↑/⇧↓ it opens on the row just added (the cursor), not on the run's first file.
+        .onChange(of: nav.selection) { model.load(nav.documentSelection(), showing: nav.selectionCursorPath) }
+        // The list marks the file shown here "on view" (W40.reader-selection-current).
+        .onChange(of: model.currentFilePath, initial: true) { nav.noteFileOnView(model.currentFilePath, by: model) }
         // Space toggles the preview closed (Finder-style); Esc also closes via the Done button.
         .onKeyPress(.space) { dismiss(); return .handled }
         // NOTE: no `.focusedObject` / `.focusedSceneObject` here — see `published` above. `.focusedObject`
@@ -71,10 +74,10 @@ struct PreviewSheet: View {
             // ↑/↓ move up/down the file list (live preview follows the selection).
             Button { nav.moveSelectionInList(-1) } label: { Image(systemName: "chevron.up") }
                 .keyboardShortcut(.upArrow, modifiers: [])
-                .help("Previous file in the list (↑)")
+                .help("Previous file in the list (↑; ⇧↑ adds it to the selection)")
             Button { nav.moveSelectionInList(1) } label: { Image(systemName: "chevron.down") }
                 .keyboardShortcut(.downArrow, modifiers: [])
-                .help("Next file in the list (↓)")
+                .help("Next file in the list (↓; ⇧↓ adds it to the selection)")
             // ←/→ cycle the page pairs of this document, then across a multi-file selection opened together.
             Button { model.previous() } label: { Image(systemName: "chevron.left") }
                 .keyboardShortcut(.leftArrow, modifiers: [])
@@ -101,6 +104,16 @@ struct PreviewSheet: View {
                 .accessibilityIdentifier("ar.preview.done")
         }
         .padding(10)
+        // ⇧↑/⇧↓ extend the selection from its anchor, as in the list (W40.reader-selection-current). Key-only,
+        // behind the header so they take no room: the chevrons' help names them.
+        .background { extendShortcut(-1, .upArrow); extendShortcut(1, .downArrow) }
+    }
+
+    /// A key-only button: ⇧ with the arrow extends the list's selection by one row.
+    private func extendShortcut(_ delta: Int, _ key: KeyEquivalent) -> some View {
+        Button { nav.extendSelectionInList(delta) } label: { EmptyView() }
+            .keyboardShortcut(key, modifiers: .shift)
+            .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
     }
 
     /// The prerendered bitmap of the image page shown, or a request still waiting for one.

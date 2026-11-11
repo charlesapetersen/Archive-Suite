@@ -22,6 +22,8 @@ struct DocumentWindowView: View {
     @FocusState private var findFocused: Bool
     @State private var didConfigureWindow = false
     @State private var docWindow: NSWindow?
+    /// Whether this is the key window: the frontmost document window's file is the list's file on view.
+    @Environment(\.controlActiveState) private var activeState
 
     private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
     private let handleWidth: CGFloat = 10
@@ -86,7 +88,18 @@ struct DocumentWindowView: View {
         .onChange(of: model.findFocusRequest) { focusFindField() }
         .onChange(of: model.showingFind) { if model.showingFind { focusFindField() } }
         // DV-1: on close, the current window size becomes the default for the next viewer.
-        .onDisappear { if let w = docWindow { AppSettings.setViewerWindowSize(w.frame.size) } }
+        .onDisappear {
+            if let w = docWindow { AppSettings.setViewerWindowSize(w.frame.size) }
+            router.nav?.endFileOnView(by: model)
+        }
+        // The list marks this window's file "on view" while it is the frontmost (W40.reader-selection-current).
+        .onChange(of: model.currentFilePath) { noteFileOnView() }
+        .onChange(of: activeState, initial: true) { noteFileOnView() }
+    }
+
+    private func noteFileOnView() {
+        guard activeState == .key else { return }
+        router.nav?.noteFileOnView(model.currentFilePath, by: model)
     }
 
     @ViewBuilder private var content: some View {
