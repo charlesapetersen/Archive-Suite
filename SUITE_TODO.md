@@ -616,7 +616,6 @@ now takes the rule table as its source.
 
 - [ ] **`W46.ent-local-shipped-prompt` — the entity prompt on the Mac and cluster models over Vision text [S-M]** (lane: segbench) (uses: light,machine) (cluster: sherlock) — Qwen3-VL 8B on the Mac and Qwen3.6 27B on the cluster, the entity prompt over the 138's Vision text, with seconds a document and peak memory; today's Mac and cluster entity figures are the old prompt on ABBYY text (`ent-truth-owner.md`), so the rows are provisional until this lands.
 
-- [ ] **`W46.layout-pair-newspapers` — PP-DocLayoutV3 against DocLayout-YOLO, paired, on newspapers [S]** (lane: segbench) (uses: light) — The two detectors through the same reader on L9 (and a photographed newspaper set if one exists), paired; closes the one open part of the newspaper detector choice (`layout-photo-tables.md`: 91.1 against 86.2, intervals overlapping, never paired).
 
 - [ ] **`W46.layout-order-newspapers-pp` — region order on PP-DocLayoutV3's own regions [S]** (lane: segbench) (uses: light) — The app's region sort and HDBSCAN on PP-DocLayoutV3's regions on L9, scored by tau, gap and reading-order edit against the native order; sets the order rule for the detector the app runs.
 
