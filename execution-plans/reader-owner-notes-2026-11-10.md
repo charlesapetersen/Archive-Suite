@@ -61,10 +61,11 @@ the repeated 91k-entry temporaries of cause A is the likely reading [I], a leak 
 2.4 GB rising to 4.5 GB over a session says something grows. Measure before fixing (W40.reader-scale-measure).
 
 **Advanced Search drops rules past about seven (owner, 2026-11-10, sent through the walkthrough).** No cap exists
-in the code [R]. Three readings, none reproduced yet: the rule list is a ScrollView capped at 420 pt that never scrolls
-to a new row (`AdvancedSearchSheet.swift:45`); the edits live only in the sheet's `@State`, seeded once from the request
-(`NavigationWindowView.swift:82`), so a re-presented or rebuilt sheet falls back to its opening rules; and every edit
-runs `countMatches` over all ~91k rows on the main actor (`NavigationModel.swift:455-465`), cause B again [R]. Item:
+in the code [R]. Scrolling the rule list does not bring the rows back (owner, 2026-11-10), so they are lost, not hidden
+below the 420 pt scroll area. Two readings are left, not reproduced: the edits live only in the sheet's `@State`, seeded
+once from the request (`NavigationWindowView.swift:82`), so a re-presented or rebuilt sheet falls back to its opening
+rules; and every edit runs `countMatches` over all ~91k rows on the main actor (`NavigationModel.swift:455-465`), cause B
+again, which may be what sets off the rebuild [R, I]. Item:
 W40.fix-reader-advanced-many-rules, reproduction first.
 
 **Items.** W40.reader-scale-measure first (the whole chain, Debug and -O, and a long session's memory), then
