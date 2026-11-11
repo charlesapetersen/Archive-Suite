@@ -92,9 +92,10 @@ final class NavigationModel: ObservableObject {
     /// takes it back, so a closing window cannot clear the file another one shows.
     @Published private(set) var fileOnViewPath: String?
     private var fileOnViewOwner: ObjectIdentifier?
-    /// Whether the last change to `displayed` was a row patch that keeps the list's order (a tag change), so the
-    /// table holds the surviving rows where they were on screen rather than where the scroll offset falls.
-    private(set) var displayedKeepsPlace = false
+    /// The `displayedGeneration` of the last rebuild of `displayed` (a filter, a sort, a new library). Every change
+    /// after it was a row patch (a tag change), so a table that took the rows at or after it holds the surviving rows
+    /// where they were on screen rather than where the scroll offset falls (W40.reader-selection-current).
+    private(set) var lastRebuildGeneration = 0
     /// Set while a row patch prunes the selection, which then patches the selection cache itself.
     private var patchingSelection = false
     @Published var fullTextQuery = ""
@@ -940,13 +941,14 @@ final class NavigationModel: ObservableObject {
         if causes != emptyListCauses { emptyListCauses = causes }
         lastSortMarks = marks
         displayed = result.displayed
-        displayedKeepsPlace = false
         displayedGeneration += 1
+        lastRebuildGeneration = displayedGeneration
         displayedOrderGeneration += 1
         _tagCloudCache = nil
         duplicatedNames = result.duplicatedNames
         ReaderStages.measure("model.pruneSelection") { pruneSelectionToDisplayed() }
         refreshSelectionCache()
+        checkSelectionEnds()
         persistViewState()
         reapplyPendingTopRow()
     }
@@ -1570,7 +1572,6 @@ final class NavigationModel: ObservableObject {
                                    position: position(of:in:))
 
         displayed = list
-        displayedKeepsPlace = true
         displayedGeneration += 1
         if orderChanged || membershipChanged { displayedOrderGeneration += 1 }
         if membershipChanged {
@@ -1604,6 +1605,7 @@ final class NavigationModel: ObservableObject {
         presentedFilesRevision = change.toRevision
         applyFacetChanges(changed, change: change)
 
+        if orderChanged || membershipChanged { checkSelectionEnds() }
         restoreSelectionIfNeeded()
         applyPendingRevealIfPossible()
         if membershipChanged { reapplyPendingTopRow() }
@@ -2623,17 +2625,22 @@ final class NavigationModel: ObservableObject {
 
     /// ⇧↑/⇧↓, in the list and in the preview sheet alike (W40.reader-selection-current): move the cursor one row
     /// and select every row from the anchor to it, so going back past the anchor shrinks the run and then grows
-    /// it the other way, as an `NSTableView` does. With nothing selected it is a plain move.
+    /// it the other way, as an `NSTableView` does. Rows selected outside that run (⌘-clicked) stay selected. With
+    /// no ends to go by (⌘-clicked rows, or a re-sort scattered the run) the run starts at the selection's last row
+    /// for ⇧↓ and its first for ⇧↑, so one key adds one row. With nothing selected it is a plain move.
     func extendSelectionInList(_ delta: Int) {
         guard !displayed.isEmpty else { return }
         let positions = currentSelectionPositions()
         guard let first = positions.first, let last = positions.last else { moveSelectionInList(delta); return }
-        // A missing end: the run grows away from the anchor, so the anchor is the end the arrow points away from.
-        let anchor = selectionAnchor.flatMap(position(ofListed:)) ?? (delta > 0 ? first : last)
-        let from = selectionCursor.flatMap(position(ofListed:)) ?? (anchor == first ? last : first)
+        var anchor = delta > 0 ? last : first, from = anchor
+        if let a = selectionAnchor.flatMap(position(ofListed:)), let c = selectionCursor.flatMap(position(ofListed:)) {
+            anchor = a; from = c
+        }
         let cursor = max(0, min(displayed.count - 1, from + delta))
         let anchorID = displayed[anchor].id, cursorID = displayed[cursor].id
-        selection = Set(displayed[min(anchor, cursor)...max(anchor, cursor)].lazy.map(\.id))
+        let oldRun = displayed[min(anchor, from)...max(anchor, from)].lazy.map(\.id)
+        let outside = selection.count > oldRun.count ? selection.subtracting(oldRun) : []
+        selection = outside.union(displayed[min(anchor, cursor)...max(anchor, cursor)].lazy.map(\.id))
         selectionAnchor = anchorID
         selectionCursor = cursorID
         requestScroll(to: cursorID)
@@ -2641,12 +2648,18 @@ final class NavigationModel: ObservableObject {
 
     /// The list reports the ends after the user changed its selection (`tableViewSelectionDidChange`): the
     /// cursor is the row it last selected; the anchor stays while it is still selected and is not the cursor,
-    /// else the selected row farthest from the cursor takes its place.
+    /// else the selected row farthest from the cursor takes its place. A ⌘-click leaves rows unselected between
+    /// the anchor and the row clicked; that row is then the anchor too, as it is the table's.
     func noteSelectionEnds(cursor: ArchiveFile.ID?, otherEnd: ArchiveFile.ID?) {
         guard selection.count > 1 else { return }       // one row is both ends already (`followSelectionEnds`)
         if let cursor, selection.contains(cursor) { selectionCursor = cursor }
         if selectionAnchor == nil || selectionAnchor == selectionCursor, let otherEnd, selection.contains(otherEnd) {
             selectionAnchor = otherEnd
+        }
+        if let a = selectionAnchor, let c = selectionCursor, a != c,
+           let pa = position(ofListed: a), let pc = position(ofListed: c),
+           !displayed[min(pa, pc)...max(pa, pc)].allSatisfy({ selection.contains($0.id) }) {
+            selectionAnchor = c
         }
     }
 
@@ -2663,8 +2676,19 @@ final class NavigationModel: ObservableObject {
     private func currentSelectionPositions() -> [Int] {
         let sel = selection
         return selectionPositions.flatMap { $0.order == displayedOrderGeneration && $0.ids == sel ? $0.positions : nil }
-            ?? displayedPositions(of: sel)
+            ?? displayedPositions(of: sel)?.sorted()
             ?? displayed.indices.filter { sel.contains(displayed[$0].id) }
+    }
+
+    /// After the list is rebuilt or reordered, the ends stand only while the run between them is still the
+    /// selection: a re-sort can carry them far apart, and one ⇧↓ would then select every row between
+    /// (W40.reader-selection-current). An `NSTableView` forgets its anchor on a reload in the same way.
+    private func checkSelectionEnds() {
+        guard selection.count > 1, let a = selectionAnchor, let c = selectionCursor else { return }
+        guard let pa = position(ofListed: a), let pc = position(ofListed: c), abs(pa - pc) + 1 == selection.count else {
+            selectionAnchor = nil; selectionCursor = nil
+            return
+        }
     }
 
     private func position(ofListed id: ArchiveFile.ID) -> Int? {

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// A quick 2-up preview (image page | OCR text page) invoked with Space from the navigation list —
@@ -71,11 +72,14 @@ struct PreviewSheet: View {
                 Text(model.positionLabel).foregroundStyle(.primary)
             }
             Spacer()
-            // ↑/↓ move up/down the file list (live preview follows the selection).
-            Button { nav.moveSelectionInList(-1) } label: { Image(systemName: "chevron.up") }
+            // ↑/↓ move up/down the file list (live preview follows the selection); with ⇧ they extend the selection
+            // from its anchor, as in the list (W40.reader-selection-current). One button per direction reads ⇧ from the
+            // event: SwiftUI hands ⇧↓ to the unmodified ↓ shortcut (measured in the VM), so a separate ⇧↓ shortcut
+            // never fired. ⇧-clicking a chevron extends too.
+            Button { browse(-1) } label: { Image(systemName: "chevron.up") }
                 .keyboardShortcut(.upArrow, modifiers: [])
                 .help("Previous file in the list (↑; ⇧↑ adds it to the selection)")
-            Button { nav.moveSelectionInList(1) } label: { Image(systemName: "chevron.down") }
+            Button { browse(1) } label: { Image(systemName: "chevron.down") }
                 .keyboardShortcut(.downArrow, modifiers: [])
                 .help("Next file in the list (↓; ⇧↓ adds it to the selection)")
             // ←/→ cycle the page pairs of this document, then across a multi-file selection opened together.
@@ -104,16 +108,15 @@ struct PreviewSheet: View {
                 .accessibilityIdentifier("ar.preview.done")
         }
         .padding(10)
-        // ⇧↑/⇧↓ extend the selection from its anchor, as in the list (W40.reader-selection-current). Key-only,
-        // behind the header so they take no room: the chevrons' help names them.
-        .background { extendShortcut(-1, .upArrow); extendShortcut(1, .downArrow) }
     }
 
-    /// A key-only button: ⇧ with the arrow extends the list's selection by one row.
-    private func extendShortcut(_ delta: Int, _ key: KeyEquivalent) -> some View {
-        Button { nav.extendSelectionInList(delta) } label: { EmptyView() }
-            .keyboardShortcut(key, modifiers: .shift)
-            .frame(width: 0, height: 0).opacity(0).accessibilityHidden(true)
+    /// One row up or down the list; with ⇧ held, the selection grows or shrinks from its anchor instead.
+    private func browse(_ delta: Int) {
+        if NSApp.currentEvent?.modifierFlags.contains(.shift) == true {
+            nav.extendSelectionInList(delta)
+        } else {
+            nav.moveSelectionInList(delta)
+        }
     }
 
     /// The prerendered bitmap of the image page shown, or a request still waiting for one.

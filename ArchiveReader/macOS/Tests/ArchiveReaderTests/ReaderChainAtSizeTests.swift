@@ -363,16 +363,24 @@ final class ReaderChainAtSizeTests: XCTestCase {
             return await measureChain(label, quiet: 1.0, trigger: { navigation.selection = change },
                                       visible: { navigation.selectedFilesCache.count == change.count })
         }
+        func extendChain(_ label: String, run: ClosedRange<Int>) async -> Chain {
+            navigation.selection = [ids[run.lowerBound]]
+            navigation.selection = Set(ids[run])
+            navigation.noteSelectionEnds(cursor: ids[run.upperBound], otherEnd: ids[run.lowerBound])
+            await pause(0.3)
+            return await measureChain(label, quiet: 1.0, trigger: { navigation.extendSelectionInList(1) },
+                                      visible: { navigation.selectedFilesCache.count == run.count + 1 })
+        }
         var arrow1: [Chain] = [], arrow500: [Chain] = [], shift1: [Chain] = [], shift500: [Chain] = []
         for k in 0..<3 {
             let a = base + k * 1_000
             arrow1.append(await selectionChain("arrow, 1 selected (run \(k + 1))", setup: [ids[a]], change: [ids[a + 1]]))
             arrow500.append(await selectionChain("arrow, 500 selected (run \(k + 1))",
                                                  setup: Set(ids[a..<(a + 500)]), change: [ids[a + 500]]))
-            shift1.append(await selectionChain("shift-extend, 1 to 2 (run \(k + 1))", setup: [ids[a]],
-                                               change: [ids[a], ids[a + 1]]))
-            shift500.append(await selectionChain("shift-extend, 500 to 501 (run \(k + 1))",
-                                                 setup: Set(ids[a..<(a + 500)]), change: Set(ids[a...(a + 500)])))
+            // ⇧↓ is the model's own extension from the run's anchor (W40.reader-selection-current), as the list and
+            // the preview sheet send it.
+            shift1.append(await extendChain("shift-extend, 1 to 2 (run \(k + 1))", run: a...a))
+            shift500.append(await extendChain("shift-extend, 500 to 501 (run \(k + 1))", run: a...(a + 499)))
         }
         summarize("arrow-1", arrow1)
         summarize("arrow-500", arrow500)

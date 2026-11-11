@@ -19,7 +19,7 @@ final class SelectionCurrentTests: XCTestCase {
     private func rows(_ count: Int) -> [ArchiveFile] {
         (0..<count).map { i in
             let url = URL(fileURLWithPath: String(format: "\(base)/Box/doc %03d.pdf", i))
-            let tags = ["Unread", "1950"]
+            let tags = ["Unread", ["1950", "1960", "1970"][i % 3]]   // a date sort scatters runs made by name
             return ArchiveLibrary.row(CorpusEntry(url: url, tagNames: tags, labelNumber: nil,
                                                   contentModified: Date(timeIntervalSince1970: 1_000),
                                                   contentTypeIdentifier: "com.adobe.pdf", isDataless: false),
@@ -89,6 +89,12 @@ final class SelectionCurrentTests: XCTestCase {
         XCTAssertEqual(model.selection, ids(model, 2...5), "the sheet's ⇧↑ grows the list's run upward")
         model.extendSelectionInList(1)
         XCTAssertEqual(model.selection, ids(model, 3...5), "and ⇧↓ shrinks it from the same end")
+
+        // A ⌘-click on row 8: the table's last selected row is 8, with 6 and 7 unselected between it and the anchor.
+        model.selection = ids(model, 3...5).union([model.displayed[8].id])
+        model.noteSelectionEnds(cursor: model.displayed[8].id, otherEnd: model.displayed[3].id)
+        model.extendSelectionInList(1)
+        XCTAssertEqual(model.selection, ids(model, 3...5).union(ids(model, 8...9)), "⇧↓ goes on from the row ⌘-clicked")
     }
 
     func testExtendingASelectionWithNoEndsGrowsAwayFromIt() async throws {
@@ -96,12 +102,41 @@ final class SelectionCurrentTests: XCTestCase {
         model.selection = Set([2, 4].map { model.displayed[$0].id })   // ⌘-clicked: no anchor, no cursor
         XCTAssertNil(model.selectionCursor)
         model.extendSelectionInList(1)
-        XCTAssertEqual(model.selection, ids(model, 2...5), "from the first row down to one past the last")
+        XCTAssertEqual(model.selection, Set([2, 4, 5].map { model.displayed[$0].id }), "⇧↓ adds the row after the last")
+        model.extendSelectionInList(1)
+        model.extendSelectionInList(-1)
+        XCTAssertEqual(model.selection, Set([2, 4, 5].map { model.displayed[$0].id }),
+                       "the run from the last row grows and shrinks; the ⌘-clicked row stays")
+        model.selection = Set([2, 4].map { model.displayed[$0].id })
+        model.extendSelectionInList(-1)
+        XCTAssertEqual(model.selection, Set([1, 2, 4].map { model.displayed[$0].id }), "⇧↑ adds the row before the first")
         model.selection = []
         model.extendSelectionInList(1)
         XCTAssertEqual(model.selection, [model.displayed[0].id], "with nothing selected it is a plain move")
         for _ in 0..<20 { model.extendSelectionInList(1) }
         XCTAssertEqual(model.selection.count, 12, "the run stops at the end of the list")
+    }
+
+    func testAReSortThatScattersTheRunForgetsItsEnds() async throws {
+        let (model, indexer) = try await model(rows: 30)
+        model.selection = [model.displayed[10].id]
+        model.extendSelectionInList(1)
+        model.extendSelectionInList(1)
+        let picked = model.selection
+        model.recompute()   // the same order: the run still lies between its ends, which stand
+        XCTAssertEqual(model.selectionAnchor, model.displayed[10].id)
+        XCTAssertEqual(model.selectionCursor, model.displayed[12].id)
+
+        // By date the three rows (three different years) land far apart; the ends would bound most of the list.
+        model.sort = [ARSortDescriptor(field: .date, ascending: true), ARSortDescriptor(field: .name, ascending: true)]
+        model.recompute()
+        await settle(model, indexer)
+        let positions = model.displayed.indices.filter { picked.contains(model.displayed[$0].id) }
+        XCTAssertGreaterThan(positions.last! - positions.first! + 1, picked.count, "precondition: the run is scattered")
+        XCTAssertEqual(model.selection, picked, "the rows stay selected")
+        XCTAssertNil(model.selectionAnchor, "the ends are forgotten")
+        model.extendSelectionInList(1)
+        XCTAssertEqual(model.selection.count, picked.count + 1, "one ⇧↓ grows the run by one row from its first")
     }
 
     func testThePreviewOpensOnTheRowJustAdded() async throws {
@@ -171,7 +206,8 @@ final class SelectionCurrentTests: XCTestCase {
         XCTAssertEqual(model.selection, [listed[5]], "the row after them is selected")
         XCTAssertEqual(model.selectedFiles.map(\.id), [listed[5]], "and the selected files say so")
         XCTAssertEqual(model.selectionCursor, listed[5], "and is where the arrows go on from")
-        XCTAssertTrue(model.displayedKeepsPlace, "the table is told to keep the rows' place")
+        XCTAssertLessThan(model.lastRebuildGeneration, model.displayedGeneration,
+                          "a patch, not a rebuild, so the table keeps the rows' place")
 
         model.selection = [model.displayed.last!.id]
         await markRead([model.displayed.count - 1])
@@ -182,7 +218,7 @@ final class SelectionCurrentTests: XCTestCase {
         XCTAssertEqual(model.selection, [listed[1]], "a selected row that stays keeps the selection to itself")
 
         model.recompute()
-        XCTAssertFalse(model.displayedKeepsPlace, "a rebuild does not keep the place")
+        XCTAssertEqual(model.lastRebuildGeneration, model.displayedGeneration, "a rebuild does not keep the place")
     }
 
     func testTheRowAfterLeavingSkipsRowsThatLeftWithIt() {
@@ -304,9 +340,14 @@ final class SelectionCurrentTests: XCTestCase {
         }
         t.coordinator.markFileOnView(model.displayed[2].path)
         XCTAssertTrue(try rowView(2).isOnView)
-        XCTAssertEqual(try rowView(2).accessibilityLabel(), "on view", "VoiceOver hears it")
         XCTAssertFalse(try rowView(1).isOnView)
-        XCTAssertNil(try rowView(1).accessibilityLabel())
+        let nameColumn = try XCTUnwrap(t.table.tableColumns.first)
+        func nameLabel(_ row: Int) -> String? {
+            let cell = t.coordinator.makeCell(tableView: t.table, column: nameColumn, itemID: model.displayed[row].id)
+            return (cell as? NSTableCellView)?.textField?.accessibilityLabel()
+        }
+        XCTAssertEqual(nameLabel(2), "\(model.displayed[2].name), on view", "the name cell says it, which VoiceOver reads")
+        XCTAssertNil(nameLabel(1))
 
         t.coordinator.markFileOnView(model.displayed[4].path)
         XCTAssertFalse(try rowView(2).isOnView, "the mark moves with the file")

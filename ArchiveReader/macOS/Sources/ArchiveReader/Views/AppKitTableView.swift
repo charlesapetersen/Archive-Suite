@@ -215,9 +215,12 @@ struct AppKitTableView: NSViewRepresentable {
         let gen = model.displayedGeneration
         var rowsChanged = false
         if coordinator.lastDisplayedGeneration != gen {
+            // Only row patches since the rows the table last took: the surviving rows keep their place.
+            let onlyPatched = coordinator.lastDisplayedGeneration >= 0
+                && model.lastRebuildGeneration <= coordinator.lastDisplayedGeneration
             coordinator.lastDisplayedGeneration = gen
             if coordinator.showRows(model.displayed, orderGeneration: model.displayedOrderGeneration,
-                                    keepingPlace: model.displayedKeepsPlace) {
+                                    keepingPlace: onlyPatched) {
                 rowsChanged = true
             } else {
                 // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
@@ -525,10 +528,21 @@ struct AppKitTableView: NSViewRepresentable {
         /// view made later is marked as it is made (`makeRowView`).
         func markFileOnView(_ path: String?) {
             guard path != markedOnView, let tableView else { return }
+            let previous = markedOnView
             markedOnView = path
             let ids = currentSnapshotIDs
+            var changed = IndexSet()
             tableView.enumerateAvailableRowViews { rowView, row in
-                (rowView as? ListRowView)?.isOnView = path != nil && row < ids.count && self.isOnView(ids[row], path)
+                guard let rowView = rowView as? ListRowView, row < ids.count else { return }
+                let onView = self.isOnView(ids[row], path)
+                if onView || self.isOnView(ids[row], previous) { changed.insert(row) }
+                rowView.isOnView = onView
+            }
+            // The name cells of the rows that changed say "on view" again (`makeCell`). Only that column is
+            // reloaded, so a tag cell being edited keeps its field editor.
+            let column = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier("name"))
+            if column >= 0, !changed.isEmpty {
+                tableView.reloadData(forRowIndexes: changed, columnIndexes: IndexSet(integer: column))
             }
         }
 
@@ -632,6 +646,8 @@ struct AppKitTableView: NSViewRepresentable {
                                             disambiguator: disambiguator,
                                             snippet: parent.model.searchSnippet(for: file.path),
                                             fontSize: currentFontSize)
+                // VoiceOver reads a row by its cells, so the name says it too (W40.reader-selection-current).
+                if file.path == markedOnView { tf.setAccessibilityLabel("\(file.name), on view") }
 
             case "type":
                 tf.stringValue = file.fileType
@@ -1042,7 +1058,8 @@ final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, Archi
 /// (W40.reader-selection-current): an outline inside the row, over the selection highlight or the plain row, so
 /// among several selected rows the one being read stands out. White on the active selection, the label colour on
 /// an inactive one (the list is inactive while the sheet or a document window has the keyboard), the accent colour
-/// on an unselected row. VoiceOver hears "on view" as the row's label.
+/// on an unselected row. VoiceOver hears "on view" from the row's name cell (`makeCell`): a label set on the row view
+/// itself never reached the accessibility tree (measured in the VM).
 final class ListRowView: NSTableRowView {
     static let reuseID = NSUserInterfaceItemIdentifier("ar.row")
     static let outlineWidth: CGFloat = 2
@@ -1050,7 +1067,6 @@ final class ListRowView: NSTableRowView {
     var isOnView = false {
         didSet {
             guard isOnView != oldValue else { return }
-            setAccessibilityLabel(isOnView ? "on view" : nil)
             needsDisplay = true
         }
     }

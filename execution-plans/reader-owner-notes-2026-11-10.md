@@ -107,7 +107,10 @@ and no current item [R].
   **Owner's call, 2026-11-10:** remove the row at once, keep the rows around it where they were on screen, and
   select the next row (the previous at the end), so the arrow keys carry on from the same place.
 
-**Item.** W40.reader-selection-current.
+**Item.** W40.reader-selection-current — shipped 2026-11-11 (`SUITE_TODO_DONE.md`). Two findings on the way, for the
+items after it: SwiftUI hands ⇧↓ to a `.keyboardShortcut(.downArrow, modifiers: [])` button (measured in the VM), so the
+reading of point 10 above was half wrong (⇧↓ in the sheet did move, as a plain ↓); and an `NSTableRowView`'s own
+accessibility label never reaches the tree, so a row is described through its cells.
 
 ## 3. Commands, names and shortcuts (point 14, and a stale binding found on the way)
 
