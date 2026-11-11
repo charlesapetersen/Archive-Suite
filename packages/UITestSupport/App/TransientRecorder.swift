@@ -317,6 +317,20 @@ final class TransientRecorder {
             return (attribute(.rows) as? [Any] ?? []).map { $0 as AnyObject }
         }
 
+        /// A string-typed message read as an object. On macOS 27 SwiftUI's elements can answer `accessibilityTitle` /
+        /// `accessibilityLabel` with an `NSAttributedString` (measured in the 27.2 guest, 2026-11-10): taken as the
+        /// declared `String`, its first use raised `-[NSConcreteAttributedString _fastCStringContents:]`, and an
+        /// exception out of the run-loop observer left it marked as firing, so the recorder never sampled again
+        /// ("the recorder never reported idle", "no watched section changed").
+        private func string(_ selector: String) -> String? {
+            guard answers(selector) else { return nil }
+            switch object.perform(NSSelectorFromString(selector))?.takeUnretainedValue() {
+            case let a as NSAttributedString: return a.string
+            case let s as String: return s
+            default: return nil
+            }
+        }
+
         /// Title, label and value, plus a selection highlight or a greyed-out control, which are displayed state too:
         /// a row deselected and selected again, or a toolbar button that flashes disabled, is a flicker.
         var text: String {
@@ -324,8 +338,8 @@ final class TransientRecorder {
             let value: Any?
             let selected, enabled: Bool
             if let modern {
-                title = answers("accessibilityTitle") ? modern.accessibilityTitle() : nil
-                label = answers("accessibilityLabel") ? modern.accessibilityLabel() : nil
+                title = string("accessibilityTitle")
+                label = string("accessibilityLabel")
                 value = answers("accessibilityValue") ? modern.accessibilityValue() : nil
                 selected = answers("isAccessibilitySelected") && modern.isAccessibilitySelected()
                 enabled = !answers("isAccessibilityEnabled") || modern.isAccessibilityEnabled()
