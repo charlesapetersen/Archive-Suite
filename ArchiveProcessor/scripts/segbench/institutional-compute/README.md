@@ -2,7 +2,7 @@
 
 Run the same OCR truth check and bulk reader on your institution’s GPU cluster, then import the resulting text
 into Archive Processor with **Institutional computing**. The import matches image SHA-256, not filenames.
-FarmShare is the first supported profile; Stanford access is not required to use the kit.
+FarmShare and Sherlock have profiles; Stanford access is not required to use the kit.
 
 This kit supports **Slurm only**, NVIDIA GPUs, Python 3.10–3.13 and a compatible vLLM/CUDA installation. It runs
 an OpenAI-compatible vLLM server on the allocated node’s loopback address and never exposes it to the network.
@@ -33,7 +33,7 @@ requeue (`job.sbatch`, `train.sbatch`). A profile cannot translate a different s
 Each `profiles/*.json` file holds the cluster’s display name, scheduler settings, GPU type and per-card
 memory, modules/CUDA setup, scratch path, and persistent storage path, plus an optional CPU partition and QOS
 (`slurm.cpu_partition`, `slurm.cpu_qos`) for a wave's score jobs. `farmshare.json` reflects FarmShare’s
-reported 2026-10-15 limits; `example-university.json` is a **fictional**, offline-tested 80 GB H100 example, not a
+reported 2026-10-15 limits; `sherlock.json` is Stanford Sherlock (below); `example-university.json` is a **fictional**, offline-tested 80 GB H100 example, not a
 claim about another university’s infrastructure. Copy either to a new file and replace every setting with
 answers from your office. JSON is data, never shell code. Paths may use `$USER`, `$HOME` and other existing
 environment variables; they must expand to absolute paths. Use an empty `gpu.gres_type` only if untyped
@@ -63,7 +63,33 @@ and the job uses that toolkit. With `"modules"`, the job loads your named module
 you must select a toolkit compatible with the installed torch wheel. All job modes log the actual GPU and
 runtime. `IC_VLLM_VERSION` can pin an approved vLLM release before setup.
 
-`paths.scratch` holds the venv, Hugging Face cache, logs and runs beneath `institutional-compute/`.
+`paths.scratch` holds the venv, Hugging Face cache, logs and runs beneath `institutional-compute/`; an optional
+`paths.environments` moves the venv elsewhere, for a cluster that keeps environments off purged scratch.
+
+A cluster that selects cards by feature rather than typed gres sets `gpu.request` to `"gpus"` (jobs ask
+`--gpus=N`) and `gpu.constraint` to a feature expression such as `GPU_MEM:48GB|GPU_MEM:80GB` (`--constraint`);
+`gpu.memory_gb` is then the smallest card the constraint admits. `runtime.cuda_mode = "container"` runs every
+Python and vLLM step inside an Apptainer image (`runtime.container`) that carries vLLM, PyTorch and CUDA, with
+`runtime.container_binds` bound and `runtime.container_pythonpath` ahead of `PYTHONPATH`. Setup then builds a
+`--system-site-packages` venv over the image holding only the kit's extra packages, every package the image has
+pinned (`image-pins.txt`), and sets `IC_PY`/`IC_VLLM` to `bin/container-python`/`bin/container-vllm`. Training
+(`setup-train.sh`, `train.sbatch`) and the news-layout venv are not containerised and refuse such a profile.
+
+### Stanford Sherlock
+
+`sherlock.json` follows `execution-plans/sherlock-access.md` and `processing-review/J-compute.md` §1: the public
+`gpu` partition, no QOS or account flag (Sherlock has no `--account`; the partition's QOS applies), cards by
+`-C GPU_MEM:48GB|GPU_MEM:80GB` (L40S or H100), the 2-day wall limit, and the `gpu` QOS's 16 GPUs and 100 submitted
+jobs a user as read on 2026-10-22. Sherlock does not publish a running-job limit; the profile assumes 16 (one GPU
+each) and setup lowers every cap to what Slurm reports. Sherlock's CentOS 7 (glibc 2.17) cannot take the vLLM wheels,
+so the profile runs in the vLLM 0.31 CUDA 12.9 image in `$GROUP_HOME/$USER/images/` with the torchcodec shim in
+`pyshim/` beside it (both built as for the W46 corpus jobs, `../sherlock/sh.env`). Environments go to
+`$GROUP_HOME/$USER/envs/institutional-compute`, results to `$GROUP_HOME/$USER/institutional-compute-results`, and
+models, logs and runs to `$SCRATCH` (purged 90 days after last change). The login-node helpers (`profiles.py`,
+`limits.py`, `submit.sh`) need Python 3.7 or later on the host: load one first (`module avail python`). Installs and
+model downloads run inside a job on Sherlock, never on a login node: run `setup.sh --profile sherlock` and
+`download.sh` from `sh_dev` (or an `sbatch` CPU job). Training on Sherlock uses `../sherlock/seg-adapt-lora/`.
+Under `ARCHIVE_UNATTENDED=1` an engine session never contacts Sherlock; it may only dry-run.
 `paths.storage` is a persistent destination created at setup; bulk output is an explicit `--out`, so copy
 verified results there before scratch is purged. An offline dry-run creates **no directories**, downloads
 nothing and never calls Slurm. Use it to review account, QOS, GPU type/count, wall time and path quoting.
@@ -188,6 +214,9 @@ python3 train_seg.py check --run shipped=RUNS/shipped-holdout,RUNS/shipped-ancho
     --weights /path/to/the/mac/build --data /scratch/$USER/training --out archive-seg-manifest.json
 ```
 
+On a container profile (Sherlock), run the scorer as `"$IC_PY" train_seg.py check …` after `source compute.env`,
+inside a job (`sh_dev`): `bin/container-python` runs it in the image, whose numpy is all it needs beyond the
+standard library, and gives the same manifest as a direct run (`test_the_gate_scores_inside_the_container`).
 It scores both on the held-out gaps (against your tags, or against your own rulings with `--ruled`) and on the
 anchor, writes the manifest and exits 1 if the gate fails. Every expected held-out gap counts: the manifest gives
 expected, answered and missing gaps, the strict accuracy (an unanswered gap is wrong) beside the answered-only one, and
@@ -232,6 +261,8 @@ rotation are not supported. This route reads pages directly; it does not require
 python3 -m unittest test_institutional_compute
 ```
 
-Tests use synthetic scratch images and a fake localhost vLLM server, validate both profiles and 24/48/80 GB
+Tests use synthetic scratch images and a fake localhost vLLM server, validate every profile and 24/48/80 GB
 preset sizing, exercise `submit.sh --dry-run` without setup or Slurm, and verify that cached transcripts cannot
-be attributed to a different cluster. No cluster jobs, real corpus or money are involved.
+be attributed to a different cluster. A fake `apptainer` checks the container profile: setup's venv over the image,
+the Sherlock dry-run's `--gpus`/`--constraint` request, and the gate's scorer inside the image. The Check tests
+need numpy (`../torch-env.sh` on the Mac). No cluster jobs, real corpus or money are involved.

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# The kit's IC_PY in container mode: the venv setup.sh built over the image (IC_CONTAINER_PYTHON), run inside it.
+# Every Python step uses it: the cluster readers, wave scoring and the held-out gate's scorer (train_seg.py check).
+set -euo pipefail
+: "${IC_CONTAINER_PYTHON:?run setup.sh for a container profile first (source compute.env)}"
+exec "$(dirname "${BASH_SOURCE[0]}")/container-run" "$IC_CONTAINER_PYTHON" "$@"

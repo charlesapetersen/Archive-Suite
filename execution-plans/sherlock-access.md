@@ -104,7 +104,8 @@ once per batch rather than once per item.
   inside Sherlock run in a job (`sbatch`, or `sh_dev` for an interactive one). Nothing server-like on a login node.
 - Every job states `--time`. GPU jobs use `-p gpu -G <n>` and select cards with `-C` features from `sh_node_feat`
   (for example `GPU_MEM:48GB|GPU_MEM:80GB`), never `--exclude`. There is no `--account`. The kit's
-  `--gres=gpu:N` and its FarmShare QOS do not carry over; a Sherlock profile has to change `scheduler.sh`.
+  `--gres=gpu:N` and its FarmShare QOS do not carry over; its Sherlock profile (`profiles/sherlock.json`,
+  W46.kit-sherlock-profile) asks `--gpus=N --constraint=...` and runs in the vLLM image.
 - Storage: environments in `$GROUP_HOME` (1 TB), never in `$SCRATCH`. Job input and output in `$SCRATCH`
   (100 TB, purged 90 days after last modification, not backed up). Caches (`PIP_CACHE_DIR`, `XDG_CACHE_HOME`,
   `HF_HOME`) in `$SCRATCH`. Results are copied home promptly; scratch never holds the only copy.

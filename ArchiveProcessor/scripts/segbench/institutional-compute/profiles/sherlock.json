@@ -1,0 +1,14 @@
+{
+  "name": "Stanford Sherlock", "scheduler": "slurm",
+  "slurm": {"partition": "gpu", "qos": "", "account": "", "wall_minutes": 2880,
+    "max_gpus_per_user": 16, "max_running_jobs": 16, "max_submitted_jobs": 100,
+    "cpu_partition": "normal", "cpu_qos": ""},
+  "gpu": {"name": "NVIDIA L40S or H100", "gres_type": "", "memory_gb": 48, "per_node": 4,
+    "request": "gpus", "constraint": "GPU_MEM:48GB|GPU_MEM:80GB"},
+  "runtime": {"modules": [], "cuda_mode": "container", "cuda_home": "",
+    "container": "$GROUP_HOME/$USER/images/vllm-0.31.0-cu129.sif",
+    "container_binds": ["$SCRATCH", "$GROUP_HOME"],
+    "container_pythonpath": ["$GROUP_HOME/$USER/images/pyshim"]},
+  "paths": {"scratch": "$SCRATCH", "storage": "$GROUP_HOME/$USER/institutional-compute-results",
+    "environments": "$GROUP_HOME/$USER/envs/institutional-compute"}
+}

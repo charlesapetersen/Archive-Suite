@@ -7,6 +7,7 @@
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 : "${IC_ROOT:?source compute.env before running/submitting}" "${HF_HOME:?missing cache snapshot}"
+[ "${IC_CUDA_MODE:-}" != container ] || { echo "training setup is not containerised; on a container profile (Sherlock) train with ../sherlock/seg-adapt-lora (README)" >&2; exit 2; }
 source runtime.sh; load_cluster_modules
 V="$IC_ROOT/train-venv"
 # The same torch as the vLLM venv (2.13 cu130), so the node's driver serves both; transformers as that venv's.

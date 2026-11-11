@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Run a command inside the profile's Apptainer image (runtime.cuda_mode "container"), with the profile's binds and
+# its extra PYTHONPATH ahead of the caller's. The settings come from the exported profile (profiles.py), so a queued
+# job uses the snapshot it was submitted with.
+#   container-run CMD [ARG...]
+set -euo pipefail
+: "${IC_CONTAINER:?the profile must set runtime.container (source compute.env)}"
+args=(-s exec --nv)
+[ -z "${IC_CONTAINER_BINDS:-}" ] || args+=(--bind "$IC_CONTAINER_BINDS")
+pp="${IC_CONTAINER_PYTHONPATH:-}${PYTHONPATH:+${IC_CONTAINER_PYTHONPATH:+:}$PYTHONPATH}"
+[ -z "$pp" ] || args+=(--env "PYTHONPATH=$pp")
+exec apptainer "${args[@]}" "$IC_CONTAINER" "$@"

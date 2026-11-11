@@ -12,11 +12,17 @@ if [ "$free_gb" -lt $((IC_DISK_GB + 5)) ]; then
   echo "need ~${IC_DISK_GB} GB for $IC_MODEL, $free_gb GB free under $HF_HOME"; exit 1
 fi
 # Public Apache-2.0 repos: no Hugging Face token needed.
-bin="$(dirname "$IC_PY")"
-cli="$bin/hf"; [ -x "$cli" ] || cli="$bin/huggingface-cli"   # huggingface_hub 1.x renamed the CLI to hf
+if [ "$IC_CUDA_MODE" = container ]; then
+  # The venv over the image, then the image's own PATH (a huggingface_hub the image already has is not reinstalled).
+  cli=(bin/container-run env "PATH=$(dirname "$IC_CONTAINER_PYTHON"):/usr/local/bin:/usr/bin:/bin" hf)
+else
+  bin="$(dirname "$IC_PY")"
+  hf="$bin/hf"; [ -x "$hf" ] || hf="$bin/huggingface-cli"   # huggingface_hub 1.x renamed the CLI to hf
+  cli=("$hf")
+fi
 # One pattern per --exclude: hf 1.x takes a single value per flag and reads any further words as FILE NAMES, so
 # "--exclude a b c" downloaded nothing at all on 2026-10-15 ("Fetching 0 files").
-"$cli" download "$IC_MODEL" --exclude '*.gguf' --exclude '*.pth' --exclude 'original/*'
+"${cli[@]}" download "$IC_MODEL" --exclude '*.gguf' --exclude '*.pth' --exclude 'original/*'
 # The detector loads its checkpoint with hf_hub_download, which finds it in this cache on the offline GPU node.
-[ -z "${IC_DET_REPO:-}" ] || "$cli" download "$IC_DET_REPO" "$IC_DET_FILE"
+[ -z "${IC_DET_REPO:-}" ] || "${cli[@]}" download "$IC_DET_REPO" "$IC_DET_FILE"
 du -sh "$HF_HOME"

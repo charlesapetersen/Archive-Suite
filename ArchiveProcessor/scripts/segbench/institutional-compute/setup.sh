@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # W41.farmshare-plan — one-time environment on a Slurm cluster login node (no GPU needed to install).
-#   bash setup.sh            # reads the cluster's limits, then builds the venv on scratch
+#   bash setup.sh            # reads the cluster's limits, then builds the venv on scratch (container
+#                            #   profiles: a venv over the image, in paths.environments)
 #   bash setup.sh --layout   # afterwards, for the glm-ocr preset: adds newspaper-ocr + DocLayout-YOLO to that venv
 # Writes: ./limits.env (from limits.py) and ./compute.env (paths every later step sources).
 set -euo pipefail
@@ -33,37 +34,55 @@ ROOT="$IC_ROOT"
 [ -d "$IC_SCRATCH" ] && [ -w "$IC_SCRATCH" ] || { echo "scratch is not writable: $IC_SCRATCH" >&2; exit 2; }
 mkdir -p "$ROOT"/{hf,runs,logs} "$IC_STORAGE"
 
-PY="$(command -v python3.12 || command -v python3.11 || command -v python3)"
-"$PY" -c 'import sys; assert (3, 10) <= sys.version_info[:2] <= (3, 13), sys.version' \
-  || { echo "need Python 3.10-3.13 for vLLM; try: module avail python"; exit 1; }
+export IC_CONTAINER_PYTHON=""
+if [ "$IC_CUDA_MODE" = container ]; then
+  # The image already holds vLLM, PyTorch and CUDA (pip wheels do not install on every cluster: Sherlock's CentOS 7
+  # glibc refuses them). Over it goes a --system-site-packages venv in paths.environments with only what the kit adds,
+  # every package the image has pinned at its version, so pip adds around vLLM or stops; it never swaps what the image
+  # carries. Run this where the cluster allows installs (Sherlock: inside a job, e.g. sh_dev), with no job using the venv.
+  configure_cluster_cuda
+  VENV="$IC_ENVIRONMENTS/venv"; mkdir -p "$IC_ENVIRONMENTS"
+  export IC_CONTAINER_PYTHON="$VENV/bin/python"
+  [ -e "$VENV/bin/python" ] || bin/container-run python3 -m venv --system-site-packages "$VENV"
+  pins="$IC_ENVIRONMENTS/image-pins.txt"
+  bin/container-run python3 -m pip freeze | grep -E '^[A-Za-z0-9._-]+==' > "$pins"
+  bin/container-python -m pip install -q -c "$pins" "huggingface_hub[cli]" -r ../ocr-panel-requirements.txt
+  PY_RUN="$PWD/bin/container-python" VLLM_RUN="$PWD/bin/container-vllm"
+else
+  PY="$(command -v python3.12 || command -v python3.11 || command -v python3)"
+  "$PY" -c 'import sys; assert (3, 10) <= sys.version_info[:2] <= (3, 13), sys.version' \
+    || { echo "need Python 3.10-3.13 for vLLM; try: module avail python"; exit 1; }
 
-if [ ! -x "$ROOT/venv/bin/python" ]; then
-  "$PY" -m venv "$ROOT/venv"
-fi
-"$ROOT/venv/bin/pip" install -q --upgrade pip
-# vLLM's wheel carries its own CUDA runtime; the node only needs the NVIDIA driver. Not pinned: the Qwen3.6
-# architecture needs a recent release. The version that ran is recorded in every run's summary (pip freeze).
-"$ROOT/venv/bin/pip" install -q "vllm${IC_VLLM_VERSION:+==$IC_VLLM_VERSION}" "huggingface_hub[cli]" \
-  -r ../ocr-panel-requirements.txt
+  if [ ! -x "$ROOT/venv/bin/python" ]; then
+    "$PY" -m venv "$ROOT/venv"
+  fi
+  "$ROOT/venv/bin/pip" install -q --upgrade pip
+  # vLLM's wheel carries its own CUDA runtime; the node only needs the NVIDIA driver. Not pinned: the Qwen3.6
+  # architecture needs a recent release. The version that ran is recorded in every run's summary (pip freeze).
+  "$ROOT/venv/bin/pip" install -q "vllm${IC_VLLM_VERSION:+==$IC_VLLM_VERSION}" "huggingface_hub[cli]" \
+    -r ../ocr-panel-requirements.txt
 
-# FlashInfer compiles kernels at start-up with the venv's own CUDA toolkit (job.sbatch points CUDA_HOME at it). pip
-# brought the 13.4 compiler (nvcc, crt and nvvm's cicc) beside torch's 13.0 runtime headers and ptxas, and the
-# compile stopped first at "CUDA compiler and CUDA toolkit headers are incompatible", then at "Unsupported .version
-# 9.4" (2026-10-15). Pin all three to torch's CUDA version. Do this with no job queued: a job that starts mid-swap
-# mixes the two versions.
-cu="$("$ROOT/venv/bin/python" -c 'import torch; print(torch.version.cuda or "")')"
-if [ "$IC_CUDA_MODE" = pip-toolkit ] && [ -n "$cu" ]; then
-  "$ROOT/venv/bin/pip" install -q "nvidia-cuda-nvcc==$cu.*" "nvidia-cuda-crt==$cu.*" "nvidia-nvvm==$cu.*"
+  # FlashInfer compiles kernels at start-up with the venv's own CUDA toolkit (job.sbatch points CUDA_HOME at it). pip
+  # brought the 13.4 compiler (nvcc, crt and nvvm's cicc) beside torch's 13.0 runtime headers and ptxas, and the
+  # compile stopped first at "CUDA compiler and CUDA toolkit headers are incompatible", then at "Unsupported .version
+  # 9.4" (2026-10-15). Pin all three to torch's CUDA version. Do this with no job queued: a job that starts mid-swap
+  # mixes the two versions.
+  cu="$("$ROOT/venv/bin/python" -c 'import torch; print(torch.version.cuda or "")')"
+  if [ "$IC_CUDA_MODE" = pip-toolkit ] && [ -n "$cu" ]; then
+    "$ROOT/venv/bin/pip" install -q "nvidia-cuda-nvcc==$cu.*" "nvidia-cuda-crt==$cu.*" "nvidia-nvvm==$cu.*"
+  fi
+
+  PY_RUN="$ROOT/venv/bin/python" VLLM_RUN="$ROOT/venv/bin/vllm"
 fi
 
 # Quote every assignment: cluster scratch/storage paths can contain spaces.
-IC_ROOT="$ROOT" HF_HOME="$ROOT/hf" IC_PY="$ROOT/venv/bin/python" IC_VLLM="$ROOT/venv/bin/vllm" \
+IC_ROOT="$ROOT" HF_HOME="$ROOT/hf" IC_PY="$PY_RUN" IC_VLLM="$VLLM_RUN" \
   python3 - "$IC_PROFILE" > compute.env <<'PYENV'
 import os, sys
 from profiles import load, shell
 values = load(sys.argv[1])
-values.update({k: os.environ[k] for k in ('IC_ROOT', 'HF_HOME', 'IC_PY', 'IC_VLLM')})
+values.update({k: os.environ[k] for k in ('IC_ROOT', 'HF_HOME', 'IC_PY', 'IC_VLLM', 'IC_CONTAINER_PYTHON')})
 print(shell(values), end='')
 PYENV
-"$ROOT/venv/bin/python" -c 'import vllm, sacrebleu, rapidfuzz, regex, PIL; print("vllm", vllm.__version__)'
+"$PY_RUN" -c 'import vllm, sacrebleu, rapidfuzz, regex, PIL; print("vllm", vllm.__version__)'
 echo "ready: $(cat compute.env | tr '\n' ' ')"

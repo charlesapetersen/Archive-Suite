@@ -4,6 +4,7 @@
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")}"
 : "${IC_ROOT:?source compute.env before submitting}" "${HF_HOME:?missing cache snapshot}"
+[ "${IC_CUDA_MODE:-}" != container ] || { echo "training is not containerised; on a container profile (Sherlock) train with ../sherlock/seg-adapt-lora (README)" >&2; exit 2; }
 source runtime.sh; load_cluster_modules
 export HF_HOME HF_HUB_OFFLINE=1 TOKENIZERS_PARALLELISM=false
 V="$IC_ROOT/train-venv/bin/python"

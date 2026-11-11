@@ -6,6 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source compute.env
+[ "${IC_CUDA_MODE:-}" != container ] || { echo "the news-layout venv is not containerised; on a container profile (Sherlock) news-layout is not offered (README)" >&2; exit 2; }
 source runtime.sh; load_cluster_modules
 NPO_COMMIT="${NPO_COMMIT:-1d5c878}"   # the newspaper-ocr commit measured on 2026-10-15
 if [ ! -d "$IC_ROOT/newspaper-ocr" ]; then

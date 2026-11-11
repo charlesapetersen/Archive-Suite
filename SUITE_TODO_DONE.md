@@ -15053,3 +15053,22 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   body path). Still to run in the VM: `NotesGUITests.testZoteroLinkPasteAttachesAndAutoFillSaysWhyItIsGreyed`
   (compiled only) → W40.fix-notes-zotero-paste-ui, blocked on W40.vm-macos27-notes. No rehearsal-cache scratch.
   <!-- /W40.fix-notes-zotero-paste -->
+- [x] **W46.kit-sherlock-profile — the kit's Sherlock profile and the containerised gate scorer [S]** · §Document processing review — W46 (lane: segbench) — SHIPPED 2026-11-11.
+  `institutional-compute/profiles/sherlock.json` beside `farmshare.json`: public `gpu` partition, no QOS or account
+  flag, cards by `--gpus=N --constraint=GPU_MEM:48GB|GPU_MEM:80GB` (L40S or H100; 48 GB budget), 2-day wall, the `gpu`
+  QOS's 16 GPUs and 100 submitted jobs (sherlock-access.md, 2026-10-22), 16 running jobs assumed (unpublished; setup
+  caps every figure to live Slurm), CPU partition `normal`, environments in `$GROUP_HOME`, job I/O in `$SCRATCH`.
+  `profiles.py` gains optional `gpu.request` (gres|gpus), `gpu.constraint` (feature names joined by | or &, validated),
+  `paths.environments`, and `runtime.cuda_mode = "container"` with `runtime.container` / `container_binds` /
+  `container_pythonpath` (the vLLM 0.31 cu129 image and its torchcodec shim). `scheduler.sh` asks by count and
+  constraint; `runtime.sh` checks Apptainer and the image instead of nvcc; `bin/container-run`, `container-python`
+  (IC_PY) and `container-vllm` (IC_VLLM) run inside the image; `setup.sh` builds a `--system-site-packages` venv over
+  the image with every image package pinned; `download.sh` uses the image's `hf`. The gate's scorer
+  (`train_seg.py check`, stdlib + numpy) runs as `"$IC_PY" train_seg.py check` and gives the same manifest as a direct
+  run. Training (`setup-train.sh`, `train.sbatch`) and the news-layout venv refuse a container profile (Sherlock
+  training stays `../sherlock/seg-adapt-lora/`). Tests (fake apptainer and sinfo, no cluster): the profile, unsafe
+  constraints and incomplete container settings refused, the Sherlock dry-run argv, setup's venv placement and pins,
+  the gate inside the container; 66 pass under the torch env (the Check tests need numpy; host python3 fails the same 11
+  as main). Not run on Sherlock: an engine session never contacts it; the owner's first setup there is the live check.
+  No rehearsal-cache scratch made. $0.
+  <!-- /W46.kit-sherlock-profile -->

@@ -531,6 +531,32 @@ class Estimate(unittest.TestCase):
             self.assertLess(fast, slow)
 
 
+SHERLOCK_ENV = {'SCRATCH': '/scratch/users/someone', 'GROUP_HOME': '/home/groups/somegroup', 'USER': 'someone'}
+FAKE_APPTAINER = r"""#!/bin/bash
+# Stands in for apptainer: records its argv, applies --env, then runs the command after the image here.
+printf '%s\n' "$*" >> "$IC_APPTAINER_LOG"
+[ "$1" = -s ] && shift; [ "$1" = exec ] && shift
+while [ "${1:-}" = --nv ] || [ "${1:-}" = --bind ] || [ "${1:-}" = --env ]; do
+  case "$1" in --nv) shift;; --bind) shift 2;; --env) export "$2"; shift 2;; esac
+done
+shift   # the image
+exec "$@"
+"""
+
+# What setup.sh asks of the image: venv creation runs for real; pip and the import check are recorded, never networked.
+INSIDE_IMAGE = r"""case "$*" in
+  *"-m pip freeze"*) echo vllm==0.31.0; echo torch==2.13.0; exit 0;;
+  *"-m pip install"*|*" -c import vllm"*) printf 'inner %s\n' "$*" >> "$IC_APPTAINER_LOG"; exit 0;;
+esac
+exec "$@"
+"""
+
+
+def fake_apptainer(bin_dir, body=FAKE_APPTAINER):
+    path = Path(bin_dir) / 'apptainer'; path.write_text(body); path.chmod(0o755)
+    return path
+
+
 class Profiles(unittest.TestCase):
     def test_profiles_keep_identity_scheduler_runtime_and_paths_together(self):
         farm = C.load('farmshare'); other = C.load('example-university')
@@ -665,6 +691,107 @@ class Profiles(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(Path(env['IC_MODULE_LOG']).read_text().splitlines(),
                              ['load python/3.12', 'load cuda/13.0'])
+
+    def test_sherlock_profile_asks_by_count_and_feature_and_runs_in_the_image(self):
+        with unittest.mock.patch.dict(os.environ, SHERLOCK_ENV):
+            sh = C.load('sherlock')
+        self.assertEqual((sh['CLUSTER_NAME'], sh['IC_PARTITION'], sh['IC_QOS'], sh['IC_ACCOUNT']),
+                         ('Stanford Sherlock', 'gpu', '', ''))
+        self.assertEqual((sh['IC_GPU_REQUEST'], sh['IC_GPU_CONSTRAINT'], sh['IC_GPU_GRES_TYPE']),
+                         ('gpus', 'GPU_MEM:48GB|GPU_MEM:80GB', ''))
+        # The constraint's smallest card sets the memory budget; the gpu QOS's figures (sherlock-access.md).
+        self.assertEqual((sh['IC_GPU_MEMORY_GB'], sh['IC_MAXGPU_PU'], sh['IC_MAXSUBMIT_PU'], sh['IC_MAXWALL_MIN']),
+                         (48, 16, 100, 2880))
+        self.assertEqual(sh['IC_CUDA_MODE'], 'container')
+        self.assertEqual(sh['IC_CONTAINER'], '/home/groups/somegroup/someone/images/vllm-0.31.0-cu129.sif')
+        self.assertEqual(sh['IC_CONTAINER_BINDS'], '/scratch/users/someone,/home/groups/somegroup')
+        self.assertEqual(sh['IC_CONTAINER_PYTHONPATH'], '/home/groups/somegroup/someone/images/pyshim')
+        # Environments in $GROUP_HOME, job I/O in purged $SCRATCH (Sherlock's rules).
+        self.assertEqual(sh['IC_ENVIRONMENTS'], '/home/groups/somegroup/someone/envs/institutional-compute')
+        self.assertEqual(sh['IC_ROOT'], '/scratch/users/someone/institutional-compute')
+        self.assertEqual(sh['IC_CPU_PARTITION'], 'normal')
+        # The other profiles keep the gres request, no container and environments on scratch.
+        farm = C.load('farmshare')
+        self.assertEqual((farm['IC_GPU_REQUEST'], farm['IC_GPU_CONSTRAINT'], farm['IC_CONTAINER']), ('gres', '', ''))
+        self.assertEqual(farm['IC_ENVIRONMENTS'], farm['IC_ROOT'])
+
+    def test_rejects_unsafe_constraints_and_incomplete_container_settings(self):
+        original = json.loads((HERE / 'profiles/sherlock.json').read_text())
+        bad = [('gpu', 'constraint', 'GPU_MEM:48GB;touch /tmp/x'), ('gpu', 'constraint', '[GPU_MEM:48GB*2]'),
+               ('gpu', 'request', 'gpu-count'), ('gpu', 'gres_type', 'l40s'),
+               ('runtime', 'container', ''), ('runtime', 'container', 'relative/image.sif'),
+               ('runtime', 'container_binds', ['/a,/b']), ('runtime', 'container_binds', '/scratch'),
+               ('runtime', 'container_pythonpath', ['/a:/b']), ('paths', 'environments', 'relative')]
+        with tempfile.TemporaryDirectory() as d, unittest.mock.patch.dict(os.environ, SHERLOCK_ENV):
+            path = Path(d) / 'profile.json'
+            path.write_text(json.dumps(original)); C.load(path)
+            for section, field, value in bad:
+                data = json.loads(json.dumps(original)); data[section][field] = value
+                path.write_text(json.dumps(data))
+                with self.assertRaises(ValueError, msg=f'{section}.{field}={value!r}'): C.load(path)
+            data = json.loads(json.dumps(original)); data['runtime']['cuda_mode'] = 'modules'
+            path.write_text(json.dumps(data))
+            with self.assertRaises(ValueError): C.load(path)   # container settings without container mode
+
+    def test_sherlock_dry_run_requests_gpus_by_feature_without_gres_qos_or_account(self):
+        with tempfile.TemporaryDirectory(prefix='sherlock dry run ') as d:
+            kit = Path(d) / 'kit'; shutil.copytree(HERE, kit)
+            for name in ('compute.env', 'limits.env'):
+                (kit / name).unlink(missing_ok=True)
+            env = dict(os.environ, **SHERLOCK_ENV)
+            result = subprocess.run(['bash', str(kit / 'submit.sh'), '--profile', 'sherlock', 'news', 'auto',
+                                     '--dry-run'], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('cluster=Stanford Sherlock', result.stdout)
+            self.assertIn('48 GB/card', result.stdout)
+            argv = shlex.split(result.stdout.splitlines()[-1])
+            self.assertIn('--partition=gpu', argv)
+            self.assertIn('--gpus=1', argv)
+            self.assertIn('--constraint=GPU_MEM:48GB|GPU_MEM:80GB', argv)
+            self.assertFalse([a for a in argv if a.startswith(('--gres', '--qos', '--account'))], argv)
+
+    def test_container_setup_builds_the_venv_over_the_image_in_environments(self):
+        with tempfile.TemporaryDirectory(prefix='container setup ') as d:
+            d = Path(d); kit = d / 'kit'; shutil.copytree(HERE, kit)
+            for name in ('compute.env', 'limits.env'):
+                (kit / name).unlink(missing_ok=True)
+            image = d / 'images' / 'vllm.sif'; image.parent.mkdir(); image.write_text('not an image')
+            data = json.loads((HERE / 'profiles/sherlock.json').read_text())
+            data['runtime'].update(container=str(image), container_binds=[str(d)], container_pythonpath=[str(d / 'shim')])
+            data['paths'] = {'scratch': str(d / 'scratch'), 'storage': str(d / 'storage'),
+                             'environments': str(d / 'envs')}
+            (d / 'scratch').mkdir()
+            profile = d / 'sherlock-test.json'; profile.write_text(json.dumps(data))
+            fake = d / 'bin'; fake.mkdir()
+            (fake / 'sinfo').write_text("#!/bin/bash\necho 'gpu|gpu:4|2-00:00:00|8'\necho 'normal*|(null)|2-00:00:00|100'\n")
+            (fake / 'sinfo').chmod(0o755)
+            fake_apptainer(fake, FAKE_APPTAINER.replace('exec "$@"', INSIDE_IMAGE))
+            log = d / 'apptainer.log'
+            env = dict(os.environ, PATH=str(fake) + os.pathsep + os.environ['PATH'], IC_APPTAINER_LOG=str(log))
+            result = subprocess.run(['bash', str(kit / 'setup.sh'), '--profile', str(profile)], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            venv = d / 'envs' / 'venv'
+            self.assertTrue((venv / 'pyvenv.cfg').is_file())
+            self.assertIn('include-system-site-packages = true', (venv / 'pyvenv.cfg').read_text())
+            self.assertFalse((d / 'scratch' / 'institutional-compute' / 'venv').exists())
+            self.assertEqual((d / 'envs' / 'image-pins.txt').read_text(), 'vllm==0.31.0\ntorch==2.13.0\n')
+            calls = log.read_text()
+            self.assertIn(f'-m pip install -q -c {d / "envs" / "image-pins.txt"} huggingface_hub[cli] -r', calls)
+            self.assertIn(f'--bind {d} --env PYTHONPATH={d / "shim"} {image}', calls)
+            env_file = (kit / 'compute.env').read_text()
+            self.assertIn(f"export IC_PY={shlex.quote(str(kit / 'bin' / 'container-python'))}", env_file)
+            self.assertIn(f"export IC_VLLM={shlex.quote(str(kit / 'bin' / 'container-vllm'))}", env_file)
+            self.assertIn(f"export IC_CONTAINER_PYTHON={shlex.quote(str(venv / 'bin' / 'python'))}", env_file)
+            self.assertIn("export IC_GPU_REQUEST=gpus", env_file)
+            caps = (kit / 'limits.env').read_text()   # no QOS named: the partition's node size and the profile's caps
+            self.assertIn('export IC_GPUS_PER_NODE=4', caps); self.assertIn('export IC_MAXGPU_PU=16', caps)
+            # Training and the layout venv are not containerised: they refuse rather than build on the host.
+            for script in ('setup-train.sh', 'setup-layout.sh'):
+                r = subprocess.run(['bash', '-c', f'source compute.env; bash {script}'], cwd=kit, env=env,
+                                   capture_output=True, text=True)
+                self.assertEqual(r.returncode, 2, r.stderr)
+                self.assertIn('not containerised', r.stderr)
 
     def test_memory_budgets_select_power_of_two_tensor_parallel_sizes(self):
         result = subprocess.run(['bash', '-c', f'source "{HERE}/models.sh"; '
@@ -1167,7 +1294,7 @@ class Check(unittest.TestCase):
             text += cls.answer(f"F{f}", list(range(1, k + 2)), set())
         return labels, text
 
-    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=(), fill=FILL, runs=2, second=None):
+    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=(), fill=FILL, runs=2, second=None, py=None, env=None):
         """Shipped and ``runs`` candidate runs; ``second`` gives run 2's (held, anchor) calls when they differ."""
         truth = {"box": "Anchor", "pages": [{"n": n, "label": "New" if n in (1, 3, 5) else "Cont"} for n in range(1, 7)],
                  "unsure": [{"id": f"u{n}", "left": n - 1, "right": n} for n in unsure]}
@@ -1184,10 +1311,33 @@ class Check(unittest.TestCase):
             (d / "answers.jsonl").write_text(self.answer("f1", [1, 2, 3, 4], held) + ftext
                                              + (self.answer("Anchor", list(range(1, 7)), anchor) if anchor is not None else ""))
         cand = [x for i in range(runs) for x in ("--run", f"cand={tmp / f'cand{i + 1}'}")]
-        return subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
+        return subprocess.run([*(py or [sys.executable]), str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
                                *cand, "--candidate", "cand", "--anchor-truth",
                                str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
-                               "--out", str(tmp / "m.json"), *extra], capture_output=True, text=True)
+                               "--out", str(tmp / "m.json"), *extra], capture_output=True, text=True, env=env)
+
+    @unittest.skipUnless(NUMPY, 'the scorer imports the bench (numpy)')
+    def test_the_gate_scores_inside_the_container(self):
+        """W46.kit-sherlock-profile: on a container profile the gate's scorer is IC_PY, bin/container-python, which runs
+        the venv over the image inside it. The same answers give the same verdict and figures as a direct run."""
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t); fake = tmp / 'bin'; fake.mkdir(); fake_apptainer(fake)
+            direct = self.run_check(tmp, {2}, {4})
+            self.assertEqual(direct.returncode, 1, direct.stderr)
+            want = json.loads((tmp / "m.json").read_text()); (tmp / "m.json").unlink()
+            log = tmp / 'apptainer.log'
+            env = dict(os.environ, PATH=str(fake) + os.pathsep + os.environ['PATH'], IC_APPTAINER_LOG=str(log),
+                       IC_CONTAINER='/groups/g/images/vllm.sif', IC_CONTAINER_BINDS='/scratch/u,/groups/g',
+                       IC_CONTAINER_PYTHONPATH='/groups/g/images/pyshim', IC_CONTAINER_PYTHON=sys.executable)
+            inside = self.run_check(tmp, {2}, {4}, py=[str(HERE / 'bin' / 'container-python')], env=env)
+            self.assertEqual(inside.returncode, 1, inside.stderr)
+            got = json.loads((tmp / "m.json").read_text())
+            for m in (want, got):
+                m.pop("made")
+            self.assertEqual(got, want)
+            self.assertTrue(log.read_text().startswith('-s exec --nv --bind /scratch/u,/groups/g --env '
+                                                       'PYTHONPATH=/groups/g/images/pyshim /groups/g/images/vllm.sif '
+                                                       f'{sys.executable} {HERE / "train_seg.py"} check '))
 
     def test_manifest_scores_and_gate(self):
         with tempfile.TemporaryDirectory() as t:

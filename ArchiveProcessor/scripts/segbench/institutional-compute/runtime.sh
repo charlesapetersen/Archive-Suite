@@ -7,6 +7,12 @@ load_cluster_modules() {
   fi
 }
 configure_cluster_cuda() {
+  if [ "$IC_CUDA_MODE" = container ]; then
+    # The image carries CUDA, PyTorch and vLLM; the node needs only the driver and Apptainer (bin/container-run).
+    command -v apptainer >/dev/null 2>&1 || { echo 'profile requires Apptainer on this node' >&2; return 1; }
+    [ -f "$IC_CONTAINER" ] || { echo "container image missing: $IC_CONTAINER" >&2; return 1; }
+    return 0
+  fi
   if [ "$IC_CUDA_MODE" = modules ]; then
     [ -z "$IC_CUDA_HOME" ] || export CUDA_HOME="$IC_CUDA_HOME" PATH="$IC_CUDA_HOME/bin:$PATH"
   else

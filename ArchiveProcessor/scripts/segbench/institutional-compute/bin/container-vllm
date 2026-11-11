@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# The kit's IC_VLLM in container mode: the image's own vllm, which needs nothing from the venv over it.
+set -euo pipefail
+exec "$(dirname "${BASH_SOURCE[0]}")/container-run" vllm "$@"
