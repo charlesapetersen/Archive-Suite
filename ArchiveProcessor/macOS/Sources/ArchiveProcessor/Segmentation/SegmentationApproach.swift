@@ -33,8 +33,9 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     }
 
     /// The approach to start a user on who has saved no choice (W41.app-seg-default). Gemini 3.8 Flash only
-    /// was the best measured approach (W41.report §3: 88.8% of pages right unchecked, 24 checks per 100 pages,
-    /// none wrong after checking, $3.61 per 1,000 pages), so it is the start whenever its key is set.
+    /// was the best measured approach (segbench-results/options.md, owner's test boxes after the rescore: 87.3%
+    /// of pages right unchecked, 24.2 checks per 100 pages, 98.5% right after checking with 2 unflagged errors,
+    /// $3.61 per 1,000 pages), so it is the start whenever its key is set.
     static func preferredDefault(_ routes: SegmentationRoutes) -> SegmentationApproach {
         routes.hasGeminiKey ? .gemini : defaultApproach
     }

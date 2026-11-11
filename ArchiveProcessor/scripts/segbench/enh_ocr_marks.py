@@ -347,8 +347,10 @@ def report(saved=False):
           'transcribed the marks here. Rough boxes include print where a mark touches it (the clear-of-print '
           'subset is the purer figure). DocRes appearance and deshadow were not run: they need a cluster GPU, '
           'neither helped any reader in W46.enh-ocr-input and the app ships no enhancement, so their marks arm '
-          'decides nothing now and is filed behind W46.nice-to-have (W46.enh-ocr-input-marks-docres). Gemini on '
-          'the enhanced images (W46.enh-ocr-input-paid) is untouched.', '']
+          'decides nothing now and is filed behind W46.nice-to-have (W46.enh-ocr-input-marks-docres). Gemini 3.7 '
+          'Flash has read the enhanced images since (W46.enh-ocr-input-paid, `enh-ocr-input.md` '
+          '§gemini3.7-flash-gw: no arm helps it, shading and SBB hurt), but that measures its text, not the '
+          "marks' ink, so it changes nothing here.", '']
     REPORT.write_text('\n'.join(L) + '\n')
     print('->', REPORT, DATA)
 

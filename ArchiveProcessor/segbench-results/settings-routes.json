@@ -10884,7 +10884,7 @@
      },
      "caveats": [
       "323 MB download",
-      "weights licence unsettled: CC BY-NC (kind-atrium.md §7) against MIT (K-kinds §8); item 'look up ATRIUM's weight licence'",
+      "weights and dataset CC BY-NC 4.0, code MIT (model card and repository README, checked 2026-11-11; kind-atrium.md §7): measurement only",
       "right where ours is wrong on 3 pages, the reverse on 19 (p 0.000855)"
      ],
      "kind_rules": [],

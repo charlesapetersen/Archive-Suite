@@ -11,7 +11,7 @@ import Foundation
 ///
 /// The optional second trigger (`onDisagreement`, off by default) also escalates a page whose word count and
 /// Apple Vision's differ by more than `disagreementRatio`. Vision runs on the Mac and costs nothing. The signal
-/// ranks poor readings well (AUC 0.78-0.89 against Vision's count, §5), but its gain over failure-only escalation
+/// ranks poor readings well (AUC 0.76-0.88 against Vision's count, difficulty.md §5), but its gain over failure-only escalation
 /// was not consistent on unseen pages, so it stays off until a larger test.
 ///
 /// Applies on the direct-provider path, and on a gateway that is a model on this Mac (W41.app-local-models: its

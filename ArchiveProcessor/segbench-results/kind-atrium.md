@@ -156,7 +156,7 @@ One process on mps, batches of 16, torch 2.15.0; model load 1.8 s. Peak resident
 | the 895 | 895 | 0.110 | 0.032 | 0.077 |
 | the 2,000 | 2000 | 0.063 | 0.032 | 0.032 |
 
-The shipped classifier, for comparison: about 0.6 s a page (Vision text lines, document request and feature print; `kind-classifier.md` §5), with no download. ATRIUM's weights are a 323 MB download (CC BY-NC). Vision signals for the shipped classifier on the 895 took 538 s (0.60 s a page). The 2,895-page pass took minutes on the Mac, so it needs no cluster.
+The shipped classifier, for comparison: about 0.6 s a page (Vision text lines, document request and feature print; `kind-classifier.md` §5), with no download. ATRIUM's weights are a 323 MB download (CC BY-NC 4.0, as is the training dataset; the code is MIT: the `ufal/vit-historical-page` model card and the `ufal/atrium-page-classification` README, checked 2026-11-11). Vision signals for the shipped classifier on the 895 took 538 s (0.60 s a page). The 2,895-page pass took minutes on the Mac, so it needs no cluster.
 
 ## Measurement card
 

@@ -661,7 +661,8 @@ def report():
         L.append(f'| {label} | {r["pages"]} | {r["s_page"]:.3f} | {r["model_s_page_median"]:.3f} | {r["decode_s_page"]:.3f} |')
     L.append('\nThe shipped classifier, for comparison: about 0.6 s a page (Vision text lines, document request and '
              'feature print; `kind-classifier.md` §5), with no download. ATRIUM\'s weights are a 323 MB download '
-             f'(CC BY-NC). Vision signals for the shipped classifier on the 895 took {run_info.get("public_signals_s", float("nan")):.0f} s '
+             '(CC BY-NC 4.0, as is the training dataset; the code is MIT: the `ufal/vit-historical-page` model card and the `ufal/atrium-page-classification` README, checked 2026-11-11). '
+             f'Vision signals for the shipped classifier on the 895 took {run_info.get("public_signals_s", float("nan")):.0f} s '
              f'({run_info.get("public_signals_s", float("nan")) / 895:.2f} s a page). The 2,895-page pass took minutes on the Mac, so it needs no cluster.\n')
     # ---- the verdict, put after the title -------------------------------------------------------------------
     h = {r['method']: r for r in J['k144_hand']}

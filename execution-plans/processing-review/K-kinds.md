@@ -137,7 +137,7 @@ Nothing open does the same by hand (typed against handwritten) out of the box.
 | 3 | same | Zero-shot CLIP fails; fine-tuned CLIP matches | zero-shot mean 35.69, best 50.08 (ViT-B/32); fine-tuned ViT-B/16 99.14 | 7 epochs | M | §5 CLIP |
 | 4 | same | Mixed pages confuse with typewritten | EfficientNet-S TEXT 85% with 13% to TEXT_T; RegNetY-16GF TEXT 94%; DiT-Large TEXT 91% | | M | §5.3.1 |
 | 5 | same | Handwriting on forms is where the classifier hesitates | top-1 under 0.9: LINE_HW 56.5% (Brno) / 35.2% (Prague); TEXT_HW 43.3 / 23.6; LINE_T 45.2 / 20.3; TEXT_T 24.6 / 21.5; TEXT_P 16.4 / 10.8; LINE_P 16.0 / 7.9; all pages 17.2 / 14.0 | 629,978 + 651,159 unlabelled pages | M | Table 5.5 |
-| 6 | ÚFAL README, HF card | Sizes, licences, runtime | params 48-305M, 224-384 px, 213 MB-1.2 GB; code MIT; weights MIT; dataset "Public Domain" on the card, "CC BY-NC 4.0" in the README; CPU "slow", 2 GB at batch 4; no latency figure | transformers 4.x only for the timm models | M (licence conflict ?) | README; card |
+| 6 | ÚFAL README, HF card | Sizes, licences, runtime | params 48-305M, 224-384 px, 213 MB-1.2 GB; code MIT; weights and dataset CC BY-NC 4.0 (card and README, rechecked 2026-11-11; earlier read as weights MIT, dataset Public Domain on the card); CPU "slow", 2 GB at batch 4; no latency figure | transformers 4.x only for the timm models | M | README; card |
 | 7 | Vafaie ARCHIVING 2022 | The material and the synthetic set | 150 colour scans + 153 microfilm documents (hand-filled forms, typewritten certificates, testimonials); region crops 117 handwritten + 320 printed (microfilm), 202 + 447 (colour); 3,764 synthetic 256x256 crops, three labels | post-1945 Baden-Württemberg reparation files | M | §WGM-SYN |
 | 8 | same | Pixel IoU on WGM-SYN test crops | WGM-MOD printed 0.42, handwritten 0.36, background 0.74, mean 0.50 (0.49 with CRF); FCN-light 0.24 / 0.26 / 0.72 / 0.41 | 429 test crops; FCN-8 variant, 294,952 params, 50 epochs | M | Table 1 |
 | 9 | same | OCR on the separated printed layer | mean OCR (flexible character accuracy, Transkribus print model) FCN-light 0.588, +CRF 0.465, WGM-MOD 0.672, +CRF 0.723 | 30 real documents, truth by archivists | M | Table 2 |
@@ -175,7 +175,7 @@ Nothing open does the same by hand (typed against handwritten) out of the box.
 
 | Item | Code | Weights or data | Licence | Mac-runnable | Cluster needs |
 |---|---|---|---|---|---|
-| ÚFAL ATRIUM classifier | github ufal/atrium-page-classification, MIT | HF `ufal/vit-historical-page` (EfficientNetV2-S/M, ViT-B 224/384, RegNetY-16GF, ViT-L/384; 213 MB-1.2 GB) | code and weights MIT [M]; dataset Public Domain (card) or CC BY-NC 4.0 (README) [?], LINDAT handle 20.500.12800/1-6184 (unreachable 2026-10-21) | yes: torch CPU or MPS, 48-87M params at 224-384 px; the README calls CPU slow but gives no figure; a 87M ViT at 384 px is of the order of our detectors (0.4-0.5 s a page) [I] | none; a fine-tune on our pages is minutes on one GPU [I] |
+| ÚFAL ATRIUM classifier | github ufal/atrium-page-classification, MIT | HF `ufal/vit-historical-page` (EfficientNetV2-S/M, ViT-B 224/384, RegNetY-16GF, ViT-L/384; 213 MB-1.2 GB) | code MIT, weights and dataset CC BY-NC 4.0 [M, checked 2026-11-11 (W46.stale-figures)], LINDAT handle 20.500.12800/1-6184 (unreachable 2026-10-21) | yes: torch CPU or MPS, 48-87M params at 224-384 px; the README calls CPU slow but gives no figure; a 87M ViT at 384 px is of the order of our detectors (0.4-0.5 s a page) [I] | none; a fine-tune on our pages is minutes on one GPU [I] |
 | WGM-SYN and WGM-MOD (FIZ) | github ISE-FIZKarlsruhe/Wiedergutmachung, MIT | `wgm_mixed.h5`, WGM-SYN train/test crops in the repository [M README]; real pages not released | MIT [M] | yes: Keras FCN-8 of 295K params | none |
 | SignaTR6K | none | 6,257 crops by request form | licence unnamed [M] | n/a | n/a |
 | AnnotationDB_1 (1804.00236) | none | tc11.cvc.uab.es/datasets/AnnotationDB_1: 50 pages, PAGE and PNG | unstated [M] | data only | none |
@@ -264,7 +264,7 @@ evidence supports is a document prior used only below the confidence floor [I].
 
 - ATRIUM: borrow the model as a second opinion on every page we have (144, 96, 895, 2,000 bulk-pilot pages), and
   its eleven-class scheme as the vocabulary for our labels (`TEXT` for mixed, `LINE_*` for forms by hand). Its
-  dataset is measurement-only until the licence conflict is resolved. It does not replace our test because it has
+  weights and dataset are non-commercial (CC BY-NC 4.0), so measurement only. It does not replace our test because it has
   no photographs.
 - WGM-SYN's synthesis pipeline (MIT): borrow it to make typed-plus-handwritten crops from our own pages for a
   region or line classifier; do not borrow its model (IoU 0.50).
@@ -392,8 +392,8 @@ in the same item (owner, 2026-10-20). Prices use the bench's measured $0.0042 a 
 
 ## 8. Open questions
 
-- ATRIUM's dataset licence: the Hugging Face card says Public Domain, the README says CC BY-NC 4.0, and the LINDAT
-  record did not load. The weights are MIT either way; the data is measurement-only until the record is read.
+- ATRIUM's licence, settled: checked 2026-11-11 (W46.stale-figures): the HF card (license cc-by-nc-4.0, modified 2026-11-09) and the GitHub README both say the fine-tuned weights and the dataset are CC BY-NC 4.0, the code MIT. So
+  the weights as well as the data are non-commercial, and measurement-only for this project.
 - No published page classifier has been run on phone photographs, and no published pixel or region separator has
   been run on them either; every figure above is on scans or microfilm.
 - Whether p009's failure is a mixed-page failure or a photograph-of-a-photograph failure (Vision called it a
@@ -415,7 +415,7 @@ in the same item (owner, 2026-10-20). Prices use the bench's measured $0.0042 a 
 | Route | Best candidate(s) for kind and mixed pages | Evidence | Licence on this route | Settling test |
 |---|---|---|---|---|
 | R1 Mac built-in (Vision, Core ML, Foundation Models) | Our Vision-signal + feature-print regressions for page kind (shipped, off by default); per-line kind from Vision line boxes with ink periodicity and feature print; the lab's sorter for newspaper/handwriting; no handwriting attribute in Vision's own API found | 139/144 hand, 13/14 forms, 0.6 s a page [M, claim 28]; Vision finds 78% of handwritten lines [M, claim 37]; per-line signals unmeasured | Apple terms; ours | tests 1, 4, 5 |
-| R2 Mac open weights, 16 GB | ATRIUM ViT-B/384 or RegNetY-16GF (87M, 345 MB) for page kind beside ours; a Core ML YOLO11 marks-and-kind detector (test 6); readers by region: GLM-OCR 8-bit on typed regions, LightOnOCR-3 4B on handwritten regions | ATRIUM 99.1% on scans [M, claim 2], unmeasured on photos; LightOnOCR-3 4B 89.67 on handwritten pages [M, claim 38]; GLM-OCR 59.7 on L4 whole [M, claim 35] | MIT weights; Apache-2.0 readers | tests 1, 3, 6 |
+| R2 Mac open weights, 16 GB | ATRIUM ViT-B/384 or RegNetY-16GF (87M, 345 MB) for page kind beside ours; a Core ML YOLO11 marks-and-kind detector (test 6); readers by region: GLM-OCR 8-bit on typed regions, LightOnOCR-3 4B on handwritten regions | ATRIUM 99.1% on scans [M, claim 2], unmeasured on photos; LightOnOCR-3 4B 89.67 on handwritten pages [M, claim 38]; GLM-OCR 59.7 on L4 whole [M, claim 35] | ATRIUM weights CC BY-NC 4.0 (measurement only); Apache-2.0 readers | tests 1, 3, 6 |
 | R2 Mac open weights, 32-64 GB+ | the same classifier and detector; Qwen3.6 27B whole page for typed and mixed pages, handwritten regions to it as well or to Gemini if a key exists | Qwen3.6 27B 92.15 on handwritten pages, 69.3 on L4 [M, claims 35, 38]; its own kind label 86/95 [M, claim 32] | Apache-2.0 | test 3 |
 | R3 cheap API (OpenRouter) | kind from the Mac (R1 or ATRIUM), not from the model; typed regions to the cheap model, handwritten regions to Gemini 3.8 Flash; the model's own label kept as a second-read trigger only | cheap readers' labels 64-83/96 [M, claim 32]; label routing no gain [M, claim 33]; Qwen3-VL 235B leads Gemini by nothing on the 96 but trails 18.7 on the 440 [M, bench README] | Apache-2.0 classifier; API terms | tests 3, 7 |
 | R4 premium API (Gemini, Claude, OpenAI, Mistral; batch) | whole page; the detector runs for marks and placement only; inline region tags in the prompt (test 7) as the second stream | routing by true kind +0.8 over the best single reader [M, claim 29]; mixed form 0.85 field accuracy for Gemini 3.1 Pro and GPT 5.4 [M, claim 15]; p031 0.99, p009 0.55-0.66 [M, claim 31] | API terms | tests 3 (paid arm), 7 |
