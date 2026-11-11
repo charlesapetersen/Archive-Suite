@@ -644,7 +644,7 @@ private struct NoteInspectorPanel: View {
                     TemplateInspector(model: nav.model, template: template)
                         .padding(.trailing, scrollerTrailing)
                 }
-            } else if nav.paneMode == .notes, nav.selection.isEmpty, !nav.detailSwitchPending,
+            } else if nav.paneMode == .notes, nav.selection.isEmpty,
                       let folder = selectedFolder {
                 // With no note selected, the folder's template, where a user looks for it (notes-2 row 18).
                 ScrollView {

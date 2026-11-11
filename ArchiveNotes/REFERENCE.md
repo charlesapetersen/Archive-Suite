@@ -325,7 +325,14 @@ macOS/Sources/ArchiveNotes/
                                    selecting a template opens its body in the detail editor, which
                                    autosaves it (W9.d3). A name is edited in its row (Return, double-click,
                                    Rename…); File ▸ New Template… opens its New sheet through
-                                   nav.newTemplateRequested (W40.fix-notes-templates)
+                                   nav.newTemplateRequested (W40.fix-notes-templates); its row menu has
+                                   Assign to Folder ▸ (W40.fix-notes-template-fields)
+    TemplateInspector.swift        The inspector in templates mode: the selected template's folders (list,
+                                   remove, Assign to Folder ▸ = TemplateFolderMenu) and the fields its notes
+                                   start with (date + uncertain, quality, tags as deltas, authors) via
+                                   NotesModel.setTemplate*/addTemplateTag; FolderTemplateInspector = the
+                                   selected folder's template picker when no note is selected
+                                   (W40.fix-notes-template-fields)
     NotesFolderTreeView.swift      Left pane — mutable id-keyed folder tree (recursive ForEach / per-level
                                    DisclosureGroup + two-way @State selection sync, Smart Folders / Folders
                                    sections, All Notes pseudo-row, context-menu create/rename/delete) (W6-S2).
@@ -558,7 +565,11 @@ macOS/Tests/ArchiveNotesTests/
                                    ancestor / blank / dangling-reported / dangling-fall-through / cycle),
                                    NoteStore template CRUD + no-leak + rename-on-save, NotesModel
                                    assign/effective-dangling/delete-clears-assignments/new-from-template/
-                                   blank-defaults-Inbox+Extracts/kind-filter
+                                   blank-defaults-Inbox+Extracts/kind-filter; template fields carry into a
+                                   new note, tag deltas, a tagged template's note mirrored to Finder (the
+                                   template file untagged), foldersAssigned (W40.fix-notes-template-fields)
+  TemplateInspectorRenderTests.swift  2 headless render guards: the template and folder inspectors draw,
+                                   seeded with the stored values (W40.fix-notes-template-fields)
   EditorBindingTests.swift         9 tests: TextKit 2, undo/find bar, raw-mode font, write-back
                                    flush, programmatic suppress, mode-switch undo-clear/text-preserve,
                                    lint (no .layoutManager in Editor/); serialization debounce/flush

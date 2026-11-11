@@ -90,6 +90,55 @@ final class TemplatesUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.fix-notes-template-fields (notes-2 row 18): with a template selected, the inspector offers its folders and
+    /// the fields its notes start with; a date typed there is saved in the template. Not yet run: Notes' VM UITests
+    /// wait for W40.vm-macos27-notes; the unit bundle's TemplateInspectorRenderTests cover the drawing meanwhile.
+    func testTemplateInspectorOffersFoldersAndSavesADate() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            XCTAssertTrue(mainWindow.waitForExistence(timeout: 10))
+            app.activate()
+            let fileMenu = app.menuBars.menuBarItems["File"]
+            XCTAssertTrue(fileMenu.waitForExistence(timeout: 10), "the File menu should exist")
+            fileMenu.click()
+            fileMenu.menuItems["New Template\u{2026}"].click()
+            let sheet = mainWindow.sheets.firstMatch
+            XCTAssertTrue(sheet.waitForExistence(timeout: 10), "New Template… should show the sheet")
+            let name = sheet.textFields.firstMatch
+            name.click()
+            name.typeKey("a", modifierFlags: .command)
+            name.typeText("Field Template")
+            sheet.buttons["Create"].click()
+
+            let dir = try XCTUnwrap(pollTemplateDir(containing: "Field Template"), "the template should be written")
+            let id = try XCTUnwrap(UUID(uuidString: dir.lastPathComponent)).uuidString
+            let row = mainWindow.descendants(matching: .any)["an.template.row.\(id)"].firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "the template should be listed")
+            row.click()
+
+            let inspector = mainWindow.descendants(matching: .any)["an.inspector"].firstMatch
+            XCTAssertTrue(inspector.waitForExistence(timeout: 10), "the inspector should be showing")
+            XCTAssertTrue(inspector.descendants(matching: .any)["an.template.folders.heading"].waitForExistence(timeout: 10),
+                          "the inspector should list the template's folders: \(inspector.debugDescription)")
+            XCTAssertTrue(inspector.descendants(matching: .any)["an.template.folders.assign"].exists,
+                          "and offer Assign to Folder")
+            let date = inspector.textFields["an.template.date.field"].firstMatch
+            XCTAssertTrue(date.waitForExistence(timeout: 5), "the template's date field should be there")
+            date.click()
+            date.typeText("1968")
+            app.typeKey(.return, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 10) { self.templateText(dir).contains("1968") },
+                          "the date should be saved in the template: \(templateText(dir))")
+            shot("inspector-fields")
+
+            // The manager's row menu assigns too.
+            row.rightClick()
+            XCTAssertTrue(app.menuItems["Assign to Folder"].firstMatch.waitForExistence(timeout: 5),
+                          "the row's menu should offer Assign to Folder")
+            app.typeKey(.escape, modifierFlags: [])
+        }
+    }
+
     // MARK: helpers
 
     private var templateRoot: URL {

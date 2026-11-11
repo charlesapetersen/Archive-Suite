@@ -859,10 +859,22 @@ final class NotesModel: ObservableObject {
         return await mutateTemplate(id, "set the template's quality") { $0.quality = canonical }
     }
 
+    /// Tag edits are deltas, as a note's are (`addTag`/`removeTag`): two quick edits, or two windows, cannot erase
+    /// each other through a stale list.
     @discardableResult
-    func setTemplateTags(_ tags: [String], for id: UUID) async -> Bool {
-        let tags = NotesTagVocabulary.normalizedSubjects(tags)
-        return await mutateTemplate(id, "set the template's tags") { $0.tags = tags }
+    func addTemplateTag(_ tag: String, to id: UUID) async -> Bool {
+        guard let tag = NotesTagVocabulary.normalizedSubjects([tag]).first else { return false }
+        return await mutateTemplate(id, "add the template's tag") {
+            $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags + [tag])
+        }
+    }
+
+    @discardableResult
+    func removeTemplateTag(_ tag: String, from id: UUID) async -> Bool {
+        guard let token = NotesTagVocabulary.normalizedSubjects([tag]).first else { return false }
+        return await mutateTemplate(id, "remove the template's tag") {
+            $0.tags = NotesTagVocabulary.normalizedSubjects($0.tags).filter { $0 != token }
+        }
     }
 
     @discardableResult
@@ -874,7 +886,8 @@ final class NotesModel: ObservableObject {
     /// One atomic fresh-load edit of a template's front matter, as `renameTemplate` does it (W23.h2).
     private func mutateTemplate(_ id: UUID, _ action: String,
                                 _ mutate: @Sendable (inout Item) -> Void) async -> Bool {
-        guard let noteStore else { return false }
+        // A field left with an edit as its template is deleted applies on disappearing; there is nothing to save to.
+        guard let noteStore, !deletedTemplateIDs.contains(id) else { return false }
         do {
             _ = try await noteStore.withTemplate(id) { item in
                 mutate(&item)
@@ -968,11 +981,15 @@ final class NotesModel: ObservableObject {
             // A template's tags are subjects like any note's: mirror them as the tag bar does, through the same
             // journalled transaction, so the new note's Finder tags match its front matter from the start
             // (W40.fix-notes-template-fields). A failed mirror keeps the journal; the next tag edit retries it.
+            // Its own catch: the note is already written, so a failure here must not leave it unfiled and unindexed.
             if !item.tags.isEmpty {
-                created = try await noteStore.withItem(item.id, projectSubjects: Self.projectSubjectTags) { _ in }
-                if let failure = created.subjectProjectionError {
-                    report(NoteStore.StoreError.writeFailed(failure), "project the note's tags (retry the tag edit)")
-                }
+                let action = "mirror the template's tags to the new note in Finder (edit its tags to retry)"
+                do {
+                    created = try await noteStore.withItem(item.id, projectSubjects: Self.projectSubjectTags) { _ in }
+                    if let failure = created.subjectProjectionError {
+                        report(NoteStore.StoreError.writeFailed(failure), action)
+                    }
+                } catch { report(error, action) }
             }
             let tx = try await reconcileFacetProjection(from: created, noteStore: noteStore)
             try await organization.addMembership(item: item.id, folder: target)

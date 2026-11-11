@@ -362,7 +362,9 @@ struct NotesModelTemplateTests {
         #expect(await env.model.setTemplateDate("1968-3", precision: .month, for: tid))
         #expect(await env.model.setTemplateDateUncertain(true, for: tid))
         #expect(await env.model.setTemplateQuality(2, for: tid))
-        #expect(await env.model.setTemplateTags(["labor", " ", "labor"], for: tid))
+        #expect(await env.model.addTemplateTag("labor", to: tid))
+        #expect(await env.model.addTemplateTag("labor", to: tid))      // already there: still one
+        #expect(await env.model.addTemplateTag(" ", to: tid) == false)  // blank: nothing written
         #expect(await env.model.setTemplateAuthors([" Ada Lovelace ", "", "C. Babbage"], for: tid))
 
         let stored = try await env.store.loadTemplate(tid)
@@ -380,6 +382,30 @@ struct NotesModelTemplateTests {
         let note = try await env.store.load(newID)
         #expect(note.date == "1968-03" && note.datePrecision == .month && note.dateUncertain)
         #expect(note.quality == 2 && note.tags == stored.tags && note.authors == stored.authors)
+    }
+
+    @Test("template tag edits are deltas: two adds made from one stale list both land, and a removal keeps the rest")
+    func templateTagDeltas() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "T", kind: .note))
+        // Both started before either saves, as two quick chip adds are.
+        async let a = env.model.addTemplateTag("alpha", to: tid)
+        async let b = env.model.addTemplateTag("beta", to: tid)
+        _ = await (a, b)
+        let both = try await env.store.loadTemplate(tid).tags
+        #expect(Set(both) == Set(NotesTagVocabulary.normalizedSubjects(["alpha", "beta"])))
+        await env.model.removeTemplateTag("alpha", from: tid)
+        #expect(try await env.store.loadTemplate(tid).tags == NotesTagVocabulary.normalizedSubjects(["beta"]))
+    }
+
+    @Test("a deleted template takes no field edit, and reports no error for one")
+    func deletedTemplateTakesNoEdit() async throws {
+        let env = try await makeEnv(); defer { Task { await cleanup(env) } }
+        let tid = try #require(await env.model.createTemplate(name: "Gone", kind: .note))
+        await env.model.deleteTemplate(tid)
+        env.model.statusMessage = nil
+        #expect(await env.model.setTemplateAuthors(["Someone"], for: tid) == false)
+        #expect(env.model.statusMessage == nil)
     }
 
     @Test("an out-of-range quality is unrated; clearing a template's date clears its uncertainty")
@@ -403,7 +429,8 @@ struct NotesModelTemplateTests {
     func newNoteFromTemplateMirrorsTags() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let tid = try #require(await env.model.createTemplate(name: "Tagged", kind: .note))
-        await env.model.setTemplateTags(["labor", "oral history"], for: tid)
+        await env.model.addTemplateTag("labor", to: tid)
+        await env.model.addTemplateTag("oral history", to: tid)
         await env.model.setTemplateDate("1968", precision: .year, for: tid)
         await env.model.setTemplateQuality(3, for: tid)
 

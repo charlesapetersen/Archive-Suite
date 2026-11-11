@@ -131,9 +131,16 @@ struct TemplateInspector: View {
     private var tagsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Tags").font(.subheadline)
+            // The field hands back the whole list; it is sent as the tags added and removed, so an edit made before
+            // the last one has saved is not lost (the list shown is the saved one).
             NoteTagChipsField(tags: Binding(get: { template.tags }, set: { tags in
-                                  let id = template.id
-                                  Task { await model.setTemplateTags(tags, for: id) }
+                                  let (id, old) = (template.id, template.tags)
+                                  let added = tags.filter { !old.contains($0) }
+                                  let removed = old.filter { !tags.contains($0) }
+                                  Task {
+                                      for tag in added { await model.addTemplateTag(tag, to: id) }
+                                      for tag in removed { await model.removeTemplateTag(tag, from: id) }
+                                  }
                               }),
                               draft: $tagDraft, placeholder: "Add tag…",
                               identifier: "an.template.tags.field", chipIdentifier: "an.template.tags.chip",
@@ -246,7 +253,7 @@ struct FolderTemplateInspector: View {
             .labelsHidden()
             .frame(maxWidth: 220)
             .accessibilityIdentifier("an.folder.inspector.template")
-            Text(note(own: own, effective: effective))
+            Text(Self.templateNote(own: own, effective: effective, hasTemplates: !model.templates.isEmpty))
                 .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("an.folder.inspector.template.note")
@@ -258,12 +265,13 @@ struct FolderTemplateInspector: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func note(own: UUID?, effective: Template?) -> String {
+    /// What New does in the folder, said under the picker.
+    static func templateNote(own: UUID?, effective: Template?, hasTemplates: Bool) -> String {
         if own != nil, let effective {
             return "New in this folder and its subfolders starts from “\(effective.name)”, unless a subfolder has its own."
         }
         if let effective { return "Inherited from a parent folder: New here starts from “\(effective.name)”." }
-        if model.templates.isEmpty { return "No templates yet. Make one, then choose it here." }
+        if !hasTemplates { return "No templates yet. Make one, then choose it here." }
         return "New in this folder starts blank. Choose a template to start each new note from it."
     }
 }
