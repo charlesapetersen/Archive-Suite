@@ -153,6 +153,19 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
             sheet.buttons["an.advanced.search"].click()   // "Save" while editing
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] },
                           "the edited smart folder should show the one egalitarian note, saw \(visibleNotes())")
+
+            // W40.fix-notes-clear-all-advanced: Clear All leaves an unsaved Advanced Search too.
+            mainWindow.buttons["an.filter.advanced"].click()
+            sheet = mainWindow.sheets.firstMatch
+            XCTAssertTrue(sheet.waitForExistence(timeout: 5))
+            sheet.buttons["an.advanced.search"].click()
+            let inEffect = mainWindow.descendants(matching: .any)["an.filter.chip.advancedSearch"].firstMatch
+            XCTAssertTrue(inEffect.waitForExistence(timeout: 10), "the In effect row should show the Advanced Search")
+            XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] })
+            shot("w40-notes-advanced-in-effect")
+            mainWindow.descendants(matching: .any)["an.filter.clear"].firstMatch.click()
+            XCTAssertTrue(pollUntil(timeout: 10) { !inEffect.exists && self.visibleNotes() == self.allNotes },
+                          "Clear All should leave the Advanced Search, saw \(visibleNotes())")
         }
     }
 

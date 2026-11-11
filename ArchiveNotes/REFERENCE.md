@@ -353,8 +353,10 @@ macOS/Sources/ArchiveNotes/
                                    bm25 relevance as-you-type) · quality ★1–★3 toggles · tag chips
                                    (all must match; Any is Advanced Search's) · year date range + its own
                                    clear · Advanced Search button · Save-as-Smart-Folder / Clear All (W6-S4,
-                                   W40.fix-notes-filter-bar); an "Advanced Search" row while the list is
-                                   an unsaved one (Edit… / Show All Notes)
+                                   W40.fix-notes-filter-bar); the Reader's In effect row of removable
+                                   chips (`Models/NotesActiveFilters.swift`), led by an unsaved Advanced
+                                   Search with Edit…; Clear All leaves that search too, a smart folder
+                                   stays (W40.fix-notes-clear-all-advanced)
     NotesAdvancedSearchSheet.swift The Advanced Search form: rule rows, live count, Search, Save as Smart
                                    Folder…, Edit Smart Folder… in place (W40.notes-advanced-search)
     NameEntrySheet.swift           The one "give it a name" sheet (folders, templates, smart folders):
