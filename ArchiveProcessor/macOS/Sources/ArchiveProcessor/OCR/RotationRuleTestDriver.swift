@@ -60,8 +60,8 @@ enum RotationRuleTestDriver {
                 == V(correction: 90, unsure: true))
         check("1 a disagreement takes the cloud's answer",
               await OCRProcessor.agreementVerdict(vision: 90, lcnet: 270, cloud: answers(180)) == V(correction: 180))
-        check("1 a failed cloud call falls back to Vision",
-              await OCRProcessor.agreementVerdict(vision: 90, lcnet: 270, cloud: answers(nil)) == V(correction: 90))
+        check("1 a failed cloud call falls back to Vision, unsure",
+              await OCRProcessor.agreementVerdict(vision: 90, lcnet: 270, cloud: answers(nil)) == V(correction: 90, unsure: true))
         check("1 a failed cloud call with Vision abstaining is unsure",
               await OCRProcessor.agreementVerdict(vision: nil, lcnet: 270, cloud: answers(nil)) == V(correction: 0, unsure: true))
 

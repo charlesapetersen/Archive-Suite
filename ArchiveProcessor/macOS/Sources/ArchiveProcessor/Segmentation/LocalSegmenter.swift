@@ -8,7 +8,7 @@ import Foundation
 ///
 /// What the bench says, and so what the chooser says: on the development boxes the 8-bit build put 90.3% of pages in
 /// the exact document unchecked (Gemini 3.8 Flash 90.7%), 18 s a seven-page window and a 4.4 GB peak on an 18 GB
-/// M3 Pro; on the locked test boxes (full precision) 78.8% against Gemini's 88.8%. Its confidences make no useful
+/// M3 Pro; on the locked test boxes (full precision) 80.3% against Gemini's 87.3%. Its confidences make no useful
 /// flag, so the review asks about most gaps: a first draft the user skims. It was trained on one owner's archives.
 enum LocalSegmenter {
     /// The voter's model id in `WindowVoter.catalog` and options.json: the build, not where it is downloaded from.
