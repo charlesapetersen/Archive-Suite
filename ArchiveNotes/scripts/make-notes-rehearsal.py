@@ -284,8 +284,9 @@ class Builder:
     def front_matter(self, iid: str, kind: str, title: str, created: dt.datetime, modified: dt.datetime):
         r = self.rng
         fm = ["---", "schema: 1", f"id: {iid}", f"kind: {kind}", f"title: {q(title)}"]
+        # Notes have no authors (W40.notes-remove-authors); the draws stay so the seeded store is otherwise the same.
         if r.random() < 0.7:
-            fm.append(f"authors: {flow(r.sample(AUTHORS, r.randint(1, 3)))}")
+            r.sample(AUTHORS, r.randint(1, 3))
         roll = r.random()
         if roll < 0.75:
             prec = r.choice(["decade", "year", "month", "day", "day", "year"])

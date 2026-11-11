@@ -23,8 +23,8 @@ per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read 
   **Quality has no such ledger:** `Q1`–`Q3` are always Notes-owned, so a hand-applied `Q` token that
   front-matter does not hold (and that is not also a subject) is replaced or removed on the note's next save
   (`W19.q4`). The retired `ArchiveSuite` stamp is stripped lazily, on a note's next projection, not at launch.
-  `authors` stay **front‑matter‑only**; an author facet remains a deferred owner decision. No Finder vocabulary
-  beyond the shared subject, Quality and date contract (overview decisions **D2/D4/D9**).
+  Notes have **no authors** (owner, notes-2 row 14, W40.notes-remove-authors): an `authors:` line in a file is an
+  unknown key, kept verbatim; a Zotero citation still carries Zotero's authors. No Finder vocabulary beyond the shared subject, Quality and date contract (overview decisions **D2/D4/D9**).
 - Test/scratch output goes to `mktemp` / `TESTOUT` — **never** the real store or corpus during dev/test.
 - **Full protocol:** [`GUI_SAFETY.md`](GUI_SAFETY.md) — authoritative for test file safety: the scratch-corpus
   rules (never drive the store picker; confirm scratch before any tag write) + the DEBUG scratch-write guard that

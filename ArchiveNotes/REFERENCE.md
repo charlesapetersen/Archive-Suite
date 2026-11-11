@@ -339,7 +339,7 @@ macOS/Sources/ArchiveNotes/
                                    Assign to Folder ▸ (W40.fix-notes-template-fields)
     TemplateInspector.swift        The inspector in templates mode: the selected template's folders (list,
                                    remove, Assign to Folder ▸ = TemplateFolderMenu) and the fields its notes
-                                   start with (date + uncertain, quality, tags as deltas, authors) via
+                                   start with (date + uncertain, quality, tags as deltas) via
                                    NotesModel.setTemplate*/addTemplateTag; FolderTemplateInspector = the
                                    selected folder's template picker when no note is selected
                                    (W40.fix-notes-template-fields)
@@ -448,7 +448,7 @@ macOS/Sources/ArchiveNotes/
                                    citation fetch, in-memory cache, injected ZoteroTransport (§D.3/D.4);
                                    URLSessionZoteroTransport has an init(session:) DI seam (W8-S5 tests)
     ZoteroCacheStore.swift         actor — disposable on-disk JSON cache for CSL metadata (§D.6)
-    ZoteroAutoFill.swift           CSL→front-matter mapping (authors/date+precision/title) +
+    ZoteroAutoFill.swift           CSL→front-matter mapping (date+precision/title; never authors) +
                                    AutoFillPlan (per-field diff, fill-empty default policy) (§D.4/D.5)
     ZoteroAutoFillModel.swift      @MainActor confirmation view-model + exact-one attached-reference
                                    resolver: per-field toggles; confirm delegates to NotesModel's atomic
@@ -685,7 +685,7 @@ macOS/Tests/ArchiveNotesTests/
                                    threading, buildInsertableBlock preview, reveal URL validation
   ZoteroClientTests.swift          23 tests: probe (BBT/localAPI/unavailable/cache-TTL/reset),
                                    fetch CSL (BBT/localAPI/cache-hit/unavailable-throws/citation/group),
-                                   CSL mapping (year/month/day precision, literal/given-family author),
+                                   CSL mapping (year/month/day precision, literal/given-family name parse),
                                    cache store (round-trip/loadMissing/cacheKey) — via a protocol-level
                                    ZoteroTransport stub (never builds a URLSession)
   ZoteroLocalServerTests.swift     5 tests (W8-S5, §1.8): the REAL transport over an in-process
@@ -695,8 +695,8 @@ macOS/Tests/ArchiveNotesTests/
                                    bounded request timeout (hang→URLSession timeout fires). Pointed at a
                                    non-default port to prove the Config base-URL seam
   ZoteroAutoFillTests.swift        28 tests: CSL date-parts→precision (year/month/day, 3-digit year,
-                                   out-of-range m/d, raw-year fallback, no-decade), author/title
-                                   mapping, AutoFillPlan fill-empty/replace/no-op, apply-selected,
+                                   out-of-range m/d, raw-year fallback, no-decade), title mapping,
+                                   authors never proposed, AutoFillPlan fill-empty/replace/no-op, apply-selected,
                                    view-model confirm/cancel (fill-empty, replace-with-confirm,
                                    no-write-on-cancel, stamps only the matching ref), plus scratch
                                    atomic commit for a source-block attachment preserving a concurrent body edit (W9.b1)

@@ -3,6 +3,21 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ CHANGED (W40.notes-remove-authors, 2026-11-11) — notes have no authors
+
+The owner does not want an Authors field (Notes session 2, row 14). It is gone from the note and template inspectors,
+the detail header, Advanced Search, the index and Zotero Auto-fill; a Zotero citation still names Zotero's authors.
+An `authors:` line already in a file is an unknown key, kept verbatim and never written by the app. The index drops
+its `authors` column and FTS table in one transaction on open and re-reads every row from its file; the folders
+tables are untouched. A smart folder saved with an Authors rule no longer decodes: it says its query is unreadable
+and shows All Notes, and only deleting it clears it (no migration, as nothing real exists, owner 2026-08-01).
+
+## ⚠️ OPEN (W40.notes-dup-additional-dates) — a duplicated `additional_dates:` key does not settle on save
+
+Found by the seeded fuzz test when its random stream shifted. A damaged file with two `additional_dates:` keys, the
+first's list item under-indented, decodes, but its first save and the save after it differ (the item's indentation
+changes), so the file keeps changing. Reproducer and fix: the `SUITE_TODO.md` item.
+
 ## ✅ FIXED (W40.fix-notes-advanced-search-menu, 2026-11-08) — Advanced Search stays in Edit
 
 The command was absent, rather than disabled: the real-menu regression assertion reproduced its disappearance

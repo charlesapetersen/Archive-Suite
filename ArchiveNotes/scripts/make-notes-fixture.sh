@@ -182,7 +182,6 @@ schema: 1
 id: $ID_READER
 kind: note
 title: Moore on Intel culture
-authors: [Gordon E. Moore]
 date: 1968
 date_precision: year
 date_uncertain: false
@@ -209,7 +208,6 @@ schema: 1
 id: $ID_ZOTERO
 kind: note
 title: Lovelace paper
-authors: [Ada Lovelace]
 tags: [computing history]
 roundup: false
 created: $CREATED

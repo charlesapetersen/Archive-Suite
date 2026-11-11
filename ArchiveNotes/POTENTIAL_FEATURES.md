@@ -18,11 +18,6 @@ evidence these are one suite.
 
 ## Medium priority
 
-- **Mirror author to Finder tags for cross-app parity** — Notes already projects its canonical
-  `Q1`...`Q3` Quality and the existing Year/Month/Day/Decade date facets, but keeps `authors`
-  front-matter-only (overview decisions D2/D4; date shipped in W19.date). An author facet needs a
-  shared-contract `Author:` facet in `SPEC/tag-format.md`, so it remains a deferred owner decision and
-  would be Tier-2 across all three apps. _(CLAUDE.md Core-Directive bullet; 00-overview §15.4.)_
 - **Unified suite-wide storage path + migration** — a suite-level default root plus a migration that re-keys
   Reader's path-keyed index and the Notes store, serving the owner's "move to a new computer easily" goal.
   Tier-2, separately gated. _(00-overview §15.1 / §2 deferred list; also noted in `SUITE_TODO.md` as a `(later)`
@@ -46,8 +41,6 @@ evidence these are one suite.
   history across the raw/styled toggle, beyond the shipped construct set. _(`00-overview` §17 out-of-scope.)_
 - **Per-block stable GUIDs + reverse back-index** — give blocks durable per-block identity and build the inverse
   "N extracts derive from this note" index for a source note. _(`00-overview` §17 out-of-scope.)_
-- **Author inheritance** — auto-populate an extract's author from its source note instead of manual entry.
-  _(`00-overview` §17 out-of-scope.)_
 - **`zotero://open-pdf` page-anchored links** — support page-anchored attachment links in addition to
   `zotero://select` item/attachment links. _(`00-overview` §17 out-of-scope.)_
 - **Page-within-merged-PDF scroll navigation** — from the source-block quick preview, scroll to a specific page

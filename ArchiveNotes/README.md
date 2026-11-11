@@ -36,18 +36,18 @@ words**.
 > deferrals and deviations are in `../execution-plans/archive-notes/00-overview.md` §17.
 > [CLAUDE.md](CLAUDE.md) is the authoritative record.
 
-- **Notes** — a note is a single Markdown file with a title, date, author, quality rating, and
+- **Notes** — a note is a single Markdown file with a title, date, quality rating, and
   subjects, all in durable YAML front-matter. Styled editor with a raw-Markdown toggle (⌘/).
 - **Provenance** — paste a page/document link copied from Archive Reader to drop a **source block**
   with a chip that jumps back to (and previews) the exact source; links are GUID-based, so they
   survive the corpus moving to another computer (one re-grant).
 - **Extracts** — build an extract from selected passages across notes; each extract carries its own
-  title/date/author and an embedded, snapshot-independent copy of the source passage's bytes.
+  title/date and an embedded, snapshot-independent copy of the source passage's bytes.
 - **Zotero** — attach Zotero reference links and citation metadata to a note.
 - **Organize** — a mutable folder tree, **smart folders** (saved searches), and **replication** (one
   note in many folders as memberships, never copies) with a delete-last-instance guard. Templates
   per folder.
-- **Search** — full-text (SQLite FTS5, bm25-ranked, as-you-type) across titles, bodies, authors, and
+- **Search** — full-text (SQLite FTS5, bm25-ranked, as-you-type) across titles, bodies and
   subjects; filter by kind / quality / date range / tags.
 - Two windows (**Notes** and **Extracts**), a virtualized list that stays smooth at scale, and
   keyboard-driven editing.

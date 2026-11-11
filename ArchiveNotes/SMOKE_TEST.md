@@ -62,8 +62,8 @@ step.
       *(Build-free proof: `scripts/e2e-durable-links.sh`; unit gate: `DurableLinkE2ETests`.)*
 - [ ] **L. Metadata edit** — date and quality edits in the inspector persist to front-matter; quality
       1–3 also mirrors Q1–Q3 only onto the note's own `.md`, while clear/0 removes its Q token. Title
-      (inline rename) and subject (inspector Tags) editing are wired (`W9.b3`), and so are authors
-      (`W9.b8`); check that each persists to front-matter.
+      (inline rename) and subject (inspector Tags) editing are wired (`W9.b3`); check that each persists to
+      front-matter. Notes have no Authors field (W40.notes-remove-authors).
 - [ ] **M. Replication + delete-last-instance guard** — replicate a note into a second folder
       (membership, not a copy); removing a replicant is quiet; removing the **last** instance prompts a
       modal (fresh re-check at confirm) → the sidebar's Trash; Edit ▸ Undo, or Trash ▸ Put Back, returns it

@@ -111,11 +111,19 @@ actor NotesIndex {
 
         // W40.notes-remove-authors: notes have no authors any more. Both tables are rebuildable caches, so a DB
         // from before drops the column and its FTS table, and every row is re-read from its `.md` (mtime -1, as
-        // for `display_calendar` above), which refills the new FTS table. The folders tables are untouched.
+        // for `display_calendar` above), which refills the new FTS table. The folders tables are untouched. One
+        // transaction, so a failure part-way cannot leave an empty FTS table whose rows are never re-read.
         if itemsHasColumn("authors") {
-            try exec("ALTER TABLE items DROP COLUMN authors;")
-            try exec("DROP TABLE IF EXISTS fts;")
-            try exec("UPDATE items SET mtime = -1;")
+            try exec("BEGIN IMMEDIATE;")
+            do {
+                try exec("ALTER TABLE items DROP COLUMN authors;")
+                try exec("DROP TABLE IF EXISTS fts;")
+                try exec("UPDATE items SET mtime = -1;")
+                try exec("COMMIT;")
+            } catch {
+                try? exec("ROLLBACK;")
+                throw error
+            }
         }
 
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
