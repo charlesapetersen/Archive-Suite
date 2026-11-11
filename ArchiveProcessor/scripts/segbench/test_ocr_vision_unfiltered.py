@@ -57,5 +57,30 @@ class Turns(unittest.TestCase):
             self.assertEqual(V.turns(), {'aaaa': 90, 'bbbb': 90})
 
 
+class Jpeg(unittest.TestCase):
+    def test_a_kept_jpeg_replaces_the_reading_and_keeps_the_pdf_count(self):
+        rows = [dict(row(1, 3), source='pdf image (no original)'), dict(row(2, 8), source='pdf image (no original)'),
+                dict(row(3, 90), source='original')]
+        j = {'0000000000000001': {'kept': True, 'method': 'number', 'words': 150, 'orient_corr': 0.9},
+             '0000000000000002': {'kept': False, 'method': 'folder', 'words': None, 'orient_corr': 0.3}}
+        m = V.merge_jpeg(rows, j)
+        self.assertEqual((m[0]['words'], m[0]['pdf_words'], m[0]['source']), (150, 3, 'original (pairs.tsv number)'))
+        self.assertEqual((m[1]['words'], m[1]['source']), (8, 'pdf image (no original)'))   # not the page: stays
+        self.assertFalse(m[1]['jpeg']['kept'])
+        self.assertNotIn('jpeg', m[2])
+        self.assertEqual(rows[0]['words'], 3)                                                 # input untouched
+
+    def test_jpeg_pairs_skips_unpaired_rows(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(V.CP, 'CACHE', tmp):
+            (Path(tmp) / 'pairs.tsv').write_text('pdf\tjpeg\tmethod\ttied\n'
+                                                 'A/1.pdf\tA/1.JPG\tnumber\t[]\nA/2.pdf\t\tnone\t[]\n')
+            self.assertEqual(V.jpeg_pairs(), {'A/1.pdf': ('A/1.JPG', 'number')})
+
+    def test_owner_turns_from_the_sheet_and_from_an_upside_down_note(self):
+        ans = {'_turns': {'drawn:a': 90, 'drawn:b': 360}, '_notes': {'replaced:c': 'Very blurry and Upside down.',
+                                                                       'drawn:d': 'faint'}}
+        self.assertEqual(V.owner_turns(ans), {'drawn:a': 90, 'replaced:c': 180})
+
+
 if __name__ == '__main__':
     unittest.main()

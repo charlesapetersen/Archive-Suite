@@ -10,6 +10,8 @@ current OS, and asks the owner one thing per page, with no transcription: does i
   heavy-run.py run -- /usr/local/bin/python3 ocr_vision_unfiltered.py draw    # pages, Vision words, the orientation scores
   python3 ocr_vision_unfiltered.py sheet                        # the owner's sheet (private, in the bench cache)
   python3 ocr_vision_unfiltered.py report                       # the draw's counts, before the owner's answers
+  heavy-run.py run -- /usr/local/bin/python3 ocr_vision_unfiltered.py jpeg ANSWERS.json
+                                                                # the PDF-image pages from their paired JPEGs
   python3 ocr_vision_unfiltered.py score ANSWERS.json           # the failure rate -> segbench-results
 
 THE DRAW RULE, written before the draw ran (salt ``SALT``):
@@ -50,6 +52,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE / 'corpus')]
+import corpus_pairs as CP                  # noqa: E402
 import ocr_truth as T                      # noqa: E402
 
 TRUTH = T.CACHE                             # the 96's draw (read only here)
@@ -145,8 +148,113 @@ def cmd_draw(_):
     print(len(rows), 'pages,', len(failed), 'not readable from disk')
 
 
-def load_pages():
-    return [json.loads(x) for x in (OUT / 'pages.jsonl').read_text().splitlines()]
+# ---------------------------------------------------------------- the JPEG originals (under the heavy lock)
+#
+# Owner, walkthrough 2026-11-11: JPEG originals whenever one exists. ocr_truth.prepare finds an original only by
+# the PDF's exact file name, so 56 of the 219 were read from the PDF's image; corpus-pairs/pairs.tsv pairs 44 of
+# them with a JPEG (number or folder method). Each is made as ocr_truth.extract makes an original (EXIF applied,
+# turned like the PDF's page 1) and kept only at orient_like_pdf >= MIN_CORR, which is also the check that the
+# JPEG is the page the owner saw (the sheet showed the PDF's image); below it the page stays a PDF image and is
+# flagged. The owner's answers carry over by page. Written to jpeg.jsonl beside the draw; pages.jsonl is unchanged.
+
+MIN_CORR = 0.65                              # truth_jpeg_upgrade.MIN_CORR: true pairs measure 0.69-0.98
+# the pairs refused by MIN_CORR, checked by eye side by side with the PDF's image (2026-11-11)
+EYE = {'2c68ee4a154e5148': 'a different page (pairs.tsv paired the wrong JPEG)',
+       '28e1455b6dc8fa4c': 'a different photograph of the same cover',
+       'e41b7dddbe95d4d3': 'the same page, cropped differently',
+       '1ebcf4a91fe092e8': 'the same page, cropped differently'}
+UPSIDE_DOWN = ('upside down', 'upside-down')  # a note that says the page was shown upside down
+
+
+def jpeg_pairs() -> dict[str, tuple[str, str]]:
+    """'folder/name.pdf' -> (JPEG path under ORIGINALS, pairing method), from corpus-pairs/pairs.tsv."""
+    out = {}
+    for line in (Path(CP.CACHE) / 'pairs.tsv').read_text(encoding='utf-8').splitlines()[1:]:
+        p, j, m = line.split('\t')[:3]
+        if j and m != 'none':
+            out[p] = (j, m)
+    return out
+
+
+def merge_jpeg(rows, jpeg):
+    """The rows with each kept JPEG reading in place of the PDF image's; the PDF image's count kept beside it."""
+    out = []
+    for r in rows:
+        j = jpeg.get(r['key'])
+        if j is None:
+            out.append(r)
+            continue
+        r = {**r, 'jpeg': j}
+        if j['kept']:
+            r.update(pdf_source=r['source'], pdf_words=r['words'], source=f"original (pairs.tsv {j['method']})",
+                     words=j['words'])
+        out.append(r)
+    return out
+
+
+def owner_turns(answers) -> dict[str, int]:
+    """{page id: degrees clockwise}: the owner's own turns on the sheet, and 180 where a note says upside down."""
+    out = {k: int(v) % 360 for k, v in (answers.get('_turns') or {}).items() if int(v) % 360}
+    for k, v in (answers.get('_notes') or {}).items():
+        if k not in out and any(s in v.lower() for s in UPSIDE_DOWN):
+            out[k] = 180
+    return out
+
+
+def cmd_jpeg(a):
+    from PIL import Image
+    rows = load_pages(jpeg=False)
+    pairs = jpeg_pairs()
+    (OUT / 'jpeg').mkdir(exist_ok=True)
+    res = {}
+    for r in rows:
+        if r['source'] == 'original' or f"{r['folder']}/{r['name']}" not in pairs:
+            continue
+        j, method = pairs[f"{r['folder']}/{r['name']}"]
+        img = OUT / 'jpeg' / f"{r['key']}.jpg"
+        meta = T.extract('original', T.ORIGINALS / j, img, T.CORPUS / r['folder'] / r['name'])
+        kept = meta['orient_corr'] >= MIN_CORR
+        res[r['key']] = {'jpeg': j, 'method': method, 'orient_corr': meta['orient_corr'], 'rotated': meta['rotated'],
+                         'size': [meta['width'], meta['height']], 'kept': kept,
+                         'words': T.vision_words(img) if kept else None}
+        print(r['id'], method, meta['orient_corr'], res[r['key']]['words'], r['words'], '' if kept else 'NOT KEPT', flush=True)
+    # a page the owner turned, read again at the owner's turn (the as-stored count stays the rate's)
+    answers = json.loads(Path(a.answers).read_text())
+    tn = turns()
+    by_id = {r['id']: r for r in merge_jpeg(rows, res)}
+    turned = {}
+    (OUT / 'turned').mkdir(exist_ok=True)
+    for pid, deg in owner_turns(answers).items():
+        r = by_id[pid]
+        src = OUT / 'jpeg' / f"{r['key']}.jpg" if r.get('jpeg', {}).get('kept') else image_path(r)
+        total = (tn.get(r['key'], 0) + deg) % 360
+        dst = OUT / 'turned' / f"{r['key']}-{total}.jpg"
+        with Image.open(src) as im:
+            im.rotate(-total, expand=True).save(dst, 'JPEG', quality=92)   # PIL turns counter-clockwise
+        turned[r['key']] = {'turn': total, 'words': T.vision_words(dst)}
+        print(pid, 'at', total, turned[r['key']]['words'], 'as stored', r['words'], flush=True)
+    for k, v in turned.items():
+        res.setdefault(k, {})['owner_turn'] = v
+    (OUT / 'jpeg.jsonl').write_text(''.join(json.dumps({'key': k, **v}) + '\n' for k, v in res.items()))
+    print(sum(1 for v in res.values() if v.get('kept')), 'of', sum(1 for v in res.values() if 'kept' in v),
+          'paired JPEGs kept;', len(turned), 'read at the owner\'s turn')
+
+
+def load_jpeg() -> dict[str, dict]:
+    f = OUT / 'jpeg.jsonl'
+    return {d.pop('key'): d for d in (json.loads(x) for x in f.read_text().splitlines())} if f.exists() else {}
+
+
+def load_pages(jpeg=True):
+    rows = [json.loads(x) for x in (OUT / 'pages.jsonl').read_text().splitlines()]
+    if not jpeg:
+        return rows
+    j = load_jpeg()
+    rows = merge_jpeg(rows, {k: v for k, v in j.items() if 'kept' in v})
+    for r in rows:
+        if 'owner_turn' in j.get(r['key'], {}):
+            r['owner_turn'] = j[r['key']]['owner_turn']
+    return rows
 
 
 def turns() -> dict[str, int]:
@@ -315,6 +423,30 @@ def write_result(meta, t, answers=None):
               ' / '.join(str(rp['answers'].get(v, 0)) for v in ANSWERS.values()) + ' |',
               f"| Vision under {T.MIN_WORDS} words on a page of text | {fmt(d['fail_on_text_page'])} | {fmt(rp['fail_on_text_page'])} |",
               f"| Vision reads nothing on a page with text | {fmt(d['empty_on_has_text'])} | {fmt(rp['empty_on_has_text'])} |"]
+    j = meta.get('jpeg')
+    if j and j['paired']:
+        L += ['', '## The JPEG originals', '',
+              f"The draw read {j['pdf_image_pages']} pages from the PDF's image, because ocr_truth.prepare finds an "
+              f"original only by the PDF's exact file name (W46.prepare-jpeg-pairs). corpus-pairs/pairs.tsv pairs "
+              f"{j['paired']} of them with a JPEG; each was made as an original is (EXIF applied, turned like the PDF's "
+              f"page 1) and kept at orient_like_pdf >= {MIN_CORR}, which is also the check that it is the page the "
+              f"owner saw on the sheet. {j['kept']} were kept (" +
+              ', '.join(f'{v} by {k}' for k, v in sorted(j['methods'].items())) +
+              ") and read by Vision in their place; the owner's answers carry over by page. "
+              f"{j['unpaired']['drawn']} drawn and {j['unpaired']['replaced']} replaced pages have no paired JPEG "
+              f"and stay PDF images.", '']
+        if j['refused']:
+            L += [f"Refused below {MIN_CORR}, so read from the PDF's image (checked by eye):", '']
+            L += [f"- `{r['id']}`: {r['orient_corr']}, {r['eye']}; Vision {r['words']} words on the PDF's image"
+                  for r in j['refused']]
+            L += ['']
+        L += [(f"Pages the JPEG moves across the {T.MIN_WORDS}-word line or off zero: " +
+               '; '.join(f"`{c['id']}` {c['pdf_words']} -> {c['jpeg_words']}" for c in j['changed']) + '.')
+              if j['changed'] else f"No page moves across the {T.MIN_WORDS}-word line or off zero with its JPEG."]
+    if meta.get('owner_turn'):
+        L += ['', 'Read again at the owner\'s turn (a note or the sheet\'s turn button), the as-stored count staying '
+              'the one counted above: ' + '; '.join(f"`{o['id']}` {o['as_stored']} as stored, {o['words']} at "
+                                                    f"{o['turn']}°" for o in meta['owner_turn']) + '.']
     L += ['', '## Measurement card', '',
           '- **Truth:** ' + ('the owner\'s answer per page (1 no text, 2 a few words, 3 a page of text), on a sheet '
                              'that shows neither Vision\'s count nor which pages were replaced; no model drafted it.'
@@ -325,7 +457,10 @@ def write_result(meta, t, answers=None):
           'ABBYY text. The replaced pages were selected by Vision (26.6) and are kept apart for that reason.',
           f"- **Comparison:** one route, Vision as the panel reads it, on the prepared image as stored (turned like the "
           f"PDF page, as the 96's were); the app's rotation step is not applied first, so a page stored sideways counts "
-          f"against Vision here ({meta['turned']} pages are stored turned, by a clear text score or an eye check).",
+          f"against Vision here ({meta['turned']} pages are stored turned, by a clear text score or an eye check; "
+          f"{meta['turned_drawn_under_min']} of the {meta['turned_drawn']} drawn ones reads under {T.MIN_WORDS} words). "
+          f"The JPEG original where one exists, by file name or a pairs.tsv pair ({(j or {}).get('kept', 0)} by the "
+          f"pair), else the PDF's image.",
           '- **Noise:** Vision is deterministic on one OS build (vision-27-reread.md); the intervals are Wilson 95% on '
           'pages, one page per document.',
           '- **Scope:** owner material in the collection folders only; a rate of pages, not of words read wrongly on '
@@ -336,8 +471,23 @@ def write_result(meta, t, answers=None):
 
 def meta_of(rows):
     m = json.loads((OUT / 'draw.json').read_text())
-    m['turned'] = len(turns())
+    tn = turns()
+    m['turned'] = len(tn)
+    m['turned_drawn'] = sum(1 for r in rows if r['key'] in tn and r['set'] == 'drawn')
+    m['turned_drawn_under_min'] = sum(1 for r in rows if r['key'] in tn and r['set'] == 'drawn' and r['words'] < T.MIN_WORDS)
     m['minutes'] = round(len(rows) * SECONDS_PER_PAGE / 60)
+    pdf = [r for r in rows if r.get('pdf_source', r['source']) != 'original']
+    kept = [r for r in pdf if r.get('jpeg', {}).get('kept')]
+    m['jpeg'] = {'pdf_image_pages': len(pdf), 'paired': sum(1 for r in pdf if 'jpeg' in r), 'kept': len(kept),
+                 'methods': dict(collections.Counter(r['jpeg']['method'] for r in kept)),
+                 'refused': [{'id': r['id'], 'orient_corr': r['jpeg']['orient_corr'], 'words': r['words'],
+                              'eye': EYE.get(r['key'], 'not checked')} for r in pdf if 'jpeg' in r and not r['jpeg']['kept']],
+                 'unpaired': {s: sum(1 for r in pdf if 'jpeg' not in r and r['set'] == s) for s in ('drawn', 'replaced')},
+                 'changed': [{'id': r['id'], 'pdf_words': r['pdf_words'], 'jpeg_words': r['words']} for r in kept
+                             if (r['pdf_words'] < T.MIN_WORDS) != (r['words'] < T.MIN_WORDS) or
+                             (r['pdf_words'] == 0) != (r['words'] == 0)]}
+    m['owner_turn'] = [{'id': r['id'], 'turn': r['owner_turn']['turn'], 'words': r['owner_turn']['words'],
+                        'as_stored': r['words']} for r in rows if 'owner_turn' in r]
     return m
 
 
@@ -366,11 +516,12 @@ def main(argv=None):
     sub.add_parser('draw')
     sub.add_parser('sheet')
     sub.add_parser('report')
+    sub.add_parser('jpeg').add_argument('answers')
     s = sub.add_parser('score')
     s.add_argument('answers')
     s.add_argument('--partial', action='store_true')
     a = p.parse_args(argv)
-    {'draw': cmd_draw, 'sheet': cmd_sheet, 'report': cmd_report, 'score': cmd_score}[a.cmd](a)
+    {'draw': cmd_draw, 'sheet': cmd_sheet, 'report': cmd_report, 'jpeg': cmd_jpeg, 'score': cmd_score}[a.cmd](a)
 
 
 if __name__ == '__main__':
