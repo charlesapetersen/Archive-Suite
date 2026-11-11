@@ -18,7 +18,7 @@ struct LibraryPresentation: Sendable {
 
         func build() -> LibraryPresentation {
             let universe = excludedPrefixes.isEmpty ? files : files.filter { file in
-                !excludedPrefixes.contains { file.path == $0 || file.path.hasPrefix($0 + "/") }
+                !LibraryPresentation.isExcluded(file.path, by: excludedPrefixes)
             }
             let base = universe.filter(matches)
             let rows: [ArchiveFile]
@@ -29,6 +29,21 @@ struct LibraryPresentation: Sendable {
                 ambiguousCount: universe.reduce(0) { $0 + ($1.dateIsAmbiguous ? 1 : 0) },
                 duplicatedNames: DuplicateNames.duplicatedNames(in: rows))
         }
+    }
+
+    /// Whether `path` is in one of the excluded folders (absolute prefixes).
+    static func isExcluded(_ path: String, by prefixes: [String]) -> Bool {
+        prefixes.contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+
+    /// Whether `build()` lists `a` before `b`: the relevance rank when the list sorts by it, else
+    /// `LibrarySort.before`. A patched row goes where this puts it (W40.fix-reader-change-incremental).
+    static func listedBefore(_ a: ArchiveFile, _ b: ArchiveFile, sort: [ARSortDescriptor], marks: SortMarks,
+                             rank: [String: Int]?) -> Bool {
+        if let rank, sort.first?.field == .relevance {
+            return (rank[a.path] ?? Int.max) < (rank[b.path] ?? Int.max)
+        }
+        return LibrarySort.before(a, b, by: sort, marks: marks)
     }
 
     static func subjectSpellings(_ files: [ArchiveFile]) -> [String] {

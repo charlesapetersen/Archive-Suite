@@ -207,6 +207,46 @@ enum LibrarySort {
         return order.map { files[$0] }
     }
 
+    /// Whether `sorted(_:by:marks:)` puts `a` before `b`, worked out from the two rows alone: the same keys in
+    /// the same order, strings by `localizedStandardCompare` (which is the order of their collation ranks),
+    /// a missing key last in either direction, then the paths. Rows it calls equal (paths that collate equal)
+    /// may stand either way round. For placing a few changed rows without sorting every row again
+    /// (W40.fix-reader-change-incremental); `LibrarySortTests` holds it to `sorted`.
+    static func before(_ a: ArchiveFile, _ b: ArchiveFile, by descriptors: [ARSortDescriptor],
+                       marks: SortMarks = SortMarks()) -> Bool {
+        enum Key { case int(Int), string(String), missing }
+        func key(_ f: ArchiveFile, _ field: SortField) -> Key {
+            func int(_ v: Int?) -> Key { v.map(Key.int) ?? .missing }
+            func string(_ v: String?) -> Key { v.map(Key.string) ?? .missing }
+            switch field {
+            case .date:      return int(f.sortDate)
+            case .quality:   return int(f.quality)
+            case .name:      return string(f.name)
+            case .fileType:  return string(f.fileType)
+            case .readState: return string(f.readState?.rawValue)
+            case .subjects:  return string(subjectsKey(f))
+            case .flag:      return .int(marks.flagged.contains(f.path) ? 0 : 1)
+            case .attention: return .int(marks.needsAttention.contains(f.path) ? 0 : 1)
+            case .relevance: return .missing
+            }
+        }
+        for d in descriptors where d.field != .relevance {
+            let order: ComparisonResult
+            switch (key(a, d.field), key(b, d.field)) {
+            case (.missing, .missing): continue
+            case (.missing, _): return false
+            case (_, .missing): return true
+            case let (.int(x), .int(y)): order = x == y ? .orderedSame : (x < y ? .orderedAscending : .orderedDescending)
+            case let (.string(x), .string(y)): order = x.localizedStandardCompare(y)
+            default: continue
+            }
+            if order == .orderedSame { continue }
+            return d.ascending ? order == .orderedAscending : order == .orderedDescending
+        }
+        // With no keys `sorted` keeps the input order, which is the library's: the paths, as here.
+        return a.path.localizedStandardCompare(b.path) == .orderedAscending
+    }
+
     /// The `localizedStandardCompare` order of every string the list has sorted, kept across sorts.
     static let collation = CollationRanks()
 

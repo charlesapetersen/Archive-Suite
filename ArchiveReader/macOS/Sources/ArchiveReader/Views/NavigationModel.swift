@@ -59,7 +59,11 @@ final class NavigationModel: ObservableObject {
     /// a 150 ms pause so recompute doesn't fire on every keystroke at 40k+ rows.
     @Published var filterSearchText = ""
     @Published var sort = LibrarySort.default
-    @Published var selection = Set<ArchiveFile.ID>() { didSet { persistSelection(); refreshSelectionCache() } }
+    @Published var selection = Set<ArchiveFile.ID>() {
+        didSet { persistSelection(); if !patchingSelection { refreshSelectionCache() } }
+    }
+    /// Set while a row patch prunes the selection, which then patches the selection cache itself.
+    private var patchingSelection = false
     @Published var fullTextQuery = ""
     /// The active smart folder's base scope — the visible universe. `nil` = whole root. User
     /// `filter` narrows *within* this. Selecting a folder / All Files exits the scope. It is either a saved
@@ -96,6 +100,10 @@ final class NavigationModel: ObservableObject {
     /// AppKit table bridge skip its O(N) snapshot comparison when `updateNSView`
     /// fires for unrelated state changes (selection, scroll, font size).
     private(set) var displayedGeneration: Int = 0
+    /// Incremented only when `displayed`'s rows or their order may have changed, not when rows were only
+    /// replaced in place (a tag change, W40.fix-reader-change-incremental). The table skips its comparison
+    /// of every row id while this stands.
+    private(set) var displayedOrderGeneration: Int = 0
     @Published private(set) var selectedFilesCache: [ArchiveFile] = []
     @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
@@ -218,7 +226,7 @@ final class NavigationModel: ObservableObject {
         filterSearchText = filter.searchText   // seed from restored state
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
         // fires on main. Defer its consumption until the new value commits (@Published uses willSet).
-        library.$files
+        library.$filesRevision
             .sink { [weak self] _ in MainActor.assumeIsolated {
                 guard let self else { return }
                 // Invalidate before willSet finishes, including work already preparing off-main.
@@ -453,17 +461,43 @@ final class NavigationModel: ObservableObject {
     /// How many files `search` matches over the whole library (excluded folders left out), for the form's count.
     /// Its text rules run through the index first.
     func countMatches(_ search: AdvancedSearch) async -> Int {
+        await countWithBasis(search).count
+    }
+
+    /// A saved search as it was last counted: its rules as tested and their outside answers (text hits, flagged,
+    /// needs attention). A row change then moves the count by that row's difference
+    /// (W40.fix-reader-change-incremental). Valid until a refresh: every input that changes these answers
+    /// (an index pass, a flag, an exclusion, the saved rules) starts one.
+    private struct CountBasis: Sendable {
+        let search: AdvancedSearch
+        let rules: AdvancedSearch
+        let context: RuleContext
+
+        func counts(_ file: ArchiveFile, excluded: [String]) -> Bool {
+            !LibraryPresentation.isExcluded(file.path, by: excluded) && rules.matches(file, context)
+        }
+    }
+
+    /// `countMatches`, with the basis it counted on. The row test runs off the main actor over the library as
+    /// it is when the text answers arrive.
+    private func countWithBasis(_ search: AdvancedSearch) async -> (basis: CountBasis, count: Int) {
         let rules = search.droppingFolders(outside: rootStore.discoveredPathPrefix).search
         let hits = await textHits(for: rules)
-        return ReaderStages.measure("model.countMatches.rows") {
-            var context = ruleContext(for: rules)
-            context.textHits = hits
-            var files = library.files
-            if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-                files = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
+        var context = ruleContext(for: rules)
+        context.textHits = hits
+        let basis = CountBasis(search: search, rules: rules, context: context)
+        let files = library.files, excluded = excludedAbsolutePrefixes()
+        let count = await Task.detached(priority: .userInitiated) {
+            ReaderStages.measure("model.countMatches.rows") {
+                files.reduce(0) { $0 + (basis.counts($1, excluded: excluded) ? 1 : 0) }
             }
-            return files.reduce(0) { $0 + (rules.matches($1, context) ? 1 : 0) }
-        }
+        }.value
+        return (basis, count)
+    }
+
+    /// The excluded folders as absolute path prefixes, as the list and the counts test them.
+    private func excludedAbsolutePrefixes() -> [String] {
+        rootStore.discoveredPathPrefix.map { excludedFolders.absolutePrefixes(rootPath: $0) } ?? []
     }
 
     /// Each active text rule's index answer, by rule id.
@@ -773,8 +807,7 @@ final class NavigationModel: ObservableObject {
     private var viewRevision: UInt64 = 0
 
     private func presentationInput(_ files: [ArchiveFile]) -> LibraryPresentation.Input {
-        let prefixes = rootStore.discoveredPathPrefix.map { excludedFolders.absolutePrefixes(rootPath: $0) } ?? []
-        return LibraryPresentation.Input(files: files, excludedPrefixes: prefixes,
+        LibraryPresentation.Input(files: files, excludedPrefixes: excludedAbsolutePrefixes(),
             matches: rowPredicate(scope: scope, filter: filter, ftsPaths: ftsPaths),
             sort: sort, marks: sortMarks(), rank: ftsRank ?? baseRank)
     }
@@ -782,16 +815,23 @@ final class NavigationModel: ObservableObject {
     func recompute() {
         viewRevision &+= 1
         let input = presentationInput(library.files)
-        present(ReaderStages.measure("presentation.build") { input.build() }, marks: input.marks)
+        present(ReaderStages.measure("presentation.build") { input.build() }, marks: input.marks,
+                filesRevision: library.filesRevision)
     }
 
-    private func present(_ result: LibraryPresentation, marks: SortMarks) {
+    /// The `library.filesRevision` that `displayed` was built from, so a row patch knows whether its change
+    /// set starts where the list stands (W40.fix-reader-change-incremental).
+    private var presentedFilesRevision: UInt64?
+
+    private func present(_ result: LibraryPresentation, marks: SortMarks, filesRevision: UInt64) {
+        presentedFilesRevision = filesRevision
         if result.ambiguousCount != ambiguousDateCount { ambiguousDateCount = result.ambiguousCount }
         let causes = result.displayed.isEmpty ? emptyCauses(in: result.universe) : []
         if causes != emptyListCauses { emptyListCauses = causes }
         lastSortMarks = marks
         displayed = result.displayed
         displayedGeneration += 1
+        displayedOrderGeneration += 1
         _tagCloudCache = nil
         duplicatedNames = result.duplicatedNames
         ReaderStages.measure("model.pruneSelection") { pruneSelectionToDisplayed() }
@@ -1210,6 +1250,13 @@ final class NavigationModel: ObservableObject {
 
     /// React to a new `library.files`: rebuild only what actually changed, then recompute + index.
     private func libraryDidChange() {
+        let change = library.takeChange()
+        if ReaderStages.measure("model.applyRowChanges", { applyRowChanges(change) }) {
+#if DEBUG
+            rowPatchesForTesting += 1
+#endif
+            return
+        }
         let files = library.files
         let ps = LibraryChangeSignature.paths(files)
         let pathsChanged = ps != pathsSig
@@ -1218,7 +1265,7 @@ final class NavigationModel: ObservableObject {
         // first frame with the verified chip for ~400 ms (50k rows, Debug). Prepare immutable data
         // off-main; smaller libraries keep the cheap synchronous path. No write or ledger work moves.
         if !pathsChanged, files.count >= 1_000 {
-            let revision = libraryRevision, view = viewRevision
+            let revision = libraryRevision, view = viewRevision, filesRevision = library.filesRevision
             let input = presentationInput(files), previousSubjects = subjectsSig
             let preparation = Task.detached(priority: .userInitiated) {
                 ReaderStages.measure("presentation.prepare") {
@@ -1227,19 +1274,27 @@ final class NavigationModel: ObservableObject {
             }
             libraryPreparation = preparation
             Task { [weak self] in
+                guard let self else { return }
                 guard let result = await preparation.value, !preparation.isCancelled,
-                      let self, self.libraryRevision == revision else { return }
+                      self.libraryRevision == revision else {
+                    // Superseded: a newer change follows, and must not wait on this one to patch.
+                    if self.libraryPreparation == preparation { self.libraryPreparation = nil }
+                    return
+                }
                 self.libraryPreparation = nil
                 ReaderStages.measure("model.libraryDidChange (prepared)") {
                     self.updateLibraryCaches(subjects: result.subjectsSignature, matches: result.matchSignature,
                                              spellings: result.spellings)
                     // A filter/sort/flag change may already have recomputed a newer presentation.
-                    if self.viewRevision == view { self.present(result.presentation, marks: input.marks) }
+                    if self.viewRevision == view {
+                        self.present(result.presentation, marks: input.marks, filesRevision: filesRevision)
+                    }
                     self.finishLibraryChange(files, pathsChanged: false)
                 }
             }
             return
         }
+        libraryPreparation = nil   // an interrupted preparation is superseded by this whole rebuild
         let ss = LibraryChangeSignature.subjects(files)
         let spellings = ss == subjectsSig ? nil : LibraryPresentation.subjectSpellings(files)
         updateLibraryCaches(subjects: ss, matches: LibraryChangeSignature.matchFacets(files), spellings: spellings)
@@ -1247,7 +1302,156 @@ final class NavigationModel: ObservableObject {
         finishLibraryChange(files, pathsChanged: pathsChanged)
     }
 
+    /// A change that only replaced rows (their tags; no row came or went, no file's content changed) is
+    /// patched from those rows alone (W40.fix-reader-change-incremental): each moves in `displayed` only if its
+    /// sort key changed, enters or leaves it as the filter says, the smart-folder counts move by its
+    /// difference, and the selection loses only a row that left. No indexing pass, format-status read, prune
+    /// or second recompute starts: a tag change cannot change what those read. False: rebuild instead,
+    /// because rows came or went, a file's content changed (the index must read it), or the list is in a
+    /// state a patch cannot extend (empty, or a rebuild still preparing).
+    private func applyRowChanges(_ change: LibraryChangeSet) -> Bool {
+        guard let rows = change.rows, !rows.isEmpty, libraryPreparation == nil, !displayed.isEmpty,
+              change.fields.isSubset(of: .tags) else { return false }
+        let changed = rows.values.compactMap { row in row.old.flatMap { old in row.new.map { (old, $0) } } }
+        guard changed.count == rows.count else { return false }
+        // The list must stand where the change set starts. A recompute in between (a filter, a sort, a
+        // flag) already shows the new rows, and only the parts that do not read the list remain.
+        if presentedFilesRevision == change.toRevision {
+            applyFacetChanges(changed, rows: Array(rows.values))
+            return true
+        }
+        guard presentedFilesRevision == change.fromRevision else { return false }
+
+        let predicate = rowPredicate(scope: scope, filter: filter, ftsPaths: ftsPaths)
+        let excluded = excludedAbsolutePrefixes()
+        let sort = self.sort, marks = lastSortMarks, rank = ftsRank ?? baseRank
+        func before(_ a: ArchiveFile, _ b: ArchiveFile) -> Bool {
+            LibraryPresentation.listedBefore(a, b, sort: sort, marks: marks, rank: rank)
+        }
+        /// Where `file`'s row is in `list`: by binary search on its sort keys, else (a list sorted some other
+        /// way) by a scan.
+        func position(of file: ArchiveFile, in list: [ArchiveFile]) -> Int? {
+            var lo = 0, hi = list.count
+            while lo < hi {
+                let mid = (lo + hi) / 2
+                if before(list[mid], file) { lo = mid + 1 } else { hi = mid }
+            }
+            var k = lo
+            while k < list.count, !before(file, list[k]) {
+                if list[k].path == file.path { return k }
+                k += 1
+            }
+            return list.firstIndex { $0.path == file.path }
+        }
+
+        var list = displayed
+        var membershipChanged = false, orderChanged = false, cloudChanged = false
+        var left = Set<ArchiveFile.ID>()
+        var ambiguous = ambiguousDateCount
+        for (old, new) in changed {
+            if LibraryPresentation.isExcluded(new.path, by: excluded) { continue }
+            ambiguous += (new.dateIsAmbiguous ? 1 : 0) - (old.dateIsAmbiguous ? 1 : 0)
+            if old.subjects != new.subjects { cloudChanged = true }
+            let shown = predicate(new)
+            if let i = position(of: old, in: list) {
+                if shown, i == 0 || !before(new, list[i - 1]), i == list.count - 1 || !before(list[i + 1], new) {
+                    list[i] = new
+                    continue
+                }
+                list.remove(at: i)
+                orderChanged = true
+                if !shown { membershipChanged = true; left.insert(new.id); continue }
+            } else if !shown {
+                continue
+            } else {
+                membershipChanged = true
+            }
+            var lo = 0, hi = list.count
+            while lo < hi {
+                let mid = (lo + hi) / 2
+                if before(list[mid], new) { lo = mid + 1 } else { hi = mid }
+            }
+            list.insert(new, at: lo)
+        }
+        guard !list.isEmpty else { return false }   // the empty list's explanation needs the whole rebuild
+
+        displayed = list
+        displayedGeneration += 1
+        if orderChanged || membershipChanged { displayedOrderGeneration += 1 }
+        if membershipChanged {
+            duplicatedNames = DuplicateNames.duplicatedNames(in: list)
+            cloudChanged = true
+        }
+        if cloudChanged { _tagCloudCache = nil }
+        if ambiguous != ambiguousDateCount { ambiguousDateCount = ambiguous }
+
+        // The selection: a row that left goes, and the cache takes the changed rows' new values.
+        if !left.isEmpty, !selection.isDisjoint(with: left) {
+            patchingSelection = true
+            selection.subtract(left)
+            patchingSelection = false
+        }
+        let changedIDs = Set(changed.map(\.1.id))
+        if selection.isEmpty {
+            if !selectedFilesCache.isEmpty { selectedFilesCache = [] }
+        } else if !selection.isDisjoint(with: changedIDs) || !left.isEmpty {
+            let shownNow = changed.map(\.1).filter { selection.contains($0.id) && !left.contains($0.id)
+                                                     && !LibraryPresentation.isExcluded($0.path, by: excluded)
+                                                     && predicate($0) }
+            let kept = selectedFilesCache.filter { !changedIDs.contains($0.id) }
+            selectedFilesCache = ReaderStages.measure("model.selectionCache (patch)") {
+                LibrarySort.sorted(kept + shownNow, by: sort, marks: marks)
+            }
+        }
+
+        presentedFilesRevision = change.toRevision
+        applyFacetChanges(changed, rows: Array(rows.values))
+
+        restoreSelectionIfNeeded()
+        applyPendingRevealIfPossible()
+        if membershipChanged { reapplyPendingTopRow() }
+        return true
+    }
+
+    /// What the changed rows' facets feed besides the list: the match signature, the smart-folder counts, and
+    /// the subjects only if they moved.
+    private func applyFacetChanges(_ changed: [(ArchiveFile, ArchiveFile)], rows: [LibraryChangeSet.Row]) {
+        for (old, new) in changed {
+            matchSig ^= LibraryChangeSignature.matchFacets(of: old) ^ LibraryChangeSignature.matchFacets(of: new)
+        }
+        applyCountChanges(rows)
+        if changed.contains(where: { $0.0.subjects != $0.1.subjects }) { refreshSubjectsInBackground() }
+    }
+
+    private var subjectsGeneration = 0
+#if DEBUG
+    /// Library changes `applyRowChanges` patched rather than rebuilt.
+    private(set) var rowPatchesForTesting = 0
+#endif
+
+    /// The subject union and its spellings after a patch that changed a row's subjects, off the main actor. A
+    /// newer refresh, or a whole rebuild that set them itself, supersedes it.
+    private func refreshSubjectsInBackground() {
+        subjectsGeneration += 1
+        let generation = subjectsGeneration, files = library.files, previous = subjectsSig
+        Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                ReaderStages.measure("model.subjects (background)") { () -> (Int, [String]?) in
+                    let ss = LibraryChangeSignature.subjects(files)
+                    return (ss, ss == previous ? nil : LibraryPresentation.subjectSpellings(files))
+                }
+            }.value
+            guard let self, generation == self.subjectsGeneration else { return }
+            self.subjectsSig = result.0
+            if let spellings = result.1 {
+                self.allSubjectsCache = spellings
+                self.subjectSpellingByKey = Dictionary(spellings.map { (tagKey($0), $0) }, uniquingKeysWith: { a, _ in a })
+            }
+        }
+    }
+
     private func updateLibraryCaches(subjects: Int, matches: Int, spellings: [String]?) {
+        subjectsGeneration += 1   // supersedes a background subjects refresh
         subjectsSig = subjects
         if let spellings {
             allSubjectsCache = spellings
@@ -1384,26 +1588,58 @@ final class NavigationModel: ObservableObject {
     }
 
     private var smartFolderCountGeneration = 0
+    private var smartFolderBasis: [UUID: CountBasis] = [:]
+    /// True while `smartFolderCounts` counts the library as it is: the last refresh finished and every row change
+    /// since moved the counts itself.
+    private var smartFolderCountsLive = false
 
     /// Count each saved rule tree over the whole library, independently of the open scope and user filters.
     /// Text rules use the same index answers as the Advanced Search form. Keep the previous counts until
     /// refreshed answers arrive; a changed library, rule, flag, exclusion or index pass supersedes the task.
     private func refreshSmartFolderCounts() {
         smartFolderCountGeneration += 1
+        smartFolderCountsLive = false
         let generation = smartFolderCountGeneration
         let searches = savedSearches.searches
         smartFolderCounts = smartFolderCounts.filter { id, _ in searches.contains { $0.id == id } }
         Task { [weak self] in
             guard let self, generation == self.smartFolderCountGeneration else { return }
             var counts: [UUID: Int] = [:]
+            var bases: [UUID: CountBasis] = [:]
             for search in searches {
-                let count = await self.countMatches(search.search)
+                let (basis, count) = await self.countWithBasis(search.search)
                 guard generation == self.smartFolderCountGeneration else { return }
                 counts[search.id] = count
+                bases[search.id] = basis
             }
             guard generation == self.smartFolderCountGeneration else { return }
             self.smartFolderCounts = counts
+            self.smartFolderBasis = bases
+            self.smartFolderCountsLive = true
         }
+    }
+
+    /// Move each smart folder's count by the changed rows' difference, the rows before against the rows after.
+    /// A count that is not live (a refresh running, the saved searches changed since) is refreshed instead,
+    /// off the main actor.
+    private func applyCountChanges(_ rows: [LibraryChangeSet.Row]) {
+        let searches = savedSearches.searches
+        guard smartFolderCountsLive, searches.count == smartFolderBasis.count,
+              searches.allSatisfy({ smartFolderBasis[$0.id]?.search == $0.search && smartFolderCounts[$0.id] != nil })
+        else { refreshSmartFolderCounts(); return }
+        let excluded = excludedAbsolutePrefixes()
+        var counts = smartFolderCounts
+        ReaderStages.measure("model.countChanges") {
+            for search in searches {
+                guard let basis = smartFolderBasis[search.id], var count = counts[search.id] else { continue }
+                for row in rows {
+                    if let old = row.old, basis.counts(old, excluded: excluded) { count -= 1 }
+                    if let new = row.new, basis.counts(new, excluded: excluded) { count += 1 }
+                }
+                counts[search.id] = count
+            }
+        }
+        if counts != smartFolderCounts { smartFolderCounts = counts }
     }
 
     /// Build the sidebar folder tree from the discovered file paths under the archive root — no extra
@@ -1570,12 +1806,7 @@ final class NavigationModel: ObservableObject {
     }
 
     private func libraryFilesStage(atPaths paths: [String]) -> [ArchiveFile] {
-        guard !paths.isEmpty else { return [] }
-        if paths.count == 1 { return library.files.first { $0.path == paths[0] }.map { [$0] } ?? [] }
-        let wanted = Set(paths)
-        var found: [String: ArchiveFile] = [:]
-        for f in library.files where wanted.contains(f.path) { found[f.path] = f }
-        return paths.compactMap { found[$0] }
+        library.files(atPaths: paths)
     }
 
     /// The tag actions' targets: the named paths when the document window asks, else the list's selection.

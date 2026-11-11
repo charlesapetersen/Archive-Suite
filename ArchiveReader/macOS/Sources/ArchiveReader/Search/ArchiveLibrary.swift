@@ -46,7 +46,19 @@ struct IndexedLibraryScanRequest: Sendable {
 /// **"I could not look"** separately from **"there is nothing here"**: see `phase` / `LibraryPhase`.
 @MainActor
 final class ArchiveLibrary: ObservableObject {
-    @Published private(set) var files: [ArchiveFile] = []
+    /// Every listed row, in `localizedStandardCompare` order of its path. Not `@Published` itself, so a change
+    /// to a few rows edits this one buffer in place instead of copying all of it (at 116k rows each copy was
+    /// tens of megabytes the allocator kept; W40.fix-reader-change-incremental). Every change bumps
+    /// `filesRevision` first, and `takeChange()` says which rows it touched.
+    private(set) var files: [ArchiveFile] = []
+    /// Bumped on every change to `files`; subscribe to `$filesRevision` to hear of one.
+    @Published private(set) var filesRevision: UInt64 = 0
+    private var pendingChange = LibraryChangeSet()
+    private var pendingChangeFrom: UInt64 = 0
+    /// `files`' row index, while it matches; see `rowIndexForPatch()`.
+    private var rowIndex: LibraryRowIndex?
+    private var rowIndexGeneration: UInt64 = 0
+    private var rowIndexBuild: Task<Void, Never>?
     /// Replaced `isGathering: Bool` outright (plan §7a.4 / the walk2 item): one boolean could not both
     /// drive a list-blanking spinner and gate destructive content-index pruning once discovery
     /// revalidates behind rows that are already on screen.
@@ -272,7 +284,7 @@ final class ArchiveLibrary: ObservableObject {
         // `currentScan` during that gap and could publish old-root rows into the new root.
         clock &+= 1
         currentScan = clock
-        files = []
+        replaceFiles([])
         verifiedWrites.removeAll()      // no override may leak across roots
         lastSettled = nil
         lastRootScanStartedAt = nil
@@ -561,7 +573,7 @@ final class ArchiveLibrary: ObservableObject {
             .map { Self.row($0, provenance: .cache(asOf: snapshot.asOf)) }
             .sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }
         guard !warm.isEmpty || snapshot.asOf != nil else { return } // truly cold root
-        files = warm
+        replaceFiles(warm)
         lastSettled = snapshot.asOf
         phase = .revalidating(asOf: snapshot.asOf)
     }
@@ -796,7 +808,7 @@ final class ArchiveLibrary: ObservableObject {
                                      generation: UInt64) {
         guard generation == currentScan else { return }
         inFlight = nil
-        files = nextFiles
+        replaceFiles(nextFiles)
         if case let .settled(asOf, _) = next { lastSettled = asOf }
         // A coalesced recovery request received during this pass means discovery is still in
         // progress. Never publish an authoritative `.settled` window while the queued pass waits for
@@ -1113,6 +1125,12 @@ final class ArchiveLibrary: ObservableObject {
     /// Merge a path/subtree batch once. A clean subtree may authoritatively replace only that prefix;
     /// an unreadable subtree keeps every unseen prior row, the same conservative rule as a full pass.
     private func apply(_ changes: CorpusWatchChangeSet, readGeneration: UInt64) {
+        if let patch = rowPatch(for: changes, readGeneration: readGeneration) {
+            commit(patch.rows)
+            finishApply(failures: patch.failures, folderFailures: patch.folderFailures,
+                        changes: changes, readGeneration: readGeneration)
+            return
+        }
         var rows = Dictionary(uniqueKeysWithValues: files.map { (LibraryIndexPath($0.url), $0) })
         let priorRows = rows
         var failures: [CorpusReadFailure] = []
@@ -1205,11 +1223,195 @@ final class ArchiveLibrary: ObservableObject {
             }
         }
 
-        let nextFiles = rows.values.sorted {
-            $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending
-        }
-        if nextFiles != files { files = nextFiles }
+        let nextFiles = rows.values.sorted { Self.listedBefore($0.path, $1.path) }
+        if nextFiles != files { replaceFiles(nextFiles) }
+        finishApply(failures: failures, folderFailures: folderFailures,
+                    changes: changes, readGeneration: readGeneration)
+    }
 
+    /// The listed order: `localizedStandardCompare` of the paths.
+    nonisolated static func listedBefore(_ a: String, _ b: String) -> Bool {
+        a.localizedStandardCompare(b) == .orderedAscending
+    }
+
+    private struct RowPatch {
+        /// The row each touched path ends with (nil: not listed), in the order first touched.
+        var rows: [(path: String, row: ArchiveFile?)] = []
+        var failures: [CorpusReadFailure] = []
+        var folderFailures = 0
+    }
+
+    /// `apply`'s merge, worked out for the touched paths alone, or nil when the batch needs the
+    /// whole-library merge: a subtree read, or a path some row lies under (the merge clears a path's
+    /// whole prefix, so a file that replaced a folder must take its rows with it). Every rule is the
+    /// merge's own, in the same order; only the lookup changed, from a dictionary of every row to the
+    /// row index (W40.fix-reader-change-incremental). The prior row is the one listed before this batch.
+    private func rowPatch(for changes: CorpusWatchChangeSet, readGeneration: UInt64) -> RowPatch? {
+        guard changes.subtrees.isEmpty, !changes.paths.isEmpty else { return nil }
+#if DEBUG
+        if forceWholeMergeForTesting { return nil }
+#endif
+        let index = rowIndexForPatch()
+        var patch = RowPatch()
+        var touched: [UTF8Key: Int] = [:]          // path → position in `patch.rows`
+        func current(_ path: String) -> ArchiveFile? {
+            if let k = touched[UTF8Key(path)] { return patch.rows[k].row }
+            return index.position(of: path).map { files[$0] }
+        }
+        func set(_ path: String, _ row: ArchiveFile?) {
+            if let k = touched[UTF8Key(path)] { patch.rows[k].row = row; return }
+            touched[UTF8Key(path)] = patch.rows.count
+            patch.rows.append((path, row))
+        }
+        for change in changes.paths {
+            let path = LibraryIndexPath(change.url).value
+            // A folder-spelled URL ("…/x/") keys the merge's dictionary differently from the row it clears,
+            // so the merge's own answer is the only exact one.
+            if path.count > 1, path.hasSuffix("/") { return nil }
+            switch change.inspection {
+            case .tracked, .untracked, .directorySymbolicLink, .nonRegular, .vanished:
+                // The merge clears every row at or under `path`. Here only the row at `path` may go: a
+                // row under it, listed or added earlier in this batch, needs the whole merge.
+                if index.hasRows(under: path) { return nil }
+                if patch.rows.contains(where: { $0.row != nil && CorpusWatchRequest.contains($0.path, under: path)
+                                                && $0.path != path }) { return nil }
+                if current(path) != nil { set(path, nil) }
+            case .directory, .unreadable:
+                break
+            }
+
+            if let write = verifiedWrites[change.url], write.seq > readGeneration {
+                if CorpusWalker.tracksReadState(write.after) {
+                    if case let .tracked(entry) = change.inspection {
+                        guard LibraryIndexPath(entry.url).value == path else { return nil }
+                        set(path, Self.row(entry, tagNames: write.after, labelNumber: write.afterLabel))
+                    } else if let base = index.position(of: path).map({ files[$0] }) {
+                        set(path, Self.rebuilt(base, after: write.after, afterLabel: write.afterLabel))
+                    }
+                }
+                continue
+            }
+
+            switch change.inspection {
+            case let .tracked(entry):
+                // The walker's entry is always for the path it inspected; if not, the row's own path
+                // decides where it goes, and only the merge places it.
+                guard LibraryIndexPath(entry.url).value == path else { return nil }
+                set(path, Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber))
+            case .untracked, .directorySymbolicLink, .nonRegular, .vanished:
+                break
+            case let .unreadable(failure):
+                patch.failures.append(failure)
+            case .directory:
+                patch.folderFailures += 1
+            }
+        }
+        return patch
+    }
+
+    /// Put a patch's rows into `files` in place: a replacement keeps its position, a removal closes up,
+    /// and a new row goes where the listed order puts it. Publishes once, and only if a row changed.
+    private func commit(_ rows: [(path: String, row: ArchiveFile?)]) {
+        let index = rowIndexForPatch()
+        var replacements: [(position: Int, row: ArchiveFile)] = []
+        var removals: [Int] = []
+        var additions: [ArchiveFile] = []
+        var changed: [(path: String, old: ArchiveFile?, new: ArchiveFile?)] = []
+        for (path, row) in rows {
+            let position = index.position(of: path)
+            let old = position.map { files[$0] }
+            if old == nil, row == nil { continue }
+            if let old, let row, old == row { continue }
+            changed.append((path, old, row))
+            switch (position, row) {
+            case let (p?, r?): replacements.append((p, r))
+            case let (p?, nil): removals.append(p)
+            case let (nil, r?): additions.append(r)
+            case (nil, nil): break
+            }
+        }
+        guard !changed.isEmpty else { return }
+        filesRevision &+= 1
+        for (position, row) in replacements { files[position] = row }
+        if !removals.isEmpty || !additions.isEmpty {
+            for position in removals.sorted(by: >) { files.remove(at: position) }
+            for row in additions {
+                var lo = 0, hi = files.count
+                while lo < hi {
+                    let mid = (lo + hi) / 2
+                    if Self.listedBefore(files[mid].path, row.path) { lo = mid + 1 } else { hi = mid }
+                }
+                files.insert(row, at: lo)
+            }
+            invalidateRowIndex()
+        }
+        for c in changed { pendingChange.record(path: c.path, old: c.old, new: c.new) }
+    }
+
+    /// Replace every row: a walk, a warm snapshot, the whole-library merge.
+    private func replaceFiles(_ next: [ArchiveFile]) {
+        filesRevision &+= 1
+        files = next
+        pendingChange.markWhole()
+        invalidateRowIndex()
+    }
+
+    /// What changed since the last call (see `LibraryChangeSet`), and start afresh.
+    func takeChange() -> LibraryChangeSet {
+        var change = pendingChange
+        change.fromRevision = pendingChangeFrom
+        change.toRevision = filesRevision
+        pendingChange = LibraryChangeSet()
+        pendingChangeFrom = filesRevision
+        return change
+    }
+
+    private func invalidateRowIndex() {
+        rowIndex = nil
+        rowIndexGeneration &+= 1
+        rowIndexBuild?.cancel()
+        rowIndexBuild = nil
+        guard files.count >= 1_000 else { return }   // small libraries build it when asked, in no time
+        // Built off the main actor in the quiet after a publish, so the first change after a walk finds it.
+        let generation = rowIndexGeneration, snapshot = files
+        rowIndexBuild = Task { [weak self] in
+            let built = await Task.detached(priority: .utility) {
+                ReaderStages.measure("library.rowIndex") { LibraryRowIndex(snapshot) }
+            }.value
+            guard let self, self.rowIndexGeneration == generation else { return }
+            self.rowIndex = built
+            self.rowIndexBuild = nil
+        }
+    }
+
+    /// The row index for `files`, built here if the background build has not finished.
+    private func rowIndexForPatch() -> LibraryRowIndex {
+        if let rowIndex { return rowIndex }
+        let built = ReaderStages.measure("library.rowIndex") { LibraryRowIndex(files) }
+        rowIndex = built
+        rowIndexGeneration &+= 1      // a background build of the same rows is no longer needed
+        rowIndexBuild?.cancel()
+        rowIndexBuild = nil
+        return built
+    }
+
+    /// The rows at these paths, in the order given; a path the library does not list is left out. Uses
+    /// the row index when it is built, so the inspector's lookup is not a scan of every row.
+    func files(atPaths paths: [String]) -> [ArchiveFile] {
+        guard !paths.isEmpty else { return [] }
+        if let rowIndex {
+            return paths.compactMap { path in rowIndex.position(of: path).map { files[$0] } }
+        }
+        if paths.count == 1 { return files.first { $0.path == paths[0] }.map { [$0] } ?? [] }
+        let wanted = Set(paths)
+        var found: [String: ArchiveFile] = [:]
+        for f in files where wanted.contains(f.path) { found[f.path] = f }
+        return paths.compactMap { found[$0] }
+    }
+
+    private func finishApply(failures: [CorpusReadFailure], folderFailures: Int,
+                             changes: CorpusWatchChangeSet, readGeneration: UInt64) {
+        let nextFiles = files
         if !failures.isEmpty || folderFailures > 0 {
             let synthetic = CorpusScanResult(entries: [], unreadable: failures,
                                              directoryErrors: (0..<folderFailures).map {
@@ -1254,8 +1456,11 @@ final class ArchiveLibrary: ObservableObject {
 
     var verifiedWriteCountForTesting: Int { verifiedWrites.count }
 
+    /// Send every watch batch through the whole-library merge: the oracle the row patch is tested against.
+    var forceWholeMergeForTesting = false
+
     /// Lets a NavigationModel write-safety test model rows already published from a warm cache.
-    func replaceFilesForTesting(_ replacement: [ArchiveFile]) { files = replacement }
+    func replaceFilesForTesting(_ replacement: [ArchiveFile]) { replaceFiles(replacement) }
 
     func closeLibraryIndexForTesting() async { await libraryIndex?.close() }
 #endif
@@ -1326,14 +1531,31 @@ final class ArchiveLibrary: ObservableObject {
             verifiedWrites[r.url] = write
             replacements[r.url] = write
         }
-        let next = ReaderStages.measure("library.applyVerifiedWrites") {
-            files.compactMap { f in
-                guard let write = replacements[f.url] else { return f }
-                guard CorpusWalker.tracksReadState(write.after) else { return nil }
-                return Self.rebuilt(f, after: write.after, afterLabel: write.afterLabel)
+        ReaderStages.measure("library.applyVerifiedWrites") {
+            // The written rows alone, found through the row index (W40.fix-reader-change-incremental). A
+            // result whose path the index does not hold falls back to the scan by URL this used to be, so
+            // a row is never missed because its spelling differs.
+            let index = rowIndexForPatch()
+            var patch: [(path: String, row: ArchiveFile?)] = []
+            var unmatched: [URL: VerifiedWrite] = [:]
+            for (url, write) in replacements {
+                guard let position = index.position(of: url.path), files[position].url == url else {
+                    unmatched[url] = write
+                    continue
+                }
+                let f = files[position]
+                patch.append((f.path, CorpusWalker.tracksReadState(write.after)
+                              ? Self.rebuilt(f, after: write.after, afterLabel: write.afterLabel) : nil))
             }
+            if !unmatched.isEmpty {
+                for f in files {
+                    guard let write = unmatched[f.url] else { continue }
+                    patch.append((f.path, CorpusWalker.tracksReadState(write.after)
+                                  ? Self.rebuilt(f, after: write.after, afterLabel: write.afterLabel) : nil))
+                }
+            }
+            commit(patch)
         }
-        files = next
     }
 
     // MARK: - Row construction

@@ -212,7 +212,7 @@ struct AppKitTableView: NSViewRepresentable {
         var rowsChanged = false
         if coordinator.lastDisplayedGeneration != gen {
             coordinator.lastDisplayedGeneration = gen
-            if coordinator.showRows(model.displayed) {
+            if coordinator.showRows(model.displayed, orderGeneration: model.displayedOrderGeneration) {
                 rowsChanged = true
             } else {
                 // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
@@ -371,9 +371,14 @@ struct AppKitTableView: NSViewRepresentable {
         }
 
         @discardableResult
-        func showRows(_ files: [ArchiveFile]) -> Bool {
-            let idsChanged = files.count != currentSnapshotIDs.count
-                || !zip(files, currentSnapshotIDs).allSatisfy { $0.id == $1 }
+        /// `orderGeneration` is the model's `displayedOrderGeneration`. While it is the one the snapshot was
+        /// last checked at, the rows were only replaced in place, so comparing every id (79 ms at 116k rows,
+        /// W40.reader-scale-measure) is skipped. nil always compares.
+        func showRows(_ files: [ArchiveFile], orderGeneration: Int? = nil) -> Bool {
+            let sameOrder = orderGeneration != nil && orderGeneration == checkedOrderGeneration
+                && files.count == currentSnapshotIDs.count
+            let idsChanged = !sameOrder && (files.count != currentSnapshotIDs.count
+                || !zip(files, currentSnapshotIDs).allSatisfy { $0.id == $1 })
             // Return writes a tag cell's tags while it is still being edited (W40.fix-reader-tag-entry), and that
             // write can move or drop rows: a sort by tags, a tag filter. A new snapshot then would reload the cell
             // under its field editor, and the cell, reused for another row, would keep this file's id and tokens,
@@ -385,8 +390,12 @@ struct AppKitTableView: NSViewRepresentable {
             }
             rows = files
             if idsChanged { applySnapshot(files.map(\.id), animated: false) }
+            checkedOrderGeneration = orderGeneration
             return idsChanged
         }
+
+        /// The `displayedOrderGeneration` at which the snapshot last matched the model's rows.
+        private var checkedOrderGeneration: Int?
 
         /// The hidden columns the table last took.
         private var appliedHiddenColumns: Set<String>?

@@ -20,46 +20,75 @@ enum ArchiveFileProvenance: Hashable, Sendable {
 /// `tags` are parsed for display/sort/filter from ArchiveCore's on-disk read. `url` is the identity used
 /// for opening and for `TagWriter` mutations. UI-free.
 struct ArchiveFile: Identifiable, Sendable {
-    let url: URL
+    /// The row's fields, held once and shared by every copy (W40.fix-reader-change-incremental). The list
+    /// copies whole arrays of rows: the library's `files`, the presentation's filtered and sorted lists,
+    /// the table's rows. Inline, each copy retained a dozen references per row and allocated about 300
+    /// bytes per row, 75 ms and tens of megabytes at 116k rows; shared, a copy is one pointer per row.
+    /// Every field is a `let`, so sharing cannot be seen from outside.
+    private final class Fields: Sendable {
+        let url: URL
+        let path: String
+        let pathHash: Int
+        let name: String
+        let fileType: String
+        let tags: DocumentTags
+        let contentModified: Date?
+        let isDataless: Bool
+        let provenance: ArchiveFileProvenance
+        let dateAmbiguities: [DateAmbiguity]
+        let subjectKeys: Set<String>
+
+        init(url: URL, path: String, name: String, fileType: String, tags: DocumentTags,
+             contentModified: Date?, isDataless: Bool, provenance: ArchiveFileProvenance) {
+            self.url = url
+            self.path = path
+            self.pathHash = UTF8Key(path).hashValue
+            self.name = name
+            self.fileType = fileType
+            self.tags = tags
+            self.contentModified = contentModified
+            self.isDataless = isDataless
+            self.provenance = provenance
+            self.dateAmbiguities = tags.dateAmbiguities
+            self.subjectKeys = Set(tags.subjects.map(tagKey))
+        }
+    }
+    private let fields: Fields
+
+    var url: URL { fields.url }
     /// `url.path`, built once. URL rebuilds it on every access, and the list reads it for every row on
     /// every tag edit (filters, signatures, the prune set, the sort's tiebreak): at 116k rows that was
     /// most of what remained of a tag edit's cost (W40.fix-reader-list-recompute-at-size).
-    let path: String
+    var path: String { fields.path }
     /// `path`'s UTF-8 hash, for the change signatures (`LibraryChangeSignature`), which hash every row's
     /// path on every library change.
-    let pathHash: Int
-    let name: String
-    let fileType: String        // short label, e.g. "PDF"
-    let tags: DocumentTags
-    let contentModified: Date?
-    let isDataless: Bool
-    let provenance: ArchiveFileProvenance
+    var pathHash: Int { fields.pathHash }
+    var name: String { fields.name }
+    var fileType: String { fields.fileType }        // short label, e.g. "PDF"
+    var tags: DocumentTags { fields.tags }
+    var contentModified: Date? { fields.contentModified }
+    var isDataless: Bool { fields.isDataless }
+    var provenance: ArchiveFileProvenance { fields.provenance }
     /// W40.fix-reader-date-ambiguity: date facets that carried two tags, worked out once per row so the
     /// filter and the list never re-classify every subject of every file.
-    let dateAmbiguities: [DateAmbiguity]
+    var dateAmbiguities: [DateAmbiguity] { fields.dateAmbiguities }
     /// The subjects' tag identities (`tagKey`), worked out once per row: tags that differ only in case are
     /// one tag (W40.fix-tags-case-insensitive), and the filter tests every row against them.
-    let subjectKeys: Set<String>
+    var subjectKeys: Set<String> { fields.subjectKeys }
+
+    /// Whether two rows are the same stored row (a copy of one), which makes them equal without comparing.
+    func isSameStoredRow(as other: ArchiveFile) -> Bool { fields === other.fields }
 
     init(url: URL, name: String, fileType: String, tags: DocumentTags,
          contentModified: Date?, isDataless: Bool = false,
          provenance: ArchiveFileProvenance = .disk(readAt: Date())) {
-        self.url = url
         // Native UTF-8, made once here: a bridged string (what the walk and URL hand over) is copied
         // to UTF-8 on every byte-hash, which made each sort's 116k key lookups slower, not faster.
         var path = url.path, name = name
         path.makeContiguousUTF8()
         name.makeContiguousUTF8()
-        self.path = path
-        self.pathHash = UTF8Key(path).hashValue
-        self.name = name
-        self.fileType = fileType
-        self.tags = tags
-        self.contentModified = contentModified
-        self.isDataless = isDataless
-        self.provenance = provenance
-        self.dateAmbiguities = tags.dateAmbiguities
-        self.subjectKeys = Set(tags.subjects.map(tagKey))
+        fields = Fields(url: url, path: path, name: name, fileType: fileType, tags: tags,
+                        contentModified: contentModified, isDataless: isDataless, provenance: provenance)
     }
 
     /// Discovery and index reconstruction build URLs from filesystem representations; URL equality
@@ -99,9 +128,10 @@ struct ArchiveFile: Identifiable, Sendable {
 // left the row visibly "Unread". Comparing the displayed fields forces the row to re-render on edit.
 extension ArchiveFile: Hashable {
     static func == (lhs: ArchiveFile, rhs: ArchiveFile) -> Bool {
-        lhs.url == rhs.url && lhs.name == rhs.name && lhs.fileType == rhs.fileType
-            && lhs.tags == rhs.tags && lhs.contentModified == rhs.contentModified
-            && lhs.isDataless == rhs.isDataless && lhs.provenance == rhs.provenance
+        lhs.isSameStoredRow(as: rhs)
+            || (lhs.url == rhs.url && lhs.name == rhs.name && lhs.fileType == rhs.fileType
+                && lhs.tags == rhs.tags && lhs.contentModified == rhs.contentModified
+                && lhs.isDataless == rhs.isDataless && lhs.provenance == rhs.provenance)
     }
     // url-only hash stays valid: value-equal files share a url, so they share a hash (collisions OK).
     func hash(into hasher: inout Hasher) { hasher.combine(url) }

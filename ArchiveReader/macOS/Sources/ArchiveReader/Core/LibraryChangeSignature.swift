@@ -34,13 +34,16 @@ enum LibraryChangeSignature {
     /// subjects), as a per-file composite hash. Folding the unique `url.path` into each file's hash
     /// means distinct files never structurally cancel, so parity is a non-issue here.
     static func matchFacets(_ files: [ArchiveFile]) -> Int {
-        files.reduce(0) { acc, f in
-            var h = Hasher()
-            h.combine(f.pathHash)
-            h.combine(f.readState)
-            h.combine(f.quality)
-            for s in f.subjects { h.combine(s) }
-            return acc ^ h.finalize()
-        }
+        files.reduce(0) { $0 ^ matchFacets(of: $1) }
+    }
+
+    /// One file's part of `matchFacets`: a changed row moves the signature by `old ^ new`.
+    static func matchFacets(of f: ArchiveFile) -> Int {
+        var h = Hasher()
+        h.combine(f.pathHash)
+        h.combine(f.readState)
+        h.combine(f.quality)
+        for s in f.subjects { h.combine(s) }
+        return h.finalize()
     }
 }

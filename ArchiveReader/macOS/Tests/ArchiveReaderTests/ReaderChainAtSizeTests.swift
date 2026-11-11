@@ -148,6 +148,35 @@ final class ReaderChainAtSizeTests: XCTestCase {
         printStages(label, runs.sorted { $0.busy < $1.busy }[runs.count / 2])
     }
 
+    // MARK: - Budgets (W40.fix-reader-change-incremental), asserted on the -O run
+
+    private func median(_ xs: [Double]) -> Double { xs.sorted()[xs.count / 2] }
+
+    /// Main-thread time spent in `stage`, summed.
+    private func onMain(_ stage: String, _ chain: Chain) -> Double {
+        chain.stages.filter { $0.key.stage == stage && $0.key.onMain }.values
+            .reduce(0) { $0 + Double($1.nanoseconds) / 1e9 }
+    }
+
+    /// The tag-change budgets W40.reader-scale-measure set: main-busy (less TagWriter's own write, verify and
+    /// fsync, which stay), visible, the longest stall, and no row count on the main thread.
+    private func assertChangeBudget(_ label: String, _ runs: [Chain], busy: Double, visible: Double,
+                                    excludingWriter: Bool) {
+        guard optimized else { return }
+        let busyLessWriter = runs.map { $0.busy - (excludingWriter ? onMain("tagWriter.writes", $0) : 0) }
+        print("CH budget \(label): main-busy\(excludingWriter ? " after TagWriter" : "") median \(ms(median(busyLessWriter))) "
+              + "(budget \(ms(busy))), visible median \(ms(median(runs.map { $0.visible ?? .infinity }))) "
+              + "(budget \(ms(visible))), longest stall max \(ms(runs.map(\.longest).max() ?? 0))")
+        XCTAssertLessThanOrEqual(median(busyLessWriter), busy, "\(label): main-busy")
+        XCTAssertLessThanOrEqual(median(runs.map { $0.visible ?? .infinity }), visible, "\(label): visible")
+        for (k, run) in runs.enumerated() {
+            let writer = excludingWriter ? (run.stages.first { $0.key.stage == "tagWriter.writes" && $0.key.onMain }?
+                .value.maxNanoseconds).map { Double($0) / 1e9 } ?? 0 : 0
+            XCTAssertLessThanOrEqual(run.longest - writer, 0.100, "\(label) run \(k + 1): a stall over 100 ms")
+            XCTAssertEqual(onMain("model.countMatches.rows", run), 0, "\(label) run \(k + 1): rows counted on main")
+        }
+    }
+
     // MARK: - Outside measurements (footprint, heap, leaks), run by the harness
 
     /// Ask the harness to run `kind` (footprint | heap | leaks) on this process; wait for it.
@@ -277,6 +306,7 @@ final class ReaderChainAtSizeTests: XCTestCase {
             XCTAssertEqual(row?.tags.raw.sorted(), tags.sorted(), "the foreign write reached the library")
         }
         summarize("foreign-1", foreign)
+        assertChangeBudget("foreign-1", foreign, busy: 0.050, visible: 0.500, excludingWriter: false)
 
         // ── 2. A Reader write (Mark Read / Unread) on 1 and on 20 files, inside a smart folder.
         let box12 = try XCTUnwrap(navigation.savedSearches.searches.first { $0.name == "Box 12" })
@@ -297,6 +327,7 @@ final class ReaderChainAtSizeTests: XCTestCase {
                                                visible: { navigation.displayedGeneration != generation }))
             }
             summarize("reader-write-\(count)", runs)
+            assertChangeBudget("reader-write-\(count)", runs, busy: 0.150, visible: 0.250, excludingWriter: true)
         }
         navigation.removeFilter(.smartFolder)
         _ = await waitUntil(timeout: 30) { navigation.displayed.count == navigation.library.files.count }
@@ -392,6 +423,9 @@ final class ReaderChainAtSizeTests: XCTestCase {
         let quietEnd = footprintMiB()
         print(String(format: "CH memory after a quiet minute footprint %.0f MiB (%+.0f from start, %+.0f from busy end)",
                      quietEnd, quietEnd - memoryStart, quietEnd - busyEnd))
+        if optimized {
+            XCTAssertLessThanOrEqual(quietEnd - memoryStart, 100, "200 edits plateau within 100 MB of the start")
+        }
         await outside("footprint", "end-quiet")
         await outside("heap", "end-quiet")
         await outside("leaks", "end-quiet", timeout: 1_200)
@@ -496,7 +530,8 @@ final class ViewEmulation {
         ReaderStages.measure("view.inspector body (emulated)") { _ = navigation.libraryFiles(atPaths: paths) }
         if navigation.displayedGeneration != shownGeneration {
             shownGeneration = navigation.displayedGeneration
-            ReaderStages.measure("view.table showRows (emulated)") { _ = coordinator.showRows(navigation.displayed) }
+            ReaderStages.measure("view.table showRows (emulated)") { _ = coordinator.showRows(navigation.displayed,
+                                                                                    orderGeneration: navigation.displayedOrderGeneration) }
         }
         if navigation.selection != shownSelection {
             shownSelection = navigation.selection
