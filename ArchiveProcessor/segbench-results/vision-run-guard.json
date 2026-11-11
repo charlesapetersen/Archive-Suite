@@ -1,0 +1,210 @@
+{
+ "os_build": "26B123",
+ "machine": "arm64",
+ "pages": 96,
+ "runs": [
+  {
+   "run": 1,
+   "seconds": 16.5,
+   "changed": [],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 2,
+   "seconds": 16.0,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 3,
+   "seconds": 16.2,
+   "changed": [
+    "p050",
+    "p053"
+   ],
+   "short": [
+    "p053"
+   ],
+   "lines": 4454,
+   "words": 29214
+  },
+  {
+   "run": 4,
+   "seconds": 16.1,
+   "changed": [],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 5,
+   "seconds": 16.1,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 6,
+   "seconds": 16.1,
+   "changed": [
+    "p048",
+    "p053"
+   ],
+   "short": [
+    "p053"
+   ],
+   "lines": 4450,
+   "words": 29191
+  },
+  {
+   "run": 7,
+   "seconds": 16.2,
+   "changed": [
+    "p048",
+    "p050"
+   ],
+   "short": [],
+   "lines": 4455,
+   "words": 29223
+  },
+  {
+   "run": 8,
+   "seconds": 16.1,
+   "changed": [
+    "p048",
+    "p050"
+   ],
+   "short": [],
+   "lines": 4455,
+   "words": 29223
+  },
+  {
+   "run": 9,
+   "seconds": 16.1,
+   "changed": [],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 10,
+   "seconds": 16.2,
+   "changed": [
+    "p050"
+   ],
+   "short": [],
+   "lines": 4455,
+   "words": 29223
+  },
+  {
+   "run": 11,
+   "seconds": 16.2,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 12,
+   "seconds": 16.1,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 13,
+   "seconds": 16.4,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 14,
+   "seconds": 16.2,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 15,
+   "seconds": 16.4,
+   "changed": [
+    "p048",
+    "p050"
+   ],
+   "short": [],
+   "lines": 4455,
+   "words": 29223
+  },
+  {
+   "run": 16,
+   "seconds": 16.2,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 17,
+   "seconds": 16.1,
+   "changed": [
+    "p048",
+    "p050"
+   ],
+   "short": [],
+   "lines": 4455,
+   "words": 29223
+  },
+  {
+   "run": 18,
+   "seconds": 16.2,
+   "changed": [
+    "p048"
+   ],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  },
+  {
+   "run": 19,
+   "seconds": 16.2,
+   "changed": [
+    "p050"
+   ],
+   "short": [],
+   "lines": 4455,
+   "words": 29223
+  },
+  {
+   "run": 20,
+   "seconds": 16.2,
+   "changed": [],
+   "short": [],
+   "lines": 4451,
+   "words": 29200
+  }
+ ],
+ "binary_sha256_16": "8c0741beaa66c9b4"
+}

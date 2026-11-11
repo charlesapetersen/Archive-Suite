@@ -12,7 +12,7 @@ lose a line or more than 3% of their words is refused (VisionRunFault), and the 
 `~/Library/Caches/ArchiveSuiteRehearsal/vision-guard/quarantine/<stamp>/` (never deleted), so a cached runner that skips
 existing outputs reads them again next time instead of keeping them. On 27.2 typed pages read identically from run to
 run (W46.dewarp-bin-reread: 1,532 of 1,536 identical, every difference a handwritten page, one motion-blurred page or one
-character), so the slack is a margin, not a measured spread; the faulty run lost 41-74% of these pages' words. Other
+character), so the slack is a margin, not a measured spread; the faulty run lost 65-75% of these pages' words. Other
 `segbench-dewarp` modes (quad, encode) read no text and run unguarded.
 
 The frozen file holds counts and hashes only (the repo is public; the texts stay in the cache). It names the OS build it
