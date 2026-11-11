@@ -5,7 +5,8 @@ import ArchiveCore
 /// Sources, authors, document DATE (one typed field + a "date uncertain" toggle), QUALITY, the item's
 /// folder locations and Zotero. These fields use front matter through `NotesNavigationModel` →
 /// `NotesModel`; authors remain front-matter only, while the model mirrors valid Quality values as Q1...Q3
-/// on this note's own `.md`. Tags are edited in the tag bar under the note (`NoteTagBar`).
+/// on this note's own `.md`. Tags are edited in the tag bar under the note (`NoteTagBar`), or above these
+/// fields while that bar is hidden (`NoteInspectorPanel`).
 ///
 /// Adapted from Reader's `InlineEditCells.DateCell` + `TagEditorView.dateSection`/`prioritySection`,
 /// retargeted from tag writes to the Notes front-matter store. Local field state is seeded from the

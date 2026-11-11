@@ -15,9 +15,13 @@ import ArchiveCoreUI
 /// keeps the keyboard for the next tag. There is no Add button. Edits run one at a time in the order they were
 /// made, so several tags typed in a row all land, and the field is never disabled while one saves (a disabled
 /// field would lose the keyboard after every tag).
+///
+/// `inInspector` lays the same editor out for the inspector, the field under the tokens: with the bar hidden (View ▸
+/// Hide Tag Bar, W40.notes-window-panes; owner, notes-2 row 22) the inspector shows it, so tagging stays possible.
 struct NoteTagBar: View {
     @ObservedObject var model: NotesModel
     let item: ItemSummary
+    var inInspector = false
     @State private var draft = ""
     private enum Edit: Equatable {
         case add(String), remove(String)
@@ -35,40 +39,63 @@ struct NoteTagBar: View {
     static let maxLines: CGFloat = 3
 
     var body: some View {
+        if inInspector {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tags").font(.caption.weight(.semibold))
+                if !item.managedTags.isEmpty { tokens }
+                entry
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("an.inspector.tags")
+        } else {
+            bar
+        }
+    }
+
+    private var bar: some View {
         HStack(alignment: .top, spacing: 8) {
             Text("Tags").font(.caption.weight(.semibold))
                 .frame(height: Self.lineHeight)
-            ScrollView(.vertical) {
-                FlowLayout(spacing: 4, lineSpacing: 2) {
-                    ForEach(item.managedTags, id: \.self) { tag in token(tag) }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tokensHeight = $0 }
-            }
-            .scrollIndicators(.automatic)
-            .frame(height: max(Self.lineHeight, min(tokensHeight, Self.lineHeight * Self.maxLines + 4)))
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("an.tagbar.tokens")
-            VStack(alignment: .leading, spacing: 2) {
-                SubjectEntryField(draft: $draft, placeholder: "Add tag…", identifier: "an.detail.tags.input",
-                                  fillsInAnyCase: true,
-                                  suggestions: { Self.suggestions(for: item, in: model.allItems) },
-                                  onAdd: { enqueue(.add($0)) })
-                if !failedEdits.isEmpty {
-                    HStack {
-                        Text("Couldn't finish saving tags.").font(.caption).foregroundStyle(.red)
-                        Button("Retry") { failedEdits.forEach(enqueue) }
-                            .accessibilityIdentifier("an.detail.tags.retry")
-                    }
-                }
-            }
-            .frame(width: 180)
+            tokens
+            entry
+                .frame(width: 180)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         // A container, so the controls inside keep their own identifiers (an outer one replaced them).
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("an.tagbar")
+    }
+
+    private var tokens: some View {
+        ScrollView(.vertical) {
+            FlowLayout(spacing: 4, lineSpacing: 2) {
+                ForEach(item.managedTags, id: \.self) { tag in token(tag) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tokensHeight = $0 }
+        }
+        .scrollIndicators(.automatic)
+        .frame(height: max(Self.lineHeight, min(tokensHeight, Self.lineHeight * Self.maxLines + 4)))
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("an.tagbar.tokens")
+    }
+
+    private var entry: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SubjectEntryField(draft: $draft, placeholder: "Add tag…", identifier: "an.detail.tags.input",
+                              fillsInAnyCase: true,
+                              suggestions: { Self.suggestions(for: item, in: model.allItems) },
+                              onAdd: { enqueue(.add($0)) })
+            if !failedEdits.isEmpty {
+                HStack {
+                    Text("Couldn't finish saving tags.").font(.caption).foregroundStyle(.red)
+                    Button("Retry") { failedEdits.forEach(enqueue) }
+                        .accessibilityIdentifier("an.detail.tags.retry")
+                }
+            }
+        }
     }
 
     private func token(_ tag: String) -> some View {

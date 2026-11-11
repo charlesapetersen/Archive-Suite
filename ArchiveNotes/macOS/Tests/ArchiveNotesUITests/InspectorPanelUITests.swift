@@ -185,6 +185,53 @@ final class InspectorPanelUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.notes-window-panes (owner, notes-2 row 22): View hides the Folders pane, the note's header, its formatting
+    /// bar and its tag bar, leaving the filters, the list and the note text; with the tag bar hidden the inspector
+    /// edits the tags; the Markdown toggle keeps working with no row of its own. Every part is shown again at the end,
+    /// since the choices persist beyond the fixture restore.
+    func testEachPartOfTheWindowHidesAndTagsMoveToTheInspector() throws {
+        try withFixture {
+            let any = mainWindow.descendants(matching: .any)
+            let folders = any["an.sidebar.newFolder"], header = any["an.detail.header"]
+            let bold = any["an.editor.toolbar.bold"], tagBar = any["an.tagbar"], raw = any["an.editor.rawToggle"]
+            defer {
+                for (shown, title) in [(folders, "Show Folders"), (header, "Show Note Header"),
+                                       (bold, "Show Formatting Bar"), (tagBar, "Show Tag Bar")] where !shown.exists {
+                    clickViewMenuItem(title)
+                }
+            }
+            _ = selectItem(uuid: Self.idPlain)
+            XCTAssertTrue(header.waitForExistence(timeout: 10) && bold.exists && tagBar.exists && folders.exists,
+                          "every part is shown by default")
+            XCTAssertEqual(raw.frame.midY, bold.frame.midY, accuracy: 4,
+                           "the Markdown toggle shares the formatting bar's row")
+
+            clickViewMenuItem("Hide Folders")
+            XCTAssertTrue(pollUntil(timeout: 5) { !folders.exists }, "View ▸ Hide Folders hides the Folders pane")
+            clickViewMenuItem("Hide Note Header")
+            XCTAssertTrue(pollUntil(timeout: 5) { !header.exists }, "View ▸ Hide Note Header hides the header")
+            clickViewMenuItem("Hide Formatting Bar")
+            XCTAssertTrue(pollUntil(timeout: 5) { !bold.exists }, "View ▸ Hide Formatting Bar hides it")
+            XCTAssertTrue(raw.exists, "the Markdown toggle stays, in the editor's corner")
+            clickViewMenuItem("Hide Tag Bar")
+            XCTAssertTrue(pollUntil(timeout: 5) { !tagBar.exists }, "View ▸ Hide Tag Bar hides it")
+            let inspectorTags = inspector.descendants(matching: .any)["an.inspector.tags"]
+            XCTAssertTrue(inspectorTags.waitForExistence(timeout: 5), "with the bar hidden, the inspector edits the tags")
+            XCTAssertTrue(inspectorTags.descendants(matching: .any)["an.detail.tags.input"].exists,
+                          "the inspector offers the add-tag field")
+            XCTAssertTrue(any["an.filter.kind"].exists && editor.exists, "the filters, the list and the note remain")
+            shot("window-panes-hidden")
+
+            raw.click()
+            XCTAssertTrue(raw.exists, "raw, the toggle is still there to switch back")
+            raw.click()
+
+            clickViewMenuItem("Show Tag Bar")
+            XCTAssertTrue(tagBar.waitForExistence(timeout: 5), "View ▸ Show Tag Bar brings it back")
+            XCTAssertFalse(inspectorTags.exists, "the tags leave the inspector once the bar is back")
+        }
+    }
+
     // MARK: - Helpers
 
     private func clickViewMenuItem(_ title: String) {

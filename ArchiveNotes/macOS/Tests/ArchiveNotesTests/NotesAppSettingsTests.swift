@@ -201,6 +201,25 @@ struct NotesAppSettingsTests {
         #expect(NotesLayoutSettings(reading: d).inspectorWidth == NotesLayoutSettings.inspectorWidthMax)
     }
 
+    /// W40.notes-window-panes: the formatting bar, the note header and the tag bar are shown until hidden, each
+    /// under its own `an.` key, apart from the panels' keys.
+    @Test func notePanePartsDefaultShownAndRoundTrip() {
+        let d = scratchDefaults()
+        let shown = NotesLayoutSettings(reading: d)
+        #expect(shown.showFormattingBar && shown.showNoteHeader && shown.showTagBar)
+        d.set(false, forKey: NotesLayoutSettingsKey.showFormattingBar)
+        #expect(NotesLayoutSettings(reading: d).showFormattingBar == false)
+        #expect(NotesLayoutSettings(reading: d).showNoteHeader && NotesLayoutSettings(reading: d).showTagBar)
+        d.set(false, forKey: NotesLayoutSettingsKey.showNoteHeader)
+        d.set(false, forKey: NotesLayoutSettingsKey.showTagBar)
+        let hidden = NotesLayoutSettings(reading: d)
+        #expect(!hidden.showNoteHeader && !hidden.showTagBar)
+        let keys = [NotesLayoutSettingsKey.showFormattingBar, NotesLayoutSettingsKey.showNoteHeader,
+                    NotesLayoutSettingsKey.showTagBar]
+        #expect(keys == ["an.showFormattingBar", "an.showNoteHeader", "an.showTagBar"])
+        #expect(Set(keys).isDisjoint(with: [NotesLayoutSettingsKey.showTree, NotesLayoutSettingsKey.showInspector]))
+    }
+
     // MARK: stacked layout (W48.notes-stacked-layout)
 
     @Test func layoutModeDefaultsToSideBySideAndRoundTrips() {

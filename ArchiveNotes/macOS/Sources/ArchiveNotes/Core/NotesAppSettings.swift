@@ -31,6 +31,12 @@ enum NotesLayoutSettingsKey {
     static let layoutMode = "an.layoutMode"
     /// The item list's height in the stacked layout (W48.notes-stacked-layout).
     static let listHeight = "an.listHeight"
+    /// The note pane's parts that View menu items show or hide (W40.notes-window-panes; notes-2 row 22), shared by
+    /// both windows: the formatting bar above the editor, the title/date/authors header, the tag bar under it.
+    /// Hidden, the note's title and tags are still edited in the inspector.
+    static let showFormattingBar = "an.showFormattingBar"
+    static let showNoteHeader = "an.showNoteHeader"
+    static let showTagBar = "an.showTagBar"
 }
 
 /// How the browser arranges the item list and the note (W48.notes-stacked-layout). The folder tree stays on the
@@ -54,6 +60,9 @@ struct NotesLayoutSettings: Equatable, Sendable {
     var detailWidth: Double
     var showTree: Bool
     var showInspector: Bool
+    var showFormattingBar: Bool
+    var showNoteHeader: Bool
+    var showTagBar: Bool
     var inspectorWidth: Double
     var hiddenColumns: Set<String>
     var layoutMode: NotesLayoutMode
@@ -125,6 +134,9 @@ struct NotesLayoutSettings: Equatable, Sendable {
 
         showTree = d.object(forKey: NotesLayoutSettingsKey.showTree) as? Bool ?? true
         showInspector = d.object(forKey: NotesLayoutSettingsKey.showInspector) as? Bool ?? true
+        showFormattingBar = d.object(forKey: NotesLayoutSettingsKey.showFormattingBar) as? Bool ?? true
+        showNoteHeader = d.object(forKey: NotesLayoutSettingsKey.showNoteHeader) as? Bool ?? true
+        showTagBar = d.object(forKey: NotesLayoutSettingsKey.showTagBar) as? Bool ?? true
         let iw = d.object(forKey: NotesLayoutSettingsKey.inspectorWidth) as? Double ?? Self.defaultInspectorWidth
         inspectorWidth = min(Self.inspectorWidthMax, max(Self.inspectorWidthMin, iw))
         hiddenColumns = Set(d.stringArray(forKey: NotesLayoutSettingsKey.hiddenColumns) ?? [])

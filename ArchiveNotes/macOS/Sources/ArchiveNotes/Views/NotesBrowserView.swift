@@ -458,6 +458,8 @@ private struct ItemListPane: View {
     @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
+    @AppStorage(NotesLayoutSettingsKey.showNoteHeader) private var showingHeader = true
+    @AppStorage(NotesLayoutSettingsKey.showTagBar) private var showingTagBar = true
     @Binding var selectedTemplateID: UUID?
 
     var body: some View {
@@ -553,6 +555,8 @@ private struct ItemListPane: View {
 private struct DetailPane: View {
     @ObservedObject var nav: NotesNavigationModel
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
+    @AppStorage(NotesLayoutSettingsKey.showNoteHeader) private var showingHeader = true
+    @AppStorage(NotesLayoutSettingsKey.showTagBar) private var showingTagBar = true
     @Binding var selectedTemplateID: UUID?
 
     var body: some View {
@@ -587,12 +591,16 @@ private struct DetailPane: View {
 
     /// The header, the editor and the tag bar under it. The fields and locations are in the inspector
     /// (`NoteInspectorPanel`), so the editor takes the whole height between the header and the tags.
+    /// View ▸ Hide Note Header / Hide Tag Bar take either away (W40.notes-window-panes); the title is still renamed in
+    /// the list, and the tags move to the inspector. The editor stays put, so hiding one never reloads the note.
     private var noteDetail: some View {
         VStack(spacing: 0) {
-            selectedHeader
-            Divider()
+            if showingHeader {
+                selectedHeader
+                Divider()
+            }
             NoteEditorPane(nav: nav)
-            if let summary = nav.detailSummary {
+            if showingTagBar, let summary = nav.detailSummary {
                 Divider()
                 // Keyed by the note, so a tag still saving finishes on the note it was typed for.
                 NoteTagBar(model: nav.model, item: summary)
@@ -651,14 +659,26 @@ private struct NoteInspectorPanel: View {
     /// With a mouse, macOS shows always-on ("legacy") scroll bars, and the scroll bar sat over the right edge of the
     /// fields, where the Locations rows' remove buttons are: a click there hit the scroll bar (VM run 4).
     @State private var scrollerStyle = NSScroller.preferredScrollerStyle
+    /// With the tag bar under the note hidden, the tags are edited here (W40.notes-window-panes, notes-2 row 22).
+    @AppStorage(NotesLayoutSettingsKey.showTagBar) private var showingTagBar = true
 
     var body: some View {
         VStack(spacing: 0) {
             if nav.paneMode == .notes, let summary = nav.detailSummary {
                 // No identifier of its own: as the panel's one child, the scroll area takes the panel's `an.inspector`.
                 ScrollView {
-                    NoteMetadataInspector(nav: nav, item: summary)
-                        .padding(.trailing, scrollerTrailing)
+                    VStack(spacing: 0) {
+                        if !showingTagBar {
+                            // Keyed by the note, as the bar is, so a tag still saving finishes on its own note.
+                            NoteTagBar(model: nav.model, item: summary, inInspector: true)
+                                .id(summary.id)
+                                .padding(.horizontal, 10)
+                                .padding(.top, 8)
+                            Divider().padding(.horizontal, 10).padding(.top, 10)
+                        }
+                        NoteMetadataInspector(nav: nav, item: summary)
+                    }
+                    .padding(.trailing, scrollerTrailing)
                 }
             } else if nav.showingTemplates,
                       let template = nav.model.templates.first(where: { $0.id == selectedTemplateID }) {

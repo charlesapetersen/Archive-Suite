@@ -15,6 +15,8 @@ struct NoteEditorPane: View {
 
     @StateObject private var bodyEditor = NoteBodyEditorModel()
     @State private var isRaw = false
+    /// View ▸ Hide Formatting Bar (W40.notes-window-panes); the Format menu still formats.
+    @AppStorage(NotesLayoutSettingsKey.showFormattingBar) private var showingFormattingBar = true
     @State private var parseFailureMessage: String?
     /// W7-S3 — a pending jump-to-source request this window should honor (select the note + scroll to
     /// its block). Set by `handleOpen`; the scroll fires once `bodyEditor.loadedID` reaches the target.
@@ -72,16 +74,22 @@ struct NoteEditorPane: View {
                 zoteroBanner(ref)
                 Divider()
             }
-            if !isRaw {
-                // Nothing to format with no note shown (W40.fix-notes-visual-polish). Keyed to the loaded
-                // body, not `editorIsReady`: that is false for a moment on every note switch, and the
-                // toolbar then flickered disabled between two notes (TransientStateUITests).
-                FormattingToolbar(context: formatting)
-                    .disabled(bodyEditor.loadedID == nil)
+            if togglesInFormattingBar {
+                // The Markdown toggle ends the formatting bar's row rather than taking a row of its own
+                // (W40.notes-window-panes; owner, notes-2 row 22).
+                HStack(spacing: 0) {
+                    // Nothing to format with no note shown (W40.fix-notes-visual-polish). Keyed to the loaded
+                    // body, not `editorIsReady`: that is false for a moment on every note switch, and the
+                    // toolbar then flickered disabled between two notes (TransientStateUITests).
+                    FormattingToolbar(context: formatting)
+                        .disabled(bodyEditor.loadedID == nil)
+                    rawToggle
+                        .padding(.trailing, 8)
+                        .frame(height: 28)
+                        .background(.bar)
+                }
                 Divider()
             }
-            rawToggleBar
-            Divider()
             if let parseFailureMessage {
                 Label(parseFailureMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -103,6 +111,16 @@ struct NoteEditorPane: View {
                 .id(bodyEditor.loadedID)
                 .id(extractEditorGeneration)
                 .disabled(!editorIsReady)
+                // Raw, or with the formatting bar hidden (View ▸ Hide Formatting Bar), the toggle floats in the
+                // editor's corner and the text starts at the top.
+                .overlay(alignment: .topTrailing) {
+                    if !togglesInFormattingBar {
+                        rawToggle
+                            .padding(3)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5))
+                            .padding(4)
+                    }
+                }
 #if DEBUG
             uiTestControlStrip
 #endif
@@ -558,23 +576,20 @@ struct NoteEditorPane: View {
         zoteroStatus.refreshAvailability()
     }
 
-    private var rawToggleBar: some View {
-        HStack {
-            Spacer()
-            Button {
-                guard editorIsReady else { return }
-                isRaw.toggle()
-            } label: {
-                Image(systemName: isRaw ? "doc.plaintext" : "doc.richtext")
-                    .help(isRaw ? "Switch to styled mode" : "Switch to raw Markdown (⌘/)")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut("/", modifiers: .command)
-            .accessibilityIdentifier("an.editor.rawToggle")
-            .padding(.trailing, 8)
+    /// The formatting bar is shown, so the Markdown toggle sits at its end.
+    private var togglesInFormattingBar: Bool { showingFormattingBar && !isRaw }
+
+    private var rawToggle: some View {
+        Button {
+            guard editorIsReady else { return }
+            isRaw.toggle()
+        } label: {
+            Image(systemName: isRaw ? "doc.plaintext" : "doc.richtext")
+                .help(isRaw ? "Switch to styled mode" : "Switch to raw Markdown (⌘/)")
         }
-        .frame(height: 28)
-        .background(.bar)
+        .buttonStyle(.borderless)
+        .keyboardShortcut("/", modifiers: .command)
+        .accessibilityIdentifier("an.editor.rawToggle")
     }
 
     /// W40.fix-notes-held-draft-reopen: the editor shows text a closed editor could not save, not the

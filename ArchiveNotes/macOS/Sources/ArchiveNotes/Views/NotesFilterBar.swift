@@ -22,18 +22,9 @@ struct NotesFilterBar: View {
         VStack(spacing: 6) {
             topRow
             facetRow
+            // Round-up is not a filter here (owner, notes-2 row 19): it is set in the inspector and searched
+            // in Advanced Search, whose chip still shows in the row below.
             tagFilter
-            HStack {
-                Picker("Round-up", selection: $nav.filter.roundup) {
-                    Text("Any").tag(Optional<Bool>.none)
-                    Text("Round-up notes").tag(Optional(true))
-                    Text("Other items").tag(Optional(false))
-                }
-                .pickerStyle(.menu)
-                .fixedSize()
-                .accessibilityIdentifier("an.filter.roundup")
-                Spacer(minLength: 0)
-            }
             let chips = nav.activeFilterChips
             if !chips.isEmpty { activeFilterChipRow(chips) }
         }
@@ -188,6 +179,8 @@ struct NotesFilterBar: View {
                               suggestions: { NoteTagChipsField.suggestions(in: nav.model.allItems) })
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("an.filter.tags")
     }
 
     private var dateRange: some View {

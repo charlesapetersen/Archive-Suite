@@ -312,7 +312,10 @@ macOS/Sources/ArchiveNotes/
                                    NoteTagBar; NoteInspectorPanel at the window's right (an.inspector, outside the
                                    panes' layout so it runs full height stacked; View ▸ Show/Hide Inspector ⌥⌘I,
                                    toolbar an.inspector.toggle, an.showInspector/an.inspectorWidth 220–360 pt;
-                                   W40.notes-detail-layout) holds NoteMetadataInspector; settled empty-library, empty-folder,
+                                   W40.notes-detail-layout) holds NoteMetadataInspector, and NoteTagBar(inInspector:)
+                                   while the tag bar is hidden; View ▸ Hide Folders/Note Header/Formatting Bar/
+                                   Tag Bar (an.showTree/.showNoteHeader/.showFormattingBar/.showTagBar,
+                                   W40.notes-window-panes); settled empty-library, empty-folder,
                                    and no-match guidance over the list (W9.d8)
                                    (W6-S3); .task bootstraps the store. Toolbar kind label + "New" menu (both
                                    kinds, own first; New from Template ▸ both kinds' templates; another kind
@@ -400,7 +403,8 @@ macOS/Sources/ArchiveNotes/
                                    (W9.d2); Add/Move folder and scoped Remove — the a11y/keyboard drag path (W6-S5)
     NotesWindowAccessor.swift      NSViewRepresentable reaching the hosting NSWindow (restore/remember
                                    window size, DV-1 pattern; Reader's WindowAccessor is private)
-    NoteEditorPane.swift           Center pane: FormattingToolbar + raw toggle + MarkdownEditorView,
+    NoteEditorPane.swift           Center pane: FormattingToolbar (raw toggle at its row's end; raw or bar
+                                   hidden, the toggle floats in the editor's corner) + MarkdownEditorView,
                                    BOUND to the selected item's body via NoteBodyEditorModel (load-on-
                                    select + autosave + flush-on-switch, W7-S1a); publishes the item's
                                    id/title/date to FormattingContext for W7 Create-Extract; wires
@@ -714,7 +718,7 @@ in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard m
 | File | Choose Archive Folder… · Choose Store Folder… | `⇧⌘O` (the Reader's key) · — |
 | Edit | Paste as Source Block(s) | `⇧⌘V` |
 | Edit | Find ▸ Find… · Find Next · Find Previous · Use Selection for Find (the Mac's own, `TextEditingCommands`; the editor's find bar) | `⌘F` · `⌘G` · `⇧⌘G` · `⌘E` |
-| View | Show/Hide Inspector · Layout (Side by Side / List Above Note) | `⌥⌘I` (`⌘I` is Italic) · — |
+| View | Show/Hide Folders · Show/Hide Inspector · Show/Hide Note Header · Formatting Bar · Tag Bar · Layout (Side by Side / List Above Note) | `⌃⌘S` · `⌥⌘I` (`⌘I` is Italic) · — · — · — · — |
 | Format | Bold · Italic · Inline Code · Link… | `⌘B` · `⌘I` · `⌥⌘C` · `⌘K` |
 | Format | Body · Heading 1–6 | `⌥⌘0` · `⌥⌘1`–`⌥⌘6` |
 | Format | Bulleted List · Numbered List · Blockquote · Code Block | `⌥⌘U` · `⌥⌘O` · `⌥⌘Q` · `⌥⌘K` |

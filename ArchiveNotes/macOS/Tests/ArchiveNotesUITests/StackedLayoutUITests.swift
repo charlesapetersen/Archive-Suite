@@ -107,14 +107,16 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             let list = mainWindow.tables.firstMatch
             let listTop = divider.frame.minY - 160
             let kind = mainWindow.descendants(matching: .any)["an.filter.kind"].firstMatch
-            let roundup = mainWindow.descendants(matching: .any)["an.filter.roundup"].firstMatch
+            // The bar's last row is the tag filter since Round-up left it (W40.notes-window-panes).
+            let lastRow = mainWindow.descendants(matching: .any)["an.filter.tags"].firstMatch
             let firstRow = list.tableRows.firstMatch
-            print("[small-fixes] at the floor: list top \(listTop), kind \(kind.frame), round-up \(roundup.frame), "
+            print("[small-fixes] at the floor: list top \(listTop), kind \(kind.frame), tags \(lastRow.frame), "
                   + "table \(list.frame), first row \(firstRow.frame), divider \(divider.frame)")
             XCTAssertGreaterThanOrEqual(kind.frame.minY, listTop - 0.5, "the filter bar's top row should be inside the list")
-            XCTAssertTrue(roundup.isHittable, "the filter bar's last row should still be shown")
+            XCTAssertTrue(lastRow.exists && lastRow.frame.maxY <= divider.frame.minY + 0.5,
+                          "the filter bar's last row should still be shown")
             XCTAssertLessThanOrEqual(firstRow.frame.maxY, divider.frame.minY + 0.5, "a whole row should show under the bar")
-            XCTAssertGreaterThanOrEqual(firstRow.frame.minY, roundup.frame.maxY, "the row should be below the bar")
+            XCTAssertGreaterThanOrEqual(firstRow.frame.minY, lastRow.frame.maxY, "the row should be below the bar")
             drag(divider, by: 60)
             XCTAssertEqual(height(divider), 220, accuracy: 6, "dragging down should grow the list")
             XCTAssertEqual(list.frame.maxY, divider.frame.minY, accuracy: 4, "the list should end at the divider")

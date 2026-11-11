@@ -229,16 +229,35 @@ extension FocusedValues {
 /// View menu: side by side, or the list above the note (W48.notes-stacked-layout), and Show/Hide Inspector
 /// (⌥⌘I, W40.notes-detail-layout; ⌘I is Italic here). Both windows follow the one remembered choice;
 /// `NotesBrowserView` reads the same keys.
+///
+/// Each other part of the window shows and hides here too (W40.notes-window-panes; owner, notes-2 row 22), so the
+/// filters, the list and the note text can be all there is: the Folders pane (⌃⌘S, the toolbar's left button), the
+/// note's header (title, date, authors), its formatting bar and its tag bar. Hiding the header or the tag bar loses
+/// nothing: the list renames a note, the inspector shows its dates and authors, and with the bar hidden its tags.
 struct LayoutCommands: Commands {
     @AppStorage(NotesLayoutSettingsKey.layoutMode) private var layoutMode: NotesLayoutMode = .sideBySide
     @AppStorage(NotesLayoutSettingsKey.showInspector) private var showingInspector = true
+    @AppStorage(NotesLayoutSettingsKey.showTree) private var showingTree = true
+    @AppStorage(NotesLayoutSettingsKey.showNoteHeader) private var showingNoteHeader = true
+    @AppStorage(NotesLayoutSettingsKey.showFormattingBar) private var showingFormattingBar = true
+    @AppStorage(NotesLayoutSettingsKey.showTagBar) private var showingTagBar = true
 
     var body: some Commands {
         CommandGroup(before: .toolbar) {
+            Button(showingTree ? "Hide Folders" : "Show Folders") {
+                withAnimation { showingTree.toggle() }
+            }
+            .keyboardShortcut("s", modifiers: [.command, .control])
             Button(showingInspector ? "Hide Inspector" : "Show Inspector") {
                 showingInspector.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
+            Divider()
+            Button(showingNoteHeader ? "Hide Note Header" : "Show Note Header") { showingNoteHeader.toggle() }
+            Button(showingFormattingBar ? "Hide Formatting Bar" : "Show Formatting Bar") {
+                showingFormattingBar.toggle()
+            }
+            Button(showingTagBar ? "Hide Tag Bar" : "Show Tag Bar") { showingTagBar.toggle() }
             Divider()
             Picker("Layout", selection: $layoutMode) {
                 ForEach(NotesLayoutMode.allCases, id: \.self) { mode in

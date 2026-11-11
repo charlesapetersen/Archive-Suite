@@ -2461,22 +2461,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
             attachment.lifetime = .keepAlways
             XCTContext.runActivity(named: "Capture the round-up inspector") { $0.add(attachment) }
 
-            let picker = mainWindow.descendants(matching: .any)["an.filter.roundup"].firstMatch
-            XCTAssertTrue(picker.waitForExistence(timeout: 5))
-            picker.click()
-            app.menuItems["Round-up notes"].click()
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idReader)"].exists
-                    && !self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"].exists
-            })
-            picker.click()
-            app.menuItems["Other items"].click()
-            XCTAssertTrue(pollUntil(timeout: 10) {
-                !self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idReader)"].exists
-                    && self.mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"].exists
-            })
-            picker.click()
-            app.menuItems["Any"].click()
+            // Round-up is no longer a filter-bar choice (W40.notes-window-panes, owner notes-2 row 19): the
+            // inspector sets it and Advanced Search finds it (`NotesAdvancedSearchTests`).
+            XCTAssertFalse(mainWindow.descendants(matching: .any)["an.filter.roundup"].exists,
+                           "the filter bar should not offer Round-up")
             selectItem(uuid: Self.idReader)
             toggle.click()
             XCTAssertTrue(pollUntil(timeout: 10) {
