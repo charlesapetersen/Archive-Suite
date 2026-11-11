@@ -72,12 +72,15 @@ enum FrontMatterCodec {
         // there is nothing to say; entries this build could not interpret follow verbatim.
         let inline = item.unparsedAdditionalDates.filter { $0.key == Self.inlineAdditionalDatesKey }
         let entries = item.unparsedAdditionalDates.filter { $0.key != Self.inlineAdditionalDatesKey }
-        if item.sentWith == nil, entries.isEmpty, !inline.isEmpty {
-            // A non-block value kept whole: its raw lines already carry the `additional_dates:` key, so
-            // they replace the generated header rather than following it (never a duplicate key).
-            for u in inline { lines.append(contentsOf: u.rawLines) }
-        } else if item.sentWith != nil || !entries.isEmpty {
+        // Lines with no `- ` opener of their own (a duplicated `additional_dates:` key whose block starts
+        // mid-entry) are read back as part of whatever entry they follow, so they go first, where they
+        // read back alone; written after an entry they merged into it and the file changed on the next
+        // save (W40.notes-dup-additional-dates).
+        let headless = entries.filter { !isListEntryOpener($0.rawLines.first ?? "") }
+        let opened = entries.filter { isListEntryOpener($0.rawLines.first ?? "") }
+        if item.sentWith != nil || !entries.isEmpty {
             lines.append("additional_dates:")
+            for u in headless { lines.append(contentsOf: u.rawLines) }
             if let sent = item.sentWith {
                 let fm = Item.frontMatterDate(sent)
                 lines.append("  - role: \(DateRole.sentWith.rawValue)")
@@ -85,10 +88,12 @@ enum FrontMatterCodec {
                 lines.append("    precision: \(fm.precision.rawValue)")
                 lines.append("    uncertain: \(item.sentWithUncertain)")
             }
-            for u in entries {
-                for raw in u.rawLines { lines.append(raw) }
-            }
+            for u in opened { lines.append(contentsOf: u.rawLines) }
         }
+        // A non-block value kept whole: its raw lines already carry the `additional_dates:` key, so they
+        // follow the block rather than joining it. Only a file that already had the key twice gets it
+        // twice; dropping the value instead would lose what the file said.
+        for u in inline { lines.append(contentsOf: u.rawLines) }
 
         // W24.cal1-toggle: omitted when the item is shown as stored, so an item nobody chose a calendar
         // for encodes byte-for-byte as before.
@@ -473,7 +478,7 @@ enum FrontMatterCodec {
 
         while j < lines.count && isIndented(lines[j]) {
             let trimmed = lines[j].trimmingCharacters(in: .whitespaces)
-            if trimmed.hasPrefix("- ") || trimmed == "-" {
+            if isListEntryOpener(lines[j]) {
                 flushEntry()
                 entryLines = [lines[j]]
                 if trimmed.count > 2 { take(String(trimmed.dropFirst(2))) }
@@ -545,6 +550,12 @@ enum FrontMatterCodec {
     }
 
     // MARK: - Helpers
+
+    /// A line that starts a block-list entry, the test `parseAdditionalDates` splits entries on.
+    private static func isListEntryOpener(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.hasPrefix("- ") || trimmed == "-"
+    }
 
     private static func isIndented(_ line: String) -> Bool {
         guard let first = line.first else { return false }

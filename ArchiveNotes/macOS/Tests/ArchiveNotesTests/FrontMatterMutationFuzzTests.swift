@@ -82,6 +82,31 @@ struct FrontMatterMutationFuzzTests {
         #expect(accepted > 500, "only \(accepted)/4000 damaged files decoded — the loop is not reaching encode")
     }
 
+    /// The case `damagedNoteFilesDecodeCleanlyOrSettle` found (W40.notes-dup-additional-dates), fixed in
+    /// `FrontMatterCodec.encode`: a second `additional_dates:` key whose block starts mid-entry was written
+    /// after the first key's entry, merged into it on the next read and became a valid sent-with date, so
+    /// the second save re-wrote it. Its variants: the same headless lines after an interpreted sent-with
+    /// date, and an inline value beside a block (which the save used to drop).
+    @Test
+    func duplicatedAdditionalDatesKeySettlesAfterOneSave() throws {
+        let id = "e09f3c88-1b0b-446a-b3f9-695d2d2aa164"
+        let tail = "display_calendar: islamic\nroundup: false\ncreated: 2018-05-30T14:42:45Z\nmodified: 2018-05-30T14:43:45Z\n---\n"
+        let found = "---\nschema: 1\nid: \(id)\nkind: note\ntitle: a \\\" b\nadditional_dates:\n    - role: sent_with\n    date: 543-10\nadditional_dates:\n    precision: month\n    uncertain: true\n" + tail
+        let afterSentWith = "---\nschema: 1\nid: \(id)\nkind: note\ntitle: t\nadditional_dates:\n  - role: sent_with\n    date: 1958\n    precision: year\nadditional_dates:\n    precision: month\n" + tail
+        let inlineBeside = "---\nschema: 1\nid: \(id)\nkind: note\ntitle: t\nadditional_dates: [{role: received, date: 1960}]\nadditional_dates:\n  - role: received\n    date: 1961\n" + tail
+        for (name, text) in [("found", found), ("afterSentWith", afterSentWith), ("inlineBeside", inlineBeside)] {
+            let item = try FrontMatterCodec.decode(text)
+            let saved = FrontMatterCodec.encode(item)
+            let reread = try FrontMatterCodec.decode(saved)
+            #expect(FrontMatterCodec.encode(reread) == saved, "\(name): the file keeps changing across saves\n\(saved)")
+            #expect(reread.sentWith == item.sentWith, "\(name): the sent-with date changed on the second read")
+            for u in item.unparsedAdditionalDates {
+                for raw in u.rawLines { #expect(saved.contains(raw), "\(name): the save lost \(raw.debugDescription)") }
+            }
+        }
+        #expect(try FrontMatterCodec.decode(found).sentWith == nil, "an entry with no precision is never coerced into a date")
+    }
+
     /// The case `damagedNoteFilesDecodeCleanlyOrSettle` found (W40.e6), fixed in `BlockParser`: a block header
     /// cut off before its `-->` degrades to a freeform block (§6, `BlockHeaderTests`), and used to come back
     /// from every save under one more empty `<!-- block: freeform -->`, so the file grew by a block per save.

@@ -12,11 +12,14 @@ its `authors` column and FTS table in one transaction on open and re-reads every
 tables are untouched. A smart folder saved with an Authors rule no longer decodes: it says its query is unreadable
 and shows All Notes, and only deleting it clears it (no migration, as nothing real exists, owner 2026-08-01).
 
-## ⚠️ OPEN (W40.notes-dup-additional-dates) — a duplicated `additional_dates:` key does not settle on save
+## ✅ FIXED (W40.notes-dup-additional-dates, 2026-11-11) — a duplicated `additional_dates:` key settles after one save
 
-Found by the seeded fuzz test when its random stream shifted. A damaged file with two `additional_dates:` keys, the
-first's list item under-indented, decodes, but its first save and the save after it differ (the item's indentation
-changes), so the file keeps changing. Reproducer and fix: the `SUITE_TODO.md` item.
+Found by the seeded fuzz test when its random stream shifted. A file with a second `additional_dates:` key whose
+block starts mid-entry (`precision:` with no `- role:` line before it) was saved with those lines after the first
+key's entry; the next read merged them into it, and the merged entry was a valid sent-with date. Lines with no `- `
+opener are now written first in the block, where they read back alone, so the first save is a fixed point. An
+inline value (`additional_dates: [...]`) beside a block is now kept as its own key after the block; it used to be
+dropped. Regression: `FrontMatterMutationFuzzTests.duplicatedAdditionalDatesKeySettlesAfterOneSave`.
 
 ## ✅ FIXED (W40.fix-notes-advanced-search-menu, 2026-11-08) — Advanced Search stays in Edit
 
