@@ -9,6 +9,7 @@ import XCTest
 ///
 /// Two runs in one test: as shipped, and with `-ARViewerNoPrefetch YES` (nothing opened or drawn ahead,
 /// the viewer before this item), so the probe's noise (the test's own accessibility queries) is in both.
+/// A third run shows the thumbnail sidebar (W40.reader-page-views), which must keep inside the same budget.
 /// Evidence: `[vs]` lines in the runner's `xcuitest.log`.
 final class ViewerSwitchUITests: FixtureUITestCase {
     private var baseArguments: [String]?
@@ -25,7 +26,8 @@ final class ViewerSwitchUITests: FixtureUITestCase {
         continueAfterFailure = true
         let on = try run(prefetch: true)
         let off = try run(prefetch: false)
-        for (name, r) in [("on", on), ("off", off)] {
+        let thumbnails = try run(prefetch: true, thumbnails: true)
+        for (name, r) in [("on", on), ("off", off), ("thumbnails", thumbnails)] {
             print("[vs] \(name): \(r.raw)")
             print("[vs] \(name): footprint start \(r.footprintStart) MiB, end \(r.footprintEnd) MiB, "
                   + "growth \(r.footprintEnd - r.footprintStart) MiB over \(r.switches) switches")
@@ -37,6 +39,9 @@ final class ViewerSwitchUITests: FixtureUITestCase {
         // app's busy main thread), so it is printed, not budgeted; the 100 ms budget is asserted on the
         // unit lane (`ReaderChainAtSizeTests`, -O). What this run can see is whether the image was in hand.
         XCTAssertGreaterThanOrEqual(on.bitmapHits, on.switches * 9 / 10, "the image page was drawn ahead")
+        XCTAssertGreaterThanOrEqual(thumbnails.switches, 200)
+        XCTAssertLessThanOrEqual(thumbnails.footprintEnd - thumbnails.footprintStart, 100,
+                                 "with the thumbnails shown, a 200-switch run still ends within 100 MB of its start")
     }
 
     private struct Result {
@@ -48,11 +53,12 @@ final class ViewerSwitchUITests: FixtureUITestCase {
         var footprintEnd: Int
     }
 
-    private func run(prefetch: Bool) throws -> Result {
+    private func run(prefetch: Bool, thumbnails: Bool = false) throws -> Result {
         app.terminate()
         let base = baseArguments ?? app.launchArguments
         baseArguments = base
-        app.launchArguments = base + ["-ARSwitchProbe", "YES", "-ARViewerNoPrefetch", prefetch ? "NO" : "YES"]
+        app.launchArguments = base + ["-ARSwitchProbe", "YES", "-ARViewerNoPrefetch", prefetch ? "NO" : "YES",
+                                      "-ar.doc.thumbnailsVisible", thumbnails ? "YES" : "NO"]
         app.launch()
         app.activate()
         waitForRows(minimum: 5, timeout: 30)
@@ -61,6 +67,8 @@ final class ViewerSwitchUITests: FixtureUITestCase {
         pressKey("o", modifiers: .command)
         let probe = app.staticTexts["ar.debug.switchProbe"]
         XCTAssertTrue(probe.waitForExistence(timeout: 15), "the document window opens with the probe")
+        XCTAssertEqual(app.descendants(matching: .any)["ar.doc.thumbnails"].firstMatch.waitForExistence(timeout: 5),
+                       thumbnails, "the sidebar is shown exactly in the thumbnails run")
         RunLoop.current.run(until: Date().addingTimeInterval(3))   // the first file drawn, neighbours opened
 
         // Forward through the five and back, until 200 switches past the opening one.

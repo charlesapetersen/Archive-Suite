@@ -145,22 +145,20 @@ struct PreviewSheet: View {
     }
 
     @ViewBuilder private var content: some View {
-        if model.current == nil {
-            ContentUnavailableView(model.loadError ?? "No document", systemImage: "doc.questionmark")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            HStack(spacing: 0) {
-                if model.showingThumbnails, !model.showingAllPages {
-                    PageThumbnailSidebar(model: model, pages: model.pageCounts, idPrefix: "ar.preview")
-                    Divider()
+        HStack(spacing: 0) {
+            if model.showingThumbnails, !model.showingAllPages, !model.urls.isEmpty {
+                PageThumbnailSidebar(model: model, pages: model.pageCounts, idPrefix: "ar.preview")
+                Divider()
+            }
+            if model.current == nil {
+                ContentUnavailableView(model.loadError ?? "No document", systemImage: "doc.questionmark")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.showingAllPages {
+                DocumentPageOverview(model: model, pages: model.pageCounts, idPrefix: "ar.preview") {
+                    DispatchQueue.main.async { model.focusPane(model.focusedPane) }
                 }
-                if model.showingAllPages {
-                    DocumentPageOverview(model: model, pages: model.pageCounts, idPrefix: "ar.preview") {
-                        DispatchQueue.main.async { model.focusPane(model.focusedPane) }
-                    }
-                } else {
-                    readingPanes
-                }
+            } else {
+                readingPanes
             }
         }
     }

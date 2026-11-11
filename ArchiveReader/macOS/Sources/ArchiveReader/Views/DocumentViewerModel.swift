@@ -105,7 +105,8 @@ final class DocumentViewerModel: ObservableObject {
     func openTiledPage(file: Int, page: Int) {
         guard urls.indices.contains(file), page >= 1 else { return }
         if file != index {
-            guard let count = pageCounts.count(urls[file].path), page <= count else { return }
+            // Until its count is read, a file shows its first page alone, which can be opened.
+            guard page <= (pageCounts.count(urls[file].path) ?? 1) else { return }
             prepareFindForManualCycle()
             index = file                     // didSet → loadCurrent()
         }

@@ -35,7 +35,8 @@ struct DocumentWindowView: View {
         HStack(spacing: 0) {
             // View ▸ Thumbnails (W40.reader-page-views). The contact sheet shows every page itself, so the
             // sidebar steps aside while it is up.
-            if model.showingThumbnails, !model.showingAllPages, model.current != nil {
+            // It stays beside a file that cannot be opened, the way to the other files.
+            if model.showingThumbnails, !model.showingAllPages {
                 PageThumbnailSidebar(model: model, pages: model.pageCounts, idPrefix: "ar.doc")
                 Divider()
             }

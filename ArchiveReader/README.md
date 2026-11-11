@@ -43,9 +43,11 @@ Protocol.
 - **Mark Read/Unread** in one keystroke; read files drop out of an Unread view.
 - **Document window**: two-up viewer (image left / OCR text right), independent per-pane zoom, a
   draggable splitter (default ⅔ : ⅓), keyboard-driven page-scroll + document cycling, intelligent copy
-  (line-break-aware, de-hyphenating), and in-document Find. **View ▸ All Pages Tiled** (also in the
-  document toolbar) shows every PDF page as a numbered tile, including OCR pages. Click a tile to
-  read it; the toolbar returns to the selected page. Window tabbing is disabled to keep pages and
+  (line-break-aware, de-hyphenating), and in-document Find. Preview's page views, in the document
+  window and the preview sheet: **View ▸ Thumbnails** (⌥⌘2) is a sidebar of the scans of every open
+  file, the file on view marked; **View ▸ Contact Sheet** (⌥⌘6) shows every PDF page of every open file
+  as a numbered tile, OCR pages included; **Hide Thumbnails** (⌥⌘1) returns to the page alone. Click a
+  thumbnail or tile to read it. Both are also toolbar buttons, and draw from the on-disk thumbnail cache. Window tabbing is disabled to keep pages and
   windows distinct.
 - **Options** (⌘,): link format, copy behavior, viewer defaults, and more.
 - Fully keyboard-operable.

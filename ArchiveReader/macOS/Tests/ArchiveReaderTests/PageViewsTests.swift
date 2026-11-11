@@ -72,8 +72,9 @@ final class PageViewsTests: XCTestCase {
         XCTAssertEqual(reader.pageCounts.count(urls[1].path), 1, "the current file's count is known when it loads")
         XCTAssertNil(reader.pageCounts.count(urls[2].path), "the others are read as their sections appear")
         reader.setPageView(.contactSheet)
-        reader.openTiledPage(file: 1, page: 1)
-        XCTAssertEqual(reader.index, 0, "a tile whose file has not been counted does nothing")
+        reader.openTiledPage(file: 1, page: 2)
+        XCTAssertEqual(reader.index, 0, "a file not yet counted shows only its first page, so no other opens")
+        XCTAssertTrue(reader.showingAllPages)
         await reader.pageCounts.request(urls[2].path)
         XCTAssertEqual(reader.pageCounts.count(urls[2].path), 1)
         reader.openTiledPage(file: 1, page: 2)
@@ -82,6 +83,10 @@ final class PageViewsTests: XCTestCase {
         reader.openTiledPage(file: 1, page: 1)
         XCTAssertEqual(reader.currentFilePath, urls[2].path)
         XCTAssertFalse(reader.showingAllPages)
+        let fresh = viewer([urls[1], urls[2]])
+        fresh.setPageView(.contactSheet)
+        fresh.openTiledPage(file: 1, page: 1)
+        XCTAssertEqual(fresh.currentFilePath, urls[2].path, "the stand-in first page opens before the count is read")
 
         let five = viewer([urls[0], urls[1]])
         five.setPageView(.contactSheet)
@@ -94,8 +99,9 @@ final class PageViewsTests: XCTestCase {
         XCTAssertNil(five.pageCounts.count(urls[0].path))
         XCTAssertEqual(five.pageCounts.count(urls[2].path), 1)
         let missing = OpenFilePageCounts()
-        await missing.request("/tmp/does-not-exist-\(UUID()).pdf")
-        XCTAssertEqual(missing.counts.values.first, 0, "a file that cannot be read counts no pages")
+        let gone = "/tmp/does-not-exist-\(UUID()).pdf"
+        await missing.request(gone)
+        XCTAssertEqual(missing.count(gone), 0, "a file that cannot be read counts no pages")
     }
 
     func testAViewerWithoutPageViewsAndASinglePageFile() throws {

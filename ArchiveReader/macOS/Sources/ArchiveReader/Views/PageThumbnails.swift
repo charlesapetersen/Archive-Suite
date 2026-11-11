@@ -11,12 +11,20 @@ enum PageThumbnails {
     /// One size for both views, so a page has one cache entry; each view decodes it down to its own size.
     static let spec = PDFThumbnailer.Spec(pointWidth: 240, scale: 2)
 
-    /// The unit host gets a cache of its own in its temporary folder, so tests never fill or read the app's.
-    static let thumbnailer: PDFThumbnailer = ArchiveTestHost.isUnitTestHost
-        ? PDFThumbnailer(cacheDirectory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("ArchiveReaderTests-PageThumbnails-\(ProcessInfo.processInfo.processIdentifier)",
-                                    isDirectory: true))
-        : ArchiveLinkThumbnailer.shared
+    /// A cache of its own beside Copy Archive Link's, so scrolling the page views never queues a copied link's
+    /// picture behind theirs or evicts it. The unit host's is in its temporary folder, so tests never touch the app's.
+    static let thumbnailer = PDFThumbnailer(cacheDirectory: cacheDirectory, diskBudgetBytes: 300 * 1024 * 1024)
+
+    private static let cacheDirectory: URL = {
+        guard !ArchiveTestHost.isUnitTestHost else {
+            return FileManager.default.temporaryDirectory.appendingPathComponent(
+                "ArchiveReaderTests-PageThumbnails-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("ArchiveReader", isDirectory: true)
+            .appendingPathComponent("PageThumbnails", isDirectory: true)
+    }()
 
     /// The image of PDF page `pageIndex` (0-based) at most `maxPixel` on its longer side, turned `turns`
     /// quarter turns clockwise (the reader's view-only turn, `PageTurnStore`). `nil` when the file or the page
@@ -108,7 +116,8 @@ final class OpenFilePageCounts: ObservableObject {
         guard counts[path] == nil, !asked.contains(path) else { return }
         asked.insert(path)
         let count = await PageThumbnails.pageCount(path: path) ?? 0
-        if counts[path] == nil { counts[path] = count }
+        // A file the viewer let go of while its count was read stays out.
+        if counts[path] == nil, asked.contains(path) { counts[path] = count }
     }
 }
 
@@ -171,6 +180,9 @@ struct PageThumbnailCell: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier(identifier)
         .task(id: "\(path)#\(pageIndex)#\(turns)") {
+            // A cell is reused by position when the files change, so the last file's picture must not linger.
+            image = nil
+            finished = false
             let fetched = await PageThumbnails.image(path: path, pageIndex: pageIndex, maxPixel: maxPixel, turns: turns)
             guard !Task.isCancelled else { return }
             image = fetched

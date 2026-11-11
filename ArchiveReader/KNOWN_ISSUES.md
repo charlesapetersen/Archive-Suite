@@ -23,6 +23,15 @@ The owner’s requested shortcut is ⇧⌘C for Edit ▸ Copy Cleaned for Prose.
 uses the freed ⌥⌘C, keeping the commands distinct even while the preview sheet is open.
 The menu shortcut checks and existing document/preview copy interaction tests use the new bindings.
 
+## ✅ CLOSED (W40.reader-page-views, 2026-11-11) — Thumbnails and Contact Sheet across all open files
+
+Preview's page views are in the document window and the preview sheet: View ▸ Hide Thumbnails ⌥⌘1, Thumbnails
+⌥⌘2, Contact Sheet ⌥⌘6 (All Pages Tiled, below, renamed), plus two toolbar buttons. The sidebar shows the image
+page of each page pair, never the OCR text page, for every open file under a heading that marks the file on view;
+the contact sheet keeps every PDF page. Both draw lazily from the on-disk `PDFThumbnailer` cache, decoded to their
+size, and turned as the reader turned the page; off-screen cells hold no bitmap. Each window remembers its sidebar.
+Limit: the cache renders a page's crop box without its own `/Rotate`, which Processor output never sets.
+
 ## ✅ CLOSED (W40.reader-tiled-pages, 2026-11-08) — all PDF pages tiled, without window tabs
 
 View ▸ All Pages Tiled and the document toolbar show numbered tiles for every physical PDF page,

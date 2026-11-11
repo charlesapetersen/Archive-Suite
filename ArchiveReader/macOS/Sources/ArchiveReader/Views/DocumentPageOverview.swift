@@ -17,7 +17,10 @@ struct DocumentPageOverview: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView { grid }
-                .onAppear { proxy.scrollTo(tileID(model.index, model.focusedPageNumber)) }
+                // A turn later, once the lazy grid has laid out its first rows.
+                .onAppear {
+                    DispatchQueue.main.async { proxy.scrollTo(PageSlot(file: model.index, index: model.focusedPageNumber - 1)) }
+                }
         }
         .background(Color(nsColor: .underPageBackgroundColor))
         .accessibilityIdentifier("\(idPrefix).pageOverview")
@@ -29,7 +32,7 @@ struct DocumentPageOverview: View {
         let several = files.count > 1
         return LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 260), spacing: 18)], spacing: 18,
                          pinnedViews: several ? [.sectionHeaders] : []) {
-            ForEach(files, id: \.offset) { file, url in
+            ForEach(files, id: \.element) { file, url in
                 Section {
                     tiles(file: file, path: url.path)
                 } header: {
@@ -43,16 +46,18 @@ struct DocumentPageOverview: View {
         .padding(18)
     }
 
+    /// One `ForEach` whatever is known: until the count is read the first page stands in, and the cells keep
+    /// their identity when it arrives. Swapping in a second branch with the same ids left a stale cell in the
+    /// lazy stack, one that did not follow the page on view (seen in the VM).
     @ViewBuilder private func tiles(file: Int, path: String) -> some View {
-        if let count = pages.count(path) {
-            if count == 0 {
-                Label("Cannot be opened", systemImage: "exclamationmark.triangle").font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(0..<count, id: \.self) { index in tile(file: file, path: path, pageIndex: index) }
-        } else {
-            // Until the count is read, the first page stands in; reading it is what scrolling here asks for.
-            tile(file: file, path: path, pageIndex: 0).task { await pages.request(path) }
+        let count = pages.count(path)
+        if count == 0 {
+            Label("Cannot be opened", systemImage: "exclamationmark.triangle").font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        ForEach(PageSlot.slots(file: file, count: count ?? 1), id: \.self) { slot in
+            tile(file: file, path: path, pageIndex: slot.index)
+                .task(id: path) { if slot.index == 0 { await pages.request(path) } }
         }
     }
 
@@ -70,10 +75,16 @@ struct DocumentPageOverview: View {
         .background(Color(nsColor: .controlBackgroundColor))
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .accessibilityHint("Open this page in the scan and OCR reading view")
-        .id(tileID(file, number))
     }
+}
 
-    private func tileID(_ file: Int, _ page: Int) -> String { "tile#\(file)#\(page)" }
+/// A cell of the page views: a file and a page (the contact sheet) or a page pair (the thumbnails). Unique across
+/// files, so it is both the cell's identity and what the views scroll to.
+struct PageSlot: Hashable {
+    let file: Int
+    let index: Int
+
+    static func slots(file: Int, count: Int) -> [PageSlot] { (0..<max(0, count)).map { PageSlot(file: file, index: $0) } }
 }
 
 /// View ▸ Thumbnails (⌥⌘2): a sidebar of the image pages of every open file, in order, one per page pair — the
@@ -88,8 +99,9 @@ struct PageThumbnailSidebar: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView { list }
-            .onChange(of: model.pageIdentity, initial: true) {
-                proxy.scrollTo(thumbnailID(model.index, model.pair))
+            // The path is in the key: the preview sheet reloads every file it browses to on file 0, pair 0.
+            .onChange(of: "\(model.currentFilePath ?? "")#\(model.pageIdentity)", initial: true) {
+                DispatchQueue.main.async { proxy.scrollTo(PageSlot(file: model.index, index: model.pair)) }
             }
         }
         .frame(width: Self.width)
@@ -104,7 +116,7 @@ struct PageThumbnailSidebar: View {
         let files = Array(model.urls.enumerated())
         let several = files.count > 1
         return LazyVStack(spacing: 10, pinnedViews: several ? [.sectionHeaders] : []) {
-            ForEach(files, id: \.offset) { file, url in
+            ForEach(files, id: \.element) { file, url in
                 Section {
                     thumbnails(file: file, path: url.path)
                 } header: {
@@ -118,17 +130,17 @@ struct PageThumbnailSidebar: View {
         .padding(.horizontal, 8).padding(.vertical, 10)
     }
 
+    /// One `ForEach` whatever is known, as in the contact sheet.
     @ViewBuilder private func thumbnails(file: Int, path: String) -> some View {
-        if let count = pages.count(path) {
-            if count == 0 {
-                Label("Cannot be opened", systemImage: "exclamationmark.triangle").font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(0..<DocumentPagePairs.pairCount(pageCount: count), id: \.self) { pair in
-                thumbnail(file: file, path: path, pair: pair)
-            }
-        } else {
-            thumbnail(file: file, path: path, pair: 0).task { await pages.request(path) }
+        let count = pages.count(path)
+        if count == 0 {
+            Label("Cannot be opened", systemImage: "exclamationmark.triangle").font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        ForEach(PageSlot.slots(file: file, count: count.map { DocumentPagePairs.pairCount(pageCount: $0) } ?? 1),
+                id: \.self) { slot in
+            thumbnail(file: file, path: path, pair: slot.index)
+                .task(id: path) { if slot.index == 0 { await pages.request(path) } }
         }
     }
 
@@ -137,14 +149,11 @@ struct PageThumbnailSidebar: View {
         return PageThumbnailCell(path: path, pageIndex: pageIndex,
                                  turns: model.pageTurns.turns(path: path, page: pageIndex), label: "\(pair + 1)",
                                  selected: file == model.index && pair == model.pair && !model.showingAllPages,
-                                 height: 150, maxPixel: 280, identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
+                                 height: 150, maxPixel: 340, identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
                                  accessibilityLabel: "Page \(pair + 1) of file \(file + 1)") {
             model.openThumbnail(file: file, pair: pair)
         }
-        .id(thumbnailID(file, pair))
     }
-
-    private func thumbnailID(_ file: Int, _ pair: Int) -> String { "thumb#\(file)#\(pair)" }
 }
 
 /// The toolbar's (and the preview sheet's) two page-view buttons, beside View ▸ Thumbnails and Contact Sheet.

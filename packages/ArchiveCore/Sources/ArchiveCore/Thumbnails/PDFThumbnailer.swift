@@ -102,8 +102,12 @@ public actor PDFThumbnailer {
 
         let mediaBox = sourcePage.bounds(for: .cropBox)
         guard mediaBox.width > 0, mediaBox.height > 0 else { return nil }
+        // `draw(with:to:)` applies the page's own /Rotate, so a quarter-turned page needs a canvas of the turned
+        // shape; sized from the unturned box, its picture fell mostly outside the bitmap (W40.reader-page-views).
+        let quarterTurned = ((sourcePage.rotation / 90) % 2 + 2) % 2 == 1
+        let shown = quarterTurned ? CGSize(width: mediaBox.height, height: mediaBox.width) : mediaBox.size
 
-        let aspect = mediaBox.height / mediaBox.width
+        let aspect = shown.height / shown.width
         let pxWidth = spec.pointWidth * spec.scale
         let pxHeight = pxWidth * aspect
         let width = Int(pxWidth.rounded(.up))
@@ -123,7 +127,7 @@ public actor PDFThumbnailer {
 
         // Both the raw bitmap context and PDF page use Quartz's bottom-left coordinate system. Draw
         // directly into a private bitmap: neither the source PDF nor its PDFPage is modified.
-        let scale = CGFloat(width) / mediaBox.width
+        let scale = CGFloat(width) / shown.width
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         context.scaleBy(x: scale, y: scale)

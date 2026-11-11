@@ -5,7 +5,8 @@ import AppKit
 /// All tests run against the pre-built GUI fixture.
 final class ViewerUITests: FixtureUITestCase {
 
-    /// W40.reader-tiled-pages: run in the off-screen VM, with the generated two-page PDF fixture.
+    /// W40.reader-tiled-pages: run in the off-screen VM, with the generated two-page PDF fixture. View ▸ All Pages
+    /// Tiled is View ▸ Contact Sheet since W40.reader-page-views, and its tiles are named by file and page.
     func testAllPagesOverview() throws {
         waitForRows(minimum: 3, timeout: 10)
         let name = app.textFields["ar.filter.name"]
@@ -16,26 +17,26 @@ final class ViewerUITests: FixtureUITestCase {
         clickRow(0)
         pressKey("o", modifiers: .command)
         settle(2)
-        let allPages = viewMenuItem("All Pages Tiled")
+        let allPages = viewMenuItem("Contact Sheet")
         XCTAssertTrue(allPages.isEnabled)
         let bar = app.menuBars.element(boundBy: 0)
         XCTAssertFalse(bar.menuItems["Show All Tabs"].exists, "window tabs must not be confused with document pages")
         allPages.click()
-        let tile = app.buttons["ar.doc.pageTile.2"]
+        let tile = app.buttons["ar.doc.pageTile.1.2"]
         XCTAssertTrue(tile.waitForExistence(timeout: 5), "the OCR page also has a numbered tile")
         settle(2)   // allow the asynchronous page thumbnails to draw before the pixel capture
         captureScreenshot("w40-tiled-pages-overview")
         XCTAssertFalse(documentMenuItem("Zoom In").isEnabled, "pane commands do not target hidden views")
         closeMenu()
         tile.click()
-        XCTAssertFalse(app.buttons["ar.doc.pageTile.2"].exists)
+        XCTAssertFalse(app.buttons["ar.doc.pageTile.1.2"].exists)
         XCTAssertTrue(documentMenuItem("Zoom In").isEnabled)
         closeMenu()
         captureScreenshot("w40-tiled-pages-open-page2")
-        viewMenuItem("All Pages Tiled").click()
+        viewMenuItem("Contact Sheet").click()
         pressKey("f", modifiers: .command)
         XCTAssertTrue(app.textFields["ar.doc.findField"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["ar.doc.pageTile.2"].exists, "Find returns to the reading panes")
+        XCTAssertFalse(app.buttons["ar.doc.pageTile.1.2"].exists, "Find returns to the reading panes")
         pressKey("w", modifiers: .command)
     }
 

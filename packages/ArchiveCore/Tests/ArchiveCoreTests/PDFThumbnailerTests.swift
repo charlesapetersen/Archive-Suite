@@ -406,4 +406,30 @@ struct PDFThumbnailerTests {
             #expect(large.count > small.count)
         }
     }
+
+    /// A page whose own /Rotate quarter-turns it is drawn whole, turned, on a canvas of the turned shape. It used to
+    /// be drawn on the unturned shape, and most of the page fell outside the bitmap (W40.reader-page-views).
+    @Test func rendersAQuarterTurnedPageWholeAndTurned() async throws {
+        let (pdfURL, tempDir) = try makeOrientationPDF()   // 100 × 200, red above blue
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let turnedURL = tempDir.appendingPathComponent("turned.pdf")
+        let document = try #require(PDFDocument(url: pdfURL))
+        document.page(at: 0)?.rotation = 90
+        #expect(document.write(to: turnedURL))
+        let cacheDir = try makeCacheDir()
+        defer { try? FileManager.default.removeItem(at: cacheDir) }
+
+        let data = await PDFThumbnailer(cacheDirectory: cacheDir).png(
+            fileURL: turnedURL, page: 1, linkKey: "test://turned", mtime: Date())
+        let rep = try #require(data.flatMap(NSBitmapImageRep.init(data:)))
+        #expect(rep.pixelsWide > rep.pixelsHigh, "a quarter turn makes the portrait page landscape")
+        func redMinusBlue(xFraction: CGFloat) -> CGFloat? {
+            rep.colorAt(x: Int(CGFloat(rep.pixelsWide) * xFraction), y: rep.pixelsHigh / 2)?
+                .usingColorSpace(.deviceRGB).map { $0.redComponent - $0.blueComponent }
+        }
+        let left = try #require(redMinusBlue(xFraction: 0.25))
+        let right = try #require(redMinusBlue(xFraction: 0.75))
+        #expect(right > 0.5, "turned clockwise, the red top is on the right")
+        #expect(left < -0.5, "and the blue bottom on the left")
+    }
 }
