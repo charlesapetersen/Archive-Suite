@@ -72,6 +72,10 @@ once from the request (`NavigationWindowView.swift:82`), so a re-presented or re
 rules; and every edit runs `countMatches` over all ~91k rows on the main actor (`NavigationModel.swift:455-465`), cause B
 again, which may be what sets off the rebuild [R, I]. Item:
 W40.fix-reader-advanced-many-rules, reproduction first.
+**Fixed, 2026-11-11** (W40.fix-reader-advanced-many-rules): reproduced in the VM, no rule is lost; the list was fixed
+at about eight rows and an added row went below them without scrolling to it. The list now grows to 420 pt and
+scrolls to each new row, the rules live in the request, and a count at 116k rows with 12 rules takes a median 216 ms
+off main and stops on the next edit. Evidence: `verification/evidence/reader/W40.fix-reader-advanced-many-rules.md`.
 
 **Items.** W40.reader-scale-measure first (the whole chain, Debug and -O, and a long session's memory), then
 W40.fix-reader-change-incremental (A), W40.fix-reader-selection-at-size (B), W40.fix-reader-viewer-switch (C).

@@ -31,6 +31,39 @@ final class AdvancedSearchTests: XCTestCase {
         XCTAssertTrue(any.matches(file("/c/a.pdf", ["Unread"]), RuleContext()))
     }
 
+    /// W40.fix-reader-advanced-many-rules: the count's prepared rules answer as `matches` does, inactive rows,
+    /// empty groups, padded names and missing index answers included, under both all and any.
+    func testPreparedRulesMatchAsTheRulesDo() {
+        let files = [file("/c/Box 1 letter.pdf", ["Unread", "Press", "1981"]),
+                     file("/c/memo.pdf", ["Read", "Treasury"]),
+                     file("/c/sub/Box 2.pdf", ["Unread"], label: 3)]
+        let text = rule(.ocrText) { $0.text = "budget" }
+        var context = RuleContext()
+        context.textHits[text.id] = ["/c/memo.pdf"]
+        let unanswered = rule(.text) { $0.text = "taxes" }   // its index answer has not arrived
+        let rows = [rule(.ocrText), rule(.tags), rule(.date),                      // the starter rows, empty
+                    rule(.fileName, .contains) { $0.text = "  box " },
+                    rule(.fileName, .doesNotContain) { $0.text = "letter" },
+                    rule(.tags, .hasAny) { $0.tags = ["Press", "Treasury"] },
+                    rule(.date, .between) { $0.text = "1980"; $0.text2 = "1982" },
+                    rule(.folder) { $0.text = "/c/sub" }, rule(.readState) { $0.read = .unread },
+                    text, unanswered, .group(.any, [rule(.fileName)]),                // a group with no active row
+                    .group(.all, [rule(.quality) { $0.qualities = [3] }, rule(.ocrText)])]
+        for combine in [RuleCombine.all, .any] {
+            for k in 0..<rows.count {
+                for set in [[rows[k]], rows.enumerated().filter { $0.offset != k }.map(\.element), rows] {
+                    let s = AdvancedSearch(combine: combine, rules: set)
+                    let p = s.prepared()
+                    for f in files {
+                        XCTAssertEqual(p.matchesPrepared(f, context), s.matches(f, context),
+                                       "\(combine) \(set.map(\.field)) on \(f.name)")
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(AdvancedSearch.starter.prepared().rules.count, 0, "empty rows are taken out")
+    }
+
     func testTagsAllAnyAndNoneByTagIdentity() {
         let both = file("/c/both.pdf", ["Treasury", "Press"])
         let treasury = file("/c/t.pdf", ["treasury"])

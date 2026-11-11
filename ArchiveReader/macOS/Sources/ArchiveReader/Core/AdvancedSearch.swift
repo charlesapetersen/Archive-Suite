@@ -183,14 +183,35 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
     }
 
     func matches(_ file: ArchiveFile, _ context: RuleContext) -> Bool {
-        Self.evaluate(rules, combine, file, context)
+        Self.evaluate(rules, combine, file, context, prepared: false)
+    }
+
+    /// The same search ready for a pass over many rows: inactive rows (and groups left with none) taken out
+    /// and file-name text trimmed, so `matchesPrepared` parses nothing per row. An inactive row is skipped
+    /// either way, so the answer is the same (W40.fix-reader-advanced-many-rules).
+    func prepared() -> AdvancedSearch {
+        func prune(_ rules: [SearchRule]) -> [SearchRule] {
+            rules.compactMap { r in
+                guard r.isActive else { return nil }
+                var r = r
+                if r.field == .group { r.children = prune(r.children) }
+                if r.field == .fileName { r.text = r.text.trimmingCharacters(in: .whitespaces) }
+                return r
+            }
+        }
+        return AdvancedSearch(combine: combine, rules: prune(rules))
+    }
+
+    /// `matches` for a search from `prepared()`.
+    func matchesPrepared(_ file: ArchiveFile, _ context: RuleContext) -> Bool {
+        Self.evaluate(rules, combine, file, context, prepared: true)
     }
 
     private static func evaluate(_ rules: [SearchRule], _ combine: RuleCombine, _ file: ArchiveFile,
-                                 _ context: RuleContext) -> Bool {
+                                 _ context: RuleContext, prepared: Bool) -> Bool {
         var anyTested = false
         for rule in rules {
-            guard let result = test(rule, file, context) else { continue }
+            guard let result = test(rule, file, context, prepared: prepared) else { continue }
             anyTested = true
             if combine == .all, !result { return false }
             if combine == .any, result { return true }
@@ -199,15 +220,16 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
     }
 
     /// nil = the rule is skipped (inactive, or its index answer has not arrived).
-    private static func test(_ rule: SearchRule, _ file: ArchiveFile, _ context: RuleContext) -> Bool? {
-        guard rule.isActive else { return nil }
+    private static func test(_ rule: SearchRule, _ file: ArchiveFile, _ context: RuleContext,
+                             prepared: Bool) -> Bool? {
+        guard prepared || rule.isActive else { return nil }
         let positive = rule.op != .isNot
         switch rule.field {
         case .text, .ocrText:
             guard let hits = context.textHits[rule.id] else { return nil }
             return rule.op == .noWords ? !hits.contains(file.path) : hits.contains(file.path)
         case .fileName:
-            let q = rule.text.trimmingCharacters(in: .whitespaces)
+            let q = prepared ? rule.text : rule.text.trimmingCharacters(in: .whitespaces)
             let opts: String.CompareOptions = [.caseInsensitive]   // as the filter bar's name box
             switch rule.op {
             case .doesNotContain: return file.name.range(of: q, options: opts) == nil
@@ -241,7 +263,7 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
         case .needsAttention: return context.needsAttention.contains(file.path) == positive
         case .ambiguousDate: return file.dateIsAmbiguous == positive
         case .flagged: return context.flagged.contains(file.path) == positive
-        case .group: return evaluate(rule.children, rule.combine, file, context)
+        case .group: return evaluate(rule.children, rule.combine, file, context, prepared: prepared)
         }
     }
 

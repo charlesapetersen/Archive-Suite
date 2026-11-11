@@ -502,13 +502,14 @@ final class NavigationModel: ObservableObject {
     /// (an index pass, a flag, an exclusion, the saved rules) starts one.
     private struct CountBasis: Sendable {
         let search: AdvancedSearch
+        /// From `prepared()`: tested with `matchesPrepared`.
         let rules: AdvancedSearch
         let context: RuleContext
         /// The `library.filesRevision` its rows were counted at.
         let filesRevision: UInt64
 
         func counts(_ file: ArchiveFile, excluded: [String]) -> Bool {
-            !LibraryPresentation.isExcluded(file.path, by: excluded) && rules.matches(file, context)
+            !LibraryPresentation.isExcluded(file.path, by: excluded) && rules.matchesPrepared(file, context)
         }
     }
 
@@ -523,20 +524,43 @@ final class NavigationModel: ObservableObject {
         var context = ruleContext(for: rules)
         context.textHits = hits
         let files = library.files, excluded = excludedAbsolutePrefixes()
-        let basis = CountBasis(search: search, rules: rules, context: context, filesRevision: library.filesRevision)
+        let basis = CountBasis(search: search, rules: rules.prepared(), context: context,
+                               filesRevision: library.filesRevision)
         if cancellable, Task.isCancelled { return (basis, 0) }
         let pass = Task.detached(priority: .userInitiated) {
             ReaderStages.measure("model.countMatches.rows") {
-                var n = 0
-                for (i, file) in files.enumerated() {
-                    if cancellable, i & 4095 == 0, Task.isCancelled { break }
-                    if basis.counts(file, excluded: excluded) { n += 1 }
-                }
-                return n
+                Self.countRows(files, basis: basis, excluded: excluded, cancellable: cancellable)
             }
         }
         let count = await withTaskCancellationHandler { await pass.value } onCancel: { pass.cancel() }
         return (basis, count)
+    }
+
+    /// The row pass, in waves of chunks across the cores; between waves a cancelled task stops. 116k rows
+    /// under twelve name rules took 1.1 s at -O on one thread (W40.fix-reader-advanced-many-rules).
+    private nonisolated static func countRows(_ files: [ArchiveFile], basis: CountBasis, excluded: [String],
+                                              cancellable: Bool) -> Int {
+        let chunk = 4096
+        let chunks = (files.count + chunk - 1) / chunk
+        let wave = max(1, ProcessInfo.processInfo.activeProcessorCount)
+        // Each worker writes its own chunk's slot, and the waves end before the sum reads them.
+        nonisolated(unsafe) let counts = UnsafeMutableBufferPointer<Int>.allocate(capacity: max(chunks, 1))
+        counts.initialize(repeating: 0)
+        defer { counts.deallocate() }
+        var start = 0
+        while start < chunks {
+            if cancellable, Task.isCancelled { break }
+            let first = start, n = min(wave, chunks - start)
+            DispatchQueue.concurrentPerform(iterations: n) { k in
+                let c = first + k
+                var hits = 0
+                for i in (c * chunk)..<min(files.count, (c + 1) * chunk)
+                where basis.counts(files[i], excluded: excluded) { hits += 1 }
+                counts[c] = hits
+            }
+            start += n
+        }
+        return counts.reduce(0, +)
     }
 
     /// The excluded folders as absolute path prefixes, as the list and the counts test them.
