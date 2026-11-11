@@ -79,6 +79,7 @@ LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-mar
 MARKS_DETECT = RESULTS / "marks-detect.json"  # W46.marks-detect: marks_detect.py report, trained marks detectors
 MIXED_ROUTE = RESULTS / "mixed-route.json"    # W46.mixed-route: mixed_route.py report, marks read whole page or by box
 MIXED_BANDS = RESULTS / "mixed-route-bands.json"   # W46.mixed-route-bands: mixed_route_bands.py report
+LAYOUT_ORDER_PP = RESULTS / "layout-order-pp.json"  # W46.layout-order-newspapers-pp: orderers on PP-DocLayoutV3's L9 regions
 LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid: Gemini 3.7 Flash's blocks in its order
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
@@ -969,7 +970,15 @@ def layout_order():
     d = json.loads(LAYOUT_ORDER.read_text())
     return layout_order_paid({"guard": d["guard"], "sources": d["sources"],
                               **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")},
-                              **layout_order_marks()})
+                              **layout_order_marks(), **layout_order_pp()})
+
+
+def layout_order_pp():
+    """W46.layout-order-newspapers-pp: every orderer on PP-DocLayoutV3's own L9 regions, over the Vision lines inside
+    them, with each arm's paired tau difference from the native order."""
+    if not LAYOUT_ORDER_PP.exists():
+        return {}
+    return {"l9_pp": json.loads(LAYOUT_ORDER_PP.read_text())["summary"]["own"]}
 
 
 def layout_order_paid(lo):

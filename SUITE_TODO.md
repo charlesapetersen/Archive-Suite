@@ -617,8 +617,6 @@ now takes the rule table as its source.
 - [ ] **`W46.ent-local-shipped-prompt` — the entity prompt on the Mac and cluster models over Vision text [S-M]** (lane: segbench) (uses: light,machine) (cluster: sherlock) — Qwen3-VL 8B on the Mac and Qwen3.6 27B on the cluster, the entity prompt over the 138's Vision text, with seconds a document and peak memory; today's Mac and cluster entity figures are the old prompt on ABBYY text (`ent-truth-owner.md`), so the rows are provisional until this lands.
 
 
-- [ ] **`W46.layout-order-newspapers-pp` — region order on PP-DocLayoutV3's own regions [S]** (lane: segbench) (uses: light) — The app's region sort and HDBSCAN on PP-DocLayoutV3's regions on L9, scored by tau, gap and reading-order edit against the native order; sets the order rule for the detector the app runs.
-
 - [ ] **`W46.place-hands-cost` — the hand placement route's memory and time [S]** (lane: segbench) (uses: light,machine) — Peak memory and seconds a page of the whole hand route (blla, McCATMuS alignment of both matchers, the pick, the writer) on the 20 owner hand pages on 16 and 18 GB Macs; only blla's 6.1 s a page is measured today. Fills the row's memory and time; the 16 GB claim waits on it.
 
 - [ ] **`W46.reader-keeps-lines` — which hands readers keep the page's lines [S]** (lane: segbench) (uses: light) — For every hands reader, the reading's line count against blla's detected lines on the 20 owner hand pages, from saved readings; a `reflows` flag per row (a reflowing reader gets the text page; LightOnOCR-3 passes 21.5%).

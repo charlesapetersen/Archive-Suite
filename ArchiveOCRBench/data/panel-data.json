@@ -66781,6 +66781,369 @@
    "mixed_read": "LightOnOCR-3 4B 16 of 35 given the whole page, 17 from the owner's box, 24 from either reading; Apple Vision 14 of 35 given the whole page, 13 from the owner's box, 17 from either reading; GLM-OCR 13 of 35 given the whole page, 18 from the owner's box, 21 from either reading; Qwen3.6-27B 26 of 35 given the whole page, 19 from the owner's box, 27 from either reading (not ranked: it pre-flagged the pages of 30 of them; on the other 5, 3 and 4, too few to rank)",
    "mixed_bands": "Mixed pages are an estimated 33% (24-44%) of the bulk-pilot draw, 24% (17-34%) with more than a signature, initials or a date; on the 96's 78 typed and printed pages, body NES against Apple Vision is LightOnOCR-3 4B +1.8 (-2.2 to +5.9), GLM-OCR +4.3 (+0.4 to +8.8), Qwen3.6-27B +7.3 (+2.6 to +12.3) points"
   },
+  "l9_pp": {
+   "pp_native": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.9768,
+    "word_acc": 0.3799,
+    "bow_f1": 0.596,
+    "gap": 0.2161,
+    "roe": 0.1208
+   },
+   "topbottom": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.1924,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.7844,
+     "p": 0.0001,
+     "lo": -0.8595,
+     "hi": -0.6989
+    },
+    "word_acc": 0.1076,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.2723,
+     "p": 0.0001,
+     "lo": -0.3514,
+     "hi": -0.1935
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.4884,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.2723,
+     "p": 0.0001,
+     "lo": 0.1935,
+     "hi": 0.3514
+    },
+    "roe": 0.498,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.3772,
+     "p": 0.0065,
+     "lo": 0.1662,
+     "hi": 0.5783
+    }
+   },
+   "columns": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.3872,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.5896,
+     "p": 0.0001,
+     "lo": -0.7502,
+     "hi": -0.4146
+    },
+    "word_acc": 0.1577,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.2222,
+     "p": 0.0003,
+     "lo": -0.3121,
+     "hi": -0.1391
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.4383,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.2222,
+     "p": 0.0003,
+     "lo": 0.1391,
+     "hi": 0.3121
+    },
+    "roe": 0.3662,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.2454,
+     "p": 0.0472,
+     "lo": 0.0437,
+     "hi": 0.4477
+    }
+   },
+   "xycut": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.1924,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.7844,
+     "p": 0.0001,
+     "lo": -0.8595,
+     "hi": -0.6989
+    },
+    "word_acc": 0.1076,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.2723,
+     "p": 0.0001,
+     "lo": -0.3514,
+     "hi": -0.1935
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.4884,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.2723,
+     "p": 0.0001,
+     "lo": 0.1935,
+     "hi": 0.3514
+    },
+    "roe": 0.498,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.3772,
+     "p": 0.0065,
+     "lo": 0.1662,
+     "hi": 0.5783
+    }
+   },
+   "xycut_yfirst": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.3145,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.6623,
+     "p": 0.0001,
+     "lo": -0.7818,
+     "hi": -0.5381
+    },
+    "word_acc": 0.1444,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.2355,
+     "p": 0.0001,
+     "lo": -0.2934,
+     "hi": -0.1745
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.4516,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.2355,
+     "p": 0.0001,
+     "lo": 0.1745,
+     "hi": 0.2934
+    },
+    "roe": 0.4285,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.3077,
+     "p": 0.0187,
+     "lo": 0.105,
+     "hi": 0.514
+    }
+   },
+   "app_regions": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.8996,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.0772,
+     "p": 0.005,
+     "lo": -0.175,
+     "hi": -0.0162
+    },
+    "word_acc": 0.3313,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.0486,
+     "p": 0.0111,
+     "lo": -0.0861,
+     "hi": -0.0159
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.2647,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.0486,
+     "p": 0.0111,
+     "lo": 0.0159,
+     "hi": 0.0861
+    },
+    "roe": 0.2169,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.0961,
+     "p": 0.2519,
+     "lo": -0.0077,
+     "hi": 0.2568
+    }
+   },
+   "hdbscan": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.9047,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.0722,
+     "p": 0.0002,
+     "lo": -0.1483,
+     "hi": -0.0193
+    },
+    "word_acc": 0.3211,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.0588,
+     "p": 0.0044,
+     "lo": -0.1174,
+     "hi": -0.0157
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.2749,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.0588,
+     "p": 0.0044,
+     "lo": 0.0157,
+     "hi": 0.1174
+    },
+    "roe": 0.2676,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.1468,
+     "p": 0.0047,
+     "lo": 0.0667,
+     "hi": 0.2376
+    }
+   },
+   "app_columns": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.1924,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.7844,
+     "p": 0.0001,
+     "lo": -0.8595,
+     "hi": -0.6989
+    },
+    "word_acc": 0.1076,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.2723,
+     "p": 0.0001,
+     "lo": -0.3514,
+     "hi": -0.1935
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.4884,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.2723,
+     "p": 0.0001,
+     "lo": 0.1935,
+     "hi": 0.3514
+    },
+    "roe": 0.498,
+    "roe_vs_native": {
+     "n": 14,
+     "delta": 0.3772,
+     "p": 0.0065,
+     "lo": 0.1662,
+     "hi": 0.5783
+    }
+   },
+   "app_columns_lines": {
+    "pages": 15,
+    "valid": 15,
+    "tau": 0.5738,
+    "tau_vs_native": {
+     "n": 15,
+     "delta": -0.403,
+     "p": 0.0001,
+     "lo": -0.5242,
+     "hi": -0.2902
+    },
+    "word_acc": 0.1855,
+    "word_acc_vs_native": {
+     "n": 15,
+     "delta": -0.1943,
+     "p": 0.0001,
+     "lo": -0.2541,
+     "hi": -0.1345
+    },
+    "bow_f1": 0.596,
+    "bow_f1_vs_native": {
+     "n": 15,
+     "delta": 0.0,
+     "p": 1.0,
+     "lo": 0.0,
+     "hi": 0.0
+    },
+    "gap": 0.4104,
+    "gap_vs_native": {
+     "n": 15,
+     "delta": 0.1943,
+     "p": 0.0001,
+     "lo": 0.1345,
+     "hi": 0.2541
+    },
+    "roe": 0.2999,
+    "roe_vs_native": {
+     "n": 12,
+     "delta": 0.159,
+     "p": 0.0712,
+     "lo": 0.0179,
+     "hi": 0.3111
+    }
+   }
+  },
   "gemini": {
    "cost": 1.68,
    "rerun": {
