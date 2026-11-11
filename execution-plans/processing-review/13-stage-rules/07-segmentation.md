@@ -41,11 +41,13 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   clippings box: individual clippings taken in a reading room, mixed with other papers, 61% clipping-tagged; STATE.md
   "Locked boxes named"), and two public boxes, `manuscripts-public` (Lincoln, 19th-century handwritten
   correspondence) and `typed-gov-public` (CREST) [M]. Rules: (a) the `magazine` figures rank nothing until
-  W46.seg-magazine-rule-redo; the sheet shows them with "ranks nothing yet" and the solver never picks on them. The
+  W46.seg-magazine-rule-app; the sheet shows them with "ranks nothing yet" and the solver never picks on them. The
   reason is not the prompts (only Gemini's g1 carries the full-issue rule; Claude's w1 and GLM's c1 have none, and
   every cloud route merges the newsletter pair with or without it, P8-4, seg-boxes-score.md Reading): it is that the
-  students trained on the box and no route has been run with a prompt that states the article-within-issue rule
-  (seg-boxes-score.md Scope); g1's rule explains at most the excess of its 40 merges over the teacher's 21. (b) The
+  students trained on the box and the shipped routes' prompts do not state the article-within-issue rule. Measured
+  since (W46.seg-magazine-rule-redo, seg-magazine-rule.md): Gemini 3.7 with g2, g1 with rule 10 on that rule, scores
+  93.8% of the Illustrated Review's gaps against g1's 71.2% (false merges 40 to 0), so g1's rule caused its merges
+  there; the app's voters still send g1 and c1 until W46.seg-magazine-rule-app. (b) The
   `clippings-mixed` comparison uses the owner-ruled weighted figure, never the all-known diagnostic (P4-2). (c) On
   handwritten manuscript material a local or cluster Qwen route carries the warning "on Lincoln's manuscripts this
   model put 35.6% of pages in the right document" and the sheet recommends a cloud voter where one is feasible
@@ -98,7 +100,7 @@ segment figures conditional on each route's call at unsure gaps.
  "time":{"per_unit_s":5.3,"measured":false,"measured_on":"16 s a 3.7 gateway call, seg-boxes-score.md, as figures.json derives it","source":{"file":"execution-plans/processing-review/settings-design/figures.json","route":"Gemini only","attribute":"s_page","value":"5.3 (s_est true)"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
  "caveats":["single run, no measured offset range (P7-4); 3.7's range at this level is 83.0-85.2% no checking","both unflagged errors are Stanton 101|102 and 102|103, merged by every cloud route with or without the magazine rule (P8-4)","introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md)","no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)"],
- "kind_rules":["magazine: figures rank nothing until W46.seg-magazine-rule-redo"],"fallback":"manual","conditions":[]},
+ "kind_rules":["magazine: figures rank nothing until W46.seg-magazine-rule-app"],"fallback":"manual","conditions":[]},
 
 {"id":"gemini3.7-flash-gateway","name":"Gemini 3.7 Flash (Stanford gateway)","family":"cloud","app_route":null,"status":"measured","needs":{"key":["gateway"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
  "figures":{"test-boxes":{"value":85.2,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"pages in an exact document, no checking (range 83.0-85.2%)","value":"85.2%"}},
@@ -285,8 +287,9 @@ adaptation row).
   than 3.2 points from 87.3%, the shown figure becomes the range and the cheap-API and premium picks are rechecked.
 - The text-only Gemini window on the test boxes within 3.2 points of the image window, at about half the tokens
   (seg-window-gateway.md, 46% of the cost on dev): a text tier row becomes `shipped` for a budget setting.
-- W46.seg-magazine-rule-redo: if the new prompt splits Stanton 101|102 and 102|103, the cloud unflagged count falls
-  from 2 to 0 and the `magazine` figures become rankable.
+- W46.seg-magazine-rule-redo (done 2026-11-10, seg-magazine-rule.md): on Gemini 3.7, g2 splits Stanton 101|102 and
+  102|103 and the route's unflagged count falls from 2 to 0 (pages exact 85.2% to 88.8% no checking, 98.5% to 100%
+  after). The `magazine` figures become rankable once the app sends the new rule (W46.seg-magazine-rule-app).
 - A handwritten manuscript owner box locked and scored: the manuscript warning would then rest on owner material, not
   Lincoln, and may change kind rule (c).
 - A second material for the LoRA test with start recall held: the "measured on one material" label goes; a loss of

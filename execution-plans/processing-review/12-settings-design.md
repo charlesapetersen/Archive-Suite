@@ -197,7 +197,8 @@ files an item where the sheet needs the figure.
 - Per-kind reading figures exist for the owner's 96 only; the public strata have per-route figures for the reference
   routes and the FarmShare panel, not for every route the sheet lists.
 - Segmentation figures are per box (letters, a magazine, typed office files, clippings), not per document kind; the
-  magazine rule is pending `W46.seg-magazine-rule-redo`.
+  bench's Gemini prompt is on the article-within-issue rule (g2, `segbench-results/seg-magazine-rule.md`); the app's
+  voters wait on `W46.seg-magazine-rule-app`.
 - The checking-time figure assumes 20 s a boundary; nobody has timed a user checking.
 - The Claude plan's cost is a share of its windows, measured on the user's account by the method in `usage.md`; the
   ChatGPT plan has no meter an app can read.
