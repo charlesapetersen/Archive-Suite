@@ -17,6 +17,7 @@ whenever enough new results have landed, and reworks the queue on what it finds.
 Opus at xhigh (its `(effort: xhigh)` marker), not Fable at max.
 
 Cadence. Owner, 2026-11-04: a review is due when MIN_ITEMS items have finished with a result since the last review.
+Owner, 2026-11-11: MIN_ITEMS is 12 (it was 8; passes 12 and 13 landed eight hours apart).
 An item counts when a commit on origin/main since the last review names it (`type(scope): TAG ...`) and touched a
 result path, and the item is now ticked in SUITE_TODO_DONE.md, so an item's checkpoint commits count once and only
 when it is done. Items the review itself filed do not count: the next pass checks them through the queue anyway.
@@ -48,7 +49,7 @@ SCRIPTS = os.path.normpath(os.path.join(HERE, "..", "autonomous"))
 GATE = "W46.measure-review-due"
 ITEM = "W46.measure-review"
 SEED = "66daa3c1"            # the measurement audit's commit: the first review covers what landed after it
-MIN_ITEMS = 8
+MIN_ITEMS = 12           # owner, 2026-11-11 (8 from 2026-11-04)
 RESULT_PATHS = ["ArchiveProcessor/segbench-results", "ArchiveOCRBench/data"]
 SUBJECT_TAG = re.compile(r"^[A-Za-z]+(?:\([^)]*\))?!?:\s*`?(W\d+\.[A-Za-z0-9._-]*[A-Za-z0-9])")
 REVIEW_FILED = re.compile(r"\*\*[^\n]*?— Measurement review[^.\n]{0,40}pass \d+, P\d+-\d+")
