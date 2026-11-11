@@ -1,0 +1,2886 @@
+{
+ "item": "W46.place-curved-owner",
+ "cue": "spread",
+ "threshold": 2.96,
+ "owner_cue": {
+  "uiuc-00233": 9.222,
+  "uiuc-00149": 2.96
+ },
+ "surveyed": 3773,
+ "failed": 0,
+ "eligible": 3043,
+ "duplicates": 43,
+ "above_threshold": 421,
+ "above_00233": 11,
+ "above_5deg": 107,
+ "curved_cue_min": 7.229,
+ "cue_quantiles": {
+  "50": 1.249,
+  "90": 3.454600000000001,
+  "95": 4.371300000000001,
+  "99": 7.201119999999999
+ },
+ "results": {
+  "route.blla": {
+   "curved": [
+    978,
+    1316,
+    74.3161094224924
+   ],
+   "flat": [
+    1065,
+    1132,
+    94.08127208480565
+   ],
+   "diff": [
+    -19.765162662313244,
+    -26.178013486992327,
+    -12.78356482843165
+   ]
+  },
+  "route.own": {
+   "curved": [
+    1319,
+    1611,
+    81.8746120422098
+   ],
+   "flat": [
+    1223,
+    1253,
+    97.60574620909816
+   ],
+   "diff": [
+    -15.731134166888353,
+    -23.37098866460569,
+    -8.857673015580247
+   ]
+  },
+  "raw.blla": {
+   "curved": [
+    912,
+    1316,
+    69.30091185410335
+   ],
+   "flat": [
+    1017,
+    1132,
+    89.84098939929329
+   ],
+   "diff": [
+    -20.540077545189945,
+    -29.99136442141623,
+    -10.368282990935782
+   ]
+  },
+  "raw.own": {
+   "curved": [
+    1227,
+    1611,
+    76.16387337057728
+   ],
+   "flat": [
+    1186,
+    1253,
+    94.65283320031924
+   ],
+   "diff": [
+    -18.488959829741958,
+    -28.620540644355884,
+    -8.626783359309442
+   ]
+  },
+  "oracle.blla": {
+   "curved": [
+    823,
+    1316,
+    62.537993920972646
+   ],
+   "flat": [
+    933,
+    1132,
+    82.42049469964664
+   ],
+   "diff": [
+    -19.882500778673993,
+    -28.32803433671451,
+    -10.464850748890413
+   ]
+  },
+  "failures": {
+   "curved": {
+    "blla_n": 1316,
+    "blla_pass": 978,
+    "blla_broken": 130,
+    "blla_short": 91,
+    "arm": "route"
+   },
+   "flat": {
+    "blla_n": 1132,
+    "blla_pass": 1065,
+    "blla_broken": 35,
+    "blla_short": 12,
+    "arm": "route"
+   }
+  },
+  "deskewed": {
+   "curved": 11,
+   "flat": 8
+  },
+  "spearman_cue_pass": {
+   "n": 62,
+   "rho": -0.6417324886127713
+  },
+  "paired.blla": {
+   "pairs": 32,
+   "mean": -16.754762166954773,
+   "lo": -21.681249409145753,
+   "hi": -12.139515337264752
+  },
+  "paired.own": {
+   "pairs": 32,
+   "mean": -12.993128040155451,
+   "lo": -17.604518582659658,
+   "hi": -8.847386511325057
+  }
+ },
+ "rows": [
+  {
+   "key": "uiuc-00233",
+   "group": "curved",
+   "collection": "UIUC",
+   "rel": "UIUC/UIUC \u2014 00233.HEIC",
+   "pair": null,
+   "cue": 9.222,
+   "angle": 1.313,
+   "route": "deskew",
+   "vision_lines": 28,
+   "vision_words": 253,
+   "blla_lines": 29,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 27,
+     "blla_pass": 18,
+     "blla_broken": 7,
+     "blla_short": 1,
+     "own_n": 26,
+     "own_pass": 20,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 27,
+     "blla_pass": 21,
+     "blla_broken": 3,
+     "blla_short": 2,
+     "own_n": 26,
+     "own_pass": 24,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 27,
+     "blla_pass": 14,
+     "blla_broken": 7,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00149",
+   "group": "curved",
+   "collection": "UIUC",
+   "rel": "UIUC/UIUC \u2014 00149.HEIC",
+   "pair": null,
+   "cue": 2.96,
+   "angle": -3.508,
+   "route": "deskew",
+   "vision_lines": 37,
+   "vision_words": 242,
+   "blla_lines": 37,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 4,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 33,
+     "blla_pass": 17,
+     "blla_broken": 2,
+     "blla_short": 0,
+     "own_n": 34,
+     "own_pass": 17,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 33,
+     "blla_pass": 33,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 34,
+     "own_pass": 34,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 33,
+     "blla_pass": 24,
+     "blla_broken": 5,
+     "blla_short": 2,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03370",
+   "group": "curved",
+   "collection": "Chicago, University of, Archives/Coleman papers",
+   "rel": "Archival Photos JPEGS/University of Chicago Archives/Coleman papers \u2014\u00a0backup drive/00579 IMG \u2014\u00a0Coleman Papers.jpg",
+   "pair": null,
+   "cue": 41.116,
+   "angle": -0.215,
+   "route": "raw",
+   "vision_lines": 15,
+   "vision_words": 35,
+   "blla_lines": 8,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 4,
+     "blla_pass": 3,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 11,
+     "own_pass": 8,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 4,
+     "blla_pass": 4,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02046",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Moore",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Moore \u2014\u00a0M1965/00332 \u2014 Moore.jpg",
+   "pair": null,
+   "cue": 21.648,
+   "angle": 0.477,
+   "route": "raw",
+   "vision_lines": 20,
+   "vision_words": 39,
+   "blla_lines": 2,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 1,
+     "blla_pass": 1,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 11,
+     "own_pass": 7,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 1,
+     "blla_pass": 1,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01262",
+   "group": "curved",
+   "collection": "Hoover Institute/Zschau",
+   "rel": "Archival Photos JPEGS/Hoover Institute/Ed Zschau papers/00365 IMG \u2014\u00a0Zschau Papers.jpg",
+   "pair": null,
+   "cue": 15.821,
+   "angle": -0.101,
+   "route": "raw",
+   "vision_lines": 336,
+   "vision_words": 1332,
+   "blla_lines": 200,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 40
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 159,
+     "blla_pass": 133,
+     "blla_broken": 18,
+     "blla_short": 5,
+     "own_n": 259,
+     "own_pass": 241,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 159,
+     "blla_pass": 96,
+     "blla_broken": 32,
+     "blla_short": 24,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01776",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Intel Publications",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Fairchild : Intel Related/Intel Pubs \u2014\u00a0M2254/00535 \u2014 Intel Publications.jpg",
+   "pair": null,
+   "cue": 12.386,
+   "angle": 5.604,
+   "route": "deskew",
+   "vision_lines": 142,
+   "vision_words": 823,
+   "blla_lines": 150,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 3,
+    "short": 4,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 143,
+     "blla_pass": 60,
+     "blla_broken": 66,
+     "blla_short": 2,
+     "own_n": 136,
+     "own_pass": 59,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 143,
+     "blla_pass": 90,
+     "blla_broken": 10,
+     "blla_short": 28,
+     "own_n": 136,
+     "own_pass": 103,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 143,
+     "blla_pass": 51,
+     "blla_broken": 46,
+     "blla_short": 33,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01403",
+   "group": "curved",
+   "collection": "Hoover Institute/Roger Freeman papers",
+   "rel": "Archival Photos JPEGS/Hoover Institute/Roger Freeman papers/Freeman Papers \u2014\u00a0IMG 00273.jpg",
+   "pair": null,
+   "cue": 11.851,
+   "angle": 0.932,
+   "route": "raw",
+   "vision_lines": 74,
+   "vision_words": 274,
+   "blla_lines": 86,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 12,
+    "short": 38,
+    "shared": 10
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 26,
+     "blla_pass": 20,
+     "blla_broken": 3,
+     "blla_short": 0,
+     "own_n": 43,
+     "own_pass": 30,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 26,
+     "blla_pass": 20,
+     "blla_broken": 3,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03050",
+   "group": "curved",
+   "collection": "Stanford University Archives/Stanford Alumni Review",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Stanford Alumni Review/Alumni Review \u2014\u00a0IMG 00199.jpg",
+   "pair": null,
+   "cue": 11.061,
+   "angle": -0.62,
+   "route": "raw",
+   "vision_lines": 189,
+   "vision_words": 1160,
+   "blla_lines": 200,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 3,
+    "short": 31,
+    "shared": 18
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 148,
+     "blla_pass": 82,
+     "blla_broken": 27,
+     "blla_short": 7,
+     "own_n": 180,
+     "own_pass": 99,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 148,
+     "blla_pass": 89,
+     "blla_broken": 38,
+     "blla_short": 16,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01517",
+   "group": "curved",
+   "collection": "NYPL/New Yorker papers",
+   "rel": "Archival Photos JPEGS/NYPL/New Yorker/00006 IMG \u2014\u00a0New Yorker.jpg",
+   "pair": null,
+   "cue": 10.685,
+   "angle": 0.945,
+   "route": "raw",
+   "vision_lines": 33,
+   "vision_words": 148,
+   "blla_lines": 32,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 4,
+    "short": 7,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 21,
+     "blla_pass": 17,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 27,
+     "own_pass": 27,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 21,
+     "blla_pass": 19,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03048",
+   "group": "curved",
+   "collection": "Stanford University Archives/Stanford Alumni Review",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Stanford Alumni Review/Alumni Review \u2014\u00a0IMG 00150.jpg",
+   "pair": null,
+   "cue": 10.607,
+   "angle": 1.253,
+   "route": "deskew",
+   "vision_lines": 135,
+   "vision_words": 717,
+   "blla_lines": 135,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 10,
+    "short": 13,
+    "shared": 7
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 105,
+     "blla_pass": 74,
+     "blla_broken": 18,
+     "blla_short": 2,
+     "own_n": 131,
+     "own_pass": 101,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 105,
+     "blla_pass": 73,
+     "blla_broken": 15,
+     "blla_short": 5,
+     "own_n": 131,
+     "own_pass": 103,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 105,
+     "blla_pass": 66,
+     "blla_broken": 14,
+     "blla_short": 15,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01665",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Anderson",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Anderson \u2014\u00a0M1222/00652 \u2014 Anderson.jpg",
+   "pair": null,
+   "cue": 10.163,
+   "angle": 0.995,
+   "route": "raw",
+   "vision_lines": 44,
+   "vision_words": 341,
+   "blla_lines": 36,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 33,
+     "blla_pass": 18,
+     "blla_broken": 10,
+     "blla_short": 3,
+     "own_n": 34,
+     "own_pass": 19,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 33,
+     "blla_pass": 17,
+     "blla_broken": 9,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03335",
+   "group": "curved",
+   "collection": "USC/Brown",
+   "rel": "Archival Photos JPEGS/USC/Jerry Brown papers \u2014 on backup drive/06762 IMG \u2014\u00a0Brown.jpeg",
+   "pair": null,
+   "cue": 10.104,
+   "angle": 1.345,
+   "route": "deskew",
+   "vision_lines": 27,
+   "vision_words": 255,
+   "blla_lines": 28,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 2,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 24,
+     "blla_pass": 19,
+     "blla_broken": 4,
+     "blla_short": 1,
+     "own_n": 26,
+     "own_pass": 25,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 24,
+     "blla_pass": 22,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 26,
+     "own_pass": 26,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 24,
+     "blla_pass": 19,
+     "blla_broken": 2,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01668",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Anderson",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Anderson \u2014\u00a0M1222/00688 \u2014 Anderson.jpg",
+   "pair": null,
+   "cue": 9.952,
+   "angle": 1.809,
+   "route": "deskew",
+   "vision_lines": 33,
+   "vision_words": 348,
+   "blla_lines": 35,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 34,
+     "blla_pass": 17,
+     "blla_broken": 11,
+     "blla_short": 3,
+     "own_n": 33,
+     "own_pass": 18,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 34,
+     "blla_pass": 22,
+     "blla_broken": 1,
+     "blla_short": 10,
+     "own_n": 33,
+     "own_pass": 27,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 34,
+     "blla_pass": 14,
+     "blla_broken": 6,
+     "blla_short": 10,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00676",
+   "group": "curved",
+   "collection": "Harvard University Archives/Glazer papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Glazer papers \u2014 backup drive/00102 IMG \u2014\u00a0Glazer Papers.jpg",
+   "pair": null,
+   "cue": 9.103,
+   "angle": -1.767,
+   "route": "deskew",
+   "vision_lines": 27,
+   "vision_words": 136,
+   "blla_lines": 38,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 6,
+    "short": 7,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 25,
+     "blla_pass": 18,
+     "blla_broken": 2,
+     "blla_short": 2,
+     "own_n": 25,
+     "own_pass": 22,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 25,
+     "blla_pass": 16,
+     "blla_broken": 4,
+     "blla_short": 2,
+     "own_n": 25,
+     "own_pass": 18,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 25,
+     "blla_pass": 10,
+     "blla_broken": 8,
+     "blla_short": 3,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00395",
+   "group": "curved",
+   "collection": "UIUC",
+   "rel": "UIUC/UIUC \u2014 00395.HEIC",
+   "pair": null,
+   "cue": 8.897,
+   "angle": -0.431,
+   "route": "raw",
+   "vision_lines": 23,
+   "vision_words": 51,
+   "blla_lines": 21,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 5,
+    "short": 6,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 10,
+     "blla_pass": 6,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 13,
+     "own_pass": 13,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 10,
+     "blla_pass": 7,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01319",
+   "group": "curved",
+   "collection": "Hoover Institute/McCloskey",
+   "rel": "Archival Photos JPEGS/Hoover Institute/McCloskey/00026 \u2014\u00a0McCloskey.jpeg",
+   "pair": null,
+   "cue": 8.868,
+   "angle": 3.082,
+   "route": "deskew",
+   "vision_lines": 35,
+   "vision_words": 220,
+   "blla_lines": 35,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 4,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 31,
+     "blla_pass": 16,
+     "blla_broken": 11,
+     "blla_short": 2,
+     "own_n": 31,
+     "own_pass": 15,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 31,
+     "blla_pass": 20,
+     "blla_broken": 2,
+     "blla_short": 5,
+     "own_n": 31,
+     "own_pass": 22,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 31,
+     "blla_pass": 10,
+     "blla_broken": 8,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00185",
+   "group": "curved",
+   "collection": "Cambridge/Wilmott Peter",
+   "rel": "Archival Photos JPEGS/Churchill Archives/Wilmott/00009 \u2014\u00a0Wilmott.jpeg",
+   "pair": null,
+   "cue": 8.763,
+   "angle": -0.565,
+   "route": "raw",
+   "vision_lines": 24,
+   "vision_words": 99,
+   "blla_lines": 36,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 9,
+    "short": 9,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 18,
+     "blla_pass": 14,
+     "blla_broken": 0,
+     "blla_short": 3,
+     "own_n": 22,
+     "own_pass": 21,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 18,
+     "blla_pass": 10,
+     "blla_broken": 3,
+     "blla_short": 4,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01667",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Anderson",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Anderson \u2014\u00a0M1222/00674 \u2014 Anderson.jpg",
+   "pair": null,
+   "cue": 8.761,
+   "angle": 2.223,
+   "route": "deskew",
+   "vision_lines": 64,
+   "vision_words": 351,
+   "blla_lines": 50,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 5,
+    "short": 10,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 35,
+     "blla_pass": 18,
+     "blla_broken": 12,
+     "blla_short": 3,
+     "own_n": 53,
+     "own_pass": 34,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 35,
+     "blla_pass": 21,
+     "blla_broken": 5,
+     "blla_short": 1,
+     "own_n": 53,
+     "own_pass": 40,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 35,
+     "blla_pass": 19,
+     "blla_broken": 8,
+     "blla_short": 6,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01717",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Cusick",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Cusick/00032 \u2014 Cusick.jpg",
+   "pair": null,
+   "cue": 8.664,
+   "angle": -1.245,
+   "route": "deskew",
+   "vision_lines": 45,
+   "vision_words": 326,
+   "blla_lines": 42,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 3,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 36,
+     "blla_pass": 19,
+     "blla_broken": 4,
+     "blla_short": 3,
+     "own_n": 40,
+     "own_pass": 23,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 36,
+     "blla_pass": 23,
+     "blla_broken": 6,
+     "blla_short": 3,
+     "own_n": 40,
+     "own_pass": 25,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 36,
+     "blla_pass": 19,
+     "blla_broken": 6,
+     "blla_short": 4,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00573",
+   "group": "curved",
+   "collection": "Harvard University Archives/Bell papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Bell papers \u2014 backup drive/02484 IMG \u2014\u00a0Bell Papers.jpg",
+   "pair": null,
+   "cue": 8.571,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 22,
+   "vision_words": 60,
+   "blla_lines": 30,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 10,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 18,
+     "blla_pass": 15,
+     "blla_broken": 1,
+     "blla_short": 2,
+     "own_n": 19,
+     "own_pass": 17,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 18,
+     "blla_pass": 15,
+     "blla_broken": 2,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00571",
+   "group": "curved",
+   "collection": "Harvard University Archives/Bell papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Bell papers \u2014 backup drive/02443 IMG \u2014\u00a0Bell Papers.jpg",
+   "pair": null,
+   "cue": 8.352,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 44,
+   "vision_words": 382,
+   "blla_lines": 42,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 38,
+     "blla_pass": 38,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 40,
+     "own_pass": 40,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 38,
+     "blla_pass": 16,
+     "blla_broken": 13,
+     "blla_short": 4,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02141",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Norman",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Norman \u2014\u00a0M1826/00066 \u2014 Norman.jpg",
+   "pair": null,
+   "cue": 8.092,
+   "angle": 0.096,
+   "route": "raw",
+   "vision_lines": 69,
+   "vision_words": 661,
+   "blla_lines": 73,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 17,
+    "short": 0,
+    "shared": 20
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 36,
+     "blla_pass": 26,
+     "blla_broken": 0,
+     "blla_short": 6,
+     "own_n": 66,
+     "own_pass": 51,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 36,
+     "blla_pass": 33,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00806",
+   "group": "curved",
+   "collection": "Harvard University Archives/Riesman papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Riesman papers \u2014 backup drive/00067 IMG \u2014\u00a0Riesman Papers.jpg",
+   "pair": null,
+   "cue": 7.872,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 44,
+   "vision_words": 315,
+   "blla_lines": 40,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 0,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 37,
+     "blla_pass": 34,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 42,
+     "own_pass": 42,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 37,
+     "blla_pass": 33,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01421",
+   "group": "curved",
+   "collection": "Hoover Institute/Roger Freeman papers",
+   "rel": "Archival Photos JPEGS/Hoover Institute/Roger Freeman papers/Freeman Papers \u2014\u00a0IMG 00590.jpg",
+   "pair": null,
+   "cue": 7.848,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 57,
+   "vision_words": 318,
+   "blla_lines": 56,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 1,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 52,
+     "blla_pass": 43,
+     "blla_broken": 4,
+     "blla_short": 0,
+     "own_n": 54,
+     "own_pass": 50,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 52,
+     "blla_pass": 37,
+     "blla_broken": 7,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00053",
+   "group": "curved",
+   "collection": "Center for Jewish History/American Jewish Congress Records",
+   "rel": "Archival Photos JPEGS/Center for Jewish History/American Jewish Congress Records/00117 \u2014 AJ Congress.jpg",
+   "pair": null,
+   "cue": 7.754,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 24,
+   "vision_words": 273,
+   "blla_lines": 24,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 23,
+     "blla_pass": 19,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 23,
+     "own_pass": 22,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 23,
+     "blla_pass": 17,
+     "blla_broken": 2,
+     "blla_short": 2,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03051",
+   "group": "curved",
+   "collection": "Stanford University Archives/Stanford Alumnus",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Stanford Alumnus/Alumnus clippings \u2014\u00a0IMG 00023.jpg",
+   "pair": null,
+   "cue": 7.732,
+   "angle": 1.887,
+   "route": "deskew",
+   "vision_lines": 92,
+   "vision_words": 274,
+   "blla_lines": 65,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 6,
+    "short": 17,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 42,
+     "blla_pass": 28,
+     "blla_broken": 9,
+     "blla_short": 0,
+     "own_n": 63,
+     "own_pass": 45,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 42,
+     "blla_pass": 29,
+     "blla_broken": 9,
+     "blla_short": 0,
+     "own_n": 63,
+     "own_pass": 49,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 42,
+     "blla_pass": 36,
+     "blla_broken": 3,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01511",
+   "group": "curved",
+   "collection": "NYPL/NYRB.pdf",
+   "rel": "Archival Photos JPEGS/NYPL/NYRB papers/00014 \u2014\u00a0NYRB.jpg",
+   "pair": null,
+   "cue": 7.683,
+   "angle": 0.409,
+   "route": "raw",
+   "vision_lines": 54,
+   "vision_words": 512,
+   "blla_lines": 48,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 3,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 45,
+     "blla_pass": 40,
+     "blla_broken": 4,
+     "blla_short": 0,
+     "own_n": 50,
+     "own_pass": 47,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 45,
+     "blla_pass": 40,
+     "blla_broken": 2,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03303",
+   "group": "curved",
+   "collection": "USC/Brown",
+   "rel": "Archival Photos JPEGS/USC/Jerry Brown papers \u2014 on backup drive/05701 IMG \u2014\u00a0Brown.jpg",
+   "pair": null,
+   "cue": 7.625,
+   "angle": 0.953,
+   "route": "raw",
+   "vision_lines": 26,
+   "vision_words": 212,
+   "blla_lines": 25,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 24,
+     "blla_pass": 19,
+     "blla_broken": 5,
+     "blla_short": 0,
+     "own_n": 24,
+     "own_pass": 22,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 24,
+     "blla_pass": 19,
+     "blla_broken": 3,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00122",
+   "group": "curved",
+   "collection": "Babbage/CDC",
+   "rel": "Archival Photos JPEGS/Charles Babbage Institute/CDC/00718 \u2014 CDC.jpg",
+   "pair": null,
+   "cue": 7.361,
+   "angle": 0.813,
+   "route": "raw",
+   "vision_lines": 14,
+   "vision_words": 80,
+   "blla_lines": 13,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 11,
+     "blla_pass": 11,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 13,
+     "own_pass": 12,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 11,
+     "blla_pass": 8,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01716",
+   "group": "curved",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Cusick",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Cusick/00019 \u2014 Cusick.jpg",
+   "pair": null,
+   "cue": 7.326,
+   "angle": 0.639,
+   "route": "raw",
+   "vision_lines": 23,
+   "vision_words": 65,
+   "blla_lines": 36,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 15,
+    "short": 5,
+    "shared": 1
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 15,
+     "blla_pass": 10,
+     "blla_broken": 1,
+     "blla_short": 2,
+     "own_n": 19,
+     "own_pass": 17,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 15,
+     "blla_pass": 14,
+     "blla_broken": 0,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01335",
+   "group": "curved",
+   "collection": "Hoover Institute/McCloskey",
+   "rel": "Archival Photos JPEGS/Hoover Institute/McCloskey/00311 \u2014\u00a0McCloskey.jpeg",
+   "pair": null,
+   "cue": 7.291,
+   "angle": -0.356,
+   "route": "raw",
+   "vision_lines": 28,
+   "vision_words": 285,
+   "blla_lines": 28,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 28,
+     "blla_pass": 25,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 28,
+     "own_pass": 28,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 28,
+     "blla_pass": 24,
+     "blla_broken": 3,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02883",
+   "group": "curved",
+   "collection": "Stanford University Archives/Richard W. Lyman, President of Stanford University Papers, SC0215",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Richard W. Lyman, President of Stanford University Papers, SC0215/Lyman Presidency papers \u2014\u00a0IMG 01148.jpeg",
+   "pair": null,
+   "cue": 7.229,
+   "angle": -0.899,
+   "route": "raw",
+   "vision_lines": 36,
+   "vision_words": 223,
+   "blla_lines": 35,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 34,
+     "blla_pass": 34,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 35,
+     "own_pass": 35,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 34,
+     "blla_pass": 22,
+     "blla_broken": 4,
+     "blla_short": 7,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00254",
+   "group": "flat",
+   "collection": "UIUC",
+   "rel": "UIUC/UIUC \u2014 00254.HEIC",
+   "pair": "uiuc-00233",
+   "cue": 0.996,
+   "angle": -0.922,
+   "route": "raw",
+   "vision_lines": 18,
+   "vision_words": 169,
+   "blla_lines": 18,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 17,
+     "blla_pass": 17,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 17,
+     "own_pass": 17,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 17,
+     "blla_pass": 11,
+     "blla_broken": 1,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00032",
+   "group": "flat",
+   "collection": "UIUC",
+   "rel": "UIUC/UIUC \u2014 00032.HEIC",
+   "pair": "uiuc-00149",
+   "cue": 1.016,
+   "angle": -0.275,
+   "route": "raw",
+   "vision_lines": 38,
+   "vision_words": 348,
+   "blla_lines": 38,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 38,
+     "blla_pass": 38,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 38,
+     "own_pass": 37,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 38,
+     "blla_pass": 27,
+     "blla_broken": 4,
+     "blla_short": 6,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03372",
+   "group": "flat",
+   "collection": "Chicago, University of, Archives/Coleman papers",
+   "rel": "Archival Photos JPEGS/University of Chicago Archives/Coleman papers \u2014\u00a0backup drive/00590 IMG \u2014\u00a0Coleman Papers.jpg",
+   "pair": "s03370",
+   "cue": 0.916,
+   "angle": 0.23,
+   "route": "raw",
+   "vision_lines": 39,
+   "vision_words": 281,
+   "blla_lines": 26,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 26,
+     "blla_pass": 25,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 35,
+     "own_pass": 35,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 26,
+     "blla_pass": 26,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02115",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Moore",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Moore \u2014\u00a0M1965/01684 \u2014 Moore.jpg",
+   "pair": "s02046",
+   "cue": 0.752,
+   "angle": -0.928,
+   "route": "raw",
+   "vision_lines": 24,
+   "vision_words": 354,
+   "blla_lines": 23,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 23,
+     "blla_pass": 23,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 23,
+     "own_pass": 23,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 23,
+     "blla_pass": 23,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01245",
+   "group": "flat",
+   "collection": "Hoover Institute/Zschau",
+   "rel": "Archival Photos JPEGS/Hoover Institute/Ed Zschau papers/00065 IMG \u2014\u00a0Zschau Papers.jpg",
+   "pair": "s01262",
+   "cue": 0.532,
+   "angle": 2.162,
+   "route": "deskew",
+   "vision_lines": 11,
+   "vision_words": 65,
+   "blla_lines": 11,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 10,
+     "blla_pass": 3,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 10,
+     "own_pass": 3,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 10,
+     "blla_pass": 10,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 10,
+     "own_pass": 10,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 10,
+     "blla_pass": 4,
+     "blla_broken": 0,
+     "blla_short": 3,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02009",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Intel Publications",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Intel Pubs \u2014\u00a0M2254/00792 \u2014 Intel Publications.jpg",
+   "pair": "s01776",
+   "cue": 0.53,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 62,
+   "vision_words": 405,
+   "blla_lines": 68,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 7,
+    "short": 7,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 52,
+     "blla_pass": 48,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 54,
+     "own_pass": 52,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 52,
+     "blla_pass": 31,
+     "blla_broken": 10,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01401",
+   "group": "flat",
+   "collection": "Hoover Institute/Roger Freeman papers",
+   "rel": "Archival Photos JPEGS/Hoover Institute/Roger Freeman papers/Freeman Papers \u2014\u00a0IMG 00255.jpg",
+   "pair": "s01403",
+   "cue": 0.502,
+   "angle": -1.32,
+   "route": "deskew",
+   "vision_lines": 42,
+   "vision_words": 165,
+   "blla_lines": 38,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 6,
+    "short": 8,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 24,
+     "blla_pass": 24,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 27,
+     "own_pass": 26,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 24,
+     "blla_pass": 23,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 27,
+     "own_pass": 26,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 24,
+     "blla_pass": 18,
+     "blla_broken": 3,
+     "blla_short": 2,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03044",
+   "group": "flat",
+   "collection": "Stanford University Archives/Stanford Alumni Review",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Stanford Alumni Review/Alumni Review \u2014\u00a0IMG 00090.jpg",
+   "pair": "s03050",
+   "cue": 1.144,
+   "angle": 0.494,
+   "route": "raw",
+   "vision_lines": 89,
+   "vision_words": 418,
+   "blla_lines": 65,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 4,
+    "short": 21,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 40,
+     "blla_pass": 38,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 84,
+     "own_pass": 76,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 40,
+     "blla_pass": 35,
+     "blla_broken": 4,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01520",
+   "group": "flat",
+   "collection": "NYPL/New Yorker papers",
+   "rel": "Archival Photos JPEGS/NYPL/New Yorker/00029 IMG \u2014\u00a0New Yorker.jpg",
+   "pair": "s01517",
+   "cue": 1.17,
+   "angle": -1.23,
+   "route": "deskew",
+   "vision_lines": 19,
+   "vision_words": 78,
+   "blla_lines": 21,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 2,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 17,
+     "blla_pass": 17,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 17,
+     "own_pass": 17,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 17,
+     "blla_pass": 17,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 17,
+     "own_pass": 17,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 17,
+     "blla_pass": 14,
+     "blla_broken": 3,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02488",
+   "group": "flat",
+   "collection": "Stanford University Archives/Guido Marx papers",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Guido Marx/00489 \u2014\u00a0Guido Marx.jpg",
+   "pair": "s03048",
+   "cue": 0.486,
+   "angle": -0.294,
+   "route": "raw",
+   "vision_lines": 27,
+   "vision_words": 291,
+   "blla_lines": 26,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 25,
+     "blla_pass": 25,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 26,
+     "own_pass": 26,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 25,
+     "blla_pass": 22,
+     "blla_broken": 2,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01629",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Anderson",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Anderson \u2014\u00a0M1222/00017 \u2014 Anderson.jpg",
+   "pair": "s01665",
+   "cue": 1.1,
+   "angle": -0.707,
+   "route": "raw",
+   "vision_lines": 31,
+   "vision_words": 156,
+   "blla_lines": 31,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 2,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 27,
+     "blla_pass": 20,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 31,
+     "own_pass": 27,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 27,
+     "blla_pass": 11,
+     "blla_broken": 6,
+     "blla_short": 6,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03297",
+   "group": "flat",
+   "collection": "USC/Brown",
+   "rel": "Archival Photos JPEGS/USC/Jerry Brown papers \u2014 on backup drive/05536 IMG \u2014\u00a0Brown.jpg",
+   "pair": "s03335",
+   "cue": 1.012,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 36,
+   "vision_words": 377,
+   "blla_lines": 35,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 32,
+     "blla_pass": 32,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 32,
+     "own_pass": 32,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 32,
+     "blla_pass": 31,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01650",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Anderson",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Anderson \u2014\u00a0M1222/00386 \u2014 Anderson.jpg",
+   "pair": "s01668",
+   "cue": 1.017,
+   "angle": -0.429,
+   "route": "raw",
+   "vision_lines": 35,
+   "vision_words": 370,
+   "blla_lines": 33,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 4,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 29,
+     "blla_pass": 29,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 29,
+     "own_pass": 29,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 29,
+     "blla_pass": 29,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00747",
+   "group": "flat",
+   "collection": "Harvard University Archives/Glazer papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Glazer papers \u2014 backup drive/01325 IMG \u2014\u00a0Glazer Papers.jpg",
+   "pair": "s00676",
+   "cue": 0.378,
+   "angle": -0.653,
+   "route": "raw",
+   "vision_lines": 40,
+   "vision_words": 257,
+   "blla_lines": 37,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 33,
+     "blla_pass": 26,
+     "blla_broken": 0,
+     "blla_short": 4,
+     "own_n": 34,
+     "own_pass": 33,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 33,
+     "blla_pass": 25,
+     "blla_broken": 2,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "uiuc-00002",
+   "group": "flat",
+   "collection": "UIUC",
+   "rel": "UIUC/UIUC \u2014 00002.HEIC",
+   "pair": "uiuc-00395",
+   "cue": 0.797,
+   "angle": -0.754,
+   "route": "raw",
+   "vision_lines": 28,
+   "vision_words": 181,
+   "blla_lines": 25,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 22,
+     "blla_pass": 22,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 23,
+     "own_pass": 23,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 22,
+     "blla_pass": 19,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01323",
+   "group": "flat",
+   "collection": "Hoover Institute/McCloskey",
+   "rel": "Archival Photos JPEGS/Hoover Institute/McCloskey/00101 \u2014\u00a0McCloskey.jpeg",
+   "pair": "s01319",
+   "cue": 0.333,
+   "angle": -1.736,
+   "route": "deskew",
+   "vision_lines": 31,
+   "vision_words": 197,
+   "blla_lines": 29,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 29,
+     "blla_pass": 21,
+     "blla_broken": 0,
+     "blla_short": 4,
+     "own_n": 31,
+     "own_pass": 27,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 29,
+     "blla_pass": 25,
+     "blla_broken": 2,
+     "blla_short": 0,
+     "own_n": 31,
+     "own_pass": 30,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 29,
+     "blla_pass": 26,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00214",
+   "group": "flat",
+   "collection": "Cambridge/Young, Sasha",
+   "rel": "Archival Photos JPEGS/Churchill Archives/Young, Sasha/00476 \u2014\u00a0Young, Sasha.jpeg",
+   "pair": "s00185",
+   "cue": 0.938,
+   "angle": 0.971,
+   "route": "raw",
+   "vision_lines": 61,
+   "vision_words": 193,
+   "blla_lines": 31,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 3,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 26,
+     "blla_pass": 19,
+     "blla_broken": 4,
+     "blla_short": 1,
+     "own_n": 43,
+     "own_pass": 40,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 26,
+     "blla_pass": 12,
+     "blla_broken": 7,
+     "blla_short": 5,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01646",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Anderson",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Anderson \u2014\u00a0M1222/00342 \u2014 Anderson.jpg",
+   "pair": "s01667",
+   "cue": 0.873,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 26,
+   "vision_words": 290,
+   "blla_lines": 26,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 24,
+     "blla_pass": 24,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 24,
+     "own_pass": 24,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 24,
+     "blla_pass": 20,
+     "blla_broken": 3,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01721",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Cusick",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Cusick/00137 \u2014 Cusick.jpg",
+   "pair": "s01717",
+   "cue": 0.952,
+   "angle": -0.556,
+   "route": "raw",
+   "vision_lines": 43,
+   "vision_words": 281,
+   "blla_lines": 45,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 3,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 42,
+     "blla_pass": 41,
+     "blla_broken": 0,
+     "blla_short": 1,
+     "own_n": 43,
+     "own_pass": 43,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 42,
+     "blla_pass": 29,
+     "blla_broken": 4,
+     "blla_short": 4,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00591",
+   "group": "flat",
+   "collection": "Harvard University Archives/Bell papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Bell papers \u2014 backup drive/02856 IMG \u2014\u00a0Bell Papers.jpg",
+   "pair": "s00573",
+   "cue": 1.02,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 43,
+   "vision_words": 279,
+   "blla_lines": 34,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 4,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 30,
+     "blla_pass": 29,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 35,
+     "own_pass": 32,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 30,
+     "blla_pass": 30,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00515",
+   "group": "flat",
+   "collection": "Harvard University Archives/Bell papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Bell papers \u2014 backup drive/01280 IMG \u2014\u00a0Bell Papers.jpg",
+   "pair": "s00571",
+   "cue": 0.594,
+   "angle": 1.246,
+   "route": "deskew",
+   "vision_lines": 35,
+   "vision_words": 345,
+   "blla_lines": 32,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 1,
+    "shared": 2
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 28,
+     "blla_pass": 22,
+     "blla_broken": 5,
+     "blla_short": 0,
+     "own_n": 34,
+     "own_pass": 30,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 28,
+     "blla_pass": 27,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 34,
+     "own_pass": 34,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 28,
+     "blla_pass": 26,
+     "blla_broken": 0,
+     "blla_short": 2,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02113",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Moore",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Moore \u2014\u00a0M1965/01640 \u2014 Moore.jpg",
+   "pair": "s02141",
+   "cue": 0.714,
+   "angle": 0.223,
+   "route": "raw",
+   "vision_lines": 19,
+   "vision_words": 219,
+   "blla_lines": 19,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 17,
+     "blla_pass": 17,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 17,
+     "own_pass": 16,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 17,
+     "blla_pass": 16,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00862",
+   "group": "flat",
+   "collection": "Harvard University Archives/Riesman papers",
+   "rel": "Archival Photos JPEGS/Harvard University Archives/Riesman papers \u2014 backup drive/01212 IMG \u2014\u00a0Riesman Papers.jpg",
+   "pair": "s00806",
+   "cue": 0.22,
+   "angle": -0.147,
+   "route": "raw",
+   "vision_lines": 16,
+   "vision_words": 150,
+   "blla_lines": 17,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 14,
+     "blla_pass": 14,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 15,
+     "own_pass": 15,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 14,
+     "blla_pass": 13,
+     "blla_broken": 0,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01418",
+   "group": "flat",
+   "collection": "Hoover Institute/Roger Freeman papers",
+   "rel": "Archival Photos JPEGS/Hoover Institute/Roger Freeman papers/Freeman Papers \u2014\u00a0IMG 00526.jpg",
+   "pair": "s01421",
+   "cue": 0.798,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 118,
+   "vision_words": 1166,
+   "blla_lines": 110,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 1,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 108,
+     "blla_pass": 101,
+     "blla_broken": 7,
+     "blla_short": 0,
+     "own_n": 117,
+     "own_pass": 117,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 108,
+     "blla_pass": 88,
+     "blla_broken": 10,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00052",
+   "group": "flat",
+   "collection": "Center for Jewish History/American Jewish Congress Records",
+   "rel": "Archival Photos JPEGS/Center for Jewish History/American Jewish Congress Records/00085 \u2014 AJ Congress.jpg",
+   "pair": "s00053",
+   "cue": 0.61,
+   "angle": 0.777,
+   "route": "raw",
+   "vision_lines": 49,
+   "vision_words": 516,
+   "blla_lines": 48,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 45,
+     "blla_pass": 35,
+     "blla_broken": 10,
+     "blla_short": 0,
+     "own_n": 46,
+     "own_pass": 46,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 45,
+     "blla_pass": 41,
+     "blla_broken": 2,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02736",
+   "group": "flat",
+   "collection": "Stanford University Archives/0 \u2014\u00a0This material, Re-OCRed",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Office of Undergraduate Admissions records, SC0407/Initial Accession/Undergraduate Admissions \u2014\u00a0IMG 01867.jpg",
+   "pair": "s03051",
+   "cue": 0.528,
+   "angle": -0.696,
+   "route": "raw",
+   "vision_lines": 27,
+   "vision_words": 273,
+   "blla_lines": 27,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 27,
+     "blla_pass": 27,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 27,
+     "own_pass": 27,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 27,
+     "blla_pass": 26,
+     "blla_broken": 0,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01515",
+   "group": "flat",
+   "collection": "NYPL/NYRB.pdf",
+   "rel": "Archival Photos JPEGS/NYPL/NYRB papers/00080 \u2014\u00a0NYRB.jpg",
+   "pair": "s01511",
+   "cue": 0.391,
+   "angle": -0.185,
+   "route": "raw",
+   "vision_lines": 29,
+   "vision_words": 281,
+   "blla_lines": 28,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 0,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 28,
+     "blla_pass": 27,
+     "blla_broken": 0,
+     "blla_short": 0,
+     "own_n": 28,
+     "own_pass": 28,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 28,
+     "blla_pass": 27,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s03281",
+   "group": "flat",
+   "collection": "USC/Brown",
+   "rel": "Archival Photos JPEGS/USC/Jerry Brown papers \u2014 on backup drive/05289 IMG \u2014\u00a0Brown.jpg",
+   "pair": "s03303",
+   "cue": 0.957,
+   "angle": -1.086,
+   "route": "deskew",
+   "vision_lines": 50,
+   "vision_words": 342,
+   "blla_lines": 45,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 0,
+    "short": 4,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 41,
+     "blla_pass": 34,
+     "blla_broken": 1,
+     "blla_short": 4,
+     "own_n": 45,
+     "own_pass": 44,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 41,
+     "blla_pass": 38,
+     "blla_broken": 2,
+     "blla_short": 0,
+     "own_n": 45,
+     "own_pass": 44,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 41,
+     "blla_pass": 39,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s00126",
+   "group": "flat",
+   "collection": "Babbage/CDC",
+   "rel": "Archival Photos JPEGS/Charles Babbage Institute/CDC/00749 \u2014 CDC.jpg",
+   "pair": "s00122",
+   "cue": 1.12,
+   "angle": 1.812,
+   "route": "deskew",
+   "vision_lines": 41,
+   "vision_words": 232,
+   "blla_lines": 40,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 3,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 36,
+     "blla_pass": 9,
+     "blla_broken": 20,
+     "blla_short": 0,
+     "own_n": 36,
+     "own_pass": 16,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 36,
+     "blla_pass": 35,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 36,
+     "own_pass": 36,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 36,
+     "blla_pass": 29,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02026",
+   "group": "flat",
+   "collection": "Stanford University Archives \u2014\u00a0Tech/Moore",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/0 Tech/Moore \u2014\u00a0M1965/00013 \u2014 Moore.jpg",
+   "pair": "s01716",
+   "cue": 0.927,
+   "angle": 0.754,
+   "route": "raw",
+   "vision_lines": 160,
+   "vision_words": 1049,
+   "blla_lines": 159,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 1,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 156,
+     "blla_pass": 150,
+     "blla_broken": 4,
+     "blla_short": 0,
+     "own_n": 157,
+     "own_pass": 155,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 156,
+     "blla_pass": 133,
+     "blla_broken": 10,
+     "blla_short": 7,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s01327",
+   "group": "flat",
+   "collection": "Hoover Institute/McCloskey",
+   "rel": "Archival Photos JPEGS/Hoover Institute/McCloskey/00200 \u2014\u00a0McCloskey.jpeg",
+   "pair": "s01335",
+   "cue": 0.612,
+   "angle": 0.0,
+   "route": "raw",
+   "vision_lines": 46,
+   "vision_words": 366,
+   "blla_lines": 46,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 2,
+    "short": 2,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 42,
+     "blla_pass": 41,
+     "blla_broken": 0,
+     "blla_short": 1,
+     "own_n": 44,
+     "own_pass": 43,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 42,
+     "blla_pass": 33,
+     "blla_broken": 5,
+     "blla_short": 3,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  },
+  {
+   "key": "s02881",
+   "group": "flat",
+   "collection": "Stanford University Archives/Richard W. Lyman, President of Stanford University Papers, SC0215",
+   "rel": "Archival Photos JPEGS/Stanford University Archives/1 Admissions/Richard W. Lyman, President of Stanford University Papers, SC0215/Lyman Presidency papers \u2014\u00a0IMG 01117.jpg",
+   "pair": "s02883",
+   "cue": 0.989,
+   "angle": -2.273,
+   "route": "deskew",
+   "vision_lines": 43,
+   "vision_words": 174,
+   "blla_lines": 40,
+   "blla_failed": false,
+   "skipped": {
+    "empty": 10,
+    "short": 6,
+    "shared": 0
+   },
+   "arms": {
+    "raw": {
+     "blla_n": 24,
+     "blla_pass": 19,
+     "blla_broken": 1,
+     "blla_short": 1,
+     "own_n": 31,
+     "own_pass": 27,
+     "unplaced": 0
+    },
+    "deskew": {
+     "blla_n": 24,
+     "blla_pass": 22,
+     "blla_broken": 1,
+     "blla_short": 0,
+     "own_n": 31,
+     "own_pass": 30,
+     "unplaced": 0
+    },
+    "oracle": {
+     "blla_n": 24,
+     "blla_pass": 19,
+     "blla_broken": 3,
+     "blla_short": 1,
+     "own_n": 0,
+     "own_pass": 0,
+     "unplaced": 0
+    }
+   }
+  }
+ ],
+ "selection": {
+  "curved": [
+   "uiuc-00233",
+   "uiuc-00149",
+   "s03370",
+   "s02046",
+   "s01262",
+   "s01776",
+   "s01403",
+   "s03050",
+   "s01517",
+   "s03048",
+   "s01665",
+   "s03335",
+   "s01668",
+   "s00676",
+   "uiuc-00395",
+   "s01319",
+   "s00185",
+   "s01667",
+   "s01717",
+   "s00573",
+   "s00571",
+   "s02141",
+   "s00806",
+   "s01421",
+   "s00053",
+   "s03051",
+   "s01511",
+   "s03303",
+   "s00122",
+   "s01716",
+   "s01335",
+   "s02883"
+  ],
+  "flat": [
+   "uiuc-00254",
+   "uiuc-00032",
+   "s03372",
+   "s02115",
+   "s01245",
+   "s02009",
+   "s01401",
+   "s03044",
+   "s01520",
+   "s02488",
+   "s01629",
+   "s03297",
+   "s01650",
+   "s00747",
+   "uiuc-00002",
+   "s01323",
+   "s00214",
+   "s01646",
+   "s01721",
+   "s00591",
+   "s00515",
+   "s02113",
+   "s00862",
+   "s01418",
+   "s00052",
+   "s02736",
+   "s01515",
+   "s03281",
+   "s00126",
+   "s02026",
+   "s01327",
+   "s02881"
+  ],
+  "flat_cut": 1.249
+ }
+}

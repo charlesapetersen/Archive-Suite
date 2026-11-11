@@ -118,8 +118,8 @@ def pitch_fill(lines, W, H, min_width=0.15):
     """A bend's signature in Vision's own boxes: Vision cuts every word from its line's straight quad, so a bowed line
     gets a quad tall enough to hold the bow and it reaches into the next line. For each wide line, its quad height
     over the distance to the nearest line below that shares half its width; returns the 90th percentile (None with
-    fewer than 5 pairs). Ordinary text sits near 0.6-0.8; tilt alone does not raise it, since the quads turn with
-    the lines."""
+    fewer than 5 pairs). Tried as a cue and not used: on the sample its median is 1.08 and UIUC 00233 scores 0.71,
+    below most flat pages (forms and columns raise it more than a bend does)."""
     rows = []
     for ln in lines:
         q = np.asarray(ln['quad'], float) * [W, H]
@@ -227,7 +227,7 @@ def cmd_survey(a):
 
 
 # ---------------------------------------------------------------- the selection
-CUE = 'fill'          # chosen after the survey: see the report's "The cue"
+CUE = 'spread'        # chosen after the survey: place-curved-owner.md, "How many of the owner's pages are curved"
 MIN_WIDE = 8          # a page needs this many wide lines for its cue to mean anything
 
 
@@ -235,9 +235,30 @@ def eligible(r):
     return not r.get('failed') and (r.get('wide') or 0) >= MIN_WIDE and r.get(CUE) is not None
 
 
+def unique_pool(rows):
+    """The eligible sample pages, the two owner pages left out, one per file content: the sample holds some images
+    twice under two folders (Intel Publications 00535 is in both "Fairchild : Intel Related" and "Intel Pubs")."""
+    import hashlib
+    f = CACHE / 'digests.json'
+    dig = json.loads(f.read_text()) if f.exists() else {}
+    seen, pool, dups = set(), [], 0
+    for r in rows:
+        if not eligible(r) or r['key'] in OWNER_PAGES:
+            continue
+        if r['key'] not in dig:
+            dig[r['key']] = hashlib.sha1(image_of_row(r).read_bytes()).hexdigest()
+        if dig[r['key']] in seen:
+            dups += 1
+            continue
+        seen.add(dig[r['key']])
+        pool.append(r)
+    f.write_text(json.dumps(dig))
+    return pool, dups
+
+
 def cmd_select(a):
     rows = json.loads((CACHE / 'survey.json').read_text())
-    pool = [r for r in rows if eligible(r) and r['key'] not in OWNER_PAGES]
+    pool, dups = unique_pool(rows)
     pool.sort(key=lambda r: -r[CUE])
     curved = [r for r in rows if r['key'] in OWNER_PAGES] + pool[:N_CURVED]
     chosen = {r['key'] for r in curved}
@@ -254,17 +275,31 @@ def cmd_select(a):
                 flat.append({**f, 'pair': c['key'], 'match': 'collection' if level == 2 else 'archive'})
                 chosen.add(f['key'])
                 break
-    sel = {'cue': CUE, 'min_wide': MIN_WIDE, 'flat_cut': flat_cut, 'curved': curved, 'flat': flat}
+    sel = {'cue': CUE, 'min_wide': MIN_WIDE, 'flat_cut': flat_cut, 'duplicates': dups,
+           'pool': [r['key'] for r in pool], 'curved': curved, 'flat': flat}
     (CACHE / 'selection.json').write_text(json.dumps(sel, indent=1))
     print(f'curved {len(curved)}, flat {len(flat)} (cut {flat_cut:.3f}); eligible {len(pool)} of {len(rows)}')
     for name, rs in (('curved', curved), ('flat', flat)):
         sheet(name, rs)
 
 
+def image_of_row(r):
+    return CACHE / 'img' / f'{r["key"]}.jpg' if r['key'].startswith('uiuc-') else SAMPLE / r['rel']
+
+
 def image_of(key):
     rows = {r['key']: r for r in json.loads((CACHE / 'survey.json').read_text())}
-    r = rows[key]
-    return CACHE / 'img' / f'{key}.jpg' if key.startswith('uiuc-') else SAMPLE / r['rel']
+    return image_of_row(rows[key])
+
+
+def write_upright(src, dst, turn):
+    """The stored pixels turned `turn` clockwise quarter turns, saved with no EXIF: Vision reads stored pixels, but
+    kraken applies an EXIF orientation, and a copy that kept the HEIC's orientation 6 came out sideways again."""
+    from PIL import Image
+    im = Image.open(src)
+    im.load()
+    im = im.convert('RGB').rotate(-90 * turn, expand=True) if turn % 4 else im.convert('RGB')
+    im.save(dst, 'JPEG', quality=92)
 
 
 def sheet(name, rs):
@@ -309,9 +344,7 @@ def cmd_truth(a):
     for r, _ in selected():
         k = r['key']
         if not up_image(k).exists():
-            subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '92',
-                            '-r', str(90 * r['turn']), str(image_of(k)), '--out', str(up_image(k))],
-                           check=True, stdout=subprocess.DEVNULL)
+            write_upright(image_of(k), up_image(k), r['turn'])
         jobs.append(f'{up_image(k)}\t{up_lines(k)}\n')
     jf = CACHE / 'lines-up-jobs.tsv'
     jf.write_text(''.join(jobs))
@@ -354,14 +387,20 @@ def inside(poly, c):
     return hit
 
 
-def vertical_mid(poly, x):
-    """The middle of a boundary polygon's vertical extent at x (None where the polygon does not reach x)."""
+def span_at(poly, x):
+    """The y values where a boundary polygon's edges cross x (None where the polygon does not reach x)."""
     ys = []
     n = len(poly)
     for k in range(n):
         (x0, y0), (x1, y1) = poly[k], poly[(k + 1) % n]
         if (x0 <= x <= x1) or (x1 <= x <= x0):
             ys.append(y0 if x1 == x0 else y0 + (x - x0) * (y1 - y0) / (x1 - x0))
+    return ys or None
+
+
+def vertical_mid(poly, x):
+    """The middle of a boundary polygon's vertical extent at x (None where the polygon does not reach x)."""
+    ys = span_at(poly, x)
     return (min(ys) + max(ys)) / 2 if ys else None
 
 
@@ -421,6 +460,11 @@ def blla_expected(blines, vwords):
     return out, skipped
 
 
+def clip(pts):
+    """Vision boxes can reach a hair past the image edge; a drag point there starts on the edge instead."""
+    return [(min(1.0, max(0.0, x)), min(1.0, max(0.0, y))) for x, y in pts]
+
+
 def ink_drag(m, vwords, ws, boundary):
     """From the first word's left edge to the last's right, each at the middle of the blla boundary there."""
     b0, b1 = vwords[ws[0]]['box'], vwords[ws[-1]]['box']
@@ -429,13 +473,13 @@ def ink_drag(m, vwords, ws, boundary):
     y1 = vertical_mid(boundary, x1)
     y0 = b0[1] + b0[3] / 2 if y0 is None else y0
     y1 = b1[1] + b1[3] / 2 if y1 is None else y1
-    return m([(x0, y0), (x1, y1)])
+    return m(clip([(x0, y0), (x1, y1)]))
 
 
 def own_drag(m, vwords, ws):
     """Vision-only: from the first word's left edge to the last's right, at each word's own mid-height."""
     b0, b1 = vwords[ws[0]]['box'], vwords[ws[-1]]['box']
-    return m([(b0[0], b0[1] + b0[3] / 2), (b1[0] + b1[2], b1[1] + b1[3] / 2)])
+    return m(clip([(b0[0], b0[1] + b0[3] / 2), (b1[0] + b1[2], b1[1] + b1[3] / 2)]))
 
 
 def layer_lines(m, vlines, vwords):
@@ -478,6 +522,32 @@ def page_row(r, group):
                 drags.append({'id': f'v{n}', 'expected': ' '.join(vwords[j]['text'] for j in ln['words']),
                               'start': s.tolist(), 'end': e.tolist()})
         plans[arm] = (pdf, drags)
+    # the control: blla's own scored lines written as one level run each over their boundary's box, dragged the same
+    # way; what fails here fails for any one-level-run-per-line layer, whoever groups the lines
+    m = arms[route]
+    pdf = work / 'oracle.pdf'
+    olines = []
+    for i, ws, boundary in exp:
+        # across: the words' own extent; up and down: the blla boundary over that extent (the band the bent ink
+        # line fills), so the run's glyphs fall where the words are
+        x0 = min(vwords[j]['box'][0] for j in ws)
+        x1 = max(vwords[j]['box'][0] + vwords[j]['box'][2] for j in ws)
+        xs = np.linspace(x0, x1, 9)
+        band = []
+        for x in xs:
+            mid = vertical_mid(boundary, x)
+            if mid is None:
+                continue
+            ys = [y for y in (span_at(boundary, x) or ())]
+            band += [(x, min(ys)), (x, max(ys))]
+        if not band:
+            continue
+        pts = m(np.asarray(band, float))
+        pts = pts[np.all(np.isfinite(pts), 1)]
+        if len(pts):
+            olines.append({'text': ' '.join(vwords[j]['text'] for j in ws), 'box': quad_bbox(pts)})
+    jobs.append({'out': str(pdf), 'width': m.out_w * PT, 'height': m.out_h * PT, 'lines': olines})
+    plans['oracle'] = (pdf, [d for d in plans[route][1] if d['id'].startswith('b')])
     jf = work / 'jobs.json'
     jf.write_text(json.dumps(jobs))
     unplaced = json.loads(run_tool([WRITER, jf]))['unplaced']
@@ -492,8 +562,12 @@ def page_row(r, group):
         got = json.loads(do.read_text())['lines']
         b = [g for g in got if str(g['id']).startswith('b')]
         v = [g for g in got if str(g['id']).startswith('v')]
+        exp_of = {d['id']: d['expected'] for d in drags}
         out['arms'][arm] = {'blla_n': len(b), 'blla_pass': sum(g['pass'] for g in b),
                             'blla_broken': sum(g['broken'] for g in b),
+                            # not broken, but the selection is only part of the line (a drag end inside a word)
+                            'blla_short': sum(1 for g in b if not g['pass'] and not g['broken']
+                                              and g['got'] in exp_of[g['id']]),
                             'own_n': len(v), 'own_pass': sum(g['pass'] for g in v),
                             'unplaced': sum(1 for u in unplaced if u['out'] == str(pdf))}
     return out
@@ -533,7 +607,8 @@ def cmd_report(a):
     rows = json.loads((CACHE / 'rows.json').read_text())
     survey = json.loads((CACHE / 'survey.json').read_text())
     sel = json.loads((CACHE / 'selection.json').read_text())
-    pool = [r for r in survey if eligible(r) and r['key'] not in OWNER_PAGES]
+    keep = set(sel['pool'])
+    pool = [r for r in survey if r['key'] in keep]
     vals = sorted(r[CUE] for r in pool)
     owner_cue = {r['key']: r.get(CUE) for r in survey if r['key'] in OWNER_PAGES}
     thr = min(v for v in owner_cue.values() if v is not None)
@@ -548,9 +623,43 @@ def cmd_report(a):
             res[f'{name}.{truth}'] = {
                 'curved': pooled(curved, arm_of, nk, pk), 'flat': pooled(flat, arm_of, nk, pk),
                 'diff': boot_diff(curved, flat, arm_of, nk, pk)}
+    oracle = lambda r: 'oracle'
+    res['oracle.blla'] = {'curved': pooled(curved, oracle, 'blla_n', 'blla_pass'),
+                          'flat': pooled(flat, oracle, 'blla_n', 'blla_pass'),
+                          'diff': boot_diff(curved, flat, oracle, 'blla_n', 'blla_pass')}
+    res['failures'] = {g: {k: sum(r['arms'][a(r)][k] for r in rs) for k in ('blla_n', 'blla_pass', 'blla_broken', 'blla_short')}
+                       | {'arm': name}
+                       for g, rs in (('curved', curved), ('flat', flat))
+                       for name, a in (('route', route),)}
+    res['deskewed'] = {'curved': sum(r['route'] == 'deskew' for r in curved),
+                       'flat': sum(r['route'] == 'deskew' for r in flat)}
+    # dose: the curved pages' pass rate against the cue (Spearman, pages with 5 or more scored lines)
+    pts = [(r['cue'], r['arms'][r['route']]['blla_pass'] / r['arms'][r['route']]['blla_n']) for r in curved + flat
+           if r['arms'][r['route']]['blla_n'] >= 5]
+    rk = lambda v: [sorted(v).index(x) for x in v]
+    cx, cy = rk([p[0] for p in pts]), rk([p[1] for p in pts])
+    res['spearman_cue_pass'] = {'n': len(pts), 'rho': float(np.corrcoef(cx, cy)[0, 1])}
+    # paired: each flat page was drawn from its curved page's collection; mean of the pairs' page-rate differences
+    by = {r['key']: r for r in curved}
+    for truth, nk, pk in (('blla', 'blla_n', 'blla_pass'), ('own', 'own_n', 'own_pass')):
+        diffs = []
+        for f in flat:
+            c = by.get(f['pair'])
+            if c is None:
+                continue
+            ca, fa = c['arms'][c['route']], f['arms'][f['route']]
+            if ca[nk] and fa[nk]:
+                diffs.append(100 * ca[pk] / ca[nk] - 100 * fa[pk] / fa[nk])
+        rng = random.Random(SEED)
+        bs = sorted(statistics.mean(rng.choice(diffs) for _ in diffs) for _ in range(DRAWS)) if diffs else []
+        res[f'paired.{truth}'] = {'pairs': len(diffs), 'mean': statistics.mean(diffs) if diffs else None,
+                                  'lo': bs[int(0.025 * DRAWS)] if bs else None,
+                                  'hi': bs[int(0.975 * DRAWS) - 1] if bs else None}
     out = {'item': 'W46.place-curved-owner', 'cue': CUE, 'threshold': thr, 'owner_cue': owner_cue,
            'surveyed': len(survey), 'failed': sum(1 for r in survey if r.get('failed')), 'eligible': len(pool),
-           'above_threshold': len(above), 'cue_quantiles': {q: float(np.percentile(vals, q)) for q in (50, 90, 95, 99)},
+           'duplicates': sel['duplicates'],
+           'above_threshold': len(above), 'above_00233': sum(1 for r in pool if r[CUE] >= owner_cue['uiuc-00233']),
+           'above_5deg': sum(1 for r in pool if r[CUE] >= 5), 'curved_cue_min': min(r['cue'] for r in curved if r['key'] not in OWNER_PAGES), 'cue_quantiles': {q: float(np.percentile(vals, q)) for q in (50, 90, 95, 99)},
            'results': res, 'rows': rows,
            'selection': {'curved': [r['key'] for r in sel['curved']], 'flat': [r['key'] for r in sel['flat']],
                          'flat_cut': sel['flat_cut']}}

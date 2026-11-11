@@ -149,6 +149,8 @@ line layer [M] `place-print.md`; no row. R6 services (Azure, Textract, Document 
 - A stage 04 reader shown to keep line breaks on hands: it joins the hand route instead of the text page.
 - More hand truth: the gate refit (`place-hands.md` calls 0.67 a starting value).
 - A dewarp whose lattice keeps every word and beats deskew on the owner's curled pages (it lost, −8.6, `place-geom.md`).
+  On the owner's 32 most curved pages the layer itself loses −19.8 (−26.2 to −12.8) against flat pages, and blla's
+  own lines as level runs lose as much, so it is the level run on a bent line [M] `place-curved-owner.md`.
 - An RTL path in the writer, or word boxes for CJK and Thai.
 
 ## 7. Owner calls
