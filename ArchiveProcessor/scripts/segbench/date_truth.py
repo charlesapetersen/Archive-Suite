@@ -33,6 +33,7 @@ import corpus_survey as CS
 import date_scorers as S
 import date_tagging as DT
 import enclosure_split as ES
+from seg_card import keep_card
 
 CASES = os.path.join(DT.CACHE, "cases")
 RESULTS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "segbench-results", "date-truth.md")
@@ -372,8 +373,9 @@ def write_md(out):
           "and a quote: the neighbour must be in the context given, the quote a spacing-tolerant substring of its text, "
           "and the quote must carry the year; a located region must contain a date string with that year. A right year "
           "with failed evidence counts as unsupported.", ""]
+    text = keep_card(RESULTS, "\n".join(L))
     with open(RESULTS, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(L))
+        fh.write(text)
 
 
 def main():

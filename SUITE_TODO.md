@@ -619,8 +619,6 @@ now takes the rule table as its source.
 
 - [ ] **`W46.place-hands-cost` — the hand placement route's memory and time [S]** (lane: segbench) (uses: light,machine) — Peak memory and seconds a page of the whole hand route (blla, McCATMuS alignment of both matchers, the pick, the writer) on the 20 owner hand pages on 16 and 18 GB Macs; only blla's 6.1 s a page is measured today. Fills the row's memory and time; the 16 GB claim waits on it.
 
-- [ ] **`W46.cards-missing` — measurement cards the Phase 4 drafters found missing [XS]** (lane: segbench) (uses: light) — `date-image.md`, `date-traceable.md`, `date-traceable-paid.md`, `date-enclosure.md`, `date-model.md`, `date-truth.md`, `date-truth-sets.md`, `ent-robust.md` (naming its macOS 26.6 Vision text) and `capture-tags.md` get a `## Measurement card`.
-
 - [ ] **`W46.ocr-rows-omitted` — rows for the cheap hosted routes the reading table leaves out [XS]** (lane: segbench) (uses: light) (blocked-on: W46.settings-routes-table) — `execution-plans/processing-review/13-stage-rules/04-reading.md` lists 23 headline routes with no row, each with its reason; the cheap hosted ones among them (a user's OpenRouter key reaches them) get rows from the panel's own figures so the solver can pick them, with the same per-run discipline.
 
 ## The settings layer — W46.settings (owner, 2026-11-04; filed by Phase 4, 2026-11-06)

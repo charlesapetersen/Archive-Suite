@@ -36,6 +36,7 @@ import time
 sys.path.insert(0, os.getcwd())
 import date_scorers as S
 import date_tagging as DT
+from seg_card import keep_card
 
 CACHE = os.path.join(DT.CACHE, "traceable")
 LTS_2B = os.path.expanduser("~/Claude/Long term storage/FarmShare-20261018/date-cache")
@@ -1103,7 +1104,8 @@ def write_md(out):
         n = sum(v for a, v in c["calls"].items() if a != "2b") * 1000 / max(1, s["n"])
         L.append(f"| {k} | {n:.0f} | {c['gpu_s']:.0f} | {c['mac_s']:.0f} |")
     L.append("")
-    open(RESULTS, "w", encoding="utf-8").write("\n".join(L))
+    text = keep_card(RESULTS, "\n".join(L))
+    open(RESULTS, "w", encoding="utf-8").write(text)
 
 
 def main():

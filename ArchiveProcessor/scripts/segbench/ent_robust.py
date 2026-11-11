@@ -60,6 +60,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ent_truth as ET  # noqa: E402  (stdlib-only at import, so the GLiNER venv can load it)
+from seg_card import keep_card  # noqa: E402  (stdlib-only too)
 
 RC = os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal")
 CACHE = os.path.join(RC, "ent-robust")
@@ -593,7 +594,9 @@ def cmd_report(a):
     if os.path.exists(g17):
         s["g17"] = json.load(open(g17))
     json.dump(s, open(os.path.join(RESULTS, "ent-robust.json"), "w"), indent=1, sort_keys=True)
-    open(os.path.join(RESULTS, "ent-robust.md"), "w").write(markdown(s))
+    md = os.path.join(RESULTS, "ent-robust.md")
+    text = keep_card(md, markdown(s))
+    open(md, "w").write(text)
     print(json.dumps({k: v.get("switch_off") for k, v in s["extractors"].items()}))
 
 

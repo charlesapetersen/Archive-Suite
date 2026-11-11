@@ -40,6 +40,23 @@ def _truth() -> str:
 TRUTH = _truth()
 
 
+def keep_card(path, text: str) -> str:
+    """`text` with the hand-written card of the report at `path` carried over, when `text` writes none of its own.
+
+    W46.cards-missing: those cards were added by hand to reports whose writers regenerate the whole file, so a rescore
+    would drop them. The card is kept as written; a rerun that changes its figures must revise it by hand."""
+    if "## Measurement card" in text:
+        return text
+    try:
+        old = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return text
+    at = old.find("\n## Measurement card")
+    if at < 0:
+        return text
+    return text.rstrip("\n") + "\n" + old[at:]
+
+
 def card(truth: str, selection: str, comparison: str, noise: str, scope: str) -> list[str]:
     """The card's lines, ending with a blank line."""
     return ["## Measurement card", "",

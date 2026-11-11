@@ -23,6 +23,8 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import mean, median
 
+from seg_card import keep_card
+
 RESULTS = Path(__file__).resolve().parents[2] / 'segbench-results'
 TAGS, PAGES, OUT = RESULTS / 'capture-tags.json', RESULTS / 'ocr-pages.csv', RESULTS / 'capture-tags.md'
 PROVIDER_FAILURES = {'error', 'provider-error', 'interrupted'}
@@ -180,8 +182,8 @@ def main():
     scores, kinds = load_scores()
     res = analyse(attrs, tags, scores, kinds)
     lad = ladder(args.ladder, tags, attrs) if args.ladder else None
-    OUT.write_text(report(attrs, tags, kinds, res, meta['method'], lad, meta.get('agreement'),
-                          meta.get('reading', '')))
+    OUT.write_text(keep_card(OUT, report(attrs, tags, kinds, res, meta['method'], lad, meta.get('agreement'),
+                                         meta.get('reading', ''))))
     print(OUT.read_text())
 
 

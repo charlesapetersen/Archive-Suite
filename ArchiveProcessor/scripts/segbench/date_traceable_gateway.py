@@ -29,6 +29,7 @@ sys.path.insert(0, os.getcwd())
 import date_tagging as DT
 import date_traceable as T
 import gateway_gemini as G
+from seg_card import keep_card
 
 CACHE = os.path.join(T.CACHE, "gateway")
 LABEL = "gemini3.7-flash-gw"
@@ -202,7 +203,8 @@ def write_md(out):
     for k, s in P.items():
         L.append(f"| {k} | {s['residue_calls']} | " + " | ".join(
             pc(s["exact"][c]) for c in ("in text", "not in text", "A", "B", "C", "D", "C+D")) + " |")
-    open(RESULTS, "w").write("\n".join(L) + "\n")
+    text = keep_card(RESULTS, "\n".join(L) + "\n")
+    open(RESULTS, "w").write(text)
 
 
 def findings(out):

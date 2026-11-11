@@ -52,6 +52,7 @@ sys.path.insert(0, os.getcwd())
 import corpus_pairs as CP
 import corpus_survey as CS
 import date_tagging as DT
+from seg_card import keep_card
 
 OUT = os.path.join(DT.CACHE, "enclosure")
 SET = os.path.join(OUT, "set.jsonl")
@@ -726,8 +727,9 @@ def write_md(out):
               "per 1,000 documents." for arm, r in costed]
     if FINDINGS:
         L += ["", "## Findings", ""] + [f"- {f}" for f in FINDINGS]
+    text = keep_card(RESULTS, "\n".join(L) + "\n")
     with open(RESULTS, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(L) + "\n")
+        fh.write(text)
 
 
 if __name__ == "__main__":
