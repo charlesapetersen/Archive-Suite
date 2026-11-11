@@ -440,7 +440,7 @@ struct DocumentWindowView: View {
 
 /// Reaches the hosting `NSWindow` once the view is in the hierarchy, to apply AppKit-only window
 /// configuration (frame autosave + first-run maximize) that SwiftUI's scene API doesn't expose.
-private struct WindowAccessor: NSViewRepresentable {
+struct WindowAccessor: NSViewRepresentable {
     let onWindow: (NSWindow) -> Void
     func makeNSView(context: Context) -> NSView {
         let v = NSView()

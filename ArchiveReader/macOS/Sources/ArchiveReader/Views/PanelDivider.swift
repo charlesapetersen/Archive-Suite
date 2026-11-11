@@ -12,9 +12,12 @@ struct PanelDivider: View {
 
     @State private var startWidth: CGFloat?
 
+    /// The divider's own width, which the navigation window counts in its minimum.
+    static let width: CGFloat = 7
+
     var body: some View {
         PanelDividerHandle(width: $width, range: range, label: label, id: id)
-            .frame(width: 7)
+            .frame(width: Self.width)
             .contentShape(Rectangle())
             .onHover { inside in
                 if inside { NSCursor.resizeLeftRight.push() }

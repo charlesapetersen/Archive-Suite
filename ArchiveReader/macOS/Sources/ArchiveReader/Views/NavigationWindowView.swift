@@ -4,7 +4,7 @@ import ArchiveCore
 
 /// The file-navigation window — a Finder-Smart-Folder-like browser over the tagged corpus.
 struct NavigationWindowView: View {
-    @StateObject private var model = NavigationModel()
+    @StateObject private var model: NavigationModel
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var linkContext: ArchiveLinkContext
     @Environment(\.openWindow) private var openWindow
@@ -26,6 +26,11 @@ struct NavigationWindowView: View {
     @State private var previewViewer: DocumentViewerModel?
     /// The window's content size, so the preview sheet can be sized to fit inside it (W40.fix-reader-preview-sheet-oversize).
     @State private var contentSize: CGSize = .zero
+    @State private var window: NSWindow?
+
+    init() { _model = StateObject(wrappedValue: NavigationModel()) }
+    /// A model the caller made, so a render guard can host the window over throwaway defaults.
+    init(model: NavigationModel) { _model = StateObject(wrappedValue: model) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -64,7 +69,13 @@ struct NavigationWindowView: View {
             .clipped().opacity(model.showingEditor ? 1 : 0)
             .disabled(!model.showingEditor).accessibilityHidden(!model.showingEditor)
         }
-        .frame(minWidth: 900, minHeight: 560)
+        .frame(minWidth: minimumWidth, minHeight: 560)
+        .background(WindowAccessor { found in
+            guard window !== found else { return }
+            window = found
+            Self.widen(found, toContentWidth: minimumWidth)
+        })
+        .onChange(of: minimumWidth) { _, width in Self.widen(window, toContentWidth: width) }
         .overlay(alignment: .top) { TitleBarBackdrop() }   // W40.fix-reader-titlebar-gradient
         .onGeometryChange(for: CGSize.self) { $0.size } action: { contentSize = $0 }
         .animation(.easeInOut(duration: 0.2), value: showingSidebar)
@@ -115,6 +126,39 @@ struct NavigationWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.applicationDidBecomeActive()
         }
+    }
+
+    // MARK: Minimum width (W40.fix-reader-inspector-narrow)
+
+    /// The content column's own minimum: the filter bar's widest unbreakable row and its padding. Measured by
+    /// `NavigationWindowMinimumWidthTests`, which fails if the column needs more.
+    static let contentColumnMinWidth: CGFloat = 600
+
+    /// The window's minimum width for the panels showing. Its sidebar and Inspector have fixed widths, so with
+    /// both open a 900-pt window left the content column less than it needs, and the row ran past the window's
+    /// right edge with the Inspector's Close button outside it. The panels and the column are added up instead;
+    /// 900 pt stays the floor.
+    static func minimumWidth(sidebar: CGFloat?, inspector: CGFloat?) -> CGFloat {
+        let panels = [sidebar, inspector].compactMap { $0 }.map { $0 + PanelDivider.width }.reduce(0, +)
+        return max(900, panels + contentColumnMinWidth)
+    }
+
+    private var minimumWidth: CGFloat {
+        Self.minimumWidth(sidebar: showingSidebar ? sidebarWidth : nil, inspector: model.showingEditor ? infoWidth : nil)
+    }
+
+    /// A larger minimum does not move a window that is already narrower, so it is widened here (as Pages widens its
+    /// window for the Inspector), to the left as well where the screen's right edge is in the way.
+    static func widen(_ window: NSWindow?, toContentWidth width: CGFloat) {
+        guard let window else { return }
+        let content = window.contentRect(forFrameRect: window.frame)
+        guard content.width < width - 0.5 else { return }
+        var frame = window.frame
+        frame.size.width += width - content.width
+        if let visible = window.screen?.visibleFrame, frame.maxX > visible.maxX {
+            frame.origin.x = max(visible.minX, visible.maxX - frame.width)
+        }
+        window.setFrame(frame, display: true)
     }
 
     /// The preview sheet's `DocumentViewerModel`, published to the SCENE so `ArchiveReaderCommands`'
