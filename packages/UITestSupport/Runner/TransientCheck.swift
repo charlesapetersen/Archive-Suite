@@ -112,7 +112,12 @@ enum TransientCheck {
                       expectFindings: Bool = false, file: StaticString = #filePath, line: UInt = #line,
                       _ action: () -> Void) -> [String] {
         guard let before = waitIdle(app) else {
-            XCTFail("transient: \(name): the recorder never reported idle before the action "
+            // Say what the runner could read, so "never idle" is told apart from "no report at all".
+            let element = app.staticTexts[reportIdentifier]
+            let seen = element.exists
+                ? "its report read \"\(String(((element.value as? String) ?? "(no value)").prefix(160)))\""
+                : "no \(reportIdentifier) element in the app's tree"
+            XCTFail("transient: \(name): the recorder never reported idle before the action; \(seen) "
                     + "(is the app launched with TransientCheck.launchArguments?)", file: file, line: line)
             return []
         }
