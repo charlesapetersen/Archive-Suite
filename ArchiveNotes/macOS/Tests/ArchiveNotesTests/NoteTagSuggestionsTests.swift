@@ -23,4 +23,15 @@ final class NoteTagSuggestionsTests: XCTestCase {
         let note = summary(["Intel"])
         XCTAssertEqual(NoteTagBar.suggestions(for: note, in: [note]), [])
     }
+
+    /// W40.fix-notes-tag-fields: the filter bar's and Advanced Search's tag field suggest every tag on a note, in
+    /// each spelling a note has, since the filter bar matches a tag's spelling exactly.
+    func testSearchFieldsSuggestEveryTagInEachSpellingMostUsedFirst() {
+        let items = [summary(["Intel", "Silicon Valley"]), summary(["intel", "Silicon Valley", "Silicon Valley"]),
+                     summary(["Computing History", " "]), summary([])]
+        XCTAssertEqual(NoteTagChipsField.suggestions(in: items),
+                       ["Silicon Valley", "Computing History", "Intel", "intel"],
+                       "counted once per note, blank tags dropped, ties by name")
+        XCTAssertEqual(NoteTagChipsField.suggestions(in: []), [])
+    }
 }

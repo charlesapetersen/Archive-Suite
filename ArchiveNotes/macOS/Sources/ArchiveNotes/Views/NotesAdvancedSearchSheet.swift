@@ -39,7 +39,8 @@ struct NotesAdvancedSearchSheet: View {
                 Text("of the following rules")
             }
             ScrollView {
-                NotesRuleListView(rules: $search.rules, folders: folderChoices, depth: 0)
+                NotesRuleListView(rules: $search.rules, folders: folderChoices, depth: 0,
+                                  tagSuggestions: { NoteTagChipsField.suggestions(in: nav.model.allItems) })
                     .padding(.vertical, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -139,11 +140,12 @@ private struct NotesRuleListView: View {
     @Binding var rules: [NotesSearchRule]
     let folders: [FolderChoice]
     let depth: Int
+    let tagSuggestions: () -> [String]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach($rules) { $rule in
-                NotesRuleRowView(rule: $rule, folders: folders, depth: depth,
+                NotesRuleRowView(rule: $rule, folders: folders, depth: depth, tagSuggestions: tagSuggestions,
                                  canRemove: rules.count > 1,
                                  onAdd: { add(after: rule.id, group: $0) },
                                  onRemove: { rules.removeAll { $0.id == rule.id } })
@@ -162,6 +164,7 @@ private struct NotesRuleRowView: View {
     @Binding var rule: NotesSearchRule
     let folders: [FolderChoice]
     let depth: Int
+    let tagSuggestions: () -> [String]
     let canRemove: Bool
     let onAdd: (_ group: Bool) -> Void
     let onRemove: () -> Void
@@ -180,7 +183,8 @@ private struct NotesRuleRowView: View {
                     Spacer(minLength: 8)
                     rowButtons
                 }
-                NotesRuleListView(rules: $rule.children, folders: folders, depth: depth + 1)
+                NotesRuleListView(rules: $rule.children, folders: folders, depth: depth + 1,
+                                  tagSuggestions: tagSuggestions)
                     .padding(.leading, 22)
             }
         } else {
@@ -195,7 +199,7 @@ private struct NotesRuleRowView: View {
                 }
                 .labelsHidden().fixedSize()
                 .accessibilityIdentifier("an.advanced.rule.op")
-                NotesRuleValueView(rule: $rule, folders: folders)
+                NotesRuleValueView(rule: $rule, folders: folders, tagSuggestions: tagSuggestions)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 rowButtons
             }
@@ -233,7 +237,19 @@ private struct NotesRuleRowView: View {
 private struct NotesRuleValueView: View {
     @Binding var rule: NotesSearchRule
     let folders: [FolderChoice]
+    let tagSuggestions: () -> [String]
+    /// The tag being typed in a tags row, not yet a chip.
+    @State private var tagDraft = ""
 
+
+    /// A tags row's tags, chips one way and its comma-separated text the other; a tag already there in another
+    /// case is not added again, as the rule matches tags in any case.
+    private var tagsBinding: Binding<[String]> {
+        Binding(get: { rule.tagList }, set: { new in
+            var seen = Set<String>()
+            rule.text = new.filter { seen.insert($0.lowercased()).inserted }.joined(separator: ", ")
+        })
+    }
     var body: some View {
         switch rule.field {
         case .text, .noteText, .title, .authors:
@@ -245,11 +261,12 @@ private struct NotesRuleValueView: View {
                       : (rule.field == .title ? "Part of the title" : "Part of an author's name"))
                 .accessibilityIdentifier("an.advanced.rule.text")
         case .tags:
-            TextField("tags, separated by commas", text: $rule.text)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 160, maxWidth: .infinity)
-                .help("Tags separated by commas")
-                .accessibilityIdentifier("an.advanced.rule.tags")
+            // Chips and the suite's tag field (W40.fix-notes-tag-fields; owner session notes-2 row 24). The rule
+            // keeps its tags as text separated by commas, which the field cannot type into a tag.
+            NoteTagChipsField(tags: tagsBinding, draft: $tagDraft, placeholder: "Add tag…",
+                              identifier: "an.advanced.rule.tags", chipIdentifier: "an.advanced.rule.tagChip",
+                              suggestions: tagSuggestions)
+                .frame(minWidth: 160, maxWidth: .infinity, alignment: .leading)
         case .kind:
             Picker("Kind", selection: $rule.kind) {
                 Text("a note").tag(Item.Kind.note)

@@ -95,7 +95,11 @@ final class NotesAdvancedSearchUITests: NotesFixtureUITestCase {
             app.menuItems["has any of"].click()
             let tags = sheet.textFields.matching(identifier: "an.advanced.rule.tags").firstMatch
             tags.click()
-            tags.typeText("silicon valley")
+            tags.typeText("silicon valley\r")
+            // Return makes the tag a chip (W40.fix-notes-tag-fields), in the spelling the notes have.
+            let chip = sheet.descendants(matching: .any).matching(NSPredicate(
+                format: "identifier BEGINSWITH[c] %@", "an.advanced.rule.tagChip.silicon valley")).firstMatch
+            XCTAssertTrue(chip.waitForExistence(timeout: 5), "the tag should show as a chip")
             let combine = sheet.popUpButtons["an.advanced.combine"]
             combine.click()
             app.menuItems["any"].click()

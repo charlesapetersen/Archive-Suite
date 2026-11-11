@@ -9,7 +9,7 @@ import AppKit
 /// row 37, as ruled for the Reader on 2026-11-04). The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
 ///
-/// Adapted from Reader's `NavigationWindowView.filterBar`; layout is three compact rows so all facets
+/// Adapted from Reader's `NavigationWindowView.filterBar`; layout is compact rows so all facets
 /// stay visible at the browser's minimum width.
 struct NotesFilterBar: View {
     @ObservedObject var nav: NotesNavigationModel
@@ -23,6 +23,7 @@ struct NotesFilterBar: View {
             if nav.model.scopeIsUnsavedSearch { advancedScopeRow }
             topRow
             facetRow
+            tagFilter
             HStack {
                 Picker("Round-up", selection: $nav.filter.roundup) {
                     Text("Any").tag(Optional<Bool>.none)
@@ -137,13 +138,11 @@ struct NotesFilterBar: View {
         .accessibilityIdentifier("an.filter.advancedScope")
     }
 
-    // MARK: Row 2 — quality · tags · date range
+    // MARK: Row 2 — quality · date range; row 3 — tags
 
     private var facetRow: some View {
         HStack(spacing: 12) {
             qualityToggles
-            Divider().frame(height: 16)
-            tagFilter
             Divider().frame(height: 16)
             dateRange
             Spacer(minLength: 0)
@@ -169,29 +168,16 @@ struct NotesFilterBar: View {
         }
     }
 
+    /// Its own row, the width of the bar, so the field is big enough and the chips wrap
+    /// (W40.fix-notes-tag-fields; owner session notes-2 row 20).
     private var tagFilter: some View {
-        HStack(spacing: 6) {
-            TextField("Tag…", text: $pendingTag)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 90)
-                .onSubmit(addPendingTag)
-                .accessibilityLabel("Add tag filter")
-                .accessibilityIdentifier("an.filter.tagInput")
-
-            ForEach(nav.filter.tags, id: \.self) { tag in
-                HStack(spacing: 2) {
-                    Text(tag).font(.caption).lineLimit(1)
-                    Button { nav.filter.tags.removeAll { $0 == tag } } label: {
-                        Image(systemName: "xmark.circle.fill").font(.caption2)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                .accessibilityIdentifier("an.filter.tagChip.\(tag)")
-            }
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: "tag").foregroundStyle(.secondary).frame(height: 22)
+                .accessibilityHidden(true)
+            NoteTagChipsField(tags: $nav.filter.tags, draft: $pendingTag, placeholder: "Tag…",
+                              identifier: "an.filter.tagInput", chipIdentifier: "an.filter.tagChip",
+                              suggestions: { NoteTagChipsField.suggestions(in: nav.model.allItems) })
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -226,13 +212,6 @@ struct NotesFilterBar: View {
     }
 
     // MARK: Actions + derived bindings
-
-    private func addPendingTag() {
-        let t = pendingTag.trimmingCharacters(in: .whitespacesAndNewlines)
-        pendingTag = ""
-        guard !t.isEmpty, !nav.filter.tags.contains(t) else { return }
-        nav.filter.tags.append(t)
-    }
 
     /// Year ⇆ sortDate int, derived straight from the filter (so Clear resets the field). The lower
     /// bound is the year's start (`year*10000`), matching a year-only item's sortDate so it's included.
