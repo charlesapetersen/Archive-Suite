@@ -326,7 +326,10 @@ struct DocumentWindowView: View {
     /// The inspector beside this window’s document, editing the open file through the navigation window's model.
     @ViewBuilder private var tagInspector: some View {
         if let nav = router.nav, let path = model.currentFilePath {
-            TagInspectorView(model: nav, paths: [path], isVisible: model.showingTagEditor) { model.showingTagEditor = false }
+            TagInspectorView(model: nav, paths: [path], identity: path, isVisible: model.showingTagEditor) {
+                model.showingTagEditor = false
+            }
+            .equatable()
         } else {
             VStack(spacing: 12) {
                 Text("Tags can be edited while the Archive Reader window is open.")

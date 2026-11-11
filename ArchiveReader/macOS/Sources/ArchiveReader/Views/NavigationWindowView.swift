@@ -53,10 +53,13 @@ struct NavigationWindowView: View {
                 PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,
                              label: "Edit Info width", id: "ar.divider.info")
             }
-            // Keep the editor mounted when hidden: an invalid draft and its hint survive ⌘I.
-            TagInspectorView(model: model, paths: model.selectedFiles.map(\.path), isVisible: model.showingEditor) {
+            // Keep the editor mounted when hidden: an invalid draft and its hint survive ⌘I. Hidden, it holds
+            // the selection it had and observes nothing (`inspectorTarget`).
+            TagInspectorView(model: model, paths: model.inspectorTarget.paths,
+                             identity: String(model.inspectorTarget.generation), isVisible: model.showingEditor) {
                 model.showingEditor = false
             }
+            .equatable()
             .frame(width: model.showingEditor ? infoWidth : 0)
             .clipped().opacity(model.showingEditor ? 1 : 0)
             .disabled(!model.showingEditor).accessibilityHidden(!model.showingEditor)
@@ -749,10 +752,7 @@ struct NavigationWindowView: View {
                     .help(f.detail)
                     .accessibilityIdentifier("ar.status.discoveryFailure")
             }
-            if let p = model.indexingProgress {
-                ProgressView(value: Double(p.done), total: Double(max(1, p.total))).frame(width: 70)
-                Text("Indexing \(p.done)/\(p.total)").foregroundStyle(.primary)
-            }
+            if model.isIndexing { IndexingProgressLabel(progress: model.indexProgress) }
             // A degraded content index says so here instead of leaving an idle status bar over an
             // empty index, where "no results" is indistinguishable from "no matches" (W23.m9).
             if let f = model.indexFailure {

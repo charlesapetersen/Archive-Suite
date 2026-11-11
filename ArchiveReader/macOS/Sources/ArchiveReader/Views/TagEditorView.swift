@@ -6,7 +6,9 @@ import ArchiveCoreUI
 /// via `NavigationModel.applyEdit` → `TagWriter` (delta-based, verified, grouped-undoable). Group
 /// edits show Finder-style tri-state: subjects on all vs. some; facets show "(mixed)" when they differ.
 struct TagEditorView: View {
-    @ObservedObject var model: NavigationModel
+    /// Observed through `feed`, and only while shown (`TagInspectorView`).
+    let model: NavigationModel
+    @StateObject private var feed = InspectorFeed()
     /// Immutable for this editor instance, so a departing field always writes its original targets.
     /// (W40.fix-reader-menus-follow-window). Every write still goes through `NavigationModel` → `TagWriter`.
     let targetPaths: [String]
@@ -53,7 +55,9 @@ struct TagEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear { feed.follow(model, visible: isVisible) }
         .onChange(of: isVisible) { _, visible in
+            feed.follow(model, visible: visible)
             if !visible {
                 focusedField = nil
                 addSubject()

@@ -60,7 +60,7 @@ final class NavigationModel: ObservableObject {
     @Published var filterSearchText = ""
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>() {
-        didSet { persistSelection(); if !patchingSelection { refreshSelectionCache() } }
+        didSet { schedulePersistSelection(); if !patchingSelection { refreshSelectionCache() } }
     }
     /// Set while a row patch prunes the selection, which then patches the selection cache itself.
     private var patchingSelection = false
@@ -83,8 +83,16 @@ final class NavigationModel: ObservableObject {
     // Sheet/dialog presentation lives on the model so menu commands can trigger it too.
     /// The non-modal inspector follows the visible selection. Its editor owns explicit target paths.
     @Published var showingEditor = false {
-        didSet { if showingEditor != oldValue { pruneSelectionToDisplayed(); refreshSelectionCache() } }
+        didSet {
+            guard showingEditor != oldValue else { return }
+            pruneSelectionToDisplayed(); refreshSelectionCache(); followSelectionInInspector()
+        }
     }
+    /// What the library window's inspector edits (W40.fix-reader-selection-at-size): the selection's paths, frozen
+    /// while it is hidden, so a hidden inspector is not rebuilt for every arrow key and a draft it holds survives
+    /// ⌘I. `generation` is its identity, and changes only when the set of paths does, not their order.
+    private(set) var inspectorTarget = InspectorTarget()
+    struct InspectorTarget: Equatable { var paths: [String] = []; var generation = 0 }
     @Published var showingPreview = false
     @Published var showingSaveDialog = false
     @Published var renamingSearch: SavedSearch?     // non-nil while renaming a smart folder
@@ -104,7 +112,7 @@ final class NavigationModel: ObservableObject {
     /// replaced in place (a tag change, W40.fix-reader-change-incremental). The table skips its comparison
     /// of every row id while this stands.
     private(set) var displayedOrderGeneration: Int = 0
-    @Published private(set) var selectedFilesCache: [ArchiveFile] = []
+    @Published private(set) var selectedFilesCache: [ArchiveFile] = [] { didSet { followSelectionInInspector() } }
     @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
     @Published private(set) var smartFolderCounts: [UUID: Int] = [:]   // D2: files matching each saved search
@@ -160,7 +168,11 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var formatStatuses: [String: PDFFormatStatus] = [:]   // non-standard-PDF detection, per path
     @Published private(set) var needsAttentionCount = 0     // indexed files that need attention
     @Published private(set) var ambiguousDateCount = 0      // files with two tags for one date facet (R-47)
-    @Published private(set) var indexingProgress: (done: Int, total: Int)?
+    /// Whether an index pass is running. Its count lives in `indexProgress`, which only the status bar observes:
+    /// a tick of it used to republish this model, re-running every view of it (W40.fix-reader-selection-at-size).
+    @Published private(set) var isIndexing = false
+    let indexProgress = IndexProgress()
+    var indexingProgress: (done: Int, total: Int)? { indexProgress.value }
     /// Mirrored from `ContentIndexer.failure` — a degraded content index, so the status bar can say so
     /// instead of going idle over a partial or unopenable one (W23.m9). `nil` = healthy.
     @Published private(set) var indexFailure: ContentIndexer.Failure?
@@ -262,7 +274,8 @@ final class NavigationModel: ObservableObject {
             .store(in: &cancellables)
         indexer.$progress
             .sink { [weak self] p in MainActor.assumeIsolated {
-                self?.indexingProgress = p
+                self?.indexProgress.value = p
+                if self?.isIndexing != (p != nil) { self?.isIndexing = p != nil }
                 if p == nil {
                     self?.refreshFormatStatuses()           // a pass just finished → fold in new detection flags
                     self?.refreshFullTextSearchIfActive()   // Part B: newly indexed files may now match the active query
@@ -278,7 +291,7 @@ final class NavigationModel: ObservableObject {
             .store(in: &cancellables)
         // A quit straight after a scroll still saves the place (W40.fix-reader-restore-scroll).
         NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.topRowWrite?.perform() } }
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.topRowWrite?.perform(); self?.flushSelectionWrite() } }
             .store(in: &cancellables)
         // Republish when flags change so the table's flag column refreshes.
         flags.objectWillChange
@@ -793,6 +806,22 @@ final class NavigationModel: ObservableObject {
 
     /// The user scrolled or clicked in the list: their place wins over the one being restored.
     func userMovedInList() { pendingTopRow = nil }
+    /// A run of arrow keys writes the selection once, when it stops (W40.fix-reader-selection-at-size).
+    private var selectionWrite: DispatchWorkItem?
+    private func schedulePersistSelection() {
+        selectionWrite?.cancel()
+        let write = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.selectionWrite = nil; self?.persistSelection() }
+        }
+        selectionWrite = write
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: write)
+    }
+    /// Writes a selection still waiting for its pause: at quit, and for tests.
+    func flushSelectionWrite() {
+        guard let write = selectionWrite else { return }
+        write.cancel(); selectionWrite = nil
+        persistSelection()
+    }
     private func persistSelection() { ReaderStages.measure("model.persistSelection") {
         // Cap persistence so a huge multi-select (e.g. Select All over 150k) never serializes a giant
         // array on the main actor or bloats the defaults plist; such selections aren't worth restoring.
@@ -1196,9 +1225,64 @@ final class NavigationModel: ObservableObject {
 
     private func refreshSelectionCache() {
         let sel = selection
-        let base = displayed
         selectedFilesCache = ReaderStages.measure("model.selectionCache") {
-            sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort, marks: lastSortMarks)
+            guard !sel.isEmpty else { return [] }
+            if let positions = displayedPositions(of: sel) { return positions.sorted().map { displayed[$0] } }
+            return displayed.filter { sel.contains($0.id) }
+        }
+    }
+
+    /// Up to this many selected rows are found in the list one by one; more, and one pass over it is cheaper.
+    private static let selectionLookupLimit = 4_096
+
+    /// Where each of these rows stands in `displayed`, found by binary search on the list's sort keys
+    /// (W40.fix-reader-selection-at-size), so the cost is the selection's, not the library's: a scan of every row
+    /// took 90-116 ms at 116k on each arrow key. Nil when any is not found that way (a row the list does not
+    /// show, or one the library changed since the list was built), or there are too many: the caller scans.
+    private func displayedPositions(of ids: Set<ArchiveFile.ID>) -> [Int]? {
+        guard ids.count <= Self.selectionLookupLimit, !displayed.isEmpty else { return nil }
+        let rows = library.files(atPaths: ids.map(\.path))
+        guard rows.count == ids.count else { return nil }
+        let sort = self.sort, marks = lastSortMarks, rank = ftsRank ?? baseRank
+        var positions: [Int] = []
+        positions.reserveCapacity(rows.count)
+        for row in rows {
+            guard ids.contains(row.id), let i = Self.sortedPosition(of: row, in: displayed, before: {
+                LibraryPresentation.listedBefore($0, $1, sort: sort, marks: marks, rank: rank)
+            }) else { return nil }
+            positions.append(i)
+        }
+        return positions
+    }
+
+    /// Where `file`'s row is in `list`, a list sorted by `before`: a binary search, then a walk over the rows
+    /// whose sort keys equal its own. Nil when it is not there, or `list` is sorted some other way.
+    private static func sortedPosition(of file: ArchiveFile, in list: [ArchiveFile],
+                                       before: (ArchiveFile, ArchiveFile) -> Bool) -> Int? {
+        var lo = 0, hi = list.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if before(list[mid], file) { lo = mid + 1 } else { hi = mid }
+        }
+        var k = lo
+        while k < list.count, !before(file, list[k]) {
+            if list[k].path == file.path { return k }
+            k += 1
+        }
+        return nil
+    }
+
+    /// The inspector follows the selection only while it is shown (`inspectorTarget`).
+    private func followSelectionInInspector() {
+        guard showingEditor else { return }
+        let files = selectedFilesCache
+        let old = inspectorTarget.paths
+        if files.count == old.count, zip(files, old).allSatisfy({ $0.path == $1 }) { return }
+        let paths = files.map(\.path)
+        if paths.count == old.count, Set(paths) == Set(old) {
+            inspectorTarget.paths = paths   // the same files in a new order: the same editor
+        } else {
+            inspectorTarget = InspectorTarget(paths: paths, generation: inspectorTarget.generation &+ 1)
         }
     }
 
@@ -1207,7 +1291,7 @@ final class NavigationModel: ObservableObject {
     /// (`W40.fix-reader-phantom-selection`). Losing a selection to a narrowing filter is the price,
     /// as in Finder.
     private func pruneSelectionToDisplayed() {
-        guard !selection.isEmpty else { return }
+        guard !selection.isEmpty, displayedPositions(of: selection) == nil else { return }
         let visible = Set(displayed.map(\.id))
         if !selection.isSubset(of: visible) { selection.formIntersection(visible) }
     }
@@ -1337,17 +1421,7 @@ final class NavigationModel: ObservableObject {
         /// Where `file`'s row is in `list`: by binary search on its sort keys, else (a list sorted some other
         /// way) by a scan.
         func position(of file: ArchiveFile, in list: [ArchiveFile]) -> Int? {
-            var lo = 0, hi = list.count
-            while lo < hi {
-                let mid = (lo + hi) / 2
-                if before(list[mid], file) { lo = mid + 1 } else { hi = mid }
-            }
-            var k = lo
-            while k < list.count, !before(file, list[k]) {
-                if list[k].path == file.path { return k }
-                k += 1
-            }
-            return list.firstIndex { $0.path == file.path }
+            Self.sortedPosition(of: file, in: list, before: before) ?? list.firstIndex { $0.path == file.path }
         }
 
         var list = displayed
@@ -1406,7 +1480,7 @@ final class NavigationModel: ObservableObject {
                                                      && predicate($0) }
             let kept = selectedFilesCache.filter { !changedIDs.contains($0.id) }
             selectedFilesCache = ReaderStages.measure("model.selectionCache (patch)") {
-                LibrarySort.sorted(kept + shownNow, by: sort, marks: marks)
+                (kept + shownNow).sorted(by: before)   // the list's order, as `refreshSelectionCache` gives
             }
         }
 
@@ -2395,7 +2469,9 @@ final class NavigationModel: ObservableObject {
         let files = selectedFiles
         guard let first = files.first else { return [] }
         var paths = files.prefix(2).map(\.path)
-        guard neighbours, files.count == 1, let i = displayed.firstIndex(where: { $0.id == first.id }) else { return paths }
+        guard neighbours, files.count == 1,
+              let i = displayedPositions(of: [first.id])?.first ?? displayed.firstIndex(where: { $0.id == first.id })
+        else { return paths }
         if i + 1 < displayed.count { paths.append(displayed[i + 1].path) }
         if i > 0 { paths.append(displayed[i - 1].path) }
         return paths
@@ -2406,11 +2482,11 @@ final class NavigationModel: ObservableObject {
     func moveSelectionInList(_ delta: Int) {
         guard !displayed.isEmpty else { return }
         let next: ArchiveFile.ID = ReaderStages.measure("model.moveSelectionInList.find") {
-            let ids = displayed.map(\.id)
             let sel = selection
-            let positions = ids.enumerated().filter { sel.contains($0.element) }.map(\.offset)
+            let positions = displayedPositions(of: sel)
+                ?? displayed.indices.filter { sel.contains(displayed[$0].id) }
             let anchor = delta < 0 ? (positions.min() ?? 0) : (positions.max() ?? -1)
-            return ids[max(0, min(ids.count - 1, anchor + delta))]
+            return displayed[max(0, min(displayed.count - 1, anchor + delta))].id
         }
         selection = [next]
     }

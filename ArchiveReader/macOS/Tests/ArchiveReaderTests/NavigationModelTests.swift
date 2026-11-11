@@ -114,6 +114,7 @@ final class NavigationModelDefaultsIsolationTests: XCTestCase {
         let file = try XCTUnwrap(model.library.files.first,
                                  "precondition: the fixture root is discoverable, so there is a row to select")
         model.selection = [file.id]
+        model.flushSelectionWrite()   // written once a run of selection changes pauses
 
         XCTAssertEqual(defaults.stringArray(forKey: "lastSelectionFileURLs"),
                        [file.id.absoluteString],

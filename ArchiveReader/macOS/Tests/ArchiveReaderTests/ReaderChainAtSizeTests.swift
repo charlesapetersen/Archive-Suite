@@ -180,6 +180,16 @@ final class ReaderChainAtSizeTests: XCTestCase {
     // MARK: - Outside measurements (footprint, heap, leaks), run by the harness
 
     /// Ask the harness to run `kind` (footprint | heap | leaks) on this process; wait for it.
+    /// The selection budget W40.reader-scale-measure set (W40.fix-reader-selection-at-size): at most 16 ms main-busy,
+    /// the inspector and the table included, and so no stall over one frame either.
+    private func assertSelectionBudget(_ label: String, _ runs: [Chain]) {
+        guard optimized else { return }
+        print("CH budget \(label): main-busy median \(ms(median(runs.map(\.busy)))) (budget 16.0 ms), "
+              + "longest stall max \(ms(runs.map(\.longest).max() ?? 0))")
+        XCTAssertLessThanOrEqual(median(runs.map(\.busy)), 0.016, "\(label): main-busy")
+        XCTAssertLessThanOrEqual(runs.map(\.longest).max() ?? 0, 0.016, "\(label): a stall over 16 ms")
+    }
+
     private func outside(_ kind: String, _ label: String, timeout: Double = 900) async {
         guard let dir = handshake("requests") else { print("CH outside \(kind) \(label): no requests dir"); return }
         let base = URL(fileURLWithPath: dir).appendingPathComponent("\(label)-\(kind)")
@@ -332,7 +342,9 @@ final class ReaderChainAtSizeTests: XCTestCase {
         navigation.removeFilter(.smartFolder)
         _ = await waitUntil(timeout: 30) { navigation.displayed.count == navigation.library.files.count }
 
-        // ── 3. Selection: an arrow key with 1 and with 500 selected, ⇧-extending by one row.
+        // ── 3. Selection: an arrow key with 1 and with 500 selected, ⇧-extending by one row. Edit Info is shown,
+        // the costlier case: a hidden inspector follows nothing (W40.fix-reader-selection-at-size).
+        navigation.showingEditor = true
         let ids = navigation.displayed.map(\.id)
         let base = ids.count / 2
         func selectionChain(_ label: String, setup: Set<URL>, change: Set<URL>) async -> Chain {
@@ -366,6 +378,11 @@ final class ReaderChainAtSizeTests: XCTestCase {
                                               visible: { navigation.selection != before }))
         }
         summarize("preview-arrow-1", preview)
+        navigation.showingEditor = false
+        for (label, runs) in [("arrow-1", arrow1), ("arrow-500", arrow500), ("shift-extend-1", shift1),
+                              ("shift-extend-500", shift500), ("preview-arrow-1", preview)] {
+            assertSelectionBudget(label, runs)
+        }
 
         // ── 4. A document window with 5 files open, switching file. Real PDFs from the W40.c2 sample when
         // the harness names it (scratch clones, read only), else synthetic ones from the clone.
@@ -526,8 +543,11 @@ final class ViewEmulation {
 
     private func render() {
         pending = false
-        let paths = navigation.selectedFiles.map(\.path)
-        ReaderStages.measure("view.inspector body (emulated)") { _ = navigation.libraryFiles(atPaths: paths) }
+        // The inspector's editor runs only while it is shown, on the paths it holds (`inspectorTarget`).
+        if navigation.showingEditor {
+            let paths = navigation.inspectorTarget.paths
+            ReaderStages.measure("view.inspector body (emulated)") { _ = navigation.libraryFiles(atPaths: paths) }
+        }
         if navigation.displayedGeneration != shownGeneration {
             shownGeneration = navigation.displayedGeneration
             ReaderStages.measure("view.table showRows (emulated)") { _ = coordinator.showRows(navigation.displayed,
@@ -536,6 +556,8 @@ final class ViewEmulation {
         if navigation.selection != shownSelection {
             shownSelection = navigation.selection
             ReaderStages.measure("view.table syncSelection (emulated)") { coordinator.syncSelection(shownSelection) }
+            // The preview's image prefetch asks for the rows around a single selection on each change.
+            ReaderStages.measure("view.prefetch paths (emulated)") { _ = navigation.previewPrefetchPaths(neighbours: true) }
         }
     }
 }
@@ -574,7 +596,9 @@ final class DocumentWindowEmulation {
         let index = viewer.index
         guard viewer.urls.indices.contains(index) else { return }
         let path = viewer.urls[index].path
-        ReaderStages.measure("view.document inspector body (emulated)") { _ = navigation.libraryFiles(atPaths: [path]) }
+        if viewer.showingTagEditor {   // a hidden inspector observes nothing (W40.fix-reader-selection-at-size)
+            ReaderStages.measure("view.document inspector body (emulated)") { _ = navigation.libraryFiles(atPaths: [path]) }
+        }
         guard renderedIndex != index, let document = viewer.current else { return }
         ReaderStages.measure("view.document panes copy+draw (emulated)") {
             for pageIndex in 0..<min(2, document.pageCount) {

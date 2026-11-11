@@ -126,6 +126,7 @@ final class RestoreListPlaceTests: XCTestCase {
         settle(seed)
         let selected = seed.displayed[5].id
         seed.selection = [selected]
+        seed.flushSelectionWrite()
         defaults.set(root.appendingPathComponent("gone.pdf").absoluteString, forKey: "lastTopRowFileURL")
 
         let model = NavigationModel(defaults: defaults)
