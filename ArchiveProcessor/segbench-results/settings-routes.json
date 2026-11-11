@@ -22,8 +22,8 @@
   },
   "reading": {
    "metric": "nes",
-   "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points",
-   "source": "ocr-rerun-noise.md §The tie rule"
+   "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie in ocr-pair-matrix.json",
+   "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"
   },
   "placement": {
    "metric": "line_pass_strict",

@@ -362,7 +362,7 @@ NOISE = {
  "reading-copy": {"metric": "rotation_pages_wrong", "tie": "Wilson page intervals that overlap; a gap of a few turns is a tie", "source": "rotation-routes.md §Noise"},
  "ocr-input": {"metric": "nes", "tie": "paired 95% interval across 0, or a gap under 0.49 NES points", "source": "enh-ocr-input.md §Measurement card"},
  "layout": {"metric": "nes_strict", "tie": "paired 95% page-bootstrap interval across 0, NES points; per-kind groups under 20 pages are descriptive", "source": "layout-photo.md §Measurement card"},
- "reading": {"metric": "nes", "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points", "source": "ocr-rerun-noise.md §The tie rule"},
+ "reading": {"metric": "nes", "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie in ocr-pair-matrix.json", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"},
  "placement": {"metric": "line_pass_strict", "tie": "paired page-bootstrap 95% interval holding 0; about 2 points on 20 owner hand pages, about 10 on 14 Bentham pages", "source": "place-print.md §Measurement card"},
  "marks": {"metric": "marks_read_nes08", "tie": "a gap inside the page-bootstrap interval, about 20 marks-read points", "source": "marks-read.md §Measurement card"},
  "segmentation": {"metric": "pages_exact", "tie": "under the rerun floor of 1.4 to 3.2 points of pages exact a box (3.2 for pooled test-box figures); in gap accuracy the paired interval decides", "source": "seg-boxes-score.md §Paired differences"},

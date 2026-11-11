@@ -89,7 +89,8 @@ replaced (under 20 Vision words) include 4 handwritten pages Vision could not re
 "higher_is_better": true}. `kinds`: typewritten, printed, handwritten, mixed (2 pages, never ranked), forms (L4),
 newspapers (L9), clippings (no figure), nonlatin (N1-N6), early_modern_hands (L2, L5-L7), early_print (L8).
 `noise`: {"metric": "nes", "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted
-0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points", "source": "ocr-rerun-noise.md"}. `fallback`: "fail-and-flag (CascadeExhausted)".
+0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie
+in ocr-pair-matrix.json", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"}. `fallback`: "fail-and-flag (CascadeExhausted)".
 
 ## 4. Table rows
 
@@ -371,7 +372,7 @@ dropped (`ocr-panel-cloud.md`); GPT-5.6 Luna was read through OpenRouter instead
    seconds a page (12-settings-design §3.9) in the same item from the existing logs where they exist.
 5. **`W46.ocr-pair-matrix`** [S · $0, offline]: paired bootstrap intervals for every pair of routes the solver can
    compare, on the 96 (answered and strict) and per stratum on the 895, from `ocr-pages.csv` and
-   `ocr-scorers-pages.csv`; done when the table's `noise` points at it. Waits on nothing.
+   `ocr-scorers-pages.csv`; done when the table's `noise` points at it. Waits on nothing. Shipped 2026-11-11: `ocr-pair-matrix.md`.
 6. **`W46.settings-routes-r8`** [XS]: the schema's `stages` and `trigger` fields for cascade rows, and `kinds` ids
    for the public strata, in `settings_routes.py`. Waits on the generator item.
 7. **`W46.ocr-plan-chatgpt`** [S · plan route, no money]: the 96 through the app's Local Agent backend on the ChatGPT
