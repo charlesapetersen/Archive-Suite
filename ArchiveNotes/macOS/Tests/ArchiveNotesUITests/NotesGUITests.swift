@@ -1794,6 +1794,47 @@ final class NotesGUITests: NotesFixtureUITestCase {
                        "Open in Zotero should dispatch the item's select link; got \(url)")
     }
 
+    /// W40.fix-notes-zotero-paste (notes-2 rows 27, 28): a greyed Auto-fill says why on the line under it, and ⌘V
+    /// of a `zotero://select/…` link in the editor attaches it as a Zotero block, after which Auto-fill is live.
+    /// Written 2026-11-11 and compiled, not yet run: Notes' UITests wait for the macOS 27.2 guest
+    /// (`W40.fix-notes-zotero-paste-ui`, blocked on `W40.vm-macos27-notes`).
+    func testZoteroLinkPasteAttachesAndAutoFillSaysWhyItIsGreyed() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let uuid = Self.idPlain
+            _ = selectItem(uuid: uuid)
+            XCTAssertTrue(editor.waitForExistence(timeout: 10), "the plain fixture note should load")
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                ((editor.value as? String) ?? "").contains("A plain note with")
+            }, "the plain fixture note must finish loading")
+            XCTAssertFalse((rawMarkdown(inItemDir: uuid) ?? "").contains("block: zotero-item"))
+
+            let noteMenu = app.menuBars.menuBarItems["Note"]
+            let autoFill = app.menuItems["Auto-fill from Zotero…"]
+            let noLink = app.menuItems["This note has no Zotero link: paste one into it first"]
+            XCTAssertTrue(noteMenu.waitForExistence(timeout: 5), "Note menu should exist")
+            noteMenu.click()
+            XCTAssertTrue(noLink.waitForExistence(timeout: 5), "a greyed Auto-fill should say the note has no link")
+            XCTAssertFalse(autoFill.isEnabled)
+            app.typeKey(.escape, modifierFlags: [])
+
+            let selectLink = "zotero://select/library/items/ABCD1234"
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(selectLink, forType: .string)
+            editor.click()
+            app.typeKey("v", modifierFlags: .command)
+            XCTAssertTrue(pollUntil(timeout: 8) {
+                let raw = rawMarkdown(inItemDir: uuid) ?? ""
+                return raw.contains("block: zotero-item") && raw.contains(selectLink)
+            }, "⌘V of a Zotero link should save a Zotero source block")
+
+            noteMenu.click()
+            XCTAssertTrue(pollUntil(timeout: 5) { autoFill.isEnabled }, "the pasted link should enable Auto-fill")
+            XCTAssertFalse(noLink.exists, "a live Auto-fill shows no reason")
+            app.typeKey(.escape, modifierFlags: [])
+        }
+    }
+
     /// G15 — Note ▸ Attach Zotero Link… then Auto-fill from Zotero… is the full B1 path: the production
     /// attach command creates a real source block (not hand-seeded B2 note-level metadata), auto-fill
     /// flushes that just-added block before fetching through the injected client, the user sees a fill-empty

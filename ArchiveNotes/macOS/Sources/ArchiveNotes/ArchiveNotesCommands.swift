@@ -267,9 +267,12 @@ struct SourceBlockCommands: Commands {
 }
 
 /// Note-menu command: attach a Zotero reference from the clipboard (or a prompt).
+///
+/// ⌃⌘Z Attach and ⌃⌥⌘Z Auto-fill, Z for Zotero (W40.fix-notes-zotero-paste, notes-2 row 27); ⌘V of a
+/// `zotero://select/…` link attaches it too. A greyed Auto-fill says why on the line under it (row 28).
 struct ZoteroCommands: Commands {
     @FocusedValue(\.formattingContext) private var formatting
-    @FocusedValue(\.zoteroAutoFillAvailable) private var autoFillAvailable
+    @FocusedValue(\.zoteroAutoFillState) private var autoFillState
     @FocusedValue(\.copyLinkAvailable) private var copyLinkAvailable
 
     var body: some Commands {
@@ -280,9 +283,16 @@ struct ZoteroCommands: Commands {
                 .disabled(copyLinkAvailable != true)
             Divider()
             Button("Attach Zotero Link\u{2026}") { formatting?.attachZoteroLink() }
+                .keyboardShortcut("z", modifiers: [.command, .control])
                 .disabled(formatting == nil)
             Button("Auto-fill from Zotero\u{2026}") { formatting?.autoFillFromZotero() }
-                .disabled(autoFillAvailable != true)
+                .keyboardShortcut("z", modifiers: [.command, .control, .option])
+                .disabled(autoFillState?.isAvailable != true)
+                .help(autoFillState?.reason ?? "")
+            if let reason = (autoFillState ?? .noNote).reason {
+                Button(reason) {}
+                    .disabled(true)
+            }
         }
     }
 }

@@ -15036,3 +15036,20 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `settings-routes.json` regenerated, `--check` green (526 figures, 0 failures); the settings prototype rebuilt, no
   change. No rehearsal-cache scratch made (the generators rewrite their usual cache outputs only).
   <!-- /W46.p12-wording -->
+- [x] **W40.fix-notes-zotero-paste — A pasted Zotero link is recognised, the Zotero commands have keys, and a greyed Auto-fill says why [S-M · S3]** · §W40 (lane: notes) (uses: build,vm) — Found by the owner's Notes guided session 2, 2026-11-06 (`verification/sessions/notes-2-returned.md`, rows 27, 28); the owner's call: fix everything on the form, the B rows first. The owner asks why Zotero links need a special Attach command: detect a `zotero://select/…` link on paste, as source blocks detect an archive link, and give Attach and Auto-fill a keystroke each. Auto-fill is live only on a note whose links resolve to exactly one Zotero item (`ZoteroAutoFillReferenceResolver`); when greyed, its menu item or a tooltip says why (an extract, no link, two different links). Notes' VM UITests do not pass on macOS 27 until `W40.vm-macos27-notes`; verify with the unit bundle and render guards, and name the UITest still to run. SHIPPED 2026-11-11.
+  What shipped: ⌘V of a paste made only of `zotero://select/…` links (one per line; CRLF/CR split; a repeat attached
+  once; at most 100) attaches each as a Zotero source block through the same insert and citation fetch as Note ▸
+  Attach Zotero Link… (`ZoteroClipboardDetect.pastedLinks`, `EditorTextView.tryPasteZoteroLinks`,
+  `Coordinator.handleZoteroPaste`), and dismisses the clipboard banner. A link inside a sentence stays text; an
+  extract, raw Markdown or a read-only editor keep the paste as text (an extract says so, as for a Reader link). Keys:
+  Attach Zotero Link… ⌃⌘Z, Auto-fill from Zotero… ⌃⌥⌘Z (Z for Zotero; `MenuShortcutTests` checks them and that no
+  two commands share a key). A greyed Auto-fill shows why on a greyed line under it and as its tooltip
+  (`ZoteroAutoFillMenuState`: select a note, notes only not extracts, fetching, no Zotero link, links to more than
+  one Zotero item); the command's title is unchanged, so the UITests that find it still do. Also fixed: attaching a
+  second block of the SAME Zotero item greyed Auto-fill until the note was reselected (it was treated as a second
+  source); it now stays live, and a different item makes it "more than one". No migration: nothing to migrate.
+  Verified: the whole Notes unit bundle (251 XCTest + 1176 Swift Testing incl. 7 new in `ZoteroPasteTests`, 0
+  failures, no new warning); the UITest bundle compiles. Not Tier-2 (editor insertion through the existing audited
+  body path). Still to run in the VM: `NotesGUITests.testZoteroLinkPasteAttachesAndAutoFillSaysWhyItIsGreyed`
+  (compiled only) → W40.fix-notes-zotero-paste-ui, blocked on W40.vm-macos27-notes. No rehearsal-cache scratch.
+  <!-- /W40.fix-notes-zotero-paste -->

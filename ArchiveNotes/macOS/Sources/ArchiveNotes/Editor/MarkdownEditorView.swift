@@ -184,6 +184,9 @@ struct MarkdownEditorView: NSViewRepresentable {
         textView.sourceBlockPasteHandler = { [weak coordinator = context.coordinator] entries in
             coordinator?.handleSourceBlockPaste(entries) ?? false
         }
+        textView.zoteroPasteHandler = { [weak coordinator = context.coordinator] refs in
+            coordinator?.handleZoteroPaste(refs) ?? false
+        }
         textView.passageCopyHandler = { [weak coordinator = context.coordinator] in
             coordinator?.copyPassageIfNote() ?? false
         }
@@ -658,6 +661,24 @@ struct MarkdownEditorView: NSViewRepresentable {
             ])
             line.append(block)
             return line
+        }
+
+        // MARK: Zotero-link paste (W40.fix-notes-zotero-paste)
+
+        /// Attach each pasted Zotero link as a Zotero source block, through the same insert (and citation fetch)
+        /// as Note ▸ Attach Zotero Link…. Declined, so the paste stays text, where a source block cannot go: raw
+        /// Markdown, a read-only editor, or an extract (extracts reference notes only, §D7).
+        func handleZoteroPaste(_ refs: [ZoteroRef]) -> Bool {
+            // The context inserts through its own coordinator: only when that is this editor, or the
+            // paste would vanish (or land in another editor of the same pane).
+            guard let textView, textView.isEditable, !currentIsRaw, !refs.isEmpty,
+                  let formattingContext, formattingContext.coordinator === self,
+                  formattingContext.currentItemKind != .extract else { return false }
+            textView.breakUndoCoalescing()
+            for ref in refs { formattingContext.insertZoteroBlock(ref) }
+            // The clipboard banner offered this same link; it is attached now.
+            formattingContext.zoteroStatus?.dismissClipboardRef()
+            return true
         }
 
         // MARK: Source-block paste (W4-S6)

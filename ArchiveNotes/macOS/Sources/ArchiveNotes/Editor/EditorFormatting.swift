@@ -75,25 +75,34 @@ final class FormattingContext: ObservableObject {
     /// Refreshed from the persisted selected item by `NoteEditorPane`. A command stays unavailable for
     /// an unreferenced or ambiguous note instead of pretending it can choose a citation safely.
     @Published private(set) var zoteroAutoFillReference: ZoteroAutoFillReference?
+    /// What the last read of the selected note found; `nil` until it is read. Names why the command is greyed.
+    @Published private(set) var zoteroAutoFillResolution: ZoteroAutoFillReferenceResolution?
 
-    var canAutoFillFromZotero: Bool {
-        guard let currentItemID, !isFetchingZoteroAutoFill else { return false }
+    var zoteroAutoFillMenuState: ZoteroAutoFillMenuState {
         // Selection and the editor's derived kind are published independently. Consult the shared
         // summary here so the command cannot remain disabled in the brief interval between them.
-        return notesModel?.allItems.first(where: { $0.id == currentItemID })?.kind == .note
-            && zoteroAutoFillReference != nil
+        let kind = currentItemID.flatMap { id in notesModel?.allItems.first(where: { $0.id == id })?.kind } ?? currentItemKind
+        return .make(hasItem: currentItemID != nil, kind: kind, isFetching: isFetchingZoteroAutoFill,
+                     resolution: zoteroAutoFillResolution)
     }
+
+    var canAutoFillFromZotero: Bool { zoteroAutoFillMenuState.isAvailable }
 
     func updateZoteroAutoFillReference(from item: Item) {
         guard item.id == currentItemID else { return }
-        if case let .available(reference) = ZoteroAutoFillReferenceResolver.resolve(in: item) {
+        setZoteroAutoFillResolution(ZoteroAutoFillReferenceResolver.resolve(in: item))
+    }
+
+    func clearZoteroAutoFillReference() { setZoteroAutoFillResolution(nil) }
+
+    private func setZoteroAutoFillResolution(_ resolution: ZoteroAutoFillReferenceResolution?) {
+        zoteroAutoFillResolution = resolution
+        if case let .available(reference) = resolution {
             zoteroAutoFillReference = reference
         } else {
             zoteroAutoFillReference = nil
         }
     }
-
-    func clearZoteroAutoFillReference() { zoteroAutoFillReference = nil }
 
     func copyCurrentItemLink() {
         guard canCopyCurrentItemLink, let currentItemID else { return }
@@ -224,14 +233,18 @@ final class FormattingContext: ObservableObject {
         guard coordinator.insertBlock(kind: kind, anchor: anchor, pendingCitationID: pendingID) else { return }
         if let pendingID { fetchCitation(for: ref, kind: kind, anchor: anchor, pendingID: pendingID) }
         // The block's debounce is flushed before the command reads it. If the note already had a
-        // resolved source, avoid selecting an arbitrary one while the new block is pending.
-        if zoteroAutoFillReference == nil {
-            zoteroAutoFillReference = ZoteroAutoFillReference(
+        // different resolved source, avoid selecting an arbitrary one while the new block is pending;
+        // a second block of the same item leaves the note's one source as it was.
+        switch zoteroAutoFillResolution {
+        case .some(.available(let existing)) where existing.target.selectLink == ref.selectLink:
+            break
+        case .some(.available), .some(.ambiguous):
+            setZoteroAutoFillResolution(.ambiguous)
+        case .some(.none), nil:
+            setZoteroAutoFillResolution(.available(ZoteroAutoFillReference(
                 ref: ref,
                 target: ZoteroAutoFillReferenceTarget(selectLink: ref.selectLink,
-                                                      noteFrontMatter: false, sourceBlocks: true))
-        } else {
-            zoteroAutoFillReference = nil
+                                                      noteFrontMatter: false, sourceBlocks: true))))
         }
     }
 
@@ -397,7 +410,7 @@ struct FormattingContextKey: FocusedValueKey {
 /// Commands are rendered outside the editor's object-observation graph. Publish the availability as a
 /// value-type focus key as well, so a persisted attachment resolving after selection refreshes the menu.
 struct ZoteroAutoFillAvailabilityKey: FocusedValueKey {
-    typealias Value = Bool
+    typealias Value = ZoteroAutoFillMenuState
 }
 
 /// Note ▸ Copy Link's enablement, for the same reason (W9.e2-fu2): the context's identity fields are not
@@ -412,7 +425,7 @@ extension FocusedValues {
         set { self[FormattingContextKey.self] = newValue }
     }
 
-    var zoteroAutoFillAvailable: Bool? {
+    var zoteroAutoFillState: ZoteroAutoFillMenuState? {
         get { self[ZoteroAutoFillAvailabilityKey.self] }
         set { self[ZoteroAutoFillAvailabilityKey.self] = newValue }
     }

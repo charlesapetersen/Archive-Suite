@@ -931,6 +931,10 @@ final class EditorTextView: NSTextView {
     /// Set by the coordinator; returns true if handled.
     var sourceBlockPasteHandler: (([SourceBlockPaster.PasteEntry]) -> Bool)?
 
+    /// Handler for pasting `zotero://select/…` links as Zotero source blocks (W40.fix-notes-zotero-paste).
+    /// Set by the coordinator; returns true if handled.
+    var zoteroPasteHandler: (([ZoteroRef]) -> Bool)?
+
     /// W7-S2: copy the selection as a `com.archivenotes.passage` payload (note editor only). Set by the
     /// coordinator; returns true when it wrote a passage (so the default RTF/plain copy is skipped).
     var passageCopyHandler: (() -> Bool)?
@@ -975,10 +979,12 @@ final class EditorTextView: NSTextView {
         // preserved). The handler declines outside an extract editor / without a passage payload.
         if tryPastePassage(from: pb) { return }
         if tryPasteSourceBlocks(from: pb) { return }
+        if tryPasteZoteroLinks(from: pb) { return }
         // For text: prefer plain string to avoid importing unmodeled rich styling
         if let str = pb.string(forType: .string), !str.isEmpty {
             insertPlainText(str)
-            if PassagePasteboard.hasPassage(pb) || !SourceBlockPaster.readPasteboard(from: pb).isEmpty {
+            if PassagePasteboard.hasPassage(pb) || !SourceBlockPaster.readPasteboard(from: pb).isEmpty
+                || !ZoteroClipboardDetect.pastedLinks(in: str).isEmpty {
                 plainPasteFallbackHandler?()
             }
             return
@@ -1005,6 +1011,15 @@ final class EditorTextView: NSTextView {
         let entries = SourceBlockPaster.readPasteboard(from: pb)
         guard !entries.isEmpty else { return false }
         return handler(entries)
+    }
+
+    /// A paste made only of Zotero links becomes Zotero source blocks, as Note ▸ Attach Zotero Link… makes.
+    @discardableResult
+    private func tryPasteZoteroLinks(from pb: NSPasteboard) -> Bool {
+        guard let handler = zoteroPasteHandler, let text = pb.string(forType: .string) else { return false }
+        let refs = ZoteroClipboardDetect.pastedLinks(in: text)
+        guard !refs.isEmpty else { return false }
+        return handler(refs)
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {

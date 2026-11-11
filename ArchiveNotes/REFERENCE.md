@@ -718,11 +718,14 @@ in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard m
 | Format | Bold · Italic · Inline Code · Link… | `⌘B` · `⌘I` · `⌥⌘C` · `⌘K` |
 | Format | Body · Heading 1–6 | `⌥⌘0` · `⌥⌘1`–`⌥⌘6` |
 | Format | Bulleted List · Numbered List · Blockquote · Code Block | `⌥⌘U` · `⌥⌘O` · `⌥⌘Q` · `⌥⌘K` |
-| Note | Copy Link · Attach Zotero Link… · Auto-fill from Zotero… | `⇧⌘C` (the Reader's Copy Link(s)) · — · — |
+| Note | Copy Link · Attach Zotero Link… · Auto-fill from Zotero… | `⇧⌘C` (the Reader's Copy Link(s)) · `⌃⌘Z` · `⌃⌥⌘Z` (Z for Zotero) |
 | Extract | Create Extract · Append to Extract… | `⌥⌘E` · — |
 
 - Not in the menu bar: `⌘/` switches the editor (and the template editor) between styled and raw Markdown, from the
   button above it. The list's context menu (Open, Reveal in Finder, Copy Link, folders, Set Quality, Delete…) has no keys.
+- `W40.fix-notes-zotero-paste` (notes-2 rows 27, 28): ⌘V of a paste made only of `zotero://select/…` links attaches
+  each as Attach Zotero Link… does (not in an extract or raw Markdown, where it stays text); a greyed Auto-fill shows
+  why on a greyed line under it and in its tooltip (`ZoteroAutoFillMenuState`).
 - Changed by `W40.fix-suite-shortcuts`: the lists were `⇧⌘U`/`⇧⌘O`, and ⇧⌘O is Choose Archive Folder… in every app
   of the suite (notes-1, row 1), so both lists joined the other block formats on ⌥⌘. Choose Archive Folder…, Copy
   Link and Find had no key.

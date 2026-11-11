@@ -19,6 +19,51 @@ enum ZoteroAutoFillReferenceResolution: Sendable, Equatable {
     case ambiguous
 }
 
+/// Note ▸ Auto-fill from Zotero…'s state, and why it is greyed (W40.fix-notes-zotero-paste, notes-2 row 28: the
+/// owner found it greyed with nothing saying why; an extract, no link and two different links all looked alike).
+/// The menu shows `reason` as a greyed line under the command and as its tooltip.
+enum ZoteroAutoFillMenuState: Sendable, Equatable {
+    case available
+    /// The selected note's links are still being read: brief, so no reason is shown.
+    case checking
+    case noNote
+    case extract
+    case fetching
+    case noLink
+    case severalLinks
+
+    static func make(hasItem: Bool, kind: Item.Kind?, isFetching: Bool,
+                     resolution: ZoteroAutoFillReferenceResolution?) -> ZoteroAutoFillMenuState {
+        guard hasItem else { return .noNote }
+        if isFetching { return .fetching }
+        switch kind {
+        case .extract: return .extract
+        case .note: break
+        case nil: return .checking
+        }
+        // `.some(.none)` spelled out: a bare `.none` here would match the Optional's nil.
+        switch resolution {
+        case .some(.available): return .available
+        case .some(.ambiguous): return .severalLinks
+        case .some(.none): return .noLink
+        case nil: return .checking
+        }
+    }
+
+    var isAvailable: Bool { self == .available }
+
+    var reason: String? {
+        switch self {
+        case .available, .checking: return nil
+        case .noNote: return "Select a note to auto-fill it"
+        case .extract: return "Auto-fill is for notes, not extracts"
+        case .fetching: return "Fetching from Zotero\u{2026}"
+        case .noLink: return "This note has no Zotero link: paste one into it first"
+        case .severalLinks: return "This note links to more than one Zotero item"
+        }
+    }
+}
+
 /// Resolves a source the user can safely auto-fill from. A note with exactly one distinct attached
 /// reference is unambiguous; we never silently pick the first of several sources.
 enum ZoteroAutoFillReferenceResolver {
