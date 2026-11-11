@@ -639,6 +639,21 @@ def wins(summ, reader):
                for s in ('control', '96-gated'))
 
 
+VISION_NOISE = ('Vision is deterministic on typed pages, but on 27.2 a handwritten page varies by up to 3.7 NES from '
+                'run to run (vision-27-reread.md), and every page here was read once')
+
+
+def said(d):
+    """A paired delta in words: a gain or a loss only when its interval excludes 0, otherwise a tie."""
+    return 'a gain' if d['lo'] > 0 else 'a loss' if d['hi'] < 0 else 'a tie'
+
+
+def unread(reader, s):
+    """Gemini was asked for the dropout image on the 96 only where the gate fires; elsewhere page_rows carries its raw
+    reading as the dropout one, so its ungated arm on the 96 was never read."""
+    return reader != 'apple-vision' and s == '96'
+
+
 def markdown(out):
     summ = out['summary']
     L = ['# W46.ocr-input-colour-dropout — a stamp in a second ink, dropped from the OCR input only', '',
@@ -651,7 +666,9 @@ def markdown(out):
     for r, name in READERS.items():
         m, c, g = (summ.get(f'{r}|{s}|dropout') for s in ('stamp-marked', 'control', '96-gated'))
         a = summ.get(f'{r}|stamp|dropout')
-        L.append(f'- **{name}: {"dropout helps" if verdicts[r] else "dropout does not help"}.** All 40 stamp-class '
+        word = ('dropout helps' if verdicts[r] else 'dropout costs it on the stamp class' if a['hi'] < 0
+                else 'dropout ties raw')
+        L.append(f'- **{name}: {word}.** All 40 stamp-class '
                  f'pages {a["raw"]} → {a["dropout"]} NES ({a["delta"]:+} [{a["lo"]:+}, {a["hi"]:+}]); the '
                  f'{m["n"]} with a drafted coloured mark {m["delta"]:+} [{m["lo"]:+}, {m["hi"]:+}]; controls '
                  f'{c["delta"]:+} [{c["lo"]:+}, {c["hi"]:+}]; the 96 with the gate {g["delta"]:+} '
@@ -671,30 +688,39 @@ def markdown(out):
         L += ['No R02 change is proposed: R02.1 (nothing applied before OCR) stands, and W46.settings gains no switch.', '']
     v = {s: summ[f'apple-vision|{s}|dropout'] for s in ('stamp-marked', 'stamp-unmarked', 'control')}
     gm = {s: summ[f'gemini3.7-flash-gw|{s}|dropout'] for s in ('stamp', 'stamp-unmarked', 'control')}
-    L += ['**Reading it.** Where a real coloured mark lies over the text, dropout probably helps Vision: '
+    vu = summ['apple-vision|96|dropout']
+    L += ['**Reading it.** Where a real coloured mark lies over the text, dropout and raw tie for Vision: '
           f'{v["stamp-marked"]["delta"]:+} [{v["stamp-marked"]["lo"]:+}, {v["stamp-marked"]["hi"]:+}] on the 16, with '
           f'fewer words of the text under the mark missed ({v["stamp-marked"]["body_missed_raw"]}% → '
-          f'{v["stamp-marked"]["body_missed_dropout"]}%), short of the paired interval. But the cue cannot tell a stamp '
-          'from coloured print, and on the coloured-print pages it fires on Vision ties '
+          f'{v["stamp-marked"]["body_missed_dropout"]}%); the paired interval holds 0, so it is no gain. The cue cannot '
+          'tell a stamp from coloured print, and on the coloured-print pages it fires on Vision ties '
           f'({v["stamp-unmarked"]["delta"]:+}) while Gemini loses {gm["stamp-unmarked"]["delta"]:+} (coloured printed '
-          'words go faint in the channel and Gemini leaves them out). Gemini already reads through the stamps: '
-          f'{gm["stamp"]["body_missed_raw"]}% of the text under the marks missed on raw. The gate fires on no control (they '
-          'are their own class); dropout applied to them anyway costs Vision '
-          f'{v["control"]["delta"]:+} and Gemini {gm["control"]["delta"]:+}, so dropout without a gate is harmful, and this '
-          'gate fires on 1 of the 96, which no reader reads differently. A route worth having would need a cue that '
-          'separates stamps from coloured print, and an owner-checked truth for the borderline Vision gain; both are '
-          'filed behind W46.nice-to-have.', '']
+          'words go faint in the channel and Gemini leaves them out). Against its own draft, Gemini misses '
+          f'{gm["stamp"]["body_missed_raw"]}% of the text under the marks on raw: the truth of the 60 is the same model '
+          'at medium reasoning, so that figure is the model agreeing with itself, not evidence that it reads through '
+          'the stamps. The gate fires on no control (they are their own class); dropout applied to them anyway is '
+          f'{said(v["control"])} for Vision ({v["control"]["delta"]:+} [{v["control"]["lo"]:+}, {v["control"]["hi"]:+}]) '
+          f'and {said(gm["control"])} for Gemini ({gm["control"]["delta"]:+} [{gm["control"]["lo"]:+}, '
+          f'{gm["control"]["hi"]:+}]), and ungated on the 96 {said(vu)} for Vision ({vu["delta"]:+} [{vu["lo"]:+}, '
+          f'{vu["hi"]:+}]): no harm shown, and no safety either. This gate fires on 1 of the 96, which no reader reads '
+          'differently. A route worth having would need a cue that separates stamps from coloured print, and an '
+          'owner-checked truth for the Vision tie on the 16; both are filed behind W46.nice-to-have.', '']
     L += ['## Every set, per reader', '',
           'NES ×100 against the truth, paired Δ dropout − raw with its 95% bootstrap interval (ocr_panel_score.paired), '
           f'pages moved more than {100 * HELP:.0f} points either way, and the words of the truth\'s text (the marks\' own '
           'words taken out) that the reading misses. "route Δ" is dropout followed by the mark layer\'s reading as page '
-          'text, against raw: reported to show that it is not how the mark should be kept (below).', '',
+          'text, against raw: reported to show that it is not how the mark should be kept (below). Gemini\'s ungated '
+          'arm on the 96 was never read (it was asked for the dropout image only where the gate fires), so that row is '
+          '"not read".', '',
           '| reader | set | n | raw | dropout | Δ [95%] | helped / harmed | text missed raw → dropout | route Δ |',
           '|---|---|---|---|---|---|---|---|---|']
     for r, name in READERS.items():
         for s, label in SETS:
             d, rt = summ.get(f'{r}|{s}|dropout'), summ.get(f'{r}|{s}|route')
             if not d:
+                continue
+            if unread(r, s):
+                L.append(f'| {name} | {label} | {d["n"]} | {d["raw"]} | not read | — | — | — | — |')
                 continue
             L.append(f'| {name} | {label} | {d["n"]} | {d["raw"]} | {d["dropout"]} | {d["delta"]:+} [{d["lo"]:+}, '
                      f'{d["hi"]:+}] | {d["helped"]} / {d["harmed"]} | {d["body_missed_raw"]}% → {d["body_missed_dropout"]}% '
@@ -728,8 +754,9 @@ def markdown(out):
           'coloured mark at all (the ungated arm). Thresholds: `' + json.dumps(out['thresholds']) + '`.', '',
           '## Measurement card', '',
           '- **Truth.** The 96: the owner\'s truth. The 60: Gemini 3.7 Flash\'s draft through the gateway (medium '
-          'reasoning, the raw and the dropout image both, the panel prompt with each coloured mark listed apart), '
-          'the same family as one scored reader, so Gemini\'s figures lean its way on both arms; the owner has not '
+          'reasoning, the raw and the dropout image both, the panel prompt with each coloured mark listed apart). That '
+          'is the same model as the scored Gemini reader (which runs at low reasoning, temperature 0), so Gemini\'s '
+          'figures on the 60 are scored against its own reading and lean its way on both arms; the owner has not '
           'checked it. `colour_dropout_sheet.py` builds the boxed sheet for the disputed places under the mark (blind), '
           'filed as its own item. The draft saw the dropout image, which could favour a dropout reading where the two '
           'disagree.',
@@ -739,7 +766,7 @@ def markdown(out):
           'en-US; Gemini through the gateway at temperature 0, low reasoning, the panel prompt. Raw on the 96 for Gemini '
           'is W46.fix-ocr-scorers-paid\'s reading of the same frozen image. The dropout input is the plain channel, as '
           'the owner\'s note measured it.',
-          f'- **Noise.** Paired bootstrap intervals over pages; Vision is deterministic (no rerun floor); Gemini\'s rerun '
+          f'- **Noise.** Paired bootstrap intervals over pages; {VISION_NOISE} (no rerun floor applied); Gemini\'s rerun '
           f'floor on the 96 is {FLOOR} points (ocr-rerun-noise.md), applied as a tie bound. n is 40, 16, 24, 20 and 96.',
           '- **Scope.** One dropout method (a single plain channel, chosen by the mark\'s hue), one cue, two readers. '
           'It does not settle a masked dropout (whitening only the mark\'s pixels), dropout for placement only '

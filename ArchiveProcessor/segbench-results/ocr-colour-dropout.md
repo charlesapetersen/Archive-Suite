@@ -4,18 +4,18 @@ Owner, 2026-11-10 (point 6): "UIUC 156" tests how well the readers resolve a red
 
 ## Verdict
 
-- **Apple Vision (accurate, macOS 27.2): dropout does not help.** All 40 stamp-class pages 71.07 → 71.76 NES (+0.69 [-1.34, +3.06]); the 16 with a drafted coloured mark +3.38 [-0.14, +8.38]; controls -4.22 [-8.92, +0.06]; the 96 with the gate -0.0 [-0.0, +0.0]. Words of the text under the marks missed: 7.74% raw, 6.65% dropout.
-- **Gemini 3.7 Flash (gateway): dropout does not help.** All 40 stamp-class pages 90.8 → 83.6 NES (-7.2 [-12.58, -2.69]); the 16 with a drafted coloured mark -0.33 [-0.91, +0.22]; controls -0.71 [-1.99, +0.01]; the 96 with the gate +0.0 [+0.0, +0.0]. Words of the text under the marks missed: 1.05% raw, 1.78% dropout.
+- **Apple Vision (accurate, macOS 27.2): dropout ties raw.** All 40 stamp-class pages 71.07 → 71.76 NES (+0.69 [-1.34, +3.06]); the 16 with a drafted coloured mark +3.38 [-0.14, +8.38]; controls -4.22 [-8.92, +0.06]; the 96 with the gate -0.0 [-0.0, +0.0]. Words of the text under the marks missed: 7.74% raw, 6.65% dropout.
+- **Gemini 3.7 Flash (gateway): dropout costs it on the stamp class.** All 40 stamp-class pages 90.8 → 83.6 NES (-7.2 [-12.58, -2.69]); the 16 with a drafted coloured mark -0.33 [-0.91, +0.22]; controls -0.71 [-1.99, +0.01]; the 96 with the gate +0.0 [+0.0, +0.0]. Words of the text under the marks missed: 1.05% raw, 1.78% dropout.
 
 UIUC 00156 itself: Vision 93.2 → 95.5 NES, its lines under the mark 14 → 6 holding 43 → 46 words, body words missed 16 → 4 of 195; Gemini 99.9 → 99.3. One page is the case that raised the question, not evidence for a rule.
 
 No R02 change is proposed: R02.1 (nothing applied before OCR) stands, and W46.settings gains no switch.
 
-**Reading it.** Where a real coloured mark lies over the text, dropout probably helps Vision: +3.38 [-0.14, +8.38] on the 16, with fewer words of the text under the mark missed (8.94% → 6.18%), short of the paired interval. But the cue cannot tell a stamp from coloured print, and on the coloured-print pages it fires on Vision ties (-1.11) while Gemini loses -11.78 (coloured printed words go faint in the channel and Gemini leaves them out). Gemini already reads through the stamps: 1.05% of the text under the marks missed on raw. The gate fires on no control (they are their own class); dropout applied to them anyway costs Vision -4.22 and Gemini -0.71, so dropout without a gate is harmful, and this gate fires on 1 of the 96, which no reader reads differently. A route worth having would need a cue that separates stamps from coloured print, and an owner-checked truth for the borderline Vision gain; both are filed behind W46.nice-to-have.
+**Reading it.** Where a real coloured mark lies over the text, dropout and raw tie for Vision: +3.38 [-0.14, +8.38] on the 16, with fewer words of the text under the mark missed (8.94% → 6.18%); the paired interval holds 0, so it is no gain. The cue cannot tell a stamp from coloured print, and on the coloured-print pages it fires on Vision ties (-1.11) while Gemini loses -11.78 (coloured printed words go faint in the channel and Gemini leaves them out). Against its own draft, Gemini misses 1.05% of the text under the marks on raw: the truth of the 60 is the same model at medium reasoning, so that figure is the model agreeing with itself, not evidence that it reads through the stamps. The gate fires on no control (they are their own class); dropout applied to them anyway is a tie for Vision (-4.22 [-8.92, +0.06]) and a tie for Gemini (-0.71 [-1.99, +0.01]), and ungated on the 96 a tie for Vision (-0.4 [-1.22, +0.34]): no harm shown, and no safety either. This gate fires on 1 of the 96, which no reader reads differently. A route worth having would need a cue that separates stamps from coloured print, and an owner-checked truth for the Vision tie on the 16; both are filed behind W46.nice-to-have.
 
 ## Every set, per reader
 
-NES ×100 against the truth, paired Δ dropout − raw with its 95% bootstrap interval (ocr_panel_score.paired), pages moved more than 2 points either way, and the words of the truth's text (the marks' own words taken out) that the reading misses. "route Δ" is dropout followed by the mark layer's reading as page text, against raw: reported to show that it is not how the mark should be kept (below).
+NES ×100 against the truth, paired Δ dropout − raw with its 95% bootstrap interval (ocr_panel_score.paired), pages moved more than 2 points either way, and the words of the truth's text (the marks' own words taken out) that the reading misses. "route Δ" is dropout followed by the mark layer's reading as page text, against raw: reported to show that it is not how the mark should be kept (below). Gemini's ungated arm on the 96 was never read (it was asked for the dropout image only where the gate fires), so that row is "not read".
 
 | reader | set | n | raw | dropout | Δ [95%] | helped / harmed | text missed raw → dropout | route Δ |
 |---|---|---|---|---|---|---|---|---|
@@ -30,7 +30,7 @@ NES ×100 against the truth, paired Δ dropout − raw with its 95% bootstrap in
 | Gemini 3.7 Flash (gateway) | stamp class, a coloured mark in the draft | 16 | 92.32 | 91.99 | -0.33 [-0.91, +0.22] | 0 / 2 | 1.54% → 1.88% | -19.79 |
 | Gemini 3.7 Flash (gateway) | stamp class, no coloured mark in the draft | 24 | 89.78 | 78.0 | -11.78 [-19.96, -4.56] | 1 / 8 | 0.47% → 1.65% | -21.49 |
 | Gemini 3.7 Flash (gateway) | controls, 20 | 20 | 93.72 | 93.01 | -0.71 [-1.99, +0.01] | 0 / 1 | 6.12% → 6.14% | -38.32 |
-| Gemini 3.7 Flash (gateway) | the owner's 96, dropout wherever a mark exists (ungated) | 96 | 96.73 | 96.73 | +0.0 [+0.0, +0.0] | 0 / 0 | 0.57% → 0.57% | -0.52 |
+| Gemini 3.7 Flash (gateway) | the owner's 96, dropout wherever a mark exists (ungated) | 96 | 96.73 | not read | — | — | — | — |
 | Gemini 3.7 Flash (gateway) | the owner's 96, the gate | 96 | 96.73 | 96.73 | +0.0 [+0.0, +0.0] | 0 / 0 | 0.57% → 0.57% | -0.52 |
 | Gemini 3.7 Flash (gateway) | the 96, the pages the gate fires on | 1 | 99.54 | 99.54 | +0.0 [+0.0, +0.0] | 0 / 0 | 0.0% → 0.0% | -49.49 |
 
@@ -51,10 +51,10 @@ By colour only, never by a reader: `colour_dropout.cue` on 3772 originals (the 5
 
 ## Measurement card
 
-- **Truth.** The 96: the owner's truth. The 60: Gemini 3.7 Flash's draft through the gateway (medium reasoning, the raw and the dropout image both, the panel prompt with each coloured mark listed apart), the same family as one scored reader, so Gemini's figures lean its way on both arms; the owner has not checked it. `colour_dropout_sheet.py` builds the boxed sheet for the disputed places under the mark (blind), filed as its own item. The draft saw the dropout image, which could favour a dropout reading where the two disagree.
+- **Truth.** The 96: the owner's truth. The 60: Gemini 3.7 Flash's draft through the gateway (medium reasoning, the raw and the dropout image both, the panel prompt with each coloured mark listed apart). That is the same model as the scored Gemini reader (which runs at low reasoning, temperature 0), so Gemini's figures on the 60 are scored against its own reading and lean its way on both arms; the owner has not checked it. `colour_dropout_sheet.py` builds the boxed sheet for the disputed places under the mark (blind), filed as its own item. The draft saw the dropout image, which could favour a dropout reading where the two disagree.
 - **Selection.** By the colour cue alone (above); no reader chose a page. The marked/unmarked split uses the draft's marks list, so it is the drafter's, and is said where it is used.
 - **Comparison.** Same images, sizes and settings per reader: Vision accurate with language correction, en-US; Gemini through the gateway at temperature 0, low reasoning, the panel prompt. Raw on the 96 for Gemini is W46.fix-ocr-scorers-paid's reading of the same frozen image. The dropout input is the plain channel, as the owner's note measured it.
-- **Noise.** Paired bootstrap intervals over pages; Vision is deterministic (no rerun floor); Gemini's rerun floor on the 96 is 0.49 points (ocr-rerun-noise.md), applied as a tie bound. n is 40, 16, 24, 20 and 96.
+- **Noise.** Paired bootstrap intervals over pages; Vision is deterministic on typed pages, but on 27.2 a handwritten page varies by up to 3.7 NES from run to run (vision-27-reread.md), and every page here was read once (no rerun floor applied); Gemini's rerun floor on the 96 is 0.49 points (ocr-rerun-noise.md), applied as a tie bound. n is 40, 16, 24, 20 and 96.
 - **Scope.** One dropout method (a single plain channel, chosen by the mark's hue), one cue, two readers. It does not settle a masked dropout (whitening only the mark's pixels), dropout for placement only (Vision's lines from dropout, the reader's text from raw), or pages outside the Reader sample's collections.
 
 ## Cost and tools

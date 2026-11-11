@@ -206,7 +206,9 @@ def sh(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, **kw)
 
 
-MIN_CORR = 0.65   # orient_like_pdf of a pairs.tsv JPEG against its PDF: true pairs measure 0.69-0.98
+MIN_CORR = 0.65   # orient_like_pdf of a pairs.tsv JPEG against its PDF. Set on the 44 pairs of W46.ocr-vision-unfiltered's
+                  # draw, which it then judged: the 40 kept measure 0.659-0.982, the 4 refused 0.399-0.623; a later
+                  # draw reports its refused pairs.
 _PAIRS = None
 
 

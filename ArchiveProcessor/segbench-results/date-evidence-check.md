@@ -12,7 +12,7 @@
 ## Measurement card
 
 - **Truth:** the owner's date tags (date_truth, the 300), used only to say whether a year is right; the verdict itself needs no truth. The newly accepted quotes were read by this session against the rule.
-- **Selection:** every trace-neigh reply with a year on the owner's 300; none chosen by a tested route or by ABBYY text.
+- **Selection:** every trace-neigh reply with a year on the owner's 300; none chosen by a tested route or by ABBYY text. The checker is in-sample: its new forms and its exclusions were written from these same 296 replies (the forms are rows of the accepted table below, the tests are the quotes the 27B's refused right years cited), so "right-year refusals 49 → 28" is its fit to them, not a figure off them; W46.date-route-pipeline's fresh replies give the first out-of-sample counts.
 - **Comparison:** the same replies, the same contexts, the checker before and after.
 - **Noise:** none from sampling; it is a deterministic re-score of fixed replies. The change in counts is exact.
 - **Scope:** one model (Qwen3.6 27B), one prompt (trace-neigh), Vision text. The corpus-text replies behind date-traceable.md's "49 of 101" and the Gemini arm's replies (45 of 131 failing) are in the owner's backup since 30 Oct and were not re-scored; W46.date-route-pipeline makes fresh Gemini and 27B replies and scores them with this checker. Whether a two-digit year's century is right is the year's question, not the quote's.

@@ -22,7 +22,9 @@ TRUTH_96 = (
 # with Apple Vision, so the 96 are conditional on Vision. Every Selection line about the 96 carries this.
 DRAW_96 = ("Every page where Apple Vision (26.6) read fewer than 20 words was replaced at the draw (19 of them, "
            "4 tagged Handwritten; `ocr-truth.md`), so the 96 hold no page Vision reads as empty, and every "
-           "comparison with Vision on them is on pages Vision could read.")
+           "comparison with Vision on them is on pages Vision could read. By the owner's answers, 15 of the 19 "
+           "replaced pages were few-word pages, and 19 of 200 drawn owner pages (about 10%) hold only a few words "
+           "(`ocr-vision-unfiltered.md`).")
 
 NOISE_96 = ("The rerun floor on the 96 is `ocr-rerun-noise.md`'s: a gap under 0.49 NES points, or a paired "
             "interval across 0, is a tie.")

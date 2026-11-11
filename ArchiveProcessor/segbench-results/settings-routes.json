@@ -10221,14 +10221,14 @@
        }
       },
       "evidence_valid": {
-       "value": "216 / 80",
+       "value": "243 / 53",
        "n": 300,
        "truth": "evidence_check",
        "source": {
-        "file": "segbench-results/date-traceable.md",
-        "route": "27B trace-neigh (Vision text)",
-        "attribute": "evidence valid / unsupported",
-        "value": "216 / 80"
+        "file": "segbench-results/date-evidence-check.md",
+        "route": "Valid / unsupported",
+        "attribute": "the widened checker, after",
+        "value": "243 / 53"
        }
       },
       "interval_90": {

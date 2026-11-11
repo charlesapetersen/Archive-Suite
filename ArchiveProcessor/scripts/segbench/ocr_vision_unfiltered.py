@@ -461,7 +461,8 @@ def write_result(meta, t, answers=None):
           f"{meta['turned_drawn_under_min']} of the {meta['turned_drawn']} drawn ones reads under {T.MIN_WORDS} words). "
           f"The JPEG original where one exists, by file name or a pairs.tsv pair ({(j or {}).get('kept', 0)} by the "
           f"pair), else the PDF's image.",
-          '- **Noise:** Vision is deterministic on one OS build (vision-27-reread.md); the intervals are Wilson 95% on '
+          '- **Noise:** Vision is deterministic on typed pages, but on 27.2 a handwritten page varies by up to 3.7 NES '
+          'from run to run (vision-27-reread.md), and each page here was read once; the intervals are Wilson 95% on '
           'pages, one page per document.',
           '- **Scope:** owner material in the collection folders only; a rate of pages, not of words read wrongly on '
           'pages Vision does read (the 96 measure that); the free default\'s card cites the drawn figure, never the '
