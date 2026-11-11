@@ -148,12 +148,50 @@ def pitch_fill(lines, W, H, min_width=0.15):
     return float(np.percentile(ratios, 90))
 
 
+def turn_points(pts, k):
+    """Normalised top-left points of an image turned k quarter turns clockwise (sips -r 90k)."""
+    out = []
+    for x, y in pts:
+        for _ in range(k % 4):
+            x, y = 1 - y, x
+        out.append([x, y])
+    return out
+
+
+def quarter_turns(d):
+    """How many clockwise quarter turns bring the page upright: the turn that makes the median direction of Vision's
+    lines (bottom-left to bottom-right, in pixels) closest to left-to-right. Phone photographs are often stored
+    sideways (UIUC 00233 is), and Vision reads them in any of the four turns."""
+    W, H = d['width'], d['height']
+    angs = [math.atan2((ln['quad'][2][1] - ln['quad'][3][1]) * H, (ln['quad'][2][0] - ln['quad'][3][0]) * W)
+            for ln in d['lines']]
+    if not angs:
+        return 0
+    c = math.atan2(sum(math.sin(a) for a in angs), sum(math.cos(a) for a in angs))
+    # a clockwise quarter turn adds 90 degrees to every direction (image y down)
+    return min(range(4), key=lambda k: abs(math.remainder(c + k * math.pi / 2, 2 * math.pi)))
+
+
+def upright(d):
+    """The Vision reading with every point turned upright, and the turn used."""
+    k = quarter_turns(d)
+    if k == 0:
+        return d, 0
+    W, H = (d['height'], d['width']) if k % 2 else (d['width'], d['height'])
+    lines = []
+    for ln in d['lines']:
+        lines.append({**ln, 'quad': turn_points(ln['quad'], k),
+                      'words': [{**w, 'quad': turn_points(w['quad'], k)} for w in ln.get('words') or []]})
+    return {**d, 'width': W, 'height': H, 'lines': lines}, k
+
+
 def cues(d):
+    d, turn = upright(d)
     W, H, lines = d['width'], d['height'], d['lines']
     wide = [ln for ln in lines if (ln['quad'][2][0] - ln['quad'][3][0]) >= 0.25]
     angs = [math.degrees(math.atan2((ln['quad'][2][1] - ln['quad'][3][1]) * H, (ln['quad'][2][0] - ln['quad'][3][0]) * W))
             for ln in wide]
-    return {'lines': len(lines), 'words': sum(len(ln.get('words') or []) for ln in lines), 'wide': len(wide),
+    return {'turn': turn, 'lines': len(lines), 'words': sum(len(ln.get('words') or []) for ln in lines), 'wide': len(wide),
             'angle': round(page_angle(lines, W, H), 3),
             'resid': (lambda v: None if v is None else round(v, 3))(angle_residual(lines, np.array([W, H], float))),
             'spread': (lambda v: None if v is None else round(v, 3))(angle_spread(lines, W, H)),
@@ -232,9 +270,14 @@ def image_of(key):
 def sheet(name, rs):
     """A contact sheet of the set (ImageMagick), for the eye check of what the cue picked."""
     out = CACHE / f'sheet-{name}.jpg'
+    (CACHE / 'thumb').mkdir(parents=True, exist_ok=True)
     args = ['magick', 'montage']
     for r in rs:
-        args += [f'{image_of(r["key"])}[400x400]']
+        t = CACHE / 'thumb' / f'{r["key"]}.jpg'
+        if not t.exists():
+            subprocess.run(['sips', '-s', 'format', 'jpeg', '-Z', '400', '-r', str(90 * r['turn']),
+                            str(image_of(r['key'])), '--out', str(t)], check=True, stdout=subprocess.DEVNULL)
+        args += [str(t)]
     args += ['-tile', '8x', '-geometry', '300x300+4+4', '-label', '', str(out)]
     subprocess.run(args, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -249,7 +292,30 @@ def blla_path(key):
     return CACHE / 'blla' / f'{key}.json'
 
 
+def up_image(key):
+    return CACHE / 'up' / f'{key}.jpg'
+
+
+def up_lines(key):
+    return CACHE / 'lines-up' / f'{key}.json'
+
+
 def cmd_truth(a):
+    """Upright copies of the selected pages (the reading copy is upright; blla reads left to right), Vision lines
+    read again on them, then blla's lines."""
+    (CACHE / 'up').mkdir(parents=True, exist_ok=True)
+    (CACHE / 'lines-up').mkdir(parents=True, exist_ok=True)
+    jobs = []
+    for r, _ in selected():
+        k = r['key']
+        if not up_image(k).exists():
+            subprocess.run(['sips', '-s', 'format', 'jpeg', '-s', 'formatOptions', '92',
+                            '-r', str(90 * r['turn']), str(image_of(k)), '--out', str(up_image(k))],
+                           check=True, stdout=subprocess.DEVNULL)
+        jobs.append(f'{up_image(k)}\t{up_lines(k)}\n')
+    jf = CACHE / 'lines-up-jobs.tsv'
+    jf.write_text(''.join(jobs))
+    subprocess.run([str(VISION), 'lines', str(jf)], check=True, stdout=subprocess.DEVNULL)
     xml_dir = CACHE / 'blla-xml'
     xml_dir.mkdir(parents=True, exist_ok=True)
     (CACHE / 'blla').mkdir(parents=True, exist_ok=True)
@@ -257,7 +323,7 @@ def cmd_truth(a):
     for r in todo:
         # one call a page: a page kraken cannot segment is recorded, not fatal to the rest
         xml = xml_dir / f'{r["key"]}.xml'
-        p = subprocess.run([str(KRAKEN), '-i', str(image_of(r['key'])), str(xml), '-x', 'segment', '-bl'],
+        p = subprocess.run([str(KRAKEN), '-i', str(up_image(r['key'])), str(xml), '-x', 'segment', '-bl'],
                            capture_output=True, text=True)
         if p.returncode != 0 or not xml.exists():
             blla_path(r['key']).write_text(json.dumps({'failed': p.stderr[-400:]}))
@@ -315,7 +381,9 @@ def along(baseline, c):
 
 
 def vision(key):
-    d = json.loads(lines_path(key).read_text())
+    d = json.loads(up_lines(key).read_text())
+    d, k = upright(d)
+    assert k == 0, (key, 'upright copy still turned', k)
     vlines, vwords = [], []
     for k, ln in enumerate(d['lines']):
         ids = []
