@@ -2,9 +2,9 @@
  "built": "2026-11-11",
  "table_built": "2026-11-11",
  "noise": {
-  "ocr_tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie in ocr-pair-matrix.json",
+  "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 the interval across 0; NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
   "seg_rerun_pages_exact_points": "under the rerun floor of 1.4 to 3.2 points of pages exact a box (3.2 for pooled test-box figures); in gap accuracy the paired interval decides",
-  "truth_note": "The 96's truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner; close rows among those families are provisional. Ties: gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie in ocr-pair-matrix.json (ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair)."
+  "truth_note": "The 96's truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner; close rows among those families are provisional. Ties: on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 the interval across 0; NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3 (ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair)."
  },
  "ocr": [
   {
@@ -19,7 +19,7 @@
    "s_page": 0.21,
    "s_est": false,
    "peak_gb": 0,
-   "note": "every figure is the macOS 27.2 reading (vision-27-reread.md); the 96 were drawn through a 20-word Vision filter: no owner page Vision reads as empty is in them (P8-3, ocr-truth.md)",
+   "note": "every figure is the macOS 27.2 reading (vision-27-reread.md); the 96 were drawn through a 20-word Vision filter (P8-3, ocr-truth.md); on 200 owner pages drawn without it, one per document, Vision reads under 20 words on 1 of the 181 pages of text (0.6%, 95% 0.1-3.1%) and nothing on none of the 200 with text (ocr-vision-unfiltered.md)",
    "source": "settings-routes.json, stage reading, row apple-vision",
    "nes": {
     "typewritten": 92.18,

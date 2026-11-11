@@ -32,16 +32,21 @@ because a failed page then goes on to another reader; with no fallback a failed 
 solver ranks on strict NES [I, from the owner's framing of 2026-10-15 in `difficulty.md` and the OCR-2 fix]. Per kind
 the bench has strict figures only (`charts.<kind>`), and the hand figure is `ocr-hands-rescore.md`'s "after" column.
 
-**Tie rule.** A gap is a tie when it is under twice the larger rerun range of the two routes, or when its paired 95%
-interval crosses 0 (`ocr-rerun-noise.md`, "The tie rule"). Floors, each already twice a measured range: a hosted
+**Tie rule.** A gap is a tie only when the paired gap is under twice the larger rerun range of the two routes
+(`ocr-rerun-noise.md`, "The tie rule"); the paired 95% interval is shown beside the figure but makes no tie (the
+owner, walkthrough 2026-11-11, W46.pairs-redecide-owner-ok: floor only, as `12-settings-design.md` §3.3 reads). Floors, each already twice a measured range: a hosted
 route 0.49 points (twice Gemini 3.7 Flash's rerun range of 0.24, lent to every hosted route without its own rerun); a
-local greedy route 0.00, so the paired interval alone decides (Qwen3-VL 8B 4-bit byte-identical across two runs 15 days
+local greedy route 0.00, so any paired gap separates two of them (Qwen3-VL 8B 4-bit byte-identical across two runs 15 days
 apart); per kind twice the kind's own range (handwritten hosted 0.60, twice 0.30, `ocr-ppocrv6-hands-paid.md` Noise);
 on the 895 there is no floor and the paired interval alone decides (R-3).
-The bench publishes paired intervals against one baseline, Qwen3.6 27B (hosted, the local panel's reading), not
-between every pair, so the solver applies the 0.49 floor where no pair exists and marks the comparison "pair not
-measured" (an item, section 8). `12-settings-design.md` §3.3 says a tie goes to the cheaper route; the half-point
-shorthand there is the floor test only, and the interval test also applies.
+The bench pairs every reading row that has per-page scores with every other (`ocr-pair-matrix.md`, W46.ocr-pair-matrix
+and W46.pair-matrix-cover): on the 96 over all pages, per kind (typewritten, printed, handwritten, each with its kind
+floor: 0.42, 0.24, 0.60 hosted, a Mac pair 0.00) and on hands16; on the 895 per stratum and pooled L1-L3. The
+solver reads each tie from the pair's entry; `settings_routes.py --check` fails when a row with per-page scores has
+none. The rows without per-page scores (Apple FM 27, the PP-OCRv6 kraken blla route, the kraken specialists, the
+cascades) keep the floor alone and "pair not measured". A tie goes to the cheaper, then the faster route
+(`12-settings-design.md` §3.3); the picks below are re-decided from the matrix under the floor-only rule in
+W46.pairs-redecide.
 
 **Kind rules.**
 - Handwritten pages are ranked on `hands16` and, where the route read them, the public L1-L3 (independent truth);
@@ -198,8 +203,10 @@ route leads, `churro-3b-farmshare`, now a row. It is the best cluster route on s
 against LightOnOCR-3 4B 58.90, L6 69.45 against Infinity-Parser2-Pro 54.46, L7 53.85 against Xiaomi-OCR-0 43.93, L8
 92.61, N1 69.19, N3 84.70, N4 57.88), and on L8 and N4 above Gemini 3.7 Flash's 89.83 and 48.65; it was trained on
 CHURRO-DS, the source of those strata, so its row carries OCR-15 until item 8 counts the overlap. The other near miss:
-`ling3-flash-vl-farmshare` N5 82.29 against `qwen3.6-35b-a3b-farmshare` 82.12, 0.17 apart, under the floor, so no
-row (four GPUs, 76.6 pages an hour). The dominated hosted routes have no public run of their own.
+`ling3-flash-vl-farmshare` N5 82.29 against `qwen3.6-35b-a3b-farmshare` 82.12: paired on the 40 N5 pages, +0.16
+[−4.39, +4.86] strict and −0.75 [−5.20, +3.79] answered (n 38), and against the N5 leader `gemini3.7-flash-gw`
+−1.72 [−6.76, +3.17], each a tie by the interval (the 895 has no floor; the earlier "under the floor" applied a 96
+rule), so no row (four GPUs, 76.6 pages an hour; W46.pair-matrix-cover). The dominated hosted routes have no public run of their own.
 
 R6, commercial document services: none found worth a row. On 25 of the 96 Azure Document Intelligence read 89.6,
 AWS Textract 86.6 and Transkribus Text Titan I 82.5, each under Mistral OCR 4.1's 92.5 on the same pages (Azure -2.9,

@@ -10,7 +10,8 @@ ocr_rescore.owner_sources() (every cached route on the 96); a failure is an empt
 the panels. Scores are ocr_panel_score.score's NES, in points; intervals are ocr_panel_score.paired (per-page
 differences, 95% bootstrap, 10,000 rounds).
 
-Writes segbench-results/ocr-hands-rescore.md and .json (scores and counts only; no text).
+Writes segbench-results/ocr-hands-rescore.md and .json (scores and counts only; no text), and ocr-hands-pages.csv
+(each route's per-page NES on the corrected truth, for ocr_pair_matrix.py's hands16 group).
 """
 from __future__ import annotations
 
@@ -240,6 +241,9 @@ def build(out: Path) -> dict:
                           'summary': robustness(tr)}}
     out.mkdir(parents=True, exist_ok=True)
     (out / 'ocr-hands-rescore.json').write_text(json.dumps(res, indent=1) + '\n')
+    # W46.pair-matrix-cover: each route's per-page scores on the corrected truth, for ocr_pair_matrix.py's hands16 group
+    (out / 'ocr-hands-pages.csv').write_text('route,page,nes\n' + ''.join(
+        f'"{r}",{p},{after[r][p]:.6f}\n' for r in sorted(after) for p in pages))
     write_md(out / 'ocr-hands-rescore.md', res)
     return res
 

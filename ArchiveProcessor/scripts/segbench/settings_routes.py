@@ -379,7 +379,7 @@ NOISE = {
  "reading-copy": {"metric": "rotation_pages_wrong", "tie": "Wilson page intervals that overlap; a gap of a few turns is a tie", "source": "rotation-routes.md §Noise"},
  "ocr-input": {"metric": "nes", "tie": "paired 95% interval across 0, or a gap under 0.49 NES points", "source": "enh-ocr-input.md §Measurement card"},
  "layout": {"metric": "nes_strict", "tie": "paired 95% page-bootstrap interval across 0, NES points; per-kind groups under 20 pages are descriptive", "source": "layout-photo.md §Measurement card"},
- "reading": {"metric": "nes", "tie": "gap under the floor (hosted 0.49, local greedy 0.00, handwritten hosted 0.60; each floor already twice a rerun range) or paired 95% interval across 0, NES points; each pair's interval and tie in ocr-pair-matrix.json", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"},
+ "reading": {"metric": "nes", "tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 the interval across 0; NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"},
  "placement": {"metric": "line_pass_strict", "tie": "paired page-bootstrap 95% interval holding 0; about 2 points on 20 owner hand pages, about 10 on 14 Bentham pages", "source": "place-print.md §Measurement card"},
  "marks": {"metric": "marks_read_nes08", "tie": "a gap inside the page-bootstrap interval, about 20 marks-read points", "source": "marks-read.md §Measurement card"},
  "segmentation": {"metric": "pages_exact", "tie": "under the rerun floor of 1.4 to 3.2 points of pages exact a box (3.2 for pooled test-box figures); in gap accuracy the paired interval decides", "source": "seg-boxes-score.md §Paired differences"},
@@ -596,6 +596,39 @@ def walk_sources(x, where, out):
             walk_sources(v, where, out)
 
 
+def check_pair_cover(table):
+    """W46.pair-matrix-cover: every reading row with per-page scores is paired with every other such row in
+    ocr-pair-matrix.json, in each of its groups (the 96's kinds and hands16, the 895's strata and L1-L3)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import ocr_pair_matrix as M
+    path = os.path.join(R, "ArchiveProcessor/segbench-results/ocr-pair-matrix.json")
+    m = json.load(open(path))
+    want = M.coverage(M.table_routes(table))
+    have = {}
+    for e in m["pairs"]:
+        st = M.HANDS_GROUP if e["group"] == M.HANDS_GROUP else e["set"]
+        have.setdefault(st, set()).update((e["a"], e["b"]))
+    bad = 0
+    for st, ids in want.items():
+        gone = [i for i in ids if i not in have.get(st, set()) or i not in m["routes"].get(st, [])]
+        if gone:
+            print(f"FAIL pair matrix: {st} has no pair entries for {', '.join(gone)} (rerun ocr_pair_matrix.py)"); bad += 1
+    groups = {"owner96": ["all", *M.KINDS], M.HANDS_GROUP: [M.HANDS_GROUP]}
+    for st, gs in groups.items():
+        k = len(want[st])
+        for g in gs:
+            n = sum(1 for e in m["pairs"] if e["group"] == g and e["set"] == "owner96")
+            if n != k * (k - 1) // 2:
+                print(f"FAIL pair matrix: owner96/{g} holds {n} pairs, {k * (k - 1) // 2} wanted"); bad += 1
+    for g in M.POOLED:
+        if not any(e["group"] == g for e in m["pairs"]):
+            print(f"FAIL pair matrix: no {g} group on the 895"); bad += 1
+    if not bad:
+        print(f"PASS pair matrix: {len(want['owner96'])} rows on the 96 ({len(want[M.HANDS_GROUP])} with hands16), "
+              f"{len(want['public895'])} on the 895, each paired in every group")
+    return bad
+
+
 def check(table):
     bad = 0
     committed_path = os.path.join(R, OUT)
@@ -639,6 +672,7 @@ def check(table):
         why = check_section(n["source"])
         if why:
             print(f"FAIL noise {sid}: {why}"); bad += 1
+    bad += check_pair_cover(table)
     shared = [r for st in table["stages"] for r in st["routes"] if r["id"] == "seg-2b-lora-k200"]
     if len(shared) == 2 and shared[0] != shared[1]:
         print("FAIL seg-2b-lora-k200 differs between notes 07 and 12 (one row shared)"); bad += 1
