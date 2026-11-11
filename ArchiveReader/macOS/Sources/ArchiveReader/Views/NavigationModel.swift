@@ -227,7 +227,7 @@ final class NavigationModel: ObservableObject {
                 let revision = self.libraryRevision
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.libraryRevision == revision else { return }
-                    self.libraryDidChange()
+                    ReaderStages.measure("model.libraryDidChange") { self.libraryDidChange() }
                 }
             } }
             .store(in: &cancellables)
@@ -455,13 +455,15 @@ final class NavigationModel: ObservableObject {
     func countMatches(_ search: AdvancedSearch) async -> Int {
         let rules = search.droppingFolders(outside: rootStore.discoveredPathPrefix).search
         let hits = await textHits(for: rules)
-        var context = ruleContext(for: rules)
-        context.textHits = hits
-        var files = library.files
-        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            files = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
+        return ReaderStages.measure("model.countMatches.rows") {
+            var context = ruleContext(for: rules)
+            context.textHits = hits
+            var files = library.files
+            if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
+                files = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
+            }
+            return files.reduce(0) { $0 + (rules.matches($1, context) ? 1 : 0) }
         }
-        return files.reduce(0) { $0 + (rules.matches($1, context) ? 1 : 0) }
     }
 
     /// Each active text rule's index answer, by rule id.
@@ -755,7 +757,7 @@ final class NavigationModel: ObservableObject {
 
     /// The user scrolled or clicked in the list: their place wins over the one being restored.
     func userMovedInList() { pendingTopRow = nil }
-    private func persistSelection() {
+    private func persistSelection() { ReaderStages.measure("model.persistSelection") {
         // Cap persistence so a huge multi-select (e.g. Select All over 150k) never serializes a giant
         // array on the main actor or bloats the defaults plist; such selections aren't worth restoring.
         let paths = selection.map(\.absoluteString)
@@ -764,7 +766,7 @@ final class NavigationModel: ObservableObject {
         } else {
             defaults.removeObject(forKey: Self.selectionKey)
         }
-    }
+    } }
 
     // MARK: Derived
 
@@ -780,7 +782,7 @@ final class NavigationModel: ObservableObject {
     func recompute() {
         viewRevision &+= 1
         let input = presentationInput(library.files)
-        present(input.build(), marks: input.marks)
+        present(ReaderStages.measure("presentation.build") { input.build() }, marks: input.marks)
     }
 
     private func present(_ result: LibraryPresentation, marks: SortMarks) {
@@ -792,7 +794,7 @@ final class NavigationModel: ObservableObject {
         displayedGeneration += 1
         _tagCloudCache = nil
         duplicatedNames = result.duplicatedNames
-        pruneSelectionToDisplayed()
+        ReaderStages.measure("model.pruneSelection") { pruneSelectionToDisplayed() }
         refreshSelectionCache()
         persistViewState()
         reapplyPendingTopRow()
@@ -915,16 +917,18 @@ final class NavigationModel: ObservableObject {
     func refreshFormatStatuses() {
         formatGeneration += 1
         let generation = formatGeneration
-        let paths = library.files.map(\.path)
+        let paths = ReaderStages.measure("model.formatStatuses.paths") { library.files.map(\.path) }
         Task { [weak self] in
             guard let self else { return }
             let statuses = await self.indexer.formatStatuses(for: paths)
             let classifications = await self.indexer.classifications(for: paths)
             let count = await self.indexer.needsAttentionCount(among: paths)   // R-5: scope to the current library
             guard generation == self.formatGeneration else { return }   // superseded by a newer refresh
-            self.formatStatuses = statuses
-            self.classifications = classifications
-            self.needsAttentionCount = count
+            ReaderStages.measure("model.formatStatuses.publish") {
+                self.formatStatuses = statuses
+                self.classifications = classifications
+                self.needsAttentionCount = count
+            }
             self.recompute()
             if self.savedSearches.searches.contains(where: { $0.search.uses(.needsAttention) || $0.search.hasTextRules }) {
                 self.refreshSmartFolderCounts()   // counts follow committed content and format statuses
@@ -1151,8 +1155,9 @@ final class NavigationModel: ObservableObject {
     private func refreshSelectionCache() {
         let sel = selection
         let base = displayed
-        selectedFilesCache = sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort,
-                                                                         marks: lastSortMarks)
+        selectedFilesCache = ReaderStages.measure("model.selectionCache") {
+            sel.isEmpty ? [] : LibrarySort.sorted(base.filter { sel.contains($0.id) }, by: sort, marks: lastSortMarks)
+        }
     }
 
     /// A row the filter hid leaves the selection, as it leaves the table's highlight; kept, it was
@@ -1208,7 +1213,7 @@ final class NavigationModel: ObservableObject {
         let files = library.files
         let ps = LibraryChangeSignature.paths(files)
         let pathsChanged = ps != pathsSig
-        if pathsChanged { pathsSig = ps; folderTree = buildFolderTree() }            // paths → folder tree
+        if pathsChanged { pathsSig = ps; folderTree = ReaderStages.measure("model.buildFolderTree") { buildFolderTree() } }            // paths → folder tree
         // Tag edits leave the path set alone. At scale the cache + sort pass used to block the
         // first frame with the verified chip for ~400 ms (50k rows, Debug). Prepare immutable data
         // off-main; smaller libraries keep the cheap synchronous path. No write or ledger work moves.
@@ -1216,18 +1221,22 @@ final class NavigationModel: ObservableObject {
             let revision = libraryRevision, view = viewRevision
             let input = presentationInput(files), previousSubjects = subjectsSig
             let preparation = Task.detached(priority: .userInitiated) {
-                LibraryPresentation.Refresh.prepare(input, previousSubjects: previousSubjects)
+                ReaderStages.measure("presentation.prepare") {
+                    LibraryPresentation.Refresh.prepare(input, previousSubjects: previousSubjects)
+                }
             }
             libraryPreparation = preparation
             Task { [weak self] in
                 guard let result = await preparation.value, !preparation.isCancelled,
                       let self, self.libraryRevision == revision else { return }
                 self.libraryPreparation = nil
-                self.updateLibraryCaches(subjects: result.subjectsSignature, matches: result.matchSignature,
-                                         spellings: result.spellings)
-                // A filter/sort/flag change may already have recomputed a newer presentation.
-                if self.viewRevision == view { self.present(result.presentation, marks: input.marks) }
-                self.finishLibraryChange(files, pathsChanged: false)
+                ReaderStages.measure("model.libraryDidChange (prepared)") {
+                    self.updateLibraryCaches(subjects: result.subjectsSignature, matches: result.matchSignature,
+                                             spellings: result.spellings)
+                    // A filter/sort/flag change may already have recomputed a newer presentation.
+                    if self.viewRevision == view { self.present(result.presentation, marks: input.marks) }
+                    self.finishLibraryChange(files, pathsChanged: false)
+                }
             }
             return
         }
@@ -1248,6 +1257,10 @@ final class NavigationModel: ObservableObject {
     }
 
     private func finishLibraryChange(_ files: [ArchiveFile], pathsChanged: Bool) {
+        ReaderStages.measure("model.finishLibraryChange") { finishLibraryChangeStages(files, pathsChanged: pathsChanged) }
+    }
+
+    private func finishLibraryChangeStages(_ files: [ArchiveFile], pathsChanged: Bool) {
         // Filter excluded folders before indexing so excluded files are never added to the content index.
         let filesToIndex: [ArchiveFile]
         if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
@@ -1553,6 +1566,10 @@ final class NavigationModel: ObservableObject {
     /// The document window names its open file by path, and acts through the same `TagWriter` actions as the
     /// list (W40.fix-reader-menus-follow-window), so the row still passes `reverifyCacheRows` before any write.
     func libraryFiles(atPaths paths: [String]) -> [ArchiveFile] {
+        ReaderStages.measure("model.libraryFiles(atPaths:)") { libraryFilesStage(atPaths: paths) }
+    }
+
+    private func libraryFilesStage(atPaths paths: [String]) -> [ArchiveFile] {
         guard !paths.isEmpty else { return [] }
         if paths.count == 1 { return library.files.first { $0.path == paths[0] }.map { [$0] } ?? [] }
         let wanted = Set(paths)
@@ -1576,7 +1593,7 @@ final class NavigationModel: ObservableObject {
     func mark(_ target: ReadState, paths: [String]? = nil) {
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
-        let reverified = reverifyCacheRows(targets)
+        let reverified = ReaderStages.measure("model.reverifyCacheRows") { reverifyCacheRows(targets) }
         let files = reverified.files
         guard !files.isEmpty else {
             if reverified.rejected > 0 {
@@ -1590,7 +1607,7 @@ final class NavigationModel: ObservableObject {
         var verified: [TagWriteResult] = []
         var failures = reverified.rejected
         let group = UUID()                       // §12: the whole action is one ledger group, as it is one undo
-        AuditLedger.withContext(group: group) {
+        ReaderStages.measure("tagWriter.writes") { AuditLedger.withContext(group: group) {
             for f in files {
                 let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
                 do {
@@ -1599,7 +1616,7 @@ final class NavigationModel: ObservableObject {
                     if !r.isNoOp { changed += 1 }  // real changes → undo
                 } catch { failures += 1 }
             }
-        }
+        } }
         // Only verified (non-throwing) writes move a row — a failed write keeps the last-discovered value and
         // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
         library.applyVerifiedWrites(verified)
@@ -1610,7 +1627,9 @@ final class NavigationModel: ObservableObject {
         announce(statusMessage)
     }
 
-    private func refreshUndoHistory() {
+    private func refreshUndoHistory() { ReaderStages.measure("model.refreshUndoHistory") { refreshUndoHistoryStage() } }
+
+    private func refreshUndoHistoryStage() {
         if let root = rootStore.root {
             let main = ReaderArchiveLayout(grantedRoot: root).mainRoot
             undoGroups = AuditLedger.shared.undoGroups(in: main)
@@ -1793,7 +1812,7 @@ final class NavigationModel: ObservableObject {
         let op = inLibrarySpelling(op)
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
-        let reverified = reverifyCacheRows(targets)
+        let reverified = ReaderStages.measure("model.reverifyCacheRows") { reverifyCacheRows(targets) }
         let files = reverified.files
         guard !files.isEmpty else {
             if reverified.rejected > 0 {
@@ -2140,12 +2159,14 @@ final class NavigationModel: ObservableObject {
     /// via the preview's ↑/↓. Anchors on the current selection's position in `displayed`.
     func moveSelectionInList(_ delta: Int) {
         guard !displayed.isEmpty else { return }
-        let ids = displayed.map(\.id)
-        let sel = selection
-        let positions = ids.enumerated().filter { sel.contains($0.element) }.map(\.offset)
-        let anchor = delta < 0 ? (positions.min() ?? 0) : (positions.max() ?? -1)
-        let next = max(0, min(ids.count - 1, anchor + delta))
-        selection = [ids[next]]
+        let next: ArchiveFile.ID = ReaderStages.measure("model.moveSelectionInList.find") {
+            let ids = displayed.map(\.id)
+            let sel = selection
+            let positions = ids.enumerated().filter { sel.contains($0.element) }.map(\.offset)
+            let anchor = delta < 0 ? (positions.min() ?? 0) : (positions.max() ?? -1)
+            return ids[max(0, min(ids.count - 1, anchor + delta))]
+        }
+        selection = [next]
     }
 
     /// Reveal (and select) the chosen files in Finder. Read-only — opens Finder pointing at the files;

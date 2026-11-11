@@ -1106,7 +1106,7 @@ final class ArchiveLibrary: ObservableObject {
         guard rootGeneration == self.rootGeneration else { return }
         watchWorkInFlight = false
         watchCancellation = nil
-        apply(changes, readGeneration: readGeneration)
+        ReaderStages.measure("library.apply (watch batch)") { apply(changes, readGeneration: readGeneration) }
         drainWatchWork()
     }
 
@@ -1326,11 +1326,14 @@ final class ArchiveLibrary: ObservableObject {
             verifiedWrites[r.url] = write
             replacements[r.url] = write
         }
-        files = files.compactMap { f in
-            guard let write = replacements[f.url] else { return f }
-            guard CorpusWalker.tracksReadState(write.after) else { return nil }
-            return Self.rebuilt(f, after: write.after, afterLabel: write.afterLabel)
+        let next = ReaderStages.measure("library.applyVerifiedWrites") {
+            files.compactMap { f in
+                guard let write = replacements[f.url] else { return f }
+                guard CorpusWalker.tracksReadState(write.after) else { return nil }
+                return Self.rebuilt(f, after: write.after, afterLabel: write.afterLabel)
+            }
         }
+        files = next
     }
 
     // MARK: - Row construction

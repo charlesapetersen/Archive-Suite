@@ -605,6 +605,11 @@ final class DocumentViewerModel: ObservableObject {
         imageSource = .pdf
         guard urls.indices.contains(index) else { current = nil; loadError = nil; return }
         let url = urls[index]
+        ReaderStages.measure("viewer.loadDocument") { loadDocument(url) }
+        ReaderStages.measure("viewer.jpegPartner") { refreshJPEGPartner() }
+    }
+
+    private func loadDocument(_ url: URL) {
         if let doc = PDFDocument(url: url) {
             current = doc
             loadError = doc.pageCount == 0 ? "“\(url.lastPathComponent)” has no pages." : nil
@@ -619,7 +624,6 @@ final class DocumentViewerModel: ObservableObject {
             current = nil
             loadError = "Could not open “\(url.lastPathComponent)” (missing, corrupt, or unsupported format)."
         }
-        refreshJPEGPartner()
     }
 
     private var currentURL: URL? { urls.indices.contains(index) ? urls[index] : nil }

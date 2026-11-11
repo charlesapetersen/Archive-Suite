@@ -143,6 +143,10 @@ final class ContentIndexer: ObservableObject {
     ///   follow-up pass cheaply skips everything unchanged, so a tag-only update (mark Read, edit tags)
     ///   does NOT restart the expensive initial extraction from zero.
     func startIndexing(_ files: [ArchiveFile]) {
+        ReaderStages.measure("indexer.startIndexing") { startIndexingStage(files) }
+    }
+
+    private func startIndexingStage(_ files: [ArchiveFile]) {
         guard !files.isEmpty else {
             generation += 1                 // invalidate any in-flight pass's callbacks
             task?.cancel(); task = nil; pending = nil; progress = nil
