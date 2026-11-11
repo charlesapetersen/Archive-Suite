@@ -156,6 +156,21 @@ with its kind; "boundaries" has one entry for every gap between consecutive page
 the cue is unambiguous, about 0.6 when you are close to guessing.
 """
 
+# g2 (W46.seg-magazine-rule-redo) is g1 with rule 10 on the article-within-issue rule (owner, 2026-10-29: an article
+# inside an issue is its own document; the full-magazine rule is only the fallback where splitting by article is too
+# difficult; 2026-10-30: an advertisement photographed between an article's pages goes with that article). g1 stays
+# as measured: every cached g1 answer and the app's shipped voter are keyed to its exact text.
+RULE10_G1 = "10. A full magazine is ONE document, cover to end; its articles are not separate clippings.\n"
+RULE10_G2 = """10. A magazine or newsletter issue is split by article. Its cover or contents page (masthead, issue
+   date, table of contents) is one document; each article or editorial inside the issue starts a new one,
+   and a later page of the same article continues it. An advertisement photographed between two pages of
+   one article is part of that article: continue. Only where the articles cannot be told apart in photo
+   order (one article's pages interleaved with another's) is the whole issue one document, cover to end.
+"""
+assert PROMPT.count(RULE10_G1) == 1, "prompt g1 changed"
+PROMPT_G2 = PROMPT.replace(RULE10_G1, RULE10_G2)
+PROMPTS = {"g1": PROMPT, "g2": PROMPT_G2}
+
 
 # --- the request ------------------------------------------------------------------------------
 
