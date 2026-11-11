@@ -1004,12 +1004,14 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   coordinated `trashItem` of the whole `<uuid>/` dir. Cancel only clears `pendingDeletion`.
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes`;
   `.testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`;
+  `.testG22_CommandDeleteAndRedo` (⌘⌫, Undo, Redo, Undo; W40.fix-notes-delete-redo);
   `ArchiveNotesTests/NotesReplicationTests.confirmAfterConcurrentReplicateKeepsFile`.
 - **Runtime evidence:** 2026-11-06 · owner session notes-2, task 4 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)): a scratch note deleted, brought back with Edit ▸ Undo, deleted again, found in the sidebar's Trash and put back; the store's `Trash/` was empty afterwards ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)). Redo after the Undo did not delete it again (row 17, A, the pack's known limit: `W40.fix-notes-delete-redo`).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-11-06 W40.g2-notes-2-ledger — runtime evidence for delete, Undo, the Trash and Put Back; stays `unproven`: removing a replicant, the last-instance question and Cancel were not reported on. The owner wants Delete on ⌘⌫ (row 16, `W40.fix-notes-delete-redo`).
+  - 2026-11-11 W40.fix-notes-delete-redo — Edit ▸ Delete Note… on ⌘⌫, and Redo moves the note to the Trash again after an Undo (rows 16, 17); `testG22_CommandDeleteAndRedo` passes in the macOS 27.2 VM. Stays `unproven` for the reasons above.
 - **Notes:** the W9.e2 result is `W9.e2-notes`: note delete and the delete-last-instance guard,
   `NotesGUITests.testG8_…` and `.testG19_…` (already on main). On the source conflict, the code moves the whole
   `<uuid>/` folder to the Trash (`NoteStore.swift:415-430`, never `removeItem`), so §3.6/§16.1 ("deletes the

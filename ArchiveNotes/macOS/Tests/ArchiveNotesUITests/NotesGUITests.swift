@@ -2307,7 +2307,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
         let row = selectItem(uuid: id)
         _ = pollUntil(timeout: 8) { app.activate(); return row.isHittable }
-        // No second click: on a selected row it would start editing the title, where ⌘⌫ edits the text.
+        // A window's first selection hands the keyboard to the note's editor, where ⌘⌫ deletes text, so
+        // click the row again (past the double-click interval, which would rename it) to give it to the list.
+        Thread.sleep(forTimeInterval: 1.5)
+        row.click()
         app.typeKey(.delete, modifierFlags: .command)
         let confirm = app.descendants(matching: .any)["an.dialog.deleteLastInstance.confirm"]
         XCTAssertTrue(confirm.waitForExistence(timeout: 8), "⌘⌫ should ask for the delete confirmation")
