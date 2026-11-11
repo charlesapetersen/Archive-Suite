@@ -1,0 +1,79 @@
+{
+ "meta": {
+  "salt": "W46.ocr-vision-unfiltered",
+  "os": "27.2",
+  "pool_docs": 20986,
+  "n_drawn": 200,
+  "failed": [],
+  "turned": 6,
+  "minutes": 18
+ },
+ "tally": {
+  "drawn": {
+   "pages": 200,
+   "vision_empty": {
+    "k": 0,
+    "n": 200,
+    "pct": 0.0,
+    "ci95": [
+     0.0,
+     1.9
+    ]
+   },
+   "vision_under_min": {
+    "k": 10,
+    "n": 200,
+    "pct": 5.0,
+    "ci95": [
+     2.7,
+     9.0
+    ]
+   },
+   "handwritten_tagged": {
+    "pages": 1,
+    "vision_under_min": {
+     "k": 0,
+     "n": 1,
+     "pct": 0.0,
+     "ci95": [
+      0.0,
+      79.3
+     ]
+    }
+   }
+  },
+  "replaced": {
+   "pages": 19,
+   "vision_empty": {
+    "k": 1,
+    "n": 19,
+    "pct": 5.3,
+    "ci95": [
+     0.9,
+     24.6
+    ]
+   },
+   "vision_under_min": {
+    "k": 17,
+    "n": 19,
+    "pct": 89.5,
+    "ci95": [
+     68.6,
+     97.1
+    ]
+   },
+   "handwritten_tagged": {
+    "pages": 4,
+    "vision_under_min": {
+     "k": 2,
+     "n": 4,
+     "pct": 50.0,
+     "ci95": [
+      15.0,
+      85.0
+     ]
+    }
+   }
+  }
+ }
+}
