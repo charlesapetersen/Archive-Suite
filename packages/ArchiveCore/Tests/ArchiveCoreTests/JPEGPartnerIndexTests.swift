@@ -121,4 +121,55 @@ struct JPEGPartnerIndexTests {
         #expect(partnerIndex.resolve(pdfURL: pdf, mainRoot: tree.main,
                                      collectionContext: "Collection B") == .match(discoveredSecond))
     }
+
+    /// W40.fix-reader-viewer-switch: the lookups are dictionaries, so they must give exactly what a scan of
+    /// every candidate gives — the mirrored path, the leaf stem in table order, and an exact path.
+    @Test("the dictionary lookups agree with a scan of every candidate, and stay cheap at size")
+    func lookupsAgreeWithAScan() throws {
+        let tree = try makeTree()
+        defer { try? FileManager.default.removeItem(at: tree.root) }
+        var pdfs: [URL] = []
+        for c in 0..<20 {
+            for k in 0..<100 {
+                let name = "c\(c)/scan-\(k % 60)"   // stems repeat across collections and within names
+                try makeFile(tree.jpegs.appendingPathComponent(name + (k % 3 == 0 ? ".JPG" : ".jpeg")))
+                if k < 3 { pdfs.append(tree.main.appendingPathComponent(name + ".pdf")) }
+            }
+        }
+        pdfs.append(tree.main.appendingPathComponent("elsewhere/scan-7.pdf"))
+        pdfs.append(tree.main.appendingPathComponent("elsewhere/missing.pdf"))
+        for pdf in pdfs { try makeFile(pdf) }
+        let partnerIndex = index(tree.jpegs)
+        #expect(partnerIndex.candidates.count == 1_200)   // 20 folders × 60 names (k and k + 60 write one file)
+
+        let jpegRoot = try #require(CorpusWalker.discoveredPathPrefix(for: tree.jpegs))
+        let mainRoot = try #require(CorpusWalker.discoveredPathPrefix(for: tree.main))
+        for pdf in pdfs {
+            let canonical = mainRoot + "/" + pdf.path.dropFirst(tree.main.path.count + 1)
+            let pdfStem = ((String(canonical.dropFirst(mainRoot.count + 1))) as NSString).deletingPathExtension
+            let exact = partnerIndex.candidates.filter {
+                ($0.path.dropFirst(jpegRoot.count + 1) as NSString).deletingPathExtension == pdfStem
+            }
+            let byStem = partnerIndex.candidates.filter { $0.stem == (pdfStem as NSString).lastPathComponent }
+            let url = { (p: String) in URL(fileURLWithPath: p) }
+            let expected: JPEGPartnerResolution = exact.count == 1 ? .match(url(exact[0].path))
+                : exact.count > 1 ? .ambiguous(exact.map { url($0.path) })
+                : byStem.isEmpty ? .none : byStem.count == 1 ? .match(url(byStem[0].path))
+                : .ambiguous(byStem.map { url($0.path) })
+            #expect(partnerIndex.resolve(pdfURL: pdf, mainRoot: tree.main) == expected, "\(pdf.lastPathComponent)")
+        }
+        for candidate in partnerIndex.candidates.prefix(50) {
+            #expect(partnerIndex.candidate(atPath: candidate.path) == candidate)
+        }
+        #expect(partnerIndex.candidate(atPath: jpegRoot + "/nowhere.jpg") == nil)
+
+        // A persisted table rebuilt from its rows answers the same, and equals the scanned one.
+        let reloaded = JPEGPartnerIndex(jpegRootPath: partnerIndex.jpegRootPath, candidates: partnerIndex.candidates,
+                                        isClean: true, filesSeen: partnerIndex.filesSeen)
+        #expect(reloaded == partnerIndex)
+        let start = Date()
+        for pdf in pdfs { _ = reloaded.resolve(pdfURL: pdf, mainRoot: tree.main) }
+        // Loose on purpose (a guard against a return to per-candidate filesystem work, not a benchmark).
+        #expect(Date().timeIntervalSince(start) < 1.0)
+    }
 }

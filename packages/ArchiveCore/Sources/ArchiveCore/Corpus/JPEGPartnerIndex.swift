@@ -32,6 +32,10 @@ public enum JPEGPartnerResolution: Sendable, Equatable {
 /// The index only reads names and syscall fingerprints. It never opens image bytes, reads tags, or guesses
 /// between duplicate stems. An incomplete walk remains `unknown`; its partial rows cannot establish that a
 /// partner is absent.
+///
+/// Lookups go through dictionaries built once with the table (W40.fix-reader-viewer-switch): the document
+/// window resolves a partner on every file switch, and a scan of every candidate per switch grew with the
+/// JPEG folder. Equality compares the table itself, never the derived lookups.
 public struct JPEGPartnerIndex: Sendable, Equatable {
     private struct FileSystemKey: Hashable, Sendable {
         let bytes: [UInt8]
@@ -42,6 +46,32 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
     public let isClean: Bool
     public let filesSeen: Int
     public let candidates: [JPEGPartnerCandidate]
+    private let lookup: Lookup
+
+    /// Positions in `candidates`, in its order, by exact path, by leaf stem, and by the relative path less
+    /// its extension under `root` (the JPEG root's comparison spelling when the table was built).
+    private struct Lookup: Sendable {
+        var root: String
+        var byPath: [FileSystemKey: Int] = [:]
+        var byStem: [FileSystemKey: [Int]] = [:]
+        var byRelativeStem: [FileSystemKey: [Int]] = [:]
+
+        init(candidates: [JPEGPartnerCandidate], jpegRootPath: String) {
+            root = JPEGPartnerIndex.comparisonRootPath(URL(fileURLWithPath: jpegRootPath, isDirectory: true))
+            for (i, candidate) in candidates.enumerated() {
+                if byPath[FileSystemKey(candidate.path)] == nil { byPath[FileSystemKey(candidate.path)] = i }
+                byStem[FileSystemKey(candidate.stem), default: []].append(i)
+                if let relative = JPEGPartnerIndex.relativePath(candidate.path, under: root) {
+                    byRelativeStem[FileSystemKey((relative as NSString).deletingPathExtension), default: []].append(i)
+                }
+            }
+        }
+    }
+
+    public static func == (a: JPEGPartnerIndex, b: JPEGPartnerIndex) -> Bool {
+        a.jpegRootPath == b.jpegRootPath && a.isClean == b.isClean && a.filesSeen == b.filesSeen
+            && a.candidates == b.candidates
+    }
 
     public init(jpegRoot: URL, scan: CorpusFingerprintScanResult) {
         // Keep the caller's spelling for storage/security-scope identity. The discovered prefix is only
@@ -67,6 +97,7 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
                                         collectionContext: parent == "." ? "" : parent,
                                         fingerprint: entry.fingerprint)
         }.sorted { Array($0.path.utf8).lexicographicallyPrecedes(Array($1.path.utf8)) }
+        lookup = Lookup(candidates: candidates, jpegRootPath: jpegRootPath)
     }
 
     /// Reconstruct a persisted table. Only `LibraryIndex` should call this after reading its clean marker.
@@ -76,6 +107,12 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
         self.candidates = candidates
         self.isClean = isClean
         self.filesSeen = filesSeen
+        lookup = Lookup(candidates: candidates, jpegRootPath: jpegRootPath)
+    }
+
+    /// The candidate at exactly this path (byte for byte), if the table has one.
+    public func candidate(atPath path: String) -> JPEGPartnerCandidate? {
+        lookup.byPath[FileSystemKey(path)].map { candidates[$0] }
     }
 
     /// Resolve a PDF by an exact mirrored relative path first, then by a unique stem. A supplied context
@@ -89,12 +126,16 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
             return .unknown
         }
         let pdfStem = (relative as NSString).deletingPathExtension
-        let exactMatches = candidates.filter {
-            let candidateRelative = Self.relativePath($0.path, under: Self.comparisonRootPath(
-                URL(fileURLWithPath: jpegRootPath, isDirectory: true)))
-            return candidateRelative.map {
-                FileSystemKey(($0 as NSString).deletingPathExtension) == FileSystemKey(pdfStem)
-            } ?? false
+        let jpegRoot = Self.comparisonRootPath(URL(fileURLWithPath: jpegRootPath, isDirectory: true))
+        let exactMatches: [JPEGPartnerCandidate]
+        if jpegRoot == lookup.root {
+            exactMatches = (lookup.byRelativeStem[FileSystemKey(pdfStem)] ?? []).map { candidates[$0] }
+        } else {   // the root now resolves elsewhere than when the table was built: compare afresh
+            exactMatches = candidates.filter {
+                Self.relativePath($0.path, under: jpegRoot).map {
+                    FileSystemKey(($0 as NSString).deletingPathExtension) == FileSystemKey(pdfStem)
+                } ?? false
+            }
         }
         if exactMatches.count == 1, let exact = exactMatches.first {
             return .match(Self.exactFileURL(exact.path))
@@ -104,7 +145,7 @@ public struct JPEGPartnerIndex: Sendable, Equatable {
         }
 
         let stem = (pdfStem as NSString).lastPathComponent
-        let matches = candidates.filter { FileSystemKey($0.stem) == FileSystemKey(stem) }
+        let matches = (lookup.byStem[FileSystemKey(stem)] ?? []).map { candidates[$0] }
         guard !matches.isEmpty else { return .none }
 
         if let collectionContext {

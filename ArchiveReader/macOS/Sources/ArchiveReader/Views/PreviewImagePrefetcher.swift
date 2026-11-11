@@ -19,6 +19,9 @@ import SwiftUI
 @MainActor
 final class PreviewImagePrefetcher: ObservableObject {
     static let shared = PreviewImagePrefetcher()
+    /// The document window's: its image pane is window-sized, so its box follows the pane
+    /// (`setPixelBox`), and it keeps the open file and the files either side (W40.fix-reader-viewer-switch).
+    static let documentWindow = PreviewImagePrefetcher(pixelBox: CGSize(width: 1536, height: 1536), cacheLimit: 4)
 
     /// A finished bitmap of one page's crop box, unrotated: PDFKit lays a page overlay out in page space and
     /// turns it with the page, so the overlay draws it as it is.
@@ -59,8 +62,11 @@ final class PreviewImagePrefetcher: ObservableObject {
     static let defaultPixelBox = CGSize(width: 940, height: 1300)
     /// Bitmaps kept: the selection, the rows either side and a few just left. About 4 MB each.
     static let cacheLimit = 8
+    /// The largest box `setPixelBox` takes: a full-screen pane on a 5K display, about 23 MB a bitmap.
+    static let maxPixelSide: CGFloat = 3072
 
-    private let pixelBox: CGSize
+    private(set) var pixelBox: CGSize
+    private let cacheLimit: Int
     private let queue: DispatchQueue
     private var cache: [Key: Rendered] = [:]
     private var order: [Key] = []          // least recently used first
@@ -69,10 +75,22 @@ final class PreviewImagePrefetcher: ObservableObject {
     /// Bumped when a bitmap lands, so a view showing `image(path:pageIndex:)` asks again.
     @Published private(set) var generation = 0
 
-    init(pixelBox: CGSize = PreviewImagePrefetcher.defaultPixelBox,
+    init(pixelBox: CGSize = PreviewImagePrefetcher.defaultPixelBox, cacheLimit: Int = PreviewImagePrefetcher.cacheLimit,
          queue: DispatchQueue = DispatchQueue(label: "ArchiveReader.previewPrefetch", qos: .userInitiated)) {
         self.pixelBox = pixelBox
+        self.cacheLimit = max(1, cacheLimit)
         self.queue = queue
+    }
+
+    /// Draw at a new size: a square of the longer side, rounded up to 256 px so a window resize does not
+    /// redraw on every point, and at most `maxPixelSide`. A changed size drops the bitmaps drawn at the old
+    /// one (a render already running lands at its own size, which the overlay's resolution check covers).
+    func setPixelBox(longSide: CGFloat) {
+        let side = min(Self.maxPixelSide, max(256, (longSide / 256).rounded(.up) * 256))
+        guard side != pixelBox.width || side != pixelBox.height else { return }
+        pixelBox = CGSize(width: side, height: side)
+        cache = [:]
+        order = []
     }
 
     /// Draw these files' first image pages, in order, dropping whatever an earlier call asked for and has
@@ -116,7 +134,7 @@ final class PreviewImagePrefetcher: ObservableObject {
         if let rendered {
             cache[key] = rendered
             touch(key)
-            while order.count > Self.cacheLimit { cache[order.removeFirst()] = nil }
+            while order.count > cacheLimit { cache[order.removeFirst()] = nil }
             generation &+= 1
         }
         startNext()

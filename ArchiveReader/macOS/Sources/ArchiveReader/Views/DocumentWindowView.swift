@@ -11,6 +11,9 @@ struct DocumentWindowView: View {
     @StateObject private var model = DocumentViewerModel()
     @EnvironmentObject private var linkContext: ArchiveLinkContext
     @EnvironmentObject private var router: DeepLinkRouter
+    /// The image pages of the open file and its neighbours, drawn ahead at pane size and shown until
+    /// PDFKit's own render lands (W40.fix-reader-viewer-switch, the preview's W40.fix-reader-preview-image-speed).
+    @ObservedObject private var imagePrefetcher = PreviewImagePrefetcher.documentWindow
 
     @AppStorage("ar.doc.infoWidth") private var infoWidth = 380.0
     @AppStorage("ar.doc.infoVisible") private var infoVisible = false
@@ -60,6 +63,7 @@ struct DocumentWindowView: View {
             model.showingTagEditor = infoVisible
             fraction = defaultFraction
             if let selection { model.load(selection) }
+            imagePrefetcher.prefetch(paths: model.neighbourhoodPaths)
             // A deep link that cited a page opens straight on it (W23.m4 defect 3). Deferred first
             // responder: the pane's PDFView isn't in a window yet on the first `onAppear`.
             if let page = selection?.initialPage {
@@ -73,6 +77,7 @@ struct DocumentWindowView: View {
         // and a pane's PDFView is an AppKit first responder SwiftUI's focus doesn't always take from, so it
         // is resigned first. The counter makes ⌘F refocus a bar that is already open; `showingFind` still
         // covers ⌘G / ⇧⌘G opening the bar.
+        .onChange(of: model.index) { imagePrefetcher.prefetch(paths: model.neighbourhoodPaths) }
         .onChange(of: model.findFocusRequest) { focusFindField() }
         .onChange(of: model.showingFind) { if model.showingFind { focusFindField() } }
         // DV-1: on close, the current window size becomes the default for the next viewer.
@@ -101,10 +106,13 @@ struct DocumentWindowView: View {
                     // identity covers the page PAIR, not just the file, so stepping within an interleaved
                     // multi-page document rebuilds the panes too.
                     PDFPaneView(page: model.displayedImagePage, controller: model.leftController,
-                                id: "ar.doc.imagePane", reference: model.imagePage)
+                                id: "ar.doc.imagePane", reference: model.imagePage,
+                                placeholder: model.isShowingJPEG ? nil : imagePlaceholder)
                         .id(model.imagePaneIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
+                        .onAppear { sizeImageBitmaps(width: leftW, height: geo.size.height) }
+                        .onChange(of: geo.size) { sizeImageBitmaps(width: leftW, height: geo.size.height) }
                     splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
                         PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.doc.textPane")
@@ -127,6 +135,23 @@ struct DocumentWindowView: View {
                 .coordinateSpace(name: "split")
             }
         }
+    }
+
+    /// The prerendered bitmap of the image page shown, or a request still waiting for one.
+    private var imagePlaceholder: PlaceholderRequest? {
+        guard let path = model.currentFilePath else { return nil }
+        let pageIndex = DocumentPagePairs.imagePageIndex(pair: model.pair)
+        _ = imagePrefetcher.generation   // re-read when a bitmap lands
+        return PlaceholderRequest(key: PlaceholderRequest.key(path: path, pageIndex: pageIndex),
+                                  image: imagePrefetcher.image(path: path, pageIndex: pageIndex)?.image)
+    }
+
+    /// Draw ahead at the image pane's size in pixels: the fitted page's longer side is at most the pane's.
+    private func sizeImageBitmaps(width: CGFloat, height: CGFloat) {
+        let backing = docWindow?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        let before = imagePrefetcher.pixelBox
+        imagePrefetcher.setPixelBox(longSide: max(width, height) * backing)
+        if imagePrefetcher.pixelBox != before { imagePrefetcher.prefetch(paths: model.neighbourhoodPaths) }
     }
 
     /// A thin accent outline on the pane that has keyboard focus, so it's clear which page ⌘+/⌘−
