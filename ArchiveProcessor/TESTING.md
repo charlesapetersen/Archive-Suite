@@ -470,6 +470,9 @@ existing scratch, key-free, no-network execution remains unchanged.
   the bench's layout and prompts byte for byte, both combining rules, failure and usage-limit handling, the
   transports' request/response shapes (HTTP seam, fake `claude`), and the bench's verdict reproduced on every gap
   of one recorded development box. No model call.
+- **`test-settings-solver.sh`** — the W46 settings solver on every case of `13-stage-rules/13-profile-tests.md` (a
+  pending case SKIPs by name), the router cases, and that every pick names its evidence row. No Keychain read, no
+  window; the table's figures are checked against their sources by `scripts/segbench/settings_routes.py --check`.
 - **`test-segmentation-chooser.sh`** — the W36 approach chooser: each approach's figures and cost as the user reads
   them at several page counts and routes (key, `claude` plan, mix), price-change and stale-price notes, unavailable
   rows and the keys they offer, and a render guard that each row card draws non-blank pixels offscreen. No Keychain

@@ -58,8 +58,9 @@ struct SettingsAnswers: Sendable {
     /// The document mix as shares by kind (`typewritten`, `printed`, `handwritten`, `forms`, `newspapers`, …),
     /// the owner's 96 unless measured.
     var mix: [String: Double] = ["typewritten": 50, "printed": 28, "handwritten": 16]
-    /// Public strata the period, languages and scripts select (`L5` … `N6`), each read by its own leader.
-    var strata: [String] = []
+    /// Public strata the period, languages and scripts select (`L5` … `N6`), each read by its own leader, with its
+    /// share of the pages on the mix's scale.
+    var strata: [String: Double] = [:]
     /// The batch's money ceiling in dollars; nil is no ceiling.
     var ceilingUSD: Double?
     var hours: Double = 8
@@ -257,9 +258,16 @@ struct SettingsSolver {
         if !r.offered, let c = r.conditions.first(where: { $0.hasPrefix("not offered") || $0.hasPrefix("never offered") }) {
             out.append(c)
         }
-        let ids = [r.id] + (r.stages ?? [])
-        if let fam = resources.excludedModelFamilies.sorted().first(where: { f in ids.contains { $0.hasPrefix(f) } }) {
-            out.append("you chose not to send pages to \(fam.capitalized) models")
+        // A cascade's condition is what it waits for in the app ("not built: …", "a Mac escalation stage in
+        // OCRCascade"); a disagreement partner is not a voter alone (note 07).
+        if r.stages != nil, let c = r.conditions.first { out.append("waits for: \(c)") }
+        if let c = r.conditions.first(where: { $0.contains("not as a voter alone") }) { out.append(c) }
+        // A family the user will not send pages to: only routes whose pages leave this Mac.
+        if r.family != .mac && r.family != .manual {
+            let text = ([r.id, r.name] + (r.stages ?? [])).joined(separator: " ").lowercased()
+            if let fam = resources.excludedModelFamilies.sorted().first(where: { text.contains($0.lowercased()) }) {
+                out.append("you chose not to send pages to \(fam.capitalized) models")
+            }
         }
         if answers.appRoutesOnly && r.appRoute == nil { out.append("not in the app yet") }
         let n = r.needs
@@ -346,14 +354,16 @@ struct SettingsSolver {
         var id: String { route.id }
     }
 
-    func usdPer1000(_ r: SettingsRouteTable.Route) -> Double {
+    func usdPer1000(_ r: SettingsRouteTable.Route, stage: String) -> Double {
         switch r.family {
         case .mac, .manual, .kit: return 0
         default: break
         }
         let a = access(r)
-        if a.viaPlan || (a.viaCluster && !a.viaKey) { return 0 }   // a plan's usage and a cluster are not money
-        if answers.hours >= 24, let batch = r.batchUSDPer1000 { return batch }   // overnight unlocks batch prices
+        if a.viaPlan || a.viaCluster { return 0 }   // a plan's usage and the user's cluster are not money
+        // Overnight unlocks batch prices for reading; the segmentation engine sends every window interactively
+        // (`SegmentationRow.make`), so its batch figure is not a price the app pays.
+        if stage == "reading", answers.hours >= 24, let batch = r.batchUSDPer1000 { return batch }
         return r.listUSDPer1000 ?? 0
     }
 
@@ -368,6 +378,11 @@ struct SettingsSolver {
     }
 
     func hours(_ r: SettingsRouteTable.Route, units: Double) -> Double {
+        // A cascade reads every page with its first reader at least; its own time is not tabulated.
+        if r.secondsPerUnit == nil, r.pagesPerHourPerGPUSet == nil, let first = r.stages?.first,
+           let row = table.stage("reading")?.route(first), row.stages == nil {
+            return hours(row, units: units)
+        }
         switch bucket(r) {
         case .none: return 0
         case .mac: return (r.secondsPerUnit ?? 0) * units / 3600
@@ -380,7 +395,7 @@ struct SettingsSolver {
 
     func cand(_ r: SettingsRouteTable.Route, stage: String, value: Double, units: Double,
               minus base: Cand? = nil, baseUnits: Double = 0) -> Cand {
-        let per = usdPer1000(r)
+        let per = usdPer1000(r, stage: stage)
         var usd = per * units / 1000
         var h = hours(r, units: units)
         var bucket = bucket(r)
@@ -512,7 +527,11 @@ struct SettingsSolver {
         }
         // The free default (owner call 4): when nothing but this Mac can read, typed and printed pages go to Apple
         // Vision and handwriting to a downloaded hand reader, else it is flagged.
-        let free = !singles.contains { $0.family != .mac && blockers($0, stage: "reading").isEmpty }
+        let free = !singles.contains { r in
+            guard r.family != .mac, let v = overall(r) else { return false }
+            let c = cand(r, stage: "reading", value: v, units: pages)
+            return c.blockers.isEmpty && state.fits(c)
+        }
 
         func readingTie(_ x: Cand, _ best: Cand, group: String, score: String, hands: Bool) -> (Bool, OCRPairMatrix.Gap?) {
             if let g = pairs?.gap("owner96", group, x.id, best.id, score: score) {
@@ -525,7 +544,7 @@ struct SettingsSolver {
         }
 
         var out: [SettingsPick] = []
-        let share = answers.mix.values.reduce(0, +)
+        let share = answers.mix.values.reduce(0, +) + answers.strata.values.reduce(0, +)
         func pagesOf(_ kind: String) -> Double { share > 0 ? pages * (answers.mix[kind] ?? 0) / share : 0 }
 
         // The batch's reader, for every page no kind rule sends elsewhere.
@@ -553,13 +572,13 @@ struct SettingsSolver {
             // A measured cascade is a route, picked when it beats the single pick by more than the floor (no per-page
             // scores, so the floor alone).
             let cc = cascades.compactMap { r in r.figure("overall").map { cand(r, stage: "reading", value: $0, units: pages) } }
-                .filter { $0.blockers.isEmpty && state.fits($0) && $0.value > ch.pick.value + Self.readingHostedFloor }
+                .filter { $0.blockers.isEmpty && state.fits($0) && $0.value > ch.best.value + Self.readingHostedFloor }
             if let top = cc.max(by: { $0.value < $1.value }) {
                 chosen = Choice(pick: top, best: top, pool: [top], overLimits: false)
                 mainGap = nil
                 mainReason = "\(top.route.name) (\(top.id)), a measured cascade, beats the best single route "
-                    + "\(ch.pick.id) by more than the \(Self.num(Self.readingHostedFloor)) floor: "
-                    + "\(Self.num(top.value)) against \(Self.num(ch.pick.value))."
+                    + "\(ch.best.id) by more than the \(Self.num(Self.readingHostedFloor)) floor: "
+                    + "\(Self.num(top.value)) against \(Self.num(ch.best.value))."
             }
             main = chosen.pick
             mainBetter = betterRoutes(mainCands, than: chosen, pickValue: chosen.pick.value, state: state)
@@ -581,7 +600,7 @@ struct SettingsSolver {
                                 reason: mainReason, gap: mainGap, better: mainBetter, fallbackRouteID: fallbackID,
                                 shown: true, usd: main.usd, hours: main.hours))
         for kind in ["typewritten", "printed"] where (answers.mix[kind] ?? 0) > 0 {
-            out.append(SettingsPick(stage: "reading", part: kind, route: main.route, figure: main.route.figure(kind),
+            out.append(SettingsPick(stage: "reading", part: kind, route: main.route, figure: main.route.figure(kind) ?? main.value,
                                     flag: nil, reason: mainReason, gap: mainGap, better: mainBetter,
                                     fallbackRouteID: fallbackID, shown: true, usd: 0, hours: 0))
         }
@@ -590,10 +609,10 @@ struct SettingsSolver {
         // truth, decides where they read it (rule hands-ranked-on-hands16, OCR-1).
         if (answers.mix["handwritten"] ?? 0) > 0 {
             let hp = pagesOf("handwritten")
-            let hc = singles.filter { !(free && $0.id == "apple-vision") }   // never read at 60 (owner call 4)
+            let hc = singles.filter { $0.id != "apple-vision" }   // handwriting is flagged, never read at 60 (owner call 4)
                 .compactMap { r in r.figure("hands16").map { cand(r, stage: "reading", value: $0, units: hp, minus: main, baseUnits: hp) } }
             if let ch = choose(hc, state, tie: { readingTie($0, $1, group: "hands16", score: "strict", hands: true).0 },
-                               prefer: defaultPrefer), !(free && ch.overLimits) {
+                               prefer: defaultPrefer), !ch.overLimits {
                 var pick = ch.pick
                 var reason: String
                 var gap = pick.id == ch.best.id ? nil : readingTie(pick, ch.best, group: "hands16", score: "strict", hands: true).1
@@ -608,10 +627,11 @@ struct SettingsSolver {
                 } else {
                     reason = explain(ch, metric: "owner96 hands16 strict", unit: "pages", gap: gap)
                 }
+                let before = state
                 state.add(pick)
                 out.append(SettingsPick(stage: "reading", part: "handwritten", route: pick.route, figure: pick.value,
                                         flag: nil, reason: reason, gap: gap,
-                                        better: betterRoutes(hc, than: ch, pickValue: pick.value, state: state),
+                                        better: betterRoutes(hc, than: ch, pickValue: pick.value, state: before),
                                         fallbackRouteID: nil, shown: true, usd: pick.usd, hours: pick.hours))
             } else {
                 out.append(SettingsPick(stage: "reading", part: "handwritten", route: nil, figure: nil,
@@ -631,7 +651,9 @@ struct SettingsSolver {
         where list.count == 1 && (answers.mix[kind] ?? 0) > 0 && kind != "handwritten" {
             strata.append((list[0], pagesOf(kind)))
         }
-        for s in answers.strata where !strata.contains(where: { $0.0 == s }) { strata.append((s, 0)) }
+        for (s, x) in answers.strata.sorted(by: { $0.key < $1.key }) where !strata.contains(where: { $0.0 == s }) {
+            strata.append((s, share > 0 ? pages * x / share : 0))
+        }
         for (s, sp) in strata {
             let sc = singles
                 .filter { !(s.hasPrefix("N") && $0.id == "apple-vision") }   // rule nonlatin-not-vision
@@ -642,11 +664,12 @@ struct SettingsSolver {
                 let gap = runner.flatMap { pairs?.gap("public895", s, lead.id, $0.id, score: "strict") }
                 let reason = "\(lead.route.name) (\(lead.id)) leads public895 \(s) strict among the routes this batch "
                     + "can use, \(Self.num(lead.value))" + (gap.map { " (\($0.citation) against \(runner!.id))" } ?? "") + "."
+                let before = state
                 state.add(lead)
                 out.append(SettingsPick(stage: "reading", part: s, route: lead.route, figure: lead.value, flag: nil,
                                         reason: reason, gap: gap,
                                         better: betterRoutes(sc, than: Choice(pick: lead, best: lead, pool: [lead], overLimits: false),
-                                                             pickValue: lead.value, state: state),
+                                                             pickValue: lead.value, state: before),
                                         fallbackRouteID: nil, shown: true, usd: lead.usd, hours: lead.hours))
             } else {
                 out.append(SettingsPick(stage: "reading", part: s, route: main.route, figure: nil, flag: "no figure",
@@ -688,13 +711,14 @@ struct SettingsSolver {
             // Equal cost, time and figure: the fewer checks a user is asked for.
             return (a.route.figure("test-boxes.checks_per_100") ?? 100) < (b.route.figure("test-boxes.checks_per_100") ?? 100)
         }) else { return [] }
+        let before = state
         state.add(ch.pick)
         return [SettingsPick(stage: "segmentation", part: "all", route: ch.pick.route,
                              figure: segmentationShown(ch.pick.route), flag: nil,
                              reason: explain(ch, metric: "test-boxes pages exact", unit: "pages", gap: nil,
                                              tieText: "test-boxes \(Self.num(ch.pick.value)) against "
                                                 + "\(Self.num(ch.best.value)), under the \(Self.num(tie))-point floor"),
-                             gap: nil, better: betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: state),
+                             gap: nil, better: betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: before),
                              fallbackRouteID: nil, shown: true, usd: ch.pick.usd, hours: ch.pick.hours)]
     }
 
@@ -738,6 +762,7 @@ struct SettingsSolver {
                                         fallbackRouteID: nil, shown: true, usd: 0, hours: 0))
                 continue
             }
+            let before = state
             state.add(ch.pick)
             used[ch.pick.id] = ch.pick
             let reason = explain(ch, metric: key.replacingOccurrences(of: "_", with: " "), unit: "documents", gap: nil,
@@ -751,7 +776,7 @@ struct SettingsSolver {
             }
             out.append(SettingsPick(stage: "dating", part: part, route: ch.pick.route, figure: ch.pick.value, flag: nil,
                                     reason: reason, gap: nil,
-                                    better: betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: state),
+                                    better: betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: before),
                                     fallbackRouteID: nil, shown: true, usd: ch.pick.usd, hours: ch.pick.hours))
         }
         return out
@@ -787,11 +812,11 @@ struct SettingsSolver {
                              fallbackRouteID: nil, shown: ranked, usd: 0, hours: 0)
             }
         }
+        let better = betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: state)
         state.add(ch.pick)
         let reason = explain(ch, metric: "sender ed2 F1", unit: "documents", gap: nil,
                              tieText: "sender \(Self.num(ch.pick.value)) against \(Self.num(ch.best.value)), "
                                 + "inside the few points ENT-1 rules a tie")
-        let better = betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: state)
         let mac = ch.pick.route.family == .mac
         return [
             SettingsPick(stage: "entities", part: "correspondence-typed", route: ch.pick.route, figure: ch.pick.value,

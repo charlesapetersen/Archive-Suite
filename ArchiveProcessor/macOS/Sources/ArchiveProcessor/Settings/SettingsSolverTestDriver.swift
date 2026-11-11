@@ -86,7 +86,8 @@ enum SettingsSolverTestDriver {
            "lightonocr-3-4b-mlx8")
         eq("B1 downloads declined: handwriting flagged, never read at 60",
            pick(solve("B1-nodl", mac(16, downloads: false)), "reading", "handwritten"), "flag: needs a download or a key")
-        check("B1 no cascade picked", !pick(b1, "reading").hasPrefix("casc-"), pick(b1, "reading"))
+        check("B1 the free cascade waits for a Mac escalation stage",
+              b1.blockers("reading", "casc-free-fail").contains { $0.hasPrefix("waits for:") })
         skip("B1 cascade casc-free-fail", "pending the cascade rows' Mac memory per tier (note 10 §8)")
         skip("B1 layout regions on newspapers only", "a rule, not a pick: the sheet's rules tab (W46.settings-sheet)")
         eq("B1 segmentation: the 2B", pick(b1, "segmentation"), "seg-qwen3.5-2b-8bit")
@@ -137,8 +138,8 @@ enum SettingsSolverTestDriver {
         eq("A segmentation as B1", pick(a, "segmentation"), pick(b1, "segmentation"))
         eq("A dating as B1", pick(a, "dating", "step 1"), pick(b1, "dating", "step 1"))
         eq("A no names on the Mac until ranked", pick(a, "entities", "correspondence-typed"), "none")
-        check("A detected key listed, nothing spent", a.usd == 0
-              && b4.blockers("reading", "gemini3.8-flash") == a.blockers("reading", "gemini3.8-flash"))
+        check("A detected key listed hollow, nothing spent", a.usd == 0
+              && a.blockers("reading", "gemini3.8-flash").contains("this batch stays on the Mac"))
 
         // C. An OpenRouter key, Gemini models not used.
         var orKey = mac(16)
@@ -166,6 +167,25 @@ enum SettingsSolverTestDriver {
         eq("C names, the Mac's 8B out: Qwen3.6 27B", pick(c8, "entities", "correspondence-typed"), "qwen3.6-27b")
         eq("C names on handwriting: Qwen3.6 27B", pick(c8, "entities", "correspondence-handwritten"), "qwen3.6-27b")
         skip("C dating", "pending W46.date-route-pipeline (no trace row an OpenRouter-only key reaches)")
+        // A key whose routes cost more than the ceiling: Vision for typed and printed, and handwriting flagged, never
+        // read by Vision (owner call 4).
+        var zero = SettingsAnswers()
+        zero.ceilingUSD = 0
+        var gemNoDL = mac(16, downloads: false)
+        gemNoDL.keys = ["gemini"]
+        let z = solve("key-zero-ceiling", gemNoDL, zero)
+        eq("A key at a $0 ceiling: typed pages Vision", pick(z, "reading", "typewritten"), "apple-vision")
+        eq("A key at a $0 ceiling: handwriting flagged, not Vision", pick(z, "reading", "handwritten"),
+           "flag: needs a download or a key")
+        // Cascades the shipped cascade cannot run (a kind or disagreement trigger) are never picked.
+        var orAll = mac(16)
+        orAll.keys = ["openrouter"]
+        let cn = solve("C-strict-gemini", orAll, strict)
+        check("An unbuilt cascade is not picked", !["casc-2-vision-hands", "casc-disagree-0.5"].contains(pick(cn, "reading")),
+              pick(cn, "reading"))
+        check("An unbuilt cascade says what it waits for",
+              cn.blockers("reading", "casc-2-vision-hands").contains { $0.hasPrefix("waits for: not built") })
+
         // G6. A kind with no figure for the chosen route: forms on an OpenRouter-only key.
         var forms = SettingsAnswers()
         forms.mix["forms"] = 10
@@ -200,6 +220,9 @@ enum SettingsSolverTestDriver {
         check("D2 segmentation spends nothing", ["seg-qwen3.5-2b-8bit", "manual"].contains(pick(d2, "segmentation")),
               pick(d2, "segmentation"))
         check("G3 within the ceiling", d2.usd <= 1 + 1e-9, "\(d2.usd)")
+        let segShort = d2.pick("segmentation", "all")?.better.first { $0.id == "gemini3.8-flash" }
+        check("G3 segmentation at its list price: Gemini 3.8 Flash $3.61 against what is left",
+              segShort.map { $0.reason.hasPrefix("raise the ceiling by $") } == true, segShort?.reason ?? "not listed")
 
         // D3. The Claude plan only.
         var claude = mac(16)
@@ -235,7 +258,7 @@ enum SettingsSolverTestDriver {
         cl.gpusPerJob = 2
         var ea = SettingsAnswers()
         ea.mix = ["typewritten": 50, "printed": 28, "handwritten": 16, "forms": 5, "newspapers": 5]
-        ea.strata = ["N6", "L5", "L6", "L7", "L8", "N1", "N3", "N4"]
+        ea.strata = Dictionary(uniqueKeysWithValues: ["N6", "L5", "L6", "L7", "L8", "N1", "N3", "N4"].map { ($0, 1.0) })
         let e = solve("E", cl, ea)
         eq("E reading: Qwen3.6 27B ties Qwen3.5 27B and is faster", pick(e, "reading"), "qwen3.6-27b-farmshare")
         check("E reading cites its pair", e.pick("reading", "all")?.gap?.citation == "−0.07 [−0.71, +0.47], n 95, owner96/all/answered",
@@ -253,6 +276,18 @@ enum SettingsSolverTestDriver {
         eq("E dating step 4: the 27B trace", pick(e, "dating", "step 4"), "qwen3.6-27b-trace-neigh-vision")
         eq("E dating step 2: the 27B image pass", pick(e, "dating", "step 2"), "qwen3.6-27b-image")
         eq("E names: Qwen3.6 27B", pick(e, "entities", "correspondence-typed"), "qwen3.6-27b")
+        check("E the teacher is a partner, not a voter alone",
+              e.blockers("segmentation", "qwen3.5-27b-teacher").contains { $0.contains("not as a voter alone") })
+        var clKey = cl
+        clKey.keys = ["openrouter"]
+        eq("E with a key as well: names from Gemini tagging (note 09 §9 profile 4)",
+           pick(solve("E-key", clKey, ea), "entities", "correspondence-typed"), "gemini-tagging-place")
+        clKey.excludedModelFamilies = ["gemini"]
+        let ek = solve("E-key-nogemini", clKey, ea)
+        eq("E with an OpenRouter key, no Gemini: names on the cluster", pick(ek, "entities", "correspondence-typed"),
+           "qwen3.6-27b")
+        check("E with an OpenRouter key: the cluster costs no money", ek.pick("entities", "correspondence-typed")?.usd == 0,
+              "\(ek.pick("entities", "correspondence-typed")?.usd ?? -1)")
         skip("E placement's hand line detector setting", "a rule stage: the sheet's rules tab (W46.settings-sheet)")
         var cl1 = cl
         cl1.gpusPerJob = 1

@@ -65,7 +65,9 @@ hollow with the reason "stays on the Mac"; picks as B1.
   GLM when it does not.
 - Dating: steps 1 and 4 `gemini3.7-flash-trace-neigh` only if the key reaches Gemini, else the Mac route of B1 (no
   trace row for an OpenRouter-only model; pending `W46.date-route-pipeline`).
-- Entities: `qwen3.6-27b` (sender 0.62) on correspondence, extracted always on a cloud route, shown when names rank.
+- Entities: `qwen3.6-27b` (sender 0.62) on correspondence, extracted always on a cloud route, shown when names rank;
+  where the Mac's 8B fits (16 GB, downloads allowed) it ties the 27B (0.58, ENT-1) and is free, so the 8B
+  (W46.settings-solver).
 
 ## D. Premium API or plans
 

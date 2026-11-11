@@ -451,7 +451,9 @@ routes has the floor 0.00, so any paired gap separates two of them; on the 895 a
   owner96/hands16/strict), over the 0.60 floor; labelled conditional (OCR-1).
 - Without Gemini (open weights only): `qwen3.6-27b` 95.38 ($1.94) is best; `qwen3.8-flash` 95.11 ($0.60) minus it
   −0.08 [−1.62, +1.64] (n 91, owner96/all/answered), a tie, so `qwen3.8-flash`; its 3 refusals go to a fallback. With
-  no fallback (strict) it is −2.27 [−6.77, +1.90] (n 95), no tie, so `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16
+  no fallback (strict) it is −2.27 [−6.77, +1.90] (n 95), no tie; but `qwen3-vl-235b` ties the 27B on strict, −0.37
+  [−2.16, +1.92] (n 95, owner96/all/strict, under the 0.49 floor), and is cheaper ($1.22), so `qwen3-vl-235b`
+  (found by W46.settings-solver's test). Handwritten: `qwen3.6-27b` (hands16
   92.61); `mistral-large4` ties it, −0.42 [−1.45, +0.68] (n 16, owner96/hands16/strict), but costs more ($2.69), and
   every other OpenRouter route trails beyond the 0.60 floor (Qwen3-VL 235B −1.02, Qwen3.8 Flash −1.36). `qwen3.5-27b`
   (95.86 answered on 82 pages) has no row until its rerun (paid, deferred to W43.sweep); it would then be the best

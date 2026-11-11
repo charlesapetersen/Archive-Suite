@@ -34,17 +34,21 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
 
     /// The approach to start a user on who has saved no choice: the settings solver's segmentation pick
     /// (W46.settings-solver) for the keys and plans found, among the approaches the app runs, with nothing
-    /// downloaded (the 2B on this Mac waits for the user's yes). Manual when nothing else can run.
+    /// downloaded (the 2B on this Mac waits for the user's yes). Manual when nothing else can run. The Claude
+    /// plan is not counted: an installed `claude` may not be signed in, which only the first call shows, and a
+    /// saved choice is kept for good. A missing or unfit table falls back to W41.app-seg-default's rule, Gemini
+    /// 3.8 Flash whenever its key is set.
     static func preferredDefault(_ routes: SegmentationRoutes) -> SegmentationApproach {
-        guard let table = SettingsRouteTable.bundled else { return defaultApproach }
+        guard let table = SettingsRouteTable.bundled, table.problems().isEmpty else {
+            return routes.hasGeminiKey ? .gemini : defaultApproach
+        }
         var resources = SettingsResources(macMemoryGB: routes.memoryGB)
         resources.downloadsAllowed = false
         for (has, key) in [(routes.hasAnthropicKey, "anthropic"), (routes.hasGeminiKey, "gemini"),
                            (routes.hasOpenAIKey, "openai"), (routes.hasOpenRouterKey, "openrouter")] where has {
             resources.keys.insert(key)
         }
-        if routes.claudeByPlan { resources.plans.insert("claude") }
-        if routes.chatGPTByPlan { resources.plans.insert("chatgpt") }
+        if routes.chatGPTByPlan { resources.plans.insert("chatgpt") }   // a signed-in account the app has seen
         var answers = SettingsAnswers()
         answers.appRoutesOnly = true
         answers.stagesToSolve = ["segmentation"]

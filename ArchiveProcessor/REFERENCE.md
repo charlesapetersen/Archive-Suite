@@ -336,6 +336,15 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.
+Settings/                      W46.settings-solver: the settings layer's solver, no UI yet.
+  SettingsRouteTable.swift     Decodes the bundled `segbench-results/settings-routes.json` (the rule table,
+                               `scripts/segbench/settings_routes.py`) and `ocr-pair-matrix.json` (reading ties).
+  SettingsSolver.swift         `SettingsResources` + `SettingsAnswers` → one pick per stage and part (reading per kind
+                               and stratum, dating per step, names per kind), each with a one-sentence reason naming
+                               its row and pair entry, the hollow rows' reasons, up to four better routes with the one
+                               reason each is out, the limit to relax, the kit's after-training points.
+                               Self-test: `SettingsSolverTestDriver`, `scripts/test-settings-solver.sh` (the cases of
+                               `execution-plans/processing-review/13-stage-rules/13-profile-tests.md`).
 Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
                                `execution-plans/segmentation/04-options-build.md` Part 3 §2. `TaggingMode` says who
                                tags, `SegmentationApproach` who segments; `SegmentationPlan` joins them.
@@ -352,7 +361,8 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                Self-test: `SegmentationReviewTestDriver`, `scripts/test-segmentation-review.sh`;
                                VM UITest `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`.
   SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix, `DefaultsKeys.segmentationApproach`,
-                               default manual; with nothing saved, a Gemini key preselects `gemini`, W41.app-seg-default);
+                               default manual; with nothing saved, the settings solver's segmentation pick is saved,
+                               W46.settings-solver, replacing W41.app-seg-default's Gemini rule);
                                `SegmentationOptions` decodes the bundled `segbench-results/options.json`
                                (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check.
   WindowSegmenter.swift        Port of the bench: 7/3 windows, reply parser, per-voter combine, min/mean rules, the

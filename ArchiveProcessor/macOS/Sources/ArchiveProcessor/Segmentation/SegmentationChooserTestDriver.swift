@@ -303,10 +303,19 @@ enum SegmentationChooserTestDriver {
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini", SegmentationApproach.stored(d), .gemini)
         d.removeObject(forKey: key)
-        var gemPlan = gemOnly
-        gemPlan.hasClaudeCLI = true
-        SegmentationApproach.preselect(gemPlan, defaults: d)
-        eq("6 Gemini key and the Claude plan: a tie at 3.2, the plan wins on money", SegmentationApproach.stored(d), .claude)
+        var gemCLI = gemOnly
+        gemCLI.hasClaudeCLI = true
+        SegmentationApproach.preselect(gemCLI, defaults: d)
+        eq("6 Gemini key and an installed claude: Gemini (claude's sign-in is unknown)", SegmentationApproach.stored(d),
+           .gemini)
+        d.removeObject(forKey: key)
+        check("6 an installed claude alone: saves nothing",
+              !SegmentationApproach.preselect(SegmentationRoutes(hasClaudeCLI: true), defaults: d))
+        var gemChatGPT = gemOnly
+        gemChatGPT.chatGPTAccount = "user@example.com"
+        SegmentationApproach.preselect(gemChatGPT, defaults: d)
+        eq("6 Gemini key and a signed-in ChatGPT plan: ChatGPT", SegmentationApproach.stored(d), .openai)
+        d.removeObject(forKey: key)
         for a in SegmentationApproach.allCases {
             eq("6 \(a.rawValue) has a rule-table row", SettingsRouteTable.bundled?.stage("segmentation")?.routes
                 .contains { $0.appRoute.flatMap(SegmentationApproach.init(appRoute:)) == a }, true)
