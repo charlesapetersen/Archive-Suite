@@ -5,9 +5,20 @@
                                                                         # Mac or node: the training set
   train_seg.py train --data DIR --model Qwen/Qwen3.5-4B --out DIR [--epochs 1] [--max-windows N]
   train_seg.py merge --adapter DIR --out DIR                            # base + LoRA -> one model vLLM can serve
+  train_seg.py mac   --merged DIR --out DIR --pack DIR [--bits 8] [--windows 8]
+                                                                        # on the Mac: the MLX build + its figures
   train_seg.py check --run shipped=DIR --run NAME=DIR[,DIR] --run NAME=DIR[,DIR] --candidate NAME --anchor-truth BOX.json
-                     [--labels labels.jsonl] [--ruled FILE] [--weights DIR] [--data DIR] --out manifest.json
+                     [--labels labels.jsonl] [--ruled FILE] [--weights DIR] [--data DIR] [--out manifest.json]
                                                                         # W46.kit-gate: the held-out gate + manifest
+
+MAC (W46.kit-mac-build). Run with a Python that has mlx-vlm (the app's local route uses the same). It converts the
+merged student (`merge`, copied from the cluster) to MLX and quantises it (8 bits: seg-students.md §On the Mac found
+4 bits two to five points worse), then times a warm-up on a pack's windows (the anchor pack the cluster answered: the
+request the gate scores, 1024 px images, thinking off, temperature 0, a retry at twice the token limit) and writes the
+Mac figures as `archive-seg-mac.json` in the build. `--build DIR` times an existing build instead. Then `check
+--weights DIR` hashes the build, takes the figures from it, and writes `archive-seg-manifest.json` beside it; the two
+kit files are left out of the weights hash, so writing them does not change it. The gate's answers come from the
+cluster's full-precision run: say so in `--note` (the command `mac` prints does).
 
 TEXT ROWS (W41.date-model). A row with no `box` is a text-only request: one user message holding the prompt, no
 images, trained the same way (thinking off, loss over the reply). public_dates.py mix writes such a set.
@@ -217,6 +228,9 @@ RUNS_NEEDED = 2
 ANCHOR_MARGIN = 3.2
 BAR = 0.98                # the review load is counted to 98% of pages in the exact document
 DRAWS, CHECK_SEED = 2000, 46
+MANIFEST = "archive-seg-manifest.json"   # what the app reads beside the weights (LocalSegmenter.manifestName)
+MAC_FIGURES = "archive-seg-mac.json"     # `mac`'s warm-up figures, which `check` puts in the manifest
+KIT_FILES = (MANIFEST, MAC_FIGURES)
 
 
 def run_votes(dirs):
@@ -411,9 +425,12 @@ def anchor_score(a_docs, b_docs, rng):
 
 
 def sha256_of(path):
+    """A file's hash, or a folder's over every file's relative path and bytes, the kit's own files beside the
+    weights (KIT_FILES) left out, so a build hashes the same before and after its manifest is written."""
     import hashlib
     h = hashlib.sha256()
-    files = sorted(q for q in Path(path).rglob("*") if q.is_file()) if Path(path).is_dir() else [Path(path)]
+    files = (sorted(q for q in Path(path).rglob("*") if q.is_file() and q.relative_to(path).as_posix() not in KIT_FILES)
+             if Path(path).is_dir() else [Path(path)])
     for q in files:
         h.update(q.relative_to(path).as_posix().encode() if Path(path).is_dir() else b"")
         with open(q, "rb") as f:
@@ -501,7 +518,13 @@ def cmd_check(a):
     """Score base, shipped and candidate on the held-out collections (against the tags, and against the owner's
     rulings where given) and on a locked public anchor box, then write the candidate's manifest. Reads answers only.
     A name given in several --run flags has several scored runs; the candidate needs RUNS_NEEDED of them, and each
-    must pass. Candidate run i is paired with shipped run i (the last shipped run when there are fewer)."""
+    must pass. Candidate run i is paired with shipped run i (the last shipped run when there are fewer).
+    With --weights naming a Mac build (`mac`), the manifest goes beside it and its figures come from it by default."""
+    built = Path(a.weights) if a.weights and Path(a.weights).is_dir() else None
+    if not a.out and not built:
+        raise SystemExit("--out is needed unless --weights names the model's folder (the manifest goes beside it)")
+    out = Path(a.out) if a.out else built / MANIFEST
+    mac = a.mac or (str(built / MAC_FIGURES) if built and (built / MAC_FIGURES).is_file() else None)
     runs = {}
     for spec in a.run:
         name, _, dirs = spec.partition("=")
@@ -556,7 +579,7 @@ def cmd_check(a):
         "anchor": None if not cand["anchor"] else {"box": box, "truth_sha256": sha256_of(a.anchor_truth), **cand["anchor"]},
         "review_load_at_98": None if not cand["anchor"] else cand["anchor"]["review_load_per_100_pages"],
         "scored_runs": len(cand_runs),
-        "mac": json.loads(Path(a.mac).read_text()) if a.mac else None, "note": a.note,
+        "mac": json.loads(Path(mac).read_text()) if mac else None, "note": a.note,
         "gate": {"rule": f"{RUNS_NEEDED} scored runs, each with an anchor score and a held-out score on at least "
                          f"{MIN_KNOWN_GAPS} known gaps in two documents or more (the owner's rulings when they reach "
                          f"that, else the tags), its intervals resampling folders and, inside each, documents; "
@@ -568,11 +591,158 @@ def cmd_check(a):
                          f"blocks are run 1's; every run is under compared",
                  "passed": not reasons, "reasons": reasons},
         "compared": report["models"], "made": time.strftime("%Y-%m-%dT%H:%M:%S")}
-    out = Path(a.out)
     out.write_text(json.dumps(manifest, indent=1) + "\n")
     print(json.dumps({k: manifest[k] for k in ("model", "anchor", "heldout", "gate")}, indent=1))
     print("wrote", out)
     return 0 if not reasons else 1
+
+
+
+# --- mac: the build the app loads, and its figures (W46.kit-mac-build) ---------------------------------------------
+
+def safetensors_params(folder):
+    """The parameters in a build's safetensors, read from their headers alone, as mlx-vlm counts them for its bits a
+    weight: a quantised weight (one with a `.scales` beside it) packs 32/bits values into each uint32, and its scales
+    and biases are overhead, not parameters. Counted on the build, not the merged model: convert drops the merged
+    Qwen3.5's multi-token-prediction head (about 61M parameters of the 2B), which put the figure at 9.4, not 9.6."""
+    import struct
+    head = {}
+    for f in sorted(Path(folder).glob("*.safetensors")):
+        with open(f, "rb") as fh:
+            head.update(json.loads(fh.read(struct.unpack("<Q", fh.read(8))[0])))
+    head.pop("__metadata__", None)
+    bits = (json.loads((Path(folder) / "config.json").read_text()).get("quantization") or {}).get("bits")
+    n = 0
+    for k, v in head.items():
+        if k.endswith((".scales", ".biases")) and k.rsplit(".", 1)[0] + ".weight" in head and bits:
+            continue
+        packed = bits and k.endswith(".weight") and k[: -len("weight")] + "scales" in head
+        n += math.prod(v["shape"]) * (32 // bits if packed else 1)
+    return n
+
+
+def folder_bytes(folder, pattern="*"):
+    return sum(q.stat().st_size for q in Path(folder).rglob(pattern)
+               if q.is_file() and q.relative_to(folder).as_posix() not in KIT_FILES)
+
+
+def measured_on():
+    """This Mac as the chooser names it: "18 GB M3 Pro"."""
+    import subprocess
+    sysctl = lambda k: subprocess.run(["sysctl", "-n", k], capture_output=True, text=True).stdout.strip()
+    chip = sysctl("machdep.cpu.brand_string").removeprefix("Apple ") or "Mac"
+    return f"{round(int(sysctl('hw.memsize') or 0) / 2**30)} GB {chip}"
+
+
+def mac_figures(recs, load_s, pack_windows, pack_pages, build, size_bytes, on, pack_name):
+    """The Mac figures from a warm-up's windows. The first window is not timed (its time includes building the
+    kernels). Seconds a page are a window's mean times the pack's windows a page, as the bench counts a box's time
+    (seg-students.md: each page sits in about 2.3 windows)."""
+    timed = recs[1:] or recs
+    s_window = sum(r["wall_s"] for r in timed) / len(timed)
+    failed = sum(r["status"] != "ok" for r in recs)
+    return {"build": build, "download_gb": round(size_bytes / 2**30, 1),
+            "peak_memory_gb": round(max(r["peak_gb"] for r in recs), 1),
+            "seconds_per_page": round(s_window * pack_windows / pack_pages, 1), "measured_on": on,
+            "seconds_per_window": round(s_window, 1), "load_seconds": round(load_s, 1),
+            "windows_timed": len(timed), "windows_unparsed": failed,
+            "source": f"train_seg.py mac: a warm-up of {len(recs)} windows of {pack_name} ({len(timed)} timed), "
+                      f"{time.strftime('%Y-%m-%d')}"}
+
+
+def mlx_convert(merged, out, bits):
+    """mlx-vlm's convert, quantising the language model (it leaves the vision tower as it is). mlx-vlm 0.7.4 copies
+    the source's files keeping a read-only mode and then fails overwriting tokenizer.json before it writes the
+    quantised config.json, which leaves a build that will not load; the copies are made writable (the Vision OCR
+    lab's convert-mlx.py)."""
+    import shutil
+    from mlx_vlm.convert import convert
+    copy = shutil.copy
+
+    def writable(src, dst, **kw):
+        r = copy(src, dst, **kw)
+        os.chmod(r, 0o644)
+        return r
+    shutil.copy = writable
+    try:
+        convert(str(merged), str(out), quantize=True, q_bits=bits)
+    finally:
+        shutil.copy = copy
+
+
+def warm_up(build, pack, rows, limit):
+    """Each window as the cluster asks it (cluster_seg.read_window): the pack's prompt and images, thinking off,
+    temperature 0, once more at twice the token limit (the window's own, else the pack's) if the answer does not
+    parse. Wall time and peak memory."""
+    import re
+    import method_window as W
+    import mlx.core as mx
+    from mlx_vlm import load, generate
+    from mlx_vlm.prompt_utils import apply_chat_template
+    mx.set_cache_limit(256 * 2**20)   # as method_local.collect: freed buffers otherwise count as held
+    t0 = time.time()
+    model, processor = load(str(build))
+    load_s = time.time() - t0
+    recs = []
+    for k, w in enumerate(rows, 1):
+        imgs = [str(pack / "images" / w["box"] / f"{n}.jpg") for n in w.get("images", w["window"])]
+        chat = apply_chat_template(processor, model.config, w["prompt"], num_images=len(imgs), enable_thinking=False)
+        t1, status, own = time.time(), "failed", w.get("max_tokens", limit)
+        for max_tokens in (own, 2 * own):
+            r = generate(model, processor, chat, image=imgs, max_tokens=max_tokens, temperature=0.0, verbose=False)
+            try:
+                W.parse_answer(re.sub(r"<think>.*?</think>", "", r.text, flags=re.S), w["window"])
+            except (W.ParseError, TypeError, ValueError, KeyError, AttributeError):
+                continue
+            status = "ok"
+            break
+        recs.append({"window": w["window"], "status": status, "wall_s": round(time.time() - t1, 1),
+                     "peak_gb": mx.get_peak_memory() / 2**30})
+        print(f"[{k}/{len(rows)}] {w['box']} {w['window'][0]}-{w['window'][-1]} {status} {recs[-1]['wall_s']}s "
+              f"peak {recs[-1]['peak_gb']:.1f} GB", flush=True)
+    return recs, load_s
+
+
+def cmd_mac(a):
+    """Convert and quantise the merged student into an MLX build (or take one already made), time a warm-up on the
+    pack, and write the build's Mac figures beside its weights for `check`."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import model_store
+    model_store.use()   # before mlx_vlm (convert or load) imports huggingface_hub, which reads HF_HOME once
+    pack = Path(a.pack)
+    rows = [json.loads(l) for l in (pack / "windows.jsonl").read_text().splitlines() if l.strip()]
+    if len(rows) < 2:
+        raise SystemExit(f"{pack} has {len(rows)} windows; the warm-up needs two or more")
+    if a.merged:
+        if not a.out:
+            raise SystemExit("--merged needs --out, a new folder for the build")
+        out = Path(a.out)
+        if out.exists():
+            raise SystemExit(f"{out} exists; pick a new path")
+        mlx_convert(a.merged, out, a.bits)
+    else:
+        out = Path(a.build)
+    if not (out / "config.json").is_file():
+        raise SystemExit(f"{out} holds no MLX build (no config.json)")
+    q = json.loads((out / "config.json").read_text()).get("quantization") or {}
+    build = f"{q['bits']}-bit MLX" if q.get("bits") else "MLX, not quantised"
+    build += f" ({folder_bytes(out, '*.safetensors') * 8 / safetensors_params(out):.1f} bits a weight)"
+    limit = json.loads((pack / "pack.json").read_text()).get("max_tokens", 1500) if (pack / "pack.json").is_file() else 1500
+    recs, load_s = warm_up(out, pack, rows[: a.windows + 1], limit)
+    pages = len({(w["box"], n) for w in rows for n in w["window"]})
+    fig = mac_figures(recs, load_s, len(rows), pages, build, folder_bytes(out), measured_on(), pack.name)
+    (out / MAC_FIGURES).write_text(json.dumps(fig, indent=1) + "\n")
+    print(json.dumps(fig, indent=1))
+    print(f"wrote {out / MAC_FIGURES}. Next, with the cluster's runs of this model and the shipped one:\n"
+          f"  python3 train_seg.py check --run shipped=RUNS/shipped-holdout,RUNS/shipped-anchor "
+          f"--run mine=RUNS/mine-holdout,RUNS/mine-anchor --candidate mine --anchor-truth ANCHOR.json "
+          f"--labels labels.jsonl --weights {out} --note 'scores from the cluster run at full precision; the weights "
+          f"and Mac figures are this {build} build'")
+    if fig["windows_unparsed"]:
+        print(f"{fig['windows_unparsed']} of {len(recs)} windows gave no answer that parses, after a retry: the build "
+              f"may be broken; compare it with the cluster's answers before using it", file=sys.stderr)
+        return 1
+    return 0
 
 
 def main():
@@ -596,11 +766,20 @@ def main():
     p.add_argument("--labels", help="corpus_pairs.py labels.jsonl (held-out gaps and their tags)")
     p.add_argument("--ruled", help="owner rulings: folder_id,n,new|same per line")
     p.add_argument("--base-build"); p.add_argument("--weights"); p.add_argument("--adapter"); p.add_argument("--data")
-    p.add_argument("--mac", help="the Mac figures as JSON (seconds a page, peak GB, download GB, measured on)")
+    p.add_argument("--mac", help=f"the Mac figures as JSON (seconds a page, peak GB, download GB, measured on); "
+                                 f"default {MAC_FIGURES} in the --weights folder")
     p.add_argument("--note", help="what the figures were measured on, if not the weights hashed")
-    p.add_argument("--out", required=True)
+    p.add_argument("--out", help=f"default {MANIFEST} in the --weights folder")
+    p = sub.add_parser("mac")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--merged", help="the merged student (`merge`), to convert and quantise into --out")
+    g.add_argument("--build", help="an MLX build already made, to time only")
+    p.add_argument("--out", help="the new build's folder (with --merged)")
+    p.add_argument("--pack", required=True, help="a cluster_seg.py pack (windows.jsonl, images/): the anchor pack")
+    p.add_argument("--bits", type=int, choices=(4, 8), default=8)
+    p.add_argument("--windows", type=int, default=8, help="windows timed, after one untimed")
     a = ap.parse_args()
-    sys.exit({"data": cmd_data, "train": cmd_train, "merge": cmd_merge, "check": cmd_check}[a.cmd](a))
+    sys.exit({"data": cmd_data, "train": cmd_train, "merge": cmd_merge, "check": cmd_check, "mac": cmd_mac}[a.cmd](a))
 
 
 if __name__ == "__main__":

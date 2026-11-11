@@ -204,15 +204,32 @@ sbatch --export=ALL "${SBATCH_ARGS[@]}" train.sbatch
 
 Before a trained student is used, score it with the held-out gate (W46.kit-gate). Serve the merged model with
 `submit.sh seg seg-student` (`IC_STUDENT`, `IC_STUDENT_NAME`) on a held-out pack (`corpus_pairs.py subpack
---split holdout`) and on a locked public anchor box (`public_segmentation.py pack`), then run
+--split holdout`) and on a locked public anchor box (`public_segmentation.py pack`). Then, on the Mac, build the
+model the app loads from the merged student copied back from the cluster (W46.kit-mac-build), with a Python that
+has mlx-vlm, under a memory guard such as the Vision OCR lab's `run-guarded.sh`:
+
+```bash
+python3 train_seg.py mac --merged /path/to/merged --out /path/to/the/mac/build --pack /path/to/the/anchor-pack
+```
+
+It converts the merged model to MLX and quantises it at 8 bits (4 bits read two to five points worse,
+`segbench-results/seg-students.md` §On the Mac), times a warm-up of nine windows of the pack (the first not timed)
+as the cluster asked them, and writes the Mac figures (seconds a page, peak memory, download size, this Mac) as
+`archive-seg-mac.json` in the build. It exits 1 when a window gives no answer that parses after a retry: a trained
+student answers every one, the untrained base does not. `--build DIR` times a build made already. Then run
 
 ```bash
 python3 train_seg.py check --run shipped=RUNS/shipped-holdout,RUNS/shipped-anchor \
     --run mine=RUNS/mine-holdout,RUNS/mine-anchor --run mine=RUNS/mine-holdout-2,RUNS/mine-anchor-2 \
     --candidate mine \
     --anchor-truth segbench-results/public-segmentation/lincoln.json --labels labels.jsonl \
-    --weights /path/to/the/mac/build --data /scratch/$USER/training --out archive-seg-manifest.json
+    --weights /path/to/the/mac/build --data /scratch/$USER/training \
+    --note 'scores from the cluster run at full precision; the weights and Mac figures are this 8-bit MLX build'
 ```
+
+With `--weights` naming the build and no `--out`, the manifest is written into the build as
+`archive-seg-manifest.json`, its `mac` block is the build's `archive-seg-mac.json`, and the weights hash is of the
+build, leaving out those two files, so it is the same before and after they are written.
 
 On a container profile (Sherlock), run the scorer as `"$IC_PY" train_seg.py check …` after `source compute.env`,
 inside a job (`sh_dev`): `bin/container-python` runs it in the image, whose numpy is all it needs beyond the
@@ -227,8 +244,8 @@ name: two separate `submit.sh seg` jobs of the same model), and in each: the low
 gap-accuracy interval above -3 points; **at least 267 known held-out gaps** behind it (your rulings when you have that
 many, else your tags; fewer are refused, since the interval would be too wide to mean anything; so are gaps all in one
 document); and anchor pages
-exact less than 3.2 points below the shipped model's (W46.kit-gate-rule). Put `archive-seg-manifest.json` beside the weights the
-app loads: Archive Processor refuses a model of yours without one, without an anchor score, or for another
+exact less than 3.2 points below the shipped model's (W46.kit-gate-rule). `archive-seg-manifest.json` must sit beside the weights the
+app loads (where `check --weights` puts it): Archive Processor refuses a model of yours without one, without an anchor score, or for another
 prompt. The held-out intervals resample your folders and, inside each, their documents (as your tags start them), so
 a held-out set of one box still has a real interval (W46.kit-gate-groups); a set of several unlike boxes gets a wider
 one. Separating 3 points of pages-exact needs about 1,850 held-out gaps on the 2026-10-31 truth (`segbench-results/seg-kit-gate.md`, which `kit_gate.py report` recomputes).

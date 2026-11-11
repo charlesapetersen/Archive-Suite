@@ -1294,7 +1294,8 @@ class Check(unittest.TestCase):
             text += cls.answer(f"F{f}", list(range(1, k + 2)), set())
         return labels, text
 
-    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=(), fill=FILL, runs=2, second=None, py=None, env=None):
+    def run_check(self, tmp, cand_new, anchor_new, *extra, unsure=(), fill=FILL, runs=2, second=None, py=None, env=None,
+                  out=True):
         """Shipped and ``runs`` candidate runs; ``second`` gives run 2's (held, anchor) calls when they differ."""
         truth = {"box": "Anchor", "pages": [{"n": n, "label": "New" if n in (1, 3, 5) else "Cont"} for n in range(1, 7)],
                  "unsure": [{"id": f"u{n}", "left": n - 1, "right": n} for n in unsure]}
@@ -1314,7 +1315,60 @@ class Check(unittest.TestCase):
         return subprocess.run([*(py or [sys.executable]), str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
                                *cand, "--candidate", "cand", "--anchor-truth",
                                str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
-                               "--out", str(tmp / "m.json"), *extra], capture_output=True, text=True, env=env)
+                               *(("--out", str(tmp / "m.json")) if out else ()), *extra],
+                              capture_output=True, text=True, env=env)
+
+    @staticmethod
+    def fake_build(folder, tensors, bits=8):
+        """An MLX build's files as `mac` leaves them: config.json and a safetensors file whose header names the
+        tensors (shape only; the data is zeros of the right length)."""
+        import struct
+        folder.mkdir(parents=True)
+        (folder / "config.json").write_text(json.dumps({"quantization": {"group_size": 64, "bits": bits}}))
+        size = {"U32": 4, "BF16": 2, "F16": 2}
+        head, off = {}, 0
+        for k, (dtype, shape) in tensors.items():
+            n = size[dtype]
+            for d in shape:
+                n *= d
+            head[k] = {"dtype": dtype, "shape": shape, "data_offsets": [off, off + n]}
+            off += n
+        h = json.dumps(head).encode()
+        (folder / "model.safetensors").write_bytes(struct.pack("<Q", len(h)) + h + bytes(off))
+
+    def test_manifest_goes_beside_the_mac_build_and_takes_its_figures(self):
+        # W46.kit-mac-build: with --weights naming the build and no --out, check writes archive-seg-manifest.json in
+        # it, fills `mac` from archive-seg-mac.json there, and hashes the weights without the two kit files, so the
+        # hash is the same before and after (and matches the shipped manifest's on the real build).
+        import train_seg
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t); build = tmp / "build"
+            self.fake_build(build, {"l.weight": ("U32", [64, 16]), "l.scales": ("BF16", [64, 2]),
+                                    "l.biases": ("BF16", [64, 2]), "norm.weight": ("BF16", [64])})
+            before = train_seg.sha256_of(build)
+            fig = {"build": "8-bit MLX", "seconds_per_page": 6.7, "peak_memory_gb": 4.2}
+            (build / train_seg.MAC_FIGURES).write_text(json.dumps(fig))
+            r = self.run_check(tmp, {2}, {2, 4}, "--weights", str(build), out=False)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            m = json.loads((build / train_seg.MANIFEST).read_text())
+            self.assertEqual(m["mac"], fig)
+            self.assertEqual(m["weights_sha256"], before)
+            self.assertEqual(train_seg.sha256_of(build), before)
+            # 64 x 16 uint32 at 8 bits hold 64 x 64 weights; scales and biases are overhead, the norm is 64 more.
+            self.assertEqual(train_seg.safetensors_params(build), 64 * 64 + 64)
+            r = self.run_check(tmp, {2}, {2, 4}, out=False)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("--out is needed", r.stderr)
+
+    def test_mac_figures_leave_the_first_window_untimed(self):
+        import train_seg
+        recs = [{"window": [1], "status": "ok", "wall_s": 60.0, "peak_gb": 3.9},
+                {"window": [2], "status": "ok", "wall_s": 20.0, "peak_gb": 4.2},
+                {"window": [3], "status": "failed", "wall_s": 40.0, "peak_gb": 4.1}]
+        f = train_seg.mac_figures(recs, 2.0, 51, 149, "8-bit MLX", 2.5 * 2**30, "18 GB M3 Pro", "pack")
+        self.assertEqual(f["seconds_per_window"], 30.0)               # the 60 s first window is not timed
+        self.assertEqual(f["seconds_per_page"], round(30 * 51 / 149, 1))
+        self.assertEqual((f["peak_memory_gb"], f["download_gb"], f["windows_unparsed"]), (4.2, 2.5, 1))
 
     @unittest.skipUnless(NUMPY, 'the scorer imports the bench (numpy)')
     def test_the_gate_scores_inside_the_container(self):
