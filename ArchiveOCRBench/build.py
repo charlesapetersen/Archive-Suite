@@ -71,6 +71,7 @@ VISION_REREAD = RESULTS / "vision-27-reread.json"  # W46.vision-27-reread: Apple
 ROTATION = RESULTS / "rotation-routes.json"  # W46.rotation-routes: every rotation route on the same turned pages
 CAPTURE = RESULTS / "capture-ladder.json"  # W46.capture-ladder: capture_ladder.py report, capture defects by reader
 ENH_OCR = RESULTS / "enh-ocr-input.json"  # W46.enh-ocr-input: enh_ocr_input.py report, content-removing enhancement
+COLOUR_DROPOUT = RESULTS / "ocr-colour-dropout.json"  # W46.ocr-input-colour-dropout: ocr_colour_dropout.py report
 ENH_MARKS = RESULTS / "enh-ocr-marks.json"  # W46.enh-ocr-input-marks: the mark-region ink check
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
@@ -1229,6 +1230,29 @@ def enh_ocr_chart_routes(data, kinds, op):
     return out
 
 
+def colour_dropout_chart_routes(data, kinds):
+    """Colour dropout as the OCR input on the 96 (W46.ocr-input-colour-dropout): Apple Vision with dropout on every page
+    that has a coloured mark at all, and with the gate (dropout only where a stamp lies over dark text, 1 of the 96);
+    Gemini 3.7 Flash with the gate, from its own estimated token cost. Raw is each reader's own route already."""
+    if data is None:
+        return []
+    by = {(r["route"], r["arm"], r["group"]): r for r in data["chart_rows"]}
+    names = {"apple-vision": "Apple Vision (macOS 27.2)",
+             "gemini3.7-flash-gw": "Gemini 3.7 Flash (Stanford gateway, price estimated)"}
+    arms = {"ungated": "colour dropout on every marked page", "gated": "colour dropout, stamp gate"}
+    out = []
+    for route, arm in dict.fromkeys((r["route"], r["arm"]) for r in data["chart_rows"]):
+        overall = by[(route, arm, "the 96")]
+        scores = {key: [round(100 * by[(route, arm, g)]["nes"], 2), by[(route, arm, g)]["ok"], by[(route, arm, g)]["n"]]
+                  for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
+        common = {"id": f"colour-{route}-{arm}", "name": names[route] + " · " + arms[arm], "batch": None, "scores": scores}
+        if route == "apple-vision":
+            out.append({**common, "panel": "local", "std": 0.0})
+        else:
+            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"])})
+    return out
+
+
 def enh_marks():
     """W46.enh-ocr-input-marks: per arm and ink threshold, the share of the mark boxes' ink each method keeps on the
     marks set's 40-page owner core, the boxes it loses and the print kept outside them (enh_ocr_marks.py report)."""
@@ -1383,6 +1407,12 @@ def main():
             c["scores"][route["id"]] = scores[c["key"]]
     enh_ocr = json.loads(ENH_OCR.read_text()) if ENH_OCR.exists() else None
     for route in enh_ocr_chart_routes(enh_ocr, inputs["kinds"], op):
+        scores = route.pop("scores")
+        routes.append(route)
+        for c in charts:
+            c["scores"][route["id"]] = scores[c["key"]]
+    colour = json.loads(COLOUR_DROPOUT.read_text()) if COLOUR_DROPOUT.exists() else None
+    for route in colour_dropout_chart_routes(colour, inputs["kinds"]):
         scores = route.pop("scores")
         routes.append(route)
         for c in charts:

@@ -481,6 +481,7 @@ def page_rows():
             route = drop + ('\n' + mark if mark else '')
             body = bag(t) - bag('\n'.join(marks))
             r = {'reader': reader, 'set': st, 'page': k, 'fires': fires, 'marks': len(marks),
+                 'marked': bool(draft(k)['marks']) if st != '96' else None,
                  'body_words': sum(body.values())}
             for arm, text in (('raw', raw), ('dropout', drop), ('route', route)):
                 s = S.score(t, text)
@@ -527,9 +528,25 @@ def chart_rows(rows):
         groups = {'the 96': list(rr), **{f'kind:{k}': [p for p in rr if kind[p] == k] for k in sorted(set(kind[p] for p in rr))}}
         for arm, f in arms:
             for g, ps in groups.items():
-                out.append({'route': reader, 'arm': arm, 'group': g, 'n': len(ps), 'ok': len(ps),
-                            'nes': round(sum(f(rr[p]) for p in ps) / len(ps), 5)})
+                row = {'route': reader, 'arm': arm, 'group': g, 'n': len(ps), 'ok': len(ps),
+                       'nes': round(sum(f(rr[p]) for p in ps) / len(ps), 5)}
+                if reader != 'apple-vision':
+                    row['cost'] = round(sum(reply_cost('raw', p) + (reply_cost('dropout', p) + reply_cost('mark', p)
+                                                                    if rr[p]['fires'] else 0) for p in ps), 6)
+                out.append(row)
     return out
+
+
+def reply_cost(kind, key):
+    """A Gemini reply's estimated cost (its ledger figure, the larger of the estimate and the gateway's own)."""
+    G = _gateway()
+    if kind == 'raw' and key.startswith('p') and key[1:].isdigit():
+        j = next(j for j in G.panel_manifest()[1] if j['page'] == key)
+        f = G.REHEARSAL / 'gateway-gemini' / 'panel' / (j['id'] + '.json')
+    else:
+        f = reply_path(kind, key)
+    m = json.loads(f.read_text())['meta']
+    return max(m.get('cost') or 0, m.get('gateway_cost') or 0)
 
 
 def report():
@@ -542,8 +559,10 @@ def report():
     spent = G.spent()
     summ = {}
     for reader in READERS:
-        for st in ('stamp', 'control', '96'):
-            rr = [r for r in rows if r['reader'] == reader and r['set'] == st]
+        for st in ('stamp', 'stamp-marked', 'stamp-unmarked', 'control', '96'):
+            base = st.split('-')[0]
+            rr = [r for r in rows if r['reader'] == reader and r['set'] == base
+                  and (st == base or r['marked'] == (st == 'stamp-marked'))]
             summ[f'{reader}|{st}|route'] = summary(rr, 'route')
             summ[f'{reader}|{st}|dropout'] = summary(rr, 'dropout')
             if st == '96':
@@ -555,7 +574,7 @@ def report():
     stamp_v = [r for r in rows if r['reader'] == 'apple-vision' and r['set'] == 'stamp' and r.get('raw_lines_under') is not None]
     lines = {arm: (sum(r[arm + '_lines_under'] for r in stamp_v), sum(r[arm + '_words_under'] for r in stamp_v))
              for arm in ('raw', 'dropout')}
-    with_marks = {st: sum(1 for r in rows if r['reader'] == 'apple-vision' and r['set'] == st and r['marks'] > 0)
+    with_marks = {st: sum(1 for r in rows if r['reader'] == 'apple-vision' and r['set'] == st and r['marked'])
                   for st in ('stamp', 'control')}
     owner = {r['reader']: {a: r[a] for a in ('raw', 'dropout', 'route', 'raw_body_missed', 'dropout_body_missed',
                                               'body_words', 'raw_lines_under', 'dropout_lines_under',
