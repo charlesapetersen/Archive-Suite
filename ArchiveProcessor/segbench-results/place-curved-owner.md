@@ -1,4 +1,4 @@
-# Selection on the owner's curved and bound pages (W46.place-curved-owner)
+# Selection on the owner's pages whose lines fan most (W46.place-curved-owner)
 
 Owner, 2026-11-10 (point 9): UIUC 00233 and 00149 "test warping with selection; perhaps we've already fully tested
 that". We had not: stage 01 calls strongly curled or bound pages untested (`01-reading-copy.md`), and the placement
@@ -14,6 +14,15 @@ model was called and nothing was spent. Script: `scripts/segbench/place_curved.p
 (−21.7 to −12.1)** as the mean over the 32 same-collection pairs. Both intervals are far from 0. The more curved the
 page, the worse it selects: across all 62 pages with 5 or more scored lines, Spearman's ρ between the cue and the
 page's pass rate is −0.64.
+
+**What the curved set is** (measurement review pass 12, P12-5). It is the cue's top 1% of the sample: the pages whose
+lines fan most, with covers, angled display type and some handwriting among them as well as bound volumes. Nobody
+classed the 64 pages, so this is not a measured gap on bound or curled pages. The owner's own Finder tags on the 64
+source PDFs (`corpus_survey.read_tags`, read only) tag 1 curved page Handwritten and 4 Clippings, against 0 and 1 in the
+flat set. The gap survives taking those out: −19.8 (−26.3 to −12.4) without the handwritten pair, −17.1 (−23.5 to
+−9.4) without the handwritten and clipping pairs, and −20.8 (−27.0 to −12.8) without the pages whose spread is over
+15°; 25 of the 32 pairs are worse. The tags are far from complete (several pages are handwritten and only one is
+tagged), so the effect is real on these pages, but how much of it is bending is not shown.
 
 - **The owner's two pages.** UIUC 00233 (bound, curved, back showing through) passes 21 of 27 lines (78%); its UIUC
   pair 00254 passes 17 of 17. UIUC 00149 passes 33 of 33. Its curve is mild (cue 3.0°, against 9.2° for 00233), and
@@ -34,9 +43,11 @@ page's pass rate is −0.64.
   ones. The route deskews 11 curved and 8 flat pages. On the curved ones deskewing lifts the pass from 304 to 370 of 535
   lines (57% to 69%), and on the flat ones from 149 to 197 of 209 (71% to 94%).
 
-**For W46.dewarp-guard (no reopening of the 2026-11-06 call).** This is the case its revisit condition names: a new
-owner kind, bound or curled pages, with more than the 10 curl-tagged pages scored, and the layer fails markedly on
-it. One level run per line cannot carry a bent line, and a dewarped reading copy is the stage 01 remedy the owner
+**For W46.dewarp-guard (no reopening of the 2026-11-06 call).** This is evidence for the case its revisit condition
+names, not yet the case itself: the layer fails markedly on the owner's pages whose lines fan most, more than the 10
+curl-tagged pages, but those pages are not classed as bound or curled. Before this figure reopens the call, the 64
+pages are classed (bound or curled, perspective, display type, handwritten) by the owner or a gateway model, and the
+gap is restated on the bound or curled pairs. One level run per line cannot carry a bent line, and a dewarped reading copy is the stage 01 remedy the owner
 declined for now. `place-geom.md`'s −8.6 for UVDoc was measured on the 58 benchmark pages, which are mostly flat. A
 sloped or curved run per line (the writer, not the image) is the other way to follow the bend. `place-geom.md`
 measured a sloped run only on those mostly flat pages, where it lost (−7.4).
@@ -65,7 +76,7 @@ separate 00233 from ordinary pages: 00233's residual 0.26 is below the median, 0
 
 The median page's spread is 1.25°, the 90th percentile 3.45°. The spread is a geometry cue, so a strong camera
 perspective raises it as well as a bend. The curved set below is the cue's top 30, not a judgement of each page.
-Read it as "pages whose lines fan most", of which bound volumes and curled sheets are the most common.
+Read it as "pages whose lines fan most"; how many of them are bound volumes or curled sheets was not counted.
 
 ## The pages
 
@@ -136,7 +147,9 @@ carries each page's sample-relative path.
   route chose a page. The flat pages were drawn at random within the curved page's collection under the pool's
   median spread. I looked at the curved set's contact sheet as a sanity check, and nothing was chosen or left out by
   eye. It holds covers with angled display type and handwritten pages as well as bound volumes. Those pages stay in,
-  so the curved set is "pages whose lines fan most", not a hand-sorted set of bound pages.
+  so the curved set is "pages whose lines fan most", not a hand-sorted set of bound pages. That composition sentence
+  rests on the look alone; the owner's tags count 1 Handwritten and 4 Clippings among the curved pages (0 and 1 among
+  the flat), and the gap without them is in the Verdict.
 - **Comparison.** The same route, writer, drag scorer and truth rule on both sets, with Vision read again on the
   upright copies of both. The route deskews 11 curved pages and 8 flat ones. The raw-photograph arm, scored on every
   page, shows the same gap (−20.5, −30.0 to −10.4).

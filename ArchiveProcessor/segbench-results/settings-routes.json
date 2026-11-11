@@ -6487,7 +6487,8 @@
      "caveats": [
       "selection ties Vision's own layer (+0.1, -0.4 to +0.7); Find placed +0.8 (-0.3 to +2.2), resolved only on typewritten (+1.6, +0.5 to +3.3)",
       "drafter reading Gemini 3.8 Flash is -0.6 (-1.0 to -0.2), a small resolved loss, labelled drafter",
-      "51% of typed truth lines Vision-derived (OCR-10)"
+      "51% of typed truth lines Vision-derived (OCR-10)",
+      "pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them; not classed as bound or curled) pass -19.8 (-26.2 to -12.8) against same-collection flat pages (place-curved-owner.md)"
      ],
      "kind_rules": [
       "handwritten: hand-blla-ctc"
@@ -6568,7 +6569,8 @@
      },
      "caveats": [
       "handwritten figure counts only lines whose every word Vision read; Find locates 585 of 1,405 distinct truth words in Vision's own hand layer and 922 in the aligned layer (F-placement §3, HW-PLACE row)",
-      "RecognizeDocumentsRequest lines lose -10.8 (-15.3 to -6.5) and are not offered (place-print.md)"
+      "RecognizeDocumentsRequest lines lose -10.8 (-15.3 to -6.5) and are not offered (place-print.md)",
+      "pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them; not classed as bound or curled) pass -15.7 (-23.4 to -8.9) on its own lines against same-collection flat pages (place-curved-owner.md)"
      ],
      "kind_rules": [
       "handwritten: not chosen"
@@ -9547,7 +9549,7 @@
      "caveats": [
       "measured with Gemini 3.7 Flash on Vision text; the app's 3.8 not run on the shipped prompt (ent-prompt-app.md Scope)",
       "sender rule is person-only, stricter than the truth (P6-3); 41 of 129 senders left empty under tagging-new (ent-prompt-app.md)",
-      "place rule a tie on the owner-checked truth: invented places 14 to 1, written places missed (ent-place-rule.md, W46.place-rule-fold)",
+      "place rule a tie on the owner-checked truth: invented places 14 to 1, of which 7 to 1 on the 18 unchecked rows the rule emptied and 7 to 0 elsewhere (6 to 0 owner-checked, 1 to 0 on the 88 it did not empty), written places missed (ent-place-rule.md, W46.place-rule-fold)",
       "every gain against the old prompt is in-sample (ent-prompt-app.md card)",
       "first 3,000 characters only: 78 of 138 named senders in that span of Vision text, 90 in 8,000 (ent-score-paid.md)",
       "no quotes returned; the evidence rule needs an app-side text check (item 1)",
@@ -10608,7 +10610,7 @@
     {
      "id": "label-floors",
      "text": "No continuation under 200 corrected gaps of one material; no handwriting fine-tune under 80 line-broken corrected lines of one hand, nor from paragraph-level truth.",
-     "source": "ocr-ppocrv6-hands.md",
+     "source": "seg-adapt-lora.md; 14-owner-calls.md §1. The owner's calls; ocr-ppocrv6-hands.md",
      "switch": null
     },
     {

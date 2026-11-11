@@ -71,7 +71,7 @@ not a level, so the field is kept and the schema needs it or the level.
  "cost":{"usd_1000_list":0,"usd_1000_batch":null,"price_read":null,"source":{"file":"place-print.md","attribute":"no model call"}},
  "time":{"per_unit_s":null,"measured":false,"measured_on":"aligner and writer not timed"},"memory":{"peak_gb":null,"measured_on":"not measured"},
  "caveats":["selection ties Vision's own layer (+0.1, -0.4 to +0.7); Find placed +0.8 (-0.3 to +2.2), resolved only on typewritten (+1.6, +0.5 to +3.3)",
-  "drafter reading Gemini 3.8 Flash is -0.6 (-1.0 to -0.2), a small resolved loss, labelled drafter","51% of typed truth lines Vision-derived (OCR-10)"],
+  "drafter reading Gemini 3.8 Flash is -0.6 (-1.0 to -0.2), a small resolved loss, labelled drafter","51% of typed truth lines Vision-derived (OCR-10)","pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them; not classed as bound or curled) pass -19.8 (-26.2 to -12.8) against same-collection flat pages (place-curved-owner.md)"],
  "kind_rules":["handwritten: hand-blla-ctc"],"fallback":"vision-own","conditions":[]}
 {"id":"vision-own","name":"Apple Vision's own words and lines (today's layer)","family":"mac","app_route":null,"status":"shipped",
  "needs":{"key":[],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
@@ -81,7 +81,7 @@ not a level, so the field is kept and the schema needs it or the level.
   "handwritten":{"value":61.1,"n":18,"truth":"226 lines Vision read whole","source":{"file":"place-geom.md","route":"raw, lab writer","attribute":"hand line pass %","value":"61.1"}}},
  "cost":{"usd_1000_list":0},"time":{"per_unit_s":null,"measured":false},"memory":{"peak_gb":null},
  "caveats":["handwritten figure counts only lines whose every word Vision read; Find locates 585 of 1,405 distinct truth words in Vision's own hand layer and 922 in the aligned layer (F-placement §3, HW-PLACE row)",
-  "RecognizeDocumentsRequest lines lose -10.8 (-15.3 to -6.5) and are not offered (place-print.md)"],
+  "RecognizeDocumentsRequest lines lose -10.8 (-15.3 to -6.5) and are not offered (place-print.md)","pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them; not classed as bound or curled) pass -15.7 (-23.4 to -8.9) on its own lines against same-collection flat pages (place-curved-owner.md)"],
  "kind_rules":["handwritten: not chosen"],"fallback":"text-page","conditions":[]}
 {"id":"hand-blla-ctc","name":"kraken blla lines, McCATMuS forced alignment, conf pick, 0.67 gate","family":"mac","app_route":null,"status":"shipped",
  "needs":{"key":[],"plan":[],"cluster":false,"mac_gb":null,"gpus":0},
@@ -149,8 +149,10 @@ line layer [M] `place-print.md`; no row. R6 services (Azure, Textract, Document 
 - A stage 04 reader shown to keep line breaks on hands: it joins the hand route instead of the text page.
 - More hand truth: the gate refit (`place-hands.md` calls 0.67 a starting value).
 - A dewarp whose lattice keeps every word and beats deskew on the owner's curled pages (it lost, −8.6, `place-geom.md`).
-  On the owner's 32 most curved pages the layer itself loses −19.8 (−26.2 to −12.8) against flat pages, and blla's
-  own lines as level runs lose as much, so it is the level run on a bent line [M] `place-curved-owner.md`.
+  On the owner's 32 pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them,
+  not classed as bound or curled) the layer itself loses −19.8 (−26.2 to −12.8) against flat pages, −17.1 (−23.5 to
+  −9.4) without the tagged handwritten and clipping pairs, and blla's own lines as level runs lose as much, so it is
+  the level run on a line that fans [M] `place-curved-owner.md`.
 - An RTL path in the writer, or word boxes for CJK and Thai.
 
 ## 7. Owner calls

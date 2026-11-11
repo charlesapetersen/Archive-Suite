@@ -93,7 +93,7 @@ The stage header above is kept apart from the route rows, which follow as a list
   "memory": null,
   "caveats": ["measured with Gemini 3.7 Flash on Vision text; the app's 3.8 not run on the shipped prompt (ent-prompt-app.md Scope)",
    "sender rule is person-only, stricter than the truth (P6-3); 41 of 129 senders left empty under tagging-new (ent-prompt-app.md)",
-   "place rule a tie on the owner-checked truth: invented places 14 to 1, written places missed (ent-place-rule.md, W46.place-rule-fold)",
+   "place rule a tie on the owner-checked truth: invented places 14 to 1, of which 7 to 1 on the 18 unchecked rows the rule emptied and 7 to 0 elsewhere (6 to 0 owner-checked, 1 to 0 on the 88 it did not empty), written places missed (ent-place-rule.md, W46.place-rule-fold)",
    "every gain against the old prompt is in-sample (ent-prompt-app.md card)",
    "first 3,000 characters only: 78 of 138 named senders in that span of Vision text, 90 in 8,000 (ent-score-paid.md)",
    "no quotes returned; the evidence rule needs an app-side text check (item 1)",

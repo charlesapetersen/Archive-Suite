@@ -914,11 +914,25 @@ def cmd_report(a):
         vp, rs = C["vision_box_precision"]["Red"], C["red_steps"]
         low = rs.get("lower number", 0) / max(sum(rs.values()), 1)
         kind = S["routes"]["vision"]["kind"]["scored"]
+        acc_v, acc_g = S["routes"]["vision"]["accession"]["scored"], S["routes"][gem]["accession"]["scored"]
+        acc_gap = S["gaps"]["accession"]
+        acc_gs = f"{100 * acc_gap['gap']:+.0f} ({100 * acc_gap['ci'][0]:+.0f} to {100 * acc_gap['ci'][1]:+.0f})"
+        fp = C["vision_box_precision"]["Purple"]
+        f_wrong = fp["given"] - fp["right"]
+        f_ci = wilson(f_wrong, fp["given"])
+        pv = C["purple_vs_box"]
+        comparable = pv.get("same box as the box photo before it", 0) + pv.get("another box than the box photo before it", 0)
+        disagree = pv.get("another box than the box photo before it", 0)
+        red_turns = {k: n for k, n in C["turns"].items() if k.startswith("Red ") and k != "Red None"}
+        red_read, red_other = sum(red_turns.values()), sum(n for k, n in red_turns.items() if k != "Red 0")
         L += ["## What it recommends, per field (for W47.ct-design-ok)", "",
               "Free routes only; W47.ct-read-paid adds the gateway arm before the design review. On the hard cells "
-              "the owner ruled, Gemini 3.7 Flash is ahead of every free route on almost every field, although those "
-              "are cells where at least one drafter was wrong, which handicaps a drafter; the paid arm should "
-              "confirm that on the whole set.", "",
+              "the owner ruled, Gemini 3.7 Flash is ahead of every free route on almost every field, but those are "
+              "the cells where the drafters split, and choosing them favours the strongest drafter rather than "
+              "handicapping it. The paid arm (W47.ct-read-paid) confirms it on the owner's cells (FLD-9), not on the "
+              f"whole set: Gemini 3.7 co-drafted the {S['cells'].get('readers', 0):,} unanimous cells, so a whole-set "
+              "figure for it would be "
+              "agreement with itself.", "",
               f"- **What the photo is:** the marker's colour (the Box or Folder button), right on {kind['right']} of "
               f"{kind['n']}; no reader is needed, and Gemma's own call is worse.",
               "- **Container and folder number:** Vision + parser. It ties Gemma on both, takes a fraction of the "
@@ -927,8 +941,12 @@ def cmd_report(a):
               "- **Repository, collection title, collection number, date:** Gemma 3 12B, ahead of Vision + parser on "
               "each with an interval above zero, but still wrong or empty on a third to a half of the filled cells: "
               "proposed values the user confirms once per run, not facts.",
-              "- **Accession, series, series title:** Vision + parser; they are anchored by their keyword, Gemma's "
-              "difference is a tie, and Gemma fills an accession where there is none.",
+              "- **Series, series title:** Vision + parser; they are anchored by their keyword, and Gemma's "
+              "difference is a tie.",
+              f"- **Accession:** not a tie: Gemma less Vision is {acc_gs}, an interval clear of zero. But Vision's "
+              f"lead comes from leaving the field empty: it reads {acc_v['filled_right']} of the {acc_v['filled']} "
+              "accessions present, the same pattern as the fields below, while Gemma fills an accession where there is "
+              f"none ({acc_g['false_fill']} of {acc_g['empty']}).",
               "- **Collection subtitle, box title, other identifying marks, folder title:** no free route reads them. "
               "Vision's high accuracy on the first three comes from leaving them empty, and Gemma fills them where "
               "there is nothing. Leave them to the user, or to the paid arm if it reads them.",
@@ -936,8 +954,14 @@ def cmd_report(a):
               "the once-per-root level-map sheet, as designed.",
               f"- **Carry-forward:** box photos come in no fixed order. {pc(low)} of the steps between box photos go to "
               "a lower number, and box photos are rarely misread, so the plan's warning \"a box number goes "
-              "backwards\" would fire on about one step in four; it should not be a warning. A folder label that "
-              "names its box is the better check: the run is flagged where it disagrees with the box photo before it.",
+              "backwards\" would fire on about one step in four; it should not be a warning. Nor is a folder label "
+              "that names its box a check on the run as measured: Vision's box read on folder photos is right on "
+              f"{fp['right']} of {fp['given']} on the truth set (5 another number, 2 a box where there is none), "
+              f"{f_wrong} wrong with a Wilson interval of {f_ci[0]:.2f} to {f_ci[1]:.2f}. Only {comparable:,} folder "
+              "reads can be compared with a box photo before them, so about "
+              f"{comparable * f_wrong / fp['given']:.0f} misreads ({comparable * f_ci[0]:.0f} to "
+              f"{comparable * f_ci[1]:.0f}) are expected among them, against {disagree} disagreements observed: a "
+              "flag on disagreement would mostly fire on misreads.",
               "- **Purple:** a folder label for nearly all of the drawn photos; two were \"No Folder\" sheets and one "
               "a document page. Purple can be taken as a folder start, with \"No Folder\" sheets recognised by their "
               "text.",
@@ -946,7 +970,10 @@ def cmd_report(a):
     L += ["## Measurement card", "",
           "- **Truth:** W47.ct-truth-final's: the owner's answers on three sheets and his notes, his rules applied to "
           "the readers' readings (reported apart), and for the rest the three drafters unanimous. Drafters are scored "
-          "only on the owner's cells, less prompt examples; the routes that drafted nothing on every cell.",
+          "only on the owner's cells, less prompt examples; the routes that drafted nothing on every cell. The "
+          "truth's checks: 0 of 20 reader-unanimous controls overturned on the second sheet (upper bound about "
+          f"{100 * wilson(0, 20)[1]:.0f}%) and 0 of 10 rule-settled ones on the third (about "
+          f"{100 * wilson(0, 10)[1]:.0f}%).",
           "- **Selection:** the truth build's stratified draw by repository (square-root allocation, a floor of two), "
           "less the photos the owner took out. The pairing cut's lean stands beside every figure here (P10-6): 54 "
           "photos left out, 43 of them Red, toward little-changed PDFs. The sample is not weighted to the corpus, so "
@@ -957,7 +984,13 @@ def cmd_report(a):
           "on each gap; no rerun floor was measured, so a gap near zero is a tie.",
           "- **Scope:** the routes on this sample of one researcher's photos; the tree patterns on a synthetic set "
           "and the owner's names; carry-forward measured with Vision's own misreads mixed in. It settles no design: "
-          "that is W47.ct-design-ok.", ""]
+          "that is W47.ct-design-ok."]
+    if C:
+        vp = C["vision_box_precision"]["Red"]
+        L[-1] += (f" The carry-forward's {vp['right']} of {vp['given']} box-number precision is on the truth set's "
+                  f"upright photos, while {red_other} of the {red_read} Red reads on the corpus came from another turn "
+                  "than the EXIF one, which the truth set does not test.")
+    L += [""]
     if first:
         L += [f"The Vision parser's score is its first pass (`score-vision-firstpass.json` in the cache)."]
     open(RESULTS, "w", encoding="utf-8").write("\n".join(L) + "\n")

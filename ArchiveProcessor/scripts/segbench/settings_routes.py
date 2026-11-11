@@ -353,7 +353,7 @@ HEADERS = {
    "rules": [
     {"id": "fine-tuning-answer", "text": "No: no row shown. With a coding agent: the Mac-side handwriting row. On a cluster: the cluster rows as well.", "source": "12-training-kit.md §3. The rule for the settings layer", "switch": None},
     {"id": "gate", "text": "A segmentation candidate is used only with a manifest that passed the kit's held-out gate (paired interval's low end above -3 points, minimum known-gap support, two scored runs, anchor margin 3.2).", "source": "seg-kit-gate.md §The gate: `train_seg.py check` and the manifest", "switch": None},
-    {"id": "label-floors", "text": "No continuation under 200 corrected gaps of one material; no handwriting fine-tune under 80 line-broken corrected lines of one hand, nor from paragraph-level truth.", "source": "ocr-ppocrv6-hands.md", "switch": None},
+    {"id": "label-floors", "text": "No continuation under 200 corrected gaps of one material; no handwriting fine-tune under 80 line-broken corrected lines of one hand, nor from paragraph-level truth.", "source": "seg-adapt-lora.md; 14-owner-calls.md §1. The owner's calls; ocr-ppocrv6-hands.md", "switch": None},
     {"id": "no-mac-seg-training", "text": "No Mac segmentation training at 16-18 GB.", "source": "kit-mac-lora.md", "switch": None}],
    "fallback": "the route it replaced"},
 }

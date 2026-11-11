@@ -270,7 +270,9 @@ READING = """## Reading
   longer touches those documents; the figures below are against that truth.
 - **The tagging prompt: no measured gain in the place now, and fewer invented places.** Documents where it names a
   place and the truth has none still fall, from 14 to 1 of 138; the places wrong where the truth has one do not fall
-  (14 to 15). On the full string F1 0.72 to 0.72, +0.01 (interval -0.08 to +0.09); by the city 0.86 to 0.88, +0.03
+  (14 to 15). The invented places split 6 to 0 on the 32 owner-checked documents, 1 to 0 on the 88 the rule did not
+  empty, and 7 to 1 on the 18 unchecked documents whose place the rule emptied, a class the owner found wrong on 4 of
+  the 8 he was asked; the firm part is 7 to 0 (measurement review pass 12, P12-8). On the full string F1 0.72 to 0.72, +0.01 (interval -0.08 to +0.09); by the city 0.86 to 0.88, +0.03
   (-0.04 to +0.08), at the rerun floor (+0.03 on 40): a tie, where before the fold it was +0.08 (+0.02 to +0.14).
   The gain went with the four places the owner restored: the old prompt named all four right and the rule line
   emptied all four, while on the four he says are not written it emptied the two the old prompt had filled. On the

@@ -52,10 +52,31 @@ loss, within the frozen limit. Mac comparisons use each model's own photo predic
 **15 of 16 predeclared decision fields pass. Mac public full-date accuracy fails:** 135/150 (90.00%) versus
 137/150 (91.33%), a 1.333-point loss. This is only two documents; it is not evidence of a statistically
 reliable difference. It nevertheless exceeds the owner's fixed maximum-one-point rule. **Keep the
-separate segmentation and dating models under that rule.** No combined-model default or publication. On the two public segmentation boxes it sits level with the separate 2B and behind the 4B (`public-segmentation.md`, W43.seg-date-public).
+separate segmentation and dating models under that rule.** No combined-model default or publication. On the two public segmentation boxes it is not a clear win over the separate 2B, not level with it: +4.7 points on CREST, above the rerun floor's 3.2-point top on one run, and −2.3 on Lincoln, a tie; it is behind the 4B (`public-segmentation.md`, W43.seg-date-public).
 All counts and exact-fraction decisions are in `seg-date-model-final.json`.
 
 The Mac run took 4343s for dates plus segmentation, with 3437s for the 187 segmentation windows. MLX peak
 4.37GB; the unchanged guard recorded 5152MB peak footprint and 2769MB RSS, no kill. Both model builds/raw
 answers remain under Long term storage/FarmShare-20261018. Every date output parses. Both combined GPU
 and Mac still emit no DU tags for the 50 owner-uncertain documents. App defaults remain unchanged.
+
+## Measurement card
+
+Written by hand after the result (measurement review pass 12, P12-9); no figure above moved.
+
+- **Truth.** Segmentation: the locked test boxes' document pages in exact documents (260/330 for the separate 2B,
+  frozen in `seg-date-model-frozen.json` before the run), and the development and held-out agreed gaps, which use the
+  GPU reference's oracle photo labels. Dating: the owner year and month truth and the public dates of `date-model.md`,
+  with its collection-split and catalogue-precision limits. The owner checked nothing new for this item.
+- **Selection.** The unchanged 13,313-row mix (5,885 segmentation windows, 7,428 dating examples); no recipe search. The
+  single-task references and the one-point acceptance fields were committed before any output
+  (`seg-date-comparison-plan.json`). No tested route chose a page, and no ABBYY text was read.
+- **Comparison.** Separate and combined 2B on the same windows, prompts and dating examples, GPU against GPU and Mac
+  8-bit against Mac 8-bit, each Mac model on its own photo predictions as the reference did.
+- **Noise.** One training run (seed 41) and one locked run per model, so no intervals. The decision rule is the owner's
+  fixed maximum one-point loss per field, a point test by decision: the failing field, Mac public full date, is two
+  documents (135 against 137 of 150), not a reliable difference. On the public boxes the rerun floor is 1.4 to 3.2
+  points a box (SEG-10); CREST's +4.7 is above it on one run, Lincoln's −2.3 inside it.
+- **Scope.** It settles the owner's rule (keep the separate models), not whether a combined model is better or worse:
+  a second seed or run would be needed for that. The combined model emits no Date Uncertain tags for the 50
+  owner-uncertain documents, as the separate one does not; owner inferred-year accuracy (54/131) is diagnostic.
