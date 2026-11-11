@@ -89,10 +89,10 @@ enum OCRPageKindTestDriver {
         let runDefault = cand(claude)
         let all: Set = [cand(claude), cand(flash), cand(qwen)]
         func choose(_ kind: String?, _ conf: Double = 0.95, available: Set<PageKindRouting.Candidate> = all,
-                    run: PageKindRouting.Candidate = runDefault, override: PageKindRouting.Candidate? = nil)
-            -> PageKindRouting.Choice {
+                    run: PageKindRouting.Candidate = runDefault, override: PageKindRouting.Candidate? = nil,
+                    hand: Bool = false) -> PageKindRouting.Choice {
             PageKindRouting.choose(kind: kind.map { PageKind(kind: $0, confidence: conf) }, guidance: guide,
-                                   available: available, runDefault: run, override: override)
+                                   available: available, runDefault: run, override: override, handwritingOnTyped: hand)
         }
         check("3 a sure typewritten page goes to the guide's first pick, Gemini 3.8 Flash",
               choose("typewritten") == .init(provider: .gemini, modelID: flash.id, reason: .kind))
@@ -110,6 +110,27 @@ enum OCRPageKindTestDriver {
         check("3 a page with no kind keeps the run's model (unknown)", choose(nil).reason == .unknown)
         check("3 the user's choice wins over the kind, and over uncertainty",
               choose("typewritten", 0.3, override: cand(qwen)) == .init(provider: .openrouter, modelID: qwen.id, reason: .override))
+        // W46.mixed-route-setting: "Read handwriting on typed pages" sends typed and printed pages to the handwritten pick.
+        check("3 handwriting on typed pages: a printed page goes to the handwritten pick, Gemini 3.8 Flash, not Qwen",
+              choose("printed", hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
+        check("3 handwriting on typed pages: a typewritten page too, recorded as the switch's",
+              choose("typewritten", hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
+        check("3 handwriting on typed pages leaves handwritten pages and forms on their own kind's pick",
+              choose("handwritten", hand: true).reason == .kind
+              && choose("forms", hand: true) == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
+        check("3 handwriting on typed pages: no runnable handwritten pick routes the page by its own kind",
+              choose("printed", available: [cand(claude), cand(qwen)], hand: true)
+              == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
+        check("3 handwriting on typed pages: the handwritten pick being the run's model reads as same",
+              choose("printed", run: cand(flash), hand: true).reason == .same)
+        check("3 handwriting on typed pages leaves an unsure page and the user's choice alone",
+              choose("printed", 0.79, hand: true).reason == .uncertain
+              && choose("printed", override: cand(claude), hand: true).reason == .override)
+        check("3 the switch's reason reroutes and reads in the file list",
+              PageKindRouting.Reason.handwriting.routes && !PageKindRouting.Reason.same.routes
+              && PageKindRouting.summary(kind: PageKind(kind: "printed", confidence: 0.9),
+                                         choice: choose("printed", hand: true), modelName: flash.displayName)
+              == "Printed (90%) → \(flash.displayName), for its handwriting")
         check("3 keyed candidates: every built-in model of a keyed provider, none of an unkeyed one",
               PageKindRouting.keyedCandidates(key: { $0 == .gemini ? "k" : ($0 == .openai ? "" : nil) })
               == Set(LLMModel.geminiModels.map(cand)))
@@ -147,6 +168,13 @@ enum OCRPageKindTestDriver {
         store.update([b])
         check("4 a page removed from the list loses its own choice", store.overrides.isEmpty)
         store.batchOverride = nil
+        store.handwritingOnTyped = true
+        let handPlan = store.plan([a, b], guidance: guide, runDefault: cand(qwen))
+        check("4 with handwriting on typed pages the store plans the typed page on the handwritten pick",
+              handPlan.entry(for: a)?.choice == .init(provider: .gemini, modelID: flash.id, reason: .handwriting)
+              && handPlan.entry(for: b)?.choice.reason == .same
+              && handPlan.routedCounts(runModel: qwen).map { "\($0.0.id) \($0.1)" } == ["\(flash.id) 1"])
+        store.handwritingOnTyped = false
         store.overrides[PageReaderPlan.key(a)] = .run
         if let data = try? JSONEncoder().encode(plan), let back = try? JSONDecoder().decode(PageReaderPlan.self, from: data) {
             check("4 the plan round-trips through the run record's Codable", back == plan)

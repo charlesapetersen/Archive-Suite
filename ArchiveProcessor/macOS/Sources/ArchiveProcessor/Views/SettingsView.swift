@@ -64,6 +64,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
+    @AppStorage(DefaultsKeys.ocrHandwritingOnTyped) private var ocrHandwritingOnTyped: Bool = false
 
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
@@ -584,10 +585,20 @@ struct SettingsView: View {
         Toggle(isOn: $ocrPageKindRouting) {
             HStack {
                 Text("Choose each page's reader by its kind")
-                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind (handwritten, typewritten, printed, or a form or table) with Apple Vision, free, in about half a second a page, and the file list preselects the first model in the guide above for that kind that you have a key for. A page whose kind it is not sure of, or whose pick you have no key for, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. On the bench's pages it told the kind right on 139 of 144, and read 1 NES point below choosing by the true kinds. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
+                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind (handwritten, typewritten, printed, or a form or table) with Apple Vision, free, and the file list preselects the first model in the guide above for that kind that you have a key for. A page whose kind it is not sure of, or whose pick you have no key for, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. On the owner's bench pages it told the kind right on 137 of 141 (about 0.6 s a page), and routing by its calls read 1 NES point below choosing by the true kinds. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
             }
         }
         .accessibilityIdentifier("ap.settings.pageKindRouting")
+        // W46.mixed-route-setting: one switch on every typed or printed page, off by default (Phase 4, owner call 3).
+        Toggle(isOn: $ocrHandwritingOnTyped) {
+            HStack {
+                Text("Read handwriting on typed pages (signatures, dates, notes in the margin)")
+                HelpButton(text: "Sends every typewritten or printed page to the reader the guide above picks for handwriting, so a signature, a handwritten date or a note in the margin is read with the typed text. No check can tell a mixed page before it is read, so it acts on every typed or printed page. Measured level on typed pages, not measured on mixed pages: on the bench's 78 typed and printed pages the handwriting readers read the typed text at least as well as Apple Vision; only 2 mixed pages were scored, too few to say. Cost: hosted, about $0.002–0.004 a page; the estimate shows what it adds to your batch. Time on this Mac: figure pending, until the readers are timed like for like. Acts only with “Choose each page's reader by its kind” on, since it uses the kind this Mac tells. Your own choice for a page or a batch in the file list wins.")
+            }
+        }
+        .disabled(!ocrPageKindRouting)
+        .padding(.leading, 18)
+        .accessibilityIdentifier("ap.settings.handwritingOnTyped")
     }
 
     /// The key field's current value for a provider (loaded from the Keychain once, with the fields above).

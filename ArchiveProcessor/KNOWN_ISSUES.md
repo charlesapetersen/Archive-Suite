@@ -293,6 +293,12 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 (`segbench-results/kind-classifier.md` §6). The classifier's inputs are measured exactly as the bench's
 `kind-signals.swift` measures them — change the two together.
 
+**Read handwriting on typed pages** (W46.mixed-route-setting, beneath it) shares every limit above, since it acts only on
+the kinds told there: a PDF's pages, an unsure page and every run it does not apply to keep their reader. Its typed-text
+figure is measured on typed and printed pages only; on **mixed pages it is not measured** (2 pages scored), and its
+**Mac time is pending** `W46.ocr-time-like-for-like` (the app's readers are hosted today, so the switch's cost shows in
+the estimate and its time does not).
+
 ## ⚠️ LIMITATION (W41.app-institutional-compute, 2026-10-18): what the institutional computing import leaves open
 
 `InstitutionalComputeImport` takes a cluster bulk run's text for the pages whose image bytes it read. What it does not do:

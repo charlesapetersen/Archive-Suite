@@ -24,6 +24,12 @@ enum PageKindRouting {
         case same
         /// The user chose the reader for this page or batch.
         case override
+        /// A typewritten or printed page sent to the handwritten kind's pick by "Read handwriting on typed pages"
+        /// (W46.mixed-route-setting), so its signatures, dates and margin notes are read too.
+        case handwriting
+
+        /// The page leaves the run's model for a reader chosen for it (the kind's pick, the user's or the switch's).
+        var routes: Bool { self == .kind || self == .override || self == .handwriting }
     }
 
     struct Choice: Codable, Sendable, Equatable {
@@ -38,20 +44,32 @@ enum PageKindRouting {
         let modelID: String
     }
 
+    /// The kinds "Read handwriting on typed pages" acts on: every typed or printed page, since no pre-flag tells a
+    /// mixed page before it is read (Phase 4, `13-stage-rules/10-kinds-and-routing.md` §7 call 1).
+    static let typedKinds: Set<String> = ["typewritten", "printed"]
+
     /// The page's reader. `available` is every built-in model the user can run now (a keyed provider, or a local
-    /// route), in no order; the guide's order decides. A user override wins over everything.
+    /// route), in no order; the guide's order decides. A user override wins over everything. With
+    /// `handwritingOnTyped`, a sure typed or printed page goes to the handwritten kind's first runnable pick; when
+    /// none can run here it is routed by its own kind, as with the switch off.
     static func choose(kind: PageKind?, guidance: OCRPageGuidance?, available: Set<Candidate>,
-                       runDefault: Candidate, override: Candidate? = nil) -> Choice {
+                       runDefault: Candidate, override: Candidate? = nil, handwritingOnTyped: Bool = false) -> Choice {
         if let o = override { return Choice(provider: o.provider, modelID: o.modelID, reason: .override) }
         func keep(_ r: Reason) -> Choice { Choice(provider: runDefault.provider, modelID: runDefault.modelID, reason: r) }
         guard let kind, let guidance else { return keep(.unknown) }
         guard kind.confidence >= minimumConfidence else { return keep(.uncertain) }
-        guard let entry = guidance.kinds.first(where: { $0.id == kind.kind }) else { return keep(.noPick) }
-        for pick in entry.picks {
-            guard let id = pick.appModel, let c = available.first(where: { $0.modelID == id }) else { continue }
-            return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .kind)
+        func firstPick(_ id: String) -> Candidate? {
+            guard let entry = guidance.kinds.first(where: { $0.id == id }) else { return nil }
+            for pick in entry.picks {
+                if let m = pick.appModel, let c = available.first(where: { $0.modelID == m }) { return c }
+            }
+            return nil
         }
-        return keep(.noPick)
+        if handwritingOnTyped, typedKinds.contains(kind.kind), let c = firstPick("handwritten") {
+            return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .handwriting)
+        }
+        guard let c = firstPick(kind.kind) else { return keep(.noPick) }
+        return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .kind)
     }
 
     /// Every built-in model of a provider the user has a key for, as candidates. Reads the Keychain: call it off a
@@ -94,9 +112,9 @@ enum PageKindRouting {
         }
         let c = entry.choice
         let differs = c.provider != provider || c.modelID != model.id
-        guard c.reason == .kind || c.reason == .override, differs else {
+        guard c.reason.routes, differs else {
             // A choice that is the run's own model is not a reroute, whatever chose it.
-            let reason: Reason = c.reason == .kind || c.reason == .override ? .same : c.reason
+            let reason: Reason = c.reason.routes ? .same : c.reason
             return Reader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
                           record: record(reason, provider, model))
         }
@@ -138,6 +156,7 @@ enum PageKindRouting {
         case .unknown: return "\(k) → \(modelName), the run's model"
         case .noPick: return "\(k), no pick you can run → \(modelName), the run's model"
         case .override: return "\(k) → \(modelName), chosen by you"
+        case .handwriting: return "\(k) → \(modelName), for its handwriting"
         }
     }
 }
@@ -210,5 +229,5 @@ struct PageReaderRecord: Codable, Equatable, Sendable {
 
     /// True when the page was read by a model other than the run's (the guide's pick or the user's choice): only
     /// then is a price recorded.
-    var isRouted: Bool { (reason == .kind || reason == .override) && estimatedCost != nil }
+    var isRouted: Bool { reason.routes && estimatedCost != nil }
 }

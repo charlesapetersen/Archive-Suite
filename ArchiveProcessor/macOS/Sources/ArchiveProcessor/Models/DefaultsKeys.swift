@@ -52,6 +52,8 @@ enum DefaultsKeys {
     static let ocrCascadeOnDisagreement = "ocrCascadeOnDisagreement"
     // W41.app-page-kind (`PageKindRouting`): tell each page's kind and preselect its reader; off by default
     static let ocrPageKindRouting = "ocrPageKindRouting"
+    // W46.mixed-route-setting: typed and printed pages go to the handwritten kind's pick; off by default
+    static let ocrHandwritingOnTyped = "ocrHandwritingOnTyped"
 
     // Input & processing
     static let batchMode = "batchMode"

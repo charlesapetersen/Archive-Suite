@@ -23,6 +23,8 @@ final class PageKindStore: ObservableObject {
     @Published var overrides: [String: Pick] = [:]
     /// The user's reader for every page of the batch; nil = by kind.
     @Published var batchOverride: Pick?
+    /// "Read handwriting on typed pages" (W46.mixed-route-setting), mirrored from its setting by the OCR view.
+    @Published var handwritingOnTyped = false
     /// Pages still waiting to be classified.
     @Published private(set) var pending = 0
     /// Every built-in model the user has a key for, refreshed with the file list (one Keychain read per provider).
@@ -74,7 +76,8 @@ final class PageKindStore: ObservableObject {
     func choice(for url: URL, guidance: OCRPageGuidance?, runDefault: PageKindRouting.Candidate) -> PageKindRouting.Choice? {
         guard let told = kind(for: url) else { return nil }   // not classified yet
         return PageKindRouting.choose(kind: told, guidance: guidance, available: available, runDefault: runDefault,
-                                      override: (overrides[PageReaderPlan.key(url)] ?? batchOverride)?.resolve(runDefault))
+                                      override: (overrides[PageReaderPlan.key(url)] ?? batchOverride)?.resolve(runDefault),
+                                      handwritingOnTyped: handwritingOnTyped)
     }
 
     /// The run's plan: every classified image file among `urls`. A page still waiting is left out (the run's model).
@@ -118,7 +121,7 @@ struct PageKindRowLine: View {
         guard let told = store.kind(for: url), let c = store.choice(for: url, guidance: guidance, runDefault: runDefault)
         else { return nil }
         let name = PageKindRouting.model(.init(provider: c.provider, modelID: c.modelID))?.displayName ?? runModel.displayName
-        let routed = (c.reason == .kind || c.reason == .override) && c != runDefaultChoice(c.reason)
+        let routed = c.reason.routes && c != runDefaultChoice(c.reason)
         return (PageKindRouting.summary(kind: told, choice: c, modelName: name), routed)
     }
 
