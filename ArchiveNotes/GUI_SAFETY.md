@@ -30,7 +30,10 @@ suite therefore routes through the projector against **scratch copies only**.
    the bookmark-untouched invariant green. The one exception is `ChooseStoreFolderUITests` (VM), which
    drives it with `-ANUITestStoreBookmarkSuite <suite>` so the pick lands in a throwaway defaults suite,
    never `notesStoreRootBookmark`, and `-ANUITestStorePickPath` in place of the panel
-   (W40.fix-notes-choose-store). Without that argument the rule stands.
+   (W40.fix-notes-choose-store). Without that argument the rule stands. Its restart passes the launch
+   arguments on (`StoreFolderChooser.relaunchApp`), so the relaunched app opens the same scratch stores.
+   Likewise the note a window had open is remembered only under `-ANUITestLastOpenSuite <suite>`
+   (`ReopenLastNoteUITests`); any other UITest launch neither reads nor writes it (W40.fix-notes-small-wins).
 4. **The harness only READS tags to assert.** `gui-drive-notes.sh` uses `tag -l` (read) to verify a
    write landed; it never writes tags itself — writes go through the app's projector.
 

@@ -55,9 +55,10 @@ macOS/Sources/ArchiveNotes/
     RootFolderStore.swift          Security-scoped bookmark to the Notes store root; a chosen store that no
                                    longer opens leaves no store (never the default in its place)
     StoreFolderChooser.swift       File ▸ Choose Store Folder…: adopts a store in place or starts one in an
-                                   empty folder, refuses anything else; remembers it and quits, the next
-                                   launch opens it (W40.fix-notes-choose-store). Each store has its own
-                                   index file (NotesModel.indexFileName)
+                                   empty folder, refuses anything else; remembers it, quits and starts
+                                   Notes again in it (Restart and Switch, W40.fix-notes-small-wins;
+                                   W40.fix-notes-choose-store). Each store has its own index file
+                                   (NotesModel.indexFileName)
     RootMarkerStore.swift          Idempotent .archive-suite-root.json lifecycle
     SourceAnchor+NotePassage.swift note-passage provenance anchor factory + notePassageTarget parser
                                    (reuses ArchiveCore.DurableLink §8.2 URL) (W7-S1);
