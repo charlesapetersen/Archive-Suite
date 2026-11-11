@@ -619,11 +619,13 @@ SETS = [('stamp', 'stamp class, all 40'), ('stamp-marked', 'stamp class, a colou
         ('96', "the owner's 96, dropout wherever a mark exists (ungated)"),
         ('96-gated', "the owner's 96, the gate"), ('96-fired', 'the 96, the pages the gate fires on')]
 FLOOR = 0.49      # Gemini 3.7 Flash's rerun floor on the 96, twice its rerun range (ocr-rerun-noise.md)
-VISION_NOTE = ('The cached `segbench-dewarp` binary (built 2026-10-31) read less text on macOS 27.2 than the bench\'s '
-               'segbench-ocr on the same frozen images: on 53 of the 96 its NES was more than 5 points off, and its mean '
-               'on the 96 was 60.0 against the bench\'s 83.1. Built again from the same `dewarp.swift`, it gives the '
-               'bench\'s text character for character (checked on p001, p004, p005 and p006), and every Vision figure '
-               'here is from the rebuild; the cached binary was replaced with it (the old one kept beside it).')
+VISION_NOTE = ('The first Vision run here (2026-11-11 04:49-04:54) read less text than the bench\'s segbench-ocr on the '
+               'same frozen images: on 53 of the 96 its NES was more than 5 points off, and its mean on the 96 was 60.0 '
+               'against the bench\'s 83.1, whole lines missing. Every Vision figure here is from a second run (05:38), '
+               'which gives the bench\'s text. The fault was in that one run, not in the cached `segbench-dewarp` binary '
+               'it was first blamed on: W46.dewarp-bin-reread read the 96 again with that binary the same morning and '
+               'got 93 of 96 texts identical to the second run (the other three are handwritten pages that vary run to '
+               'run on 27.2). The first run\'s lines are kept in `lines-dewarp-bin-20261031/`.')
 
 
 def wins(summ, reader):
