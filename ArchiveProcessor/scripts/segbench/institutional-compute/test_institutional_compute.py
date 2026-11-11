@@ -737,7 +737,10 @@ class FakeSeg(http.server.BaseHTTPRequestHandler):
 
 @unittest.skipUnless(NUMPY, 'cluster_seg imports the bench (numpy)')
 class Seg(unittest.TestCase):
-    """cluster_seg.py run on a synthetic pack (the prompt is the window's page list, so the fake can answer it)."""
+    """cluster_seg.py run on a synthetic pack (the prompt is the window's page list, so the fake can answer it).
+
+    Needs a Python with numpy (cluster_seg imports the bench); under a plain `python3` the class is skipped, so run
+    it with the lab venv's Python."""
 
     @classmethod
     def setUpClass(cls):
@@ -819,9 +822,10 @@ class Seg(unittest.TestCase):
         args = lambda **k: type('A', (), {'out': str(self.tmp / 'p'), 'box': None, 'final': False, **k})  # noqa: E731
         with self.assertRaisesRegex(SystemExit, 'not development'):
             S.cmd_pack(args(box=['Stanton']))
-        saved, saved_students = R.TEACHER_FROZEN, R.STUDENTS_FROZEN
-        try:
+        saved, saved_students, saved_joint = R.TEACHER_FROZEN, R.STUDENTS_FROZEN, R.JOINT_FROZEN
+        try:                                                 # every freeze frozen_keys reads, redirected
             R.STUDENTS_FROZEN = saved_students.with_name('seg-students-absent.json')
+            R.JOINT_FROZEN = saved_joint.with_name('seg-date-model-frozen-absent.json')
             R.TEACHER_FROZEN = saved.with_name('seg-teacher-absent.json')
             with self.assertRaisesRegex(SystemExit, 'no freeze'):
                 S.cmd_pack(args(final=True))
@@ -832,7 +836,7 @@ class Seg(unittest.TestCase):
         finally:
             if R.TEACHER_FROZEN != saved:
                 R.TEACHER_FROZEN.unlink(missing_ok=True)
-            R.TEACHER_FROZEN, R.STUDENTS_FROZEN = saved, saved_students
+            R.TEACHER_FROZEN, R.STUDENTS_FROZEN, R.JOINT_FROZEN = saved, saved_students, saved_joint
         self.assertFalse((self.tmp / 'p').exists())          # refused before a single image was written
 
     def test_pack_for_another_model_is_refused(self):

@@ -455,6 +455,8 @@ def teacher() -> str:
 # W41.seg-finetune: the students, frozen on the development boxes and the held-out collections before their one
 # test-box run, as the teacher was.
 STUDENTS_FROZEN = RESULTS / "seg-students.json"
+# W41.seg-date-model: the joint recipe's students, frozen the same way.
+JOINT_FROZEN = RESULTS / "seg-date-model-frozen.json"
 
 
 def freeze_students(keys) -> None:
@@ -478,9 +480,8 @@ def frozen_keys() -> list[str]:
         keys.append(committed(TEACHER_FROZEN)["teacher"])
     if STUDENTS_FROZEN.exists():
         keys += committed(STUDENTS_FROZEN)["students"]
-    joint = RESULTS / "seg-date-model-frozen.json"
-    if joint.exists():
-        keys += committed(joint)["students"]
+    if JOINT_FROZEN.exists():
+        keys += committed(JOINT_FROZEN)["students"]
     if not keys:
         raise SystemExit("no freeze: run `freeze-teacher <key>` or `freeze-students <key>...` and commit it first")
     return keys

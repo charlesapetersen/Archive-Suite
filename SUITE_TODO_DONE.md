@@ -15008,3 +15008,12 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   12, `settings-routes.json` rebuilt) say it. The anchor's point margin is unchanged. No rehearsal-cache scratch made
   (read `kit-gate/gaps-owner.json` and `corpus-pairs/labels.jsonl` only).
   <!-- /W46.kit-gate-groups -->
+- [x] **W46.fix-freeze-guard-test — the test-box freeze guard's test, red on main since 2026-10-18 [XS]** · §Document processing review — W46 · SHIPPED 2026-11-11
+  Measurement review 2026-11-11 pass 12, P12-6. `Seg.test_test_boxes_need_the_committed_teacher_freeze` had failed since
+  2d757139: `method_openrouter.frozen_keys` read a third freeze, `segbench-results/seg-date-model-frozen.json`, from an
+  inline path the test could not redirect, so it got "fs-qwen3.5-27b is not frozen" instead of "no freeze" and its "not
+  committed" and nothing-written assertions never ran. The path is now the module constant `JOINT_FROZEN` (no behaviour
+  change), the test redirects all three freezes, and the `Seg` docstring says it needs a Python with numpy (skipped under
+  a plain `python3`). Measured: the test fails on main and passes with the fix (torch-env Python); the whole file is
+  61 tests OK, 4 skipped. Offline, $0; no rehearsal-cache scratch made.
+  <!-- /W46.fix-freeze-guard-test -->
