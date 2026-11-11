@@ -94,7 +94,9 @@ newspapers (L9), clippings (no figure), nonlatin (N1-N6), early_modern_hands (L2
 ## 4. Table rows
 
 The rows below were generated from the bench's files by a copy script (no figure computed; values rounded to two
-places from the raw value the `source` holds). `overall` is the headline (answered, p081 apart, with the paired
+places from the raw value the `source` holds); since W46.settings-routes-table that script is part of
+`ArchiveProcessor/scripts/segbench/settings_routes.py`, which builds the single-route rows from the files themselves
+(this block is kept as the note's record; the cascade rows below are read from here). `overall` is the headline (answered, p081 apart, with the paired
 difference from Qwen3.6 27B); `kinds` is strict per kind on the 96; `hands16` is the hand sheet's corrected score;
 `public` gives [strict, answered, answered/n] by stratum from `ocr-scorers.json` (one current scorer, 27.2 Vision);
 `public_L1-L3` is `ocr-ppocrv6-hands.json`. They replace `settings-design/figures.json`'s "ocr" rows, whose overall

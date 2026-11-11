@@ -95,7 +95,7 @@ hold out whole collections or boxes, never a random page split).
   },
   "cost": {"usd_1000_list": 0.0, "usd_1000_batch": null, "price_read": null,
     "source": {"file": "ArchiveProcessor/segbench-results/seg-students.md", "route": "Qwen3.5 2B, fine-tuned", "attribute": "per 1,000 pages, standard", "value": "$0.00"}},
-  "time": {"per_unit_s": 6.0, "measured": true, "measured_on": "M3 Pro 18 GB, 8-bit MLX build, about 6 s a page (18 s a seven-page window)",
+  "time": {"per_unit_s": 6.0, "per_window_s": 18.0, "measured": true, "measured_on": "M3 Pro 18 GB, 8-bit MLX build, about 6 s a page (18 s a seven-page window)", "derived": "seconds a seven-page window over 3, a window every 3 pages at stride 3",
     "source": {"file": "ArchiveProcessor/segbench-results/seg-students.md", "route": "2B, 8-bit", "attribute": "s a window", "value": "18"}},
   "memory": {"peak_gb": 4.4, "measured_on": "M3 Pro 18 GB",
     "source": {"file": "ArchiveProcessor/segbench-results/seg-students.md", "route": "2B, 8-bit", "attribute": "peak GB", "value": "4.4"}},

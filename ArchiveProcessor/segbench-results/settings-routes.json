@@ -76,7 +76,8 @@
    "metric": {
     "id": "rotation_pages_wrong",
     "label": "Rotation: held-out owner pages wrong at any of four turns (turns exact beside it)",
-    "higher_is_better": false
+    "higher_is_better": false,
+    "figure": "owner-heldout"
    },
    "kinds": [
     "latin-modern",
@@ -535,7 +536,8 @@
    "metric": {
     "id": "nes",
     "label": "NES against owner truth",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": null
    },
    "kinds": [],
    "rules": [
@@ -570,12 +572,12 @@
    "metric": {
     "id": "nes",
     "label": "strict NES",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "<kind>"
    },
    "kinds": [
     "newspapers",
-    "typewritten",
-    "printed",
+    "typed",
     "clippings",
     "tables",
     "handwritten",
@@ -845,7 +847,8 @@
    "metric": {
     "id": "nes_answered",
     "label": "NES on answered pages, failures beside",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten"
    },
    "kinds": [
     "typewritten",
@@ -859,6 +862,37 @@
     "early_modern_hands",
     "early_print"
    ],
+   "kind_strata": {
+    "handwritten": [
+     "L1",
+     "L2",
+     "L3"
+    ],
+    "forms": [
+     "L4"
+    ],
+    "newspapers": [
+     "L9"
+    ],
+    "nonlatin": [
+     "N1",
+     "N2",
+     "N3",
+     "N4",
+     "N5",
+     "N6"
+    ],
+    "early_modern_hands": [
+     "L2",
+     "L5",
+     "L6",
+     "L7"
+    ],
+    "early_print": [
+     "L8"
+    ],
+    "source": "04-reading.md §3. The rule for the settings layer"
+   },
    "rules": [
     {
      "id": "rank-answered-or-strict",
@@ -953,29 +987,43 @@
         "value": "83.61"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 92.18,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        92.18,
-        50,
-        50
-       ],
-       "printed": [
-        80.54,
-        28,
-        28
-       ],
-       "handwritten": [
-        60.58,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "apple-vision",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 92.18, 'printed': 80.54, 'handwritten': 60.58}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "92.18"
+       }
+      },
+      "printed": {
+       "value": 80.54,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "apple-vision",
+        "attribute": "charts.printed.scores[0]",
+        "value": "80.54"
+       }
+      },
+      "handwritten": {
+       "value": 60.58,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "apple-vision",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "60.58"
        }
       },
       "hands16": {
@@ -1096,29 +1144,43 @@
         "value": "88.82"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 92.03,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        92.03,
-        50,
-        50
-       ],
-       "printed": [
-        85.97,
-        28,
-        28
-       ],
-       "handwritten": [
-        86.04,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "xiaomi-ocr-0-bf16",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 92.03, 'printed': 85.97, 'handwritten': 86.04}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "92.03"
+       }
+      },
+      "printed": {
+       "value": 85.97,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "xiaomi-ocr-0-bf16",
+        "attribute": "charts.printed.scores[0]",
+        "value": "85.97"
+       }
+      },
+      "handwritten": {
+       "value": 86.04,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "xiaomi-ocr-0-bf16",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "86.04"
        }
       },
       "hands16": {
@@ -1215,29 +1277,43 @@
         "value": "90.84"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 93.69,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        93.69,
-        49,
-        50
-       ],
-       "printed": [
-        85.89,
-        27,
-        28
-       ],
-       "handwritten": [
-        80.37,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "paddleocr-vl1.6-bf16",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 93.69, 'printed': 85.89, 'handwritten': 80.37}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.69"
+       }
+      },
+      "printed": {
+       "value": 85.89,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "paddleocr-vl1.6-bf16",
+        "attribute": "charts.printed.scores[0]",
+        "value": "85.89"
+       }
+      },
+      "handwritten": {
+       "value": 80.37,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "paddleocr-vl1.6-bf16",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "80.37"
        }
       },
       "hands16": {
@@ -1333,29 +1409,43 @@
         "value": "89.15"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 90.81,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        90.81,
-        50,
-        50
-       ],
-       "printed": [
-        87.98,
-        28,
-        28
-       ],
-       "handwritten": [
-        89.91,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "lightonocr-3-4b-mlx8",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 90.81, 'printed': 87.98, 'handwritten': 89.91}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "90.81"
+       }
+      },
+      "printed": {
+       "value": 87.98,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr-3-4b-mlx8",
+        "attribute": "charts.printed.scores[0]",
+        "value": "87.98"
+       }
+      },
+      "handwritten": {
+       "value": 89.91,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr-3-4b-mlx8",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.91"
        }
       },
       "hands16": {
@@ -1453,29 +1543,43 @@
         "value": "92.93"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 93.32,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        93.32,
-        49,
-        50
-       ],
-       "printed": [
-        92.78,
-        28,
-        28
-       ],
-       "handwritten": [
-        88.06,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.5-9b-mlx4",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 93.32, 'printed': 92.78, 'handwritten': 88.06}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.32"
+       }
+      },
+      "printed": {
+       "value": 92.78,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b-mlx4",
+        "attribute": "charts.printed.scores[0]",
+        "value": "92.78"
+       }
+      },
+      "handwritten": {
+       "value": 88.06,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b-mlx4",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "88.06"
        }
       },
       "hands16": {
@@ -1573,29 +1677,43 @@
         "value": "93.62"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 91.59,
+       "answered": 48,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        91.59,
-        48,
-        50
-       ],
-       "printed": [
-        91.69,
-        27,
-        28
-       ],
-       "handwritten": [
-        89.24,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3-vl-8b-mlx4",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 91.59, 'printed': 91.69, 'handwritten': 89.24}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "91.59"
+       }
+      },
+      "printed": {
+       "value": 91.69,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b-mlx4",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.69"
+       }
+      },
+      "handwritten": {
+       "value": 89.24,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b-mlx4",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.24"
        }
       },
       "hands16": {
@@ -1676,29 +1794,43 @@
       "built_in": true
      },
      "figures": {
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 46.14,
+       "answered": 33,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        46.14,
-        33,
-        50
-       ],
-       "printed": [
-        27.97,
-        15,
-        28
-       ],
-       "handwritten": [
-        54.81,
-        13,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "apple-fm-27",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 46.14, 'printed': 27.97, 'handwritten': 54.81}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "46.14"
+       }
+      },
+      "printed": {
+       "value": 27.97,
+       "answered": 15,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "apple-fm-27",
+        "attribute": "charts.printed.scores[0]",
+        "value": "27.97"
+       }
+      },
+      "handwritten": {
+       "value": 54.81,
+       "answered": 13,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "apple-fm-27",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "54.81"
        }
       }
      },
@@ -1848,29 +1980,43 @@
         "value": "93.06"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.69,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.69,
-        50,
-        50
-       ],
-       "printed": [
-        92.34,
-        28,
-        28
-       ],
-       "handwritten": [
-        88.83,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.6-35b-a3b",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.69, 'printed': 92.34, 'handwritten': 88.83}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.69"
+       }
+      },
+      "printed": {
+       "value": 92.34,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-35b-a3b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "92.34"
+       }
+      },
+      "handwritten": {
+       "value": 88.83,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-35b-a3b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "88.83"
        }
       },
       "hands16": {
@@ -1949,29 +2095,43 @@
         "value": "95.38"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.54,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.54,
-        49,
-        50
-       ],
-       "printed": [
-        94.82,
-        28,
-        28
-       ],
-       "handwritten": [
-        92.61,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.6-27b",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.54, 'printed': 94.82, 'handwritten': 92.61}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.54"
+       }
+      },
+      "printed": {
+       "value": 94.82,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-27b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "94.82"
+       }
+      },
+      "handwritten": {
+       "value": 92.61,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-27b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "92.61"
        }
       },
       "hands16": {
@@ -2048,29 +2208,43 @@
         "value": "94.01"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 96.09,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        96.09,
-        50,
-        50
-       ],
-       "printed": [
-        93.25,
-        28,
-        28
-       ],
-       "handwritten": [
-        91.59,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3-vl-235b",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 96.09, 'printed': 93.25, 'handwritten': 91.59}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.09"
+       }
+      },
+      "printed": {
+       "value": 93.25,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-235b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "93.25"
+       }
+      },
+      "handwritten": {
+       "value": 91.59,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-235b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "91.59"
        }
       },
       "hands16": {
@@ -2200,29 +2374,43 @@
         "value": "95.11"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 93.42,
+       "answered": 48,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        93.42,
-        48,
-        50
-       ],
-       "printed": [
-        91.27,
-        27,
-        28
-       ],
-       "handwritten": [
-        91.25,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.8-flash",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 93.42, 'printed': 91.27, 'handwritten': 91.25}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.42"
+       }
+      },
+      "printed": {
+       "value": 91.27,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-flash",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.27"
+       }
+      },
+      "handwritten": {
+       "value": 91.25,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-flash",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "91.25"
        }
       },
       "hands16": {
@@ -2303,29 +2491,43 @@
         "value": "95.17"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 97.56,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        97.56,
-        50,
-        50
-       ],
-       "printed": [
-        87.92,
-        26,
-        28
-       ],
-       "handwritten": [
-        91.96,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gemini3.5-flash-lite",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 97.56, 'printed': 87.92, 'handwritten': 91.96}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "97.56"
+       }
+      },
+      "printed": {
+       "value": 87.92,
+       "answered": 26,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.5-flash-lite",
+        "attribute": "charts.printed.scores[0]",
+        "value": "87.92"
+       }
+      },
+      "handwritten": {
+       "value": 91.96,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.5-flash-lite",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "91.96"
        }
       },
       "hands16": {
@@ -2407,29 +2609,43 @@
         "value": "94.59"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 96.36,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        96.36,
-        50,
-        50
-       ],
-       "printed": [
-        86.85,
-        26,
-        28
-       ],
-       "handwritten": [
-        86.55,
-        15,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gemini3.1-flash-lite",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 96.36, 'printed': 86.85, 'handwritten': 86.55}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.36"
+       }
+      },
+      "printed": {
+       "value": 86.85,
+       "answered": 26,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.1-flash-lite",
+        "attribute": "charts.printed.scores[0]",
+        "value": "86.85"
+       }
+      },
+      "handwritten": {
+       "value": 86.55,
+       "answered": 15,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.1-flash-lite",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "86.55"
        }
       },
       "hands16": {
@@ -2510,29 +2726,43 @@
         "value": "93.56"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 94.98,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        94.98,
-        49,
-        50
-       ],
-       "printed": [
-        92.61,
-        28,
-        28
-       ],
-       "handwritten": [
-        85.2,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gpt5.6-luna",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 94.98, 'printed': 92.61, 'handwritten': 85.2}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "94.98"
+       }
+      },
+      "printed": {
+       "value": 92.61,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gpt5.6-luna",
+        "attribute": "charts.printed.scores[0]",
+        "value": "92.61"
+       }
+      },
+      "handwritten": {
+       "value": 85.2,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gpt5.6-luna",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "85.2"
        }
       },
       "hands16": {
@@ -2609,29 +2839,43 @@
         "value": "94.06"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 96.18,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        96.18,
-        50,
-        50
-       ],
-       "printed": [
-        93.72,
-        28,
-        28
-       ],
-       "handwritten": [
-        90.84,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.5-397b",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 96.18, 'printed': 93.72, 'handwritten': 90.84}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.18"
+       }
+      },
+      "printed": {
+       "value": 93.72,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-397b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "93.72"
+       }
+      },
+      "handwritten": {
+       "value": 90.84,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-397b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "90.84"
        }
       },
       "hands16": {
@@ -2712,29 +2956,43 @@
         "value": "96.47"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 98.73,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        98.73,
-        50,
-        50
-       ],
-       "printed": [
-        87.21,
-        26,
-        28
-       ],
-       "handwritten": [
-        95.81,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gemini3.8-flash",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 98.73, 'printed': 87.21, 'handwritten': 95.81}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "98.73"
+       }
+      },
+      "printed": {
+       "value": 87.21,
+       "answered": 26,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.8-flash",
+        "attribute": "charts.printed.scores[0]",
+        "value": "87.21"
+       }
+      },
+      "handwritten": {
+       "value": 95.81,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.8-flash",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "95.81"
        }
       },
       "hands16": {
@@ -2864,29 +3122,43 @@
         "value": "96.76"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 98.81,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        98.81,
-        50,
-        50
-       ],
-       "printed": [
-        94.91,
-        28,
-        28
-       ],
-       "handwritten": [
-        95.07,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gemini3.7-flash-gw",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 98.81, 'printed': 94.91, 'handwritten': 95.07}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "98.81"
+       }
+      },
+      "printed": {
+       "value": 94.91,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.7-flash-gw",
+        "attribute": "charts.printed.scores[0]",
+        "value": "94.91"
+       }
+      },
+      "handwritten": {
+       "value": 95.07,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.7-flash-gw",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "95.07"
        }
       },
       "hands16": {
@@ -3082,29 +3354,43 @@
         "value": "96.85"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 98.74,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        98.74,
-        50,
-        50
-       ],
-       "printed": [
-        89.21,
-        26,
-        28
-       ],
-       "handwritten": [
-        93.98,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gemini3.1-pro",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 98.74, 'printed': 89.21, 'handwritten': 93.98}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "98.74"
+       }
+      },
+      "printed": {
+       "value": 89.21,
+       "answered": 26,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.1-pro",
+        "attribute": "charts.printed.scores[0]",
+        "value": "89.21"
+       }
+      },
+      "handwritten": {
+       "value": 93.98,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.1-pro",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "93.98"
        }
       },
       "hands16": {
@@ -3185,29 +3471,43 @@
         "value": "95.48"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 97.34,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        97.34,
-        50,
-        50
-       ],
-       "printed": [
-        88.18,
-        26,
-        28
-       ],
-       "handwritten": [
-        92.69,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gemini3.5-flash",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 97.34, 'printed': 88.18, 'handwritten': 92.69}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "97.34"
+       }
+      },
+      "printed": {
+       "value": 88.18,
+       "answered": 26,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.5-flash",
+        "attribute": "charts.printed.scores[0]",
+        "value": "88.18"
+       }
+      },
+      "handwritten": {
+       "value": 92.69,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gemini3.5-flash",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "92.69"
        }
       },
       "hands16": {
@@ -3288,29 +3588,43 @@
         "value": "94.81"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.49,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.49,
-        49,
-        50
-       ],
-       "printed": [
-        93.32,
-        28,
-        28
-       ],
-       "handwritten": [
-        89.13,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "gpt5.4-mini",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.49, 'printed': 93.32, 'handwritten': 89.13}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.49"
+       }
+      },
+      "printed": {
+       "value": 93.32,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gpt5.4-mini",
+        "attribute": "charts.printed.scores[0]",
+        "value": "93.32"
+       }
+      },
+      "handwritten": {
+       "value": 89.13,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "gpt5.4-mini",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.13"
        }
       },
       "hands16": {
@@ -3388,29 +3702,43 @@
         "value": "93.25"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.46,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.46,
-        50,
-        50
-       ],
-       "printed": [
-        92.46,
-        28,
-        28
-       ],
-       "handwritten": [
-        92.2,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "mistral-large4",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.46, 'printed': 92.46, 'handwritten': 92.2}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.46"
+       }
+      },
+      "printed": {
+       "value": 92.46,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-large4",
+        "attribute": "charts.printed.scores[0]",
+        "value": "92.46"
+       }
+      },
+      "handwritten": {
+       "value": 92.2,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-large4",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "92.2"
        }
       },
       "hands16": {
@@ -3487,29 +3815,43 @@
         "value": "93.01"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.68,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.68,
-        50,
-        50
-       ],
-       "printed": [
-        91.49,
-        28,
-        28
-       ],
-       "handwritten": [
-        89.1,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "mistral-ocr-4-1",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.68, 'printed': 91.49, 'handwritten': 89.1}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.68"
+       }
+      },
+      "printed": {
+       "value": 91.49,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-ocr-4-1",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.49"
+       }
+      },
+      "handwritten": {
+       "value": 89.1,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-ocr-4-1",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.1"
        }
       },
       "hands16": {
@@ -3587,29 +3929,43 @@
         "value": "96.48"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 98.57,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        98.57,
-        50,
-        50
-       ],
-       "printed": [
-        96.31,
-        28,
-        28
-       ],
-       "handwritten": [
-        92.5,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "claude-sonnet5.5",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 98.57, 'printed': 96.31, 'handwritten': 92.5}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "98.57"
+       }
+      },
+      "printed": {
+       "value": 96.31,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "claude-sonnet5.5",
+        "attribute": "charts.printed.scores[0]",
+        "value": "96.31"
+       }
+      },
+      "handwritten": {
+       "value": 92.5,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "claude-sonnet5.5",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "92.5"
        }
       },
       "hands16": {
@@ -3691,29 +4047,43 @@
         "value": "95.31"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 97.22,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        97.22,
-        50,
-        50
-       ],
-       "printed": [
-        94.93,
-        28,
-        28
-       ],
-       "handwritten": [
-        92.8,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.6-27b-farmshare",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 97.22, 'printed': 94.93, 'handwritten': 92.8}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "97.22"
+       }
+      },
+      "printed": {
+       "value": 94.93,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-27b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "94.93"
+       }
+      },
+      "handwritten": {
+       "value": 92.8,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-27b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "92.8"
        }
       },
       "public_L1-L3": {
@@ -3889,29 +4259,43 @@
         "value": "95.38"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 97.61,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        97.61,
-        50,
-        50
-       ],
-       "printed": [
-        94.98,
-        28,
-        28
-       ],
-       "handwritten": [
-        92.1,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.5-27b-farmshare",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 97.61, 'printed': 94.98, 'handwritten': 92.1}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "97.61"
+       }
+      },
+      "printed": {
+       "value": 94.98,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-27b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "94.98"
+       }
+      },
+      "handwritten": {
+       "value": 92.1,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-27b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "92.1"
        }
       },
       "hands16": {
@@ -4100,29 +4484,43 @@
         "value": "94.56"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 96.45,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        96.45,
-        50,
-        50
-       ],
-       "printed": [
-        95.26,
-        28,
-        28
-       ],
-       "handwritten": [
-        89.84,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.6-35b-a3b-farmshare",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 96.45, 'printed': 95.26, 'handwritten': 89.84}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.45"
+       }
+      },
+      "printed": {
+       "value": 95.26,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-35b-a3b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "95.26"
+       }
+      },
+      "handwritten": {
+       "value": 89.84,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.6-35b-a3b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.84"
        }
       },
       "public_L1-L3": {
@@ -4298,29 +4696,43 @@
         "value": "93.27"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.84,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.84,
-        50,
-        50
-       ],
-       "printed": [
-        89.94,
-        28,
-        28
-       ],
-       "handwritten": [
-        91.76,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "infinity-parser2-pro-sherlock",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.84, 'printed': 89.94, 'handwritten': 91.76}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.84"
+       }
+      },
+      "printed": {
+       "value": 89.94,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "infinity-parser2-pro-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "89.94"
+       }
+      },
+      "handwritten": {
+       "value": 91.76,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "infinity-parser2-pro-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "91.76"
        }
       },
       "hands16": {
@@ -4446,7 +4858,7 @@
      },
      "cost": {
       "usd_1000_list": 0.0,
-      "openrouter_equivalent_usd_1000": 0.0,
+      "openrouter_equivalent_usd_1000": null,
       "source": {
        "file": "ArchiveOCRBench/data/panel-data.json",
        "route": "infinity-parser2-pro-sherlock",
@@ -4510,29 +4922,43 @@
         "value": "89.38"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 91.18,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        91.18,
-        50,
-        50
-       ],
-       "printed": [
-        88.54,
-        28,
-        28
-       ],
-       "handwritten": [
-        88.85,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "lightonocr3-4b-farmshare",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 91.18, 'printed': 88.54, 'handwritten': 88.85}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "91.18"
+       }
+      },
+      "printed": {
+       "value": 88.54,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr3-4b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "88.54"
+       }
+      },
+      "handwritten": {
+       "value": 88.85,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr3-4b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "88.85"
        }
       },
       "hands16": {
@@ -4658,7 +5084,7 @@
      },
      "cost": {
       "usd_1000_list": 0.0,
-      "openrouter_equivalent_usd_1000": 0.0,
+      "openrouter_equivalent_usd_1000": null,
       "source": {
        "file": "ArchiveOCRBench/data/panel-data.json",
        "route": "lightonocr3-4b-farmshare",
@@ -4725,29 +5151,43 @@
         "value": "90.89"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 93.67,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        93.67,
-        49,
-        50
-       ],
-       "printed": [
-        86.31,
-        27,
-        28
-       ],
-       "handwritten": [
-        80.06,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "paddleocr-vl1.6-sherlock",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 93.67, 'printed': 86.31, 'handwritten': 80.06}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.67"
+       }
+      },
+      "printed": {
+       "value": 86.31,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "paddleocr-vl1.6-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "86.31"
+       }
+      },
+      "handwritten": {
+       "value": 80.06,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "paddleocr-vl1.6-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "80.06"
        }
       },
       "hands16": {
@@ -4856,7 +5296,7 @@
      },
      "cost": {
       "usd_1000_list": 0.0,
-      "openrouter_equivalent_usd_1000": 0.0,
+      "openrouter_equivalent_usd_1000": null,
       "source": {
        "file": "ArchiveOCRBench/data/panel-data.json",
        "route": "paddleocr-vl1.6-sherlock",
@@ -4920,29 +5360,43 @@
         "value": "88.78"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 92.04,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        92.04,
-        50,
-        50
-       ],
-       "printed": [
-        85.89,
-        28,
-        28
-       ],
-       "handwritten": [
-        85.99,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "xiaomi-ocr-0-sherlock",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 92.04, 'printed': 85.89, 'handwritten': 85.99}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "92.04"
+       }
+      },
+      "printed": {
+       "value": 85.89,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "xiaomi-ocr-0-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "85.89"
+       }
+      },
+      "handwritten": {
+       "value": 85.99,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "xiaomi-ocr-0-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "85.99"
        }
       },
       "hands16": {
@@ -5068,7 +5522,7 @@
      },
      "cost": {
       "usd_1000_list": 0.0,
-      "openrouter_equivalent_usd_1000": 0.0,
+      "openrouter_equivalent_usd_1000": null,
       "source": {
        "file": "ArchiveOCRBench/data/panel-data.json",
        "route": "xiaomi-ocr-0-sherlock",
@@ -5136,29 +5590,43 @@
         "value": "95.13"
        }
       },
-      "kinds": {
-       "basis": "strict, failure as 0; [NES, answered, n]",
+      "typewritten": {
+       "value": 95.64,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
        "truth": "owner-96",
-       "typewritten": [
-        95.64,
-        49,
-        50
-       ],
-       "printed": [
-        91.15,
-        27,
-        28
-       ],
-       "handwritten": [
-        90.7,
-        16,
-        16
-       ],
        "source": {
         "file": "ArchiveOCRBench/data/panel-data.json",
         "route": "qwen3.5-9b-sherlock",
-        "attribute": "charts.<kind>.scores",
-        "value": "{'typewritten': 95.64, 'printed': 91.15, 'handwritten': 90.7}"
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.64"
+       }
+      },
+      "printed": {
+       "value": 91.15,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.15"
+       }
+      },
+      "handwritten": {
+       "value": 90.7,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-9b-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "90.7"
        }
       }
      },
@@ -5914,7 +6382,8 @@
    "metric": {
     "id": "line_pass_strict",
     "label": "strict line pass rate, PDFKit drag",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "<kind>"
    },
    "kinds": [
     "typewritten",
@@ -6355,7 +6824,8 @@
    "metric": {
     "id": "marks_read_nes08",
     "label": "Marks read (NES >= 0.8), of 35 owner-core marks",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": null
    },
    "kinds": [],
    "rules": [
@@ -6384,7 +6854,8 @@
    "metric": {
     "id": "pages_exact",
     "label": "Pages in an exact document, no checking, on the two locked test boxes",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "test-boxes"
    },
    "kinds": [
     "test-boxes",
@@ -6594,11 +7065,17 @@
       }
      },
      "time": {
-      "per_unit_s": 5.3,
+      "per_unit_s": 5.33,
+      "per_window_s": 16.0,
       "measured": false,
-      "measured_on": "16 s a 3.7 gateway call, seg-boxes-score.md, as figures.json derives it",
-      "source": null,
-      "estimate": "hand-entered in the 2026-11-04 settings prototype (figures.json, Gemini only: 5.3 (s_est true)); no measuring file"
+      "measured_on": "Gemini 3.7's gateway window call, lent to 3.8 (not timed on 3.8)",
+      "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
+      "source": {
+       "file": "seg-boxes-score.md",
+       "route": "Gateway line",
+       "attribute": "s a call",
+       "value": "16.0 s"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -6758,9 +7235,11 @@
       }
      },
      "time": {
-      "per_unit_s": 16.0,
+      "per_unit_s": 5.33,
+      "per_window_s": 16.0,
       "measured": true,
       "measured_on": "gateway, a seven-page window call",
+      "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "seg-boxes-score.md",
        "route": "Gateway line",
@@ -6837,9 +7316,11 @@
       }
      },
      "time": {
-      "per_unit_s": 4.6,
+      "per_unit_s": 1.53,
+      "per_window_s": 4.6,
       "measured": true,
       "measured_on": "gateway, mean s a K = 7 call (6.7 with images)",
+      "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "seg-window-gateway.md",
        "route": "k7-t",
@@ -6963,10 +7444,15 @@
      },
      "time": {
       "per_unit_s": 1.5,
-      "measured": false,
-      "measured_on": "25 min per 1,000 pages at three calls at once (usage.md, quoted in figures.json)",
-      "source": null,
-      "estimate": "hand-entered in the 2026-11-04 settings prototype (figures.json, Claude only: 1.5); no measuring file"
+      "measured": true,
+      "measured_on": "25 min per 1,000 pages at three calls at once, the owner's plan",
+      "derived": "25 minutes times 60 over 1,000 pages",
+      "source": {
+       "file": "usage.md",
+       "route": "Claude only",
+       "attribute": "time",
+       "value": "about 25 minutes per 1,000 pages"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -7517,9 +8003,11 @@
       }
      },
      "time": {
-      "per_unit_s": 0.5,
+      "per_unit_s": 0.17,
+      "per_window_s": 0.5,
       "measured": true,
       "measured_on": "one L40S, concurrency 16, per window",
+      "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "seg-window-modality.md",
        "route": "2B",
@@ -7614,9 +8102,11 @@
       }
      },
      "time": {
-      "per_unit_s": 0.9,
+      "per_unit_s": 0.3,
+      "per_window_s": 0.9,
       "measured": true,
       "measured_on": "one L40S, per window",
+      "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "seg-window-modality.md",
        "route": "4B",
@@ -7706,9 +8196,11 @@
       "source": null
      },
      "time": {
-      "per_unit_s": 5.0,
+      "per_unit_s": 1.67,
+      "per_window_s": 5.0,
       "measured": true,
       "measured_on": "one L40S, FP8, per window",
+      "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "seg-window-modality.md",
        "route": "Teacher",
@@ -7840,7 +8332,8 @@
    "metric": {
     "id": "not_in_text",
     "label": "Exact year where the year is not in the text, among routes whose non-explicit years carry checked evidence",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "not_in_text"
    },
    "kinds": [
     "in_text",
@@ -8439,11 +8932,14 @@
       }
      },
      "memory": {
-      "peak_gb": 7.6,
+      "peak_gb": 7.64,
       "measured_on": "M3 Pro 18 GB (OCR run)",
-      "source": null,
-      "measured": false,
-      "estimate": "hand-entered in the 2026-11-04 settings prototype (build_figures.py, qwen3-vl-8b-mlx4: 7.6); no measuring file"
+      "source": {
+       "file": "ocr-mac-local.md",
+       "route": "Qwen3-VL 8B 4-bit",
+       "attribute": "MLX peak memory, GB, max",
+       "value": "7.64"
+      }
      },
      "caveats": [
       "quotes the right date and picks another: use as a quote source, the year by rule",
@@ -8914,7 +9410,8 @@
    "metric": {
     "id": "sender_ed2_f1",
     "label": "sender found (ed2 F1), then recipient, then place by city",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "sender"
    },
    "kinds": [
     "correspondence-typed",
@@ -9710,7 +10207,8 @@
    "metric": {
     "id": "pages_right",
     "label": "Pages right per kind on the owner's 141 and the public 895",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "<kind>"
    },
    "kinds": [
     "handwritten",
@@ -10039,7 +10537,8 @@
    "metric": {
     "id": "delta_nes_strict_paired",
     "label": "Change in strict NES within one reader, paired by page",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": null
    },
    "kinds": [],
    "rules": [
@@ -10086,7 +10585,8 @@
    "metric": {
     "id": "paired_vs_shipped",
     "label": "Gap accuracy (segmentation) or NES (handwriting), paired against the route it would replace",
-    "higher_is_better": true
+    "higher_is_better": true,
+    "figure": "per row: each figure names its own metric"
    },
    "kinds": [
     "per-material",
@@ -10211,8 +10711,10 @@
      },
      "time": {
       "per_unit_s": 6.0,
+      "per_window_s": 18.0,
       "measured": true,
       "measured_on": "M3 Pro 18 GB, 8-bit MLX build, about 6 s a page (18 s a seven-page window)",
+      "derived": "seconds a seven-page window over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "ArchiveProcessor/segbench-results/seg-students.md",
        "route": "2B, 8-bit",
@@ -10399,7 +10901,7 @@
       "plan": [],
       "cluster": false,
       "gpus": null,
-      "mac": false,
+      "mac": true,
       "mac_gb": 16,
       "built_in": false
      },

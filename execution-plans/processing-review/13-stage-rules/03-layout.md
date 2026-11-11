@@ -38,7 +38,7 @@ The stage object, replacing the design's fixed text (figures.json "fixed" layout
 ```
 {"id":"layout","name":"Layout and reading order","unit":"pages","choice":false,
  "metric":{"id":"nes","label":"strict NES","higher_is_better":true},
- "kinds":["newspapers","typewritten","printed","clippings","tables","handwritten","registers"],
+ "kinds":["newspapers","typed","clippings","tables","handwritten","registers"],
  "rules":[{"id":"layout-regions-newspapers","text":"Newspapers and dense multi-column print: PP-DocLayoutV3 regions, the detector's own order, quad correction first on a photograph.","source":"layout-photo-tables.md §L9","switch":null},
   {"id":"layout-whole-otherwise","text":"Every other kind, and an uncertain kind, reads the whole page in the reader's line order.","source":"layout-photo-tables.md §the 96","switch":null},
   {"id":"layout-never-hands-registers","text":"No detector on handwritten pages or registers.","source":"layout-photo-tables.md §handwritten","switch":null},

@@ -13,9 +13,9 @@ The schema is execution-plans/processing-review/13-stage-rules/00-index.md §"Th
   2026-11-04 prototype's hand-entered tables (settings-design/figures.json, build_figures.py) marked as unmeasured
   estimates with `source: null`, since that prototype now reads this table.
 
-`needs` (every row): `key` any one of these API keys; `plan` every one of these plans (signed-in tools); a row with both
-`key` and `plan` runs with either the key or the plans; `cluster` a Slurm cluster; `gpus` GPUs a job; `mac` runs on the
-Mac; `mac_gb` the note's stated memory floor, if any (the solver uses `memory.peak_gb` plus its own headroom);
+`needs` (every row). Access is any one of: a key in `key`, every plan in `plan` (signed-in tools), or `cluster` (a
+Slurm cluster, `gpus` a job); a row with none of the three runs on the Mac alone. `mac` true means the route runs on
+this Mac, so its memory must fit (`memory.peak_gb` plus the solver's headroom, `mac_gb` the note's stated floor if any);
 `built_in` nothing to download.
 
 Usage:
@@ -143,10 +143,11 @@ def reading_rows():
                             "failures": fail, "vs_qwen3.6-27b": (f"{v['delta']} ({v['lo']} to {v['hi']}, n {v['n']})" if v else "baseline"),
                             "truth": "owner-96", "source": src(PD, hid, "headline.rows.nes_answered", h["nes_answered"])}
         if cid and cid in charts["overall"]:
-            K = {k: charts[k][cid] for k in ("typewritten", "printed", "handwritten") if charts[k].get(cid)}
-            F["kinds"] = {"basis": "strict, failure as 0; [NES, answered, n]", "truth": "owner-96",
-                          **{k: [r2(v[0]), v[1], v[2]] for k, v in K.items()},
-                          "source": src(PD, cid, "charts.<kind>.scores", {k: v[0] for k, v in K.items()})}
+            for k in ("typewritten", "printed", "handwritten"):
+                v = charts[k].get(cid)
+                if v:  # the bench has strict figures only per kind (no answered NES per kind)
+                    F[k] = {"value": r2(v[0]), "answered": v[1], "n": v[2], "basis": "strict, failure as 0", "truth": "owner-96",
+                            "source": src(PD, cid, f"charts.{k}.scores[0]", v[0])}
         if hk and hk in hands:
             h = hands[hk]
             F["hands16"] = {"value": r2(h["after"]), "n": 16, "failed": h["failed"], "unresolved_range": f"{r2(h['lo'])} to {r2(h['hi'])}",
@@ -170,7 +171,8 @@ def reading_rows():
             return None
         c = {"usd_1000_list": r["std"], "usd_1000_batch": r["batch"], "price_read": "2026-10 (panel run)", "source": src(PD, cid, "routes.std", r["std"])}
         if not money:
-            c = {"usd_1000_list": 0.0, "openrouter_equivalent_usd_1000": r["std"], "source": src(PD, cid, "routes.std (OpenRouter rate for the run's tokens)", r["std"])}
+            c = {"usd_1000_list": 0.0, "openrouter_equivalent_usd_1000": r["std"] or None,  # 0 in the panel: no OpenRouter route
+                 "source": src(PD, cid, "routes.std (OpenRouter rate for the run's tokens)", r["std"])}
             hw = r.get("hw") or {}
             if hw.get("gpu_hours_per_100k"):
                 c["gpu_hours_per_100k"] = r2(hw["gpu_hours_per_100k"])
@@ -261,7 +263,7 @@ def reading_rows():
     # ---- plans (R5)
     add("claude-sonnet5.5", "Claude Sonnet 5.5 (your Claude plan)", "plan", None, "measured", {"plan": ["claude"]},
         figs("claude-sonnet5.5", "claude-sonnet5.5", "claude-sonnet5.5"),
-        {"usd_1000_list": 0.0, "api_equivalent_usd_1000": 11.5, "plan_share": "five-hour and weekly windows; measured on the user's account (usage.md)", "source": src(PD, "claude-sonnet5.5", "routes.std (estimated API price, data/inputs.json)", routes["claude-sonnet5.5"]["std"])},
+        {"usd_1000_list": 0.0, "api_equivalent_usd_1000": routes["claude-sonnet5.5"]["std"], "plan_share": "five-hour and weekly windows; measured on the user's account (usage.md)", "source": src(PD, "claude-sonnet5.5", "routes.std (estimated API price, data/inputs.json)", routes["claude-sonnet5.5"]["std"])},
         {"per_unit_s": 10.0, "measured": True, "measured_on": "mean, three at once through claude -p", "source": src("ArchiveProcessor/segbench-results/ocr-panel-cloud.md", "claude-sonnet5.5", "mean s a page", 10)},
         {"peak_gb": 0, "source": None},
         ["Claude Opus 5.5 drafted the truth: same family (OCR-1)", "read through claude -p, whose harness may resize the image (ocr-panel-cloud.md)", "96 only"])
@@ -297,6 +299,8 @@ HEADERS = {
  "reading": {"id": "reading", "name": "Reading: OCR and HTR", "unit": "pages", "choice": True,
    "metric": {"id": "nes_answered", "label": "NES on answered pages, failures beside", "higher_is_better": True},
    "kinds": ["typewritten", "printed", "handwritten", "mixed", "forms", "newspapers", "clippings", "nonlatin", "early_modern_hands", "early_print"],
+   "kind_strata": {"handwritten": ["L1", "L2", "L3"], "forms": ["L4"], "newspapers": ["L9"], "nonlatin": ["N1", "N2", "N3", "N4", "N5", "N6"],
+                   "early_modern_hands": ["L2", "L5", "L6", "L7"], "early_print": ["L8"], "source": "04-reading.md §3. The rule for the settings layer"},
    "rules": [
     {"id": "rank-answered-or-strict", "text": "Rank on answered NES when a fallback is configured for failed pages; with no fallback rank on strict NES.", "source": "04-reading.md §3. The rule for the settings layer", "switch": None},
     {"id": "hands-ranked-on-hands16", "text": "Handwritten pages are ranked on hands16 and, where the route read them, the public L1-L3; the 16-page chart alone is labelled agreement with the drafters.", "source": "04-reading.md §3. The rule for the settings layer", "switch": None},
@@ -373,6 +377,14 @@ ORDER = [("01-reading-copy.md", "reading-copy"), ("02-ocr-input.md", "ocr-input"
          ("05-placement.md", "placement"), ("06-marks.md", "marks"), ("07-segmentation.md", "segmentation"), ("08-dating.md", "dating"),
          ("09-entities.md", "entities"), ("10-kinds-and-routing.md", "kinds"), ("11-capture.md", "capture"), ("12-training-kit.md", "training-kit")]
 
+# The figure key each stage's metric is read from: "<kind>" means the key named for the kind being ranked.
+METRIC_FIGURE = {
+ "reading-copy": "owner-heldout", "ocr-input": None, "layout": "<kind>", "marks": None, "capture": None,
+ "reading": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten",
+ "placement": "<kind>", "segmentation": "test-boxes", "dating": "not_in_text", "entities": "sender", "kinds": "<kind>",
+ "training-kit": "per row: each figure names its own metric",
+}
+
 ROW_KEYS = ["id", "name", "family", "app_route", "status", "needs", "figures", "cost", "time", "memory", "caveats", "kind_rules", "fallback", "conditions"]
 KEY_NAMES = {"stanford-gateway": "gateway"}
 
@@ -381,7 +393,9 @@ def norm_needs(n, family):
     n = n or {}
     out = {"key": sorted({KEY_NAMES.get(k, k) for k in n.get("key", [])}), "plan": list(n.get("plan", [])),
            "cluster": bool(n.get("cluster", False)), "gpus": n.get("gpus") or None,
-           "mac": bool(n.get("mac", family == "mac")), "mac_gb": n.get("mac_gb") or None, "built_in": bool(n.get("built_in", False))}
+           "mac": False, "mac_gb": n.get("mac_gb") or None, "built_in": bool(n.get("built_in", False))}
+    # a Mac route, or a row with no other access that states a Mac memory floor (the kit's Mac fine-tune)
+    out["mac"] = bool(n.get("mac", family == "mac" or (out["mac_gb"] and not (out["key"] or out["plan"] or out["cluster"]))))
     return out
 
 
@@ -433,11 +447,12 @@ def build(built):
         if head.get("id") != sid:
             raise SystemExit(f"{note}: stage id {head.get('id')!r}, expected {sid!r}")
         head["note"] = f"{NOTES}/{note}"
+        head["metric"] = dict(head["metric"], figure=METRIC_FIGURE[sid])
         head["routes"] = [norm_row(r) for r in (head.get("routes") or []) + rows]
         for k in ("rules", "kinds"):
             head.setdefault(k, [])
         head.setdefault("fallback", None)
-        order = ["id", "name", "note", "unit", "choice", "metric", "kinds", "rules", "fallback", "routes_role", "routes"]
+        order = ["id", "name", "note", "unit", "choice", "metric", "kinds", "kind_strata", "rules", "fallback", "routes_role", "routes"]
         stages.append({k: head[k] for k in order if k in head} | {k: v for k, v in head.items() if k not in order})
     ids = [r["id"] for s in stages for r in s["routes"]]
     return {"version": 1, "built": built, "item": ITEM, "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
@@ -460,8 +475,22 @@ def _has(n, text):
     return re.search(r"(?<![\d.])" + re.escape(n) + r"(?![\d])", text) is not None
 
 
+STOP = {"the", "and", "of", "a", "an", "on", "in", "at", "to", "by", "for", "with", "s", "is", "what", "this", "means", "line", "section", "all"}
+
+
+def route_tokens(route):
+    return [w for w in re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", _norm_text(route or "").lower()) if w not in STOP and len(w) > 1]
+
+
+LOOSE = "loose"
+
+
 def check_source(s, cache):
-    """None when the figure is found in the file its source names, else the reason."""
+    """None when the figure is found in the file its source names, else the reason. The source's numbers must stand
+    together on one line, else in one paragraph, else in one section, and that line, paragraph or section must also
+    carry a word of the source's route (or its attribute when no route is named); failing that, the route must be named
+    somewhere in the file (a result file about one route often names it only in its title or its own table), and
+    such a figure is counted apart as matched loosely."""
     p = resolve(s["file"])
     if not p:
         return f"no file {s['file']}"
@@ -469,19 +498,47 @@ def check_source(s, cache):
         return None  # the reading rows' JSON sources are checked by regenerating them from the file
     if p not in cache:
         t = _norm_text(open(p).read())
-        cache[p] = (t.replace(",", ""), [l.replace(",", "") for l in t.split("\n")],
-                    [b.replace(",", "").replace("\n", " ") for b in re.split(r"\n\s*\n", t)])
-    text, lines, blocks = cache[p]
+        flat = lambda x: x.replace(",", "").replace("\n", " ")
+        cache[p] = (flat(t), [l.replace(",", "") for l in t.split("\n")], [flat(b) for b in re.split(r"\n\s*\n", t)],
+                    [flat(x) for x in re.split(r"\n(?=#)", t)])
+    text, lines, blocks, sections = cache[p]
     val = s.get("value") or s.get("attribute", "")
+    toks = route_tokens(s.get("route")) or route_tokens(s.get("attribute"))
+    near = lambda u: not toks or any(w in u.lower() for w in toks)
     N = numbers(val)
     if not N:
-        return None if _norm_text(val) in text.replace("\n", " ") or _norm_text(val) in text else f"text {val!r} not in {s['file']}"
-    if any(all(_has(n, l) for n in N) for l in lines):
-        return None
-    if any(all(_has(n, b) for n in N) for b in blocks):
-        return None
+        v = _norm_text(val)
+        hits = [u for u in sections if v in u]
+        if not hits:
+            return f"text {val!r} not in {s['file']}"
+        if any(near(u) for u in hits):
+            return None
+        return LOOSE if near(text) else f"text {val!r}: neither its section nor {s['file']} names {s.get('route')!r}"
+    for level in (lines, blocks, sections):
+        hits = [u for u in level if all(_has(n, u) for n in N)]
+        if any(near(u) for u in hits):
+            return None
     missing = [n for n in N if not _has(n, text)]
-    return f"{val!r}: " + (f"{missing} not in {s['file']}" if missing else f"not together in one paragraph of {s['file']}")
+    if missing:
+        return f"{val!r}: {missing} not in {s['file']}"
+    if any(all(_has(n, u) for n in N) for u in sections) and near(text):
+        return LOOSE
+    return f"{val!r}: not together with {s.get('route') or s.get('attribute')!r} in one line, paragraph or section of {s['file']}"
+
+
+def same_figure(v, N):
+    """v is one of the source's numbers, rounded, or the same quantity in a unit 100 or 1,000 times apart
+    (a share against a percentage, dollars a page against dollars per 1,000, MB against GB)."""
+    for n in N:
+        for f in (1, 100, 0.01, 1000, 0.001):
+            m = n * f
+            if abs(v - m) <= max(0.006, abs(m) * 0.006):
+                return True
+    return False
+
+
+CHECKED_FIELDS = {"source": ("value", "usd_1000_list", "usd_1000_batch", "per_unit_s", "peak_gb", "pages_per_hour_per_gpu_set"),
+                  "whole_process_source": ("whole_process_gb",)}
 
 
 def check_section(ref):
@@ -557,6 +614,8 @@ def check(table):
             why = check_section(rule["source"])
             if why:
                 print(f"FAIL rule {st['id']}/{rule['id']}: {why}"); bad += 1
+        if "kind_strata" in st and check_section(st["kind_strata"]["source"]):
+            print(f"FAIL kind_strata {st['id']}: {check_section(st['kind_strata']['source'])}"); bad += 1
         if st["id"] not in table["noise"]:
             print(f"FAIL stage {st['id']} has no noise entry"); bad += 1
     for sid, n in table["noise"].items():
@@ -566,19 +625,28 @@ def check(table):
     shared = [r for st in table["stages"] for r in st["routes"] if r["id"] == "seg-2b-lora-k200"]
     if len(shared) == 2 and shared[0] != shared[1]:
         print("FAIL seg-2b-lora-k200 differs between notes 07 and 12 (one row shared)"); bad += 1
-    nfig = 0
+    nfig = loose = 0
     for where, s, holder in srcs:
         nfig += 1
         why = check_source(s, cache)
-        if why:
+        if why == LOOSE:
+            loose += 1
+        elif why:
             print(f"FAIL source {where}: {why}"); bad += 1
             continue
-        v = holder.get("value")
-        if isinstance(v, (int, float)) and not isinstance(v, bool) and "derived" not in holder:  # "derived" says how a stated count becomes the value
-            N = [float(n) for n in numbers(s.get("value", ""))]
-            if N and not any(abs(v - n) < 0.006 or abs(v - round(n, 2)) < 0.006 or abs(v - n * 100) < 0.06 or abs(v * 100 - n) < 0.6 for n in N):
-                print(f"FAIL value {where}: {v} in the table, {s.get('value')!r} in {s['file']}"); bad += 1
-    print(f"{'PASS' if not bad else 'FAIL'} sources: {nfig} figures checked against their files; {estimates} unmeasured estimates carried with no source; {bad} failures")
+        if s["file"].endswith(".json"):  # regenerated from the file above
+            continue
+        if "derived" in holder:  # says how the stated figure becomes the value
+            continue
+        N = [float(n) for n in numbers(s.get("value", ""))]
+        kind = "whole_process_source" if where.endswith("/whole_process_source") else "source"
+        pair = "list" in s.get("attribute", "") and "batch" in s.get("attribute", "") and len(N) >= 2
+        for k in CHECKED_FIELDS[kind]:
+            v = holder.get(k)
+            want = [N[0]] if pair and k == "usd_1000_list" else [N[1]] if pair and k == "usd_1000_batch" else N
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and N and not same_figure(v, want):
+                print(f"FAIL value {where}: {k} {v} in the table, {s.get('value')!r} in {s['file']}"); bad += 1
+    print(f"{'PASS' if not bad else 'FAIL'} sources: {nfig} figures checked against their files ({loose} found with the route named elsewhere in the file); {estimates} unmeasured estimates carried with no source; {bad} failures")
     return 1 if bad else 0
 
 

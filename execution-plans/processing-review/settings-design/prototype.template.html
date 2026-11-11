@@ -251,13 +251,15 @@ function readState() {
 // Why a route cannot be used with the resources given; empty when it can.
 function blockers(r) {
   const out = [], n = r.needs || {};
-  // settings-routes.json: any one key; every plan; a row with both runs with either the key or the plans
-  const hasKey = n.key && n.key.some(k => state.keys[k]), hasPlans = n.plan && n.plan.every(p => state.plans[p]);
-  if (!(n.key && n.plan && (hasKey || hasPlans))) {
-    if (n.key && !hasKey) { const names = n.key.map(k => ({gemini: "Gemini", openrouter: "OpenRouter", openai: "OpenAI", mistral: "Mistral", anthropic: "Anthropic", gateway: "Stanford gateway"})[k] || k); out.push("needs " + (/^[AEIOU]/.test(names[0]) ? "an " : "a ") + names.join(" or ") + " key"); }
-    if (n.plan && !hasPlans) out.push("needs the " + n.plan.map(p => ({claude: "Claude", chatgpt: "ChatGPT"})[p]).join(" and ") + " plan");
+  // settings-routes.json: access is any one of a key, every plan, or a cluster; a row with none runs on the Mac alone
+  const hasKey = !!(n.key && n.key.some(k => state.keys[k])), hasPlans = !!(n.plan && n.plan.every(p => state.plans[p])), hasCluster = !!(n.cluster && state.cluster);
+  if ((n.key || n.plan || n.cluster) && !(hasKey || hasPlans || hasCluster)) {
+    const ways = [];
+    if (n.key) { const names = n.key.map(k => ({gemini: "Gemini", openrouter: "OpenRouter", openai: "OpenAI", mistral: "Mistral", anthropic: "Anthropic", gateway: "Stanford gateway"})[k] || k); ways.push((/^[AEIOU]/.test(names[0]) ? "an " : "a ") + names.join(" or ") + " key"); }
+    if (n.plan) ways.push("the " + n.plan.map(p => ({claude: "Claude", chatgpt: "ChatGPT"})[p]).join(" and ") + " plan");
+    if (n.cluster) ways.push("a cluster");
+    out.push("needs " + ways.join(", or "));
   }
-  if (n.cluster && !state.cluster && !(n.key && n.key.some(k => state.keys[k]))) out.push("needs a cluster");
   if (n.mac_gb != null && (r.peak_gb || 0) + 5 > state.macGb) out.push(`needs about ${Math.ceil((r.peak_gb || 0) + 5)} GB of memory (peak ${r.peak_gb} GB measured)`);
   if (n.mac_gb && state.macGb < n.mac_gb) out.push(`needs a ${n.mac_gb} GB Mac`);
   return out;

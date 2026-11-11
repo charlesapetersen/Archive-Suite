@@ -174,7 +174,7 @@ JPEG original) or `reread-107` (the 107 whose year neither the ABBYY nor the Vis
    "owner_own_page": {"value": 59, "n": 27, "truth": "owner-ruled (date-truth-sets)", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B", "attribute": "found the owner's year on the page", "value": "16/27 (59%)"}}},
   "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": {"file": "segbench-results/date-image.md", "route": "open arms", "attribute": "cost", "value": "$0"}},
   "time": {"per_unit_s": 12.05, "measured": true, "measured_on": "M3 Pro 18 GB, median a document", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B, image", "attribute": "median s", "value": "12.05"}},
-  "memory": {"peak_gb": 7.6, "measured_on": "M3 Pro 18 GB (OCR run)", "source": {"file": "settings-design/build_figures.py", "route": "qwen3-vl-8b-mlx4", "attribute": "peak_gb", "value": "7.6"}},
+  "memory": {"peak_gb": 7.64, "measured_on": "M3 Pro 18 GB (OCR run)", "source": {"file": "ocr-mac-local.md", "route": "Qwen3-VL 8B 4-bit", "attribute": "MLX peak memory, GB, max", "value": "7.64"}},
   "caveats": ["quotes the right date and picks another: use as a quote source, the year by rule", "1,400 px and 4-bit not separated (DAT-11)", "3 of 99 OCR pages looped (build_figures.py)"],
   "kind_rules": [], "fallback": "step 4", "conditions": ["as gemini3.7-flash-image; its quotes feed the rule stage"]},
  {"id": "vision-2b-chooser-t3", "name": "Apple Vision text, rules, the trained 2B as chooser, propagation (Mac, no key)", "family": "mac",

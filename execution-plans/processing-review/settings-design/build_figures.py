@@ -25,7 +25,8 @@ def val(f, k):
 
 
 def needs(r):
-    """The prototype's needs: any one key, every plan, a cluster, a memory floor for Mac routes."""
+    """The prototype's needs, as the table's: access by any one of a key, every plan or a cluster; a memory floor when
+    the route runs on the Mac."""
     n = r["needs"]
     o = {}
     if n["key"]:
@@ -34,7 +35,7 @@ def needs(r):
         o["plan"] = n["plan"]
     if n["cluster"]:
         o["cluster"] = True
-    if r["family"] == "mac":
+    if n["mac"]:
         o["mac_gb"] = n["mac_gb"] or 0
     return o
 
@@ -72,11 +73,10 @@ def routes(sid):
 ocr_rows = []
 for r in routes("reading"):
     f = r["figures"]
-    if "kinds" not in f or r["id"].startswith("casc-"):
+    nes = {kk: f[kk]["value"] for kk in ("typewritten", "printed", "handwritten") if kk in f}
+    if not nes or r["id"].startswith("casc-"):
         continue
-    k = f["kinds"]
-    nes = {kk: k[kk][0] for kk in ("typewritten", "printed", "handwritten") if kk in k}
-    n = {kk: [k[kk][1], k[kk][2]] for kk in nes}
+    n = {kk: [f[kk]["answered"], f[kk]["n"]] for kk in nes}
     o = f.get("overall")
     if o:
         nes["overall"] = o["strict"]
