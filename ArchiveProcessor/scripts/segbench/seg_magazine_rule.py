@@ -4,6 +4,7 @@ rule it replaces (g1), on the boxes where the rule decides gaps.
 
   python3 seg_magazine_rule.py plan      # windows, cached answers and the gateway estimate (no calls)
   python3 seg_magazine_rule.py collect   # Gemini 3.7 Flash g2 windows through the gateway (paid, capped)
+  python3 seg_magazine_rule.py retry-once   # one retry of a request the Mac's sleep cut off (allowance kept)
   <lab venv>/bin/python seg_magazine_rule.py score   # -> segbench-results/seg-magazine-rule.{json,md} (no calls)
 
 THE ARMS, fixed before any g2 answer:
@@ -129,6 +130,16 @@ def cmd_collect(a):
         print(f"done; item spent ${S.spent():.4f}; invalid replies {len(invalid)}", flush=True)
         for x in invalid:
             print("  invalid", x)
+
+
+def cmd_retry_once(_a):
+    """seg_lincoln_gateway's explicit single retry for a request whose transport ended without usage (the Mac slept
+    mid-request): at most once per request, only after its timeout, the original allowance kept in the item's spend."""
+    STORE.mkdir(parents=True, exist_ok=True)
+    with (STORE / "collect.lock").open("a") as fh, arm("g2") as (_, _, S, _):
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        S.retry_unsettled_once()
+        print(f"retry approved; item spent ${S.spent():.4f} of ${CAP:.2f}")
 
 
 # --- scoring --------------------------------------------------------------------------------------
@@ -330,9 +341,10 @@ def main():
     c = sub.add_parser("collect")
     c.add_argument("--workers", type=int, default=1)
     c.add_argument("--limit", type=int, default=0)
+    sub.add_parser("retry-once")
     sub.add_parser("score")
     a = ap.parse_args()
-    {"plan": cmd_plan, "collect": cmd_collect, "score": cmd_score}[a.cmd](a)
+    {"plan": cmd_plan, "collect": cmd_collect, "retry-once": cmd_retry_once, "score": cmd_score}[a.cmd](a)
 
 
 if __name__ == "__main__":

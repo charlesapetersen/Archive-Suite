@@ -288,9 +288,14 @@ RULES = [
     ("A photograph (a print in the folder)",
      "Its own document. A photo of its back (caption, stamp) is Cont.",
      "A print is an item in its own right; the back belongs to the same print."),
-    ("A magazine (the whole issue, cover included)",
-     "One document: the cover's page is New and every later page Cont. Not a set of clippings.",
-     "The owner, 2026-10-05: a full magazine is one item; its articles are not separate clippings."),
+    ("A magazine or newsletter issue",
+     "Split by article: the cover or contents page is New, each article inside the issue is New, and a later "
+     "page of the same article is Cont. An advertisement photographed between an article's pages is Cont, with "
+     "that article. Only where the articles cannot be told apart (interleaved across photos), the whole issue "
+     "is one document: the cover New and every later page Cont.",
+     "The owner, 2026-10-29: an article inside an issue is its own document and takes the issue's date and title "
+     "from the cover or contents page; the full-magazine rule of 2026-10-05 is only the fallback. 2026-10-30: an "
+     "advertisement between an article's pages belongs to that article."),
     ("A blank page or the blank back of a sheet",
      "Cont, as part of the document it belongs to.",
      "It carries nothing of its own and should not start a document."),

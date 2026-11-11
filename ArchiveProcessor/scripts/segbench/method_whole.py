@@ -153,8 +153,9 @@ probability, 0 to 1, that the decision is right: 0.95 and above only when the cu
 
 # wh2 (W46.seg-magazine-rule-redo): wh1 with g2's rule 10, the article-within-issue rule. Written, not run: the whole
 # route ships nowhere, and wh1 stays as measured.
-assert PROMPT.count(G.RULE10_G1) == 1, "prompt wh1 changed"
-PROMPT_WH2 = PROMPT.replace(G.RULE10_G1, G.RULE10_G2)
+from magazine_rule import RULE10_G1, RULE10_G2  # noqa: E402
+assert PROMPT.count(RULE10_G1) == 1, "prompt wh1 changed"
+PROMPT_WH2 = PROMPT.replace(RULE10_G1, RULE10_G2)
 PROMPTS = {"wh1": PROMPT, "wh2": PROMPT_WH2}
 
 

@@ -388,7 +388,12 @@ def thumb_of(key, row, orient):
     return f"thumbs/{row['n']:04d}.jpg"
 
 
-RULES_2026_10_05 = """Judge by the document rules approved on 2026-10-05 (a full magazine is one document; each clipping article is its
+# The rules text of the boxes not on the article reading. SC0122 was answered on its 2026-10-05 wording (a full
+# magazine is one document) and the Young, Sasha sheet holds no magazine; a sheet built now states the
+# article-within-issue rule of 2026-10-29 instead (W46.seg-magazine-rule-redo).
+RULES_2026_10_05 = """Judge by the document rules approved on 2026-10-05, with the article-within-issue rule of 2026-10-29 (an article
+inside a magazine or newsletter issue is its own document, and an advertisement between its pages is part of it; the
+whole issue is one document only where splitting it by article is too difficult; each clipping article is its
 own; an enclosure with its own date, author or heading is its own; an envelope, a blank back or a repeat photo is
 part of its document). The small page on the right is the photo after, for context only.
 For each gap: does the RIGHT photo start a new document, continue the left one, or is it a box or folder label card?"""
