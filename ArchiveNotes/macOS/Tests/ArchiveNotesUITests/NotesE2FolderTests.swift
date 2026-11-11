@@ -106,7 +106,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             XCTAssertGreaterThan(before.sortOrder, readingBefore.sortOrder, "Ideas starts below Reading")
 
             ideas.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 1.0,
+                .click(forDuration: 1.0,
                        thenDragTo: reading.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.0)))
 
             var after: FolderRecord?
@@ -133,7 +133,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             try requireCanonicalScratchFixtureForStoreWrites()
             XCTAssertEqual(ideasAboveReading(), false, "fixture: Ideas starts below Reading")
             folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 1.0,
+                .click(forDuration: 1.0,
                        thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1.0))
                         .withOffset(CGVector(dx: 0, dy: 3)))
             XCTAssertTrue(pollUntil(timeout: 10) {
@@ -151,7 +151,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             try requireCanonicalScratchFixtureForStoreWrites()
             XCTAssertEqual(ideasAboveReading(), false, "fixture: Ideas starts below Reading")
             folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-                .press(forDuration: 0.05,
+                .click(forDuration: 0.05,
                        thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
                        withVelocity: .slow, thenHoldForDuration: 1.0)
             XCTAssertTrue(pollUntil(timeout: 10) {
@@ -174,7 +174,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             }
             XCTAssertNil(try XCTUnwrap(folderRecord(id: readingID)).parent)
             blankPoint(of: folderRow(named: "Reading"))
-                .press(forDuration: 0.05,
+                .click(forDuration: 0.05,
                        thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)),
                        withVelocity: .slow, thenHoldForDuration: 0.5)
             XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(id: readingID)?.parent == ideasID },
@@ -183,7 +183,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
 
             mainWindow.descendants(matching: .any)["an.sidebar.allNotes"].firstMatch.click()
             blankPoint(of: folderRow(named: "Reading"))
-                .press(forDuration: 0.05,
+                .click(forDuration: 0.05,
                        thenDragTo: folderRow(named: "Extracts").coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0))
                         .withOffset(CGVector(dx: 0, dy: -4)),
                        withVelocity: .slow, thenHoldForDuration: 0.5)
@@ -209,7 +209,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             try requireCanonicalScratchFixtureForStoreWrites()
             let ideasID = Self.folderIdeas.lowercased(), readingID = Self.folderReading.lowercased()
             folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-                .press(forDuration: 0.05,
+                .click(forDuration: 0.05,
                        thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
                        withVelocity: .slow, thenHoldForDuration: 1.0)
             XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(id: readingID)?.parent == ideasID },
@@ -220,7 +220,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             answerNameAlert("E2 Third", button: "Create")
             XCTAssertTrue(pollUntil(timeout: 10) { self.folderRecord(named: "E2 Third") != nil })
             folderRow(named: "E2 Third").coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5))
-                .press(forDuration: 0.05,
+                .click(forDuration: 0.05,
                        // 95% down is in the bottom quarter whether the AX frame is the 16 pt label or the
                        // 28 pt drop area (an open parent's row reports the latter).
                        thenDragTo: openFolderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)),
@@ -244,7 +244,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             for dy in [-4.0, 1, 8, 15, 20] {
                 let row = selectItem(uuid: Self.idPlain)
                 row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                    .press(forDuration: 0.05,
+                    .click(forDuration: 0.05,
                            thenDragTo: folderRow(named: "Ideas").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
                             .withOffset(CGVector(dx: 0, dy: dy)),
                            withVelocity: .slow, thenHoldForDuration: 1.0)
@@ -256,7 +256,7 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
                 folderRow(named: "Ideas").click()
                 let moved = selectItem(uuid: Self.idPlain)
                 moved.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                    .press(forDuration: 0.05,
+                    .click(forDuration: 0.05,
                            thenDragTo: folderRow(named: "Reading").coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
                            withVelocity: .slow, thenHoldForDuration: 0.5)
                 XCTAssertTrue(pollUntil(timeout: 10) {

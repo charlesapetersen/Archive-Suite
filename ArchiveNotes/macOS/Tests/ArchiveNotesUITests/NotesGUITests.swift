@@ -2088,7 +2088,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             }, "Reading must be the actual source scope before dragging")
             let row = selectItem(uuid: Self.idPlain)
             XCUIElement.perform(withKeyModifiers: [.option]) {
-                row.press(forDuration: 1.0, thenDragTo: ideas)
+                row.click(forDuration: 1.0, thenDragTo: ideas)
             }
             XCTAssertTrue(pollUntil(timeout: 15) {
                 let memberships = self.organizationMemberships() ?? []
@@ -2096,7 +2096,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
                     && memberships.contains([Self.folderReading, Self.idPlain])
             }, "Option-drop adds a placement and keeps the source; \(mainWindow.descendants(matching: .any)["an.sidebar.status"].debugDescription)")
             ideas.click()
-            selectItem(uuid: Self.idPlain).press(forDuration: 1.0, thenDragTo: reading)
+            selectItem(uuid: Self.idPlain).click(forDuration: 1.0, thenDragTo: reading)
             XCTAssertTrue(pollUntil(timeout: 15) {
                 let memberships = self.organizationMemberships() ?? []
                 return !memberships.contains([Self.folderIdeas, Self.idPlain])
@@ -2121,7 +2121,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(ideas.waitForExistence(timeout: 10), "the Ideas folder should be visible")
             XCTAssertNil(organizationFolderParent(for: Self.folderReading), "Reading starts at the root")
 
-            reading.press(forDuration: 1.0, thenDragTo: ideas)
+            reading.click(forDuration: 1.0, thenDragTo: ideas)
 
             XCTAssertTrue(pollUntil(timeout: 15) {
                 self.organizationFolderParent(for: Self.folderReading) == Self.folderIdeas.lowercased()

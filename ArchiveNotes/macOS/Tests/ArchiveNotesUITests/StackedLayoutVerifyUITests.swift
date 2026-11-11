@@ -157,7 +157,7 @@ final class StackedLayoutVerifyUITests: NotesFixtureUITestCase {
 
     private func drag(_ divider: XCUIElement, by dy: CGFloat) {
         let from = divider.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        from.press(forDuration: 0.3, thenDragTo: from.withOffset(CGVector(dx: 0, dy: dy)))
+        from.click(forDuration: 0.3, thenDragTo: from.withOffset(CGVector(dx: 0, dy: dy)))
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 

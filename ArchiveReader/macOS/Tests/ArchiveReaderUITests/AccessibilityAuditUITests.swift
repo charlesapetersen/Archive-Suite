@@ -66,12 +66,12 @@ final class AccessibilityAuditUITests: FixtureUITestCase {
             let splitter = main.splitters[id]
             let before = splitter.frame.midX
             splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.1, thenDragTo: splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .click(forDuration: 0.1, thenDragTo: splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                     .withOffset(CGVector(dx: 20, dy: 0)))
             LayoutGuard.waitUntilSettled(main)
             XCTAssertGreaterThan(splitter.frame.midX, before + 10, "\(id) should move with a pointer drag")
             splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-                .press(forDuration: 0.1, thenDragTo: splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                .click(forDuration: 0.1, thenDragTo: splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                     .withOffset(CGVector(dx: -20, dy: 0)))
             LayoutGuard.waitUntilSettled(main)
             XCTAssertEqual(splitter.frame.midX, before, accuracy: 2)

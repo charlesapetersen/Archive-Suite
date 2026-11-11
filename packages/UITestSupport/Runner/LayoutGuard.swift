@@ -248,19 +248,46 @@ enum LayoutGuard {
 
     /// Drag the window's bottom-right corner so it ends at `corner` (screen coordinates). The resize handle sits
     /// on the frame edge; try just inside it first, then just outside. Returns the frame afterwards.
+    /// `click(forDuration:thenDragTo:)`, never `press(…)`: on macOS 27 `press(forDuration:thenDragTo:)` synthesizes
+    /// but delivers no mouse events, so no window, divider or row moves (measured in the macOS 27.2 guest,
+    /// W40.vm-macos27-harness, 2026-11-10: every press drag left the frame unchanged, the same drag as a click
+    /// resized it from the inside corner, and the just-outside corner no longer hits the handle). Every UI suite
+    /// follows this rule.
     @MainActor
     @discardableResult
     static func dragCorner(of window: XCUIElement, to corner: CGPoint) -> CGRect {
         let before = window.frame
-        for inset in [CGVector(dx: -1, dy: -1), CGVector(dx: 3, dy: 3)] {
+        func drag(_ inset: CGVector, to aim: CGPoint) {
+            let start = window.frame
             let handle = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(inset)
             let target = window.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: corner.x - before.minX + inset.dx, dy: corner.y - before.minY + inset.dy))
-            handle.press(forDuration: 0.3, thenDragTo: target)
+                .withOffset(CGVector(dx: aim.x - start.minX + inset.dx, dy: aim.y - start.minY + inset.dy))
+            handle.click(forDuration: 0.3, thenDragTo: target)
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-            if window.frame.size != before.size { break }
         }
-        return window.frame
+        var hit: CGVector?
+        for inset in [CGVector(dx: -1, dy: -1), CGVector(dx: 3, dy: 3)] {
+            drag(inset, to: corner)
+            if window.frame.size != before.size { hit = inset; break }
+        }
+        // On macOS 27 a click drag loses its first few points to the drag threshold (measured in the 27.2 guest,
+        // 2026-11-10: about 3 pt short whatever the distance, and a 4 pt drag moved nothing), which left the
+        // restored window a few points off its typical size. Close the gap with follow-up drags that aim past the
+        // corner by the gap (at most 4 pt, about what the threshold eats), while they still change the size; a
+        // corner the window cannot reach (past its minimum, or the screen's edge) stops at the first one that
+        // changes nothing.
+        guard let hit else { return window.frame }
+        var last = window.frame
+        func past(_ gap: CGFloat) -> CGFloat { gap + (gap < 0 ? -1 : 1) * min(abs(gap), 4) }
+        for _ in 0..<3 {
+            let gapX = corner.x - last.maxX, gapY = corner.y - last.maxY
+            guard abs(gapX) > 0.5 || abs(gapY) > 0.5 else { break }
+            drag(hit, to: CGPoint(x: last.maxX + past(gapX), y: last.maxY + past(gapY)))
+            let now = window.frame
+            if now.size == last.size { break }
+            last = now
+        }
+        return last
     }
 
     /// A reproduced, filed layout bug the sweep expects to see until its fix lands. Its violations are reported

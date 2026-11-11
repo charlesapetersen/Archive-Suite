@@ -324,7 +324,7 @@ final class TriageJourneyUITests: FixtureUITestCase {
         let before = window.frame.size
         app.activate()
         let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -3, dy: -3))
-        corner.press(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)))
+        corner.click(forDuration: 0.3, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)))
         _ = waitFor(timeout: 3) { window.frame.width < before.width }
         let after = window.frame.size
         log("[d8] window restored to its minimum: \(Int(before.width))×\(Int(before.height)) → \(Int(after.width))×\(Int(after.height))")
