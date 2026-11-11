@@ -62,6 +62,34 @@ Paired document bootstrap over the five owner boxes (465 documents, 809 gaps): d
 | 4B minus 2B | 809 | 31 | +0.87 points | ±0.41 | ±0.95 |
 | 27B teacher minus 2B | 809 | 39 | +0.37 points | ±0.51 | ±1.2 |
 
+### The minimum support, on the gate's own resampling (W46.kit-gate-groups)
+
+`train_seg.py check` resamples held-out folders and, inside each drawn folder, its documents. Until 2026-11-11 it resampled folders only, so a held-out set of one folder (one box, as the continuation's next box is) had an interval of zero width: a candidate 2.96 points worse on 270 gaps passed with one folder and failed with 30 (measurement review pass 12, P12-1). The table is that two-level interval, paired, on the five owner boxes' known gaps (2,000 draws, seed 46): as one folder (documents only, all a one-box held-out set has), as five folders (one a box), and on each box alone. 'Needed' is n × (half-width / 3)², the size at which that interval's half-width reaches 3 points.
+
+| difference | resampled as | gaps | documents | difference (points) | interval | half-width | needed for ±3 points |
+|---|---|---:|---:|---:|---|---:|---:|
+| 4B minus 2B | one folder | 809 | 441 | +0.87 | -0.37 to 2.25 | ±1.31 | 154 |
+| 4B minus 2B | five folders | 809 | 441 | +0.87 | -1.13 to 2.72 | ±1.93 | 333 |
+| 4B minus 2B | Dean alone | 191 | 118 | -0.52 | -3.24 to 2.35 | ±2.79 | 166 |
+| 4B minus 2B | Deaver alone | 136 | 87 | +2.21 | -0.72 to 5.52 | ±3.12 | 147 |
+| 4B minus 2B | Herrnstein alone | 167 | 96 | +0.6 | -1.26 to 2.82 | ±2.04 | 77 |
+| 4B minus 2B | Stanton alone | 238 | 112 | +2.52 | -0.36 to 5.46 | ±2.91 | 224 |
+| 4B minus 2B | RG165 alone | 77 | 28 | -2.6 | -6.17 to 0.0 | ±3.08 | 81 |
+| 27B teacher minus 2B | one folder | 809 | 441 | +0.37 | -1.36 to 2.04 | ±1.7 | 260 |
+| 27B teacher minus 2B | five folders | 809 | 441 | +0.37 | -2.26 to 2.6 | ±2.43 | 531 |
+| 27B teacher minus 2B | Dean alone | 191 | 118 | -0.52 | -3.09 to 2.37 | ±2.73 | 158 |
+| 27B teacher minus 2B | Deaver alone | 136 | 87 | +3.68 | 0.76 to 6.98 | ±3.11 | 146 |
+| 27B teacher minus 2B | Herrnstein alone | 167 | 96 | -1.8 | -8.09 to 2.76 | ±5.42 | 546 |
+| 27B teacher minus 2B | Stanton alone | 238 | 112 | +1.26 | -1.42 to 4.08 | ±2.75 | 200 |
+| 27B teacher minus 2B | RG165 alone | 77 | 28 | -1.3 | -4.35 to 0.0 | ±2.17 | 40 |
+
+#### Reading
+
+- **The gate's minimum stays 267 known gaps.** On the gate's innermost unit, documents, the larger pair (27B teacher against the 2B) needs 260 gaps at seed 46 and 254-282 over seeds 46-50: the document bootstrap above, which drew documents to a size, gave the same figure. The floor is derived on documents because they are the unit every held-out set has, a one-box set included; below it the interval is too narrow to trust.
+- **Between boxes the interval widens, and the gate reads that from the interval, not the floor.** Resampled as five folders the same gaps need 531 for ±3 points (333 for the 4B pair), because the boxes differ from one another. A held-out set of several unlike folders gets that wider interval, and a trailing candidate fails on it; the floor only stops a set too small for any interval.
+- **One box alone varies.** The boxes' own figures run from 40 to 546: a box with a few long documents where the models differ has a wide interval at its size. The gate scores the box it is given; the floor is a minimum, not a promise that 267 gaps of any box reach ±3 points.
+- **A held-out set of one document is refused.** The draw then repeats that document, and no number of its gaps gives an interval.
+
 ## Observed, from the same records
 
 Known gaps only; pages exact over the documents every unsure gap leaves resolved (W46.seg-unsure-mask).
@@ -108,7 +136,7 @@ The dating students were trained on the owner's tags and dated public documents,
 
 ## The gate: `train_seg.py check` and the manifest
 
-`train_seg.py check` (institutional-compute) is the kit's held-out gate. It reads `cluster_seg.py` answers only, scores each run's per-gap calls on the held-out collections against their tags (and against the owner's rulings when a file of them is given) with a folder bootstrap, and on a locked public anchor box (pages exact, gap accuracy, the review load to 98%) with a document bootstrap, each paired against the shipped model. It writes H §6.3's manifest: kit version, prompt id, base build, weights, adapter and training-data hashes, the scores with intervals, the Mac figures and the gate's verdict, and exits 1 when the gate fails. The rule, as decided (call 7.2, 2026-11-06; enforced by W46.kit-gate-rule): two scored runs, each passing; in each, an anchor score, a held-out score on at least 267 known gaps (the larger of the two measured "needed" figures below, 147 and 267; the owner's rulings when they reach that, else the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 points, over every gap the shipped run answered with the candidate's unanswered gaps counted wrong, and anchor pages exact less than 3.2 points (the top of the pages-exact rerun floor) below the shipped run's. A candidate with no shipped run, no paired gap or no paired anchor fails (W46.kit-gate-coverage). The pages-exact rerun floor is not reused as a gap-accuracy tie unit (P7-4): the second run stands in for rerun wobble.
+`train_seg.py check` (institutional-compute) is the kit's held-out gate. It reads `cluster_seg.py` answers only, scores each run's per-gap calls on the held-out collections against their tags (and against the owner's rulings when a file of them is given) with a bootstrap of folders and, inside each, documents (W46.kit-gate-groups), and on a locked public anchor box (pages exact, gap accuracy, the review load to 98%) with a document bootstrap, each paired against the shipped model. It writes H §6.3's manifest: kit version, prompt id, base build, weights, adapter and training-data hashes, the scores with intervals, the Mac figures and the gate's verdict, and exits 1 when the gate fails. The rule, as decided (call 7.2, 2026-11-06; enforced by W46.kit-gate-rule): two scored runs, each passing; in each, an anchor score, a held-out score on at least 267 known gaps in more than one document (the larger of the two measured "needed" figures above, 147 and 267, derived again on the gate's own resampling; the owner's rulings when they reach that, else the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 points, over every gap the shipped run answered with the candidate's unanswered gaps counted wrong, and anchor pages exact less than 3.2 points (the top of the pages-exact rerun floor) below the shipped run's. A candidate with no shipped run, no paired gap or no paired anchor fails (W46.kit-gate-coverage). The pages-exact rerun floor is not reused as a gap-accuracy tie unit (P7-4): the second run stands in for rerun wobble.
 
 The app reads the manifest as `archive-seg-manifest.json` beside the weights. `LocalSegmenter.refusal` runs the shipped build as its own, and refuses any other Model setting that is not a folder on the Mac holding a manifest of kit `seg-kit-1`, prompt c1, with an anchor pages-exact score: it is returned before a run starts (`WindowStageTransport.current`), as an unknown voter is refused today. Six checks in `SegmentationEngineTestDriver` cover it.
 

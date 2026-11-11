@@ -1320,6 +1320,78 @@ class Check(unittest.TestCase):
             r, m = self.coverage_check(Path(t), right, right, fill=265)    # exactly 267 passes
             self.assertEqual(r.returncode, 0, r.stdout)
 
+    def one_folder_check(self, tmp, n, wrong, doc=3):
+        """W46.kit-gate-groups: a held-out set of one folder, B, of n gaps, a document starting at every ``doc``-th
+        gap (0 for one document); the shipped run is right on every gap, both candidate runs wrong on ``wrong``."""
+        truth = {"box": "Anchor", "pages": [{"n": n, "label": l} for n, l in ((1, "New"), (2, "Cont"), (3, "New"))]}
+        (tmp / "anchor.json").write_text(json.dumps(truth))
+        new = {m for m in range(1, n + 1) if doc and m % doc == 1}
+        (tmp / "labels.jsonl").write_text("".join(json.dumps(
+            {"folder_id": "B", "n": m, "split": "holdout", "tag": "new" if m in new else "cont"}) + "\n"
+            for m in range(1, n + 1)))
+        for name, calls in (("shipped", new), ("cand", new ^ set(wrong)), ("cand2", new ^ set(wrong))):
+            d = tmp / name
+            d.mkdir(exist_ok=True)
+            (d / "answers.jsonl").write_text(self.answer("Anchor", [1, 2, 3], {2}) + "".join(
+                self.answer("B", list(range(s, min(s + 10, n + 1) + 1)), calls) for s in range(1, n + 1, 10)))
+        r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check",
+                            *[x for name in ("cand", "cand2", "shipped") for x in
+                              ("--run", f"{name.removesuffix('2')}={tmp / name}")], "--candidate", "cand",
+                            "--anchor-truth", str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
+                            "--out", str(tmp / "m.json")], capture_output=True, text=True)
+        return r, json.loads((tmp / "m.json").read_text())
+
+    def test_one_folder_held_out_set_has_a_real_interval(self):
+        # Measurement review pass 12, P12-1: folders alone were resampled, so one folder gave the point, and a
+        # candidate 2.9 points worse on 276 gaps passed at [-2.9, -2.9]. Its documents are resampled now.
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.one_folder_check(Path(t), 276, range(5, 276, 34))      # 8 wrong of 276: -2.9
+            self.assertEqual(r.returncode, 1, r.stdout)
+            h = m["heldout"]["tags"]
+            self.assertEqual((h["paired_gaps"], h["paired_folders"], h["paired_documents"], h["difference"]),
+                             (276, 1, 92, -2.9))
+            lo, hi = h["difference_interval"]
+            self.assertLess(lo, -3)
+            self.assertGreater(hi - lo, 2)
+            self.assertIn("trail the shipped model", " ".join(m["gate"]["reasons"]))
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.one_folder_check(Path(t), 276, ())                     # one folder is not refused as such
+            self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_one_held_out_document_is_refused(self):
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.one_folder_check(Path(t), 276, (), doc=0)
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertEqual(m["heldout"]["tags"]["paired_documents"], 1)
+            self.assertEqual(m["gate"]["reasons"], [f"run {i}: one held-out document: 1 (tags, paired with the shipped "
+                                                    "run), and the gate's interval resamples documents, so it needs at "
+                                                    "least two" for i in (1, 2)])
+
+    # The corpus held-out set the shipped kit is checked on: 22 folders, (gaps, documents) each (corpus_pairs.py).
+    CORPUS_HOLDOUT = ((8, 1), (8, 1), (11, 7), (20, 5), (28, 10), (52, 16), (53, 19), (61, 27), (70, 24), (71, 10),
+                      (72, 26), (115, 59), (125, 47), (128, 16), (131, 22), (190, 32), (395, 61), (420, 76),
+                      (475, 123), (770, 166), (1867, 490), (2207, 792))
+
+    def test_corpus_held_out_set_keeps_its_verdict(self):
+        # On the 22-folder set, documents inside folders leave the gate's verdict where the folder bootstrap had it:
+        # a candidate 1 point worse passes, 4 points worse fails. Each folder as one document is the folder bootstrap.
+        import random
+        import train_seg as T
+        for every, passes in ((100, True), (25, False)):
+            groups, i = {}, 0
+            for f, (n, docs) in enumerate(self.CORPUS_HOLDOUT):
+                gaps = []
+                for _ in range(n):
+                    gaps.append((i % every != 0, True))
+                    i += 1
+                size = -(-n // docs)
+                groups[f"F{f}"] = [gaps[k:k + size] for k in range(0, n, size)]
+            folders = {k: [[x for d in v for x in d]] for k, v in groups.items()}
+            for g in (groups, folders):
+                h = T.gap_score(g, random.Random(T.CHECK_SEED), True)
+                self.assertEqual(h["paired_folders"], 22)
+                self.assertEqual(h["difference_interval"][0] > -T.GATE_POINTS, passes, (every, h))
+
     def test_two_scored_runs_each_passing(self):
         with tempfile.TemporaryDirectory() as t:
             tmp = Path(t)

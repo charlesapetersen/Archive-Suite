@@ -49,7 +49,10 @@ rule is narrower and separate: `LocalSegmenter.refusal` refuses a model folder w
 prompt c1 and an anchor pages-exact score (`seg-kit-gate.md`) [M]. The threshold, the minimum support and the anchor
 margin were call 7.2, decided 2026-11-06: gap accuracy against the shipped 2B, a checker-enforced minimum known-gap
 count from the measured "needed" column (about 147 or 267 gaps, `seg-kit-gate.md`), two scored runs, and an anchor
-margin of 3.2 points on the public anchor; W46.kit-gate-rule enforces it (minimum 267, the larger figure). The solver shows the gate's verdict and
+margin of 3.2 points on the public anchor; W46.kit-gate-rule enforces it (minimum 267, the larger figure). Its held-out
+intervals resample folders and, inside each, documents, so a one-box held-out set has a real interval; the 267 was
+derived again on that resampling (documents alone, 254-282 over five seeds) and stands, and a set of one document is
+refused (W46.kit-gate-groups, measurement review pass 12 P12-1). The solver shows the gate's verdict and
 interval, and never shows an after-training segmentation row as selectable without a manifest that passed.
 
 Kind rules. Segmentation rows are per material, not per page kind: a trained student or continuation applies to the
@@ -126,7 +129,7 @@ hold out whole collections or boxes, never a random page split).
   "memory":{"peak_gb":null,"measured_on":"unmeasured: an adapter or merged continuation on the Mac was not measured; the shipped 2B 8-bit it continues peaks at 4.4 GB on the M3 Pro (seg-students.md); Mac training not measured to fit (P9-12)","source":null},
   "caveats":["the pre-set rule (no loss of start recall) is not met: at k = 200 each box loses one start (box 2 finds 67 of 69 catalogue starts against the 2B's 68)","one material (Lincoln correspondence), two adjacent boxes, one training seed","box 2's truth holds no scored start inside an item (P9-8)","k = 50 buys a tie on box 2 and loses two catalogue starts there"],
   "kind_rules":["per material: the next boxes of the material the corrections came from"],"fallback":"seg-qwen3.5-2b-8bit",
-  "conditions":["the fine-tuning answer is 'on a cluster' (14-owner-calls.md call 7)","at least 200 corrected gaps of one material in the review records (trigger: note 07)","labelled 'measured on one material'","review flagging by disagreement with a second model stays on after adaptation","the kit's gate passes on a held-out box of the same material (note 12, seg-kit-gate.md)"]},
+  "conditions":["the fine-tuning answer is 'on a cluster' (14-owner-calls.md call 7)","at least 200 corrected gaps of one material in the review records (trigger: note 07)","labelled 'measured on one material'","review flagging by disagreement with a second model stays on after adaptation","the kit's gate passes on a held-out box of the same material holding at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, its interval resampling that box's documents (note 12, seg-kit-gate.md)"]},
  {
   "id": "kit-seg-lora-mac",
   "name": "Segmentation LoRA trained on this Mac",
@@ -272,6 +275,11 @@ minimum known-gap count from the table above and two runs; adopt with an anchor 
 gap accuracy, a checker-enforced minimum taken from the measured "needed" column, two scored runs, and an anchor
 margin the owner sets; the figures do not choose the margin. The 1,850 figure is within five owner boxes only (pass 3).
 Decided (session, 14-owner-calls.md section 2): that rule, with an anchor margin of 3.2 points, the rerun floor's top.
+Since W46.kit-gate-groups (2026-11-11, P12-1): the held-out interval resamples folders and, inside each, documents (it
+resampled folders only, so one folder gave a point: a candidate 2.96 points worse on 270 gaps passed); the minimum,
+derived again on that resampling, stays 267 (documents alone 254-282; as five folders the same gaps need 531, which the
+interval itself carries); one document is refused (`seg-kit-gate.md` §The minimum support). The anchor's point margin
+is unchanged.
 
 **7.3 The licence statement for research-licensed models run through the kit.** The principle is settled (owner,
 2026-10-20, `00-plan.md`: a model a user runs on their own cluster through the kit may carry a research or
@@ -300,7 +308,8 @@ on. Open: where corrections live for the kit (H open question 9, gap audit §6);
 (box 2's size, `seg-adapt-lora.md`) is enough held-out support under call 7.2, given 267 is the larger gap-accuracy
 figure. Carried to note 07 for the trigger; the support question is decided with 7.2. Decided (session, section 2):
 corrections live in the review records; the next box of the same material is the held-out set; the gate's minimum
-support applies to it.
+support applies to it. So that box needs at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, more
+than Lincoln box 2's 244; the gate resamples its documents (W46.kit-gate-groups), so one box gets a real interval.
 
 **7.6 The fine-tuning answer's mapping.** Section 3 reads "with a coding agent" as Mac-side steps and "on a cluster" as
 adding cluster rows [I]. Confirm, or make the coding agent a requirement for the cluster rows too. Decided (session,

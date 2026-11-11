@@ -195,6 +195,56 @@ def needed(half_at: dict[int, float]) -> int:
     return int(round(n * (h / TARGET) ** 2))
 
 
+def gate_groups(rec: dict, cand: str, ref: str) -> list[list[tuple[bool, bool]]]:
+    """One box as `train_seg.gap_score` reads a held-out folder: its documents (the truth's, photo pages left out),
+    each the (candidate right, reference right) on the known gaps it owns."""
+    from score import PHOTO, segment_ids
+    labels = rec["labels"]
+    tid = segment_ids(labels)
+    gap_at = {g["i"]: k for k, g in enumerate(rec["gaps"])}
+    docs: dict[int, list] = {}
+    for p, t in enumerate(labels):
+        if t not in PHOTO and p - 1 in gap_at:
+            k = gap_at[p - 1]
+            docs.setdefault(tid[p], []).append(tuple(rec["models"][m]["gaps"][k][0] == rec["gaps"][k]["truth"]
+                                                     for m in (cand, ref)))
+    return list(docs.values())
+
+
+def gate_support(owner: list[dict]) -> dict:
+    """The minimum support derived on the gate's own resampling (W46.kit-gate-groups): `train_seg.gap_score`'s paired
+    interval, folders and inside each documents, on the five owner boxes as one folder (the innermost unit, all a
+    one-box held-out set has), as five folders, and box by box; 'needed' is n * (half-width / TARGET)^2. The floor is
+    the larger one-folder figure of the two pairs."""
+    sys.path.insert(0, str(data.HERE / "institutional-compute"))
+    import train_seg as T
+
+    def one(groups):
+        r = T.gap_score(groups, random.Random(SEED), True)
+        lo, hi = r["difference_interval"]
+        half = (hi - lo) / 2
+        return {"gaps": r["paired_gaps"], "folders": r["paired_folders"], "documents": r["paired_documents"],
+                "difference": r["difference"], "interval": [lo, hi], "half": round(half, 2),
+                "needed": int(round(r["paired_gaps"] * (half / TARGET) ** 2))}
+    out = {}
+    for a, b in PAIRS:
+        per = {r["box"]: gate_groups(r, b, a) for r in owner}
+        out[f"{b} - {a}"] = {"one folder": one({"owner": [d for v in per.values() for d in v]}),
+                             "five folders": one(per), "boxes": {k: one({k: v}) for k, v in per.items()}}
+    seeds = range(SEED, SEED + 5)      # the floor's Monte Carlo spread: the larger pair, one folder, five seeds
+    big = max(out, key=lambda k: out[k]["one folder"]["needed"])
+    b, a = big.split(" - ")
+    pooled = {"owner": [d for r in owner for d in gate_groups(r, b, a)]}
+    spread = []
+    for sd in seeds:
+        r = T.gap_score(pooled, random.Random(sd), True)
+        spread.append(int(round(r["paired_gaps"] * ((r["difference_interval"][1] - r["difference_interval"][0]) / 2
+                                                    / TARGET) ** 2)))
+    return {"pairs": out, "draws": T.DRAWS, "seed": SEED, "floor": out[big]["one folder"]["needed"],
+            "floor_pair": big, "floor_seeds": [min(spread), max(spread)], "seeds": [seeds[0], seeds[-1]],
+            "gate_minimum": T.MIN_KNOWN_GAPS}
+
+
 # --- the teacher split ------------------------------------------------------------------------------
 
 def teacher_split(boxes: list[dict]) -> dict:
@@ -289,6 +339,7 @@ def cmd_report() -> None:
         boot[f"{b} - {a}"] = {"sizes": {str(n): v for n, v in per.items()},
                               "needed": {k: needed({n: per[n][k]["half"] for n in SIZES}) for k in per[SIZES[0]]}}
     sens = {f"{b} - {a}": discordant(owner, a, b) for a, b in PAIRS}
+    support = gate_support(owner)
     observed = {}
     for rec in owner + public:
         for key, m in rec["models"].items():
@@ -299,12 +350,13 @@ def cmd_report() -> None:
                                                         "gap accuracy": round(100 * (1 - wrong / len(rec["gaps"])), 1),
                                                         "gaps": len(rec["gaps"]), "doc pages": dp,
                                                         "unscored gaps": len(rec.get("unsure", ()))}
-    OUT_JSON.write_text(json.dumps({"teacher_split": split, "bootstrap": boot, "truth_sensitivity": sens,
+    OUT_JSON.write_text(json.dumps({"teacher_split": split, "bootstrap": boot, "gate_support": support,
+                                    "truth_sensitivity": sens,
                                     "observed": observed, "label_error": LABEL_ERROR, "truth": truth_provenance(),
                                     "dates": dates, "level": LEVEL, "draws": DRAWS, "seed": SEED,
                                     "documents_in_pool": len(docs), "gaps_in_pool": sum(d["gaps"] for d in docs)},
                                    indent=1) + "\n")
-    OUT_MD.write_text(render(split, boot, observed, dates, docs, sens, owner + public))
+    OUT_MD.write_text(render(split, boot, observed, dates, docs, sens, owner + public, support))
     print("wrote", OUT_MD, OUT_JSON)
 
 
@@ -343,7 +395,7 @@ def truth_provenance() -> dict:
     return out
 
 
-def render(split, boot, observed, dates, docs, sens, records) -> str:
+def render(split, boot, observed, dates, docs, sens, records, support) -> str:
     unsure = {r["box"]: len(r.get("unsure", ())) for r in records}
     prov = truth_provenance()
     L = ["# W46.kit-gate — the kit's held-out gate and the teacher audit", "",
@@ -437,6 +489,45 @@ def render(split, boot, observed, dates, docs, sens, records) -> str:
         b, a = pair.split(" - ")
         L.append(f"| {SHORT[b]} minus {SHORT[a]} | {v['gaps']:,} | {v['discordant']} | {v['difference']:+} points | "
                  f"±{v['shift'][f'{LABEL_ERROR[0]}%']} | ±{v['shift'][f'{LABEL_ERROR[2]}%']} |")
+    fl = support["pairs"][support["floor_pair"]]
+    L += ["", "### The minimum support, on the gate's own resampling (W46.kit-gate-groups)", "",
+          "`train_seg.py check` resamples held-out folders and, inside each drawn folder, its documents. Until "
+          "2026-11-11 it resampled folders only, so a held-out set of one folder (one box, as the continuation's next "
+          "box is) had an interval of zero width: a candidate 2.96 points worse on 270 gaps passed with one folder "
+          "and failed with 30 (measurement review pass 12, P12-1). The table is that two-level interval, paired, "
+          f"on the five owner boxes' known gaps ({support['draws']:,} draws, seed {support['seed']}): as one folder "
+          "(documents only, all a one-box held-out set has), as five folders (one a box), and on each box alone. "
+          f"'Needed' is n × (half-width / {TARGET:.0f})², the size at which that interval's half-width reaches "
+          f"{TARGET:.0f} points.", "",
+          "| difference | resampled as | gaps | documents | difference (points) | interval | half-width | needed for ±3 points |",
+          "|---|---|---:|---:|---:|---|---:|---:|"]
+    for pair, v in support["pairs"].items():
+        b, a = pair.split(" - ")
+        rows = [("one folder", v["one folder"]), ("five folders", v["five folders"])] + \
+               [(f"{box} alone", r) for box, r in v["boxes"].items()]
+        for lab, r in rows:
+            L.append(f"| {SHORT[b]} minus {SHORT[a]} | {lab} | {r['gaps']} | {r['documents']} | {r['difference']:+} | "
+                     f"{r['interval'][0]} to {r['interval'][1]} | ±{r['half']} | {r['needed']:,} |")
+    L += ["", "#### Reading", "",
+          f"- **The gate's minimum stays {support['gate_minimum']} known gaps.** On the gate's innermost unit, documents, "
+          f"the larger pair ({SHORT[support['floor_pair'].split(' - ')[0]]} against the "
+          f"{SHORT[support['floor_pair'].split(' - ')[1]]}) needs {support['floor']} gaps at seed {support['seed']} "
+          f"and {support['floor_seeds'][0]}-{support['floor_seeds'][1]} over seeds {support['seeds'][0]}-"
+          f"{support['seeds'][1]}: the document bootstrap above, which drew documents to a size, gave the same figure. "
+          "The floor is derived on documents because they are the unit every held-out set has, a one-box set "
+          "included; below it the interval is too narrow to trust.",
+          f"- **Between boxes the interval widens, and the gate reads that from the interval, not the floor.** "
+          f"Resampled as five folders the same gaps need {fl['five folders']['needed']:,} for ±3 points "
+          f"({support['pairs'][PAIRS[0][1] + ' - ' + PAIRS[0][0]]['five folders']['needed']:,} for the 4B pair), "
+          "because the boxes differ from one another. A held-out set of several unlike folders gets that wider "
+          "interval, and a trailing candidate fails on it; the floor only stops a set too small for any interval.",
+          "- **One box alone varies.** The boxes' own figures run from "
+          f"{min(r['needed'] for v in support['pairs'].values() for r in v['boxes'].values())} to "
+          f"{max(r['needed'] for v in support['pairs'].values() for r in v['boxes'].values())}: a box with a few long "
+          "documents where the models differ has a wide interval at its size. The gate scores the box it is given; "
+          f"the floor is a minimum, not a promise that {support['gate_minimum']} gaps of any box reach ±3 points.",
+          "- **A held-out set of one document is refused.** The draw then repeats that document, and no number of "
+          "its gaps gives an interval."]
     L += ["", "## Observed, from the same records", "",
           "Known gaps only; pages exact over the documents every unsure gap leaves resolved (W46.seg-unsure-mask).", "",
           "| model | box | known gaps | unscored gaps | gap accuracy | pages exact |", "|---|---|---:|---:|---:|---:|"]
@@ -460,14 +551,15 @@ def render(split, boot, observed, dates, docs, sens, records) -> str:
     L += ["", "## The gate: `train_seg.py check` and the manifest", "",
           "`train_seg.py check` (institutional-compute) is the kit's held-out gate. It reads `cluster_seg.py` answers "
           "only, scores each run's per-gap calls on the held-out collections against their tags (and against the "
-          "owner's rulings when a file of them is given) with a folder bootstrap, and on a locked public anchor box "
+          "owner's rulings when a file of them is given) with a bootstrap of folders and, inside each, documents "
+          "(W46.kit-gate-groups), and on a locked public anchor box "
           "(pages exact, gap accuracy, the review load to 98%) with a document bootstrap, each paired against the "
           "shipped model. It writes H §6.3's manifest: kit version, prompt id, base build, weights, adapter and "
           "training-data hashes, the scores with intervals, the Mac figures and the gate's verdict, and exits 1 when "
           "the gate fails. The rule, as decided (call 7.2, 2026-11-06; enforced by W46.kit-gate-rule): two scored "
-          "runs, each passing; in each, an anchor score, a held-out score on at least 267 known gaps (the larger of "
-          "the two measured \"needed\" figures below, 147 and 267; the owner's rulings when they reach that, else "
-          "the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 "
+          "runs, each passing; in each, an anchor score, a held-out score on at least 267 known gaps in more than "
+          "one document (the larger of the two measured \"needed\" figures above, 147 and 267, derived again on the "
+          "gate's own resampling; the owner's rulings when they reach that, else the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 "
           "points, over every gap the shipped run answered with the candidate's unanswered gaps counted wrong, and "
           "anchor pages exact less than 3.2 points (the top of the pages-exact rerun floor) below the shipped run's. "
           "A candidate with no shipped run, no paired gap or no paired anchor fails (W46.kit-gate-coverage). The "

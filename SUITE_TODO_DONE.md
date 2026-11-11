@@ -14991,3 +14991,20 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `TemplatesUITests.testTemplateInspectorOffersFoldersAndSavesADate` (compiled only) → W40.fix-notes-template-fields-ui,
   blocked on W40.vm-macos27-notes. No rehearsal-cache scratch.
   <!-- /W40.fix-notes-template-fields -->
+- [x] **W46.kit-gate-groups — the kit gate's held-out interval on a one-box held-out set [S]** · §Document processing review — W46 (lane: segbench) — Measurement review pass 12, P12-1. Offline, $0. SHIPPED 2026-11-11.
+  `train_seg.py` `gap_score` now resamples held-out folders and, inside each drawn folder, its documents (`two_level`;
+  documents follow the scored truth in page order, a "new" gap opening one), for the accuracy and the paired difference
+  intervals. A one-folder set therefore has a real interval: 8 wrong of 276 gaps in one folder (−2.9) now fails at
+  [−5.07, −1.09] where it passed at [−2.9, −2.9]. A held-out set of one document is refused (new reason).
+  The minimum was derived again on the gate's own resampling (`kit_gate.py` `gate_support`, `seg-kit-gate.md`
+  §The minimum support): documents alone, 27B against 2B, 260 at seed 46, 254-282 over seeds 46-50; 4B pair 154. So
+  `MIN_KNOWN_GAPS` stays 267. As five folders the same 809 gaps need 333/531; the interval carries that spread itself.
+  The boxes alone run from 40 to 546. Real check on the corpus's 22-folder held-out set (joint 2B's FarmShare
+  answers, 7,277 gaps, 2,034 documents): accuracy 80.36%, interval 76.94-83.70 → 76.30-84.05, same verdict and
+  reasons. Tests (`test_institutional_compute.Check`, 14 pass): one folder at −2.9 fails with a non-zero interval, one
+  folder at par passes, one document is refused, and the 22-folder structure keeps the folder bootstrap's verdict at −1
+  (pass) and −4 (fail). Suite: 61 run, the only failure is `test_test_boxes_need_the_committed_teacher_freeze`, red on
+  main too (W46.fix-freeze-guard-test). README, note 12 §3/§7.2/§7.5 and the shared `seg-2b-lora-k200` row (notes 07 and
+  12, `settings-routes.json` rebuilt) say it. The anchor's point margin is unchanged. No rehearsal-cache scratch made
+  (read `kit-gate/gaps-owner.json` and `corpus-pairs/labels.jsonl` only).
+  <!-- /W46.kit-gate-groups -->

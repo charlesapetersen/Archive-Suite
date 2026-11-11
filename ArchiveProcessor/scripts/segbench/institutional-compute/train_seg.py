@@ -22,12 +22,13 @@ never trained on.
 CHECK (W46.kit-gate). Reads cluster_seg.py answers only: each run's per-gap P(new), averaged over the windows that
 cover a gap, scored on the held-out collections' gaps against their tags (and against the owner's rulings where a
 file of them is given), and on a locked public anchor box (pages in the exact document, gap accuracy, the review load
-to 98%), with bootstrap intervals by folder and by document, paired against the shipped model. Held-out figures
+to 98%), paired against the shipped model. Held-out intervals resample folders and, inside each drawn folder, its
+documents, so a one-box held-out set has a real interval (W46.kit-gate-groups); the anchor's resample documents. Held-out figures
 count every expected gap: expected, answered and missing, the strict accuracy (a missing answer is wrong) beside the
 answered-only one, and the paired difference over every gap the shipped run answered, the candidate's missing answers
 counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-gate-coverage). The acceptance rule
 (call 7.2, W46.kit-gate-rule): two scored runs, each passing; in each, the paired interval's low end above -3 points
-on at least 267 known held-out gaps, and anchor pages exact less than 3.2 points below the shipped run's. It writes the
+on at least 267 known held-out gaps in two documents or more, and anchor pages exact less than 3.2 points below the shipped run's. It writes the
 candidate's manifest (`archive-seg-manifest.json` beside the weights is what the app reads): prompt id, kit version,
 weights and training-data hashes, the scores, and the gate's verdict; it exits 1 when the gate fails. The app refuses a
 model whose manifest lacks the anchor score or names another prompt (`LocalSegmenter.refusal`). Sizes, from
@@ -204,7 +205,10 @@ PROMPT_ID = "c1"          # the app's id for the request these models are traine
 GATE_POINTS = 3.0         # a candidate may trail the shipped model by less than this on held-out gaps (kit_gate.py)
 # The support the 3-point interval needs: seg-kit-gate.md's "needed" column for gap accuracy is 147 (4B against the
 # 2B) and 267 (the 27B teacher against the 2B). A candidate's disagreement with the 2B is not known beforehand, so
-# the larger is the floor. Below it the interval is too wide to mean anything, and the gate refuses.
+# the larger is the floor. Below it the interval is too wide to mean anything, and the gate refuses. Derived again on
+# the gate's own resampling, folders and inside each documents (W46.kit-gate-groups, seg-kit-gate.md §The minimum
+# support): documents alone, the unit a one-box held-out set has, give 254-282 over five seeds, so 267 stands. A
+# held-out set of one document has no interval at all, and is refused too.
 MIN_KNOWN_GAPS = 267
 RUNS_NEEDED = 2
 # On the public anchor, a candidate may score below the shipped run in pages exact by less than this, in each run:
@@ -242,63 +246,87 @@ def pct_interval(xs):
     return [round(100 * xs[int(0.025 * len(xs))], 2), round(100 * xs[int(0.975 * len(xs)) - 1], 2)]
 
 
+def two_level(folders, rng):
+    """One bootstrap draw of a held-out set: folders with replacement, then, inside each drawn folder, its documents
+    with replacement (W46.kit-gate-groups). folders: [[doc totals, ...], ...], each doc's totals a tuple; returns the
+    summed totals. With one folder this is a document bootstrap, so a one-box held-out set has a real interval; with
+    many single-document folders it is the folder bootstrap the gate used before."""
+    tot = None
+    for _ in folders:
+        docs = folders[rng.randrange(len(folders))]
+        for _ in docs:
+            d = docs[rng.randrange(len(docs))]
+            tot = d if tot is None else tuple(x + y for x, y in zip(tot, d))
+    return tot
+
+
 def gap_score(groups, rng, reference=False):
-    """groups: {group: [(model right, reference right), ...]} over every expected held-out gap, each True, False or
-    None when that run has no answer for it (W46.kit-gate-coverage). Strict figures count a missing answer as wrong,
-    so a run cannot raise its score by leaving hard gaps unanswered; answered-only figures sit beside them as
-    diagnostics. With a reference (the shipped model), the paired difference model - reference is taken over every
-    gap the reference answered, the model's missing answers counted wrong. Intervals resample groups (folders)."""
+    """groups: {folder: [document, ...]}, each document the list of (model right, reference right) over its expected
+    held-out gaps, each True, False or None when that run has no answer for it (W46.kit-gate-coverage). Strict figures
+    count a missing answer as wrong, so a run cannot raise its score by leaving hard gaps unanswered; answered-only
+    figures sit beside them as diagnostics. With a reference (the shipped model), the paired difference model -
+    reference is taken over every gap the reference answered, the model's missing answers counted wrong. Intervals
+    resample folders and, inside each, documents (`two_level`)."""
     keys = sorted(groups)
-    flat = [x for k in keys for x in groups[k]]
+    flat = [x for k in keys for doc in groups[k] for x in doc]
     answered = [a for a, _ in flat if a is not None]
     out = {"expected_gaps": len(flat), "answered_gaps": len(answered), "missing_gaps": len(flat) - len(answered),
+           "folders": len(keys), "documents": sum(len(groups[k]) for k in keys),
            "accuracy": round(100 * sum(a is True for a, _ in flat) / max(1, len(flat)), 2),
            "accuracy_answered": round(100 * sum(answered) / len(answered), 2) if answered else None}
     if not flat:
         return out
+    folders = [[(len(doc), sum(a is True for a, _ in doc)) for doc in groups[k] if doc] for k in keys]
+    folders = [f for f in folders if f]
     acc = []
     for _ in range(DRAWS):
-        draw = [x for _ in keys for x in groups[keys[rng.randrange(len(keys))]]]
-        acc.append(sum(a is True for a, _ in draw) / len(draw))
+        n, right = two_level(folders, rng)
+        acc.append(right / n)
     out["interval"] = pct_interval(acc)
     if not reference:
         return out
-    paired = {k: [(a is True, b) for a, b in groups[k] if b is not None] for k in keys}
+    paired = {k: [d for d in ([(a is True, b) for a, b in doc if b is not None] for doc in groups[k]) if d] for k in keys}
     paired = {k: v for k, v in paired.items() if v}
     both = [(a, b) for a, b in flat if a is not None and b is not None]
-    out["paired_gaps"] = sum(len(v) for v in paired.values())
-    out["paired_missing_gaps"] = sum(1 for k in keys for a, b in groups[k] if b is not None and a is None)
+    out["paired_gaps"] = sum(len(d) for v in paired.values() for d in v)
+    out["paired_folders"] = len(paired)
+    out["paired_documents"] = sum(len(v) for v in paired.values())
+    out["paired_missing_gaps"] = sum(1 for _, b in flat if b is not None) - sum(1 for a, b in both)
     out["reference_missing_gaps"] = sum(1 for _, b in flat if b is None)
     out["difference_answered"] = round(100 * sum(a - b for a, b in both) / len(both), 2) if both else None
     if not paired:
         return out
     pk = sorted(paired)
-    pflat = [x for k in pk for x in paired[k]]
+    pflat = [x for k in pk for d in paired[k] for x in d]
     out["difference"] = round(100 * sum(a - b for a, b in pflat) / len(pflat), 2)
+    pfolders = [[(len(d), sum(a - b for a, b in d)) for d in paired[k]] for k in pk]
     diff = []
     for _ in range(DRAWS):
-        draw = [x for _ in pk for x in paired[pk[rng.randrange(len(pk))]]]
-        diff.append(sum(a - b for a, b in draw) / len(draw))
+        n, d = two_level(pfolders, rng)
+        diff.append(d / n)
     out["difference_interval"] = pct_interval(diff)
     return out
 
 
 def heldout_groups(labels, ruled, p_a, p_b):
-    """Per folder, (model right, reference right) on every expected held-out gap: against the tags, and against the
-    owner's rulings where given. Each is None when that run has no answer for the gap, and the reference's is None
-    throughout when p_b (the reference) is None. No gap is dropped for want of an answer (W46.kit-gate-coverage)."""
+    """Per folder, its documents, each the (model right, reference right) on its expected held-out gaps: against the
+    tags, and against the owner's rulings where given. Each is None when that run has no answer for the gap, and the
+    reference's is None throughout when p_b (the reference) is None. No gap is dropped for want of an answer
+    (W46.kit-gate-coverage). Documents follow the truth being scored, in page order: a gap whose truth is "new"
+    starts one (it belongs to the document its right page opens), any other joins the one before (W46.kit-gate-groups)."""
     tags, own = {}, {}
 
     def right(p, k, truth):
         return None if p is None or k not in p else (p[k] >= 0.5) == (truth == "new")
-    for g in labels:
-        if g["split"] != "holdout":
-            continue
+    for g in sorted((g for g in labels if g["split"] == "holdout"), key=lambda g: (g["folder_id"], g["n"])):
         k = (g["folder_id"], g["n"])
         for truth, dst in ((g["tag"], tags), (ruled.get(k), own)):
             if truth is None:
                 continue
-            dst.setdefault(g["folder_id"], []).append((right(p_a, k, truth), right(p_b, k, truth)))
+            docs = dst.setdefault(g["folder_id"], [])
+            if truth == "new" or not docs:
+                docs.append([])
+            docs[-1].append((right(p_a, k, truth), right(p_b, k, truth)))
     return tags, own
 
 
@@ -461,6 +489,11 @@ def run_reasons(row, paired, box, shipped_given):
             reasons.append(f"too few known held-out gaps: {n} ({basis.replace('_', '-')}"
                            f"{', paired with the shipped run' if paired else ''}), and the gate needs at least "
                            f"{MIN_KNOWN_GAPS} for its {GATE_POINTS:g}-point interval to mean anything")
+        docs = held.get("paired_documents", 0) if paired else held["documents"]
+        if docs < 2:
+            reasons.append(f"one held-out document: {docs} ({basis.replace('_', '-')}"
+                           f"{', paired with the shipped run' if paired else ''}), and the gate's interval resamples "
+                           f"documents, so it needs at least two")
     return reasons
 
 
@@ -525,7 +558,8 @@ def cmd_check(a):
         "scored_runs": len(cand_runs),
         "mac": json.loads(Path(a.mac).read_text()) if a.mac else None, "note": a.note,
         "gate": {"rule": f"{RUNS_NEEDED} scored runs, each with an anchor score and a held-out score on at least "
-                         f"{MIN_KNOWN_GAPS} known gaps (the owner's rulings when they reach that, else the tags); "
+                         f"{MIN_KNOWN_GAPS} known gaps in two documents or more (the owner's rulings when they reach "
+                         f"that, else the tags), its intervals resampling folders and, inside each, documents; "
                          f"for a candidate other than the shipped model, in each run, a paired held-out gap-accuracy "
                          f"interval against the shipped run, over every gap that run answered with the candidate's "
                          f"missing answers counted wrong, whose low end is above -{GATE_POINTS:g} points, and anchor "
