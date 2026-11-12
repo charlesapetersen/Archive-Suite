@@ -25,6 +25,16 @@
 #                companion on a headless AVD on the host; xcuitest lane only).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
+#                VM_KEEP=1 (W40.vm-macos27-runtime (4)): leave the guest booted for the next call, and skip the
+#                  build when the sources are unchanged since its last one — for a run of targeted tests. A
+#                  detached vm-keep-reaper.sh stops it after VM_KEEP_IDLE s (300) without a run, as soon as
+#                  the Mac's memory pressure leaves normal, or when the calling session exits. A call without
+#                  VM_KEEP=1 takes a kept guest over and stops it at the end; `vm-gui-runner.sh stop` stops it now.
+#                VM_SPLIT=N (xcuitest only): run the selection as N chunks of whole test classes, each in a freshly
+#                  booted guest (the macOS 27.2 guest slows down over a long lane; see README §"Long lanes").
+#                VM_SAMPLE=S: sample host and guest load every S s into $ART/<app>/sampler*.tsv (default 60; 0 = off).
+#
+# The guest's `xcodebuild test` is ended if it outlives its own summary or goes silent (tart_run_test).
 #
 # PREREQS (one-time — ops/gui/README.md §3): tart + the `archive-gui-runner` VM; xcodegen on the HOST;
 # for the sighted lane only, vncdotool at ~/.tart-mirror/vncenv/bin/vncdotool. Each is CHECKED, loudly.
@@ -41,9 +51,25 @@ REHEARSAL="${REHEARSAL_DIR:-$HOME/Library/Caches/ArchiveSuiteRehearsal}"   # W40
 VNCDOTOOL="${VNCDOTOOL:-$HOME/.tart-mirror/vncenv/bin/vncdotool}"
 AGENT_WAIT="${AGENT_WAIT:-240}"
 
+VM_KEEP="${VM_KEEP:-0}"
+VM_SPLIT="${VM_SPLIT:-0}"
+VM_SAMPLE="${VM_SAMPLE:-60}"
+KEEP_STATE="${VM_KEEP_STATE:-$HOME/.tart-mirror/.vm-keep}"
+[[ "$VM_SPLIT" =~ ^[0-9]+$ ]] || { echo "VM_SPLIT must be a whole number" >&2; exit 2; }
+[[ "$VM_SAMPLE" =~ ^[0-9]+$ ]] || { echo "VM_SAMPLE must be a whole number of seconds" >&2; exit 2; }
+
 # --- args: [app] [lane], app optional (old call sites pass only a lane) ---
 APP="reader"; LANE="both"
 case "${1:-}" in
+  stop)
+    # Stop a guest VM_KEEP=1 left running, now, under the VM lock (so never under a run).
+    tart_lock_acquire "${LOCK_WAIT:-120}" || { echo "the GUI VM is in use by another run (pid ${TART_LOCK_OWNER:-?})" >&2; exit 1; }
+    if [ -f "$KEEP_STATE" ]; then
+      tart_stop_clean "$(sed -n 's/^vm=//p' "$KEEP_STATE" | tail -n 1)"; rm -f "$KEEP_STATE"; echo "kept guest stopped"
+    else
+      echo "no kept guest"
+    fi
+    tart_lock_release; exit 0 ;;
   xcuitest|sighted|both) LANE="$1" ;;
   "")                    : ;;
   *)                     APP="$1"; [ -n "${2:-}" ] && LANE="$2" ;;
@@ -62,10 +88,57 @@ mkdir -p "$APP_ART"
 # begins by stopping the VM and truncating logs. Without the lock a run started while the daemon's gate is
 # mid-flight kills it, and the gate reports "inconclusive" for work it was about to complete.
 VM_BOOTED=0
+KEEP_BUILT=""   # the source fingerprint this run built (VM_KEEP=1), carried into the keep state
 cleanup() {
-  [ "$VM_BOOTED" = 1 ] && tart_stop_clean "$VM"
+  tart_sampler_stop
+  if [ "$VM_BOOTED" = 1 ] && [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then
+    keep_guest; VM_BOOTED=0
+  fi
+  [ "$VM_BOOTED" = 1 ] && tart_stop_clean "$VM" && rm -f "$KEEP_STATE"
   tart_lock_release
   return 0
+}
+
+# --- VM_KEEP=1: leave the guest up for the next call, with a reaper that stops it (vm-keep-reaper.sh) ---
+# The session that keeps it: the nearest `claude` ancestor, so the guest goes when that session does.
+keep_owner() {
+  local p="$$" c
+  while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null; do
+    c="$(ps -o comm= -p "$p" 2>/dev/null || true)"
+    case "${c##*/}" in claude) echo "$p"; return 0 ;; esac
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ' || true)"
+  done
+  return 0
+}
+keep_guest() {
+  # tart stop is a hard power-off on this guest (tart_stop_clean); if the session's process tree is killed
+  # with the guest still up, only what was synced survives. So sync after every kept run.
+  tart exec "$VM" sync >/dev/null 2>&1 || true
+  local old_built reaper
+  old_built="$(sed -n "s/^built_$APP=//p" "$KEEP_STATE" 2>/dev/null | tail -n 1)"
+  { echo "vm=$VM"; echo "repo=$REPO"; echo "rehearsal=$([ -d "$REHEARSAL" ] && echo 1 || echo 0)"
+    echo "owner=$(keep_owner)"; echo "last=$(date +%s)"
+    sed -n '/^built_/p' "$KEEP_STATE" 2>/dev/null | grep -v "^built_$APP=" || true
+    echo "built_$APP=${KEEP_BUILT:-$old_built}"; } > "$KEEP_STATE.new"
+  reaper="$(sed -n 's/^reaper=//p' "$KEEP_STATE" 2>/dev/null | tail -n 1)"
+  if [ -n "$reaper" ] && kill -0 "$reaper" 2>/dev/null; then
+    echo "reaper=$reaper" >> "$KEEP_STATE.new"; mv "$KEEP_STATE.new" "$KEEP_STATE"
+  else
+    mv "$KEEP_STATE.new" "$KEEP_STATE"
+    VM_KEEP_STATE="$KEEP_STATE" nohup bash "$HERE/vm-keep-reaper.sh" >/dev/null 2>&1 &
+    echo "reaper=$!" >> "$KEEP_STATE"
+  fi
+  log "kept $VM up for the next call (stops after ${VM_KEEP_IDLE:-300} s idle, on memory pressure, or when this session ends; now: $0 stop)"
+}
+
+# Fingerprint of the sources a guest build would compile: HEAD, the working tree's changes and untracked
+# files' contents. Equal fingerprints mean `test-without-building` tests exactly what `test` would build.
+src_fingerprint() {
+  { git -C "$REPO" rev-parse HEAD
+    git -C "$REPO" status --porcelain=v1 -uall
+    git -C "$REPO" diff HEAD --binary
+    git -C "$REPO" ls-files -o --exclude-standard -z | (cd "$REPO" && xargs -0 shasum 2>/dev/null)
+  } | shasum | awk '{print $1}'
 }
 trap cleanup EXIT
 tart_lock_acquire "${LOCK_WAIT:-120}" \
@@ -154,6 +227,11 @@ if [ -n "${TEST_ITERATIONS:-}" ]; then
   [[ "$TEST_ITERATIONS" =~ ^[1-9][0-9]*$ ]] || die "TEST_ITERATIONS must be a positive integer"
   TEST_ARGS="$TEST_ARGS-test-iterations $TEST_ITERATIONS -run-tests-until-failure "
 fi
+if [ "$VM_SPLIT" -gt 0 ]; then
+  [ "$LANE" = xcuitest ] || die "VM_SPLIT runs on the xcuitest lane only."
+  [ -z "$CORRUPT_TEST_SELECTOR" ] && [ "${VISUAL_REVIEW:-0}" != 1 ] && [ "${TRANSIENT_VIDEO:-0}" != 1 ] \
+    && [ -z "${TEST_ITERATIONS:-}" ] || die "VM_SPLIT cannot be combined with a journey, a fixture variant, VISUAL_REVIEW, TRANSIENT_VIDEO or TEST_ITERATIONS."
+fi
 VNC_HOST=""; VNC_PORT=""; VNC_PASS=""
 
 # Belt-and-braces: close a Screen Sharing window if one appears anyway. With `--no-graphics
@@ -183,6 +261,25 @@ ensure_vm() {
   # A VM this script did not start has no VNC endpoint we can read, and may hold the wrong mounts. That is
   # fatal for the sighted lane but harmless for xcuitest, so split rather than blanket-warning (the old
   # code warned and carried on, then failed obscurely inside vncdotool).
+  if tart list 2>/dev/null | awk -v v="$VM" '$2==v && $NF=="running"{f=1} END{exit !f}' && [ -f "$KEEP_STATE" ]; then
+    # A guest VM_KEEP=1 left up. Take it over only if it was booted with THIS checkout and the same shares,
+    # for the xcuitest lane, and this run's xcodegen did not rewrite the project under its mount (the
+    # 2026-08-10 "missing its project.pbxproj file" read; see the GENERATE BEFORE BOOTING note). Else restart.
+    local why=""
+    [ "$(sed -n 's/^repo=//p' "$KEEP_STATE" | tail -n 1)" = "$REPO" ] || why="it mounts another checkout"
+    [ "$(sed -n 's/^rehearsal=//p' "$KEEP_STATE" | tail -n 1)" = "$([ -d "$REHEARSAL" ] && echo 1 || echo 0)" ] || why="its shares differ"
+    [ "$LANE" = xcuitest ] || why="the $LANE lane needs a guest this run boots"
+    [ "${PROJ_REWRITTEN:-0}" = 0 ] || why="xcodegen rewrote the project"
+    # The reaper stays alive: it never stops a guest while a live run holds the VM lock, and it re-reads the
+    # state this run writes at its end.
+    if [ -z "$why" ] && tart_wait_agent "$VM" 30; then
+      VM_BOOTED=1
+      log "reusing the kept guest (no boot)"
+      return 0
+    fi
+    log "restarting the kept guest: ${why:-its agent did not answer}"
+    tart_stop_clean "$VM"; rm -f "$KEEP_STATE"
+  fi
   if tart list 2>/dev/null | awk -v v="$VM" '$2==v && $NF=="running"{f=1} END{exit !f}'; then
     [ "$LANE" = "xcuitest" ] || die "VM '$VM' is already running and this script did not start it, so there is no VNC endpoint (and the mounts may be wrong). Stop it first:  tart stop $VM"
     log "VM already running — reusing it (xcuitest only needs the guest agent)."
@@ -223,9 +320,12 @@ ensure_vm() {
   # guest's general pasteboard within seconds. G4/G5/G13/G16 seed that pasteboard and read it back moments
   # later, so a host copy in between swapped G4's PNG for text, the paste declined, and no asset appeared.
   # Tests need a pasteboard nothing outside the guest can write.
+  rm -f "$KEEP_STATE"   # a fresh boot: no kept guest, and no build fingerprint another run may have overtaken
   log "booting $VM (${gfx[*]} --no-clipboard) + repo/artifact shares…"
   VM_BOOTED=1
-  tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" >>"$runlog" 2>&1 &
+  # VM_KEEP=1: the guest must outlive this script, so it must not die with its process group either.
+  local keep=(); [ "$VM_KEEP" = 1 ] && keep=(nohup)
+  ${keep[@]+"${keep[@]}"} tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" >>"$runlog" 2>&1 &
   echo $! > "$APP_ART/tart-run.pid"
   if [ "$LANE" != "xcuitest" ]; then
     # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
@@ -268,10 +368,21 @@ ensure_display() {
 gen_project() {
   command -v xcodegen >/dev/null || die "xcodegen not on the host PATH (brew install xcodegen) — the VM builds the project it generates."
   log "xcodegen generate ($APP)…"
-  xcodegen generate --spec "$REPO/$SPEC_REL" >/dev/null
+  if [ "$VM_KEEP" = 1 ]; then
+    # A kept guest has this checkout mounted, and xcodegen rewrites the whole bundle (new inodes) even when
+    # nothing changed. With its cache it writes only on a real change; PROJ_REWRITTEN then restarts the guest.
+    local pbx="$REPO/$PROJ_REL/project.pbxproj" before after; mkdir -p "$REPO/build"
+    before="$(stat -f %i "$pbx" 2>/dev/null || echo none)"
+    xcodegen generate --use-cache --cache-path "$REPO/build/xcodegen-$APP.cache" --spec "$REPO/$SPEC_REL" >/dev/null
+    after="$(stat -f %i "$pbx" 2>/dev/null || echo none)"
+    [ "$before" = "$after" ] || PROJ_REWRITTEN=1
+  else
+    xcodegen generate --spec "$REPO/$SPEC_REL" >/dev/null
+  fi
   if [ "$NOTES_INTEGRATIONS" = 1 ]; then
     log "xcodegen generate (reader, for the integration journey)…"
     xcodegen generate --spec "$REPO/$(archive_app_field reader spec)" >/dev/null
+    PROJ_REWRITTEN=1   # uncached: a kept guest must not read it mid-rewrite
   fi
 }
 
@@ -388,8 +499,8 @@ video_stop() {
 }
 
 # --- LANE: XCUITest (accessibility) ---
-run_xcuitest() {
-  assert_accessibility
+# Per guest boot: kill the app, run the prerun, ready the DerivedData.
+prepare_guest_for_tests() {
   # Before the prerun, which is a container wipe: the guest boots with whatever was running when it was
   # last stopped, the app-under-test included (→ tart_kill_app).
   tart_kill_app "$VM" "$APP"
@@ -401,7 +512,41 @@ run_xcuitest() {
     1) die "the VM guest is too full for a safe $APP build — ${TART_GUI_DD_NOTE:-no free-space report}. Free space, then rerun." ;;
     *) die "could not prepare the VM's $APP DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}." ;;
   esac
-  tart_crash_mark "$VM"
+}
+
+# run_tests ACTION ARGS NAME — one guarded guest `xcodebuild ACTION` into $APP_ART/NAME.log, result bundle
+# NAME.xcresult, with the load sampler beside it. Leaves its verdict in RUN_VERDICT (tart_test_verdict).
+# xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
+# before executing a single test. Remove it first.
+# CODE_SIGN_IDENTITY=- : the guest has no keychain, so it cannot use the host's "Archive Suite Dev"
+# cert (W28.cert). Same rationale as ops/autonomous/gui-vm-gate.sh — see the long note there.
+# Note for anyone adding a flag here: xcodebuild's environment is NOT inherited by an app-hosted test
+# process (measured — an env var set on this line reads as unset inside the test). SnapshotTests
+# therefore detects this VM from `hw.model` rather than from anything passed in here.
+run_tests() {
+  local action="$1" args="$2" name="$3" glog="$APP_ART/$3.log" t0 bundle="$3"
+  [ "$name" = xcuitest ] && bundle=uitest   # the single run's bundle keeps its long-standing name
+  : > "$glog"
+  [ "$VM_SAMPLE" -gt 0 ] && tart_sampler_start "$VM" "$APP_ART/sampler-$name.tsv" "$VM_SAMPLE" "$(archive_app_field "$APP" procname)"
+  t0="$(date +%s)"
+  tart_run_test "$VM" "$glog" "
+    rm -rf '$GUEST_DD/$bundle.xcresult'
+    $TEST_ENV xcodebuild $action \
+      -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
+      $args -destination 'platform=macOS' \
+      -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/$bundle.xcresult' \
+      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
+  " || true
+  tart_sampler_stop
+  grep -E "^Test Suite '[^']*' (passed|failed)|^[[:space:]]+Executed [0-9]+ test|\*\* TEST|^\[guard\]" "$glog" || true
+  [ -n "$TART_TEST_GUARD" ] && warn "the guest's xcodebuild did not end by itself ($TART_TEST_GUARD guard; see the [guard] line in $glog)"
+  RUN_VERDICT="$(tart_test_verdict "$glog")"
+  log "$name: $RUN_VERDICT in $(( $(date +%s) - t0 )) s (log: $glog)"
+}
+
+run_xcuitest() {
+  assert_accessibility
+  prepare_guest_for_tests
   # W40.e10: the screen-by-screen visual review tour (`VisualReviewUITests`) runs only while this flag
   # file exists beside the app's fixture, because it is minutes long and writes hundreds of shots. Set or
   # clear it on every run so a previous VISUAL_REVIEW=1 run cannot leave it switched on.
@@ -423,34 +568,36 @@ run_xcuitest() {
   else
     tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
   fi
-  log "building + running $ONLY_TESTING for $APP in the VM…"
-  local test_env=""
-  if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then start_phone_leg; test_env="TEST_RUNNER_W40D5_DIR='$LIVE_GDIR'"; fi
-  video_start
-  # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
-  # before executing a single test. Remove it first.
-  # CODE_SIGN_IDENTITY=- : the guest has no keychain, so it cannot use the host's "Archive Suite Dev"
-  # cert (W28.cert). Same rationale as ops/autonomous/gui-vm-gate.sh — see the long note there.
-  # Note for anyone adding a flag here: xcodebuild's environment is NOT inherited by an app-hosted test
-  # process (measured — an env var set on this line reads as unset inside the test). SnapshotTests
-  # therefore detects this VM from `hw.model` rather than from anything passed in here.
-  tart exec "$VM" bash -lc "
-    rm -rf '$GUEST_DD/uitest.xcresult'
-    $test_env xcodebuild test \
-      -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
-      $TEST_ARGS -destination 'platform=macOS' \
-      -derivedDataPath '$GUEST_DD' -resultBundlePath '$GUEST_DD/uitest.xcresult' \
-      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
-  " 2>&1 | tee "$APP_ART/xcuitest.log" | grep -E 'Test Suite|Executed [0-9]+ test|\*\* TEST' || true
-  log "XCUITest log: $APP_ART/xcuitest.log"
-  [ "$PROCESSOR_LIVECAPTURE" = 1 ] && stop_phone_leg
-  video_stop
-  # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
-  tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
-  collect_shots
-  collect_xcresult
-  collect_crashes
-  if grep -q '\*\* TEST SUCCEEDED \*\*' "$APP_ART/xcuitest.log" 2>/dev/null; then
+  TEST_ENV=""
+  if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then start_phone_leg; TEST_ENV="TEST_RUNNER_W40D5_DIR='$LIVE_GDIR'"; fi
+  rm -f "$APP_ART"/sampler-*.tsv "$APP_ART"/chunk*.log
+  if [ "$VM_SPLIT" -gt 0 ]; then
+    run_split
+  else
+    # VM_KEEP=1: test what the guest already built when the sources are the ones it built (src_fingerprint).
+    local action=test fp=""
+    if [ "$VM_KEEP" = 1 ]; then
+      fp="$(src_fingerprint)"
+      if [ -f "$KEEP_STATE" ] && [ "$(sed -n "s/^built_$APP=//p" "$KEEP_STATE" | tail -n 1)" = "$fp" ]; then
+        action=test-without-building
+      fi
+    fi
+    log "$action: $ONLY_TESTING for $APP in the VM…"
+    video_start
+    tart_crash_mark "$VM"
+    run_tests "$action" "$TEST_ARGS" xcuitest
+    # A build that got as far as running tests is the build these sources make; one that failed is not.
+    [ "$action" = test ] && [ -n "$fp" ] && grep -q "^Test Suite '" "$APP_ART/xcuitest.log" && KEEP_BUILT="$fp"
+    [ "$PROCESSOR_LIVECAPTURE" = 1 ] && stop_phone_leg
+    video_stop
+    # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
+    tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
+    collect_shots
+    collect_xcresult
+    collect_crashes
+    [ "$RUN_VERDICT" = succeeded ] || XCUITEST_FAILED=1
+  fi
+  if [ "$XCUITEST_FAILED" = 0 ]; then
     collect_snapshot_reference
   else
     # W35.vm-mem-fu1: this used to be a WARN and the script still exited 0, so anything wrapping the lane
@@ -458,9 +605,51 @@ run_xcuitest() {
     # 21/31 red for days that way. Record the verdict; the script exits non-zero at the end, after the
     # artifacts (and, for `both`, the sighted lane) are collected. The health gate does not call this
     # script — gui-vm-gate.sh keys on the same marker itself — so the gate's verdict is unchanged.
-    warn "no '** TEST SUCCEEDED **' marker for $APP — the XCUITest run FAILED (or never finished); see the log."
-    XCUITEST_FAILED=1
+    warn "the XCUITest run for $APP did not succeed (failed, or never finished); see the log."
   fi
+}
+
+# --- VM_SPLIT=N: the selection as N chunks of whole classes, each in a freshly booted guest ---
+# W40.vm-macos27-runtime (1): on the macOS 27.2 guest a long lane slows down as it goes. One build, then
+# `-enumerate-tests` names every selected test (so no class can be dropped by a source grep), the classes are
+# dealt into N contiguous chunks in run order, and each chunk runs `test-without-building` after a clean
+# restart and a fresh fixture. xcuitest.log is the chunks' logs in order, so collect_shots and a reader of
+# the log see one run; each chunk keeps its own log, sampler, result bundle and crash harvest.
+run_split() {
+  local list="$APP_ART/enumerated-tests.txt" classes n k=0 per i chunk args total=0
+  log "VM_SPLIT=$VM_SPLIT: building once, then enumerating the selection…"
+  run_tests build-for-testing "" build
+  grep -q '\*\* TEST BUILD SUCCEEDED \*\*' "$APP_ART/build.log" || die "the guest build failed (log: $APP_ART/build.log)"
+  tart exec "$VM" bash -lc "xcodebuild test-without-building -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
+      $TEST_ARGS -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' \
+      -enumerate-tests -test-enumeration-style flat -test-enumeration-format text -test-enumeration-output-path - \
+      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" > "$list.raw" 2>&1 || true
+  # Selected tests are listed as Bundle/Class/test (disabled ones are not, so the chunks run what one run would).
+  grep -oE '^[[:space:]]*[A-Za-z0-9_]+/[A-Za-z0-9_]+/[A-Za-z0-9_]+' "$list.raw" | tr -d ' \t' > "$list" || true
+  classes="$(awk -F/ '!seen[$1"/"$2]++{print $1"/"$2}' "$list")"
+  n="$(printf '%s\n' "$classes" | sed '/^$/d' | wc -l | tr -d ' ')"
+  [ "$n" -gt 0 ] || die "could not enumerate the selected tests (output: $list.raw)"
+  log "$(wc -l < "$list" | tr -d ' ') tests in $n classes, in $VM_SPLIT chunk(s)"
+  per=$(( (n + VM_SPLIT - 1) / VM_SPLIT ))
+  : > "$APP_ART/xcuitest.log"
+  rm -rf "$APP_ART/shots"
+  for (( i = 0; i < n; i += per )); do
+    k=$(( k + 1 )); chunk="chunk$k"
+    args="$(printf '%s\n' "$classes" | sed -n "$(( i + 1 )),$(( i + per ))p" | sed 's/^/-only-testing:/' | tr '\n' ' ')"
+    if [ "$k" -gt 1 ]; then
+      log "$chunk: restarting the guest…"
+      tart_stop_clean "$VM"; VM_BOOTED=0
+      ensure_vm; ensure_fixture; assert_accessibility >/dev/null; prepare_guest_for_tests
+    fi
+    log "$chunk: $(printf '%s' "$args" | wc -w | tr -d ' ') classes"
+    tart_crash_mark "$VM"
+    run_tests test-without-building "$args" "$chunk"
+    cat "$APP_ART/$chunk.log" >> "$APP_ART/xcuitest.log"
+    collect_shots "$APP_ART/$chunk.log" keep
+    collect_xcresult "$chunk"
+    collect_crashes "crashes-$chunk"
+    [ "$RUN_VERDICT" = succeeded ] || XCUITEST_FAILED=1
+  done
 }
 
 # --- PROCESSOR_JOURNEY=livecapture: the phone leg on the host, and the guest-side file record afterwards ---
@@ -503,15 +692,15 @@ stop_phone_leg() {
 # The result bundle is deliberately not the channel: `xcresulttool` refuses a bundle that was never
 # finalized, and that is exactly the state a failed or killed run leaves behind — recovering the shots
 # then means classifying `…xcresult/Data` blobs by magic bytes.
-collect_shots() {
-  local dest="$APP_ART/shots" n=0 p paths
+collect_shots() {   # [LOG] [keep: add to this run's shots, for a VM_SPLIT chunk]
+  local dest="$APP_ART/shots" n=0 p paths glog="${1:-$APP_ART/xcuitest.log}"
   # Clear the directory FIRST, unconditionally. If this run took no shots, an absent dir has to mean
   # "no shots this run" — leaving the previous run's PNGs there is worse than having none, because the
-  # next session reads them as evidence about a run that never produced them.
-  rm -rf "$dest"
+  # next session reads them as evidence about a run that never produced them. (A split run clears it once.)
+  [ "${2:-}" = keep ] || rm -rf "$dest"
   # Greedy `.*` so a shot name containing a colon still resolves (the last ": wrote " wins), and `|| true`
   # because a missing log is not a reason to abort the run under `set -e`.
-  paths="$(sed -nE 's/^\[shot\] .*: wrote (.+)$/\1/p' "$APP_ART/xcuitest.log" 2>/dev/null | sort -u || true)"
+  paths="$(sed -nE 's/^\[shot\] .*: wrote (.+)$/\1/p' "$glog" 2>/dev/null | sort -u || true)"
   [ -n "$paths" ] || return 0
   mkdir -p "$dest"
   while IFS= read -r p; do
@@ -578,10 +767,11 @@ collect_crashes() {   # $1 = artifact subdir name under $APP_ART (default: crash
 
 # Keep the result bundle beside the textual log and screenshots. It is useful when Xcode finalized it,
 # but never the only screenshot channel: an interrupted test leaves its bundle unreadable.
-collect_xcresult() {
-  local dest="$APP_ART/uitest.xcresult"
+collect_xcresult() {   # [NAME] (default uitest; the guest bundle is $GUEST_DD/NAME.xcresult)
+  local name="${1:-uitest}" dest
+  dest="$APP_ART/$name.xcresult"
   rm -rf "$dest"
-  if tart exec "$VM" bash -lc "[ -d '$GUEST_DD/uitest.xcresult' ] && cp -R '$GUEST_DD/uitest.xcresult' '/Volumes/My Shared Files/out/$APP/'" >/dev/null 2>&1; then
+  if tart exec "$VM" bash -lc "[ -d '$GUEST_DD/$name.xcresult' ] && cp -R '$GUEST_DD/$name.xcresult' '/Volumes/My Shared Files/out/$APP/'" >/dev/null 2>&1; then
     log "XCUITest result bundle: $dest"
   else
     warn "no finalized XCUITest result bundle could be collected for $APP"

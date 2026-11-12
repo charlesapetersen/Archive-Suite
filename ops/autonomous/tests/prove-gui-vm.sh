@@ -14,6 +14,7 @@ trap 'rm -rf "$ROOT"' EXIT
 # The Mac-wide lock is SCRATCH here (7 Oct 2026). The shim and the real gate this drives reach heavy-run.py, and
 # with the real lock they queued behind real work — for hours, inside the gate's unlocked light block — then held
 # the Mac-wide lock for a fake tool and wrote fake jobs into waits.log, holds.log and the manager's heavy-jobs.log.
+export TART_TEST_POLL=1   # tart_run_test's guard poll: 10 s in real runs, 1 s against the fake
 export AUTONOMOUS_HEAVY_STATE="$ROOT/heavy" MAC_HEAVY_LOCK="$ROOT/mac-heavy.lock" AGENT_MANAGER_HEAVY_LOCK="$ROOT/no manager installed"
 unset AGENT_MANAGER_STATE HEAVY_LOCK_FILE ARCHIVE_HEAVY_TOKEN MAC_HEAVY_HELD AUTONOMOUS_WORKER_STATE
 BIN="$ROOT/bin"; ART="$ROOT/artifacts"; STATE="$ROOT/state/next-app"; CALLS="$ROOT/calls.log"
@@ -65,12 +66,29 @@ case "${1:-}" in
           infra:*)
             printf '%s\n' 'guest transport ended before a test verdict'
             ;;
+          hang_pass:*|hang_fail:*|stall:*)
+            # W40.vm-macos27-runtime: the macOS 27.2 guest's xcodebuild that never exits. It prints XCTest's
+            # summary (or, for stall, nothing more) and then waits until the guard's pkill arrives.
+            if [ "${GUI_VM_FAKE_MODE}" = hang_fail ]; then
+              printf "Test Case '-[Fake.%s testRenderedSurface]' failed (0.01 seconds).\n" "$app"
+              printf '%s\n' "Test Suite 'Selected tests' failed at 2026-11-12 10:00:00.000." \
+                '	 Executed 1 test, with 1 failure (0 unexpected) in 0.01 (0.01) seconds'
+            elif [ "${GUI_VM_FAKE_MODE}" = hang_pass ]; then
+              printf "Test Case '-[Fake.%s testRenderedSurface]' passed (0.01 seconds).\n" "$app"
+              printf '%s\n' "Test Suite 'Selected tests' passed at 2026-11-12 10:00:00.000." \
+                '	 Executed 1 test, with 0 failures (0 unexpected) in 0.01 (0.01) seconds'
+            fi
+            while [ ! -f "$count.killed" ]; do sleep 0.2; done
+            rm -f "$count.killed"
+            exit 143
+            ;;
           *)
             printf "Test Case '-[Fake.%s testRenderedSurface]' passed (0.01 seconds).\n" "$app"
             printf '%s\n' '** TEST SUCCEEDED **'
             ;;
         esac
         ;;
+      *'pkill -TERM -x xcodebuild'*) : > "$count.killed" ;;
       *'df -Pk'*)
         if [ "${GUI_VM_FAKE_MODE:-pass}" = full_disk ]; then
           printf '%s\n' 'storage: only 4 KiB free (need at least 6291456 KiB)'; exit 1
@@ -150,6 +168,21 @@ printf '%s\n' reader > "$STATE"
 run_gate full_disk 3 full-disk-skip
 want "$ROOT/full-disk-skip.out" 'SKIPPED: inconclusive for: notes' 'full guest disk is fail-open SKIPPED'
 want_not "$CALLS" 'xcodebuild test' 'full guest disk never starts an Xcode build'
+
+# The build tool that stays up after its summary (W40.vm-macos27-runtime (2)): the guard ends it, and the
+# verdict is XCTest's own summary line — passed is GREEN on the first attempt, failed retries and REDs.
+printf '%s\n' reader > "$STATE"
+TART_TEST_GRACE=2 run_gate hang_pass 0 hang-after-pass
+want "$ART/notes/xcuitest-attempt1.log" '[guard] summary:' 'a build tool idle after a passed summary is ended by the guard'
+[ "$(cat "$ROOT/count")" = 1 ] && pass 'a guard-ended passed run is not retried' || bad 'a guard-ended passed run is not retried'
+printf '%s\n' reader > "$STATE"
+TART_TEST_GRACE=2 run_gate hang_fail 1 hang-after-fail
+want "$ROOT/hang-after-fail.out" 'RED — reproducible UITest failure in: notes' 'a guard-ended failed summary still REDs'
+# A run that goes silent before any summary is ended too, and says nothing either way: SKIPPED.
+printf '%s\n' reader > "$STATE"
+TART_TEST_STALL=3 run_gate stall 3 stalled-skip
+want "$ART/notes/xcuitest-attempt1.log" '[guard] stalled:' 'a silent run is ended by the stall guard'
+want "$ROOT/stalled-skip.out" 'SKIPPED: inconclusive for: notes' 'a stalled run is fail-open SKIPPED, never GREEN'
 
 run_gate missing_vm 3 missing-vm-skip
 want "$ROOT/missing-vm-skip.out" "VM 'archive-gui-runner' does not exist" 'missing VM is fail-open SKIPPED'

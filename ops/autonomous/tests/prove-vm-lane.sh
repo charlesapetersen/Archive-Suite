@@ -340,11 +340,27 @@ grep -q 'XCUITEST_FAILED=1' "$RUNNER" \
 grep -q '\[ "\$XCUITEST_FAILED" = 0 \] || die' "$RUNNER" \
   && ok "runner exits non-zero at the end when the XCUITest run failed" \
   || no "runner still exits 0 after a failed XCUITest run"
-# The gate keys on the markers itself and never calls the runner. Its RED rule is the TEST FAILED marker,
-# plus (W40.e2) a CRASH_REPORT line from the crash harvest — never anything weaker.
-grep -qF "is_fail()    { grep -qE '\*\* TEST FAILED \*\*|^CRASH_REPORT\['" "$GATEF" \
-  && ok "gate keys a failed attempt on '** TEST FAILED **' or a suite crash report, nothing else" \
+# The gate keys on the markers itself and never calls the runner. Its RED rule is a suite CRASH_REPORT line
+# (W40.e2) or tart_test_verdict's `failed`: the TEST FAILED marker, or — only when the summary guard had to end
+# a build tool that would not exit (W40.vm-macos27-runtime) — XCTest's own failed top-level summary.
+grep -qF "is_fail()    { grep -qE '^CRASH_REPORT\[' \"\$(applog \"\$1\" \"\$2\")\" 2>/dev/null || tests_failed" "$GATEF" \
+  && grep -qF 'tests_failed() { [ "$(tart_test_verdict' "$GATEF" \
+  && ok "gate keys a failed attempt on tart_test_verdict or a suite crash report, nothing else" \
   || no "gate's TEST FAILED check changed"
+# tart_test_verdict itself, on the logs it has to tell apart.
+( . "$LIB"
+  v() { printf '%b' "$2" > "$TMP/verdict.log"; [ "$(tart_test_verdict "$TMP/verdict.log")" = "$1" ] || { echo "verdict: wanted $1 for: $2"; exit 1; }; }
+  S="Test Suite 'Selected tests'"
+  v succeeded "x\n** TEST SUCCEEDED **\n"
+  v failed "x\n** TEST FAILED **\n"
+  v unknown "$S passed at 1.\n\t Executed 3 tests, with 0 failures (0 unexpected) in 1 (1) seconds\n"
+  v succeeded "$S passed at 1.\n\t Executed 3 tests, with 0 failures (0 unexpected) in 1 (1) seconds\n[guard] summary: x\n"
+  v failed "$S failed at 1.\n\t Executed 3 tests, with 1 failure (0 unexpected) in 1 (1) seconds\n[guard] summary: x\n"
+  v unknown "$S passed at 1.\n\t Executed 3 tests, with 2 failures (0 unexpected) in 1 (1) seconds\n[guard] summary: x\n"
+  v unknown "t = 1s waiting\n[guard] stalled: x\n"
+  v unknown "t = 1s waiting\n[guard] maxrun: x\n"
+) && ok "tart_test_verdict: a guard-ended run is green only on a passed summary with 0 failures; a stall is unknown" \
+  || no "tart_test_verdict misreads a guard-ended or marker log"
 
 echo "== 13. the crash and hang harvest (W40.e2) =="
 # Same stub `tart` as section 11: the guest body runs on the host, against scratch report directories.

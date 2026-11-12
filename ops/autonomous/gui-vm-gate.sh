@@ -80,7 +80,6 @@ tart_require || skip "tart not installed or not on PATH (details above) — the 
 tart list 2>/dev/null | awk '{print $2}' | grep -qx "$VM" || skip "tart is installed, but VM '$VM' does not exist (build it — ops/gui/README.md §3)"
 command -v xcodegen >/dev/null || skip "xcodegen not on the host PATH (it generates the projects the VM builds)"
 mkdir -p "$ART"
-if command -v gtimeout >/dev/null; then TO=(gtimeout "$MAXRUN"); else TO=(); fi
 
 # Only stop the VM if WE booted it, and always drop the lock. The old unconditional `tart stop` fired even
 # on the pre-boot skips below, which on a shared machine means killing a VM another run legitimately owns.
@@ -177,9 +176,11 @@ applog()     { echo "$(app_art "$1")/xcuitest-attempt$2.log"; }
 # A crash/hang report from one of our processes (W40.e2, → tart_crash_harvest) fails the attempt even
 # under TEST SUCCEEDED: an app that dies after its last assertion is exactly what the marker cannot see.
 # It goes through the same retry, so a one-off crash is a flake and a repeated one is RED.
-is_fail()    { grep -qE '\*\* TEST FAILED \*\*|^CRASH_REPORT\[' "$(applog "$1" "$2")" 2>/dev/null; }
-is_success() { grep -q '\*\* TEST SUCCEEDED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
-tests_failed() { grep -q '\*\* TEST FAILED \*\*' "$(applog "$1" "$2")" 2>/dev/null; }
+# The test verdict is tart_test_verdict's: xcodebuild's marker, or, when tart_run_test's summary guard had to
+# end a build tool that would not exit (W40.vm-macos27-runtime), XCTest's own top-level summary line.
+is_fail()    { grep -qE '^CRASH_REPORT\[' "$(applog "$1" "$2")" 2>/dev/null || tests_failed "$1" "$2"; }
+is_success() { [ "$(tart_test_verdict "$(applog "$1" "$2")")" = succeeded ]; }
+tests_failed() { [ "$(tart_test_verdict "$(applog "$1" "$2")")" = failed ]; }
 # A missing Processor window can mean a guest keychain/unlock/modal failure, not an app regression. The
 # test itself saves a rendered screenshot before emitting this marker; classify it as infrastructure.
 is_processor_no_window() { [ "$1" = processor ] && grep -q '^PROCESSOR_UI_NO_WINDOW$' "$(applog "$1" "$2")" 2>/dev/null; }
@@ -270,13 +271,15 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # lane was green on before — and the host keeps the cert. Do NOT "fix" this by provisioning the cert
   # into the VM: that couples a throwaway image to host secrets and breaks again on every VM rebuild.
   tart_crash_mark "$VM"
-  "${TO[@]}" tart exec "$VM" bash -lc "
+  # tart_run_test, not a bare exec under gtimeout: it also ends a build tool that stays up after its summary
+  # or goes silent, each with a [guard] line in the log (MAXRUN stays the per-app cap).
+  tart_run_test "$VM" "$log" "
     rm -rf '$bundle'
     xcodebuild test -project '$GUEST_REPO/$proj' -scheme '$scheme' \
       $test_args -destination 'platform=macOS' \
       -derivedDataPath '$dd' -resultBundlePath '$bundle' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
-  " >>"$log" 2>&1
+  " "$MAXRUN" || true
   collect_shots "$app" "$attempt" "$log"
   collect_crashes "$app" "$attempt" "$log"
   # Preserve the finalized result bundle beside this attempt's log. A failed/interrupted Xcode run may

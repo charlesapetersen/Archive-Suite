@@ -449,3 +449,109 @@ tart_lock_release() {
 }
 
 # ---------------------------------------------------------------------------------------------------
+# tart_run_test VM LOG GUEST_CMD [MAXRUN] — run a guest `xcodebuild test` (GUEST_CMD, a `bash -lc` string),
+# appending its output to LOG, and END it when it will not end itself (W40.vm-macos27-runtime).
+#
+# THE BUGS THIS EXISTS FOR (macOS 27.2 guest, 2026-11-11). (a) After "Executed 138 tests" the guest's
+# xcodebuild sat 25 min idle in its run loop and never printed its `** TEST … **` marker; SIGINT did nothing,
+# SIGTERM ended it. A lane must not be able to hang the gate that way. (b) In the full Notes lane the
+# accessibility audits stalled testmanagerd and after ~16 silent minutes the runner lost its channel.
+# Three guards, checked every TART_TEST_POLL seconds, each recorded as one `[guard] …` line in LOG:
+#   summary — the top-level `Test Suite 'All tests'|'Selected tests' passed|failed at` line is in LOG and LOG
+#             has not grown for TART_TEST_GRACE s (default 180). Idle, not elapsed: with -test-iterations the
+#             next iteration writes at once, so only a run that is really over trips this.
+#   stalled — no summary yet and LOG has not grown for TART_TEST_STALL s (default 1500; a UI test prints a
+#             `t = …` line every few seconds while it waits, so 25 silent minutes is a stuck run).
+#   maxrun  — MAXRUN seconds elapsed (0/absent = no cap; the gate passes its per-app cap).
+# Ending: `pkill -TERM -x xcodebuild` in the guest, up to 30 s for it to go, then the host's `tart exec`.
+# TART_TEST_GUARD is left empty (the build tool ended by itself) or names the guard; the return is the
+# `tart exec` status. Read the verdict with tart_test_verdict, not with the status.
+TART_TEST_POLL="${TART_TEST_POLL:-10}"
+TART_TEST_GRACE="${TART_TEST_GRACE:-180}"
+TART_TEST_STALL="${TART_TEST_STALL:-1500}"
+TART_TEST_SUMMARY_RE="^Test Suite '(All tests|Selected tests)' (passed|failed) at "
+tart_run_test() {
+  local vm="$1" log="$2" cmd="$3" maxrun="${4:-0}" pid rc=0 start now size last_size last_grow why="" i
+  TART_TEST_GUARD=""
+  tart exec "$vm" bash -lc "$cmd" >>"$log" 2>&1 &
+  pid=$!
+  start="$(date +%s)"; last_grow="$start"; last_size=-1
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep "$TART_TEST_POLL"
+    now="$(date +%s)"
+    size="$(stat -f %z "$log" 2>/dev/null || echo 0)"
+    if [ "$size" != "$last_size" ]; then last_size="$size"; last_grow="$now"; fi
+    if grep -qE "$TART_TEST_SUMMARY_RE" "$log" 2>/dev/null; then
+      [ $(( now - last_grow )) -ge "$TART_TEST_GRACE" ] && why=summary
+    elif [ $(( now - last_grow )) -ge "$TART_TEST_STALL" ]; then
+      why=stalled
+    fi
+    [ -z "$why" ] && [ "$maxrun" -gt 0 ] 2>/dev/null && [ $(( now - start )) -ge "$maxrun" ] && why=maxrun
+    [ -n "$why" ] || continue
+    TART_TEST_GUARD="$why"
+    printf '[guard] %s: the guest xcodebuild was still running %s s after the log last grew (%s s into the run); ending it with SIGTERM\n' \
+      "$why" "$(( now - last_grow ))" "$(( now - start ))" >>"$log"
+    tart exec "$vm" bash -lc "pkill -TERM -x xcodebuild; true" >/dev/null 2>&1 || true
+    for i in 1 2 3 4 5 6; do kill -0 "$pid" 2>/dev/null || break; sleep 5; done
+    kill "$pid" 2>/dev/null || true
+    break
+  done
+  wait "$pid" 2>/dev/null || rc=$?
+  return "$rc"
+}
+
+# tart_test_verdict LOG — print `succeeded`, `failed` or `unknown` for one guest test run.
+# xcodebuild's own marker decides when it printed one. When the summary guard had to end the build tool, the
+# verdict is XCTest's own top-level summary line instead — the line xcodebuild would have turned into the
+# marker — and only when that line says `passed` AND its `Executed …` line reports 0 failures. A stall or a
+# maxrun end is `unknown`: the run did not finish, so it says nothing either way.
+tart_test_verdict() {
+  local log="$1" top exec_line
+  grep -q '\*\* TEST FAILED \*\*' "$log" 2>/dev/null && { echo failed; return 0; }
+  grep -q '\*\* TEST SUCCEEDED \*\*' "$log" 2>/dev/null && { echo succeeded; return 0; }
+  if grep -q '^\[guard\] summary:' "$log" 2>/dev/null; then
+    top="$(grep -nE "$TART_TEST_SUMMARY_RE" "$log" | tail -n 1)"
+    exec_line="$(sed -n "$(( ${top%%:*} + 1 ))p" "$log")"
+    case "$top" in
+      *"' failed at "*) echo failed; return 0 ;;
+      *"' passed at "*) case "$exec_line" in *" with 0 failures "*) echo succeeded; return 0 ;; esac ;;
+    esac
+  fi
+  echo unknown
+}
+
+# ---------------------------------------------------------------------------------------------------
+# tart_sampler_start VM OUT [SECONDS] / tart_sampler_stop — sample host and guest load across a run
+# (W40.vm-macos27-runtime (1): tell guest degradation from host load). One TSV row per SECONDS (default 60):
+#   epoch, host load1, host memory-pressure level (1 normal, 2 warn, 4 critical), guest load1, guest free /
+#   compressor-held / swapped-out pages, WindowServer %cpu and RSS (KB), testmanagerd %cpu, the app's RSS (KB).
+# Cheap (one `tart exec` a minute). Rows the transport drops are simply missing.
+tart_sampler_start() {
+  local vm="$1" out="$2" every="${3:-60}" proc="${4:-Archive}"
+  TART_SAMPLER_PID=""
+  printf 'epoch\thost_load1\thost_pressure\tguest_load1\tguest_free\tguest_compressor\tguest_swapouts\tws_cpu\tws_rss_kb\ttestmanagerd_cpu\tapp_rss_kb\n' >"$out"
+  (
+    while :; do
+      g="$(tart exec "$vm" bash -c "
+        l=\$(sysctl -n vm.loadavg | awk '{print \$2}')
+        v=\$(vm_stat | awk '/Pages free/{f=\$3} /occupied by compressor/{c=\$5} /Swapouts/{s=\$2} END{gsub(/\\./,\"\",f);gsub(/\\./,\"\",c);gsub(/\\./,\"\",s);print f\"\\t\"c\"\\t\"s}')
+        w=\$(ps -axo pcpu=,rss=,comm= | awk '/WindowServer\$/{print \$1\"\\t\"\$2; exit}')
+        t=\$(ps -axo pcpu=,comm= | awk '/testmanagerd\$/{print \$1; exit}')
+        a=\$(ps -axo rss=,comm= | awk '/\\/$proc\$/{print \$1; exit}')
+        printf '%s\t%s\t%s\t%s\t%s\n' \"\$l\" \"\$v\" \"\${w:-\t}\" \"\$t\" \"\$a\"
+      " 2>/dev/null | tail -n 1)" || g=""
+      [ -n "$g" ] && printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$(sysctl -n vm.loadavg | awk '{print $2}')" \
+        "$(sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null)" "$g" >>"$out"
+      sleep "$every"
+    done
+  ) &
+  TART_SAMPLER_PID=$!
+  return 0
+}
+tart_sampler_stop() {
+  [ -n "${TART_SAMPLER_PID:-}" ] || return 0
+  kill "$TART_SAMPLER_PID" 2>/dev/null || true
+  wait "$TART_SAMPLER_PID" 2>/dev/null || true
+  TART_SAMPLER_PID=""
+  return 0
+}
