@@ -181,11 +181,12 @@ def heavy_work_in_session(state, record):
         return False
     heavy = Path(os.environ.get("AUTONOMOUS_HEAVY_STATE") or state / "heavy")
     found = []
-    try:
-        owner = json.loads((heavy / "owner.json").read_text())
-        found.append((owner.get("owner"), owner.get("owner_start")))
-    except (OSError, ValueError, AttributeError):
-        pass
+    for name in ("owner.json", "owner.2.json"):   # heavy-run.py's slots (the second only while the Mac lock is shared)
+        try:
+            owner = json.loads((heavy / name).read_text())
+            found.append((owner.get("owner"), owner.get("owner_start")))
+        except (OSError, ValueError, AttributeError):
+            pass
     for path in sorted((heavy / "waiters").glob("*.json")):
         try:
             waiter = json.loads(path.read_text())
@@ -295,12 +296,13 @@ def heavy_busy(state):
     heavy_run = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(heavy_run)
     heavy = Path(os.environ.get("AUTONOMOUS_HEAVY_STATE") or state / "heavy")
-    try:
-        r = heavy_run.read(heavy / "owner.json")
-        if r and heavy_run.active(heavy, r):
-            return True
-    except (OSError, ValueError, RuntimeError):
-        pass
+    for path in heavy_run.owner_paths(heavy):
+        try:
+            r = heavy_run.read(path)
+            if r and heavy_run.active(heavy, r):
+                return True
+        except (OSError, ValueError, RuntimeError):
+            pass
     for path in sorted((heavy / "waiters").glob("*.json")):
         try:
             waiter = json.loads(path.read_text())

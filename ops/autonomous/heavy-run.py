@@ -10,6 +10,10 @@ a waiter here is in its queue, and the queue is first come, first served across 
 manager, or on a scratch MAC_HEAVY_LOCK with no scratch AGENT_MANAGER_STATE (a harness), it falls back
 to mac-heavy-lock.py's mkdir protocol, which bin/heavy-lock also takes and honours (Agent Manager R6).
 
+When the manager shares its lock with this project (policy heavy_share, a pilot from 2026-11-12), there are two
+slots: heavy.lock/owner.json and heavy.2.lock/owner.2.json. A job takes whichever is free; the manager's Taker
+then admits it beside another job only when their expected memory peaks fit its budget (SLOTS, slot_count).
+
 The kernel lock has no age expiry. A published child session protects work even
 if the supervisor is killed and a tool closes its inherited lock descriptor.
 Unknown/corrupt ownership fails closed. All proofs use an explicit scratch state.
@@ -51,6 +55,26 @@ def manager_lock():
         return module
     except Exception:
         return None
+
+
+# Two slots when the Agent Manager shares the Mac lock with this project (its policy heavy_share, a pilot from
+# 2026-11-12): heavy.lock/owner.json as before, and heavy.2.lock/owner.2.json for a second job that heavy-lock
+# admits beside the first only when their expected memory peaks fit its budget. Without sharing there is one slot
+# and nothing here changes.
+SLOTS = (("heavy.lock", "owner.json"), ("heavy.2.lock", "owner.2.json"))
+
+
+def slot_count(manager):
+    """2 when the manager shares its lock with this project now, else 1. A fault is 1."""
+    try:
+        return 2 if manager is not None and manager.share_slots("archive-suite") == 2 else 1
+    except Exception:
+        return 1
+
+
+def owner_paths(state):
+    """Every slot's owner record path (one may name a job from before sharing was turned off)."""
+    return [state / owner for _, owner in SLOTS]
 
 
 def try_mac(taker, label):
@@ -167,15 +191,16 @@ def end_orphaned_helpers(state):
     descriptor, so the kernel lock never frees. With the owner otherwise gone, end them. Best effort: the
     record can vanish or change under a waiter (the owner unlinks it holding heavy.lock), and the decision
     that counts is still made under the flock."""
-    try:
-        r = read(state / "owner.json")
-        if not r or active(state, r):
-            return
-        survivors = session_members(r["child"])
-        if survivors and all(xcode_helper(comm) for _, comm in survivors):
-            end_helpers(state, r["child"], survivors, ["(owner pid %d, gone)" % r["owner"]])
-    except (OSError, ValueError, RuntimeError):
-        pass
+    for path in owner_paths(state):
+        try:
+            r = read(path)
+            if not r or active(state, r):
+                continue
+            survivors = session_members(r["child"])
+            if survivors and all(xcode_helper(comm) for _, comm in survivors):
+                end_helpers(state, r["child"], survivors, ["(owner pid %d, gone)" % r["owner"]])
+        except (OSError, ValueError, RuntimeError):
+            pass
 
 
 def basic_active(r):
@@ -208,7 +233,7 @@ def protect(state, pid):
     with metadata_lock(state):
         if not held(state):
             raise RuntimeError("ownership changed before nested entry")
-        r = read(state / "owner.json")
+        r = token_record(state, os.environ.get("ARCHIVE_HEAVY_TOKEN", ""))
         sid = os.getsid(pid)
         members = state / "members"
         members.mkdir(exist_ok=True)
@@ -246,12 +271,21 @@ def belongs(r):
                 descendant(os.getpid(), r["owner"]))
 
 
+def token_record(state, token):
+    """The slot owner record that carries token, or None."""
+    for path in owner_paths(state):
+        r = read(path)
+        if r and token and r["token"] == token:
+            return r
+    return None
+
+
 def held(state):
     token = os.environ.get("ARCHIVE_HEAVY_TOKEN", "")
     if not token:
         return False
-    r = read(state / "owner.json")
-    if not r or r["token"] != token or not active(state, r):
+    r = token_record(state, token)
+    if not r or not active(state, r):
         return False
     # A surviving registered session can nest even after the original ancestor
     # exits. Token alone and a reused PID/session leader are never sufficient.
@@ -266,8 +300,10 @@ def held(state):
 
 
 def waiting(state, root):
-    r = read(state / "owner.json")
-    heavy_busy = bool(r and active(state, r))
+    heavy_busy = False
+    for path in owner_paths(state):
+        r = read(path)
+        heavy_busy = heavy_busy or bool(r and active(state, r))
     m = None if heavy_busy else mac_lock.read_owner(mac_lock.lock_path())
     # A Mac-lock holder inside the session itself is a self-wait, not queued work.
     mac_busy = bool(m and mac_lock.alive(m) and not descendant(m["pid"], root))
@@ -386,7 +422,6 @@ def run(state, command, ready):
 
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, stop)
-    owner_path = state / "owner.json"
     waited_from = None
     machine = None
     session_done = False
@@ -396,18 +431,27 @@ def run(state, command, ready):
     sampler = None
     manager = manager_lock()
     taker = manager.Taker("archive-suite", label) if manager else None
+    slot_paths = [(state / lock_name, state / owner_name) for lock_name, owner_name in SLOTS[:slot_count(manager)]]
+    owner_path = slot_paths[0][1]
 
-    with (state / "heavy.lock").open("a+") as lock:
+    with contextlib.ExitStack() as slot_files:
+        locks = [slot_files.enter_context(path.open("a+")) for path, _ in slot_paths]
+        lock = locks[0]
         try:
             blocked_by_mac = False
             queued = None  # the pid of the earlier waiter this job deferred to, when that is what blocked it
             orphans_checked = time.monotonic()
             while not interrupted:
                 blocker = None
-                try:
-                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                tried = taken = False
+                for slot_lock, (_, slot_owner) in zip(locks, slot_paths):
+                    try:
+                        fcntl.flock(slot_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    except BlockingIOError:
+                        continue   # another worker's turn at this slot: try the next
+                    tried = True
                     with metadata_lock(state):
-                        old = read(owner_path)
+                        old = read(slot_owner)
                         if not old or not active(state, old):
                             if old:
                                 retire_members(state, old["token"])
@@ -429,19 +473,25 @@ def run(state, command, ready):
                                 taker = manager = None
                                 got = try_mac(None, label)
                             if not isinstance(got, dict):
-                                machine = got
-                                break
-                            blocker = got
-                    fcntl.flock(lock, fcntl.LOCK_UN)
+                                machine, lock, owner_path, taken = got, slot_lock, slot_owner, True
+                            else:
+                                blocker = got
+                    if taken:
+                        break
+                    fcntl.flock(slot_lock, fcntl.LOCK_UN)
+                    if blocker:
+                        break   # the Mac lock gives every slot the same answer
+                if taken:
+                    break
+                if tried:
                     blocked_by_mac = bool(blocker)
                     queued = (int(blocker["pid"]) if blocker and str(blocker.get("label", "")).endswith(", queued first")
                               and str(blocker.get("pid", "")).isdigit() else None)
-                except BlockingIOError:
-                    # Another worker's turn at heavy.lock: what this one waits on is unchanged. Now and then,
-                    # check it is not only Xcode helpers left by a dead supervisor (W40.fix-heavy-run-xcode-helpers).
-                    if time.monotonic() - orphans_checked >= ORPHAN_CHECK_EVERY:
-                        orphans_checked = time.monotonic()
-                        end_orphaned_helpers(state)
+                elif time.monotonic() - orphans_checked >= ORPHAN_CHECK_EVERY:
+                    # Every slot is another worker's turn: what this one waits on is unchanged. Now and then, check
+                    # it is not only Xcode helpers left by a dead supervisor (W40.fix-heavy-run-xcode-helpers).
+                    orphans_checked = time.monotonic()
+                    end_orphaned_helpers(state)
                 if blocker and taker:
                     # In heavy-lock's queue (and its `status`); refreshed only on a poll the Mac lock blocked,
                     # so a wait on this project's heavy.lock alone does not keep a place in the Mac queue.

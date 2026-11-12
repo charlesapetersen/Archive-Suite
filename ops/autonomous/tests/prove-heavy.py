@@ -509,6 +509,55 @@ echo "gate-rc=$GATE_RC"
                       "the manager's memory guard stops a held job past its limit and says why on stderr")
             else:
                 print("SKIP memory guard: the Agent Manager heavy-lock at " + str(source) + " has none", flush=True)
+            # The memory-budgeted lock (Agent Manager pilot, 2026-11-12): with the project's heavy_share on, a second
+            # job whose expected peak fits runs beside the holder, in heavy.2.lock / owner.2.json; with it off, it waits.
+            policy_src = source.parent.parent / "policy.py"
+            if "def share_slots" in manager.read_text() and policy_src.is_file():
+                shutil.copy2(policy_src, root / "policy.py")   # heavy-lock reads the switch through ../policy.py
+                registry = root / "share-registry.json"
+                calm = root / "sysctl-calm"
+                calm.write_text('#!/bin/sh\ncase "$2" in kern.memorystatus_vm_pressure_level) echo 1 ;; '
+                                'vm.swapusage) echo "total = 1024.00M  used = 0.00M  free = 1024.00M" ;; '
+                                '*) exec /usr/sbin/sysctl "$@" ;; esac\n')
+                calm.chmod(0o755)
+                share_state = root / "share state"
+                # The second job nests a heavy-run inside itself: it must find its own token in owner.2.json.
+                nest = root / "nest.sh"
+                nest.write_text("exec %s %s --state %s run -- sleep 1\n" % (shlex.quote(sys.executable),
+                                                                           shlex.quote(str(HELPER)),
+                                                                           shlex.quote(str(share_state))))
+                nested = [sys.executable, str(HELPER), "--state", str(share_state), "run", "--", "/bin/sh", str(nest)]
+                with jobs.open("a") as f:   # three small runs of each kind, so both have an expected peak
+                    for label in ("sleep 3", " ".join(nested[6:])[:120]):
+                        for _ in range(3):
+                            f.write(json.dumps({"label": label, "project": "archive-suite",
+                                                "tree_footprint_peak_mb": 50}) + "\n")
+                share_env = dict(env, AGENT_MANAGER_HEAVY_LOCK=str(manager), AGENT_MANAGER_STATE=str(mstate),
+                                 AGENT_MANAGER_REGISTRY=str(registry), HEAVY_LOCK_SYSCTL=str(calm))
+
+                def pair(on):
+                    registry.write_text(json.dumps({"projects": [{"name": "Archive Suite",
+                                                                  "policy": {"heavy_share": on}}]}))
+                    first = subprocess.Popen([sys.executable, str(HELPER), "--state", str(share_state), "run", "--",
+                                              "sleep", "3"], env=share_env, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE, text=True)
+                    children.append(first)
+                    until(lambda: (share_state / "owner.json").exists(), 20)
+                    t0 = time.monotonic()
+                    second = subprocess.run(nested, env=share_env, capture_output=True, text=True, timeout=60)
+                    took, beside = time.monotonic() - t0, first.poll() is None
+                    first.communicate(timeout=30)
+                    return second, beside, took
+                second, beside, took = pair(True)
+                check(second.returncode == 0 and beside and took < 2.8,
+                      "with heavy_share on, a second job that fits runs beside the holder in slot 2, and nests there")
+                check(not (share_state / "owner.2.json").exists() and not (share_state / "owner.json").exists(),
+                      "both slots' owner records are gone once their jobs end")
+                second, beside, took = pair(False)
+                check(second.returncode == 0 and not beside and took >= 2.5,
+                      "with heavy_share off, the second job waits for the holder as before")
+            else:
+                print("SKIP shared lock: the Agent Manager heavy-lock at " + str(source) + " cannot share", flush=True)
         else:
             print("SKIP manager load record: no Agent Manager heavy-lock at " + str(source), flush=True)
     finally:

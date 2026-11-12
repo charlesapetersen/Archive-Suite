@@ -123,6 +123,14 @@ its memory-pressure gate to this project's jobs, and a waiter that gate holds ba
 so this project runs under critical pressure as it did before R6. It TRIES the Mac lock once while holding `heavy.lock` and backs off (releasing `heavy.lock`) when the Mac
 lock is busy, never waiting for one lock while holding the other: a hand-run `mac-heavy-lock.py run` holder
 whose command then needs `heavy.lock` would otherwise deadlock.
+**Two jobs at once, when the manager shares (pilot, 2026-11-12).** When the Agent Manager's policy turns
+`heavy_share` on for this project (`heavy-lock`'s `share_slots("archive-suite")` answers 2), `heavy-run.py` has a
+second slot, `heavy.2.lock` with `owner.2.json`, tried after `heavy.lock` on every poll and taken the same way. The
+manager decides whether the job may run beside the one already holding: both projects share, memory pressure is
+normal, they are not two VM runs, and their expected memory peaks (each kind's highest recent footprint in
+`heavy-jobs.log`, a VM guest included) fit its budget; otherwise the job queues as before. Nesting finds its token in
+either owner record, and `waiting`, the orphaned-helper sweep and `worker-state.py` read both. With sharing off
+there is one slot and nothing here changes. Agent Manager README, "Sharing the heavy lock".
 Vision OCR speaks the same wire protocol with its own bash helper (`ops/autonomous/mac-heavy-lock.sh`
 there, its `mac-heavy-lock` item), so neither repo depends on the other — the protocol in this helper's
 header is the contract; change both sides together. In short: an `mkdir` lock directory with an `owner`
