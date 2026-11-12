@@ -632,8 +632,6 @@ since the solver, the sheet and the stage rules all read it.
 
 - [ ] **`W46.settings-ledger` — the per-month ceiling's ledger [S]** (lane: processor) (uses: build) (blocked-on: W46.settings-layers) — What each batch spent, kept in the general layer and shown against the month's ceiling; the solver reads the remainder.
 
-- [ ] **`W46.settings-reader-notes` — the Reader and Notes read the collection's settings document [S]** (lane: reader,notes) (uses: build,vm) (blocked-on: W46.settings-layers) — Show what produced a collection (the frozen settings and their sources) from the document beside its output folder (owner, 2026-11-06: after the build, not part of it).
-
 ## Archival containers — W47 (owner, 2026-10-21)
 
 Repository, place, collection title, collection number, accession, series, container, folder and folder title for

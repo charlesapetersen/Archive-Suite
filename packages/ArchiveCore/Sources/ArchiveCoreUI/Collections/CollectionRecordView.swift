@@ -120,14 +120,14 @@ public struct CollectionRecordContent: View {
         let files = run.fileCount.map { ", \($0) file\($0 == 1 ? "" : "s")" } ?? ""
         VStack(alignment: .leading, spacing: 2) {
             Text((latest ? "Last run: " : "") + "\(run.kindLabel), \(date)\(files)").font(.caption)
+                .accessibilityIdentifier(id + (latest ? ".latest" : ".run"))
             if run.isNewer {
                 note("Recorded by a newer Archive Processor.")
             } else if let reader = run.reader {
                 Text("Read by \(reader)").font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier(id + (latest ? ".latest.reader" : ".run.reader"))
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(id + (latest ? ".latest" : ".run"))
     }
 
     @ViewBuilder private func settingsList(_ items: [CollectionSettingsRecord.Setting], plain: Bool = false) -> some View {

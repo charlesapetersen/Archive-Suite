@@ -60,13 +60,20 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(waitForRowCount(1), "Box 2 contains one fixture file")
         visiblePoint(of: table.tableRows.element(boundBy: 0)).click()
         XCTAssertTrue(record.waitForExistence(timeout: 10), "Box 2 is a Processor collection")
-        let latest = app.descendants(matching: .any)["ar.collectionRecord.latest"]
-        XCTAssertTrue(latest.waitForExistence(timeout: 5))
-        let words = latest.label + " " + (latest.value as? String ?? "")
-        XCTAssertTrue(words.contains("Processed files") && words.contains("Gemini"), "the last run in words: \(words)")
         // The record sits under the tags; scroll the inspector down for the screenshot.
         year.scroll(byDeltaX: 0, deltaY: -800)
         captureScreenshot("w46-collection-record-inspector")
+        func words(_ id: String) -> String {
+            let e = app.descendants(matching: .any)[id]
+            guard e.waitForExistence(timeout: 5) else { return "" }
+            return [e.label, e.value as? String ?? ""].joined(separator: " ")
+        }
+        let latest = words("ar.collectionRecord.latest")
+        XCTAssertTrue(latest.contains("Processed files") && latest.contains("1 file"), "the last run: \(latest)")
+        let reader = words("ar.collectionRecord.latest.reader")
+        XCTAssertTrue(reader.contains("Gemini, gemini-3.7-flash"), "the reading route: \(reader)")
+        let name = words("ar.collectionRecord.name")
+        XCTAssertTrue(name.contains("Fixture Project"), "the collection's project: \(name)")
     }
 
     /// A departing field must commit to its original file, including when a filter removes that row.
