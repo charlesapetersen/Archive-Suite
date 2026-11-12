@@ -1,6 +1,6 @@
 {
- "built": "2026-11-11",
- "table_built": "2026-11-11",
+ "built": "2026-11-12",
+ "table_built": "2026-11-12",
  "noise": {
   "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
   "seg_rerun_pages_exact_points": "under the rerun floor of 1.4 to 3.2 points of pages exact a box (3.2 for pooled test-box figures); in gap accuracy the paired interval decides",
@@ -1979,6 +1979,31 @@
    "pool_weighted": null,
    "uncertain_marked": 0.0,
    "false_year_undated": null,
+   "image_pass_finds": null
+  },
+  {
+   "id": "gemini3.7-flash-route",
+   "name": "Gemini 3.7 Flash, the restated route: text, image pass where the text has no year, checked neighbour estimate (gateway)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gateway"
+    ]
+   },
+   "usd_1000": 3.11,
+   "usd_1000_batch": null,
+   "s_doc": 5.64,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "Vision-defined sets on 272 of the owner's 300 (JPEG original needed), not the ABBYY-defined 131; gateway 3.7; 3.8 on a direct key unmeasured",
+   "source": "settings-routes.json, stage dating, row gemini3.7-flash-route",
+   "year": {
+    "in text": 96.3,
+    "not in text": 58.2
+   },
+   "pool_weighted": null,
+   "uncertain_marked": 62.5,
+   "false_year_undated": 15.6,
    "image_pass_finds": null
   },
   {

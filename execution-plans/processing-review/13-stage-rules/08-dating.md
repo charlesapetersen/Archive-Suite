@@ -229,6 +229,21 @@ JPEG original) or `reread-107` (the 107 whose year neither the ABBYY nor the Vis
   "memory": {"peak_gb": 3.784, "measured_on": "MLX peak; 4.549 GB guard footprint", "source": {"file": "segbench-results/date-model.md", "route": "trained 2B, Mac 8-bit", "attribute": "Peak MLX memory", "value": "3.784 GB"}},
   "caveats": ["not recommended as the default tagger (date-model.md)", "no evidence cited; ABBYY text input", "figures.json's 2.7 GB is the build size, not the peak"],
   "kind_rules": [], "fallback": "no year, Date Uncertain", "conditions": ["kept for its chooser role in vision-2b-chooser-t3"]},
+ {"id": "gemini3.7-flash-route", "name": "Gemini 3.7 Flash, the restated route: text, image pass where the text has no year, checked neighbour estimate (gateway)", "family": "cloud",
+  "app_route": null, "status": "measured", "step": [1, 2, 4],
+  "needs": {"key": ["gateway"], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},
+  "figures": {
+   "in_text": {"value": 96.3, "n": 136, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "in text (Vision-defined)", "value": "96.3% (131/136)"}},
+   "not_in_text": {"value": 58.2, "n": 91, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "not in text (Vision text and image pass)", "value": "58.2% (53/91)"}},
+   "undated_false_year": {"value": 15.6, "n": 90, "truth": "owner-ruled where ruled, else the image pass", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "false-year rate", "value": "15.6% (14/90)"}},
+   "du_certain_flagged": {"value": 14.4, "n": 181, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "certain years flagged", "value": "14.4% (26/181)"}},
+   "du_uncertain_unflagged": {"value": 37.5, "n": 40, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "uncertain years unflagged", "value": "37.5% (15/40)"}},
+   "evidence_valid": {"value": "239 / 31", "n": 270, "truth": "evidence_check", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "valid / unsupported", "value": "239 / 31"}}},
+  "cost": {"usd_1000_list": 3.11, "usd_1000_batch": null, "price_read": "3.8 list as ceiling", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "Cost and time", "value": "$3.11"}},
+  "time": {"per_unit_s": 5.64, "measured": true, "measured_on": "Stanford gateway, median call seconds summed in sequence", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 Flash (gateway)", "attribute": "seconds of calls per 1,000 documents", "value": "5,642 s"}},
+  "memory": null,
+  "caveats": ["Vision-defined sets on 272 of the owner's 300 (JPEG original needed), not the ABBYY-defined 131", "gateway 3.7; 3.8 on a direct key unmeasured", "step 3 (inheritance) not measured", "false years 15.6% under section 3's step 1; 5.6% if the model's own flag may add Date Uncertain to an explicit text year (owner gate W46.date-route-owner-ok)", "one run; the rerun floor is a 94% same-year rate"],
+  "kind_rules": [], "fallback": "no year, Date Uncertain", "conditions": ["replaces the hand-summed one-shot plus image figure (F-1)"]},
  {"id": "none", "name": "No dating", "family": "manual", "app_route": null, "status": "shipped", "step": [],
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},
   "figures": {}, "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": null},
@@ -246,8 +261,10 @@ string figure values ("86 / 45", "7 of 12", "96.9% coverage, 4.5 y") and `memory
 
 ## 5. Caveats carried
 
-- **F-1, figures.json's combined row.** `gemini-oneshot-image` repeats the one-shot's year figures and adds $2.8 to
-  $4.07 by hand; no run measured the combined pipeline. Replaced by separate step rows; the combined figure is item 8.1.
+- **F-1, figures.json's combined row.** `gemini-oneshot-image` repeated the one-shot's year figures and added $2.8 to
+  $4.07 by hand. Replaced by the measured `gemini3.7-flash-route` (W46.date-route-pipeline, 2026-11-12,
+  `date-route-pipeline.md`): 58.2% not in text, 96.3% in text, $3.11 per 1,000. The 27B's combined row is
+  W46.date-route-pipeline-27b (Sherlock).
 - **F-2.** `cluster-27b-image`'s "not in text 39.0" and `mac-8b-image`'s "16.0" are document-year exact on the 122, not
   the 131; relabelled `unprinted_122_doc_year`. **F-3.** `mac-2b`'s peak 2.7 GB is the build size; the measured peak is
   3.784 GB (`date-model.md`). **F-4.** `uncertain_marked 88` is plain agreement on owner-uncertain documents; replaced by
@@ -353,9 +370,14 @@ Recommendation: not shown until item 8.3 fixes the checker's false refusals [I].
 8.1 `W46.date-route-pipeline` [M, about $1-2 gateway, I]: the restated route end to end on the owner's 300 with JPEG
 originals and macOS 27.2 Vision text: steps 1, 2 and 4 with `Date Uncertain` set by class, on Gemini 3.7 and the 27B;
 report `not_in_text` redefined from the image pass, the false-year rate on the undated 90, and cost and seconds per
-1,000. Done when the combined rows replace F-1. Waits on nothing.
+1,000. Done when the combined rows replace F-1. Waits on nothing. Done for Gemini 2026-11-12 (`date-route-pipeline.md`);
+the 27B half is W46.date-route-pipeline-27b. Under step 1 as written the undated get 15.6% false years (14/90), 5.6% if
+the model's own flag may add Date Uncertain to an explicit text year: owner gate W46.date-route-owner-ok.
 8.2 `W46.date-image-intext` [S, about $0.35, I]: the image pass on the 119 in-text documents; how often it changes the
-year, finds a second-role date or adds evidence. Settles 7.3.
+year, finds a second-role date or adds evidence. Settles 7.3. Measured inside W46.date-route-pipeline (2026-11-12): on 172
+documents with a year candidate the pass's own date differs from the route's year on 11, 7 of them the owner's year (7
+wrong to right, 2 right to wrong), and it quotes a stamp date on 24; whether that moves step 2 to every document is
+asked at W46.date-route-owner-ok.
 8.3 `W46.date-evidence-check` [S, $0]: the checker accepts OCR-damaged four-digit years and two-digit dates in a quote,
 re-scored on cached replies. Until it is done, failed estimates stay hidden (owner call 9). Shipped 2026-11-11: on the 27B's 296 Vision-text trace-neigh replies, valid 216 to 243, right years refused 49
 to 28; the rest quote no date or another year as written (`segbench-results/date-evidence-check.md`).

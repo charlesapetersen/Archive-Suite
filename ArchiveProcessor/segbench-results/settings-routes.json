@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-11",
+ "built": "2026-11-12",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -10522,6 +10522,132 @@
      ],
      "step": [
       1
+     ]
+    },
+    {
+     "id": "gemini3.7-flash-route",
+     "name": "Gemini 3.7 Flash, the restated route: text, image pass where the text has no year, checked neighbour estimate (gateway)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "gateway"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "in_text": {
+       "value": 96.3,
+       "n": 136,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Gemini 3.7 Flash (gateway)",
+        "attribute": "in text (Vision-defined)",
+        "value": "96.3% (131/136)"
+       }
+      },
+      "not_in_text": {
+       "value": 58.2,
+       "n": 91,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Gemini 3.7 Flash (gateway)",
+        "attribute": "not in text (Vision text and image pass)",
+        "value": "58.2% (53/91)"
+       }
+      },
+      "undated_false_year": {
+       "value": 15.6,
+       "n": 90,
+       "truth": "owner-ruled where ruled, else the image pass",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Gemini 3.7 Flash (gateway)",
+        "attribute": "false-year rate",
+        "value": "15.6% (14/90)"
+       }
+      },
+      "du_certain_flagged": {
+       "value": 14.4,
+       "n": 181,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Gemini 3.7 Flash (gateway)",
+        "attribute": "certain years flagged",
+        "value": "14.4% (26/181)"
+       }
+      },
+      "du_uncertain_unflagged": {
+       "value": 37.5,
+       "n": 40,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Gemini 3.7 Flash (gateway)",
+        "attribute": "uncertain years unflagged",
+        "value": "37.5% (15/40)"
+       }
+      },
+      "evidence_valid": {
+       "value": "239 / 31",
+       "n": 270,
+       "truth": "evidence_check",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Gemini 3.7 Flash (gateway)",
+        "attribute": "valid / unsupported",
+        "value": "239 / 31"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 3.11,
+      "usd_1000_batch": null,
+      "price_read": "3.8 list as ceiling",
+      "source": {
+       "file": "segbench-results/date-route-pipeline.md",
+       "route": "Gemini 3.7 Flash (gateway)",
+       "attribute": "Cost and time",
+       "value": "$3.11"
+      }
+     },
+     "time": {
+      "per_unit_s": 5.64,
+      "measured": true,
+      "measured_on": "Stanford gateway, median call seconds summed in sequence",
+      "source": {
+       "file": "segbench-results/date-route-pipeline.md",
+       "route": "Gemini 3.7 Flash (gateway)",
+       "attribute": "seconds of calls per 1,000 documents",
+       "value": "5,642 s"
+      }
+     },
+     "memory": null,
+     "caveats": [
+      "Vision-defined sets on 272 of the owner's 300 (JPEG original needed), not the ABBYY-defined 131",
+      "gateway 3.7; 3.8 on a direct key unmeasured",
+      "step 3 (inheritance) not measured",
+      "false years 15.6% under section 3's step 1; 5.6% if the model's own flag may add Date Uncertain to an explicit text year (owner gate W46.date-route-owner-ok)",
+      "one run; the rerun floor is a 94% same-year rate"
+     ],
+     "kind_rules": [],
+     "fallback": "no year, Date Uncertain",
+     "conditions": [
+      "replaces the hand-summed one-shot plus image figure (F-1)"
+     ],
+     "step": [
+      1,
+      2,
+      4
      ]
     },
     {
