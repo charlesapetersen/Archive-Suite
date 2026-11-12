@@ -29,6 +29,8 @@ date_image already read or rendered the same way are reused from their caches, n
     python3 ops/autonomous/heavy-run.py run -- python3 date_route_pipeline.py vision    # orient + Vision, resumable
     python3 date_route_pipeline.py run [--limit N]   # Gemini 3.7 Flash through the gateway (paid, CAP)
     python3 date_route_pipeline.py export --out DIR [--remote R]   # the same requests for the 27B on Sherlock
+    python3 date_route_pipeline.py pack --src DIR    # the export as a frozen Sherlock pack (sherlock/date-route-27b/)
+    python3 date_route_pipeline.py collect           # the pack's returned answers -> CACHE/answers-27b.jsonl
     python3 date_route_pipeline.py score             # segbench-results/date-route-pipeline.md and .json
 
 The gateway is real money on a Stanford PTA (root CLAUDE.md): spend is counted at gateway_gemini.PRICE (3.8's list
@@ -387,6 +389,87 @@ def cmd_export(a):
             "thinking": "off (date-tagging.md: with thinking on the 27B ran to the cap on 300 of 300)"}
     (out / "pack.json").write_text(json.dumps(meta, indent=1) + "\n")
     print(meta)
+
+
+PACK = Path(os.path.expanduser("~/.local/state/archive-autonomous/artifacts/date-route-27b-20261112"))   # the hand-over
+REMOTE_ROOT = "/scratch/users/cp1/fs-ocr/date-route-27b-20261112"      # $FS_ROOT/<pack> (sherlock/sh.env)
+BACK = Path(os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/sherlock-results/date-route-27b-20261112"))
+TRACE_MAX_27B = 512   # the old kit's text mode, as fs-tracepack-vision ran (restart-20261022.sh)
+
+
+def cmd_pack(a):
+    """The export as a frozen pack in ent-robust's form: trace/ and image/ arms for postcorrect_cluster.py, image paths
+    under the staged root, the support files, every file hashed in freeze.json (check_pack.py reads it). Images are
+    hard-linked from the export (same disk, no second copy)."""
+    import shutil
+    src = Path(a.src)
+    if PACK.exists():
+        sys.exit(f"{PACK} exists: a frozen pack is never rebuilt in place")
+    for arm in ("trace", "image"):
+        (PACK / arm).mkdir(parents=True)
+    (PACK / "image" / "images").mkdir()
+    trace = [json.loads(l) for l in open(src / "requests.jsonl", encoding="utf-8")]
+    for r in trace:
+        r["max_tokens"] = TRACE_MAX_27B
+    image = []
+    for line in open(src / "image-requests.jsonl", encoding="utf-8"):
+        r = json.loads(line)
+        names = [Path(p).name for p in r["images"]]
+        for n, digest in zip(names, r["image_sha256s"]):
+            dst = PACK / "image" / "images" / n
+            if not dst.exists():
+                os.link(src / "images" / n, dst)
+            if hashlib.sha256(dst.read_bytes()).hexdigest() != digest:
+                sys.exit(f"{n}: the exported image differs from its request's hash")
+        r["images"] = [f"{REMOTE_ROOT}/image/images/{n}" for n in names]
+        image.append(r)
+    for arm, rows in (("trace", trace), ("image", image)):
+        with open(PACK / arm / "requests.jsonl", "w", encoding="utf-8") as fh:
+            fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+    sh = HERE / "sherlock"
+    job = PACK / "support" / "job"
+    (job / "bin").mkdir(parents=True)
+    shutil.copy2(HERE / "postcorrect_cluster.py", PACK / "support")
+    shutil.copy2(sh / "ent-robust" / "check_pack.py", PACK / "support")
+    for f in ("submit.sh", "stage-job.sh", "job.sh"):
+        shutil.copy2(sh / "date-route-27b" / f, job)
+    shutil.copy2(sh / "sh.env", job)
+    for f in (sh / "bin").iterdir():
+        shutil.copy2(f, job / "bin")
+    shutil.copy2(src / "pack.json", PACK / "pack.json")
+    files = {}
+    for dp, dns, fns in os.walk(PACK):
+        rel = os.path.relpath(dp, PACK)
+        dns[:] = [d for d in dns if d not in ("out", "logs")]     # answers are never frozen
+        for fn in fns:
+            if rel == "." and fn == "freeze.json":
+                continue
+            files[os.path.normpath(os.path.join(rel, fn))] = hashlib.sha256(Path(dp, fn).read_bytes()).hexdigest()
+    (PACK / "freeze.json").write_text(json.dumps({"item": "W46.date-route-pipeline-27b", "arms": ["trace", "image"],
+                                                  "files": dict(sorted(files.items()))}, indent=1) + "\n")
+    size = sum((PACK / f).stat().st_size for f in files)
+    print(f"froze {len(files)} files, {size / 1e6:.1f} MB: {len(trace)} trace, {len(image)} image requests -> {PACK}")
+
+
+def cmd_collect(a):
+    """The returned replies (the Mac artifact's <arm>/out, else BACK's) as CACHE/answers-27b.jsonl {id, raw, finish,
+    seconds}; every request must have a reply."""
+    rows, missing = [], []
+    for arm in ("trace", "image"):
+        out = next((d for d in (PACK / arm / "out", BACK / arm / "out") if d.is_dir()), None)
+        for line in open(PACK / arm / "requests.jsonl", encoding="utf-8"):
+            rid = json.loads(line)["id"]
+            f = out / f"{rid}.json" if out else None
+            if f is None or not f.exists():
+                missing.append(rid)
+                continue
+            r = json.loads(f.read_text())
+            rows.append({"id": rid, "raw": r.get("text"), "finish": r.get("finish"), "seconds": r.get("seconds")})
+    if missing:
+        sys.exit(f"{len(missing)} requests have no reply, e.g. {missing[:3]}")
+    with open(QWEN_ANSWERS, "w", encoding="utf-8") as fh:
+        fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+    print(dict(collections.Counter(r["finish"] for r in rows)), f"-> {QWEN_ANSWERS}")
 
 
 # --- the route --------------------------------------------------------------------------------------------------
@@ -924,9 +1007,12 @@ def main():
     r = sub.add_parser("run"); r.add_argument("--limit", type=int, default=0)
     e = sub.add_parser("export"); e.add_argument("--out", required=True)
     e.add_argument("--remote", default="$GROUP_HOME/$USER/archive-suite/date-route-pipeline")
+    k = sub.add_parser("pack"); k.add_argument("--src", default=str(CACHE / "sherlock-pack"))
+    sub.add_parser("collect")
     sub.add_parser("score")
     a = ap.parse_args()
-    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "export": cmd_export, "score": cmd_score}[a.cmd](a)
+    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "export": cmd_export, "pack": cmd_pack,
+     "collect": cmd_collect, "score": cmd_score}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,21 @@
+{
+  "tag": "W46.date-route-pipeline-27b",
+  "pack": "date-route-27b-20261112",
+  "mac": "artifacts/date-route-27b-20261112",
+  "submit": "support/job/submit.sh",
+  "jobs": 2,
+  "gpu_hours": 1.0,
+  "review": "execution-plans/items/W46.date-route-pipeline-27b.md",
+  "imports": [
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/date-route-27b-20261112",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/date-route-27b-20261112"
+  ],
+  "provenance": [],
+  "requires": [],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/date-route-27b-20261112",
+  "collect": ["$FS_ROOT/date-route-27b-20261112/jobs.tsv", "$FS_ROOT/date-route-27b-20261112/logs"],
+  "release": "trace/out and image/out collected into the Mac artifact; the engine runs date_route_pipeline.py collect, then score"
+}
