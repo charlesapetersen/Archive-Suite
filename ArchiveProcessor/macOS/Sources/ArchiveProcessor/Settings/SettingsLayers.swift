@@ -87,10 +87,13 @@ enum SettingsSource: Codable, Equatable, Sendable {
     case startingPoint(String, Date)
     /// Read from this Mac (a key in the Keychain, a signed-in plan).
     case detected(Date)
+    /// Set by the app from another answer, by that answer's label: "pages stay on this Mac" follows "Spending" until
+    /// the user sets it (W46.settings-interviews).
+    case follows(String, Date)
 
     var date: Date {
         switch self {
-        case .setByUser(let d), .measured(let d, _), .startingPoint(_, let d), .detected(let d): return d
+        case .setByUser(let d), .measured(let d, _), .startingPoint(_, let d), .detected(let d), .follows(_, let d): return d
         }
     }
 
@@ -102,6 +105,7 @@ enum SettingsSource: Codable, Equatable, Sendable {
         case .measured(_, let n): return "measured on \(day) from \(n) photo\(n == 1 ? "" : "s")"
         case .startingPoint(let name, _): return "filled by “\(name)” on \(day)"
         case .detected: return "found on this Mac on \(day)"
+        case .follows(let answer, _): return "follows your answer to “\(answer)”, \(day)"
         }
     }
 
@@ -475,7 +479,7 @@ struct SettingsResolver: Sendable {
         var a = SettingsAnswers()
         a.pages = max(1, pages)
         a.documents = documents
-        a.mix = resolve(.mix).value.numbers ?? a.mix
+        if let mix = resolve(.mix).value.numbers, !mix.isEmpty { a.mix = mix }
         // Registers are asked apart (they are not measured) and read as forms and tables (the public set L4).
         if let r = a.mix.removeValue(forKey: "registers") { a.mix["forms", default: 0] += r }
         a.strata = resolve(.strata).value.numbers ?? [:]
@@ -509,7 +513,7 @@ struct SettingsResolver: Sendable {
         let batch = resolve(.batchCeilingUSD)
         switch habit {
         case .none: return 0
-        case .noCeiling: return batch.layer == nil ? .infinity : usable(batch.value.double)
+        case .noCeiling: return batch.layer == nil || batch.layer == .general ? .infinity : usable(batch.value.double)
         case .perBatch: return usable(batch.value.double)
         case .perMonth:
             let left = max(0, usable(resolve(.monthCeilingUSD).value.double) - usable(spentThisMonthUSD))

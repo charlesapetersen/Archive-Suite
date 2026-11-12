@@ -471,7 +471,8 @@ final class ProcessorUITests: XCTestCase {
     func testGeneralInterviewOpensAtFirstStart() throws {
         relaunch(extra: ["-APUITestGeneralInterview"])
         let save = element("ap.generalInterview.save")
-        XCTAssertTrue(save.waitForExistence(timeout: 10), "the general interview must open at first start")
+        if !save.waitForExistence(timeout: 10) { attachScreenshot("processor-general-interview-missing") }
+        XCTAssertTrue(save.exists, "the general interview must open at first start")
         XCTAssertTrue(app.staticTexts["Found on this Mac"].exists, "it must show what it found on this Mac")
         let fill = app.buttons["Fill in"].firstMatch
         XCTAssertTrue(fill.exists, "the starting points must be offered")
@@ -490,7 +491,8 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(answer.waitForExistence(timeout: 10), "a collection with no answers must offer the interview")
         answer.click()
         let save = element("ap.collectionInterview.save")
-        XCTAssertTrue(save.waitForExistence(timeout: 5), "the collection interview must open")
+        if !save.waitForExistence(timeout: 10) { attachScreenshot("processor-collection-interview-missing") }
+        XCTAssertTrue(save.exists, "the collection interview must open")
         XCTAssertTrue(app.buttons["Measure from photos…"].exists, "it must offer to measure the kinds of document")
         attachScreenshot("processor-collection-interview")
         app.buttons["Skip"].click()
@@ -510,7 +512,8 @@ final class ProcessorUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
         app.typeText("Letters\r")
         let save = element("ap.collectionInterview.save")
-        XCTAssertTrue(save.waitForExistence(timeout: 5), "the new project's interview must open after the name sheet")
+        if !save.waitForExistence(timeout: 10) { attachScreenshot("processor-project-interview-missing") }
+        XCTAssertTrue(save.exists, "the new project's interview must open after the name sheet")
         XCTAssertTrue(app.staticTexts["About the project “Letters”"].exists, "the interview must name the project")
         attachScreenshot("processor-project-interview")
         app.buttons["Skip"].click()

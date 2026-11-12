@@ -86,7 +86,6 @@ struct CollectionInterviewView: View {
             .padding(16)
         }
         .frame(width: 640, height: 760)
-        .accessibilityIdentifier("ap.collectionInterview")
         .onAppear {
             guard !loaded else { return }
             loaded = true
@@ -154,8 +153,13 @@ struct CollectionInterviewView: View {
     }
 
     private var measurementText: String {
+        if let from = answers.mixInheritedFrom {
+            return "These shares come from \(from). Measure this collection's own photographs to replace them."
+        }
         guard let m = answers.measurement else {
-            return "Not measured yet. Measuring tells the kinds apart on a sample of the photographs."
+            return answers.measuredShares.isEmpty
+                ? "Not measured yet. Measuring tells the kinds apart on a sample of the photographs."
+                : "You gave these shares."
         }
         var s = "Measured on \(m.sample) photo\(m.sample == 1 ? "" : "s")"
         if m.unsure > 0 { s += "; \(m.unsure) of them unsure" }

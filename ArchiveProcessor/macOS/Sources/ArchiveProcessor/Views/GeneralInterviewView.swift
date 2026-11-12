@@ -57,7 +57,6 @@ struct GeneralInterviewView: View {
             .padding(16)
         }
         .frame(width: 600, height: 700)
-        .accessibilityIdentifier("ap.generalInterview")
         .onAppear {
             guard !readOnce else { return }
             readOnce = true

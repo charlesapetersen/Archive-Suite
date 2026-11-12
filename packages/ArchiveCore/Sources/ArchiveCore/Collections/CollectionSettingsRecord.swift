@@ -243,8 +243,10 @@ public enum CollectionSettingSource: Equatable, Sendable, Decodable {
     case measured(Date, sample: Int)
     case startingPoint(String, Date)
     case detected(Date)
+    /// Set by the Processor from another answer, by that answer's label (W46.settings-interviews).
+    case follows(String, Date)
 
-    private enum CaseKeys: String, CodingKey { case setByUser, measured, startingPoint, detected }
+    private enum CaseKeys: String, CodingKey { case setByUser, measured, startingPoint, detected, follows }
     private enum Fields: String, CodingKey { case _0, _1, sample }
 
     public init(from decoder: Decoder) throws {
@@ -259,6 +261,7 @@ public enum CollectionSettingSource: Equatable, Sendable, Decodable {
         case .startingPoint:
             self = .startingPoint(try f.decode(String.self, forKey: ._0), try f.decode(Date.self, forKey: ._1))
         case .detected: self = .detected(try f.decode(Date.self, forKey: ._0))
+        case .follows: self = .follows(try f.decode(String.self, forKey: ._0), try f.decode(Date.self, forKey: ._1))
         }
     }
 
@@ -272,6 +275,7 @@ public enum CollectionSettingSource: Equatable, Sendable, Decodable {
         case .measured(let d, let n): return "measured on \(f.string(from: d)) from \(n) photo\(n == 1 ? "" : "s")"
         case .startingPoint(let name, let d): return "filled by “\(name)” on \(f.string(from: d))"
         case .detected(let d): return "found on this Mac on \(f.string(from: d))"
+        case .follows(let answer, let d): return "follows your answer to “\(answer)”, \(f.string(from: d))"
         }
     }
 }
@@ -493,18 +497,63 @@ public enum CollectionSettingsVocabulary {
             return words[s] ?? s
         case .strings(let list):
             guard !list.isEmpty else { return "none" }
-            if key == "priorities" {
-                let words = ["reading": "reading", "findingDocuments": "finding documents", "dates": "dates",
-                             "names": "names"]
-                return list.map { words[$0] ?? $0 }.joined(separator: ", then ")
+            switch key {
+            case "priorities":
+                return list.map { priorityWords[$0] ?? $0 }.joined(separator: ", then ")
+            case "languages":
+                return list.map { languageWords[$0] ?? $0 }.joined(separator: ", ")
+            case "scripts":
+                return list.map { s -> String in
+                    let parts = s.split(separator: ":", maxSplits: 1).map(String.init)
+                    let name = scriptWords[parts[0]] ?? parts[0]
+                    return parts.count > 1 ? "\(name) \(parts[1])%" : name
+                }.joined(separator: ", ")
+            default:
+                return list.joined(separator: ", ")
             }
-            return list.joined(separator: ", ")
         case .numbers(let n):
             guard !n.isEmpty else { return "none" }
-            return n.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
-                .map { "\($0.key) \(String(format: "%g", $0.value))%" }.joined(separator: ", ")
+            let sorted = n.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            func number(_ x: Double) -> String { String(format: "%.0f", x) }
+            switch key {
+            case "weights":
+                return sorted.map { "\(priorityWords[$0.key] ?? $0.key) \(number($0.value))" }.joined(separator: ", ")
+            case "strata":
+                return sorted.map { "\(number($0.value))% judged on \(stratumWords[$0.key] ?? $0.key)" }
+                    .joined(separator: "; ")
+            case "mix":
+                return sorted.map { "\(kindWords[$0.key] ?? $0.key) \(number($0.value))%" }.joined(separator: ", ")
+            default:
+                return sorted.map { "\($0.key) \(String(format: "%g", $0.value))%" }.joined(separator: ", ")
+            }
         }
     }
+
+    // The Processor's words for the collection interview's values (`SettingsInterviews.swift`).
+    static let priorityWords = ["reading": "reading", "findingDocuments": "finding documents", "dates": "dates",
+                                "names": "names"]
+    static let languageWords = ["en": "English", "fr": "French", "de": "German", "nl": "Dutch", "es": "Spanish",
+                                "pt": "Portuguese", "it": "Italian", "la": "Latin", "other": "Another language"]
+    static let scriptWords = [
+        "latin": "Latin alphabet (English, French, German…)", "kurrent": "German handwriting (Kurrent or secretary hand)",
+        "fraktur": "Blackletter or Fraktur print", "greek": "Greek", "hebrew": "Hebrew", "arabic": "Arabic",
+        "cyrillic": "Cyrillic", "chinese": "Chinese", "devanagari": "Devanagari",
+    ]
+    static let kindWords = [
+        "handwritten": "handwritten", "typewritten": "typewritten", "printed": "printed", "forms": "form or table",
+        "clippings": "newspaper clippings", "newspapers": "whole newspaper pages", "registers": "registers and ledgers",
+        "mixed": "typed pages with handwriting on them",
+    ]
+    static let stratumWords = [
+        "L4": "ledgers, forms and tables, 1800-1950",
+        "L5": "Dutch, Spanish and Portuguese archival hands, 1600-1850",
+        "L6": "German Kurrent and secretary hands, 1500-1900",
+        "L7": "medieval and early-modern charters, before 1600",
+        "L8": "printed books and pamphlets, Fraktur included, 1500-1900",
+        "L9": "newspapers from microfilm, 1850-1920",
+        "N1": "Arabic manuscripts", "N2": "Cyrillic, early 1700s", "N3": "Greek minuscule, about 1500",
+        "N4": "Hebrew book hands, medieval", "N5": "Chinese print", "N6": "Devanagari print",
+    ]
 
     /// A processing setting's value with no key-specific words.
     public static func plain(_ value: CollectionSettingValue) -> String {

@@ -51,11 +51,14 @@ source this build does not know. Adding a value kind therefore needs no schema b
 does. A build that drops such an entry also drops it when it next writes the collection's layer, so an older Mac that
 edits a collection loses a newer build's entries of new kinds.
 
-The collection interview (W46.settings-interviews) writes these entries; the Reader and Notes may show them:
+The collection interview (W46.settings-interviews) writes these entries; the Reader and Notes may show them. It writes
+only what it answered, so every other value stays inherited. `mix`, `strata`, `scripts`, `period` and `languages` are
+one group: a layer that answers any of them writes all five (an empty value included, which still overrides the layer
+above), so a collection's mix is never read beside a project's `strata`.
 
 | name | `V` | meaning |
 |---|---|---|
-| `mix` | `numbers` | Percent of the pages by kind: `typewritten`, `printed`, `handwritten`, `forms` (measured by the kind classifier on a sample, source `measured`, until the user corrects them), and `clippings`, `newspapers`, `mixed` (given by the user, not measured). Registers are counted under `forms`. Pages that moved to a public test set are in `strata` instead. |
+| `mix` | `numbers` | Percent of the pages by kind: `typewritten`, `printed`, `handwritten`, `forms` (measured by the kind classifier on a sample, source `measured`, until the user corrects them), and `clippings`, `newspapers`, `registers`, `mixed` (given by the user, not measured). The solver reads `registers` as `forms`. Pages that moved to a public test set are in `strata` instead. |
 | `strata` | `numbers` | Percent of the pages judged on a public test set (`L4`-`L9`, `N1`-`N6`, as in `execution-plans/benchmark-corpus/00-plan.md`), on the same scale as `mix`; with `mix` it adds to 100. Derived from the mix, period, languages and scripts. |
 | `period` | `string` | `"<from>-<to>"` in years; either end may be missing. |
 | `languages` | `strings` | Codes: `en`, `fr`, `de`, `nl`, `es`, `pt`, `it`, `la`, `other`. |
@@ -71,7 +74,8 @@ The collection interview (W46.settings-interviews) writes these entries; the Rea
 
 `S` is how the layer came to hold the value. It is Swift's synthesized enum coding, one key naming the case:
 `setByUser` (`_0`: the date), `measured` (`_0`: the date, `sample`: the number of photographs), `startingPoint`
-(`_0`: the starting point's name, `_1`: the date) or `detected` (`_0`: the date).
+(`_0`: the starting point's name, `_1`: the date), `detected` (`_0`: the date) or `follows` (`_0`: the label of the
+answer it follows, `_1`: the date; the general layer's `staysOnMac` follows "Spending" until the user sets it).
 
 `settings` in a run record is the resolution frozen when the run started (`ResolvedSettingsSnapshot`):
 

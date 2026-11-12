@@ -146,19 +146,37 @@ enum SettingsInterviewsTestDriver {
 
         let back = GeneralInterviewAnswers(from: layer)
         check("running the interview again starts from the last answers",
-              back.moneyHabit == .noCeiling && back.cluster && back.gpusPerJob == 2 && !back.staysOnMac && back.staysOnMacChosen)
+              back.moneyHabit == .noCeiling && back.cluster && back.gpusPerJob == 2 && !back.staysOnMac)
         check("a first run has not chosen whether pages leave", !GeneralInterviewAnswers().staysOnMacChosen)
+        eq("a switch the spending answer set says so", layer.entry(.staysOnMac)?.source, .follows("Spending", day))
+        check("…and still follows it on the next run", !back.staysOnMacChosen)
+        var later = back
+        later.setMoneyHabit(.none)
+        check("so spending nothing on a later run keeps pages on the Mac again", later.staysOnMac)
         var chosen = back
-        chosen.setMoneyHabit(.none)
-        check("a switch the user set is not moved by the spending answer", !chosen.staysOnMac)
+        chosen.staysOnMac = false
+        chosen.staysOnMacChosen = true
+        var cl = layer
+        chosen.apply(to: &cl, inventory: fakeMac([]), now: day)
+        let second = GeneralInterviewAnswers(from: cl)
+        check("a switch the user set is theirs on the next run", second.staysOnMacChosen)
+        var kept = second
+        kept.setMoneyHabit(.none)
+        check("…and the spending answer does not move it", !kept.staysOnMac)
+        var noLimit = layer
+        noLimit.set(.batchCeilingUSD, .double(9), source: .setByUser(day))
+        check("under no limit a leftover general batch ceiling does not cap it", SettingsResolver(general: noLimit).ceilingUSD().isInfinite)
 
         let coll = SettingsLayer(kind: .collection, name: "c", entries: [
             SettingsKey.batchCeilingUSD.rawValue: SettingsEntry(value: .double(2), source: .setByUser(day))])
         eq("under no limit, a collection's own ceiling holds", SettingsResolver(general: layer, collection: coll).ceilingUSD(), 2)
 
         check("the general layer now holds answers", GeneralInterviewAnswers.hasAnswers(layer))
+        layer.set(.excludedModelFamilies, .strings(["gemini"]), source: .setByUser(day))
         GeneralInterviewAnswers.skip(fakeMac(["Gemini"]), layer: &layer, now: day)
-        eq("skipping after answering clears every earlier answer", Set(layer.entries.keys), ["keys", "plans"])
+        eq("skipping after answering clears the interview's earlier answers", Set(layer.entries.keys),
+           ["keys", "plans", "excludedModelFamilies"])
+        check("…and nothing it does not ask", layer.entry(.excludedModelFamilies) != nil)
         let rs = SettingsResolver(general: layer)
         check("…so it is free again: nothing spent, no page leaves",
               rs.ceilingUSD() == 0 && rs.answers(pages: 10).staysOnMac && rs.resources(macMemoryGB: 16).cluster == false)
@@ -195,6 +213,13 @@ enum SettingsInterviewsTestDriver {
         var bl = SettingsLayer(kind: .collection, name: "c")
         best.apply(to: &bl, now: day)
         check("a fill that does not spend leaves the inherited ceiling alone", bl.entry(.batchCeilingUSD) == nil)
+        check("a collection's fill never lets pages leave by itself", bl.entry(.staysOnMac) == nil)
+        var free = CollectionInterviewAnswers()
+        free.staysOnMac = false
+        free.fill(.free)
+        var fl = SettingsLayer(kind: .collection, name: "c")
+        free.apply(to: &fl, now: day)
+        eq("…but “Free, on this Mac” keeps them here", fl.entry(.staysOnMac)?.value, .bool(true))
         eq("…and fills what it means", bl.entry(.hours)?.source, .startingPoint("Best measured, no limit", day))
         check("a collection's money fill under 'spend nothing' says it has no effect",
               CollectionInterviewAnswers.moneyNote(point: .fewDollars, habit: .none) != nil)
@@ -344,7 +369,7 @@ enum SettingsInterviewsTestDriver {
         eq("an uncorrected mix is 'measured from 40 photos'", layer.entry(.mix)?.source, .measured(day, sample: 40))
         eq("the period is kept as a span", layer.entry(.period)?.value, .string("1950-1980"))
         eq("the languages are kept", layer.entry(.languages)?.value, .strings(["en"]))
-        check("no scripts answered, none written", layer.entry(.scripts) == nil)
+        eq("the scripts go with the mix, empty when none", layer.entry(.scripts)?.value, .strings([]))
         check("a collection never holds a general-only value", layer.entry(.keys) == nil && layer.entry(.moneyHabit) == nil)
         let r = SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), collection: layer)
         let ans = r.answers(pages: 200)
@@ -426,6 +451,43 @@ enum SettingsInterviewsTestDriver {
         let (p1, p2) = roundTrip(print)
         check("early print saved to L8 comes back as print", sameNumbers(p1.entry(.mix)?.value, p2.entry(.mix)?.value)
               && sameNumbers(p1.entry(.strata)?.value, p2.entry(.strata)?.value))
+        // The mix group lives in one layer.
+        let g = SettingsLayer(kind: .general, name: "G")
+        var project = SettingsLayer(kind: .project, name: "Letters")
+        var pg = base()
+        pg.languages = ["de"]; pg.periodFrom = 1800; pg.periodTo = 1850
+        pg.scriptShares = [.arabic: 50]
+        pg.touch(.languages); pg.touch(.scripts)
+        pg.apply(to: &project, now: day)
+        var own = CollectionInterviewAnswers(resolver: SettingsResolver(general: g, project: project), own: nil)
+        check("a project's mix shows as inherited", own.mixInheritedFrom == "the project “Letters”" && !own.correctedMix)
+        own.take(KindMeasurement.tally([PageKind(kind: "typewritten", confidence: 0.9)], date: day))
+        own.languages = []; own.scriptShares = [:]; own.periodFrom = nil; own.periodTo = nil
+        var cl2 = SettingsLayer(kind: .collection, name: "c")
+        own.apply(to: &cl2, now: day)
+        let rr = SettingsResolver(general: g, project: project, collection: cl2)
+        check("a collection's own mix never sits beside the project's public sets", rr.answers(pages: 10).strata.isEmpty)
+        eq("emptied answers override the project's", rr.resolve(.scripts).value, .strings([]))
+        let again2 = CollectionInterviewAnswers(resolver: rr, own: cl2)
+        check("…and read back empty, not the project's", again2.scriptShares.isEmpty && again2.languages.isEmpty
+              && again2.measuredShares == ["typewritten": 100])
+        var lang = CollectionInterviewAnswers(resolver: SettingsResolver(general: g), own: nil)
+        lang.languages = ["fr"]; lang.touch(.languages)
+        var ll = SettingsLayer(kind: .collection, name: "c")
+        lang.apply(to: &ll, now: day)
+        check("a language alone does not write an empty mix", ll.entry(.mix) == nil && ll.entry(.languages) != nil)
+        eq("…so the built-in mix still applies", SettingsResolver(general: g, collection: ll).answers(pages: 10).mix,
+           SettingsAnswers().mix)
+
+        var over = CollectionInterviewAnswers()
+        over.measuredShares = ["typewritten": 100]
+        over.unmeasuredShares = ["clippings": 70, "newspapers": 50]
+        let om = over.mixAndStrata().mix
+        near("unmeasured kinds over 100% are read as shares of the whole", om["clippings"].map { $0 + (om["newspapers"] ?? 0) }, 100)
+        over.touch(.mix)
+        let (o1, o2) = roundTrip(over)
+        check("…and survive answering again", sameNumbers(o1.entry(.mix)?.value, o2.entry(.mix)?.value))
+
         let measured: CollectionInterviewAnswers = {
             var m = CollectionInterviewAnswers()
             m.take(KindMeasurement(sample: 12, counts: ["typewritten": 12], unsure: 0, unknown: 0, date: day))
