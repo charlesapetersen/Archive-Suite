@@ -179,9 +179,8 @@ before the pass finishes, then verifies the final partial batch and a cleared li
 mounted popover through discovery, indexing and completion. The existing ambiguous-date navigation UITest
 now opens the popover once and waits for its Show button, rather than reopening it until counts arrive.
 `NavigationUITests.testLibraryHealthPopoverShowsCountsAndFilters` exercises that health/filter path on its
-own. The broader `testTwoYearTagsAreFlaggedAndTheFilterFindsThem` reached it successfully in the macOS 27 VM
-but failed later at the Edit Info ambiguity notice; that remaining interaction belongs to the already-open
-W40.vm-macos27-reader work. Its original assertions are retained.
+own. The broader `testTwoYearTagsAreFlaggedAndTheFilterFindsThem` passes in the macOS 27 VM since
+W40.vm-macos27-reader (2026-11-12). Its original assertions are retained.
 
 ## ✅ CLOSED (W40.fix-reader-filter-undo-levels, 2026-11-07) — multiple filename-filter undo steps
 
