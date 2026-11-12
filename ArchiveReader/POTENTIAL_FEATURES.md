@@ -42,6 +42,10 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
   `index-parallelization` plan. | Search/ContentIndex.swift, Views/NavigationModel.swift.
 
 ## Lower priority / long-term
+- **An on-device model pass for Copy Cleaned for Prose.** Measured and declined for now (W40.reader-prose-model,
+  2026-11-12): macOS 27's Foundation Models model, labelling lines behind the word guard, tied the rules on labels
+  and lost on breaks. Reopen with a new OS model version or a task adapter; the bench is
+  `scripts/prose-model/`.
 - **Cloud-drive support** (Google Drive / File Provider): conflict-copy handling, materialization
   policy, cloud-side tag-durability verification. (v1 assumes local disk.)
 - **Creation-date mirror** for native Finder chronological browsing (1678–2262 only; a bonus, never

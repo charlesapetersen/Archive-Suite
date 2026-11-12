@@ -26,20 +26,23 @@ C = the line continues the paragraph or list item of the line before;
 P = the line starts a new paragraph (including the first line of a letter's address, date or signature block);
 H = the line is a heading or title standing on its own line;
 I1 = the line starts a list item; I2 = it starts a sub-item of an I1 item; I3, I4 = deeper sub-items.
-Reply with JSON only: {{"labels": ["P", "C", ...]}} with exactly {n} labels.
+Reply with JSON only, one entry for every line number from 1 to {n}: {{"1": "P", "2": "C", ...}}
 
 {lines}"""
 
 
 def parse(raw, n):
+    """One label a row, keyed by line number so a skipped line cannot shift the rest; a row with no valid label
+    is None (scored as disputed). None for the page when over a tenth of its rows have none."""
     m = re.search(r"\{.*\}", raw, re.S)
     try:
-        labels = json.loads(m.group(0))["labels"] if m else None
-    except (ValueError, KeyError, TypeError):
+        got = json.loads(m.group(0)) if m else None
+    except ValueError:
         return None
-    if not isinstance(labels, list) or len(labels) != n or any(x not in LABELS for x in labels):
+    if not isinstance(got, dict):
         return None
-    return labels
+    labels = [got.get(str(i + 1)) if got.get(str(i + 1)) in LABELS else None for i in range(n)]
+    return labels if sum(x is None for x in labels) * 10 <= n else None
 
 
 def main():

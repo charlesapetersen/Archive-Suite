@@ -1052,7 +1052,6 @@ UITest still to run. Owner's calls, 2026-11-10: a row that drops out of a smart 
 next row is selected (point 12); the UIUC and Bower pages are tests of the pipeline, and a bulk re-read of the corpus
 waits until the pipeline is sorted out (points 6, 9).
 
-- [ ] **`W40.reader-prose-model` — can an on-device model improve the prose copy safely? Research and measure [S]** (lane: reader) (uses: build,model:4) (blocked-on: W40.reader-prose-structure) — Point 11's second half ("could it use a local model or Apple Intelligence? Research this"). Check, from Apple's documentation, the Foundation Models framework's requirements (OS, hardware, Apple Intelligence switched on, languages, context size) and what the suite's macOS 14 floor means for it. Design under one rule: the model never writes the text. It labels lines (continues, new paragraph, list item and level, heading) through guided generation, the app assembles the copy, and a check refuses any result whose words differ from the input's. Measure against W40.reader-prose-structure's rules on 40 typed pages from the sample with lists or headings (chosen by geometry, not by either method), scored on their structure; time and memory per page. If it wins clearly, file the build as an optional second pass that is used only where the framework is available, with the rules as the fallback; otherwise record why not. On-device only, $0; no corpus text leaves the Mac.
 
 ## Archive Notes — owner requests (2026-10-28)
 

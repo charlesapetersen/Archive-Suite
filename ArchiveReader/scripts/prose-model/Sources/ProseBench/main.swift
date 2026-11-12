@@ -156,8 +156,26 @@ bullet. A line that starts with a lower-case word, or follows a line ending in a
 
 /// With `images`, the page's picture (`<images>/<n>.png`, n its place in RULES, as `render` writes) goes with
 /// the rows: the macOS 27 model takes image attachments.
+/// PROSE_SHOT=1: the instructions also carry one worked example (invented text).
+let example = """
+
+Example. Lines:
+1 | indent 0.0 | gap 0.0 | width 0.40 | MINUTES OF THE BOARD
+2 | indent 0.0 | gap 2.2 | width 1.00 | The board met on the fourth of May with all members present and
+3 | indent 0.0 | gap 1.0 | width 0.97 | agreed, after a long discussion of the accounts, the following:
+4 | indent 2.1 | gap 1.0 | width 0.90 | 1. That the fund be divided between the two schools named in
+5 | indent 3.6 | gap 1.0 | width 0.60 | the letter of March.
+6 | indent 4.2 | gap 1.0 | width 0.85 | (a) The first share to be paid at once.
+7 | indent 2.1 | gap 1.0 | width 0.92 | 2. That the secretary write to both schools.
+8 | indent 0.0 | gap 2.0 | width 0.99 | The meeting closed at noon. The next will be held in the library
+9 | indent 0.0 | gap 1.0 | width 0.30 | in June.
+Labels: H, P, C, I1, C, I2, I1, P, C
+"""
+
 func fm(_ rulesPath: String, _ out: String, _ limit: Int?, images: String?) async {
-    let model = SystemLanguageModel.default
+    // PROSE_PERMISSIVE=1: the guardrails Apple offers for transforming the user's own text.
+    let model = ProcessInfo.processInfo.environment["PROSE_PERMISSIVE"] == "1"
+        ? SystemLanguageModel(guardrails: .permissiveContentTransformations) : SystemLanguageModel.default
     guard case .available = model.availability else { fail("model: \(model.availability)") }
     let labelSchema = DynamicGenerationSchema(name: "Label", anyOf: ["C", "P", "H", "I1", "I2", "I3", "I4"])
     var recs: [FMRec] = []
@@ -174,7 +192,8 @@ func fm(_ rulesPath: String, _ out: String, _ limit: Int?, images: String?) asyn
                 .init(name: "labels", schema: DynamicGenerationSchema(arrayOf: labelSchema, minimumElements: n,
                                                                       maximumElements: n))])
             let schema = try GenerationSchema(root: root, dependencies: [])
-            let session = LanguageModelSession(model: model, instructions: instructions)
+            let shot = ProcessInfo.processInfo.environment["PROSE_SHOT"] == "1"
+            let session = LanguageModelSession(model: model, instructions: instructions + (shot ? example : ""))
             let options = GenerationOptions(samplingMode: .greedy)
             let r: LanguageModelSession.Response<GeneratedContent>
             if let images {

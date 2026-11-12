@@ -172,6 +172,11 @@ measurement). Title case is shared with W47.ct-normalise, which needs the same r
 `assemble` (the units and the word guard W40.reader-prose-model's labels would feed), ArchiveCore
 `TitleCase.titleCased(_:keeping:)` for W47.ct-normalise. Both Bower pages keep their breaks, list and levels.
 
+**Model measured 2026-11-12** (W40.reader-prose-model, `ArchiveReader/scripts/prose-model/README.md`): no build.
+The checks above hold (macOS 26+, an Apple Intelligence Mac with it switched on; 8,192 tokens on macOS 27). On 40
+typed pages, the model labelling lines behind the word guard tied the rules on labels (+0.014, a tie) and lost on
+breaks (F1 0.43 against 0.62). It refused 2 pages on safety grounds and takes 3-9 s a page.
+
 ## 6. Watermarks, warping and selection (points 6 and 9)
 
 **Owner, 2026-11-10:** these pages are tests of the pipeline, not a request for a bulk re-read; a bulk re-read waits
