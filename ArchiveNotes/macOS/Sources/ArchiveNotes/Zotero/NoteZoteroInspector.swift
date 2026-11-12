@@ -38,6 +38,7 @@ struct NoteZoteroInspector: View {
             HStack {
                 TextField("zotero://select/…", text: $link)
                     .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Zotero link")   // the placeholder is not a description (macOS 27 audit)
                     .accessibilityIdentifier("an.zotero.note.link")
                     .onSubmit { attach() }
                 Button("Attach to note") { attach() }

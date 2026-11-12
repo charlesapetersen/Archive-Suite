@@ -144,6 +144,17 @@ final class AccessibilityAudit {
         },
     ]
 
+    /// Seen 2026-11-12 on macOS 27.2 in the Settings windows of Notes and the Processor, never the Reader's: one
+    /// "Parent/Child mismatch" naming no element, from any SwiftUI `TextField` in a `.grouped` `Form` (probed in
+    /// the guest on Notes' Settings: with its three text fields replaced by plain text the issue goes, with only
+    /// their prompts removed it stays). SwiftUI builds the field's accessibility; the app cannot reach the orphan,
+    /// and XCTest cannot even name it. Not in `shared`, because an issue with no element matches it anywhere: pass
+    /// it to `audit(_:screen:exempt:)` for a screen that holds such a form.
+    static let groupedFormTextFieldOrphan = Exemption(
+        reason: "SwiftUI's grouped-Form text field (macOS 27): a parent/child orphan XCTest cannot name") {
+        $0.audit == .parentChild && $0.type == nil
+    }
+
     nonisolated static func name(_ t: XCUIAccessibilityAuditType) -> String {
         switch t {
         case .contrast: "contrast"
@@ -175,9 +186,11 @@ final class AccessibilityAudit {
         self.exempt = Self.shared + exempt
     }
 
-    /// Audit `window` as it is now (see the header for what counts as inside it). `screen` names it in messages.
-    /// Fails the test with every new issue that is neither known nor exempt.
-    func audit(_ window: XCUIElement, screen name: String, file: StaticString = #filePath, line: UInt = #line) {
+    /// Audit `window` as it is now (see the header for what counts as inside it). `screen` names it in messages;
+    /// `exempt` adds exemptions for this screen alone. Fails the test with every new issue that is neither known
+    /// nor exempt.
+    func audit(_ window: XCUIElement, screen name: String, exempt screenExempt: [Exemption] = [],
+               file: StaticString = #filePath, line: UInt = #line) {
         let screen = "\(name), \(appearance)"
         var found: [AuditFinding] = []
         // All six audits in one pass first. When that runs out of time (Xcode's own limit, error -56: seen on
@@ -246,7 +259,7 @@ final class AccessibilityAudit {
                     continue
                 }
             }
-            if let e = exempt.first(where: { $0.matches(f) }) {
+            if let e = (exempt + screenExempt).first(where: { $0.matches(f) }) {
                 print("[a11y-audit] \(screen): exempt (\(e.reason)) \(f)")
             } else if let k = known.first(where: { $0.matches(f) }) {
                 knownHere[k.tag, default: []].append(f)

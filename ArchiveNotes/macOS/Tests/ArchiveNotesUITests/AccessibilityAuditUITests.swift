@@ -14,9 +14,9 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
     private var layout = Layout.sideBySide
     override var layoutLaunchArguments: [String] { Self.layoutArguments(layout) }
     override var extraLaunchArguments: [String] {
-        // Without the editor's two 1×1 test probes: with them Xcode's contrast audit never finishes
-        // (`EditorTextView.accessibilityChildren`).
-        ["-ANUITestNoEditorProbes", "YES"]
+        // Without the editor's 1×1 test probes and the sidebar's drop-highlight text: with either, Xcode's
+        // contrast audit never finishes (`EditorTextView.accessibilityChildren`, `NotesFolderTreeView`).
+        ["-ANUITestNoHiddenProbes", "YES"]
             + (bySetting ? (dark ? LayoutGuard.darkSettingArguments : LayoutGuard.lightSettingArguments)
                 : (dark ? LayoutGuard.darkModeArguments : LayoutGuard.lightModeArguments))
     }
@@ -56,7 +56,8 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
 
     private func auditMainScreens(appearance: String) {
         continueAfterFailure = true   // an issue on one screen must not hide the next screen's
-        let sweep = AccessibilityAudit(app, appearance: appearance, in: self, known: Self.known, exempt: [harness])
+        let sweep = AccessibilityAudit(app, appearance: appearance, in: self, known: Self.known,
+                                       exempt: [harness, selectedSidebarRow])
         assertLayout(layout, in: mainWindow)
         open(Self.idPlain, in: mainWindow)
         LayoutGuard.waitUntilSettled(mainWindow)
@@ -82,7 +83,7 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
                                                         "Archive Notes", "Extracts")).firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
         LayoutGuard.waitUntilSettled(settings)
-        sweep.audit(settings, screen: "settings")
+        sweep.audit(settings, screen: "settings", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
         sweep.finish()
     }
 
@@ -90,6 +91,15 @@ final class AccessibilityAuditUITests: NotesFixtureUITestCase {
     /// drawn behind the panes, and the editor's test-button strip. Not the product.
     private let harness = AccessibilityAudit.Exemption(reason: "UI-test harness element, not shipped") {
         $0.identifier.hasPrefix("an.status.") || $0.identifier.hasPrefix("an.editor.test.")
+    }
+
+    /// Seen 2026-11-12 on macOS 27.2, dark: the selected sidebar row's count "4" at 4.43:1. macOS 27 draws the
+    /// unemphasized selection of a dark sidebar in a light grey (111,110,109 in the guest) and the text keeps the
+    /// label colour (240), 4.45:1 whatever the app does with its own colours; both are AppKit's. A count or name
+    /// in a dimmer colour measures about 3:1 there and still fails, hence the 4:1 floor.
+    private let selectedSidebarRow = AccessibilityAudit.Exemption(
+        reason: "label-colour text on AppKit's unemphasized sidebar selection (macOS 27, dark)") {
+        $0.audit == .contrast && $0.identifier.hasPrefix("an.sidebar.") && ($0.measured ?? 0) >= 4
     }
 
     private func open(_ id: String, in window: XCUIElement) {

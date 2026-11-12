@@ -44,50 +44,69 @@ struct NotesFilterBar: View {
 
     // MARK: Row 1 — kind · keyword · count · actions
 
+    /// One row when it fits. At the list's narrowest it does not on macOS 27, whose segmented control is
+    /// wider (each segment as wide as "Extracts": 224 pt in all, 24 pt over the 540 pt list), so the
+    /// keyword field takes a line of its own below the rest rather than the row spilling past the pane.
     private var topRow: some View {
-        HStack(spacing: 8) {
-            Picker("Kind", selection: $nav.kindFilter) {
-                Text("All").tag(KindFilter.all)
-                Text("Notes").tag(KindFilter.notes)
-                Text("Extracts").tag(KindFilter.extracts)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                kindPicker
+                keywordField
+                topRowActions
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
-            .accessibilityIdentifier("an.filter.kind")
-
-            keywordField
-
-            Button { nav.openAdvancedSearch() } label: {
-                Image(systemName: "line.3.horizontal.decrease.circle")
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    kindPicker
+                    Spacer(minLength: 0)
+                    topRowActions
+                }
+                keywordField
             }
-            .help("Advanced Search: rules for text, title, tags, kind, quality, dates and folders (⇧⌥⌘F)")
-            .accessibilityLabel("Advanced Search")
-            .accessibilityIdentifier("an.filter.advanced")
-
-            Text("\(nav.displayed.count)")
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.primary)
-                .help("Items shown")
-                .accessibilityIdentifier("an.filter.count")
-
-            Button {
-                smartFolderName = ""
-                showingSaveSheet = true
-            } label: {
-                Image(systemName: "folder.badge.plus")
-            }
-            .help("Save as Smart Folder")
-            .accessibilityIdentifier("an.filter.save")
-
-            Button("Clear All") {
-                nav.clearAll()
-                pendingTag = ""
-            }
-            .disabled(!nav.canClearAll && pendingTag.isEmpty)
-            .help(nav.clearAllHelp)
-            .accessibilityIdentifier("an.filter.clear")
         }
+    }
+
+    private var kindPicker: some View {
+        Picker("Kind", selection: $nav.kindFilter) {
+            Text("All").tag(KindFilter.all)
+            Text("Notes").tag(KindFilter.notes)
+            Text("Extracts").tag(KindFilter.extracts)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .accessibilityIdentifier("an.filter.kind")
+    }
+
+    @ViewBuilder private var topRowActions: some View {
+        Button { nav.openAdvancedSearch() } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+        }
+        .help("Advanced Search: rules for text, title, tags, kind, quality, dates and folders (⇧⌥⌘F)")
+        .accessibilityLabel("Advanced Search")
+        .accessibilityIdentifier("an.filter.advanced")
+
+        Text("\(nav.displayed.count)")
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.primary)
+            .help("Items shown")
+            .accessibilityIdentifier("an.filter.count")
+
+        Button {
+            smartFolderName = ""
+            showingSaveSheet = true
+        } label: {
+            Image(systemName: "folder.badge.plus")
+        }
+        .help("Save as Smart Folder")
+        .accessibilityIdentifier("an.filter.save")
+
+        Button("Clear All") {
+            nav.clearAll()
+            pendingTag = ""
+        }
+        .disabled(!nav.canClearAll && pendingTag.isEmpty)
+        .help(nav.clearAllHelp)
+        .accessibilityIdentifier("an.filter.clear")
     }
 
     private var keywordField: some View {

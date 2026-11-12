@@ -457,7 +457,11 @@ struct NotesFolderTreeView: View {
                 Spacer()
                 #if DEBUG
                 // UI-test seam: the drop highlight's state, so a test can see none is left after a drop.
-                if ProcessInfo.processInfo.arguments.contains("-ANUITestStorePath") {
+                // Left out for the accessibility audit: on macOS 27 Xcode's contrast audit never finishes on
+                // this 2 pt, nearly transparent text once a note is open (W40.vm-macos27-notes, measured in
+                // the 27.2 guest: a 15 s timeout with it, 0.6 s without), the editor probes' failure again.
+                if ProcessInfo.processInfo.arguments.contains("-ANUITestStorePath"),
+                   !UserDefaults.standard.bool(forKey: "ANUITestNoHiddenProbes") {
                     Text(dropTarget.map { "\($0.zone) \($0.folder.uuidString)" } ?? "none")
                         .font(.system(size: 2)).opacity(0.05)
                         .accessibilityIdentifier("an.sidebar.test.dropTarget")
