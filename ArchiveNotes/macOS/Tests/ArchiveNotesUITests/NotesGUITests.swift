@@ -413,7 +413,7 @@ class NotesFixtureUITestCase: XCTestCase {
         if cell.isHittable {
             cell.click()
         } else {
-            cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            cell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
         }
         return cell
     }
@@ -1691,7 +1691,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "the extract row should appear once All is shown")
         _ = pollUntil(timeout: 10) { app.activate(); return extractCell.isHittable }
         if extractCell.isHittable { extractCell.click() }
-        else { extractCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+        else { extractCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click() }
 
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
         XCTAssertTrue(pollUntil(timeout: 12) { ((ed.value as? String) ?? "").contains("Moore says") },
@@ -1733,7 +1733,7 @@ final class NotesGUITests: NotesFixtureUITestCase {
         // Coordinate fallback: tap the center of the segment's slot (index/2, 3 segments).
         let index = ["All": 0, "Notes": 1, "Extracts": 2][segment] ?? 0
         let dx = (Double(index) + 0.5) / 3.0
-        control.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).tap()
+        control.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: 0.5)).click()
         return true
     }
 

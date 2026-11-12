@@ -252,7 +252,8 @@ enum LayoutGuard {
     /// but delivers no mouse events, so no window, divider or row moves (measured in the macOS 27.2 guest,
     /// W40.vm-macos27-harness, 2026-11-10: every press drag left the frame unchanged, the same drag as a click
     /// resized it from the inside corner, and the just-outside corner no longer hits the handle). Every UI suite
-    /// follows this rule.
+    /// follows this rule, and clicks a coordinate rather than tapping it: `XCUICoordinate.tap()` selects nothing
+    /// on macOS 27 either (a probe in the guest, 2026-11-11: two taps on a Reader row, both left it unselected).
     @MainActor
     @discardableResult
     static func dragCorner(of window: XCUIElement, to corner: CGPoint) -> CGRect {

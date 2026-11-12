@@ -15,13 +15,13 @@ final class NavigationUITests: FixtureUITestCase {
         let table = app.tables["ar.table"]
         let first = table.tableRows.element(boundBy: 0)
         XCTAssertTrue(first.waitForExistence(timeout: 5))
-        visiblePoint(of: first).tap()
+        visiblePoint(of: first).click()
         let closedWidth = app.windows["Archive Reader"].frame.width
         app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(app.sheets.count, 0, "the Inspector belongs in the right-hand column")
         let next = table.tableRows.element(boundBy: 1)
-        visiblePoint(of: next).tap()
+        visiblePoint(of: next).click()
         XCTAssertTrue(year.waitForExistence(timeout: 5), "browsing leaves the inspector open")
         XCTAssertGreaterThan(year.frame.minX, table.frame.midX)
         captureScreenshot("w40-edit-info-inspector")
@@ -438,9 +438,9 @@ final class NavigationUITests: FixtureUITestCase {
             ? table.staticTexts["File name"]
             : table.buttons["File name"]
         XCTAssertTrue(header.waitForExistence(timeout: 5), "File name column header should be reachable")
-        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()   // sort ascending
+        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()   // sort ascending
         RunLoop.current.run(until: Date().addingTimeInterval(1))
-        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()   // reverse direction
+        header.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()   // reverse direction
         RunLoop.current.run(until: Date().addingTimeInterval(1))
 
         XCTAssertGreaterThanOrEqual(rowCount, 5, "Table should still have rows after header-click sort")

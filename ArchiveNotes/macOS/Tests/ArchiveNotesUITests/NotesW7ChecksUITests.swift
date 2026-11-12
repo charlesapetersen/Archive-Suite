@@ -587,7 +587,7 @@ final class NotesW7ChecksUITests: NotesFixtureUITestCase {
             if el.isHittable { el.click(); return true }
         }
         let index = ["All": 0, "Notes": 1, "Extracts": 2][segment] ?? 0
-        control.coordinate(withNormalizedOffset: CGVector(dx: (Double(index) + 0.5) / 3.0, dy: 0.5)).tap()
+        control.coordinate(withNormalizedOffset: CGVector(dx: (Double(index) + 0.5) / 3.0, dy: 0.5)).click()
         return true
     }
 

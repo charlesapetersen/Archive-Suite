@@ -154,7 +154,7 @@ want_not "$CALLS" 'xcodebuild test' 'full guest disk never starts an Xcode build
 run_gate missing_vm 3 missing-vm-skip
 want "$ROOT/missing-vm-skip.out" "VM 'archive-gui-runner' does not exist" 'missing VM is fail-open SKIPPED'
 
-# The pause (W40.vm-macos27-harness): a skip that names its reason, before any boot or Xcode run.
+# The pause (W40.vm-gate-unpause): a skip that names its reason, before any boot or Xcode run.
 PAUSED='a test reason' run_gate pass 3 paused-skip
 want "$ROOT/paused-skip.out" 'SKIPPED: paused: a test reason' 'the pause is a SKIPPED that names its reason'
 want_not "$CALLS" 'tart run' 'the pause never boots the VM'
@@ -162,7 +162,7 @@ want_not "$CALLS" 'tart run' 'the pause never boots the VM'
 ( unset PAUSED; : > "$CALLS"; GUI_VM_FAKE_MODE=pass GUI_VM_FAKE_CALLS="$CALLS" GUI_VM_FAKE_COUNT="$ROOT/count" \
     AUTONOMOUS_GUI_VM_BIN_DIR="$BIN" AUTONOMOUS_GUI_VM_STATE="$STATE" ART_DIR="$ART" TART_LOCK_DIR="$ROOT/lock" \
     env -u AUTONOMOUS_GUI_VM_PAUSED "$GATE" >"$ROOT/default-pause.out" 2>&1; echo "rc=$?" >>"$ROOT/default-pause.out" )
-want "$ROOT/default-pause.out" 'W40.vm-macos27-harness' 'the default pause names W40.vm-macos27-harness'
+want "$ROOT/default-pause.out" 'W40.vm-gate-unpause' 'the default pause names W40.vm-gate-unpause'
 want "$ROOT/default-pause.out" 'rc=3' 'the default pause exits 3 (SKIPPED)'
 
 # A whole run of this proof must stay short: the gate's 50-minute cap has to leave room for the real VM lane.

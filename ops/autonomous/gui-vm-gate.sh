@@ -66,13 +66,13 @@ skip() { echo "GUI-VM gate SKIPPED: $*"; exit 3; }
 
 # ---- guards (each SKIPs; a missing prereq must never RED) --------------------------------------
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] || skip "disabled (AUTONOMOUS_GUI_VM=0)"
-# PAUSED while W40.vm-macos27-harness is open (interactive session, 2026-11-06). On the macOS 27.2 guest the
-# suites fail for harness reasons (pixel checks on the 2x display, pointer drags, window sizes), and a failing
-# run is slow: Notes took 5,875 s with 61 of 146 failing, so it cannot fit the gate's 3,000 s cap and timed the
-# gate out twice, parking the engine. Running it here tells nothing the item does not already say. The item
-# that makes the suites pass on macOS 27 sets this default back to empty in the same commit. Sessions still run
+# PAUSED until W40.vm-gate-unpause (interactive session, 2026-11-06). On the macOS 27.2 guest the suites failed
+# for harness reasons, fixed by W40.vm-macos27-harness (2026-11-11), and a run is slow: Notes took 5,875 s with
+# 61 of 146 failing, then 11,836 s for 138 with 4 failing (W40.vm-macos27-runtime), so it cannot fit the gate's
+# 3,000 s cap and timed the gate out twice, parking the engine. W40.vm-gate-unpause, once the per-app items and
+# the runtime item are done, sets this default back to empty in the same commit. Sessions still run
 # the lane themselves through ops/gui/vm-gui-runner.sh. An empty AUTONOMOUS_GUI_VM_PAUSED runs the lane anyway.
-PAUSED="${AUTONOMOUS_GUI_VM_PAUSED-W40.vm-macos27-harness is open: the UITest suites do not pass on the macOS 27.2 guest yet, and a failing run does not fit the gate}"
+PAUSED="${AUTONOMOUS_GUI_VM_PAUSED-W40.vm-gate-unpause is open: the UITest suites do not pass on the macOS 27.2 guest yet, and a run does not fit the gate}"
 [ -z "$PAUSED" ] || skip "paused: $PAUSED"
 # tart-vs-VM stays two distinct skips (W21.vmgui-path). The PATH fix now lives in tart-lib.sh so BOTH
 # entry points get it; the prefix above is kept as belt-and-braces for the lines above the source.

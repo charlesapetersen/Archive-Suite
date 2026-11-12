@@ -301,7 +301,7 @@ final class WarmStartUITests: XCTestCase {
         if row.isHittable {
             row.click()
         } else {
-            row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).tap()
+            row.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.5)).click()
         }
         return row
     }

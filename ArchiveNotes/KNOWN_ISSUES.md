@@ -66,10 +66,9 @@ the off-screen macOS 27.2 VM verified nesting, unselected-child unnesting, blank
 with its child, cycle refusal, disclosure controls, selected-row highlighting/scoping, the context menu and
 ordinary note dragging, with persisted `organization.json` checks and screenshots inspected.
 `VisualPolishUITests.testClickedFolderIsTheHighlightedRow` passes in the VM. The two raw XCUITest drag
-checks still fail to initiate their drags in the tracked macOS 27 harness (W40.vm-macos27-harness / notes),
-while real VNC input passes. Re-run `NotesE2FolderTests.testE2_QuickFolderDragOntoMiddleNests` and
-`testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow` when that harness is repaired; the latter also
-checks persistence after relaunch.
+checks, `NotesE2FolderTests.testE2_QuickFolderDragOntoMiddleNests` and
+`testE2_UnselectedFolderDragNestsAndUnnestsFromTheWholeRow` (which also checks persistence after relaunch),
+pass in the macOS 27.2 guest since W40.vm-macos27-harness made UI-test drags click drags (2026-11-11).
 
 ## ✅ FIXED (W40.fix-notes-date-cell-erase, 2026-11-08) — untouched list cells cannot clear dates or tags
 

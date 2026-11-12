@@ -114,8 +114,9 @@ class FixtureUITestCase: XCTestCase {
         if row.isHittable {
             row.click()
         } else {
-            // Fallback: tap near the row's left edge by coordinate (still exercises selection).
-            visiblePoint(of: row).tap()
+            // Fallback: click near the row's left edge by coordinate (still exercises selection). A click, never
+            // `tap()`: on macOS 27 a coordinate's tap() delivers nothing (measured in the 27.2 guest, 2026-11-11).
+            visiblePoint(of: row).click()
         }
         return row
     }
