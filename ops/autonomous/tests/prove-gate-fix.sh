@@ -99,12 +99,16 @@ reset() { : > "$STATE/daemon.log"; rm -f "$STATE"/gate-fix* "$STATE/last-gate" "
 L="$STATE/daemon.log"
 # Observe the event under test, rather than sampling at an arbitrary sleep boundary. A missing event still
 # fails the original assertions; the deadline only bounds a broken fixture (same 30 s as the stub gate cap).
+# The deadline is counted in polls, as the daemon counts that cap (`waited += 2` per `sleep 2`), not in wall
+# seconds: on a Mac starved by other work (the 2026-11-12 gate, retry at 09:05) the fixture daemon ran 8x slow,
+# so its own cap stretched while a wall-clock deadline here did not, and a correct run failed [2] and [3] with
+# every event still arriving in order. Unloaded, 300 polls of 0.1 s is the same 30 s.
 await_condition() {
-  local deadline=$((SECONDS+30))
-  while [ "$SECONDS" -lt "$deadline" ]; do
+  local polls=0
+  while [ "$polls" -lt 300 ]; do
     "$@" && return 0
     kill -0 "$P" 2>/dev/null || break
-    sleep 0.1
+    sleep 0.1; polls=$((polls+1))
   done
   return 1
 }

@@ -113,6 +113,11 @@ ALLOW=(
   "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (target as NSURL).setResourceValue(intendedTags, forKey: .tagNamesKey)"
   "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (target as NSURL).setResourceValue(intendedLabel ?? 0, forKey: .labelNumberKey)"
   "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagWrite.swift${SEP}try (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)"
+  # §7a colour restore (W40.vm-macos27-reader, a39acd67/34007ecd), audited for gate-fix 2026-11-12:
+  # `TagXattr.writeRawEntries` is module-internal and its only caller is CoordinatedTagWriter, inside the
+  # same metadata-only coordination block, after the names write; it rewrites only the Finder-tags xattr
+  # with the surviving tags' prior colours, and the writer re-reads and verifies names and colours after.
+  "tagwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagReading.swift${SEP}return data.withUnsafeBytes { setxattr(rawPath, finderTagsXattrName, \$0.baseAddress, data.count, 0, 0) }"
 
   # RootMarker: creates the archive root's identity file (a NEW sidecar, under NSFileCoordinator,
   # adopting a racing winner rather than overwriting it). It never writes an existing corpus file.

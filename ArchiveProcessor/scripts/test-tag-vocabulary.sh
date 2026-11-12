@@ -61,6 +61,7 @@ if ! xcrun swiftc -swift-version 6 \
       -I "$CORE" -L "$CORE" -lArchiveCore \
       "$SRC/Tagging/MacOSTagger.swift" \
       "$SRC/Tagging/SystemTagsProvider.swift" \
+      "$SRC/Tagging/ItemTypeColourSetting.swift" \
       "$SRC/Models/DefaultsKeys.swift" \
       "$SRC/Models/KeychainHelper.swift" \
       "$REPO/scripts/tag-vocabulary-driver.swift" \

@@ -351,6 +351,10 @@ struct TagVocabularyDriver {
         }
         let phase = args[1]
         let scratch = URL(fileURLWithPath: args[2], isDirectory: true)
+        // Since W40.suite-item-types a colour word is the marker only when the user chose that colour for
+        // an item type (none by default). These phases test the marker case, so choose the colours the
+        // Processor used before, in memory, never in the app's defaults.
+        ItemTypeColourSetting.driverOverride = .redBoxPurpleFolder
 
         switch phase {
         case "write":
