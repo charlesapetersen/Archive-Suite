@@ -118,8 +118,6 @@ enum DefaultsKeys {
     // Tools
     static let modelTestSelections = "modelTestSelections"
 
-    // Processing profiles (named snapshots of the durable processing settings; JSON-encoded [ProcessingProfile])
-    static let processingProfiles = "processingProfiles"
 
     // Processing history (bounded log of completed Process-Files runs; JSON-encoded [ProcessingRun])
     static let processingHistory = "processingHistory"

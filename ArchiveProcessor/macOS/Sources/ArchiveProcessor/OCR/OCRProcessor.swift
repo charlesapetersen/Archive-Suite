@@ -422,6 +422,9 @@ class OCRProcessor: ObservableObject {
         /// The run's OCR cascade (W41.app-ocr-cascade), so a resumed batch escalates to the route it was
         /// submitted with, never to whatever Settings hold now. Nil reads as off.
         var cascade: OCRCascade? = nil
+        /// The settings layers as they resolved when the batch was submitted (W46.settings-layers): a record of
+        /// what produced it, read by nothing that decides how the batch runs, so outside both fingerprints.
+        var resolvedSettings: ResolvedSettingsSnapshot? = nil
         /// Ordered server-side job IDs acknowledged so far. Gemini can create several paid jobs for one
         /// local run; each ID is appended and atomically saved immediately after its create response.
         var submittedChunkIds: [String]
@@ -510,6 +513,8 @@ class OCRProcessor: ObservableObject {
             lifecycleFingerprint = try c.decodeIfPresent(String.self, forKey: .lifecycleFingerprint)
             mixedPDFOutcomes = try c.decodeIfPresent([MixedPDFOutcome].self, forKey: .mixedPDFOutcomes)
             cascade = try c.decodeIfPresent(OCRCascade.self, forKey: .cascade)
+            // A record only: one this build cannot read never blocks resuming the paid batch.
+            resolvedSettings = (try? c.decodeIfPresent(ResolvedSettingsSnapshot.self, forKey: .resolvedSettings)) ?? nil
         }
 
         static func parseChunkIDs(_ value: String) -> [String] {
@@ -672,6 +677,9 @@ class OCRProcessor: ObservableObject {
         /// proposal the user reviews before anything is written.
         var segmentationWindows: [WindowKey: WindowAnswer]? = nil
         var segmentationAnswers: [String: FlaggedGapAnswer]? = nil
+        /// The settings layers as they resolved when the run started (W46.settings-layers): a record of what
+        /// produced it, read by nothing that decides how the run goes, so outside the fingerprint. A resume keeps it.
+        var resolvedSettings: ResolvedSettingsSnapshot? = nil
     }
 
 
@@ -686,6 +694,11 @@ class OCRProcessor: ObservableObject {
     /// `activePendingRun` before the tail. Nil when not running; NEVER persisted (the history log itself
     /// lives in `ProcessingHistoryStore`). See `Models/ProcessingHistory.swift`.
     var activeRunHistory: RunHistorySnapshot?
+
+    /// The settings layers frozen at this run's start (W46.settings-layers), copied into its pending run or batch.
+    var activeResolvedSettings: ResolvedSettingsSnapshot?
+    /// This start's collection record, until the run is committed and it is written; nil once written or on a resume.
+    var activeRunToRecord: PendingCollectionRecord?
 
 
 

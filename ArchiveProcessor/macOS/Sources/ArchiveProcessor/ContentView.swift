@@ -89,6 +89,7 @@ struct ContentView: View {
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SettingsSolverTestDriver.runIfRequested()        // $0 W46 settings solver on the profile cases
+            SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
             SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
             SegmentationChatGPTTestDriver.runIfRequested()   // $0 W36 ChatGPT plan route: Sign in with ChatGPT, fake server

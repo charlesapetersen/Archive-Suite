@@ -27,9 +27,6 @@ extension Notification.Name {
     static let addFilesRequested = Notification.Name("AddFilesRequested")
     /// Posted from File ▸ Choose Output Folder… (⇧⌘O); `OCRView` opens its output-folder panel.
     static let chooseOutputFolderRequested = Notification.Name("ChooseOutputFolderRequested")
-    /// Posted after a processing profile is applied so views holding derived `@State` (selected model,
-    /// API-key fields) re-sync from the freshly-written UserDefaults values.
-    static let processingProfileApplied = Notification.Name("ProcessingProfileApplied")
 }
 
 /// Whether a text field / field editor currently holds keyboard focus. Global shortcuts stand down when

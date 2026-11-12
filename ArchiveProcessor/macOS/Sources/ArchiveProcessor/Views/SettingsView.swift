@@ -96,7 +96,6 @@ struct SettingsView: View {
     @AppStorage(AppAppearance.defaultsKey) private var appearance: AppAppearance = AppAppearance.defaultValue
 
     @ObservedObject private var customModelStore = CustomModelStore.shared
-    @ObservedObject private var profileStore = ProcessingProfileStore.shared
     @ObservedObject private var modelStore = ModelSelectionStore.shared
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
@@ -115,15 +114,9 @@ struct SettingsView: View {
     @State private var signingIn = false
     @State private var driveStatus = ""
     @State private var driveAuth: DriveAuth? = nil   // retains the auth object across the async loopback flow
-    // Processing profiles (named snapshots of the durable processing settings)
-    @State private var showSaveProfileAlert = false
-    @State private var newProfileName = ""
-    @State private var renamingProfileID: UUID? = nil
-    @State private var renameProfileName = ""
-    /// Where the keyboard focus starts when Settings opens: on the first real control, not the Profiles "?"
+    /// Where the keyboard focus starts when Settings opens: on the first real control, not a "?" button
     /// (W40.fix-processor-visual-polish: the help button held the focus ring on open).
-    private enum InitialFocus: Hashable { case saveProfile }
-    @FocusState private var initialFocus: InitialFocus?
+    @FocusState private var initialFocus: CollectionSettingsSection.Focus?
 
     private var models: [LLMModel] {
         selectedProvider.models   // already includes this provider's custom models — don't concat (dupes)
@@ -173,7 +166,7 @@ struct SettingsView: View {
         HStack(spacing: 0) {
             Form {
                 appearanceSection
-                profilesSection
+                CollectionSettingsSection(focus: $initialFocus)
                 liveCaptureSection
                 providerSection
                 apiKeySection
@@ -184,7 +177,7 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
             .frame(minWidth: 400)
-            .defaultFocus($initialFocus, .saveProfile)
+            .defaultFocus($initialFocus, .project)
 
             Divider()
             costPane
@@ -193,64 +186,9 @@ struct SettingsView: View {
         .frame(width: 680, height: 660)
         .onAppear { reloadKeys() }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
-        .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
-            // A profile just wrote new values into UserDefaults. @AppStorage picks up the scalar settings
-            // automatically and `ModelSelectionStore` republishes the model ids; only the Keychain-backed
-            // key fields are left to re-sync by hand.
-            reloadKeys()
-        }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
         .sheet(isPresented: $showLocalAgentWizard) {
             LocalAgentWizard { showLocalAgentWizard = false }
-        }
-        .sheet(isPresented: $showSaveProfileAlert) {
-            NameEntrySheet(title: "Save Processing Profile",
-                           message: "Save the current processing settings as a reusable profile. API keys are never included.",
-                           confirmLabel: "Save", name: $newProfileName) { profileStore.saveCurrent(as: $0) }
-        }
-        .sheet(isPresented: Binding(get: { renamingProfileID != nil }, set: { if !$0 { renamingProfileID = nil } })) {
-            NameEntrySheet(title: "Rename Profile", confirmLabel: "Rename", name: $renameProfileName) { name in
-                if let id = renamingProfileID { profileStore.rename(id, to: name) }
-                renamingProfileID = nil
-            }
-        }
-    }
-
-    @ViewBuilder private var profilesSection: some View {
-        Section {
-            if profileStore.profiles.isEmpty {
-                Text("No saved profiles yet. Save the current settings to switch between reusable configurations in one click.")
-                    .font(.caption).foregroundStyle(.primary)
-            } else {
-                ForEach(profileStore.profiles) { profile in
-                    HStack {
-                        Text(profile.name).lineLimit(1)
-                        Spacer()
-                        Button("Apply") { profileStore.apply(profile) }
-                            .buttonStyle(.bordered)
-                        Menu {
-                            Button("Rename…") { renameProfileName = profile.name; renamingProfileID = profile.id }
-                            Button("Delete", role: .destructive) { profileStore.delete(profile.id) }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                    }
-                }
-            }
-            Button {
-                newProfileName = ""
-                showSaveProfileAlert = true
-            } label: {
-                Label("Save current settings as a profile…", systemImage: "plus")
-            }
-            .focused($initialFocus, equals: .saveProfile)
-        } header: {
-            HStack {
-                Text("Profiles")
-                HelpButton(text: "A profile is a named snapshot of these processing settings — provider, model (per provider), thinking level, tagging & rotation modes, batch, resolution/size targets, gateway configuration, live-capture mode, and more. Save the current settings, then Apply a profile any time to restore them everywhere. API keys are never stored in a profile (they stay in the Keychain); a profile only references the provider. The output folder is also left unchanged.")
-            }
         }
     }
 

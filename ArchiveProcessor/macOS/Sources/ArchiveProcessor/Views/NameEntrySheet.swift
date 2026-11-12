@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The sheet behind Settings' "give it a name" prompts (Save Processing Profile, Rename Profile). A SwiftUI
+/// The sheet behind Settings' "give it a name" prompts (New Project). A SwiftUI
 /// `.alert` with a `TextField` opened with the focus ring on Cancel and no caret in the field, so typing did
 /// nothing (W40.fix-processor-visual-polish, the same fix as Notes' `NameEntrySheet`). Here the field takes the
 /// caret as the sheet opens, Return confirms, Escape cancels, and confirm stays disabled until the trimmed name is
@@ -8,6 +8,7 @@ import SwiftUI
 struct NameEntrySheet: View {
     let title: String
     var message: String?
+    var placeholder = "Name"
     let confirmLabel: String
     @Binding var name: String
     let onConfirm: (String) -> Void
@@ -25,7 +26,7 @@ struct NameEntrySheet: View {
                 Text(message).font(.callout).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            TextField("Profile name", text: $name)
+            TextField(placeholder, text: $name)
                 .textFieldStyle(.roundedBorder)
                 .labelsHidden()
                 .focused($fieldFocused)

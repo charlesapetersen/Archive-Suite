@@ -2,6 +2,24 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W46.settings-layers, 2026-11-11): what the settings layers do not yet cover
+
+- **Nothing fills the layers yet but the project picker.** The general and collection interviews
+  (`W46.settings-interviews`) ask the questions, and the settings sheet (`W46.settings-sheet`) shows every value with
+  its source. Until then the layers resolve to the built-in "Free, on this Mac", and Settings' "This collection"
+  section lists only the values a collection holds. Its project picker and New project… are the only writers today.
+- **The run still reads the app's processing settings, not the solver's picks.** The frozen record carries both: the
+  resolved layers and the `UserDefaults` processing settings the run actually used. Running a batch from the
+  solver's picks is the sheet's job.
+- **A Live Capture session's layers resolve at Finalize.** The session cannot know its collection folders before
+  then, so each folder's record uses that folder's layers as they are at Finalize. The processing settings are the
+  ones the session took when it started.
+- **The guarded writer checks, then writes.** A local process that swaps `.archivesuite` for a link between the
+  check and the write could redirect one write (`SPEC/collection-settings.md`). Accepted: it needs a hostile local
+  process.
+- **The named processing profiles are gone, with no migration.** Nothing real was saved with them (owner,
+  2026-08-01).
+
 ## Human Poor OCR flag and new-output headers (W44.reocr-spec, 2026-11-07)
 
 `OCR Poor` is reserved for a person's assessment. `TagGenerator.parseTagResponse` rejects that token

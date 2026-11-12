@@ -87,6 +87,22 @@ extension OCRProcessor {
 
     /// Compute the v2 identity hash. Nil means the snapshot could not be encoded; callers must not start
     /// a resumable paid run in that state.
+    /// W46.settings-layers: a started run's collection record, written once by `recordActiveRunInCollection`.
+    struct PendingCollectionRecord {
+        let snapshot: ResolvedSettingsSnapshot
+        let outputDirectory: URL
+        let fileCount: Int
+    }
+
+    /// Record the run in its collection's folder, once per start; a second call (the image half of a mixed run) does
+    /// nothing. A record that cannot be written never stops the run (`SettingsLayerStore.record`).
+    func recordActiveRunInCollection(kind: String) {
+        guard let pending = activeRunToRecord else { return }
+        activeRunToRecord = nil
+        SettingsLayerStore.shared.record(pending.snapshot, kind: kind, fileCount: pending.fileCount,
+                                         in: pending.outputDirectory)
+    }
+
     nonisolated static func pendingRunFingerprintV2(_ run: PendingRun) -> String? {
         guard let config = run.runtimeConfig else { return nil }
         let encoder = JSONEncoder()
@@ -2926,7 +2942,17 @@ extension OCRProcessor {
             pdfPageCount: RunHistorySnapshot.directPDFPageCount(pdfIndices.map { files[$0] })
         )
 
+        // W46.settings-layers: resolve the general, project and collection layers once and freeze them for this run's
+        // pending record. The run is recorded in the collection's folder only once it is committed to start
+        // (`recordActiveRunInCollection`), and a resumed mixed-PDF run was recorded when it first started.
+        let frozen = SettingsLayerStore.shared.snapshot(
+            outputDirectory: outputDirectory, runID: UUID(), processing: ProcessingSettingsCapture.capture())
+        activeResolvedSettings = frozen
+        activeRunToRecord = resumingMixedPDF == nil
+            ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil
+
         if autoReOCR {
+            recordActiveRunInCollection(kind: mixedReOCR ? "mixed" : "reOCR")
             // --- PDF subset: pure render/OCR/rebuild, with no tagging or segmentation. ---
             if mixedReOCR {
                 progressRange = (start: 0, span: Double(pdfIndices.count) / Double(files.count))
@@ -2985,6 +3011,8 @@ extension OCRProcessor {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
             // A Vision-hybrid selection has no image work on this route either. Reuse its text
             // judgement backend rather than presenting Apple Vision as a network text provider.
+            // This route keeps no pending record, so the collection's run record is its only frozen settings.
+            recordActiveRunInCollection(kind: "preOCRed")
             await performPreOCRedProcessing(
                 files: files,
                 provider: runConfig.textProvider,
@@ -3069,6 +3097,7 @@ extension OCRProcessor {
                     runtimeConfig: runtimeConfig
                 )
                 pendingRun.mixedPDFOutcomes = mixedPDFOutcomes
+                pendingRun.resolvedSettings = activeResolvedSettings
                 guard let fingerprint = Self.pendingRunFingerprintV2(pendingRun) else {
                     cleanupTempFiles()
                     activeRunHistory = nil
@@ -3093,6 +3122,7 @@ extension OCRProcessor {
                     statusMessage = "Could not save the resume snapshot. No OCR requests were sent."
                     return
                 }
+                recordActiveRunInCollection(kind: "processFiles")
                 if activePendingMixedPDF != nil {
                     Self.deletePendingMixedPDF()
                     activePendingMixedPDF = nil

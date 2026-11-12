@@ -759,6 +759,7 @@ extension OCRProcessor {
             mixedPDFOutcomes: mixedPDFOutcomes
         )
         initialPendingBatch.cascade = Self.ocrCallValues(for: runConfig).cascade
+        initialPendingBatch.resolvedSettings = activeResolvedSettings
         guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
             statusMessage = "Could not create a safe paid-batch journal. No batch requests were sent."
             batchPollInterrupted = true
@@ -766,6 +767,7 @@ extension OCRProcessor {
             return
         }
         activePendingBatch = persistedInitialBatch
+        recordActiveRunInCollection(kind: "batch")
         if activePendingMixedPDF != nil {
             Self.deletePendingMixedPDF()
             activePendingMixedPDF = nil

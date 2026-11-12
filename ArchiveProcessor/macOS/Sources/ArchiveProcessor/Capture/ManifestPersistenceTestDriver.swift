@@ -290,7 +290,7 @@ enum ManifestPersistenceTestDriver {
               && SessionProcessingConfig.Bounds.textColumns == 1...4)
 
         // An unset key must STAY unset. Normalizing is about correcting what the operator stored, not
-        // about materializing five defaults he never chose — `ProcessingProfileStore.read` distinguishes
+        // about materializing five defaults he never chose — `ProcessingSettingsCapture.capture` distinguishes
         // stored from defaulted, so writing them all would change what a snapshot means.
         let normalizedNothing = SessionProcessingConfig.normalizeSizingDefaults(fu3Defaults)
         check("W16.cfg6-fu3: normalizing an all-unset domain writes nothing and reports no change",
@@ -376,30 +376,6 @@ enum ManifestPersistenceTestDriver {
               etaOCRSeconds(100) == etaOCRSeconds(12)
               && etaOCRSeconds(0) == etaOCRSeconds(1)
               && etaOCRSeconds(12) < etaOCRSeconds(1))
-
-        // A profile is unvalidated JSON on disk that `apply` writes verbatim — the one path that could put
-        // any Double back into the five keys after Settings had been left in range. Exercised on a scratch
-        // suite (that is why `apply` takes a `UserDefaults` now), never the real app's settings.
-        let fu3ProfileSuite = "APManifestTest-fu3p-\(UUID().uuidString)"
-        let fu3ProfileDefaults = UserDefaults(suiteName: fu3ProfileSuite)!
-        defer { fu3ProfileDefaults.removePersistentDomain(forName: fu3ProfileSuite) }
-        let handEditedProfile = ProcessingProfile(name: "hand-edited", values: [
-            DefaultsKeys.standardImageSizeMB: .double(500),
-            DefaultsKeys.pdfImageSizeMB: .double(-4),
-            DefaultsKeys.exportedImageSizeMB: .double(0),
-            DefaultsKeys.ocrWorkerCount: .int(64),
-            DefaultsKeys.textColumns: .int(11),
-            DefaultsKeys.batchMode: .bool(true),
-        ])
-        ProcessingProfileStore.shared.apply(handEditedProfile, to: fu3ProfileDefaults)
-        check("W16.cfg6-fu3: applying a hand-edited profile cannot store a sizing value out of range",
-              fu3ProfileDefaults.double(forKey: DefaultsKeys.standardImageSizeMB) == 20
-              && fu3ProfileDefaults.double(forKey: DefaultsKeys.pdfImageSizeMB) == 2.0   // ≤ 0 → fallback
-              && fu3ProfileDefaults.double(forKey: DefaultsKeys.exportedImageSizeMB) == 3.0
-              && fu3ProfileDefaults.integer(forKey: DefaultsKeys.ocrWorkerCount) == 12
-              && fu3ProfileDefaults.integer(forKey: DefaultsKeys.textColumns) == 4
-              // …and a non-sizing key is still applied verbatim: this bounds the writer, not the feature.
-              && fu3ProfileDefaults.bool(forKey: DefaultsKeys.batchMode))
 
         // --- W16.cfg2/cfg6: an injected config wins; with none, the helpers read defaults, not a global. ---
         let liveSizing = SessionProcessingConfig.runSizing()

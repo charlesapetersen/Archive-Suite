@@ -28,7 +28,7 @@ final class ModelSelectionStore: ObservableObject {
     static let shared = ModelSelectionStore()
 
     /// `provider.rawValue` → that provider's selected model id. Published so every observing view
-    /// re-renders on a change, whichever window (or applied profile) made it.
+    /// re-renders on a change, whichever window made it.
     @Published private(set) var selectedModelIDs: [String: String] = [:]
 
     private init() {
@@ -56,14 +56,6 @@ final class ModelSelectionStore: ObservableObject {
         var ids = selectedModelIDs
         ids[provider.rawValue] = model.id
         publish(ids)
-    }
-
-    /// Re-read every provider's id from `UserDefaults` and publish if anything moved. For the one writer
-    /// that legitimately bypasses `setModel`: `ProcessingProfileStore.apply`, which writes a whole
-    /// profile's keys in bulk. Always reads `.standard` — a caller that wrote some *other* suite simply
-    /// finds nothing changed, which is why `apply` can call this unconditionally.
-    func reloadFromDefaults() {
-        publish(Self.readIDs())
     }
 
     /// Rewrite any provider whose stored id no longer resolves to a real model — the custom model behind

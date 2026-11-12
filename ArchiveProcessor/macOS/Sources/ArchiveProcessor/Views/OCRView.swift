@@ -395,11 +395,6 @@ struct OCRView: View {
         .onChange(of: gatewayLocalModel) { _, _ in reloadAPIKey() }   // W41.app-local-models: the stand-in key
         .onChange(of: useGateway) { _, _ in reloadAPIKey() }
         .onChange(of: visionUseLLMJudgment) { _, _ in syncForProviderChange() }
-        .onReceive(NotificationCenter.default.publisher(for: .processingProfileApplied)) { _ in
-            // An applied profile may change the model for the *current* provider (no provider change), so
-            // re-sync the derived model/key state explicitly (the provider onChange above covers the rest).
-            syncForProviderChange()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .startProcessingRequested)) { _ in
             // ⌘R: run the normal Start action, but only when it's actually allowed and no field is being
             // edited — the shortcut is guarded exactly like the Start button.
@@ -915,7 +910,7 @@ struct OCRView: View {
     }
 
     /// Re-point the API-key field after `selectedProvider` changes from anywhere (the ⌘⌥P cycle
-    /// shortcut, an applied profile, or a return from Settings), so a run never uses the wrong Keychain
+    /// shortcut or a return from Settings), so a run never uses the wrong Keychain
     /// account. The model needs no hook — `selectedModel` reads the store keyed by the *current*
     /// provider, so it re-points on the same render.
     private func syncForProviderChange() {

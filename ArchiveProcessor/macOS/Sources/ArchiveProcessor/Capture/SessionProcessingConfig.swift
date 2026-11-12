@@ -179,7 +179,7 @@ struct SessionProcessingConfig: Sendable {
     ///
     /// Two deliberate restraints:
     /// - **An UNSET key stays unset.** Materializing it would only trade one silent difference for
-    ///   another (`ProcessingProfileStore` distinguishes stored from defaulted), and an unset key already
+    ///   another (`ProcessingSettingsCapture` distinguishes stored from defaulted), and an unset key already
     ///   resolves to exactly the value this would write.
     /// - **A key already equal to its normalized value is not rewritten**, so calling this on every
     ///   settings change is idempotent and does not churn `@AppStorage` observers.

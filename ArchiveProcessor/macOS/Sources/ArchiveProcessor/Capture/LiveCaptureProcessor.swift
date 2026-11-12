@@ -2069,6 +2069,30 @@ final class LiveCaptureProcessor: ObservableObject {
             ?? FileManager.default.homeDirectoryForCurrentUser
     }
 
+    /// The app's processing settings as this live session took them (W46.settings-layers), for the run record finalize
+    /// writes into each collection folder; nil reads them as they are at finalize.
+    var sessionProcessingSettings: [String: SettingsValue]?
+
+    /// W46.settings-layers: record this session in every collection folder finalize actually filed into, with the
+    /// layers as that folder resolves them and the session's processing settings. A record never blocks finalize.
+    private func recordSessionInCollections(_ plans: [MovePlan], filed: Set<String>) {
+        let processing = sessionProcessingSettings ?? ProcessingSettingsCapture.capture()
+        // Two drafts may file into one existing folder: one record per folder, counting every filed document in it.
+        var order: [URL] = []
+        var counts: [String: Int] = [:]
+        for plan in plans {
+            let key = plan.folder.standardizedFileURL.path
+            if counts[key] == nil { order.append(plan.folder) }
+            counts[key, default: 0] += plan.segments.filter { filed.contains($0.groupId) }.count
+        }
+        let store = SettingsLayerStore.shared
+        for folder in order {
+            guard let count = counts[folder.standardizedFileURL.path], count > 0 else { continue }
+            let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), processing: processing)
+            store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder)
+        }
+    }
+
     func beginFinalize() {
         guard !stagingManifestBlocked, config != nil, !staged.isEmpty else { return }
         let existing = Self.existingCollectionFolders(in: currentOutputDirectory)
@@ -2128,6 +2152,7 @@ final class LiveCaptureProcessor: ObservableObject {
                     + " ⚠️ The filed-group ledger could not be saved. Original photos and staged recovery data remain in the Backup Folder; check disk space or permissions before finishing again."
                 return
             }
+            self.recordSessionInCollections(plans, filed: filedGroups)
             let placeholderByGroup = Dictionary(
                 self.staged.compactMap { seg -> (String, [URL])? in
                     guard let held = seg.placeholderSources, !held.isEmpty else { return nil }

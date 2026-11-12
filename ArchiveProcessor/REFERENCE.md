@@ -336,7 +336,7 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.
-Settings/                      W46.settings-solver: the settings layer's solver, no UI yet.
+Settings/                      W46.settings-solver: the settings layer's solver; W46.settings-layers: its three layers.
   SettingsRouteTable.swift     Decodes the bundled `segbench-results/settings-routes.json` (the rule table,
                                `scripts/segbench/settings_routes.py`) and `ocr-pair-matrix.json` (reading ties).
   SettingsSolver.swift         `SettingsResources` + `SettingsAnswers` → one pick per stage and part (reading per kind
@@ -345,6 +345,18 @@ Settings/                      W46.settings-solver: the settings layer's solver,
                                reason each is out, the limit to relax, the kit's after-training points.
                                Self-test: `SettingsSolverTestDriver`, `scripts/test-settings-solver.sh` (the cases of
                                `execution-plans/processing-review/13-stage-rules/13-profile-tests.md`).
+  SettingsLayers.swift         The general, project and collection layers: each holds only the values it answered
+                               (`SettingsKey`, with source and reset); `SettingsResolver` reads them live, nearest
+                               first, into the solver's resources and answers; `ResolvedSettingsSnapshot` is the
+                               frozen record. Replaced the UserDefaults processing profiles (no migration).
+  SettingsLayerStore.swift     Tier-2 (writes beside the output). The general layer, projects and ledger in
+                               Application Support `settings-general.json`; the collection's document in
+                               `<output>/.archivesuite/collection-settings.json` and one file per run in its `runs/`
+                               (`SPEC/collection-settings.md`): atomic, never through a link, never over a run record,
+                               an unreadable document set aside, a newer or unopenable one left alone. `snapshot` at
+                               every run start into the pending record; `record` once the run is committed (Process
+                               Files, batch, re-OCR) or, for Live Capture, per collection folder at Finalize. Self-test: `SettingsLayersTestDriver`,
+                               `scripts/test-settings-layers.sh`. UI: `Views/CollectionSettingsSection.swift`.
 Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
                                `execution-plans/segmentation/04-options-build.md` Part 3 §2. `TaggingMode` says who
                                tags, `SegmentationApproach` who segments; `SegmentationPlan` joins them.

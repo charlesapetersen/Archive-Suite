@@ -160,9 +160,9 @@ final class VisualReviewUITests: XCTestCase {
             escape()
         } else { missing.append("help button") }
 
-        if clickButton("Save current settings as a profile…") {
+        if clickButton("New project…") {
             pause(0.8)
-            shoot("settings-save-profile-alert")
+            shoot("settings-new-project-sheet")
             cancel()
         }
 

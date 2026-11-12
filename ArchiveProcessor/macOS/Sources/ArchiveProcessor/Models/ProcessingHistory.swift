@@ -9,7 +9,7 @@ import Foundation
 //   this is the SAME per-model pricing math the pre-run estimator shows — applied to what actually ran,
 //   not a fixed 1,000-file sample. It is a close estimate of real spend, NOT a billed figure; the UI
 //   labels it accordingly.
-// - Storage mirrors `ProcessingProfileStore`: a JSON-encoded array under a single `DefaultsKeys` string
+// - Storage: a JSON-encoded array under a single `DefaultsKeys` string
 //   in UserDefaults (never the corpus, never a real file). The log is bounded (`maxRuns`) so it can't
 //   grow without limit; the oldest entries drop off.
 // - This records the **Process Files** pipeline only (the batch "run" with a file list + estimate).
@@ -229,7 +229,6 @@ extension RunHistorySnapshot {
 }
 
 /// Durable, bounded log of completed Process-Files runs (JSON in UserDefaults; never the corpus).
-/// Mirrors `ProcessingProfileStore`'s storage shape.
 final class ProcessingHistoryStore: ObservableObject, @unchecked Sendable {
     static let shared = ProcessingHistoryStore()
 

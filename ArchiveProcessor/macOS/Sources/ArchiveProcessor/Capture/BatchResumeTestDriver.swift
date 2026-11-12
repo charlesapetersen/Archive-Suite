@@ -638,7 +638,7 @@ enum BatchResumeTestDriver {
               && processor.preGroupedTypes.map(\.rawValue) == ["box", "document"])
         check("W16.cfg6: a resume leaks none of its runtime settings to a concurrent processor",
               bystander.activeRunConfig == nil
-              && bystander.rotationMode == .llmSingle
+              && bystander.rotationMode == RotationMode.standard   // the default, whatever W46.rotation-default makes it
               && bystander.taggingMode == .automatic
               && !bystander.passSourceTags && !bystander.reviewRotation
               && !bystander.mergeDocuments && bystander.tagVocabulary.isEmpty

@@ -473,6 +473,10 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-settings-solver.sh`** — the W46 settings solver on every case of `13-stage-rules/13-profile-tests.md` (a
   pending case SKIPs by name), the router cases, and that every pick names its evidence row. No Keychain read, no
   window; the table's figures are checked against their sources by `scripts/segbench/settings_routes.py --check`.
+- **`test-settings-layers.sh`** — the W46 settings layers: live resolution through general, project and collection
+  with sources and resets, the money habit's ceiling, the solver's inputs, the general store, and the collection's
+  settings document writer on scratch folders (atomic, never through a link, an unreadable file set aside with its
+  bytes, a newer one left alone, run records appended). No Keychain read, no window, never the app's own store.
 - **`test-segmentation-chooser.sh`** — the W36 approach chooser: each approach's figures and cost as the user reads
   them at several page counts and routes (key, `claude` plan, mix), price-change and stale-price notes, unavailable
   rows and the keys they offer, and a render guard that each row card draws non-blank pixels offscreen. No Keychain

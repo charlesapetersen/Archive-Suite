@@ -309,7 +309,7 @@ Three tiers, so nothing sprawls or goes stale:
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 
 Reference material belongs in each app's guides (including an Implementation Map), README, AGENTS,
-KNOWN_ISSUES and test procedures; cross-app contracts belong in `SPEC/` (`tag-format.md`, `relay-object-format.md`).
+KNOWN_ISSUES and test procedures; cross-app contracts belong in `SPEC/` (`tag-format.md`, `relay-object-format.md`, `collection-settings.md`).
 Owner grants and their constraints are a permanent committed record in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md):
 mark discharged on shipping, never delete. Fold durable detail into these sources; discard redundant docs.
 Archive superseded untracked scratch docs under gitignored `old/` (see `old/README.md`) rather than deleting them.

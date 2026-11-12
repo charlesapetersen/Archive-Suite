@@ -448,19 +448,19 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-live-capture-finishing-scrim")
     }
 
-    /// W40.fix-processor-visual-polish: the Save Processing Profile prompt takes typing at once (as an alert it
-    /// opened with the focus on Cancel and no caret in the field).
-    func testSaveProfileTakesTheNameWithoutAClick() throws {
+    /// W40.fix-processor-visual-polish: the name prompt takes typing at once (as an alert it opened with the focus on
+    /// Cancel and no caret in the field). Since W46.settings-layers the prompt is New Project's; Escape writes nothing.
+    func testNewProjectTakesTheNameWithoutAClick() throws {
         openSettings()
-        let save = app.buttons["Save current settings as a profile…"]
-        XCTAssertTrue(save.waitForExistence(timeout: 10), "Settings must offer Save profile")
+        let save = app.buttons["New project…"]
+        XCTAssertTrue(save.waitForExistence(timeout: 10), "Settings must offer New project")
         save.click()
         let field = element("ap.nameSheet.field")
-        XCTAssertTrue(field.waitForExistence(timeout: 5), "Save profile must open the name sheet")
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "New project must open the name sheet")
         Thread.sleep(forTimeInterval: 0.5)   // the sheet focuses its field one run-loop turn after it appears
         app.typeText("Box 12")
         XCTAssertEqual(field.value as? String, "Box 12", "the name field must hold the caret when the sheet opens")
-        attachScreenshot("processor-save-profile-sheet")
+        attachScreenshot("processor-new-project-sheet")
         app.typeKey(.escape, modifierFlags: [])
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: field)
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Escape must cancel the sheet")

@@ -247,6 +247,9 @@ final class CaptureSession: ObservableObject {
             let cfg = SessionProcessingConfig.fromDefaults()
             config = cfg
             processingMode = .live
+            // W46.settings-layers: the processing settings as this session took them, for the record finalize writes
+            // into each collection folder it files into.
+            liveProcessor.sessionProcessingSettings = ProcessingSettingsCapture.capture()
             liveProcessor.activate(config: cfg)
         } else {
             processingMode = .stageForLater
