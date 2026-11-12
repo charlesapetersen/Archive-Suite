@@ -2160,7 +2160,9 @@ final class NotesGUITests: NotesFixtureUITestCase {
             XCTAssertTrue(ideas.waitForExistence(timeout: 10), "the Ideas folder should be visible")
             XCTAssertNil(organizationFolderParent(for: Self.folderReading), "Reading starts at the root")
 
-            reading.click(forDuration: 1.0, thenDragTo: ideas)
+            // Slow, with a hold over the target: on macOS 27 a fast click drag dropped short of Ideas' middle
+            // (W40.vm-macos27-harness; the E2 folder drags that pass all move this way).
+            reading.click(forDuration: 1.0, thenDragTo: ideas, withVelocity: .slow, thenHoldForDuration: 1.0)
 
             XCTAssertTrue(pollUntil(timeout: 15) {
                 self.organizationFolderParent(for: Self.folderReading) == Self.folderIdeas.lowercased()

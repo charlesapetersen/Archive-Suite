@@ -105,9 +105,13 @@ final class NotesE2FolderTests: NotesFixtureUITestCase {
             XCTAssertNil(before.parent)
             XCTAssertGreaterThan(before.sortOrder, readingBefore.sortOrder, "Ideas starts below Reading")
 
+            // Slow, with a hold, aimed 3 pt above Reading's top edge: on macOS 27 the fast click drag aimed at the
+            // edge itself dropped inside Reading's row and nested Ideas there (W40.vm-macos27-harness).
             ideas.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
                 .click(forDuration: 1.0,
-                       thenDragTo: reading.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.0)))
+                       thenDragTo: reading.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.0))
+                           .withOffset(CGVector(dx: 0, dy: -3)),
+                       withVelocity: .slow, thenHoldForDuration: 1.0)
 
             var after: FolderRecord?
             var readingAfter: FolderRecord?
