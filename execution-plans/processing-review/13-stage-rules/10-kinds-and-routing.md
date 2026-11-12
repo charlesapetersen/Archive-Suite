@@ -23,7 +23,8 @@ Sheet text, kind: "Your sample's mix, measured on this Mac: handwritten, typewri
 sampled). Correct it if it is wrong. Clippings, newspapers and registers are not measured; tell us if you have them."
 Kinds not measured are asked in the interview, labelled "not measured" (section 2 pick, call 4). Cascade text: note
 04's. Sheet text, mixed: "Read handwriting on typed pages (signatures, dates, notes in the margin). Measured level on
-typed pages, not measured on mixed pages." with Mac time "figure pending" (section 2 pick, call 1).
+typed pages, not measured on mixed pages." with Mac time "figure pending" (section 2 pick, call 1), now measured:
+the Mac reader about 140 times Vision's time on typed pages (25.5 s against 0.17 s a page, `ocr-time-like-for-like.md`).
 
 - Comparison metric. Classifier: pages right per kind on the owner's 141 and the public 895, and NES lost when the 96
   are routed by its calls against routing by the labels; tie when the paired bootstrap intervals overlap, as ours +1.00
@@ -62,7 +63,9 @@ rest), with the split half in `value`, chosen from 18,538 candidates on 96 pages
 
 The mixed switch's readers (body NES on the 96's 78 typed and printed pages against Vision 88.0): LightOnOCR-3 4B +1.8 (-2.2 to +5.9), 14 pages worse, $0; GLM-OCR +4.3 (+0.4 to +8.8), 20
 worse, $0; Qwen3.6-27B hosted +7.3 (+2.6 to +12.3), 6 worse, $0.0019 a page; Gemini 3.7 Flash +9.4, $0.0039, not
-ranked (a drafter's relative) [M, `mixed-route-bands.md`]. Their time rows are `measured: false` (P11-4).
+ranked (a drafter's relative) [M, `mixed-route-bands.md`]. Their time, like for like on the same 16 owner pages
+(`ocr-time-like-for-like.md`): LightOnOCR-3 4B 23.5 s a page on the Mac; Qwen3.6-27B hosted 21.9 s a call; GLM-OCR,
+a cluster reader, not timed; Vision 0.19 s (P11-4, done).
 
 Fields used beyond 00-index.md's schema: figure keys `owner-all`, `public-895`, `mixed-flag`; figure fields
 `interval`, `false_calls`, `precision_full_call`, `recall_full_call`, `covered_frame`; `value` null on `mixed-flag`.
@@ -84,8 +87,9 @@ Fields used beyond 00-index.md's schema: figure keys `owner-all`, `public-895`, 
   rests on its marks figures.
 - P10-3: Gemini on mixed pages (W46.mixed-route-paid) was retired by the owner 2026-11-05; Gemini has no mixed row.
 - P11-4: the "about 19 times" Mac time ratio compares a Vision batch wall with launch (1.31 s) against a LightOnOCR
-  per-page wall without model load (24.4 s); the bench's 0.21 s Vision row would make it nearer 100 times. The sheet may
-  not show a ratio until the like-for-like timing is made; "level" is said of typed pages only; mixed pages are unmeasured
+  per-page wall without model load (24.4 s); the bench's 0.21 s Vision row would make it nearer 100 times. Timed like
+  for like (2026-11-11), it is about 140 times on typed pages (median of per-page ratios on 9 pages; 25.5 s against
+  0.17 s); "level" is said of typed pages only; mixed pages are unmeasured
   (2 pages, -12.1, -20.7 to -3.6) [M, `mixed-route-bands.md`, SUITE_TODO W46.mixed-route-setting].
 - P11-1: a whole-page reader misses marks a box pass reads (union LightOnOCR 24, GLM-OCR 21 of 35 against 16 and 13); the
   two-pass question belongs to `06-marks.md`, and W46.marks-detect-own was reopened behind nice-to-have (owner
@@ -148,7 +152,8 @@ Every profile: the classifier is `kind-vision-lr` (137/141, 723/895); a page und
 reader per kind is note 04's pick for the profile (its §9), not `ocr-page-guidance.json`'s. The mixed switch is off
 unless the user turns it on (owner call 3); cascade picks are note 04's.
 
-- Laptop, 16, 32, 64 GB: mixed switch reader LightOnOCR-3 4B (+1.8, a tie), time "figure pending".
+- Laptop, 16, 32, 64 GB: mixed switch reader LightOnOCR-3 4B (+1.8, a tie), about 25 s a typed page against Vision's
+  0.17 s on an 18 GB M3 Pro (`ocr-time-like-for-like.md`; other Macs not timed).
 - Cheap API: mixed switch reader Qwen3.6-27B hosted ($0.0019 a page, +7.3).
 - Premium APIs or plans: the mixed switch has no premium reader row (Gemini retired); whole page [I].
 - Cluster: mixed switch reader GLM-OCR (+4.3, $0); classifier still on the Mac.

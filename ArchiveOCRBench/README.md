@@ -161,6 +161,10 @@ record:
 - `ocr-mac-local-hw.md`: LightOnOCR-3-4B (8-bit, its card's settings) and Qwen3.5-9B (4-bit, the panel's prompt)
   on the same Mac (W41.mac-local-hw). Their scores are in the same groups CSV; each has its own speed table,
   named in `data/inputs.json` (`report`, `speed`).
+- `ocr-time-like-for-like.json` (W46.ocr-time-like-for-like): Apple Vision and every Mac reader timed on the same 16
+  owner pages in one session, model load apart. The speed text of each Mac route adds this "like for like" figure
+  beside its own report's 96-page median (the 16 are not the 96's page mix, so the two differ), and it is Apple
+  Vision's only seconds a page. Qwen3.5-9B's figure is its own earlier reading of those 16 pages, labelled so.
 - `farmshare/truth/<run>/summary.json` and `pages.csv`: Qwen3.6 27B on Stanford FarmShare. The charts use the
   fp8-KV run (`qwen3.6-27b-1849739`); the bf16-KV and fp8-at-load (`dyn`) runs are in the tables only. Scores
   per kind are averaged from `pages.csv` over the 96 accuracy pages (the agreement-only letters are read from

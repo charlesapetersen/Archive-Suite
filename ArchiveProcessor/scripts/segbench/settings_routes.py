@@ -90,6 +90,7 @@ PH = "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json"
 KL = "ArchiveProcessor/segbench-results/reader-keeps-lines.json"
 ML = "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md"
 M8 = "ArchiveProcessor/segbench-results/ocr-mac-local.md"
+OT = "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json"   # W46.ocr-time-like-for-like
 
 
 def src(f, route, attr, val):
@@ -117,6 +118,26 @@ def mac_speed_memory(f, key):
            "source": src(f, key or "", "MLX peak memory, GB, max", peak),
            "whole_process_source": src(f, key or "", "guard peak physical footprint MB, largest row", foot)}
     return time, mem
+
+
+def lfl_time(key):
+    """A Mac arm's seconds a page from the like-for-like run (ocr_time.py): the same 16 owner pages for every Mac
+    reader, one session, load apart; kraken rows are blla plus the line reader."""
+    r = load(OT)["mac"][key]
+    how = "median, blla + line reader, of" if key.startswith(("kraken", "ppocrv6")) else "median of"
+    return {"per_unit_s": r["per_unit_s"], "measured": True, "load_s": r["load_s"],
+            "measured_on": f"M3 Pro 18 GB, like for like: {how} the same 16 owner pages as every Mac reader, load apart",
+            "source": src(OT, key, f"mac.{key}.per_unit_s", r["per_unit_s"])}
+
+
+def cloud_time(rid, fallback):
+    """A cloud route's wall seconds a call from the scoring run's own log (ocr_time.py cloud), else `fallback`."""
+    r = load(OT)["cloud"].get(rid)
+    if not r:
+        return fallback
+    return {"per_unit_s": r["median_s"], "median_96_s": r["median96_s"], "measured": True,
+            "measured_on": f"median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, {r['in_flight_median']:g} calls in flight",
+            "source": src(OT, rid, f"cloud.{rid}.median_s", r["median_s"])}
 
 
 def reading_rows():
@@ -200,7 +221,7 @@ def reading_rows():
     add("apple-vision", "Apple Vision (built in, macOS 27.2)", "mac", None, "shipped", {"mac": True, "built_in": True},
         figs("apple-vision", "apple-vision", "apple-vision", ("apple-vision", "Mac")),
         cost("apple-vision"),
-        {"per_unit_s": 0.21, "measured": True, "measured_on": "kind classifier's Vision text-lines step; not a like-for-like reading wall (P11-4)", "source": src("ArchiveProcessor/segbench-results/kind-classifier.md", "Vision text lines (accurate) + ink periodicity", "s_page", 0.21)},
+        lfl_time("apple-vision"),
         {"peak_gb": None, "measured_on": "runs in the OS", "source": None},
         ["every figure is the macOS 27.2 reading (vision-27-reread.md)", "the 96 were drawn through a 20-word Vision filter (P8-3, ocr-truth.md); on 200 owner pages drawn without it, one per document, Vision reads under 20 words on 1 of the 181 pages of text (0.6%, 95% 0.1-3.1%) and nothing on none of the 200 with text (ocr-vision-unfiltered.md)",
          "public: Latin-script pages of the 440 only (L5-L8), 305 of 320 answered; empty on 15 of 80 L7 pages (P8-2)", "on 27.2 a few handwritten pages vary run to run, up to 3.7 NES a page (vision-27-reread.md Noise)"],
@@ -217,17 +238,18 @@ def reading_rows():
         ("qwen3-vl-8b-mlx4", "Qwen3-VL 8B 4-bit (Mac)", M8,
          ["3 of 99 looped to the cap at 7.3 minutes each; needs the loop stop (ocr-mac-local.md)", "memory pressure 'warn' on 18 GB with the owner's apps open", "deterministic: two readings 15 days apart byte-identical (ocr-rerun-noise.md)"], []),
     ]:
-        t, m = mac_speed_memory(f, rid if f == ML else None)
+        _, m = mac_speed_memory(f, rid if f == ML else None)
+        t = lfl_time(rid)
         add(rid, nm, "mac", None, "measured", {"mac": True}, figs(rid, rid, rid), cost(rid), t, m, cav, kr)
     add("apple-fm-27", "macOS 27 on-device model", "mac", None, "measured", {"mac": True, "built_in": True},
         figs(None, "apple-fm-27"), cost("apple-fm-27"),
-        {"per_unit_s": 9.5, "mean_s": 32.1, "measured": True, "measured_on": "M3 Pro 18 GB, median (mean 32.1)", "source": src("ArchiveProcessor/segbench-results/r1-foundation.md", "", "Speed and tokens, the owner's 96", "9.5 / 32.1")},
+        lfl_time("apple-fm-27"),
         {"peak_gb": None, "measured_on": "runs in the OS", "source": None},
         ["not a reader: 42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop (r1-foundation.md)", "not in the ranking table (no ocr-pages.csv rows)", "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables"],
         ["every kind: not offered as a reader"])
     add("ppocrv6-kraken-blla", "kraken PP-OCRv6 medium on blla lines (Mac CPU)", "mac", None, "measured", {"mac": True},
         figs(lk="ppocrv6-kraken-blla", ohk="ppocrv6-kraken-blla"), {"usd_1000_list": 0.0, "source": None},
-        {"per_unit_s": None, "measured": False, "measured_on": "not tabulated per page", "source": None},
+        lfl_time("ppocrv6-kraken-blla"),
         {"peak_gb": 6.0, "measured_on": "2-6 GB a page call on the CPU (ocr-ppocrv6-hands.md Verdict)", "source": src("ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "ppocrv6-kraken-blla", "Verdict", "2-6 GB")},
         ["no typed or printed page of the 96 read; not on the 96 ranking", "Latin script only; cannot loop (CTC)"],
         ["role: loop fallback and low-memory hands reader, not a default"], None)
@@ -250,12 +272,12 @@ def reading_rows():
     ]:
         keys = ["openrouter"] if not rid.startswith(("gemini", "gpt")) else (["gemini", "openrouter"] if rid.startswith("gemini") else ["openai", "openrouter"])
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, rid, pk), cost(rid),
-            {"per_unit_s": None, "measured": False, "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)", "source": None}, {"peak_gb": 0, "source": None}, cav)
+            cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no call log for the 96 (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None}, cav)
 
     # ---- premium API (R4) and vendors (R6)
     add("gemini3.8-flash", "Gemini 3.8 Flash", "cloud", "gemini|gemini-3.8-flash", "shipped", {"key": ["gemini", "openrouter"]},
         figs("gemini3.8-flash", "gemini3.8-flash", "gemini3.8-flash", ("gemini3.8-flash", "reference")), cost("gemini3.8-flash"),
-        {"per_unit_s": None, "measured": False, "measured_on": "not tabulated; Gemini 3.7 on the gateway 9.43 s median on the 96", "source": None}, {"peak_gb": 0, "source": None},
+        cloud_time("gemini3.8-flash", None), {"peak_gb": 0, "source": None},
         ["truth drafter (OCR-1): its 96 and hands figures are partly agreement with itself", "2 of 95 refused (a model failure in the bench's split, reprinted text)", "public: the 440 only (L5-L8, N1, N3, N4); possible training exposure through CHURRO-DS (OCR-15)", "price doubles 1 January 2027 (J-compute.md §3.1)"])
     add("gemini3.7-flash-gw", "Gemini 3.7 Flash (Stanford gateway)", "cloud", None, "measured", {"key": ["gateway"]},
         figs("gemini3.7-flash-gw", "gemini3.7-flash-gw", "gemini3.7-flash-gw", ("gemini3.7-flash-gw", "gateway"), "gemini3.7-flash-gw"), cost("gemini3.7-flash-gw"),
@@ -270,7 +292,7 @@ def reading_rows():
         ("mistral-ocr-4-1", "Mistral OCR 4.1 (vendor service)", ["mistral"], ["text only, no kind label; the app's 2,048 px encoding and no prompt (ocr-panel-cloud.md)", "96 only"]),
     ]:
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, "mistral-ocr" if rid == "mistral-ocr-4-1" else rid), cost(rid),
-            {"per_unit_s": None, "measured": False, "measured_on": "not tabulated", "source": None}, {"peak_gb": 0, "source": None}, cav)
+            cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None}, cav)
 
     # ---- plans (R5)
     add("claude-sonnet5.5", "Claude Sonnet 5.5 (your Claude plan)", "plan", None, "measured", {"plan": ["claude"]},
@@ -300,7 +322,7 @@ def reading_rows():
             {"peak_gb": None, "measured_on": "GPU memory not tabulated", "source": None}, cav)
     for rid, nm in [("german-handwriting", "kraken German handwriting model"), ("tridis", "kraken TRIDIS"), ("catmus-medieval", "kraken CATMuS Medieval"), ("greek-minuscule", "kraken Greek minuscule"), ("biblia", "kraken BiblIA")]:
         add(f"kraken-{rid}", f"{nm} (script specialist, kraken)", "mac", None, "measured", {"mac": True},
-            figs(pk=(rid, "kraken specialist")), {"usd_1000_list": 0.0, "source": None}, {"per_unit_s": None, "measured": False, "source": None}, {"peak_gb": None, "source": None},
+            figs(pk=(rid, "kraken specialist")), {"usd_1000_list": 0.0, "source": None}, lfl_time(f"kraken-{rid}"), {"peak_gb": None, "source": None},
             ["only the strata it was built for; known source overlap with its training data (specialists.md)", "no reading of the 96"], ["its own script stratum only"])
     return rows
 

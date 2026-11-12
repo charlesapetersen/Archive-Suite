@@ -180,7 +180,12 @@
    "name": "Apple Vision",
    "panel": "local",
    "std": 0.0,
-   "batch": null
+   "batch": null,
+   "lfl": {
+    "seconds": 0.19,
+    "pages": 16,
+    "earlier": null
+   }
   },
   {
    "id": "qwen3-vl-8b-mlx4",
@@ -195,6 +200,11 @@
     "seconds": 40.8,
     "peak_gb": 6.91,
     "peak_max_gb": 7.64
+   },
+   "lfl": {
+    "seconds": 35.09,
+    "pages": 16,
+    "earlier": null
    }
   },
   {
@@ -210,6 +220,11 @@
     "seconds": 23.8,
     "peak_gb": 6.44,
     "peak_max_gb": 6.45
+   },
+   "lfl": {
+    "seconds": 23.5,
+    "pages": 16,
+    "earlier": null
    }
   },
   {
@@ -225,6 +240,11 @@
     "seconds": 37.6,
     "peak_gb": 7.48,
     "peak_max_gb": 7.48
+   },
+   "lfl": {
+    "seconds": 33.73,
+    "pages": 16,
+    "earlier": "2026-10-15"
    }
   },
   {
@@ -240,6 +260,11 @@
     "seconds": 8.8,
     "peak_gb": 2.92,
     "peak_max_gb": 2.93
+   },
+   "lfl": {
+    "seconds": 7.61,
+    "pages": 16,
+    "earlier": null
    }
   },
   {
@@ -255,6 +280,11 @@
     "seconds": 4.8,
     "peak_gb": 2.58,
     "peak_max_gb": 2.74
+   },
+   "lfl": {
+    "seconds": 3.73,
+    "pages": 16,
+    "earlier": null
    }
   },
   {
@@ -621,6 +651,11 @@
     "seconds": 9.507528007030487,
     "peak_gb": null,
     "peak_max_gb": null
+   },
+   "lfl": {
+    "seconds": 3.97,
+    "pages": 16,
+    "earlier": null
    }
   },
   {

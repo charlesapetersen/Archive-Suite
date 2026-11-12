@@ -717,14 +717,14 @@
       }
      },
      "time": {
-      "per_unit_s": 0.47,
+      "per_unit_s": 0.19,
       "measured": true,
-      "measured_on": "M3 Pro CPU, the lab's 2026-10-16 run that measured the 794 MB",
+      "measured_on": "M3 Pro 18 GB, like for like: median of 3 detections on each of the same 16 owner pages every Mac reader was timed on, 1024 px draft decode, model load (1.69 s) apart (W46.ocr-time-like-for-like)",
       "source": {
-       "file": "E-layout.md",
-       "route": "claim 36",
-       "attribute": "detect s a page",
-       "value": "0.47"
+       "file": "ocr-time-like-for-like.md",
+       "route": "pp-doclayoutv3",
+       "attribute": "median s a page",
+       "value": "0.19"
       }
      },
      "memory": {
@@ -738,7 +738,8 @@
       }
      },
      "caveats": [
-      "a second run gives 0.27 s a page (layout-photo-hands.md), likely background QoS (LAY-3); re-timing owed",
+      "time re-taken like for like (LAY-3): 0.19 s a page beside Vision's 0.19 s on the same 16 pages; the lab's 0.47 s (E-layout claim 36) and the 0.27 s of layout-photo-hands.md were other runs and inputs",
+      "memory: the lab's 794 MB peak RSS stands in the table; the like-for-like run saw a 441 MB process RSS and a 1.52 GB MLX peak, not the same measure",
       "L9 is scans; photographed newspapers unmeasured",
       "on L9 scans DocLayout-YOLO leads it by 4.6 NES paired, a direction on 15 pages (at most 12 items, one collection), descriptive (layout-pair-newspapers.md)",
       "regions drop marks (LAY-2)",
@@ -1112,14 +1113,15 @@
       }
      },
      "time": {
-      "per_unit_s": 0.21,
+      "per_unit_s": 0.19,
       "measured": true,
-      "measured_on": "kind classifier's Vision text-lines step; not a like-for-like reading wall (P11-4)",
+      "load_s": 43.4,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/kind-classifier.md",
-       "route": "Vision text lines (accurate) + ink periodicity",
-       "attribute": "s_page",
-       "value": "0.21"
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "apple-vision",
+       "attribute": "mac.apple-vision.per_unit_s",
+       "value": "0.19"
       }
      },
      "memory": {
@@ -1247,14 +1249,15 @@
       }
      },
      "time": {
-      "per_unit_s": 8.8,
+      "per_unit_s": 7.61,
       "measured": true,
-      "measured_on": "M3 Pro 18 GB, median, one page at a time",
+      "load_s": 1.7,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md",
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
        "route": "xiaomi-ocr-0-bf16",
-       "attribute": "seconds a page (prompt + generation), median",
-       "value": "8.8"
+       "attribute": "mac.xiaomi-ocr-0-bf16.per_unit_s",
+       "value": "7.61"
       }
      },
      "memory": {
@@ -1393,14 +1396,15 @@
       }
      },
      "time": {
-      "per_unit_s": 4.8,
+      "per_unit_s": 3.73,
       "measured": true,
-      "measured_on": "M3 Pro 18 GB, median, one page at a time",
+      "load_s": 1.0,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md",
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
        "route": "paddleocr-vl1.6-bf16",
-       "attribute": "seconds a page (prompt + generation), median",
-       "value": "4.8"
+       "attribute": "mac.paddleocr-vl1.6-bf16.per_unit_s",
+       "value": "3.73"
       }
      },
      "memory": {
@@ -1538,14 +1542,15 @@
       }
      },
      "time": {
-      "per_unit_s": 23.8,
+      "per_unit_s": 23.5,
       "measured": true,
-      "measured_on": "M3 Pro 18 GB, median, one page at a time",
+      "load_s": 3.5,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md",
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
        "route": "lightonocr-3-4b-mlx8",
-       "attribute": "seconds a page (prompt + generation), median",
-       "value": "23.8"
+       "attribute": "mac.lightonocr-3-4b-mlx8.per_unit_s",
+       "value": "23.5"
       }
      },
      "memory": {
@@ -1685,14 +1690,15 @@
       }
      },
      "time": {
-      "per_unit_s": 37.6,
+      "per_unit_s": 33.73,
       "measured": true,
-      "measured_on": "M3 Pro 18 GB, median, one page at a time",
+      "load_s": 2.4,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md",
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
        "route": "qwen3.5-9b-mlx4",
-       "attribute": "seconds a page (prompt + generation), median",
-       "value": "37.6"
+       "attribute": "mac.qwen3.5-9b-mlx4.per_unit_s",
+       "value": "33.73"
       }
      },
      "memory": {
@@ -1832,14 +1838,15 @@
       }
      },
      "time": {
-      "per_unit_s": 40.8,
+      "per_unit_s": 35.09,
       "measured": true,
-      "measured_on": "M3 Pro 18 GB, median, one page at a time",
+      "load_s": 3.0,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/ocr-mac-local.md",
-       "route": "",
-       "attribute": "seconds a page (prompt + generation), median",
-       "value": "40.8"
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "qwen3-vl-8b-mlx4",
+       "attribute": "mac.qwen3-vl-8b-mlx4.per_unit_s",
+       "value": "35.09"
       }
      },
      "memory": {
@@ -1936,15 +1943,15 @@
       }
      },
      "time": {
-      "per_unit_s": 9.5,
-      "mean_s": 32.1,
+      "per_unit_s": 3.97,
       "measured": true,
-      "measured_on": "M3 Pro 18 GB, median (mean 32.1)",
+      "load_s": 0.06,
+      "measured_on": "M3 Pro 18 GB, like for like: median of the same 16 owner pages as every Mac reader, load apart",
       "source": {
-       "file": "ArchiveProcessor/segbench-results/r1-foundation.md",
-       "route": "",
-       "attribute": "Speed and tokens, the owner's 96",
-       "value": "9.5 / 32.1"
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "apple-fm-27",
+       "attribute": "mac.apple-fm-27.per_unit_s",
+       "value": "3.97"
       }
      },
      "memory": {
@@ -2026,10 +2033,16 @@
       "source": null
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "not tabulated per page",
-      "source": null
+      "per_unit_s": 13.28,
+      "measured": true,
+      "load_s": 3.86,
+      "measured_on": "M3 Pro 18 GB, like for like: median, blla + line reader, of the same 16 owner pages as every Mac reader, load apart",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "ppocrv6-kraken-blla",
+       "attribute": "mac.ppocrv6-kraken-blla.per_unit_s",
+       "value": "13.28"
+      }
      },
      "memory": {
       "peak_gb": 6.0,
@@ -2161,10 +2174,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 11.76,
+      "median_96_s": 15.64,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 6 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "qwen3.6-35b-a3b",
+       "attribute": "cloud.qwen3.6-35b-a3b.median_s",
+       "value": "11.76"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -2289,10 +2308,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 21.88,
+      "median_96_s": 25.27,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 2 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "qwen3.6-27b",
+       "attribute": "cloud.qwen3.6-27b.median_s",
+       "value": "21.88"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -2465,10 +2490,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 19.52,
+      "median_96_s": 27.54,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 4 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "qwen3-vl-235b",
+       "attribute": "cloud.qwen3-vl-235b.median_s",
+       "value": "19.52"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -2594,10 +2625,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 10.15,
+      "median_96_s": 11.29,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 4 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "qwen3.8-flash",
+       "attribute": "cloud.qwen3.8-flash.median_s",
+       "value": "10.15"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -2724,10 +2761,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 2.1,
+      "median_96_s": 2.36,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 4 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gemini3.5-flash-lite",
+       "attribute": "cloud.gemini3.5-flash-lite.median_s",
+       "value": "2.1"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -2855,10 +2898,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 2.39,
+      "median_96_s": 2.71,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 3 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gemini3.1-flash-lite",
+       "attribute": "cloud.gemini3.1-flash-lite.median_s",
+       "value": "2.39"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -2985,10 +3034,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 5.87,
+      "median_96_s": 5.49,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 3 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gpt5.6-luna",
+       "attribute": "cloud.gpt5.6-luna.median_s",
+       "value": "5.87"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -3111,10 +3166,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
-      "source": null
+      "per_unit_s": 4.54,
+      "median_96_s": 6.54,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 5 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "qwen3.5-397b",
+       "attribute": "cloud.qwen3.5-397b.median_s",
+       "value": "4.54"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -3229,7 +3290,7 @@
      "time": {
       "per_unit_s": null,
       "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "measured_on": "no call log for the 96 (ocr-time-like-for-like.md)",
       "source": null
      },
      "memory": {
@@ -3345,7 +3406,7 @@
      "time": {
       "per_unit_s": null,
       "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "measured_on": "no call log for the 96 (ocr-time-like-for-like.md)",
       "source": null
      },
      "memory": {
@@ -3463,7 +3524,7 @@
      "time": {
       "per_unit_s": null,
       "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "measured_on": "no call log for the 96 (ocr-time-like-for-like.md)",
       "source": null
      },
      "memory": {
@@ -3579,7 +3640,7 @@
      "time": {
       "per_unit_s": null,
       "measured": false,
-      "measured_on": "cloud seconds not tabulated (12-settings-design.md 3.9)",
+      "measured_on": "no call log for the 96 (ocr-time-like-for-like.md)",
       "source": null
      },
      "memory": {
@@ -3758,10 +3819,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "not tabulated; Gemini 3.7 on the gateway 9.43 s median on the 96",
-      "source": null
+      "per_unit_s": 3.53,
+      "median_96_s": 4.78,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 3 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gemini3.8-flash",
+       "attribute": "cloud.gemini3.8-flash.median_s",
+       "value": "3.53"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -4132,10 +4199,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "not tabulated",
-      "source": null
+      "per_unit_s": 14.15,
+      "median_96_s": 13.88,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 4 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gemini3.1-pro",
+       "attribute": "cloud.gemini3.1-pro.median_s",
+       "value": "14.15"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -4262,10 +4335,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "not tabulated",
-      "source": null
+      "per_unit_s": 2.95,
+      "median_96_s": 3.53,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 3 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gemini3.5-flash",
+       "attribute": "cloud.gemini3.5-flash.median_s",
+       "value": "2.95"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -4392,10 +4471,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "not tabulated",
-      "source": null
+      "per_unit_s": 4.8,
+      "median_96_s": 6.01,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 3 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "gpt5.4-mini",
+       "attribute": "cloud.gpt5.4-mini.median_s",
+       "value": "4.8"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -4519,10 +4604,16 @@
       }
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "measured_on": "not tabulated",
-      "source": null
+      "per_unit_s": 5.2,
+      "median_96_s": 6.83,
+      "measured": true,
+      "measured_on": "median wall a call on the 16 pages the Mac readers were timed on, from the scoring run's log, 4.5 calls in flight",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "mistral-large4",
+       "attribute": "cloud.mistral-large4.median_s",
+       "value": "5.2"
+      }
      },
      "memory": {
       "peak_gb": 0,
@@ -4647,7 +4738,7 @@
      "time": {
       "per_unit_s": null,
       "measured": false,
-      "measured_on": "not tabulated",
+      "measured_on": "no time in its call log (ocr-time-like-for-like.md)",
       "source": null
      },
      "memory": {
@@ -6724,9 +6815,16 @@
       "source": null
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "source": null
+      "per_unit_s": 9.99,
+      "measured": true,
+      "load_s": 3.65,
+      "measured_on": "M3 Pro 18 GB, like for like: median, blla + line reader, of the same 16 owner pages as every Mac reader, load apart",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "kraken-german-handwriting",
+       "attribute": "mac.kraken-german-handwriting.per_unit_s",
+       "value": "9.99"
+      }
      },
      "memory": {
       "peak_gb": null,
@@ -6789,9 +6887,16 @@
       "source": null
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "source": null
+      "per_unit_s": 9.97,
+      "measured": true,
+      "load_s": 3.96,
+      "measured_on": "M3 Pro 18 GB, like for like: median, blla + line reader, of the same 16 owner pages as every Mac reader, load apart",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "kraken-tridis",
+       "attribute": "mac.kraken-tridis.per_unit_s",
+       "value": "9.97"
+      }
      },
      "memory": {
       "peak_gb": null,
@@ -6854,9 +6959,16 @@
       "source": null
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "source": null
+      "per_unit_s": 9.51,
+      "measured": true,
+      "load_s": 3.63,
+      "measured_on": "M3 Pro 18 GB, like for like: median, blla + line reader, of the same 16 owner pages as every Mac reader, load apart",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "kraken-catmus-medieval",
+       "attribute": "mac.kraken-catmus-medieval.per_unit_s",
+       "value": "9.51"
+      }
      },
      "memory": {
       "peak_gb": null,
@@ -6914,9 +7026,16 @@
       "source": null
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "source": null
+      "per_unit_s": 10.88,
+      "measured": true,
+      "load_s": 3.77,
+      "measured_on": "M3 Pro 18 GB, like for like: median, blla + line reader, of the same 16 owner pages as every Mac reader, load apart",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "kraken-greek-minuscule",
+       "attribute": "mac.kraken-greek-minuscule.per_unit_s",
+       "value": "10.88"
+      }
      },
      "memory": {
       "peak_gb": null,
@@ -6974,9 +7093,16 @@
       "source": null
      },
      "time": {
-      "per_unit_s": null,
-      "measured": false,
-      "source": null
+      "per_unit_s": 9.06,
+      "measured": true,
+      "load_s": 4.04,
+      "measured_on": "M3 Pro 18 GB, like for like: median, blla + line reader, of the same 16 owner pages as every Mac reader, load apart",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json",
+       "route": "kraken-biblia",
+       "attribute": "mac.kraken-biblia.per_unit_s",
+       "value": "9.06"
+      }
      },
      "memory": {
       "peak_gb": null,

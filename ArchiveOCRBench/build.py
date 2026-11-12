@@ -94,7 +94,8 @@ PPOCRV6_HANDS = RESULTS / "ocr-ppocrv6-hands.json"  # W46.ocr-ppocrv6-hands: ocr
 # The line routes that item measured; every other row of its tables is a cached comparator already on the page.
 PPOCRV6_HANDS_ROUTES = ("ppocrv6-kraken-blla", "ppocrv6-kraken-vision", "apple-vision (lines)")
 OCR_PAGES = RESULTS / "ocr-pages.csv"  # ocr_pages_export.py: every whole-page route's score on every page of the 96
-OCR_SCORERS_PAGES = RESULTS / "ocr-scorers-pages.csv"  # ocr_rescore.py's per-page rows, both sets
+OCR_SCORERS_PAGES = RESULTS / "ocr-scorers-pages.csv"
+TIME_LFL = RESULTS / "ocr-time-like-for-like.json"    # W46.ocr-time-like-for-like: Mac seconds a page, like for like  # ocr_rescore.py's per-page rows, both sets
 OPEN_SWEEP = HERE / "data" / "open-sweep-20261019.json"  # the open-model sweep's receipts (hand-entered, sourced)
 # Later native routes: reports in PUBLIC, receipts in data/, with the same names.
 OPEN_SWEEP_LATER = ("new-open-sherlock-20261024", "new-open-sherlock-20261031", "new-open-boxes-20261031")
@@ -1430,6 +1431,13 @@ def main():
                        "hw": {"seconds": fm96["seconds"]["median"], "peak_gb": None, "peak_max_gb": None}})
         for c in charts:
             c["scores"]["apple-fm-27"] = sc(fm96) if c["key"] == "overall" else sc(fm96["groups"][c["key"]])
+    # W46.ocr-time-like-for-like: Vision and every Mac reader timed on the same 16 owner pages in one session, model
+    # load apart; shown beside each Mac route's own report figure, and as Vision's only seconds a page.
+    lfl = json.loads(TIME_LFL.read_text())["mac"] if TIME_LFL.exists() else {}
+    for r in routes:
+        t = lfl.get(r["id"])
+        if t and r["panel"] in ("mac", "local"):
+            r["lfl"] = {"seconds": t["per_unit_s"], "pages": t["n"], "earlier": t.get("earlier")}
     layout_photo_data = json.loads(LAYOUT_PHOTO.read_text()) if LAYOUT_PHOTO.exists() else None
     for route in [*region_chart_routes(regions, inputs["kinds"], op),
                   *layout_photo_chart_routes(layout_photo_data, inputs["kinds"], op)]:

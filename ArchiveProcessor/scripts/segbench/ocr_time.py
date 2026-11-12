@@ -5,7 +5,8 @@ a page from the panels' existing call logs. It fills the `time` cells the stage 
 like (P11-4, LAY-3).
 
   python3 ocr_time.py pages                       # the 16 pages, drawn by kind from ocr-truth/pages.tsv
-  heavy-run.py run -- python3 ocr_time.py mac     # every Mac arm in turn (resumable: a finished arm is not rerun)
+  heavy-run.py run -- python3 ocr_time.py mac [ARM ...]   # every Mac arm in turn, or those named (a finished arm is not rerun)
+  python3 ocr_time.py earlier KEY ...             # an MLX reader this run cannot start, from its earlier reading
   python3 ocr_time.py report                      # segbench-results/ocr-time-like-for-like.{json,md}, cloud included
 
 The draw is by the pages' kind tags and a fixed seed, never by a route's output: 5 typewritten, 4 printed (2 of
@@ -18,8 +19,9 @@ How each arm is timed, so the figures compare:
   * MLX readers (ocr_mac_local.py's five with a settings row): ocr_mac_local.collect on these pages into scratch, one
     process per reader under run-guarded.sh; its per-page wall (image prepare, prompt and generation), load apart.
   * The macOS 27 on-device model: fm_ocr.swift built here, its per-page `seconds` sidecar (load before the loop).
-  * kraken (blla, PP-OCRv6 medium, the five script specialists): the CLI loads its model each call, so a page's time
-    is the marginal one, (call on warm-up + 16 pages - call on the warm-up alone) / 16. A mean, no per-page spread.
+  * kraken: blla in one kraken process, its model loaded once (a blank page is no baseline for it: blla scales
+    every input to one height); each line reader (PP-OCRv6 medium, the five script specialists) one page a call
+    on blla's lines, less the median of three calls on a blank page's empty lines (the load).
   * PP-DocLayoutV3: layout.py's load_model and detect (1024 px draft decode), each page three times, median.
 The mixed switch reads a typed page with the handwriting reader instead of Vision; its figure is the two readers'
 medians on the typed and printed pages here, side by side.
@@ -191,31 +193,74 @@ def kraken_call(opts, pairs, *cmd):
 
 
 def arm_kraken(ids):
-    """blla, then each line reader on blla's lines: (warm-up + 16 pages) less (warm-up alone), over 16."""
+    """blla, then each line reader on blla's lines, one page a call (a many-page blla call grew past the heavy lock's
+    10.8 GB limit). The CLI loads its model every call, so a page's time is its call less the load: the median of
+    three calls on a blank 256 px image, which loads the model and finds nothing to do."""
     sys.path.insert(0, str(HERE / 'corpus'))
     import loop_kraken as LK
     import specialists as SP
+    from PIL import Image
     res, d = {}, STORE / 'kraken'
-    order = [WARM] + ids
-    seg = {p: d / 'seg' / f'{p}.xml' for p in order}
-    one = {p: d / 'seg1' / f'{p}.xml' for p in [WARM]}
-    for x in list(seg.values()) + list(one.values()):
+    blank = d / 'blank.jpg'
+    d.mkdir(parents=True, exist_ok=True)
+    Image.new('RGB', (256, 256), 'white').save(blank)
+    seg = {p: d / 'seg' / f'{p}.xml' for p in [WARM] + ids}
+    seg0 = [d / 'seg0' / f'blank{k}.xml' for k in range(3)]
+    for x in list(seg.values()) + seg0:
         x.parent.mkdir(parents=True, exist_ok=True)
+        x.unlink(missing_ok=True)
     blla = ['-x'], 'segment', '-bl', '--text-direction', 'horizontal-lr'
-    t1 = kraken_call(blla[0], [(image(WARM), one[WARM])], *blla[1:])
-    tn = kraken_call(blla[0], [(image(p), seg[p]) for p in order], *blla[1:])
-    res['blla'] = {'one_s': round(t1, 2), 'all_s': round(tn, 2), 'per_page_s': round((tn - t1) / len(ids), 2)}
+
+    def per_page(calls, load):
+        return {p: round(max(t - load, 0.0), 2) for p, t in calls.items()}
+    load = S.median(kraken_call(blla[0], [(blank, x)], *blla[1:]) for x in seg0)
+    calls = {p: kraken_call(blla[0], [(image(p), seg[p])], *blla[1:]) for p in [WARM] + ids}
+    res['blla'] = {'load_s': round(load, 2), 'warm_s': round(calls[WARM], 2),
+                   'pages': per_page({p: calls[p] for p in ids}, load)}
     for rid, key in KRAKEN_OCR.items():
         m = LK.model() if key is None else SP.model_path(key)
         txt = d / 'text' / rid
-        txt1 = d / 'text1' / rid
         txt.mkdir(parents=True, exist_ok=True)
-        txt1.mkdir(parents=True, exist_ok=True)
-        t1 = kraken_call(['-f', 'page'], [(seg[WARM], txt1 / f'{WARM}.txt')], 'ocr', '-m', str(m))
-        tn = kraken_call(['-f', 'page'], [(seg[p], txt / f'{p}.txt') for p in order], 'ocr', '-m', str(m))
-        res[rid] = {'one_s': round(t1, 2), 'all_s': round(tn, 2), 'per_page_s': round((tn - t1) / len(ids), 2),
-                    'model': Path(m).name}
+        load = S.median(kraken_call(['-f', 'page'], [(x, txt / f'{x.stem}.txt')], 'ocr', '-m', str(m)) for x in seg0)
+        calls = {p: kraken_call(['-f', 'page'], [(seg[p], txt / f'{p}.txt')], 'ocr', '-m', str(m)) for p in [WARM] + ids}
+        res[rid] = {'load_s': round(load, 2), 'warm_s': round(calls[WARM], 2),
+                    'pages': per_page({p: calls[p] for p in ids}, load), 'model': Path(m).name}
     return res
+
+
+BLLA_CHILD = r'''
+import json, statistics as S, sys, time
+from importlib import resources
+from PIL import Image
+from kraken import blla
+from kraken.lib import vgsl
+paths = json.loads(sys.argv[1])
+t0 = time.time(); model = vgsl.TorchVGSLModel.load_model(resources.files('kraken').joinpath('blla.mlmodel')); load = time.time() - t0
+def one(p):
+    t = time.time(); seg = blla.segment(Image.open(p), text_direction='horizontal-lr', model=model)
+    return time.time() - t, len(seg.lines)
+w, _ = one(paths[0])
+pages, lines = {}, {}
+for p in paths[1:]:
+    pages[p], lines[p] = one(p)
+print(json.dumps({"load_s": round(load, 2), "warm_s": round(w, 2), "pages": {k: round(v, 2) for k, v in pages.items()},
+                  "lines": lines}))
+'''
+
+
+def arm_blla(ids):
+    """blla alone, in one kraken process with its model loaded once: the CLI's blank-page baseline does not isolate
+    blla's load, since blla scales every input to the same height and so runs its network on a blank page too."""
+    sys.path.insert(0, str(HERE / 'corpus'))
+    import specialists as SP
+    py = SP.KRAKEN.with_name('python')
+    cmd = [str(py), '-c', BLLA_CHILD, json.dumps([str(image(p)) for p in [WARM] + ids])]
+    r = subprocess.run([str(GUARD), '--label', 'ocr-time-blla', '--need-gb', '4', '--'] + cmd,
+                       check=True, capture_output=True, text=True)
+    got = json.loads(r.stdout.strip().splitlines()[-1])
+    got['pages'] = {Path(k).name.split('-')[0]: v for k, v in got['pages'].items()}
+    got['lines'] = {Path(k).name.split('-')[0]: v for k, v in got['lines'].items()}
+    return got
 
 
 LAYOUT_CHILD = r'''
@@ -253,12 +298,53 @@ def arm_layout(ids):
     return got
 
 
-ARMS = ['vision', *MLX, 'apple-fm-27', 'kraken', 'pp-doclayoutv3']
+ARMS = ['vision', *MLX, 'apple-fm-27', 'kraken', 'kraken-blla', 'pp-doclayoutv3']
+FM_EARLIER = CACHE / 'W46.r1-foundation' / 'ocr96'
+EARLIER_DIR = PANEL / 'local'   # ocr_mac_local.py's own readings of the 96 (W41.mac-local-*, W46.ocr-new-open)
 
 
-def mac():
+def earlier_meta(key, ids):
+    return {p: json.loads((EARLIER_DIR / key / f'{p}-original.json').read_text())['meta'] for p in ids}
+
+
+def arm_earlier(key, ids):
+    """An MLX reader this run could not start (its weights since removed from the model cache, or the guard short of
+    memory) taken from its own earlier reading of these pages: same pages, settings, machine and timer, load apart.
+    The re-timed readers' agreement with their earlier readings (report) is what makes it comparable."""
+    meta = earlier_meta(key, ids)
+    return {'earlier': True, 'load_s': meta[ids[0]]['load_s'], 'warm_s': None,
+            'pages': {p: meta[p]['wall_s'] for p in ids},
+            'status': {p: meta[p]['status'] for p in ids if meta[p]['status'] != 'ok'},
+            'tokens': {p: meta[p]['completion_tokens'] for p in ids},
+            'mlx_peak_gb': max(meta[p]['mlx_peak_gb'] for p in ids),
+            'read_on': time.strftime('%Y-%m-%d', time.localtime(max(meta[p]['t'] for p in ids)))}
+
+
+def agreement(arms, ids):
+    """For each MLX reader timed in this run: this run's wall over its earlier reading's, page by page, where both
+    generated the same number of tokens."""
+    out = {}
+    for k in MLX:
+        a = arms.get(k)
+        if not a or a.get('earlier'):
+            continue
+        old = earlier_meta(k, ids)
+        r = [a['pages'][p] / old[p]['wall_s'] for p in ids if a['tokens'][p] == old[p]['completion_tokens']]
+        out[k] = {'pages_same_tokens': len(r), 'ratio_median': round(S.median(r), 3),
+                  'ratio_min': round(min(r), 3), 'ratio_max': round(max(r), 3)}
+    fm = arms.get('apple-fm-27')
+    if fm and FM_EARLIER.exists():   # W46.r1-foundation's reading of the 96, sidecars beside its texts
+        old = {p: json.loads((FM_EARLIER / f'{p}-original.txt.json').read_text()) for p in ids}
+        new = {p: json.loads((STORE / 'fm' / f'{p}.txt.json').read_text()) for p in ids}
+        r = [fm['pages'][p] / old[p]['seconds'] for p in ids if old[p].get('output_tokens') == new[p].get('output_tokens')]
+        out['apple-fm-27'] = {'pages_same_tokens': len(r), 'ratio_median': round(S.median(r), 3),
+                              'ratio_min': round(min(r), 3), 'ratio_max': round(max(r), 3)}
+    return out
+
+
+def mac(only=()):
     ids = [x['page'] for x in pages()['pages']]
-    for arm in ARMS:
+    for arm in only or ARMS:
         f = STORE / 'arms' / f'{arm}.json'
         if f.exists():
             print(f'{arm}: done already')
@@ -285,12 +371,22 @@ def run_arm(arm, ids):
         return arm_fm(ids)
     if arm == 'kraken':
         return arm_kraken(ids)
+    if arm == 'kraken-blla':
+        return arm_blla(ids)
     return arm_layout(ids)
 
 
 # --- report -------------------------------------------------------------------------------------------------------
 
-def cloud():
+def in_flight(calls):
+    """For each call (`t` its end, `wall_s` its length), how many calls were open when it began, itself included:
+    the concurrency its wall was measured under."""
+    iv = [(r['t'] - r['wall_s'], r['t']) for r in calls]
+    return [sum(1 for a, b in iv if a <= s < b) for s, _ in iv]
+
+
+def cloud(ids):
+    """Each cloud route's wall a call on the 16 pages the Mac arms read (the table's figure) and on all of the 96."""
     out = {}
     for log, keys in CLOUD_LOGS.items():
         rows = [json.loads(line) for line in (CACHE / log / 'calls.jsonl').open()]
@@ -301,12 +397,12 @@ def cloud():
                         and not r.get('pilot') and r.get('wall_s') and r['page'] not in {'p086', 'p094', 'p096'}):
                     last[r['job']] = r      # the call whose reading was kept: the last ok one
             calls = sorted(last.values(), key=lambda r: r['t'])
-            iv = [(r['t'] - r['wall_s'], r['t']) for r in calls]
-            # calls in flight at each call's start: the concurrency the wall was measured under
-            flight = [sum(1 for a, b in iv if a <= s < b) for s, _ in iv]
+            flight = in_flight(calls)
             w = [r['wall_s'] for r in calls]
-            out[k] = {'n': len(w), 'median_s': round(S.median(w), 2), 'mean_s': round(S.mean(w), 2),
-                      'p90_s': round(sorted(w)[int(0.9 * (len(w) - 1))], 2), 'in_flight_median': S.median(flight),
+            w16 = [r['wall_s'] for r in calls if r['page'] in ids]
+            out[k] = {'n16': len(w16), 'median_s': round(S.median(w16), 2), 'n': len(w), 'median96_s': round(S.median(w), 2),
+                      'mean_s': round(S.mean(w), 2), 'p90_s': round(sorted(w)[int(0.9 * (len(w) - 1))], 2),
+                      'in_flight_median': round(S.median(flight), 1),
                       'provider': calls[0].get('provider_slug'), 'log': f'{log}/calls.jsonl'}
     return out
 
@@ -337,18 +433,23 @@ def report():
     row('apple-vision', arms['vision']['pages'], arms['vision']['load_s'], arms['vision'],
         f'median of {ROUNDS} reads a page, one process')
     for k in MLX:
-        row(k, arms[k]['pages'], arms[k]['load_s'], arms[k], 'one read a page, greedy')
+        e = arms[k].get('earlier')
+        row(k, arms[k]['pages'], arms[k]['load_s'], arms[k],
+            f'earlier reading of these pages ({arms[k]["read_on"]}), not re-timed here' if e else 'one read a page, greedy')
+        if e:
+            mac_rows[k]['qos'] = None
+            mac_rows[k]['load_avg'] = None
+            mac_rows[k]['earlier'] = arms[k]['read_on']
         mac_rows[k]['peak_gb'] = arms[k]['mlx_peak_gb']
         mac_rows[k]['failed'] = arms[k]['status']
     row('apple-fm-27', arms['apple-fm-27']['pages'], arms['apple-fm-27']['load_s'], arms['apple-fm-27'],
         'one read a page, greedy, 4,096 tokens')
-    kr = arms['kraken']
+    kr, bl = arms['kraken'], arms['kraken-blla']
     for rid in KRAKEN_OCR:
-        per = round(kr['blla']['per_page_s'] + kr[rid]['per_page_s'], 2)
-        row(rid, None, round(kr[rid]['one_s'], 2), kr, f'marginal mean: blla {kr["blla"]["per_page_s"]} s + '
-            f'line reading {kr[rid]["per_page_s"]} s a page')
-        mac_rows[rid]['per_unit_s'] = per
-        mac_rows[rid]['mean'] = True
+        both = {p: round(bl['pages'][p] + kr[rid]['pages'][p], 2) for p in ids}
+        row(rid, both, round(bl['load_s'] + kr[rid]['load_s'], 2), kr,
+            f'blla {med(bl["pages"])} s (in one process, its model loaded once) + line reading {med(kr[rid]["pages"])} s '
+            f'(one page a call less a call on a blank page), medians')
     lay = arms['pp-doclayoutv3']
     row('pp-doclayoutv3', lay['pages'], lay['load_s'], lay, f'median of {ROUNDS} detections a page, 1024 px draft')
     mac_rows['pp-doclayoutv3']['peak_gb'] = lay['mlx_peak_gb']
@@ -359,8 +460,10 @@ def report():
              'vision_typed_median_s': round(S.median(v[p] for p in typed), 2),
              'reader_typed_median_s': round(S.median(lo[p] for p in typed), 2),
              'ratio_median': round(S.median(lo[p] / v[p] for p in typed), 1)}
-    out = {'tag': TAG, 'machine': machine(), 'pages': pg, 'mac': mac_rows, 'mixed_switch': mixed, 'cloud': cloud(),
-           'runs': {a: {'start': arms[a]['before']['t'], 'end': arms[a]['after']['t']} for a in ARMS}}
+    out = {'tag': TAG, 'machine': machine(), 'pages': pg, 'mac': mac_rows, 'mixed_switch': mixed, 'cloud': cloud(ids),
+           'agreement_with_earlier': agreement(arms, ids),
+           'runs': {a: {'start': arms[a]['before']['t'], 'end': arms[a]['after']['t']} for a in ARMS
+                    if not arms[a].get('earlier')}}
     save(OUT_JSON, out)
     OUT_MD.write_text(markdown(out))
     print(f'wrote {OUT_JSON.name} and {OUT_MD.name}')
@@ -388,23 +491,34 @@ def markdown(o):
          '|---|---|---|---|---|---|---|---|---|---|']
     for rid, r in m.items():
         bk = r['by_kind'] or {}
-        L.append(f'| {rid} | {r["per_unit_s"]}{" (mean)" if r.get("mean") else ""} | {bk.get("typewritten", "")} | '
+        L.append(f'| {rid} | {r["per_unit_s"]} | {bk.get("typewritten", "")} | '
                  f'{bk.get("printed", "")} | {bk.get("handwritten", "")} | {bk.get("mixed", "")} | {r["p90_s"] or ""} | '
-                 f'{r["load_s"]} | {r["load_avg"][0]}, {r["load_avg"][1]} | {r["note"]} |')
-    L += ['', '"printed" includes the two clippings. kraken rows are blla segmentation plus the line reader, a '
-          'marginal mean over the 16 (the CLI loads its model every call); their load column is one page\'s whole call.',
+                 f'{r["load_s"]} | {", ".join(map(str, r["load_avg"])) if r["load_avg"] else "-"} | {r["note"]} |')
+    L += ['', '"printed" includes the two clippings. kraken rows are blla segmentation plus the line reader on its '
+          'lines, page by page; the load column is both models\' load.',
+          '', '### The earlier Mac seconds stand', '',
+          'The readers timed again here took, page by page, this much of their earlier readings\' wall on the same '
+          'pages (where both generated the same tokens): '
+          + '; '.join(f'{k} {a["ratio_median"]} (range {a["ratio_min"]} to {a["ratio_max"]}, {a["pages_same_tokens"]} pages)'
+                      for k, a in o['agreement_with_earlier'].items())
+          + '. So the earlier ocr-mac-local and r1-foundation seconds were not slowed by the engine sessions they ran in, '
+          'and a reader this run could not start is taken from its earlier reading of the same pages: '
+          + (', '.join(f'{k} (read {r["earlier"]})' for k, r in m.items() if r.get('earlier')) or 'none') + '.',
           '', '## The mixed switch', '',
           f'On the {x["typed_pages"]} typed and printed pages, Apple Vision {x["vision_typed_median_s"]} s a page and '
           f'LightOnOCR-3 4B {x["reader_typed_median_s"]} s a page, medians; page by page the reader takes '
           f'{x["ratio_median"]} times as long (median of the per-page ratios).', '',
           '## Cloud, wall seconds a call, from the panels\' logs', '',
           'Not a new run: the calls that made the scored readings of the 96 (the last ok call a page, the three '
-          'agreement pages apart), as each panel ran them. A call\'s wall includes the queue at the provider and the '
-          'calls the panel had in flight; "in flight" is the median count of calls open when each began.', '',
-          '| route | n | median s | mean s | 90th pct | in flight | provider | log |', '|---|---|---|---|---|---|---|---|']
+          'agreement pages apart), as each panel ran them. The figure the settings table takes is the median on the 16 '
+          'pages the Mac arms read, so the page mix matches; the 96 columns are every scored page. A call\'s wall '
+          'includes the queue at the provider and the calls the panel had in flight; "in flight" is the median count '
+          'of calls already running when each began, itself included.', '',
+          '| route | median s, the 16 | n | median s, the 96 | mean s, the 96 | 90th pct, the 96 | n | in flight | provider | log |',
+          '|---|---|---|---|---|---|---|---|---|---|']
     for k, r in c.items():
-        L.append(f'| {k} | {r["n"]} | {r["median_s"]} | {r["mean_s"]} | {r["p90_s"]} | {r["in_flight_median"]} | '
-                 f'{r["provider"]} | {r["log"]} |')
+        L.append(f'| {k} | {r["median_s"]} | {r["n16"]} | {r["median96_s"]} | {r["mean_s"]} | {r["p90_s"]} | {r["n"]} | '
+                 f'{r["in_flight_median"]:g} | {r["provider"]} | {r["log"]} |')
     L += ['', 'Gemini 3.7 Flash on the gateway keeps its own figure (`gemini37-vs-38.md`, 9.43 s median on the 96) and '
           'Claude Sonnet 5.5 its mean through `claude -p` (`ocr-panel-cloud.md`, 10 s, three at once). Mistral OCR 4.1 '
           'logged no time and stays unmeasured.', '',
@@ -415,6 +529,9 @@ def markdown(o):
           '- **Comparison.** One machine, one session, the same pages and images for every Mac arm, back to back, '
           'each reader at the settings it was scored with; load apart, a warm-up page first. Cloud figures are the '
           'scoring runs\' calls and are not like for like with each other in concurrency or time of day.',
+          '- **Page mix.** The 16 hold more handwritten and mixed pages than the 96 and fewer long ones, so a median '
+          'here is not the 96\'s (the on-device model: 4.0 s here, 9.5 s on the 96, on the same per-page times). Compare '
+          'routes within this file, not against a 96-page median elsewhere.',
           f'- **Noise.** n 16 pages a Mac arm. Vision and PP-DocLayoutV3 read each page {ROUNDS} times (the per-page '
           'runs are in the JSON); the MLX readers are greedy and read once. The Mac was shared with other sessions\' '
           'light work: the load average before and after each arm is in the table.',
@@ -428,7 +545,12 @@ def main():
     if cmd == 'pages':
         print(json.dumps(pages(), indent=1))
     elif cmd == 'mac':
-        mac()
+        mac(sys.argv[2:])
+    elif cmd == 'earlier':
+        ids = [x['page'] for x in pages()['pages']]
+        for key in sys.argv[2:]:
+            save(STORE / 'arms' / f'{key}.json', {'arm': key, 'before': stamp(), 'after': stamp(), **arm_earlier(key, ids)})
+            print(f'{key}: taken from its earlier reading')
     elif cmd == 'report':
         report()
     else:

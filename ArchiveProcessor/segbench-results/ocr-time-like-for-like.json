@@ -1,0 +1,569 @@
+{
+ "agreement_with_earlier": {
+  "apple-fm-27": {
+   "pages_same_tokens": 16,
+   "ratio_max": 1.016,
+   "ratio_median": 0.95,
+   "ratio_min": 0.859
+  },
+  "lightonocr-3-4b-mlx8": {
+   "pages_same_tokens": 16,
+   "ratio_max": 1.07,
+   "ratio_median": 1.012,
+   "ratio_min": 1.002
+  },
+  "paddleocr-vl1.6-bf16": {
+   "pages_same_tokens": 16,
+   "ratio_max": 1.037,
+   "ratio_median": 1.008,
+   "ratio_min": 0.988
+  },
+  "qwen3-vl-8b-mlx4": {
+   "pages_same_tokens": 16,
+   "ratio_max": 1.029,
+   "ratio_median": 0.97,
+   "ratio_min": 0.919
+  },
+  "xiaomi-ocr-0-bf16": {
+   "pages_same_tokens": 16,
+   "ratio_max": 1.052,
+   "ratio_median": 1.008,
+   "ratio_min": 0.996
+  }
+ },
+ "cloud": {
+  "gemini3.1-flash-lite": {
+   "in_flight_median": 3,
+   "log": "ocr-panel-local/calls.jsonl",
+   "mean_s": 3.44,
+   "median96_s": 2.71,
+   "median_s": 2.39,
+   "n": 93,
+   "n16": 15,
+   "p90_s": 6.49,
+   "provider": "google-ai-studio"
+  },
+  "gemini3.1-pro": {
+   "in_flight_median": 4.0,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 13.99,
+   "median96_s": 13.88,
+   "median_s": 14.15,
+   "n": 92,
+   "n16": 15,
+   "p90_s": 21.52,
+   "provider": "google-ai-studio"
+  },
+  "gemini3.5-flash": {
+   "in_flight_median": 3.0,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 4.25,
+   "median96_s": 3.53,
+   "median_s": 2.95,
+   "n": 92,
+   "n16": 15,
+   "p90_s": 7.21,
+   "provider": "google-ai-studio"
+  },
+  "gemini3.5-flash-lite": {
+   "in_flight_median": 4.0,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 3.19,
+   "median96_s": 2.36,
+   "median_s": 2.1,
+   "n": 92,
+   "n16": 15,
+   "p90_s": 6.11,
+   "provider": "google-ai-studio"
+  },
+  "gemini3.8-flash": {
+   "in_flight_median": 3.0,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 5.72,
+   "median96_s": 4.78,
+   "median_s": 3.53,
+   "n": 92,
+   "n16": 15,
+   "p90_s": 9.1,
+   "provider": "google-ai-studio"
+  },
+  "gpt5.4-mini": {
+   "in_flight_median": 3,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 6.41,
+   "median96_s": 6.01,
+   "median_s": 4.8,
+   "n": 93,
+   "n16": 16,
+   "p90_s": 8.72,
+   "provider": "openai"
+  },
+  "gpt5.6-luna": {
+   "in_flight_median": 3,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 5.85,
+   "median96_s": 5.49,
+   "median_s": 5.87,
+   "n": 93,
+   "n16": 16,
+   "p90_s": 8.03,
+   "provider": "openai"
+  },
+  "mistral-large4": {
+   "in_flight_median": 4.5,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 7.52,
+   "median96_s": 6.83,
+   "median_s": 5.2,
+   "n": 94,
+   "n16": 16,
+   "p90_s": 12.17,
+   "provider": "mistral"
+  },
+  "qwen3-vl-235b": {
+   "in_flight_median": 4.0,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 30.61,
+   "median96_s": 27.54,
+   "median_s": 19.52,
+   "n": 94,
+   "n16": 16,
+   "p90_s": 49.64,
+   "provider": "deepinfra/fp8"
+  },
+  "qwen3.5-397b": {
+   "in_flight_median": 5.0,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 7.33,
+   "median96_s": 6.54,
+   "median_s": 4.54,
+   "n": 94,
+   "n16": 16,
+   "p90_s": 11.62,
+   "provider": "deepinfra/fp8"
+  },
+  "qwen3.6-27b": {
+   "in_flight_median": 2,
+   "log": "ocr-panel-local/calls.jsonl",
+   "mean_s": 31.28,
+   "median96_s": 25.27,
+   "median_s": 21.88,
+   "n": 95,
+   "n16": 16,
+   "p90_s": 56.77,
+   "provider": "chutes/fp8"
+  },
+  "qwen3.6-35b-a3b": {
+   "in_flight_median": 6.0,
+   "log": "ocr-panel-local/calls.jsonl",
+   "mean_s": 33.32,
+   "median96_s": 15.64,
+   "median_s": 11.76,
+   "n": 96,
+   "n16": 16,
+   "p90_s": 98.29,
+   "provider": "deepinfra/fp8"
+  },
+  "qwen3.8-flash": {
+   "in_flight_median": 4,
+   "log": "ocr-panel-cloud/calls.jsonl",
+   "mean_s": 11.53,
+   "median96_s": 11.29,
+   "median_s": 10.15,
+   "n": 93,
+   "n16": 16,
+   "p90_s": 16.36,
+   "provider": "alibaba"
+  }
+ },
+ "mac": {
+  "apple-fm-27": {
+   "by_kind": {
+    "handwritten": 3.63,
+    "mixed": 5.29,
+    "printed": 3.29,
+    "typewritten": 4.74
+   },
+   "load_avg": [
+    3.57,
+    3.82
+   ],
+   "load_s": 0.06,
+   "n": 16,
+   "note": "one read a page, greedy, 4,096 tokens",
+   "p90_s": 75.12,
+   "per_unit_s": 3.97,
+   "qos": "utility"
+  },
+  "apple-vision": {
+   "by_kind": {
+    "handwritten": 0.21,
+    "mixed": 0.17,
+    "printed": 0.17,
+    "typewritten": 0.17
+   },
+   "load_avg": [
+    2.69,
+    4.12
+   ],
+   "load_s": 43.4,
+   "n": 16,
+   "note": "median of 3 reads a page, one process",
+   "p90_s": 0.22,
+   "per_unit_s": 0.19,
+   "qos": "utility"
+  },
+  "kraken-biblia": {
+   "by_kind": {
+    "handwritten": 9.04,
+    "mixed": 7.73,
+    "printed": 10.47,
+    "typewritten": 10.03
+   },
+   "load_avg": [
+    4.0,
+    5.97
+   ],
+   "load_s": 4.04,
+   "n": 16,
+   "note": "blla 4.51 s (in one process, its model loaded once) + line reading 4.55 s (one page a call less a call on a blank page), medians",
+   "p90_s": 13.49,
+   "per_unit_s": 9.06,
+   "qos": "utility"
+  },
+  "kraken-catmus-medieval": {
+   "by_kind": {
+    "handwritten": 9.41,
+    "mixed": 8.22,
+    "printed": 10.5,
+    "typewritten": 10.23
+   },
+   "load_avg": [
+    4.0,
+    5.97
+   ],
+   "load_s": 3.63,
+   "n": 16,
+   "note": "blla 4.51 s (in one process, its model loaded once) + line reading 4.92 s (one page a call less a call on a blank page), medians",
+   "p90_s": 13.73,
+   "per_unit_s": 9.51,
+   "qos": "utility"
+  },
+  "kraken-german-handwriting": {
+   "by_kind": {
+    "handwritten": 9.64,
+    "mixed": 8.73,
+    "printed": 10.73,
+    "typewritten": 10.39
+   },
+   "load_avg": [
+    4.0,
+    5.97
+   ],
+   "load_s": 3.65,
+   "n": 16,
+   "note": "blla 4.51 s (in one process, its model loaded once) + line reading 5.12 s (one page a call less a call on a blank page), medians",
+   "p90_s": 14.16,
+   "per_unit_s": 9.99,
+   "qos": "utility"
+  },
+  "kraken-greek-minuscule": {
+   "by_kind": {
+    "handwritten": 10.93,
+    "mixed": 9.08,
+    "printed": 12.73,
+    "typewritten": 12.43
+   },
+   "load_avg": [
+    4.0,
+    5.97
+   ],
+   "load_s": 3.77,
+   "n": 16,
+   "note": "blla 4.51 s (in one process, its model loaded once) + line reading 6.38 s (one page a call less a call on a blank page), medians",
+   "p90_s": 16.1,
+   "per_unit_s": 10.88,
+   "qos": "utility"
+  },
+  "kraken-tridis": {
+   "by_kind": {
+    "handwritten": 10.07,
+    "mixed": 8.33,
+    "printed": 11.79,
+    "typewritten": 11.6
+   },
+   "load_avg": [
+    4.0,
+    5.97
+   ],
+   "load_s": 3.96,
+   "n": 16,
+   "note": "blla 4.51 s (in one process, its model loaded once) + line reading 5.5 s (one page a call less a call on a blank page), medians",
+   "p90_s": 14.9,
+   "per_unit_s": 9.97,
+   "qos": "utility"
+  },
+  "lightonocr-3-4b-mlx8": {
+   "by_kind": {
+    "handwritten": 14.68,
+    "mixed": 18.8,
+    "printed": 34.53,
+    "typewritten": 25.5
+   },
+   "failed": {},
+   "load_avg": [
+    3.76,
+    3.43
+   ],
+   "load_s": 3.5,
+   "n": 16,
+   "note": "one read a page, greedy",
+   "p90_s": 30.35,
+   "peak_gb": 6.44,
+   "per_unit_s": 23.5,
+   "qos": "utility"
+  },
+  "paddleocr-vl1.6-bf16": {
+   "by_kind": {
+    "handwritten": 2.85,
+    "mixed": 3.29,
+    "printed": 5.68,
+    "typewritten": 3.88
+   },
+   "failed": {
+    "p018": "failed"
+   },
+   "load_avg": [
+    2.87,
+    3.76
+   ],
+   "load_s": 1.0,
+   "n": 16,
+   "note": "one read a page, greedy",
+   "p90_s": 5.98,
+   "peak_gb": 2.61,
+   "per_unit_s": 3.73,
+   "qos": "utility"
+  },
+  "pp-doclayoutv3": {
+   "by_kind": {
+    "handwritten": 0.19,
+    "mixed": 0.19,
+    "printed": 0.19,
+    "typewritten": 0.19
+   },
+   "load_avg": [
+    5.97,
+    5.44
+   ],
+   "load_s": 1.69,
+   "maxrss_mb": 441,
+   "n": 16,
+   "note": "median of 3 detections a page, 1024 px draft",
+   "p90_s": 0.19,
+   "peak_gb": 1.52,
+   "per_unit_s": 0.19,
+   "qos": "utility"
+  },
+  "ppocrv6-kraken-blla": {
+   "by_kind": {
+    "handwritten": 13.21,
+    "mixed": 12.16,
+    "printed": 19.54,
+    "typewritten": 13.34
+   },
+   "load_avg": [
+    4.0,
+    5.97
+   ],
+   "load_s": 3.86,
+   "n": 16,
+   "note": "blla 4.51 s (in one process, its model loaded once) + line reading 8.21 s (one page a call less a call on a blank page), medians",
+   "p90_s": 16.46,
+   "per_unit_s": 13.28,
+   "qos": "utility"
+  },
+  "qwen3-vl-8b-mlx4": {
+   "by_kind": {
+    "handwritten": 31.58,
+    "mixed": 229.95,
+    "printed": 49.21,
+    "typewritten": 34.88
+   },
+   "failed": {
+    "p018": "failed",
+    "p031": "failed"
+   },
+   "load_avg": [
+    6.72,
+    4.34
+   ],
+   "load_s": 3.0,
+   "n": 16,
+   "note": "one read a page, greedy",
+   "p90_s": 66.74,
+   "peak_gb": 7.67,
+   "per_unit_s": 35.09,
+   "qos": "utility"
+  },
+  "qwen3.5-9b-mlx4": {
+   "by_kind": {
+    "handwritten": 30.0,
+    "mixed": 33.42,
+    "printed": 38.56,
+    "typewritten": 33.99
+   },
+   "earlier": "2026-10-15",
+   "failed": {},
+   "load_avg": null,
+   "load_s": 2.4,
+   "n": 16,
+   "note": "earlier reading of these pages (2026-10-15), not re-timed here",
+   "p90_s": 43.13,
+   "peak_gb": 7.48,
+   "per_unit_s": 33.73,
+   "qos": null
+  },
+  "xiaomi-ocr-0-bf16": {
+   "by_kind": {
+    "handwritten": 5.85,
+    "mixed": 6.57,
+    "printed": 10.8,
+    "typewritten": 7.71
+   },
+   "failed": {},
+   "load_avg": [
+    5.93,
+    2.87
+   ],
+   "load_s": 1.7,
+   "n": 16,
+   "note": "one read a page, greedy",
+   "p90_s": 10.31,
+   "peak_gb": 2.92,
+   "per_unit_s": 7.61,
+   "qos": "utility"
+  }
+ },
+ "machine": {
+  "cpu": "Apple M3 Pro",
+  "memory_gb": 18,
+  "os": "27.2"
+ },
+ "mixed_switch": {
+  "ratio_median": 139.7,
+  "reader": "lightonocr-3-4b-mlx8",
+  "reader_typed_median_s": 25.5,
+  "typed_pages": 9,
+  "vision_typed_median_s": 0.17
+ },
+ "pages": {
+  "pages": [
+   {
+    "kind": "typewritten",
+    "page": "p019"
+   },
+   {
+    "kind": "typewritten",
+    "page": "p028"
+   },
+   {
+    "kind": "typewritten",
+    "page": "p036"
+   },
+   {
+    "kind": "typewritten",
+    "page": "p064"
+   },
+   {
+    "kind": "typewritten",
+    "page": "p066"
+   },
+   {
+    "kind": "printed-clipping",
+    "page": "p065"
+   },
+   {
+    "kind": "printed-clipping",
+    "page": "p080"
+   },
+   {
+    "kind": "printed",
+    "page": "p018"
+   },
+   {
+    "kind": "printed",
+    "page": "p034"
+   },
+   {
+    "kind": "handwritten",
+    "page": "p015"
+   },
+   {
+    "kind": "handwritten",
+    "page": "p022"
+   },
+   {
+    "kind": "handwritten",
+    "page": "p045"
+   },
+   {
+    "kind": "handwritten",
+    "page": "p048"
+   },
+   {
+    "kind": "handwritten",
+    "page": "p055"
+   },
+   {
+    "kind": "mixed",
+    "page": "p009"
+   },
+   {
+    "kind": "mixed",
+    "page": "p031"
+   }
+  ],
+  "seed": 20261111,
+  "warm": "p004"
+ },
+ "runs": {
+  "apple-fm-27": {
+   "end": 1794455047.9,
+   "start": 1794454750.3
+  },
+  "kraken": {
+   "end": 1794456829.8,
+   "start": 1794455560.4
+  },
+  "kraken-blla": {
+   "end": 1794458633.4,
+   "start": 1794458538.5
+  },
+  "lightonocr-3-4b-mlx8": {
+   "end": 1794454419.7,
+   "start": 1794454008.7
+  },
+  "paddleocr-vl1.6-bf16": {
+   "end": 1794454008.7,
+   "start": 1794453868.9
+  },
+  "pp-doclayoutv3": {
+   "end": 1794456843.2,
+   "start": 1794456829.8
+  },
+  "qwen3-vl-8b-mlx4": {
+   "end": 1794458529.9,
+   "start": 1794457127.4
+  },
+  "vision": {
+   "end": 1794453603.8,
+   "start": 1794453548.2
+  },
+  "xiaomi-ocr-0-bf16": {
+   "end": 1794453868.9,
+   "start": 1794453722.4
+  }
+ },
+ "tag": "W46.ocr-time-like-for-like"
+}
