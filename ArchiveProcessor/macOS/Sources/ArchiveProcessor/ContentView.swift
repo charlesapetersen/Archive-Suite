@@ -95,6 +95,7 @@ struct ContentView: View {
             SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
             SettingsInterviewsTestDriver.runIfRequested()    // $0 W46 the general and the collection interviews, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
+            FlaggedCheckTimingTestDriver.runIfRequested(processor: processor) // $0 W46 timing the flagged checks (owner session)
             SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
             SegmentationChatGPTTestDriver.runIfRequested()   // $0 W36 ChatGPT plan route: Sign in with ChatGPT, fake server
             SegmentationProofDriver.runIfRequested()         // PAID (cents) W36 one real folder through real models
