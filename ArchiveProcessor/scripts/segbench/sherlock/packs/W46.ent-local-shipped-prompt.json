@@ -1,0 +1,21 @@
+{
+  "tag": "W46.ent-local-shipped-prompt",
+  "pack": "ent-local-27b-20261112",
+  "mac": "artifacts/ent-local-27b-20261112",
+  "submit": "support/job/submit.sh",
+  "jobs": 2,
+  "gpu_hours": 0.3,
+  "review": "execution-plans/items/W46.ent-local-shipped-prompt.md",
+  "imports": [
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/ent-local-27b-20261112",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/ent-local-27b-20261112"
+  ],
+  "provenance": [],
+  "requires": [],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/ent-local-27b-20261112",
+  "collect": ["$FS_ROOT/ent-local-27b-20261112/jobs.tsv", "$FS_ROOT/ent-local-27b-20261112/logs"],
+  "release": "ent/out collected into the Mac artifact; the engine runs ent_local_shipped.py collect, then report"
+}
