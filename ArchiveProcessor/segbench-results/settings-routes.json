@@ -7733,7 +7733,7 @@
       "cluster": false,
       "gpus": null,
       "mac": true,
-      "mac_gb": null,
+      "mac_gb": 16,
       "built_in": false
      },
      "figures": {
@@ -7775,18 +7775,25 @@
       "usd_1000_list": 0
      },
      "time": {
-      "per_unit_s": 6.1,
+      "per_unit_s": 7.52,
       "measured": true,
-      "measured_on": "blla detection only, CPU one core, M3 Pro 18 GB; alignment not timed",
+      "measured_on": "the whole route (blla, McCATMuS recognition, both matchers, the conf pick, the lab writer), median of 40 page runs on the 20 owner hand pages, CPU, M3 Pro 18 GB; mean 9.0 s, most 17.5 s; models load once in about 1 s",
       "source": {
-       "file": "place-hands.md",
-       "attribute": "s a page",
-       "value": "6.1"
+       "file": "place-hands-cost.md",
+       "route": "whole route",
+       "attribute": "s a page median",
+       "value": "7.52"
       }
      },
      "memory": {
-      "peak_gb": null,
-      "measured_on": "not measured; the route ran on an M3 Pro 18 GB (place-hands.md)"
+      "peak_gb": 8.51,
+      "measured_on": "the highest measured: one CPU process over 60 pages, not levelled off; a page alone needs at most 4.64 GB, MPS with the cache emptied after each page 4.39 GB (M3 Pro 18 GB; no 16 GB Mac run, the fit is the solver's rule)",
+      "source": {
+       "file": "place-hands-cost.md",
+       "route": "cpu-x3",
+       "attribute": "peak footprint GB",
+       "value": "8.51"
+      }
      },
      "caveats": [
       "gate chosen on per-word Find (OCR-11); rescored on line pass, it only lowers it: -0.8 (-2.8 to 0.0) with Qwen, 39 failing drags spared",
@@ -7799,7 +7806,8 @@
      ],
      "fallback": "text-page",
      "conditions": [
-      "reading keeps the page's line breaks"
+      "reading keeps the page's line breaks",
+      "memory bounded per page: MPS with the cache emptied after each page, or a worker restarted every few pages (place-hands-cost.md)"
      ]
     },
     {

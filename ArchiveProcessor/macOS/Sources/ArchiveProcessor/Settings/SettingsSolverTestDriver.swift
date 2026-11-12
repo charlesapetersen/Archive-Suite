@@ -99,7 +99,19 @@ enum SettingsSolverTestDriver {
         eq("B1 names: none on non-correspondence", pick(b1, "entities", "non-correspondence"), "none")
         eq("B1 names not ranked: nothing on the Mac", pick(solve("B1-nonames", mac(16), noNames), "entities",
                                                           "correspondence-typed"), "none")
-        skip("B1 hand placement fit", "pending W46.place-hands-cost (placement is a rule stage)")
+        // Placement is a rule stage, so the hand route is not a pick; its memory fit is the solver's rule all the same
+        // (W46.place-hands-cost: 8.51 GB measured, plus the headroom).
+        if let hand = table.stage("placement")?.routes.first(where: { $0.id == "hand-blla-ctc" }) {
+            let fit = { (gb: Double) in
+                SettingsSolver(table: table, pairs: pairs, resources: mac(gb), answers: SettingsAnswers())
+                    .blockers(hand, stage: "placement")
+            }
+            check("B1 hand placement fits 16 GB", fit(16).isEmpty, fit(16).joined(separator: "; "))
+            check("B3 hand placement does not fit 8 GB", fit(8).contains { $0.hasPrefix("needs about 14 GB of memory") },
+                  fit(8).joined(separator: "; "))
+        } else {
+            check("B1 the placement stage has hand-blla-ctc", false)
+        }
         check("B1 kit: no row", b1.afterTraining.isEmpty)
 
         // B2. 32 and 64 GB pick as B1: no 27B-class Mac row exists to borrow cluster figures for.

@@ -41,7 +41,7 @@ until names are ranked.
 - Entities (note 09 §9, owner call 11): nothing unless names are ranked; when ranked, `qwen3-vl-8b-mac` on typed and
   printed correspondence over Vision text, sender hidden; `none` on handwriting and non-correspondence.
 - Placement (note 05): Vision's own lines on print; on handwriting kraken blla lines with alignment, gate 0.67, text
-  page fallback; pending `W46.place-hands-cost` for the 16 GB fit, the hand route shows "memory unmeasured".
+  page fallback; the hand route fits 16 GB (8.51 GB measured plus the headroom, `place-hands-cost.md`) and not 8 GB.
 - Kit (note 12): no row.
 
 **B2. 32 GB and 64 GB.** Identical picks to B1 until `W46.ocr-mac-27b`, `W46.date-mac-27b` and
@@ -148,6 +148,6 @@ route won on money).
 
 ## Pending figures that skip tests
 
-`W46.place-hands-cost` (B1 hand placement fit), `W46.ocr-mac-27b` and `W46.date-mac-27b` (B2), the cascade rows' Mac
+`W46.ocr-mac-27b` and `W46.date-mac-27b` (B2), the cascade rows' Mac
 memory per tier (B1 cascade), `W46.date-route-pipeline` (C and D dating rows measured end to end). No
 reading figure is pending: C's OpenRouter hands pick and E's Infinity-Parser2-Pro pair are decided (W46.pairs-redecide).

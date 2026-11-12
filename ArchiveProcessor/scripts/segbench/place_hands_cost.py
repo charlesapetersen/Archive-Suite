@@ -13,8 +13,9 @@ memory footprint (the figure macOS's memory pressure counts). Parity: each page'
 pick's confidence against W46.place-hands' saved runs, so the timed route is the scored one.
 
 Usage (system python3; the worker runs itself under the kraken venv, through the heavy lock):
-  python3 ops/autonomous/heavy-run.py run -- python3 place_hands_cost.py run run1
-  python3 place_hands_cost.py report run1 run2     # segbench-results/place-hands-cost.json and .md
+  python3 ops/autonomous/heavy-run.py run -- python3 place_hands_cost.py run cpu1 [--device cpu|mps] [--empty-cache]
+  python3 ops/autonomous/heavy-run.py run -- python3 place_hands_cost.py run cpu-x3 --repeat 3
+  python3 place_hands_cost.py report --timing cpu1 cpu2 --plateau cpu-x3 --mps mps1   # place-hands-cost.json and .md
 Scratch: ~/Library/Caches/ArchiveSuiteRehearsal/place-hands/{lines,hyp,pdf}/*cost*, cost/ (the runs' raw records).
 """
 from __future__ import annotations
@@ -46,7 +47,8 @@ def maxrss_gb(who=resource.RUSAGE_SELF):
     return resource.getrusage(who).ru_maxrss / GB   # bytes on macOS
 
 
-ABORT_GB = 7.0   # the worker stops itself past this footprint, below the heavy lock's 60% guard, and says where
+ABORT_GB = float(os.environ.get('PHC_ABORT_GB', 7.0))   # the worker stops itself past this footprint, below the
+# heavy lock's 60% guard (10.8 GB here), and says where
 
 
 def footprint(pid=None):
@@ -92,7 +94,8 @@ class Sampler:
 
 
 def todo():
-    return [t for t in P.pages() if t['group'] == 'owner-hand' and P.keep(t)]
+    only = set(filter(None, os.environ.get('PHC_PAGES', '').split(',')))
+    return [t for t in P.pages() if t['group'] == 'owner-hand' and P.keep(t) and (not only or t['page'] in only)]
 
 
 def worker(tag, device, empty_cache, repeat=1):
@@ -161,8 +164,10 @@ def worker(tag, device, empty_cache, repeat=1):
     P.save(COST / f'{tag}.worker.json', rec)
 
 
-def run(tag, device, empty_cache, repeat=1):
+def run(tag, device, empty_cache, repeat=1, pages=None):
     P.functional_bin()
+    if pages:
+        os.environ['PHC_PAGES'] = pages
     env = dict(os.environ, PLACE_HANDS_WORKER='cost', PHC_DEVICE=device, PHC_EMPTY='1' if empty_cache else '',
                PHC_REPEAT=str(repeat))
     t0 = time.time()
@@ -184,15 +189,15 @@ def run(tag, device, empty_cache, repeat=1):
     print(json.dumps(rec['time_l']), f'wall {wall:.0f}s')
 
 
-def q(xs, f):
-    xs = sorted(xs)
-    return xs[min(len(xs) - 1, int(f * len(xs)))]
+def stats(v):
+    return {'median': statistics.median(v), 'mean': statistics.mean(v), 'max': max(v), 'min': min(v), 'sum': sum(v)}
 
 
 def summarise(rec):
     ps = rec['pages']
     col = lambda k: [r[k] for r in ps]
-    out = {'tag': rec['tag'], 'pages': len(ps), 'torch_threads': rec['torch_threads'],
+    out = {'tag': rec['tag'], 'device': rec['device'], 'empty_cache': rec['empty_cache'], 'repeat': rec.get('repeat', 1),
+           'pages': len(ps), 'torch_threads': rec['torch_threads'],
            'blla_load_s': rec['blla_load_s'], 'ctc_load_s': rec['ctc_load_s'],
            'peak_footprint_gb': rec['time_l']['peak_memory_footprint_gb'],
            'peak_rss_gb': rec['time_l']['maximum_resident_set_size_gb'],
@@ -202,24 +207,46 @@ def summarise(rec):
            'conf_match_saved': sum(r['saved_ctc_conf'] is not None and abs(r['ctc_conf'] - r['saved_ctc_conf']) < 1e-3
                                    for r in ps)}
     for k in ('blla_s', 'recognise_s', 'match_align_s', 'align_total_s', 'writer_s', 'total_s'):
-        v = col(k)
-        out[k] = {'median': statistics.median(v), 'mean': statistics.mean(v), 'max': max(v), 'min': min(v),
-                  'sum': sum(v)}
+        out[k] = stats(col(k))
+    reps = sorted({r.get('rep', 0) for r in ps})
+    out['by_rep'] = [{'rep': n, 'peak_fp_gb': max(max(r['blla_fp_gb'], r['align_fp_gb']) for r in ps if r.get('rep', 0) == n),
+                      'total_s_median': statistics.median(r['total_s'] for r in ps if r.get('rep', 0) == n)}
+                     for n in reps]
     return out
 
 
-def report(tags):
-    runs = [json.loads((COST / f'{t}.json').read_text()) for t in tags]
-    S = [summarise(r) for r in runs]
+def report(timing, plateau, mps):
+    load = lambda t: json.loads((COST / f'{t}.json').read_text())
+    T = [load(t) for t in timing]
     by_page = {}
-    for r in runs:
+    for r in T:
         for row in r['pages']:
             by_page.setdefault(row['page'], []).append(row)
+    pooled = [row['total_s'] for r in T for row in r['pages']]
+    diffs = [abs(rows[0]['total_s'] - rows[1]['total_s']) for rows in by_page.values() if len(rows) > 1]
+    runs = [summarise(r) for r in T] + [summarise(load(t)) for t in plateau + mps]
+    cpu = [s for s in runs if s['device'] == 'cpu']
     res = {'item': 'W46.place-hands-cost', 'route': 'hand-blla-ctc', 'reading': READING, 'machine': machine(),
-           'runs': S, 'pages': {p: [{k: v for k, v in row.items()} for row in rows] for p, rows in by_page.items()}}
+           'gb': 'GiB, 2^30 bytes, as macOS reports memory',
+           'row': {'per_unit_s': round(statistics.median(pooled), 2), 'per_unit_s_mean': round(statistics.mean(pooled), 2),
+                   'per_unit_s_max': round(max(pooled), 2), 'n_page_runs': len(pooled),
+                   'rerun_floor_s': {'median': round(statistics.median(diffs), 2), 'max': round(max(diffs), 2)} if diffs else None,
+                   'peak_gb': round(max(s['peak_footprint_gb'] for s in cpu), 2),
+                   'peak_gb_runs': [round(s['peak_footprint_gb'], 2) for s in cpu],
+                   'load_s': round(max(s['blla_load_s'] + s['ctc_load_s'] for s in cpu), 2)},
+           'runs': runs,
+           'pages': {p: rows for p, rows in by_page.items()},
+           'mps': [{k: v for k, v in load(t).items() if k != 'pages'} | {'pages_done': len(load(t)['pages'])} for t in mps],
+           # a fresh process per page (run fresh-<page> --pages <page>): the page's own need, nothing carried over
+           'fresh': {r['pages'][0]['page']: {'peak_footprint_gb': r['time_l']['peak_memory_footprint_gb'],
+                                             'process_wall_s': r['process_wall_s'], 'route_s': r['pages'][0]['total_s']}
+                     for r in (json.loads(f.read_text()) for f in sorted(COST.glob('fresh-*.json'))
+                               if not f.name.endswith('.worker.json'))}}
+    if res['fresh']:
+        res['row']['fresh_peak_gb'] = round(max(v['peak_footprint_gb'] for v in res['fresh'].values()), 2)
     OUT.with_suffix('.json').write_text(json.dumps(res, indent=1) + '\n')
     OUT.with_suffix('.md').write_text(write_md(res))
-    print(OUT.with_suffix('.md'))
+    print(json.dumps(res['row']))
 
 
 def machine():
@@ -229,30 +256,58 @@ def machine():
             'cores': f"{sh('sysctl', '-n', 'hw.perflevel0.physicalcpu')}P+{sh('sysctl', '-n', 'hw.perflevel1.physicalcpu')}E"}
 
 
+FINDINGS = HERE / 'place_hands_cost_findings.md'
+
+
 def write_md(res):
-    S, m = res['runs'], res['machine']
+    S, m, row = res['runs'], res['machine'], res['row']
     f2 = lambda x: f'{x:.2f}'
     L = ['# W46.place-hands-cost — the hand placement route\'s memory and time', '',
          'Generated by `ArchiveProcessor/scripts/segbench/place_hands_cost.py report` (05-placement.md §8). The shipped '
          'hand route `hand-blla-ctc` run page by page in one process: kraken blla lines, McCATMuS recognition, the '
          'reading force-aligned by both matchers (one-to-one and a span of up to 8), the `conf` pick, and the lab '
          f'writer (`place_functional oracle --fit`) writing the picked words into a PDF. Reading: {res["reading"]} '
-         f'(saved). Machine: {m["chip"]} ({m["cores"]}), {m["memory_gb"]:.0f} GB, {m["model"]}. No money, no cluster.',
-         '', '## Per run', '',
-         '| run | pages | torch threads | blla s/page (median) | recognition | matchers + pick | writer | whole route s/page (median, mean, max) | model loads s (blla, McCATMuS) | peak footprint GB | peak RSS GB | writer peak RSS GB | parity: lines, conf |',
-         '|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---|']
+         f'(saved). Machine: {m["chip"]} ({m["cores"]}), {m["memory_gb"]:.0f} GB, {m["model"]}. Memory in GB means '
+         'GiB (2^30 bytes), as macOS reports it; footprint is phys_footprint, the figure memory pressure and the heavy '
+         'lock count. No money, no cluster.', '']
+    if FINDINGS.exists():
+        L += [FINDINGS.read_text().strip(), '']
+    L += ['## Per run', '',
+          '| run | device | pages | torch threads | blla s/page (median) | recognition | matchers + pick | writer | whole route s/page (median, mean, max) | model loads s (blla, McCATMuS) | peak footprint GB | peak RSS GB | writer peak RSS GB | parity: lines, conf |',
+          '|---|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---|']
     for s in S:
-        L.append(f"| {s['tag']} | {s['pages']} | {s['torch_threads']} | {s['blla_s']['median']:.2f} | "
+        dev = s['device'] + (' + empty_cache' if s['empty_cache'] else '')
+        L.append(f"| {s['tag']} | {dev} | {s['pages']} | {s['torch_threads']} | {s['blla_s']['median']:.2f} | "
                  f"{s['recognise_s']['median']:.2f} | {s['match_align_s']['median']:.2f} | {s['writer_s']['median']:.2f} | "
                  f"{s['total_s']['median']:.2f}, {s['total_s']['mean']:.2f}, {s['total_s']['max']:.2f} | "
                  f"{s['blla_load_s']:.1f}, {s['ctc_load_s']:.1f} | {f2(s['peak_footprint_gb'])} | {f2(s['peak_rss_gb'])} | "
                  f"{f2(s['writer_peak_rss_gb'])} | {s['lines_match_saved']}/{s['pages']}, {s['conf_match_saved']}/{s['pages']} |")
-    L += ['', '## Per page (seconds; first run, then second)', '',
-          '| page | lines | blla | recognition | matchers + pick | writer | whole |', '|---|---:|---|---|---|---|---|']
+    L += ['', '## The footprint by pass over the 20 pages (one process)', '',
+          '| run | pass | peak footprint GB | whole route s/page (median) |', '|---|---:|---:|---:|']
+    for s in S:
+        for b in s['by_rep']:
+            L.append(f"| {s['tag']} | {b['rep'] + 1} | {b['peak_fp_gb']:.2f} | {b['total_s_median']:.2f} |")
+    for x in res['mps']:
+        L += ['', f"MPS run `{x['tag']}`: {x['pages_done']} pages done" +
+              (f", peak footprint {x['time_l']['peak_memory_footprint_gb']:.2f} GB" if 'time_l' in x else ', stopped (see Findings)') + '.']
+    if res['fresh']:
+        F = res['fresh']
+        worst = max(F, key=lambda p: F[p]['peak_footprint_gb'])
+        L += ['', '## A fresh process per page (CPU)', '',
+              f"Each page alone in its own process (`run fresh-<page> --pages <page>`), loads included: peak footprint "
+              f"{min(v['peak_footprint_gb'] for v in F.values()):.2f} to {F[worst]['peak_footprint_gb']:.2f} GB (the most on "
+              f"{worst}); the process's wall time {min(v['process_wall_s'] for v in F.values()):.0f} to "
+              f"{max(v['process_wall_s'] for v in F.values()):.0f} s, of which the route "
+              f"{min(v['route_s'] for v in F.values()):.1f} to {max(v['route_s'] for v in F.values()):.1f} s.", '',
+              '| page | peak footprint GB | process wall s | route s |', '|---|---:|---:|---:|']
+        L += [f"| {p} | {v['peak_footprint_gb']:.2f} | {v['process_wall_s']:.1f} | {v['route_s']:.2f} |" for p, v in F.items()]
+    L += ['', '## Per page (seconds and footprint after the stage; timing runs, first then second)', '',
+          '| page | lines | blla s | recognition s | matchers + pick s | writer s | whole s | footprint after blla GB |',
+          '|---|---:|---|---|---|---|---|---|']
     for p, rows in res['pages'].items():
         c = lambda k: ' / '.join(f'{r[k]:.2f}' for r in rows)
         L.append(f"| {p} | {rows[0]['lines']} | {c('blla_s')} | {c('recognise_s')} | {c('match_align_s')} | "
-                 f"{c('writer_s')} | {c('total_s')} |")
+                 f"{c('writer_s')} | {c('total_s')} | {c('blla_fp_gb')} |")
     return '\n'.join(L) + '\n'
 
 
@@ -263,17 +318,20 @@ def main():
     r.add_argument('tag')
     r.add_argument('--device', choices=('cpu', 'mps'), default='cpu')
     r.add_argument('--repeat', type=int, default=1, help='the 20 pages this many times in one process (does the footprint level off?)')
+    r.add_argument('--pages', help='only these pages (a fresh process per page: the worst page\'s own need)')
     r.add_argument('--empty-cache', action='store_true', help='torch.mps.empty_cache() after each page')
     rp = sub.add_parser('report')
-    rp.add_argument('tags', nargs='+')
+    rp.add_argument('--timing', nargs=2, required=True, help='the two timing runs (the rerun floor is their per-page difference)')
+    rp.add_argument('--plateau', nargs='*', default=[])
+    rp.add_argument('--mps', nargs='*', default=[])
     a = ap.parse_args()
     if a.cmd == 'run':
         if os.environ.get('PLACE_HANDS_WORKER') == 'cost':
             worker(a.tag, os.environ['PHC_DEVICE'], bool(os.environ.get('PHC_EMPTY')), int(os.environ['PHC_REPEAT']))
         else:
-            run(a.tag, a.device, a.empty_cache, a.repeat)
+            run(a.tag, a.device, a.empty_cache, a.repeat, a.pages)
     else:
-        report(a.tags)
+        report(a.timing, a.plateau, a.mps)
 
 
 if __name__ == '__main__':

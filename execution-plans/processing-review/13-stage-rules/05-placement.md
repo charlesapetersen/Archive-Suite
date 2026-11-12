@@ -17,7 +17,8 @@ page)", default on. The owner's 2026-10-20 decision prefers text placed on the i
 ## 3. The rule for the settings layer
 
 Sheet text, replacing `settings-design/figures.json` "fixed.placement" (which says Vision's own layer for print, and
-calls 6 s a page the hand route's time, which is blla's detection alone [M] `place-hands.md`):
+calls 6 s a page the hand route's time, which is blla's detection alone [M] `place-hands.md`; the whole route is 7.52 s
+a page [M] `place-hands-cost.md`):
 
 > Print: Apple Vision's line geometry, with the chosen reader's words aligned onto it, written one run per line; free.
 > Handwriting: kraken blla lines with the reading force-aligned to them by a CTC recogniser; a page whose alignment
@@ -87,16 +88,16 @@ not a level, so the field is kept and the schema needs it or the level.
   "RecognizeDocumentsRequest lines lose -10.8 (-15.3 to -6.5) and are not offered (place-print.md)","pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them; not classed as bound or curled) pass -15.7 (-23.4 to -8.9) on its own lines against same-collection flat pages (place-curved-owner.md)"],
  "kind_rules":["handwritten: not chosen"],"fallback":"text-page","conditions":[]}
 {"id":"hand-blla-ctc","name":"kraken blla lines, McCATMuS forced alignment, conf pick, 0.67 gate","family":"mac","app_route":null,"status":"shipped",
- "needs":{"key":[],"plan":[],"cluster":false,"mac_gb":null,"gpus":0},
+ "needs":{"key":[],"plan":[],"cluster":false,"mac_gb":16,"gpus":0},
  "figures":{"handwritten":{"value":42.9,"n":20,"truth":"owner-hand, 475 lines","source":{"file":"place-hands-lines.md","route":"blla.ctc-mccatmus-conf, Qwen3.6-27B","attribute":"line pass %, lab writer","value":"42.9 (204/475)"}},
   "handwritten-kept":{"value":46.3,"n":18,"truth":"owner-hand, 432 lines on kept pages","source":{"file":"place-hands-lines.md","route":"blla.ctc-mccatmus-conf, Qwen3.6-27B","attribute":"pass % on kept pages at 0.670","value":"46.3 (200/432)"}},
   "bentham":{"value":35.7,"n":14,"truth":"L2 PAGE-XML, 314 lines","source":{"file":"place-hands-lines.md","route":"Qwen3.6-27B","attribute":"line pass %","value":"35.7 (112/314)"}}},
- "cost":{"usd_1000_list":0},"time":{"per_unit_s":6.1,"measured":true,"measured_on":"blla detection only, CPU one core, M3 Pro 18 GB; alignment not timed","source":{"file":"place-hands.md","attribute":"s a page","value":"6.1"}},
- "memory":{"peak_gb":null,"measured_on":"not measured; the route ran on an M3 Pro 18 GB (place-hands.md)"},
+ "cost":{"usd_1000_list":0},"time":{"per_unit_s":7.52,"measured":true,"measured_on":"the whole route (blla, McCATMuS recognition, both matchers, the conf pick, the lab writer), median of 40 page runs on the 20 owner hand pages, CPU, M3 Pro 18 GB; mean 9.0 s, most 17.5 s; models load once in about 1 s","source":{"file":"place-hands-cost.md","route":"whole route","attribute":"s a page median","value":"7.52"}},
+ "memory":{"peak_gb":8.51,"measured_on":"the highest measured: one CPU process over 60 pages, not levelled off; a page alone needs at most 4.64 GB, MPS with the cache emptied after each page 4.39 GB (M3 Pro 18 GB; no 16 GB Mac run, the fit is the solver's rule)","source":{"file":"place-hands-cost.md","route":"cpu-x3","attribute":"peak footprint GB","value":"8.51"}},
  "caveats":["gate chosen on per-word Find (OCR-11); rescored on line pass, it only lowers it: -0.8 (-2.8 to 0.0) with Qwen, 39 failing drags spared",
   "a reflowing reader stays on the text page (LightOnOCR-3 21.5%)","on Bentham PP-OCRv6 lines pass +17.5 (+6.6 to +27.8) more: the detector is collection-dependent",
   "gate fitted on 20 pages; refit when more hand truth is drawn"],
- "kind_rules":["print: not used"],"fallback":"text-page","conditions":["reading keeps the page's line breaks"]}
+ "kind_rules":["print: not used"],"fallback":"text-page","conditions":["reading keeps the page's line breaks","memory bounded per page: MPS with the cache emptied after each page, or a worker restarted every few pages (place-hands-cost.md)"]}
 {"id":"hand-ppocrv6-ctc","name":"PP-OCRv6 det lines, CTC forced alignment","family":"cluster","app_route":null,"status":"measured",
  "needs":{"key":[],"plan":[],"cluster":true,"mac_gb":null,"gpus":0},
  "figures":{"bentham":{"value":53.2,"n":14,"truth":"L2 PAGE-XML, 314 lines","source":{"file":"place-hands-lines.md","route":"ppocrv6.ctc-mccatmus-conf, Qwen3.6-27B","attribute":"line pass %","value":"53.2 (167/314)"}},
@@ -181,10 +182,9 @@ Decided on 2026-11-06 (section "Owner's calls (2026-11-06)" below); kept as the 
 
 ## 8. Items to file
 
-- **W46.place-hands-cost** (small, $0, waits on nothing): peak memory and seconds a page of the whole hand route (blla,
-  McCATMuS alignment of both matchers, the pick, the writer) on the 20 owner hand pages, on 16 GB and 18 GB Macs. Done:
-  `memory.peak_gb`, `needs.mac_gb` and `time` filled for `hand-blla-ctc`. Today only blla's 6.1 s a page is measured,
-  and the route is known to run on an 18 GB M3 Pro; whether it fits 16 GB is unmeasured [?].
+- ~~**W46.place-hands-cost**~~ shipped 2026-11-12: the whole hand route 7.52 s a page (median, CPU), peak 8.51 GB in
+  one CPU process over 60 pages and still growing, 4.64 GB for a page alone, 4.39 GB on MPS emptying the cache each page;
+  fits 16 GB by the solver's rule, not 8 [M] (`place-hands-cost.md`; no 16 GB Mac was run).
 - **W46.place-print-pp-lines** (medium, $0): the lab writer over PP-OCRv6 det lines on the 40 typed pages, line pass
   folded and unfolded, and the largest image side at which PP-OCRv6 det fits a 16 GB Mac. Done: a row beside
   `vision-lines-aligned`.
@@ -202,7 +202,7 @@ Decided on 2026-11-06 (section "Owner's calls (2026-11-06)" below); kept as the 
 
 | profile | typewritten / printed | handwritten (switch on) |
 |---|---|---|
-| laptop 16 GB | `vision-lines-aligned` with the 04 reader (54.4 all typed); `vision-own` if none | `hand-blla-ctc` if W46.place-hands-cost fits 16 GB, else `text-page`; a reflowing reader: `text-page` |
+| laptop 16 GB | `vision-lines-aligned` with the 04 reader (54.4 all typed); `vision-own` if none | `hand-blla-ctc` (8.51 GB peak + 5 headroom fits, `place-hands-cost.md`); a reflowing reader: `text-page` |
 | laptop 32 / 64 GB | `vision-lines-aligned` | `hand-blla-ctc` (42.9), fallback `text-page` per page under 0.67 |
 | cheap API | `vision-lines-aligned` (Qwen3.6-27B ties Vision, +0.1) | `hand-blla-ctc` with a line-keeping reading (Qwen3.6-27B 42.9) |
 | premium API or plan | `vision-lines-aligned` (Gemini row labelled drafter) | `hand-blla-ctc` (Gemini 3.8 Flash 41.3, drafter); plan readers unmeasured, gate decides |
@@ -217,7 +217,8 @@ From `14-owner-calls.md` §1 call 6 and §2 "Placement". Section 3's rule and th
 - Aligned lines on handwriting, switch `place.hand_on_image` default on (call 1).
 - The gate stays at 0.67, as filed (call 1, option a).
 - The hand line detector is a visible setting on the cluster profile only (call 3); its peak memory and alignment
-  time are measured by W46.place-hands-cost before any 16 GB claim is made.
+  time are measured by W46.place-hands-cost before any 16 GB claim is made (measured 2026-11-12: it fits 16 GB by the
+  solver's rule, `place-hands-cost.md`).
 - No dewarped reading copy (call 2): dewarping is not offered, so the layer always sits on the deskewed or
   as-photographed copy; a guarded dewarp is filed to revisit in 01-reading-copy.md.
 
