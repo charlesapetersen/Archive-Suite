@@ -72,7 +72,7 @@ def session_scan(sessions):
         probe_pid = probe.pid
     if probe.returncode != 0 or stderr.strip():
         raise RuntimeError("cannot inspect session process group")
-    unknown = False
+    rows = []
     # A separate OS session prevents unrelated processes joining the group.
     for line in stdout.splitlines():
         fields = line.split()
@@ -80,22 +80,50 @@ def session_scan(sessions):
             pid, pgid = int(fields[0]), int(fields[1])
             if pid in (probe_pid, os.getpid()):
                 continue  # our owned probe necessarily exits before this scan
-            try:
-                if os.getsid(pid) in sessions:
-                    return True, False
-            except ProcessLookupError:
-                # A process group never spans sessions: a live group leader
-                # still names the vanished process's session.
-                if pgid in sessions:
-                    return True, False
-                try:
-                    if pgid <= 0:
-                        raise ProcessLookupError(pgid)  # getsid(0) would name OUR session
-                    if os.getsid(pgid) in sessions:
-                        return True, False
-                except OSError:
-                    unknown = True
+            rows.append((pid, pgid))
+    vanished = []
+    for pid, pgid in rows:
+        try:
+            if os.getsid(pid) in sessions:
+                return True, False
+        except ProcessLookupError:
+            vanished.append((pid, pgid))
+    unknown = False
+    for pid, pgid in vanished:
+        # A process group never spans sessions, so any live member of the
+        # vanished process's group names its session.
+        if pgid in sessions:
+            return True, False
+        sid = group_session(pgid, rows, pid)
+        if sid is None:
+            unknown = True
+        elif sid in sessions:
+            return True, False
     return False, unknown
+
+
+def group_session(pgid, rows, vanished):
+    """The session of process group `pgid`, read from a live member in `rows`, or None.
+
+    The leader alone was asked until 2026-11-12. On a busy Mac nearly every
+    scan then held some exited process whose leader had gone too, typically a
+    `sleep` under a shell, so three scans in a row stayed unknown and every
+    release was refused: 30 of 30 scans under load, 12 of 30 idle. Its parent
+    shell is still in the group; asking any member took that to 1 of 30 and 0.
+    A member is trusted only if it is in the group both before and after its
+    session is read: leaving the group (setsid) between two reads is seen."""
+    if pgid <= 0:
+        return None  # getsid(0) would name OUR session
+    for pid in [pgid] + [p for p, g in rows if g == pgid and p not in (pgid, vanished)]:
+        try:
+            if os.getpgid(pid) != pgid:
+                continue
+            sid = os.getsid(pid)
+            if os.getpgid(pid) == pgid:
+                return sid
+        except OSError:
+            continue
+    return None
 
 
 @contextlib.contextmanager

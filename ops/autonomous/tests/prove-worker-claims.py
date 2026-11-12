@@ -585,7 +585,7 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
             def __enter__(self): return self
             def __exit__(self, *args): pass
             def communicate(self): return "999992 999993 S\n", ""
-        original_probe, original_sid = module.subprocess.Popen, module.os.getsid
+        original_probe, original_sid, original_pgid = module.subprocess.Popen, module.os.getsid, module.os.getpgid
         try:
             module.subprocess.Popen = lambda *args, **kwargs: Snapshot()
             def gone(pid): raise ProcessLookupError()
@@ -605,11 +605,35 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
             scans.clear()
             module.subprocess.Popen = lambda *args, **kwargs: Snapshot()
             module.os.getsid = lambda pid: 1 if pid == 999993 else gone(pid)
+            module.os.getpgid = lambda pid: 999993 if pid == 999993 else gone(pid)
             check(not module.session_live({"sid": 999990}) and not scans,
                   "a vanished process is placed by its live group leader")
             module.os.getsid = lambda pid: 999990 if pid == 999993 else gone(pid)
             check(module.session_live({"sid": 999990}),
                   "a vanished process whose group leader is in the session keeps the claim")
+            # 2026-11-12: on a busy Mac nearly every scan holds an exited `sleep` whose leader has gone too,
+            # while its parent shell is still in the group. Any live member places it; the leader is not needed.
+            scans.clear()
+            class Orphaned(Snapshot):
+                def communicate(self):
+                    scans.append(1)
+                    return "999992 999993 S\n999995 999993 S\n", ""
+            module.subprocess.Popen = lambda *args, **kwargs: Orphaned()
+            module.os.getsid = lambda pid: 1 if pid == 999995 else gone(pid)
+            module.os.getpgid = lambda pid: 999993 if pid == 999995 else gone(pid)
+            check(not module.session_live({"sid": 999990}) and len(scans) == 1,
+                  "a vanished process is placed by a live member of its group when the leader is gone")
+            # A member that leaves the group while its session is read (setsid) names no session for the group.
+            scans.clear()
+            reads = []
+            def moving(pid):
+                if pid != 999995: gone(pid)
+                reads.append(pid)
+                return 999993 if len(reads) % 2 else 999995
+            module.os.getsid = lambda pid: 1 if pid == 999995 else gone(pid)
+            module.os.getpgid = moving
+            check(module.session_live({"sid": 999990}) and len(scans) == 3,
+                  "a member that left the group mid-read is not trusted: three unknown scans retain the claim")
             scans.clear()
             class Member(Snapshot):
                 def communicate(self):
@@ -620,7 +644,7 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
             check(module.session_live({"sid": 999990}) and len(scans) == 1,
                   "a vanished process in the session's own group is a member at once, without rescans")
         finally:
-            module.subprocess.Popen, module.os.getsid = original_probe, original_sid
+            module.subprocess.Popen, module.os.getsid, module.os.getpgid = original_probe, original_sid, original_pgid
         queue("- [ ] **A — uncertain termination**")
         c = reserve("worker-1")
         # A definitively dead fixture PID models a victim that left before its

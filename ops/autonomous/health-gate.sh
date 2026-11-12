@@ -310,6 +310,9 @@ step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 # prove-heavy-unlocked.sh (~3 s, 35/0) — the hook that refuses a kraken, ketos, layout-order or mlx_vlm run
 #   outside the heavy lock (the 2026-10-31 panic).
 step heavy-unlocked-proof bash "$ROOT/ops/autonomous/tests/prove-heavy-unlocked.sh"
+# prove-pyguard.sh (~1 s) — the Python start-up guard that refuses the same runs for any agent, including a
+#   script that starts them itself, which the hook cannot see.
+step pyguard-proof        bash "$ROOT/ops/autonomous/tests/prove-pyguard.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
 step harness-lifecycle-proof python3 "$ROOT/ops/autonomous/tests/prove-harness-lifecycle.py"
 step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
