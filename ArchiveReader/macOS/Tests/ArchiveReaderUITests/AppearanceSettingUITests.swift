@@ -68,7 +68,7 @@ final class AppearanceSettingUITests: FixtureUITestCase {
 
     /// The document viewer is mostly page image, which stays as scanned whatever the appearance, so it is held to a
     /// change rather than to the thresholds; its shots show whether the PDF pane's background (`PDFPaneView`,
-    /// `windowBackgroundColor`, set once) followed the switch.
+    /// `paneBackground`, set once) followed the switch.
     func testAnOpenDocumentViewerFollowsALiveSwitch() throws {
         clickRow(0)
         toolbarButton("ar.toolbar.preview").click()

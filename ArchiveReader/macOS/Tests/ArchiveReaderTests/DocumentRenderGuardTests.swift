@@ -217,6 +217,48 @@ final class DocumentRenderGuardTests: XCTestCase {
                              "a mostly-coloured view should be far from white (\(stats.nonWhiteFraction))")
     }
 
+    // MARK: the page stands out from its pane
+
+    /// A white page in the real `PDFPaneView`, hosted offscreen in each appearance: the pane around the page must
+    /// differ from the page plainly enough to see its edges. On macOS 27 `windowBackgroundColor` was as white as
+    /// the page (W40.fix-reader-pane-background).
+    @MainActor
+    func testWhitePageStandsOutFromItsPaneInBothAppearances() throws {
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            let page = PDFPage()
+            page.setBounds(CGRect(x: 0, y: 0, width: 300, height: 400), for: .mediaBox)
+            let controller = PDFPaneController(key: "left", persists: false)
+            let host = NSHostingView(rootView: PDFPaneView(page: page, controller: controller, reference: page))
+            host.appearance = NSAppearance(named: name)
+            host.frame = CGRect(x: 0, y: 0, width: 800, height: 500)
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            let pdfView = try XCTUnwrap(controller.pdfView, "the pane should have made its PDFView")
+            let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+            writeRenderArtifact(png, named: "pane-background-\(name.rawValue).png")
+            let cg = try XCTUnwrap(bitmap.cgImage)
+
+            let pageRect = pdfView.convert(page.bounds(for: .mediaBox), from: page)
+            let inHost = host.convert(pageRect, from: pdfView)
+            XCTAssertLessThan(inHost.width, host.bounds.width - 40, "the fitted page should leave pane at its sides")
+            let scale = CGFloat(cg.width) / host.bounds.width
+            func luminance(at point: CGPoint) throws -> Double {
+                // CGImage rows run top-down; the host is not flipped.
+                let x = Int(point.x * scale), y = Int((host.bounds.height - point.y) * scale)
+                let crop = try XCTUnwrap(cg.cropping(to: CGRect(x: x - 2, y: y - 2, width: 5, height: 5)))
+                let lums = InkContrast.relativeLuminances(crop)
+                return lums.reduce(0, +) / Double(max(1, lums.count))
+            }
+            let pane = try luminance(at: CGPoint(x: inHost.minX / 2, y: host.bounds.midY))
+            let paper = try luminance(at: CGPoint(x: inHost.midX, y: inHost.midY))
+            XCTAssertGreaterThan(paper, 0.9, "\(name.rawValue): the page should draw white (L=\(paper))")
+            XCTAssertGreaterThan(InkContrast.ratio(paper, pane), 1.6,
+                                 "\(name.rawValue): the pane (L=\(pane)) should stand apart from the page (L=\(paper))")
+        }
+    }
+
     // MARK: - Fixtures
 
     private func makeTempDir(_ prefix: String) -> URL {

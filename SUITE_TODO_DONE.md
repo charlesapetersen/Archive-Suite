@@ -15386,3 +15386,9 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - **Verification:** `scripts/test-settings-layers.sh` (new ledger section: free and NaN batches, collection id and name, no double count, month bounds in UTC, pruning, persistence, the solver's remainder, read-only store) and `scripts/test-settings-sheet.sh` (the monthly limit's rows, a spent month leaves free choices only), both ALL PASS; an Opus review subagent found no counting or compile defects, and its wording and coverage points were taken.
   - Bench cache: none used; nothing kept. Cost $0.
   <!-- /W46.settings-ledger -->
+- [x] **W40.fix-reader-pane-background — the image page stands out from its pane again on macOS 27 [XS]** · §W40 (lane: reader) — SHIPPED 2026-11-12
+  - Filed by W40.vm-macos27-reader: on macOS 27 `windowBackgroundColor` is as white as a page, so the document window's page showed only by its faint shadow.
+  - **Fix:** `PDFPaneView.paneBackground`, a fixed grey resolved per appearance as Preview does (white 0.78 in Light, 0.16 in Dark), replaces the system colour on both panes. A dynamic `NSColor`, so a live Light/Dark switch still follows it.
+  - **Verification:** new render guard `DocumentRenderGuardTests.testWhitePageStandsOutFromItsPaneInBothAppearances` hosts the real `PDFPaneView` offscreen in Aqua and Dark Aqua with a white page and needs a contrast of 1.6 between the page and the pane beside it. With the old colour it fails on this Mac (macOS 27.2): pane L=1.0, page L=1.0 in Light. Reader unit bundle green. UITest still to run in the guest: `AppearanceSettingUITests.testAnOpenDocumentViewerFollowsALiveSwitch` (its shots show the pane following the switch) with the rest of the Reader lane on the next VM run.
+  - Bench cache: none used; nothing kept. Cost $0.
+  <!-- /W40.fix-reader-pane-background -->

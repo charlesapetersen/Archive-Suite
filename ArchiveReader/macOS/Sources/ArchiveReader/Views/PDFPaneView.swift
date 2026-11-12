@@ -495,6 +495,14 @@ struct PDFPaneView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
+    /// The grey behind the page, as in Preview, fixed rather than a system colour: on macOS 27
+    /// `windowBackgroundColor` is as white as a scanned page, which then showed only by its faint shadow
+    /// (W40.fix-reader-pane-background). Resolved per appearance, so a live Light/Dark switch follows it.
+    static let paneBackground = NSColor(name: "ArchiveReader.pdfPaneBackground") { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(white: 0.16, alpha: 1) : NSColor(white: 0.78, alpha: 1)
+    }
+
     @MainActor final class Coordinator: NSObject {
         let controller: PDFPaneController
         init(controller: PDFPaneController) { self.controller = controller }
@@ -513,7 +521,7 @@ struct PDFPaneView: NSViewRepresentable {
         view.displayMode = .singlePage
         view.displaysPageBreaks = false
         view.autoScales = true
-        view.backgroundColor = .windowBackgroundColor
+        view.backgroundColor = Self.paneBackground
         controller.pdfView = view
         if !id.isEmpty { view.setAccessibilityIdentifier(id) }
         NotificationCenter.default.addObserver(context.coordinator,
