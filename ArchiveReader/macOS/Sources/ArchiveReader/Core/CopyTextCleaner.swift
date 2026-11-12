@@ -14,7 +14,8 @@ struct CopyTextOptions: Sendable, Equatable {
     /// first-line indent, a short line that ends a sentence), list items with their level, and headings.
     /// Reads the PDF's line boxes when there are any, else the text's own lines and leading spaces.
     var paragraphFromLayout = true
-    /// A block written wholly in capitals is copied in title case (ArchiveCore `TitleCase`).
+    /// A heading, a list item or a one-line unit written wholly in capitals is copied in title case (ArchiveCore
+    /// `TitleCase`). Prose of several lines in capitals (a cable, a telegram) is quoted as written.
     var titleCaseCapitals = true
 }
 
@@ -39,12 +40,13 @@ enum CopyTextCleaner {
             ?? plain(raw, options: options)
     }
 
-    /// From the selection's lines on the page (`lines`, in reading order), when they hold the same text as
-    /// `raw`; else from the text alone.
+    /// From the selection's lines on the page (`lines`, in reading order), when they hold the same words as
+    /// `raw`, space for space; else from the text alone. (So a repair that fused or split a word is caught here:
+    /// the final guard in `assemble` sets whitespace aside.)
     static func clean(_ raw: String, lines: [CopyTextLine], options: CopyTextOptions = .init()) -> String {
         guard structured(options) else { return plain(raw, options: options) }
         let rows = layoutRows(lines)
-        guard !rows.isEmpty, squeezed(rows.map(\.text).joined()) == squeezed(raw),
+        guard !rows.isEmpty, words(rows.map(\.text).joined(separator: "\n")) == words(raw),
               let out = assemble(structure(rows, columns: true), raw: raw, options: options)
         else { return clean(raw, options: options) }
         return out
@@ -71,7 +73,7 @@ enum CopyTextCleaner {
         if !current.isEmpty { paragraphs.append(current) }
         if paragraphs.isEmpty { return "" }
 
-        let joined = paragraphs.map { titled(join($0, options), options) }
+        let joined = paragraphs.map { $0.count == 1 ? titled(join($0, options), options) : join($0, options) }
         let separator = options.paragraphOnBlankLine ? "\n\n" : (options.collapseSingleNewlines ? " " : "\n")
         return joined.joined(separator: separator)
     }
@@ -89,7 +91,8 @@ enum CopyTextCleaner {
             // is rejoined even when single line breaks are otherwise preserved.
             if options.deHyphenate, result.hasSuffix("-"),
                isLetter(result.dropLast().last), isLetter(cont.first) {
-                result.removeLast()      // drop the line-split hyphen and join the word halves
+                // A capital after the hyphen is a compound broken at its hyphen (Anglo-|American): kept.
+                if cont.first?.isUppercase != true { result.removeLast() }   // drop the line-split hyphen
                 result += cont
             } else if options.collapseSingleNewlines {
                 result += " " + cont
@@ -140,7 +143,8 @@ enum CopyTextCleaner {
             var parts = normalizedLines(line.text.replacingOccurrences(of: "\u{FFFC}", with: ""))
             let text = parts.removeLast()
             for (n, part) in parts.enumerated() where !squeezed(part).isEmpty {
-                if n == 0, let last = rows.indices.last, rows[last].page == line.page {
+                if n == 0, let last = rows.indices.last, rows[last].page == line.page,
+                   isLetter(rows[last].text.last), part.first?.isLowercase == true {
                     rows[last].text += part
                 } else {
                     rows.append(CopyTextLine(text: part, box: line.box, page: line.page))
@@ -189,13 +193,14 @@ enum CopyTextCleaner {
     /// The rows sorted into paragraphs, headings and list items, judged within each block (a run of rows
     /// on one page and, with `columns`, one column). Measured in the block's median row height (`em`):
     /// - a **list item** starts with a marker — `1.` `1)` `(1)` `a.` `a)` `(a)` `iv.` `(iv)` `•` `–` `*` — on a
-    ///   line that starts afresh: the first, after a line that ended (a gap, a sentence or colon at its end, a
-    ///   short line), at an indent of its own, or another marker of a list already open. Its level comes from
+    ///   line that starts afresh: the first, after a line that ended (a gap, a short line) or a colon, at an
+    ///   indent of its own, or another marker of a list already open (a glyph bullet needs none of these). Its level comes from
     ///   its marker's indent against the open items, and from a new marker style at the same indent. The lines
     ///   after it, hanging or back at the margin, are its own until a gap, a short line ending a sentence, or a
     ///   new indent after a sentence end;
     /// - a **heading** is a short line (under 60% of the block's width) that starts afresh and is followed by
-    ///   a fresh start, set apart by being wholly in capitals, centred, or alone between gaps;
+    ///   a fresh start, set apart by being wholly in capitals (unless most of its block is), centred, or alone
+    ///   between gaps;
     /// - a **paragraph** starts after a gap over 1.6× the block's line spacing, at a first-line indent over
     ///   1.2 em that its neighbours do not share (a quoted block is not split line by line), or after a line
     ///   stopping well short that ends a sentence (over a quarter of the width short after `.`, `!`, `?` or `:`,
@@ -227,6 +232,9 @@ enum CopyTextCleaner {
             let width = max(right - left, em)
 
             func gapAbove(_ j: Int) -> Bool { j > 0 && spacings[j - 1] > 1.6 * usual }
+            // In a block mostly in capitals (a cable, a telegram) capitals set nothing apart.
+            let capitalsBlock = ls.count >= 3
+                && ls.filter { TitleCase.isAllCapitals($0.text) }.count * 2 > ls.count
             func indented(_ j: Int) -> Bool { ls[j].box.minX - left > 1.2 * em }
             func shortfall(_ j: Int) -> CGFloat { (right - ls[j].box.maxX) / width }
             func text(_ j: Int) -> String { ls[j].text.trimmingCharacters(in: .whitespaces) }
@@ -259,7 +267,12 @@ enum CopyTextCleaner {
                     let ownIndent = j > 0 && abs(x - ls[j - 1].box.minX) > 1.2 * em
                         && abs(x - (continuation ?? .infinity)) > 1.2 * em
                     let listGoesOn = open.contains { $0.style == marker.style }
-                    if marker.style == .bullet || fresh || ownIndent || listGoesOn {
+                    // A glyph bullet always starts an item. A dash, a letter or a number at a line start
+                    // can be prose ("- and this", "Mr.|J. Edgar", "page|12. The"): only after a line that
+                    // ended or a colon, at an indent of its own, or in a list already open.
+                    let glyph = marker.style == .bullet && !"–—*-".contains(cur.first ?? " ")
+                    let start = j == 0 ? fresh : (ended(j) || afterHeading || prev.hasSuffix(":"))
+                    if glyph || start || ownIndent || listGoesOn {
                         let level = place(marker.style, at: x, in: &open, tolerance: em)
                         units.append(Unit(kind: .item(level: level, markerLength: marker.length), lines: [cur],
                                           blankBefore: blank))
@@ -274,7 +287,7 @@ enum CopyTextCleaner {
                 let nextFresh = gapBelow || startsFresh(text(j + 1))
                 let narrow = (ls[j].box.maxX - ls[j].box.minX) / width < 0.6
                 let centred = (x - left) > 2 * em && abs((x - left) - (right - ls[j].box.maxX)) < 2 * em
-                let capitals = TitleCase.isAllCapitals(cur)
+                let capitals = TitleCase.isAllCapitals(cur) && !capitalsBlock
                 let endsOK = !cur.hasSuffix(",") && !cur.hasSuffix(";") && !cur.hasSuffix("-")
                     && (capitals || !cur.hasSuffix("."))
                 let setApart = capitals || centred || ((j == 0 || gapAbove(j)) && gapBelow && ls.count > 1)
@@ -386,7 +399,7 @@ enum CopyTextCleaner {
                 indent = String(repeating: "    ", count: level)
                 let cut = text.index(text.startIndex, offsetBy: min(markerLength, text.count))
                 text = String(text[..<cut]) + titled(String(text[cut...]), options)
-            } else {
+            } else if u.kind == .heading || u.lines.count == 1 {
                 text = titled(text, options)
             }
             if let p = previous {
@@ -419,9 +432,14 @@ enum CopyTextCleaner {
         return t.last.map { ".!?:".contains($0) } ?? false
     }
 
-    /// Whitespace-free form, for matching PDFKit's line strings against the selection's text.
+    /// Whitespace-free form, for telling an empty line selection.
     private static func squeezed(_ s: String) -> String {
         s.filter { !$0.isWhitespace && $0 != "\u{FFFC}" }
+    }
+
+    /// The words of `s` in order, object replacement characters set aside.
+    private static func words(_ s: String) -> [Substring] {
+        s.replacingOccurrences(of: "\u{FFFC}", with: " ").split(whereSeparator: \.isWhitespace)
     }
 
     /// The lower median, so that of two spacings, one of them a paragraph gap, the usual one is chosen.

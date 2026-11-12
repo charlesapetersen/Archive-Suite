@@ -30,6 +30,15 @@ final class TitleCaseTests: XCTestCase {
         XCTAssertEqual(TitleCase.titleCased("“THE FIRM” (DRAFT)"), "“The Firm” (Draft)")
     }
 
+    func testReviewCases() {
+        XCTAssertEqual(TitleCase.titleCased("MEETING ADJOURNED. THE NEXT MEETING"), "Meeting Adjourned. The Next Meeting")
+        XCTAssertEqual(TitleCase.titleCased("THE COMMANDER-IN-CHIEF"), "The Commander-in-Chief")
+        XCTAssertEqual(TitleCase.titleCased("AT&T AND THE ACLU"), "AT&T and the ACLU")
+        XCTAssertEqual(TitleCase.titleCased("LT. COL. SMITH, SGT. JONES"), "Lt. Col. Smith, Sgt. Jones")
+        XCTAssertEqual(TitleCase.titleCased("CHAPTER XLIV, TITLE XIV"), "Chapter XLIV, Title XIV")
+        XCTAssertEqual(TitleCase.titleCased("LETTER TO MR. SMITH"), "Letter to Mr. Smith")
+    }
+
     func testMixedCaseTextIsLeftAlone() {
         let s = "He wrote to the UCLA library and to MR SMITH."
         XCTAssertEqual(TitleCase.titleCased(s), s)

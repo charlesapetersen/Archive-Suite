@@ -18,11 +18,14 @@ public enum TitleCase {
     public static let knownAcronyms: Set<String> = [
         "UCLA", "USA", "USSR", "UN", "UK", "EU", "NATO", "NASA", "FBI", "CIA", "IBM", "NAACP", "YMCA", "YWCA",
         "AFL", "CIO", "HEW", "HUD", "OMB", "GOP", "MIT", "CEO", "MBA", "IRS", "SEC", "OSS", "UNESCO", "UNICEF",
-        "OPEC", "UPI", "AEC", "TVA", "WPA", "ICC", "FAA", "EEOC",
+        "OPEC", "UPI", "AEC", "TVA", "WPA", "ICC", "FAA", "EEOC", "ABC", "ACLU", "UAW", "OEO", "USIA", "AMA",
+        "OPA", "ROTC", "SEATO", "UNRRA", "USAF", "USIS", "NEA", "AARP", "AFSCME", "OAS", "IMF", "AEF",
+        "USO", "NAFTA", "UCSF", "USC", "NYU", "CUNY", "SUNY", "EPA", "OSHA", "FEMA", "NOAA",
     ]
 
     /// Abbreviated titles, which have no vowel but are words: MR. → Mr.
-    private static let titles: Set<String> = ["MR", "MRS", "MS", "DR", "ST", "JR", "SR", "MESSRS"]
+    private static let titles: Set<String> = ["MR", "MRS", "MS", "DR", "ST", "JR", "SR", "LT", "SGT", "PVT",
+                                              "CPL", "FT", "MT", "BLDG", "MGR", "BRIG", "BROS", "WM", "CHAS"]
 
     private static let smallWords: Set<String> = [
         "a", "an", "the", "and", "but", "or", "nor", "for", "of", "in", "on", "at", "to", "by", "as", "via",
@@ -54,11 +57,20 @@ public enum TitleCase {
             let last = n == ranges.count - 1
             out += word(token, first: capitaliseNext, last: last, keep: keep)
             capitaliseNext = token.hasSuffix(":") || token.hasSuffix("—") || token.hasSuffix("–")
-                || token == "—" || token == "–"
+                || token.hasSuffix("?") || token.hasSuffix("!") || endsSentence(token)
             cursor = r.upperBound
         }
         out += s[cursor...]
         return out
+    }
+
+    /// A token ending a sentence with a full stop, not an initial or abbreviated title (J., MR., U.S.).
+    private static func endsSentence(_ token: String) -> Bool {
+        var t = Substring(token)
+        while let c = t.last, "\"”'’)]".contains(c) { t = t.dropLast() }
+        guard t.hasSuffix(".") else { return false }
+        let core = t.dropLast().filter { $0.isLetter || $0 == "." }
+        return core.count > 1 && !core.contains(".") && !titles.contains(String(core))
     }
 
     private static func wordRanges(_ s: String) -> [Range<String.Index>] {
@@ -85,7 +97,7 @@ public enum TitleCase {
     }
 
     private static func cased(_ core: String, first: Bool, last: Bool, keep: Set<String>) -> String {
-        if keep.contains(core) { return core }
+        if keep.contains(core) || core.contains("&") { return core }   // AT&T, B&O
         // Initials and dotted abbreviations: J., J.W., U.S.A.
         if core.contains("."), core.split(separator: ".").allSatisfy({ $0.count <= 2 }) { return core }
         // Slash forms of short parts (M/D, A/C); longer ones are cased part by part (AND/OR → And/Or).
@@ -97,8 +109,10 @@ public enum TitleCase {
         // Hyphenated words are cased part by part (FIRST-CLASS → First-Class, AFL-CIO kept).
         if core.contains("-") || core.contains("‐") {
             let sep: Character = core.contains("-") ? "-" : "‐"
-            return core.split(separator: sep, omittingEmptySubsequences: false).enumerated()
-                .map { cased(String($1), first: first || $0 > 0, last: last, keep: keep) }
+            let parts = core.split(separator: sep, omittingEmptySubsequences: false)
+            // COMMANDER-IN-CHIEF → Commander-in-Chief: a small word inside is lower.
+            return parts.enumerated()
+                .map { cased(String($1), first: $0 == 0 && first, last: last && $0 == parts.count - 1, keep: keep) }
                 .joined(separator: String(sep))
         }
         if core.contains(where: \.isNumber) { return lowerSuffixAfterDigits(core) }
@@ -139,6 +153,6 @@ public enum TitleCase {
     }
 
     private static func isRomanNumeral(_ s: String) -> Bool {
-        s.range(of: "^X{0,3}(IX|IV|V?I{0,3})$", options: .regularExpression) != nil
+        s.range(of: "^M{0,4}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$", options: .regularExpression) != nil
     }
 }

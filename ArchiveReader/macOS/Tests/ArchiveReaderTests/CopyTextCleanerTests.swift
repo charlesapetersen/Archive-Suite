@@ -301,12 +301,43 @@ final class CopyTextCleanerTests: XCTestCase {
     }
 
     func testCapitalsTitleCasedOnlyWhenWhollyCapitals() {
-        XCTAssertEqual(CopyTextCleaner.clean("A LETTER FROM THE UCLA\nLIBRARY TO MR. J. W. SMITH"),
+        XCTAssertEqual(CopyTextCleaner.clean("A LETTER FROM THE UCLA LIBRARY TO MR. J. W. SMITH"),
                        "A Letter from the UCLA Library to Mr. J. W. Smith")
+        // Prose of several lines in capitals (a cable) is quoted as written, and its short last line is not
+        // taken for a heading.
+        let cable = "REFERENCE YOUR MESSAGE OF TUESDAY THE MINISTER WILL\nSEE THE AMBASSADOR AT NOON AND WILL CALL.\n"
+            + "THE COMMITTEE WILL MEET AFTER\nTHAT."
+        XCTAssertEqual(CopyTextCleaner.clean(cable),
+                       "REFERENCE YOUR MESSAGE OF TUESDAY THE MINISTER WILL SEE THE AMBASSADOR AT NOON AND WILL CALL. "
+                       + "THE COMMITTEE WILL MEET AFTER THAT.")
         XCTAssertEqual(CopyTextCleaner.clean("He wrote to the UCLA\nLIBRARY at once."), "He wrote to the UCLA LIBRARY at once.")
         var opts = CopyTextOptions(); opts.titleCaseCapitals = false
         XCTAssertEqual(CopyTextCleaner.clean("BOX 12\nFOLDER 3", options: opts), "BOX 12 FOLDER 3")
         XCTAssertEqual(CopyTextCleaner.clean("(A) THE MINUTES\n(B) THE ACCOUNTS"), "(A) The Minutes\n(B) The Accounts")
+    }
+
+    func testDashInitialAndCompoundAtLineStartsStayProse() {
+        let dash = "He said the board would act at once, as he put it\n- and this is the point - we must agree\nby Friday."
+        XCTAssertEqual(CopyTextCleaner.clean(dash),
+                       "He said the board would act at once, as he put it - and this is the point - we must agree by Friday.")
+        let initial = "After the vote the chair then called on Mr.\nJ. Edgar Smith, who said the whole matter\nwas closed."
+        XCTAssertEqual(CopyTextCleaner.clean(initial),
+                       "After the vote the chair then called on Mr. J. Edgar Smith, who said the whole matter was closed.")
+        XCTAssertEqual(CopyTextCleaner.clean("the Anglo-\nAmerican talks and the wel-\nfare state"),
+                       "the Anglo-American talks and the welfare state")
+    }
+
+    /// A line selection holding two whole lines ("in full.⏎Heading…") must not fuse the words: the rows no
+    /// longer match the text space for space, so the text alone is used.
+    func testSelectionWithWholeLineBeforeNewlineIsNotFused() {
+        let lines = [at("The minutes were read and approved in full.", 36, 600, 300),
+                     at("Next\nthe report of the treasurer was heard", 36, 581.7, 390),
+                     at("and agreed without a vote of the members.", 36, 563.4, 380)]
+        let raw = "The minutes were read and approved in full.\nNext\nthe report of the treasurer was heard\n"
+            + "and agreed without a vote of the members."
+        let out = CopyTextCleaner.clean(raw, lines: lines)
+        XCTAssertFalse(out.contains("full.Next"), out)
+        XCTAssertTrue(out.contains("full. Next") || out.contains("full.\n"), out)
     }
 
     /// The structure pass may only regroup: a result whose letters differ from the selection's is refused.

@@ -475,8 +475,9 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               match-facets) that gate NavigationModel's cache rebuilds. Subjects sig is
                               over the union (NOT the multiset) so even-count edits can't XOR-cancel.
   FileLink.swift              LinkFormat + FileLinkFormatter (percent-encoding; HTML-escaped).
-  CopyTextCleaner.swift       Intelligent copy (collapse single NLs, paragraph on blank, de-hyphenate,
-                              unmarked paragraph breaks from line boxes: wider gap, indent, short line).
+  CopyTextCleaner.swift       Intelligent copy (de-hyphenate; paragraphs, list items with levels and
+                              headings from line boxes, or the text's lines; capitals title-cased via
+                              ArchiveCore TitleCase; refuses any result whose letters differ).
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
   TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
                               keyboard triage; touches no file — the caller writes via TagWriter.

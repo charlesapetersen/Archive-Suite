@@ -168,6 +168,10 @@ the words in.
 **Items.** W40.reader-prose-structure (rules from geometry, no model), then W40.reader-prose-model (the research and
 measurement). Title case is shared with W47.ct-normalise, which needs the same rule for label text.
 
+**Rules shipped 2026-11-11** (W40.reader-prose-structure, `SUITE_TODO_DONE.md`): `CopyTextCleaner.structure` and
+`assemble` (the units and the word guard W40.reader-prose-model's labels would feed), ArchiveCore
+`TitleCase.titleCased(_:keeping:)` for W47.ct-normalise. Both Bower pages keep their breaks, list and levels.
+
 ## 6. Watermarks, warping and selection (points 6 and 9)
 
 **Owner, 2026-11-10:** these pages are tests of the pipeline, not a request for a bulk re-read; a bulk re-read waits
