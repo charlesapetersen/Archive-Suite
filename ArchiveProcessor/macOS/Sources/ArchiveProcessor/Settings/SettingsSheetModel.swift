@@ -366,8 +366,13 @@ struct SettingsSheetModel {
             labels.append("These figures were measured on text read by the programs used in the tests, not by "
                           + "your reading choice above; with a reading program that makes more mistakes, results may be lower.")
             if s.picks.contains(where: { $0.stage == "reading" && $0.part == "handwritten" && $0.flag != nil }) {
-                labels.append("Handwritten pages your reading choice cannot read get no "
-                              + (stage.id == "dating" ? "date" : "names") + " from their text.")
+                labels.append(stage.id == "dating"
+                    ? "Handwritten pages your reading choice cannot read get no date from their text: the year in the text "
+                        + "comes from the text your reading choice produces, and only the page-image step looks at the page "
+                        + "itself. The figures include handwritten documents, so expect fewer."
+                    : "Handwritten pages your reading choice cannot read get no names: the program here works from the "
+                        + "text your reading choice produces and does not look at the page again. The figures include "
+                        + "handwritten letters, so expect fewer.")
             }
         }
         if stage.id == "entities", let p = lead, !p.shown {
@@ -871,7 +876,7 @@ struct SettingsSheetWords {
     }
 
     static func ruleTitle(_ s: String) -> String {
-        ["reading-copy": "The copy you read: turning, straightening, image size",
+        ["reading-copy": "The copy you read: turning and straightening",
          "ocr-input": "Cleaning the image before it is read",
          "layout": "Columns and reading order",
          "placement": "Where the text sits on the page image",
@@ -932,14 +937,15 @@ struct SettingsSheetWords {
             "vision-rules-t3": "Apple Vision's text and fixed rules (built in)",
             "mlx-date-2b-8bit": "A small dating model on this Mac, reading the year by itself",
             "mix-claude-chatgpt": "Claude and ChatGPT together, comparing their answers",
-            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, reading each document once more for its date and names",
-            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), reading each document once more for its date and names",
+            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, working from each document's text for its date and names",
+            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), working from each document's text for its date and names",
             "gemini3.7-flash-trace-neigh": "Gemini 3.7 Flash (Stanford gateway), quoting its evidence and nearby dates",
+            "gemini3.7-flash-route": "Gemini 3.7 Flash (Stanford gateway): reads the text, looks at the page when no year is written, and checks a guess against nearby documents",
             "gemini3.7-flash-image": "Gemini 3.7 Flash (Stanford gateway), looking at the page image",
             "qwen3.6-27b-image": "Qwen3.6 27B on a computing cluster, looking at the page image",
             "qwen3-vl-8b-image-mac": "Qwen3-VL 8B on this Mac, looking at the page image",
             "qwen3.6-27b-trace-neigh-vision": "Qwen3.6 27B on a computing cluster, quoting its evidence",
-            "gemini-tagging-place": "Gemini, reading each document once more for its date and names",
+            "gemini-tagging-place": "Gemini, working from each document's text for its date and names",
             "gemini-entity8k": "Gemini, with a request of its own for names",
             "qwen3.6-27b": stage == "entities" ? "Qwen3.6 27B (a computing cluster or OpenRouter)" : r.name,
             "qwen3-vl-8b-mac": "Qwen3-VL 8B on this Mac",
@@ -1049,8 +1055,8 @@ struct SettingsSheetWords {
         case "reading":
             return d < 0.05 ? "less than 0.1 more characters right in 100 on your mix of pages"
                 : String(format: "%.1f more characters right in 100 on your mix of pages", d)
-        case "segmentation": return String(format: "%.0f percentage points more pages in the right document", d)
-        case "dating": return String(format: "%.0f percentage points more exact years where the year is not in the text", d)
+        case "segmentation": return String(format: "%.0f more pages in every 100 in the right document", d)
+        case "dating": return String(format: "%.0f more exact years in every 100 documents whose year is not in the text", d)
         case "entities": return String(format: "%.0f more senders right in 100", d * 100)
             .replacingOccurrences(of: "more senders right", with: "more senders right")
         default: return SettingsSolver.num(d)
@@ -1138,7 +1144,11 @@ struct SettingsSheetWords {
                 ? "Where the year is not written, it ties the best choice this collection can use (within the measurements' margin of error), and "
                 : "As good as the best choice this collection can use, within the measurements' margin of error, and ") + tail
         }
-        if r.contains("is the best route") { return "The best measured choice this collection can use." }
+        if r.contains("is the best route") {
+            return p.route.map { r in r.id.contains("3.8") && r.caveats.contains { $0.contains("3.7") } } == true
+                ? "The best choice this collection can use (its figures are Gemini 3.7's; see below)."
+                : "The best measured choice this collection can use."
+        }
         if r.contains("No names") { return "Names are not looked for in this batch." }
         return "The choice the measurements support for your answers."
     }
