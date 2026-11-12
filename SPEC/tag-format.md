@@ -44,10 +44,19 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
 - **Color-name-token preserves labelNumber.** The color label (`.labelNumberKey`) and a color-name
   token (`"Red"`, `"Green"`, …, one of Finder's seven) in the tag array are two representations of the
   same fact. **Verified:** keeping the color-name token in the array and writing only `.tagNamesKey`
-  **preserves the existing `labelNumber`** without writing it. Processor still writes `.labelNumberKey`
+  **preserves the existing `labelNumber`** without writing it — except in a sandboxed app on macOS 27,
+  where it came back `0` (measured 2026-11-12) and the writer's §7 drift restore puts it back. Processor still writes `.labelNumberKey`
   explicitly (`MacOSTagger.applyTags`: the colour the user chose for the item type, or `0` when none);
   Reader writes it **only** when a delta changes color (`TagWriter` §7), otherwise restores drift. The
   colour is the user's display choice, never the item type (§Item type).
+- **Every tag a write leaves alone keeps its own colour.** Each entry of the raw tag attribute
+  (`com.apple.metadata:_kMDItemUserTags`) carries the tag's own colour after a newline (`"Purple\n3"`).
+  A names-only `.tagNamesKey` write lets macOS choose those colours, and **on macOS 27 a sandboxed app
+  gets none** (measured 2026-11-12, host and VM: `"Purple\n3"` → `"Purple\n0"`; unsandboxed, any tag not
+  in the local Finder tag list lost its colour too). So `CoordinatedTagWriter` (§7a) puts back, exact
+  name and occurrence by occurrence, the entry each surviving tag had before the write; a tag the write
+  adds keeps whatever macOS gave it. This is separate from `labelNumber` above, which lives in the
+  file's Finder info.
 - **No search index is ever tag truth.** The filesystem xattr read through `.tagNamesKey` is the only
   authority. Spotlight's `kMDItemUserTags` was the Reader's discovery mechanism until `W26.walk2` replaced
   it with a direct walk (`ArchiveCore.CorpusWalker`) plus a disposable `LibraryIndex` cache and FSEvents;

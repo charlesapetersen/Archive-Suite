@@ -22,6 +22,9 @@ import Foundation
 //      moved/replaced under the same path is never tagged. Uses `fileResourceIdentifier` (a pure
 //      read), NEVER `.documentIdentifierKey` (which assigns & persists an id — a mutation).
 //   §7 label written only when the transform changes it; drift otherwise restored.
+//   §7a tag colours: Finder's colour-named tags carry their own colour ("Purple\n3") and every other
+//       surviving tag the colour it had. macOS 27 gives a sandboxed names-only write no colours, so they
+//       are put back in the tag attribute itself.
 //   §8 verify by re-read — multiset equality (order-independent) + label check.
 //   §9 inverse delta derived from the actual before/after diff.
 //   §10 in-process per-resolved-path serialization — the whole read→modify→verify→write above is
@@ -286,6 +289,9 @@ public enum CoordinatedTagWriter {
                 case let .failure(why):
                     throw TagWriteError.unreadable(why)
                 }
+                // The raw entries too, for the colour each tag carries (§7a). nil (unreadable as raw) only
+                // means there are no colours to keep: the names read above are what the write is judged by.
+                let beforeRaw = TagXattr.rawEntries(target)
 
                 guard let (intendedTags, intendedLabel) = transform(before, beforeLabel) else {
                     box.result = TagWriteResult(url: url, before: before, after: before,
@@ -308,6 +314,22 @@ public enum CoordinatedTagWriter {
                 if normalizedLabel(intendedLabel) == normalizedLabel(beforeLabel), normalizedLabel(afterLabel) != normalizedLabel(beforeLabel) {
                     try (target as NSURL).setResourceValue(beforeLabel ?? 0, forKey: .labelNumberKey)
                     (after, afterLabel) = try readPair(target)
+                }
+
+                // §7a tag-colour defense (W40.vm-macos27-reader): a names-only write lets macOS pick each tag's
+                // colour, and on macOS 27 a sandboxed app gets none, so every untouched "Purple\n3" came back
+                // "Purple\n0". Finder's colour-named tags get their own colour and every other surviving tag
+                // the colour it had (`TagXattr.keepingColours`), then re-read: the checks below judge the file
+                // as it is after this, not as we meant it to be. A failure here is reported after the names
+                // were written, and says so.
+                if let beforeRaw, let afterRaw = TagXattr.rawEntries(target),
+                   let corrected = TagXattr.keepingColours(before: beforeRaw, after: afterRaw) {
+                    try TagXattr.writeRawEntries(corrected, to: target)
+                    (after, afterLabel) = try readPair(target)
+                    guard let reread = TagXattr.rawEntries(target),
+                          TagXattr.keepingColours(before: beforeRaw, after: reread) == nil else {
+                        throw TagWriteError.verificationFailed("the tags were written, but their colours did not hold after restoring them")
+                    }
                 }
 
                 guard multisetEqual(after, intendedTags) else {

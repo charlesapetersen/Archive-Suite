@@ -127,10 +127,12 @@ final class TextZoomUITests: XCTestCase {
         row.click()
         app.typeKey("o", modifierFlags: .command)   // Open Document
 
-        let text = app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
-                                                        sentinel, sentinel)).firstMatch
-        XCTAssertTrue(text.waitForExistence(timeout: 20),
-                      "the document window's text pane should show the page's extracted text")
+        // The text pane itself, by its identifier: on macOS 27 PDFKit also exposes the image page's own text
+        // as a static text, which a query by content found first, and text zoom never changes that one.
+        let text = app.textViews["ar.doc.textPane"]
+        XCTAssertTrue(text.waitForExistence(timeout: 20), "the document window's text pane should come up")
+        XCTAssertTrue(((text.value as? String) ?? "").contains(sentinel),
+                      "the text pane should show the page's extracted text")
         return (app, text)
     }
 
@@ -145,7 +147,9 @@ final class TextZoomUITests: XCTestCase {
         let context = try XCTUnwrap(CGContext(url as CFURL, mediaBox: &box, nil))
         context.beginPDFPage(nil)
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        let body = (0..<40).map { "\(sentinel), sentence \($0), from a single-page archival scan." }
+        // Long enough to run past the pane at every size the tests reach (two steps smaller included): the
+        // text view is as tall as its text only once the text overflows the pane.
+        let body = (0..<80).map { "\(sentinel), sentence \($0), from a single-page archival scan." }
             .joined(separator: " ")
         NSAttributedString(string: body, attributes: [.font: NSFont.systemFont(ofSize: 11)])
             .draw(in: box.insetBy(dx: 36, dy: 36))

@@ -597,7 +597,6 @@ final class ViewerUITests: FixtureUITestCase {
         // means the tan JPEG covers as much of the pane as the white PDF page did. (Carrying the raw scale
         // factor, the old behaviour, drew it at twice the width and height.)
         let docWindow = app.windows.containing(.any, identifier: "ar.doc.imageSource").firstMatch
-        let isWhite: (Int, Int, Int) -> Bool = { r, g, b in r > 248 && g > 248 && b > 248 }
         let isTan: (Int, Int, Int) -> Bool = { r, g, b in abs(r - 180) < 30 && abs(g - 160) < 30 && abs(b - 140) < 30 }
         let zoomOut = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
                                                        "ar.doc.imageZoomOut", "Zoom Out Image")).firstMatch
@@ -608,7 +607,11 @@ final class ViewerUITests: FixtureUITestCase {
         zoomOut.click(); zoomOut.click()
         settle(1)
         captureScreenshot("jpeg-toolbar-0-pdf-zoomed")
-        let pdfSize = pageExtent(in: docWindow, isWhite)
+        // The white PDF page is measured by its accessibility frame: on macOS 27 the pane's background is as white
+        // as the page, so a pixel run finds the whole pane. The tan JPEG is still measured from the pixels.
+        let imagePage = docWindow.descendants(matching: .any)
+            .matching(NSPredicate(format: "title == %@", "Original image page")).firstMatch
+        let pdfSize = imagePage.frame.size
         jpegSide.click()
         settle(1)
         XCTAssertTrue(viewMenuItem("Show PDF Image").exists, "clicking JPEG in the toolbar shows the JPEG original")
@@ -624,7 +627,7 @@ final class ViewerUITests: FixtureUITestCase {
         XCTAssertTrue(viewMenuItem("Show JPEG Image").exists, "clicking PDF in the toolbar goes back to the PDF image")
         closeMenu()
         settle(0.5)
-        let backSize = pageExtent(in: docWindow, isWhite)
+        let backSize = imagePage.frame.size
         print("[jpeg-keep-view] page on screen back on the PDF: \(backSize)")
         XCTAssertEqual(backSize.width, pdfSize.width, accuracy: 2, "back on the PDF, its own zoom returns")
         pressKey("0", modifiers: [.command, .option])   // reset the zoom so later tests start fitted
@@ -824,16 +827,25 @@ final class ViewerUITests: FixtureUITestCase {
         settle(0.3)
         XCTAssertEqual(find.value as? String, "Calif", "typing straight after ⌘F should land in the find field")
 
-        // Move focus into the image pane, below the find bar, then ⌘F again on the open bar.
-        find.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .withOffset(CGVector(dx: 0, dy: 250)).click()
+        // Move focus into the image pane by clicking its page, then ⌘F again on the open bar. Typing is the
+        // proof both times, as above: the field's value is what a user sees.
+        let docWindow = app.windows.containing(.textField, identifier: "ar.doc.findField").firstMatch
+        let imagePage = docWindow.descendants(matching: .any)
+            .matching(NSPredicate(format: "title == %@", "Original image page")).firstMatch
+        XCTAssertTrue(imagePage.waitForExistence(timeout: 5), "precondition: the image pane shows its page")
+        imagePage.click()
         settle(0.5)
-        XCTAssertFalse((find.value(forKey: "hasKeyboardFocus") as? Bool) ?? false,
-                       "precondition: clicking the pane took focus from the find field")
+        captureScreenshot("find-focus-after-pane-click")
+        app.typeText(" ")   // a space: the pane only scrolls with it, the field would take it
+        settle(0.3)
+        XCTAssertEqual(find.value as? String, "Calif", "precondition: clicking the pane took focus from the find field")
         pressKey("f", modifiers: .command)
         settle(0.5)
-        XCTAssertTrue((find.value(forKey: "hasKeyboardFocus") as? Bool) ?? false,
-                      "⌘F with the bar already open should put the caret back in the find field")
+        app.typeText("o")
+        settle(0.3)
+        // Focusing a field may select its text, so the typed letter may replace it or follow it.
+        XCTAssertTrue(["Califo", "o"].contains(find.value as? String ?? ""),
+                      "⌘F with the bar already open should put the caret back in the find field: \(find.value ?? "nil")")
 
         pressKey("w", modifiers: .command)
         settle(1)

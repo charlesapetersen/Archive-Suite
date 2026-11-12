@@ -58,6 +58,10 @@ struct AuditFinding: CustomStringConvertible {
     var detailed: String
     /// How many labelled elements the element contains, from the window's snapshot (0 for a leaf).
     var labelledDescendants = 0
+    /// The type of the element's parent in the window's snapshot (nil for the window itself).
+    var parentType: XCUIElement.ElementType?
+    /// Whether the element's frame is the whole window's, to the point.
+    var fillsWindow = false
     /// For a contrast issue: the contrast ratio measured from the screenshot (see `ScreenPixels`).
     var measured: Double?
     /// For a measured contrast issue: the height of its tallest line of letters, in points (see `inkHeight`).
@@ -121,6 +125,23 @@ final class AccessibilityAudit {
             $0.audit == .sufficientElementDescription && $0.type == .group && $0.identifier.isEmpty
                 && $0.label.isEmpty && $0.labelledDescendants > 0
         },
+        // Seen 2026-11-12 on macOS 27.2, on every slider in the Reader (the tag cloud's threshold, Settings'
+        // split and list text size): AppKit now exposes the slider's knob as its own AXValueIndicator child,
+        // with no description. VoiceOver reads the slider, which is audited for its own description; the knob
+        // is part of the AppKit control and the app has no handle on it.
+        // Seen 2026-11-12 on macOS 27.2 on the Reader's document window (a `WindowGroup(for:)` scene), never on
+        // its navigation window: "Parent/Child mismatch" on the unnamed group SwiftUI puts directly under the
+        // window, the size of the whole window, title bar included. It stays with the inspector shown, and
+        // the app's content is all inside it; the group is SwiftUI's window hosting, which the app does not
+        // build and cannot reach. A mismatch anywhere inside the window still fails.
+        Exemption(reason: "SwiftUI's whole-window content group (macOS 27)") {
+            $0.audit == .parentChild && $0.type == .group && $0.identifier.isEmpty && $0.label.isEmpty
+                && $0.parentType == .window && $0.fillsWindow
+        },
+        Exemption(reason: "AppKit's slider knob (macOS 27); the slider carries the description") {
+            $0.audit == .sufficientElementDescription && $0.type == .valueIndicator && $0.identifier.isEmpty
+                && $0.parentType == .slider
+        },
     ]
 
     nonisolated static func name(_ t: XCUIAccessibilityAuditType) -> String {
@@ -182,14 +203,14 @@ final class AccessibilityAudit {
             XCTFail("accessibility audit: \(screen) — the window to audit is not there", file: file, line: line)
             return
         }
-        // Every element in the window, with how many labelled elements it holds.
-        var inWindow: [String: Int] = [:]
-        @discardableResult func collect(_ s: XCUIElementSnapshot) -> Int {
-            let inside = s.children.reduce(0) { $0 + collect($1) }
-            inWindow[Self.placeKey(s.elementType, s.identifier, s.frame)] = inside
+        // Every element in the window, with how many labelled elements it holds and its parent's type.
+        var inWindow: [String: (labelled: Int, parent: XCUIElement.ElementType?)] = [:]
+        @discardableResult func collect(_ s: XCUIElementSnapshot, parent: XCUIElement.ElementType?) -> Int {
+            let inside = s.children.reduce(0) { $0 + collect($1, parent: s.elementType) }
+            inWindow[Self.placeKey(s.elementType, s.identifier, s.frame)] = (inside, parent)
             return inside + (s.label.isEmpty ? 0 : 1)
         }
-        collect(tree)
+        collect(tree, parent: nil)
         let visible = tree.frame
         let screenshot = XCUIScreen.main.screenshot()
         let pixels = ScreenPixels(screenshot)
@@ -201,7 +222,9 @@ final class AccessibilityAudit {
             // An issue with no element left to name cannot be placed, so it is kept rather than dropped.
             if let type = f.type {
                 guard let n = inWindow[Self.placeKey(type, f.identifier, f.frame)] else { outside += 1; continue }
-                f.labelledDescendants = n
+                f.labelledDescendants = n.labelled
+                f.parentType = n.parent
+                f.fillsWindow = f.frame.integral == visible.integral
             }
             // Contrast is measured from the pixels under the element's frame. Where the frame is not wholly on
             // the window — text scrolled below a Settings pane, a field running past the edge — those pixels

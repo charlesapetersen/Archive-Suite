@@ -111,6 +111,80 @@ enum TagXattr {
         }
     }
 
+    /// The attribute's raw entries, each a tag name optionally followed by `\n` and the tag's own colour
+    /// ("Purple\n3"). `[]` when the attribute is absent; nil when it cannot be read or is not an array of
+    /// strings — a caller then has no colours to keep, which is never a reason to write.
+    static func rawEntries(_ url: URL) -> [String]? {
+        guard url.isFileURL else { return nil }
+        return url.withUnsafeFileSystemRepresentation { rawPath -> [String]? in
+            guard let rawPath else { return nil }
+            let size = getxattr(rawPath, finderTagsXattrName, nil, 0, 0, 0)
+            if size == -1 { return errno == ENOATTR ? [] : nil }
+            if size == 0 { return [] }
+            var buffer = [UInt8](repeating: 0, count: size)
+            let read = getxattr(rawPath, finderTagsXattrName, &buffer, size, 0, 0)
+            guard read >= 0 else { return nil }
+            guard let plist = try? PropertyListSerialization.propertyList(from: Data(buffer[0..<read]),
+                                                                          options: [], format: nil)
+            else { return nil }
+            return plist as? [String]
+        }
+    }
+
+    /// Replace the attribute with `entries`, as the binary plist Finder writes. Throws on any failure.
+    static func writeRawEntries(_ entries: [String], to url: URL) throws {
+        let data = try PropertyListSerialization.data(fromPropertyList: entries, format: .binary, options: 0)
+        let status = url.withUnsafeFileSystemRepresentation { rawPath -> Int32 in
+            guard let rawPath else { errno = EINVAL; return -1 }
+            return data.withUnsafeBytes { setxattr(rawPath, finderTagsXattrName, $0.baseAddress, data.count, 0, 0) }
+        }
+        if status != 0 {
+            throw TagWriteError.verificationFailed("the tags were written, but their colours could not be kept: \(describe(errno))")
+        }
+    }
+
+    /// The colour-preserving half of a tag write (W40.vm-macos27-reader). `before` and `after` are the raw
+    /// entries around a `.tagNamesKey` write; returns the corrected entries, or nil when nothing needs it.
+    /// - One of Finder's seven colour-named tags ("Purple") gets its own colour ("Purple\n3"), whether the
+    ///   write kept it or added it: that is the colour Finder gives it, and what a write before macOS 27
+    ///   left it with. It follows the name, never the label, so it cannot fight an intended label change.
+    /// - Any other tag that was there before and is still there keeps the entry it had, occurrence by
+    ///   occurrence, matched on the name's exact bytes ("Café" composed and decomposed are two names).
+    /// - Any other tag the write added keeps what macOS gave it.
+    /// Only colours change: every corrected entry has the same name as the entry it replaces.
+    ///
+    /// Why: writing names only lets macOS choose each tag's colour, and on macOS 27 a SANDBOXED app (all
+    /// three of ours) gets none, so every write turned "Purple\n3" into "Purple\n0" (measured 2026-11-12 on
+    /// the host and in the VM guest; unsandboxed, Finder's colour-named tags kept their colour and any
+    /// other tag took the one in the local Finder tag list, often none).
+    static func keepingColours(before: [String], after: [String]) -> [String]? {
+        func split(_ entry: String) -> (name: String, colour: Int) {
+            guard let cut = entry.lastIndex(of: "\n"), let colour = Int(entry[entry.index(after: cut)...])
+            else { return (entry, 0) }
+            return (String(entry[..<cut]), colour)
+        }
+        var kept: [[UInt8]: [String]] = [:]   // a name's bytes → its earlier entries, in order
+        for entry in before { kept[Array(split(entry).name.utf8), default: []].append(entry) }
+        var changed = false
+        let corrected = after.map { entry -> String in
+            let (name, colour) = split(entry)
+            let bytes = Array(name.utf8)
+            let earlier = kept[bytes]?.first
+            if earlier != nil { kept[bytes]?.removeFirst() }
+            let replacement: String
+            if let label = FinderLabel.allCases.first(where: { Array($0.tokenName.utf8) == bytes }) {
+                guard colour != label.rawValue else { return entry }
+                replacement = "\(name)\n\(label.rawValue)"
+            } else {
+                guard let earlier, split(earlier).colour != colour else { return entry }
+                replacement = earlier
+            }
+            changed = true
+            return replacement
+        }
+        return changed ? corrected : nil
+    }
+
     /// errno → a message a human can act on. Deliberately not `strerror`: the C-string initializers
     /// are deprecation churn, and these are the only codes this probe can produce.
     private static func describe(_ code: Int32) -> String {

@@ -604,6 +604,35 @@ final class TagWriterTests: XCTestCase {
                            "round \(round): both concurrently-added tags survive (§10 via the Reader adapter)")
         }
     }
+
+    /// W40.vm-macos27-reader: this bundle runs inside the app's sandbox, where macOS 27 gives a names-only
+    /// tag write no colours at all, so before §7a every Reader write turned an untouched "Purple\n3" into
+    /// "Purple\n0" (the VM's TriageJourney caught it; measured on the host in this bundle too).
+    func testATagWriteKeepsTheColourOfEveryTagItLeavesAlone() throws {
+        let url = try makeFile("purple.pdf", tags: [])
+        let key = "com.apple.metadata:_kMDItemUserTags"
+        func raw() -> [String] {
+            let n = getxattr(url.path, key, nil, 0, 0, 0)
+            guard n > 0 else { return [] }
+            var d = Data(count: n)
+            _ = d.withUnsafeMutableBytes { getxattr(url.path, key, $0.baseAddress, n, 0, 0) }
+            return (try? PropertyListSerialization.propertyList(from: d, format: nil)) as? [String] ?? []
+        }
+        let seed = try PropertyListSerialization.data(fromPropertyList: ["Purple\n3", "Red\n6", "Folder\n0"],
+                                                      format: .binary, options: 0)
+        XCTAssertEqual(seed.withUnsafeBytes { setxattr(url.path, key, $0.baseAddress, seed.count, 0, 0) }, 0)
+        let labelBefore = try readLabel(url)
+        let result = try CoordinatedTagWriter.write(url) { names, label in (names + ["Inline subject"], label) }
+        let after = raw()
+        XCTAssertTrue(after.contains("Purple\n3"), "Purple keeps its colour: \(after)")
+        XCTAssertTrue(after.contains("Red\n6"), "Red keeps its colour: \(after)")
+        XCTAssertTrue(after.contains("Folder\n0"), "Folder is kept as it was: \(after)")
+        XCTAssertTrue(after.contains { $0.hasPrefix("Inline subject") }, "the new tag is written: \(after)")
+        XCTAssertEqual(after.count, 4, "no tag lost or doubled: \(after)")
+        XCTAssertEqual(try readLabel(url), labelBefore, "the label is as it was")
+        XCTAssertEqual(result.after.sorted(), ["Folder", "Inline subject", "Purple", "Red"])
+    }
+
 }
 
 /// Thread-safe error sink for the concurrent-write test.

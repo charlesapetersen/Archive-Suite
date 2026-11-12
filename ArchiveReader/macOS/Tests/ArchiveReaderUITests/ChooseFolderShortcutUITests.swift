@@ -22,6 +22,13 @@ final class ChooseFolderShortcutUITests: FixtureUITestCase {
     func testShortcutAfterNavigationWindowWasClosed() throws {
         openDocumentWindow()
         let nav = app.windows["Archive Reader"]
+        // The document window opens over the whole screen, so the navigation window's close button lies under
+        // it, and a click there closes the document window instead (macOS 27 delivers the click at that point).
+        // Bring the navigation window to the front first, from the Window menu, as a user would.
+        let windowMenu = app.menuBars.element(boundBy: 0).menuBarItems["Window"]
+        windowMenu.click()
+        windowMenu.menuItems["Archive Reader"].firstMatch.click()
+        settle(0.5)
         nav.buttons[XCUIIdentifierCloseWindow].firstMatch.click()
         XCTAssertTrue(waitFor { !nav.exists }, "precondition: the navigation window closed")
         app.windows.firstMatch.click()   // the document window, now the only one
