@@ -50,8 +50,9 @@ the score item leaves them out.
 
 The old Qwen3-VL 8B and Gemma 3 12B readings and the old truth are kept on each row as opinions, never as truth.
 
-The app's call (FLD-4). The app's tagging prompt (date_tagging.build_prompt, which test_date_tagging holds equal to
-TagGenerator's) on the document's Vision text, its first 3,000 characters as the app sends, with the nearby
+The app's call (FLD-4). The app's tagging prompt as it stood on 2026-11-05 (date_tagging.build_prompt, which
+test_date_tagging holds equal to TagGenerator's, with the November name rules W46.tagging-prompt-revert later took out
+pinned back: ent_prompt_app.NEW_RULES) on the document's Vision text, its first 3,000 characters as the app sends, with the nearby
 documents' block built as the app builds it (up to three neighbouring segments in the folder, 300 characters each)
 from the Vision text of each neighbour's first page (the app joins all of a neighbour's pages before cutting at 300,
 so a neighbour whose first page holds under 300 characters gives a shorter block here). Gemini 3.7 Flash, temperature 0, the gateway's default reasoning
@@ -583,7 +584,10 @@ def tagging_prompt(d):
     import date_tagging as DT
     near = [page_text(p)[:300] for p in d["near"]]
     context = "\n---\n".join(near) if near else None
-    return DT.build_prompt(doc_text(d, marks=False), context)
+    # Its replies answered the November name rules; W46.tagging-prompt-revert put the app's back, so pin them.
+    import ent_prompt_app as EPA
+    import ent_score_paid as P
+    return P.with_rules(DT.build_prompt(doc_text(d, marks=False), context), EPA.NEW_RULES)
 
 
 def cmd_tagging(a):
@@ -1363,7 +1367,8 @@ def report(o):
           "(W47.item-fields-truth's, kept on each row as an opinion with its two readers), the new truth agrees by "
           "field: " + ", ".join(f"{f} {v[0]} of {v[1]}" for f, v in c["agree_with_old_truth"].items()) + ".", "",
           "## The app's call on Vision text", "",
-          f"The app's tagging prompt on the Vision text, nearby block from the neighbours' Vision text, Gemini 3.7 "
+          f"The app's tagging prompt (as of 2026-11-05, with the November name rules W46.tagging-prompt-revert later "
+          "reverted) on the Vision text, nearby block from the neighbours' Vision text, Gemini 3.7 "
           f"Flash: {c['tagging']['answered']} of {c['tagging']['documents']} documents answered. Scored in "
           "W47.item-fields-retruth-score as \"Gemini 3.7 on Vision text\"; it replaces the deferred 74-document run.",
           "", "## The owner sheet (W47.item-fields-owner-ok)", "",

@@ -55,7 +55,8 @@ TAG, ENT = "tagging-place", "entity3k-place"
 
 
 def prompt_tagging(d):
-    """The app's tagging prompt as this item ships it (TagGenerator, date_tagging.PROMPT: test_ent_place_rule)."""
+    """The tagging prompt as this item measured and shipped it in 4374254d; W46.tagging-prompt-revert took the rule back
+    out of the app (owner call 10), so it is pinned here (test_ent_place_rule)."""
     return P.with_rules(EPA.prompt_new(d), {"author_location": TAGGING_PLACE})
 
 

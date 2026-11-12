@@ -77,14 +77,14 @@ class City(unittest.TestCase):
 
 
 class TaggingBefore(unittest.TestCase):
-    """The tagging arm keeps the prompt its cached replies answered: the app's prompt with its three entity rules put
-    back, every other line as the app sends it (W46.ent-prompt-app changed those three)."""
-    def test_three_rules_put_back(self):
-        new = DT.build_prompt("body", "ctx").split("\n")
-        old = P.tagging_prompt_before("body", "ctx").split("\n")
-        self.assertEqual(len(new), len(old))
-        diff = [o for n, o in zip(new, old) if n != o]
-        self.assertEqual(diff, list(P.TAGGING_RULES_BEFORE.values()))
+    """The tagging arm keeps the prompt its cached replies answered: its three entity rules pinned, every other line
+    as the app sends it. W46.ent-prompt-app changed those three and W46.tagging-prompt-revert put them back, so today
+    the pinned prompt is the app's own."""
+    def test_three_rules_pinned(self):
+        app = DT.build_prompt("body", "ctx")
+        self.assertEqual(P.tagging_prompt_before("body", "ctx"), app)
+        for line in P.TAGGING_RULES_BEFORE.values():
+            self.assertIn("\n" + line + "\n", app)
 
 
 class TaggingPreds(unittest.TestCase):

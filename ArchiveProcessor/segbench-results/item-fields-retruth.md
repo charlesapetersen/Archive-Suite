@@ -48,7 +48,7 @@ Kind for correspondence: W46.fix-ent-truth's ruling decided whether each of its 
 
 ## The app's call on Vision text
 
-The app's tagging prompt on the Vision text, nearby block from the neighbours' Vision text, Gemini 3.7 Flash: 299 of 299 documents answered. Scored in W47.item-fields-retruth-score as "Gemini 3.7 on Vision text"; it replaces the deferred 74-document run.
+The app's tagging prompt (as of 2026-11-05, with the November name rules W46.tagging-prompt-revert later reverted) on the Vision text, nearby block from the neighbours' Vision text, Gemini 3.7 Flash: 299 of 299 documents answered. Scored in W47.item-fields-retruth-score as "Gemini 3.7 on Vision text"; it replaces the deferred 74-document run.
 
 ## The owner sheet (W47.item-fields-owner-ok)
 

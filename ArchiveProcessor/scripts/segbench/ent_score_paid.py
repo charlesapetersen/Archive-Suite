@@ -222,8 +222,9 @@ def context_of(prompt):
     return None if c == "(none)" else c
 
 
-# The three rules of the tagging prompt as this item sent them; W46.ent-prompt-app replaced them in TagGenerator, so
-# the tagging arm puts them back to stay the prompt its cached replies answered.
+# The three rules of the tagging prompt as this item sent them. W46.ent-prompt-app replaced them in TagGenerator and
+# W46.tagging-prompt-revert restored them (owner call 10); the tagging arm still pins them, so its cached replies keep
+# answering this prompt whatever the app's next wording is.
 TAGGING_RULES_BEFORE = {
     "author_name": '- "author_name": author, sender, or writer name if identifiable, or null',
     "recipient_name": '- "recipient_name": recipient or addressee name if identifiable, or null',

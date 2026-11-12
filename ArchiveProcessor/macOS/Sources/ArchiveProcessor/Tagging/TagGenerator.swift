@@ -64,9 +64,9 @@ class TagGenerator: ObservableObject {
         - "subject_tags": \(vocabulary.isEmpty ? "2–6 general-but-specific subject tags (e.g. \"Democratic Party\", \"taxes\", \"education\", \"transportation\", \"business\", \"literature\", \"economics\", \"foreign policy\", \"civil rights\", \"military\", \"journalism\", \"science\", \"health care\", \"labor unions\"). Do NOT use overly broad terms like \"politics\" or \"history\"." : "2–6 tags chosen ONLY from this controlled vocabulary: [\(vocabulary.map { "\"\($0)\"" }.joined(separator: ", "))]. Use only tags from this list that are relevant to the document. Do not invent new tags.")
         - Never emit "OCR Poor": it is a person's assessment, not a subject inferred by the model.
         - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
-        - "author_name": the person who wrote, signed or sent the document (a signature, a typed name under the closing, a "From:" line, a byline), or null. Always a person: if no person is named as its writer, null, never the organisation on the letterhead
-        - "recipient_name": everyone it is addressed to, a person or a body such as a committee or "All Employees" (the inside address, a "To:" line, the salutation), names separated by "; " (e.g. "Jane Doe; John Smith"), or null. Copies ("cc") are not recipients
-        - "author_location": where it was written or sent from (the letterhead's or the dateline's city), as "City, State" with the state written out (e.g. "Chicago, Illinois") or "City, Country", or null. Only a place the document writes (a dateline, a letterhead or an address): null when it writes none, never a place inferred from an institution's name, the collection or the nearby documents
+        - "author_name": author, sender, or writer name if identifiable, or null
+        - "recipient_name": recipient or addressee name if identifiable, or null
+        - "author_location": author's or sender's location if identifiable, or null
         - "recipient_location": recipient's location if identifiable, or null
         - "publication_name": newspaper, magazine, or publication name if applicable, or null
         - Respond with ONLY the JSON object. No commentary.
@@ -208,8 +208,8 @@ class TagGenerator: ObservableObject {
         return tags
     }
 
-    /// A name field as the one string the sidecar keeps. The prompt asks for several addressees joined by "; ",
-    /// but a model may answer with a JSON array instead; join that the same way rather than drop it.
+    /// A name field as the one string the sidecar keeps. A model may answer several names as a JSON array;
+    /// join them with "; " rather than drop them.
     private static func names(_ value: Any?) -> String? {
         if let s = value as? String { return s }
         guard let list = value as? [Any] else { return nil }

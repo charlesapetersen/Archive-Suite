@@ -89,6 +89,7 @@ LUNA_TAKEN = "luna's reading"
 
 # (key, label, family route?) in the report's order: drafter-family rows first, as the item asks.
 ROUTES = [("draft-gemini", "Gemini 3.7 Flash, item prompt on the page images (drafter A)", True),
+          # the app's call as of 2026-11-05, before W46.tagging-prompt-revert took the November name rules out
           ("tagging", "Gemini 3.7 Flash, the app's call on Vision text", True),
           ("app-gemini-3.8-flash", "Gemini 3.8 Flash, the app's call on ABBYY text (cached)", True),
           ("draft-luna", "GPT 5.6 Luna, item prompt on the page images (drafter B)", True),

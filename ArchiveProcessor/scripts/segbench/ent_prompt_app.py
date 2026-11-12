@@ -62,16 +62,25 @@ V1_RULES = {
 }
 
 
-# The place line as this item shipped it; W46.ent-place-rule-paid added the written-place rule to it in TagGenerator,
-# so prompt_new puts it back to stay the prompt its cached replies answered.
+# The three rules as this item shipped them. W46.ent-place-rule-paid added the written-place rule to the place line,
+# and W46.tagging-prompt-revert put the tagging prompt back to P.TAGGING_RULES_BEFORE (owner call 10, 2026-11-06), so
+# prompt_new pins them to stay the prompt its cached replies answered.
 AUTHOR_LOCATION_BEFORE = ('- "author_location": where it was written or sent from (the letterhead\'s or the '
                           'dateline\'s city), as "City, State" with the state written out (e.g. "Chicago, Illinois") '
                           'or "City, Country", or null')
+NEW_RULES = {
+    "author_name": '- "author_name": the person who wrote, signed or sent the document (a signature, a typed name '
+                   'under the closing, a "From:" line, a byline), or null. Always a person: if no person is named as '
+                   'its writer, null, never the organisation on the letterhead',
+    "recipient_name": '- "recipient_name": everyone it is addressed to, a person or a body such as a committee or '
+                      '"All Employees" (the inside address, a "To:" line, the salutation), names separated by "; " '
+                      '(e.g. "Jane Doe; John Smith"), or null. Copies ("cc") are not recipients',
+    "author_location": AUTHOR_LOCATION_BEFORE,
+}
 
 
 def prompt_new(d):
-    return P.with_rules(DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"])),
-                        {"author_location": AUTHOR_LOCATION_BEFORE})
+    return P.with_rules(DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"])), NEW_RULES)
 
 
 def prompt_v1(d):
