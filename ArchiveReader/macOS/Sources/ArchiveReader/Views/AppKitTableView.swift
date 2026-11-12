@@ -976,6 +976,9 @@ struct AppKitTableView: NSViewRepresentable {
             tagCell.tokenField.font = .systemFont(ofSize: currentFontSize)
             // Per-row accessibility id so XCUITest can target a specific row's tag cell
             tagCell.tokenField.setAccessibilityIdentifier("ar.cell.tags.\(file?.name ?? "")")
+            // Named, so a row with no subjects (a Box or Folder item, whose type is its own field since
+            // W40.suite-item-types) still describes its empty field.
+            tagCell.tokenField.setAccessibilityLabel("File tags")
             return tagCell
         }
 
