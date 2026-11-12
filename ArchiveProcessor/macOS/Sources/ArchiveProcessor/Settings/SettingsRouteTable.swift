@@ -59,10 +59,59 @@ struct SettingsRouteTable: Decodable, Sendable {
         let kindStrataTable: [String: JSONValue]?
         let fallback: String?
         let routes: [Route]
+        /// The stage's decision note, the file the settings sheet names as its source.
+        let note: String?
+        let metric: Metric?
+        /// The stage's rules, as the settings sheet's rules tab shows them (W46.settings-sheet).
+        let rules: [Rule]
+
+        struct Metric: Decodable, Sendable {
+            let id: String
+            let label: String
+        }
+
+        /// A rule with its measured source; `switchSetting` is the one switch the owner ruled for it, if any.
+        struct Rule: Decodable, Sendable {
+            let id: String
+            let text: String
+            let source: String?
+            let switchSetting: Switch?
+
+            struct Switch: Decodable, Sendable {
+                let id: String
+                let label: String
+                let defaultValue: Bool
+
+                enum CodingKeys: String, CodingKey {
+                    case id, label
+                    case defaultValue = "default"
+                }
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case id, text, source
+                case switchSetting = "switch"
+            }
+        }
 
         enum CodingKeys: String, CodingKey {
-            case id, name, unit, choice, kinds, fallback, routes
+            case id, name, unit, choice, kinds, fallback, routes, note, metric, rules
             case kindStrataTable = "kind_strata"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = try c.decode(String.self, forKey: .id)
+            name = try c.decode(String.self, forKey: .name)
+            unit = try c.decode(String.self, forKey: .unit)
+            choice = try c.decode(Bool.self, forKey: .choice)
+            kinds = try c.decode([String].self, forKey: .kinds)
+            kindStrataTable = try c.decodeIfPresent([String: JSONValue].self, forKey: .kindStrataTable)
+            fallback = try c.decodeIfPresent(String.self, forKey: .fallback)
+            routes = try c.decode([Route].self, forKey: .routes)
+            note = try c.decodeIfPresent(String.self, forKey: .note)
+            metric = try c.decodeIfPresent(Metric.self, forKey: .metric)
+            rules = try c.decodeIfPresent([Rule].self, forKey: .rules) ?? []
         }
 
         var kindStrata: [String: [String]] {

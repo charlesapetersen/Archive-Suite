@@ -168,21 +168,12 @@ final class ProcessorUITests: XCTestCase {
                       "the answers come back in gap order: \(renderedText(of: result))")
     }
 
-    /// W36.seg-opt-proof: the Segmentation chooser in Process Files offers every approach, and picking one shows
-    /// its figures, its cost and, with no key (the UI test reads no Keychain), why it cannot run yet. Ends back
-    /// on Full manual, the default.
-    func testSegmentationChooserShowsEachApproachWithFiguresAndCost() throws {
+    /// W36.seg-opt-proof, moved by W46.settings-sheet: the Segmentation chooser in Process Files offers every
+    /// approach, and its figures, cost and the other choices are on the settings sheet it opens: one card per stage
+    /// with what a better figure would need and an override, and a tab of the stages that are rules.
+    func testSegmentationChooserOffersEachApproachAndTheSheetShowsTheFigures() throws {
         let picker = element("ap.segmentation.picker")
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "Process Files must show the Segmentation chooser")
-        let row = element("ap.segmentation.row")
-
-        func choose(_ label: String) {
-            picker.click()
-            let item = app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", label)).firstMatch
-            XCTAssertTrue(item.waitForExistence(timeout: 5), "the chooser must offer \(label)")
-            item.click()
-        }
-
         for label in ["Full manual", "Claude only", "Gemini only", "ChatGPT only", "Claude and ChatGPT together"] {
             picker.click()
             XCTAssertTrue(app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", label)).firstMatch
@@ -190,29 +181,30 @@ final class ProcessorUITests: XCTestCase {
             app.typeKey(.escape, modifierFlags: [])
         }
 
-        choose("Gemini only")
-        XCTAssertTrue(waitUntil { self.renderedText(of: row).contains("To check") },
-                      "Gemini's row shows its figures: \(renderedText(of: row))")
-        let gemini = renderedText(of: row)
-        XCTAssertTrue(gemini.contains("Right after checking") && gemini.contains("Cost"),
-                      "the row carries every figure and the cost: \(gemini)")
-        // The card is one combined accessibility element, so its reason is read from the row's own text.
-        XCTAssertTrue(gemini.contains("Needs"), "with no Gemini key the row says why it cannot run: \(gemini)")
-        attachScreenshot("processor-segmentation-chooser-gemini")
+        let sheetButton = element("ap.segmentation.openSettingsSheet")
+        XCTAssertTrue(sheetButton.waitForExistence(timeout: 5), "the chooser opens the settings sheet for its figures")
+        sheetButton.click()
+        XCTAssertTrue(element("ap.sheet").waitForExistence(timeout: 10), "the settings sheet appears")
+        for stage in ["reading", "segmentation", "dating", "entities"] {
+            XCTAssertTrue(element("ap.sheet.card.\(stage)").waitForExistence(timeout: 5), "the sheet has the \(stage) card")
+            XCTAssertTrue(element("ap.sheet.override.\(stage)").exists, "the \(stage) card has its override menu")
+        }
+        XCTAssertTrue(app.sheets.firstMatch.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
+                                                                          "What a better figure would need",
+                                                                          "What a better figure would need")).firstMatch.exists,
+                      "each card says what a better figure would need")
+        attachScreenshot("processor-settings-sheet-choices")
 
-        // W36.seg-opt-openai measured ChatGPT, so its row now carries figures too; with no key and no ChatGPT
-        // sign-in it names both routes it could run by (W36.seg-opt-siwc).
-        choose("ChatGPT only")
-        XCTAssertTrue(waitUntil { self.renderedText(of: row) != gemini && self.renderedText(of: row).contains("To check") },
-                      "ChatGPT's row shows its own figures: \(renderedText(of: row))")
-        let chatGPT = renderedText(of: row)
-        XCTAssertTrue(chatGPT.contains("Cost") && chatGPT.contains("Needs") && chatGPT.contains("Sign in with ChatGPT"),
-                      "with no key and no sign-in the row says how ChatGPT could run: \(chatGPT)")
-
-        choose("Full manual")
-        XCTAssertTrue(waitUntil { self.renderedText(of: row).contains("to judge") && !self.renderedText(of: row).contains("Needs") },
-                      "Full manual always runs, every boundary judged by the user: \(renderedText(of: row))")
-        attachScreenshot("processor-segmentation-chooser-manual")
+        let rules = app.sheets.firstMatch.radioButtons["Rules"]
+        XCTAssertTrue(rules.waitForExistence(timeout: 5), "the sheet has a Rules tab")
+        rules.click()
+        for stage in ["reading-copy", "ocr-input", "layout", "placement", "marks", "capture"] {
+            XCTAssertTrue(element("ap.sheet.rule.\(stage)").waitForExistence(timeout: 5), "the Rules tab shows \(stage)")
+        }
+        XCTAssertTrue(element("ap.sheet.switch.place.hand_on_image").exists, "placement's switch is visible")
+        attachScreenshot("processor-settings-sheet-rules")
+        element("ap.sheet.done").click()
+        XCTAssertTrue(waitUntil { !self.element("ap.sheet").exists }, "Done closes the sheet")
     }
 
     private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {

@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 /// Which OCR model reads which kind of page best, from the W41 OCR panels (W41.app-ocr-hierarchy). The figures live in
 /// one checked-in table, `segbench-results/ocr-page-guidance.json`, bundled straight from the bench like
@@ -88,29 +88,5 @@ struct OCRPageGuidance: Decodable, Equatable {
         let body = rest.isEmpty ? head : "\(head), then \(rest)"
         let pages = k.pages == 1 ? "1 page" : "\(k.pages) pages"
         return "\(k.label) (\(pages)): \(body)." + (k.note.map { " \($0)" } ?? "")
-    }
-}
-
-/// The note under the OCR model picker.
-struct OCRPageGuidanceNote: View {
-    let guidance: OCRPageGuidance
-    var modelIDs: Set<String> = OCRPageGuidance.builtInModelIDs
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("What reads which pages best")
-                .font(.caption.weight(.semibold))
-            ForEach(guidance.kinds) { k in
-                Text(OCRPageGuidance.line(k, modelIDs: modelIDs))
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Text(guidance.footnote)
-                .font(.caption2)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("ap.settings.ocrPageGuidance")
     }
 }

@@ -337,7 +337,7 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.
 Settings/                      W46.settings-solver: the settings layer's solver; W46.settings-layers: its three layers;
-                               W46.settings-interviews: the two interviews that fill them.
+                               W46.settings-interviews: the two interviews that fill them; W46.settings-sheet: the sheet.
   SettingsRouteTable.swift     Decodes the bundled `segbench-results/settings-routes.json` (the rule table,
                                `scripts/segbench/settings_routes.py`) and `ocr-pair-matrix.json` (reading ties).
   SettingsSolver.swift         `SettingsResources` + `SettingsAnswers` → one pick per stage and part (reading per kind
@@ -368,6 +368,17 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                (first start, Settings), `Views/CollectionInterviewView.swift` (a new output folder,
                                "This collection", a new project). Self-test: `SettingsInterviewsTestDriver`,
                                `scripts/test-settings-interviews.sh`.
+  SettingsSheetModel.swift     The settings sheet's content (`12-settings-design.md` §3.3, shape A), from the table,
+                               the solver and the resolved layers: the limits and their sources, the batch totals,
+                               one card per stage (the pick and its family, per-kind figures with sample and the
+                               notes' labels, cost, time, memory, what a better figure would need, the nearest
+                               alternatives, the override menu with the app's pick for the way back, what Process
+                               Files runs and whether the pick can be applied to it), and the rules tab (notes 01,
+                               02, 03, 05, 06, 11: the notes' sheet text, the owner's switches, the rules in detail).
+                               An override is `override.<stage>.all` in the nearest layer, read as the solver's
+                               `onlyRoutes`. View: `Views/SettingsSheetView.swift`, opened from the segmentation
+                               chooser and the Provider section. Self-test: `SettingsSheetTestDriver`,
+                               `scripts/test-settings-sheet.sh` (words, labels, a no-bench-ids check, offscreen pages).
 Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
                                `execution-plans/segmentation/04-options-build.md` Part 3 §2. `TaggingMode` says who
                                tags, `SegmentationApproach` who segments; `SegmentationPlan` joins them.
@@ -402,7 +413,8 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                `scripts/test-segmentation-engine.sh`): reproduces the bench's verdict on every gap
                                of a recorded box (`scripts/segbench/engine-fixture-deaver.json`, from
                                `export_engine_fixture.py`), plus rules, failure, usage limit and transports.
-  SegmentationChooser.swift    The chooser's row text + cost (Part 3 §3-4); UI in `Views/SegmentationChooserView.swift`.
+  SegmentationChooser.swift    The chooser's row text + cost (Part 3 §3-4); UI in `Views/SegmentationChooserView.swift`
+                               (the choice and its run controls; the figures are on the settings sheet).
                                Self-test: `SegmentationChooserTestDriver`, `scripts/test-segmentation-chooser.sh`.
   PlanUsage.swift              The Claude plan route (W36.seg-opt-subscription, `segbench-results/usage.md`): the
                                `stream-json` meter (`rate_limit_event`), `PlanCalibration` (points per notional
@@ -462,7 +474,8 @@ Views/                         SwiftUI (+ AppKit where needed):
                                in OCRView+*.swift (see god-file note).
   LiveCaptureView.swift        Live Capture tab: pairing QR, session status, tag cards, Backup Folder reveal.
   SettingsView.swift           The ⌘, Settings scene (grouped Form + pinned live cost-estimate pane).
-                               Page-kind note under the model picker: `OCR/OCRPageGuidance.swift` (W41.app-ocr-hierarchy).
+                               The page-kind guidance (`OCR/OCRPageGuidance.swift`, W41.app-ocr-hierarchy) now only
+                               feeds page-kind routing; what reads which pages best is the settings sheet's reading card.
   ToolsView.swift              Tools tab: Compare Models + Test Resolution + Processing History.
   CollectionFinalizeSheet.swift  End-of-session: name each collection or append to an existing folder.
   BoxFolderConfirmSheet.swift  Confirm/reclassify every box/folder identification.

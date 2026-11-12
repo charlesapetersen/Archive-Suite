@@ -475,6 +475,12 @@ final class SettingsLayerStore: ObservableObject {
         return problem
     }
 
+    /// What the ledger records for the current calendar month, which a per-month ceiling is read against.
+    func spentThisMonthUSD(now: Date = Date(), calendar: Calendar = .current) -> Double {
+        file.ledger.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) && $0.usd.isFinite }
+            .reduce(0) { $0 + max(0, $1.usd) }
+    }
+
     nonisolated static var thisMacMemoryGB: Double {
         (Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824).rounded()
     }

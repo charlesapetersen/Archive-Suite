@@ -1,10 +1,9 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
-import AppKit
-import SwiftUI
+import Foundation
 
 /// Headless, $0 self-test of the approach chooser (W36.seg-opt-chooser), gated by `SEGMENTATION_CHOOSER_TEST=1`
-/// (does nothing in normal use). No model call, no network, no Keychain read (the routes are passed in), no window:
-/// the render guard draws offscreen with `ImageRenderer`. Run by `scripts/test-segmentation-chooser.sh`.
+/// (does nothing in normal use). No model call, no network, no Keychain read (the routes are passed in), no window.
+/// Run by `scripts/test-segmentation-chooser.sh`.
 ///
 /// What has to be true:
 ///   1. The bundled options.json is fit to ship, including the per-model prices the chooser adds up.
@@ -16,7 +15,7 @@ import SwiftUI
 ///      when only `claude` can run it; a mix adding its Claude and ChatGPT parts by route.
 ///   4. An approach that cannot run says why: the file's reason when unmeasured, the missing key or `claude`
 ///      otherwise, with the keys the wizard should offer. Manual always runs, at no cost.
-///   5. Render guard: each row card draws non-blank pixels offscreen.
+///   5. (The row card is gone; its figures are on the settings sheet, which SettingsSheetTestDriver renders.)
 ///   6. With nothing saved, the settings solver's segmentation pick is saved (no key saves nothing; W46.settings-solver);
 ///      a saved choice, even manual or an unknown value, is never overridden (W41.app-seg-default).
 @MainActor
@@ -276,12 +275,8 @@ enum SegmentationChooserTestDriver {
               pricedLocal?.problems().contains("local: local model L has a price") == true,
               "\(pricedLocal?.problems() ?? ["could not rebuild the file"])")
 
-        // 5. Render guard.
-        for r in [claude, gemini, mix, manual, openai, noClaude, claudePlan, local] {
-            let name = "\(r.approach.rawValue)\(r.canRun ? "" : "-unavailable")"
-            let ink = renderedInk(SegmentationRowCard(row: r, scaleCaption: "per 1,000 pages"), saveAs: name)
-            check("5 renders \(r.approach.rawValue)\(r.canRun ? "" : " (unavailable)") (\(ink) dark px)", ink > 300)
-        }
+        // 5. The figure card is gone from the chooser: the figures are on the settings sheet, whose pages
+        // SettingsSheetTestDriver renders (W46.settings-sheet).
 
         // 6. The preselected approach (W41.app-seg-default), on a scratch defaults domain.
         let suite = "SegmentationChooserTestDriver.preselect.\(ProcessInfo.processInfo.processIdentifier)"
@@ -347,36 +342,6 @@ enum SegmentationChooserTestDriver {
 
     private static func mutateBundled(_ change: (inout [[String: Any]]) -> Bool) -> SegmentationOptions? {
         mutateBundledData(change).flatMap { try? SegmentationOptions.decode($0) }
-    }
-
-    /// With `SEGMENTATION_CHOOSER_RENDER_DIR` set, each card is also saved there as a PNG to look at.
-    private static func renderedInk(_ view: some View, saveAs name: String) -> Int {
-        let content = view
-            .frame(width: 320, alignment: .leading)
-            .padding(8)
-            .background(Color.white)
-            .environment(\.colorScheme, .light)
-        let renderer = ImageRenderer(content: content)
-        renderer.scale = 1
-        guard let cg = renderer.cgImage else { return 0 }
-        if let dir = ProcessInfo.processInfo.environment["SEGMENTATION_CHOOSER_RENDER_DIR"],
-           let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
-            try? png.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
-        }
-        let w = cg.width, h = cg.height
-        var px = [UInt8](repeating: 0, count: w * h * 4)
-        guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
-                                  space: CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
-        ctx.setFillColor(.white)
-        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
-        var ink = 0
-        for i in stride(from: 0, to: px.count, by: 4) {
-            let lum = (Int(px[i]) + Int(px[i + 1]) + Int(px[i + 2])) / 3
-            if lum < 160 { ink += 1 }
-        }
-        return ink
     }
 
     private static func finish() {

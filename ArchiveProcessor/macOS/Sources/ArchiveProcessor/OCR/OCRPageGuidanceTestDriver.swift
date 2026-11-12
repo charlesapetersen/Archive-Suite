@@ -1,17 +1,16 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
-import AppKit
-import SwiftUI
+import Foundation
 
-/// Headless, $0 self-test of the OCR picker's page-kind note (W41.app-ocr-hierarchy), gated by
-/// `OCR_PAGE_GUIDANCE_TEST=1` (does nothing in normal use). No model call, no network, no Keychain read, no window: the
-/// render guard draws offscreen with `ImageRenderer`. Run by `scripts/test-ocr-page-guidance.sh`, which also checks
-/// every figure in the table against the bench result file it names.
+/// Headless, $0 self-test of the OCR page-kind guidance (W41.app-ocr-hierarchy), gated by `OCR_PAGE_GUIDANCE_TEST=1`
+/// (does nothing in normal use). No model call, no network, no Keychain read, no window. Run by
+/// `scripts/test-ocr-page-guidance.sh`, which also checks every figure in the table against the bench result file it
+/// names.
 ///
 /// What has to be true:
 ///   1. The bundled ocr-page-guidance.json decodes and has no problems: picks best first, NES in range, and every
 ///      `app_model` a built-in model id.
 ///   2. The lines read as the user should see them, including "(not in this list yet)" for a model the app lacks.
-///   3. Render guard: the note draws non-blank pixels offscreen, one line per kind of page.
+///   3. (The note it drew is now the settings sheet's reading card; SettingsSheetTestDriver renders it.)
 @MainActor
 enum OCRPageGuidanceTestDriver {
     private static var didRun = false
@@ -63,7 +62,7 @@ enum OCRPageGuidanceTestDriver {
         let ids = OCRPageGuidance.builtInModelIDs
         let by = Dictionary(uniqueKeysWithValues: g.kinds.map { ($0.id, OCRPageGuidance.line($0, modelIDs: ids)) })
         eq("2 handwriting", by["handwritten"],
-           "Handwriting (16 pages): Gemini 3.8 Flash 96.0, then Gemini 3.1 Pro 94.1.")
+           "Handwriting (16 pages): Gemini 3.8 Flash 95.8, then Gemini 3.1 Pro 94.0.")
         eq("2 printed", by["printed"],
            "Printed or typeset (28 pages): Claude Sonnet 5.5 96.3 (not in this list yet), then Qwen3.6 27B (open) 94.8. "
            + "Gemini refused two of these pages; the app sends a refused page to a second model.")
@@ -74,45 +73,9 @@ enum OCRPageGuidanceTestDriver {
               && by["low-resolution"]?.contains("89.7") == true, by["low-resolution"] ?? "nil")
         let pick = g.kinds[0].picks[0]
         eq("2 a model the app lacks is marked", OCRPageGuidance.text(pick, modelIDs: []),
-           "Gemini 3.8 Flash 96.0 (not in this list yet)")
-
-        // 3. Render guard.
-        let ink = renderedInk(OCRPageGuidanceNote(guidance: g), saveAs: "note")
-        check("3 note renders (\(ink) dark px)", ink > 1500)
-        let one = OCRPageGuidance(measured: g.measured, footnote: g.footnote, kinds: [g.kinds[0]])
-        let inkOne = renderedInk(OCRPageGuidanceNote(guidance: one), saveAs: "note-one-kind")
-        check("3 every kind draws a line (\(ink) > \(inkOne) dark px)", ink > inkOne + 500 && inkOne > 300)
-    }
-
-    /// Dark pixels in the note drawn offscreen on white at the Settings form's width. Blank → 0. With
-    /// `OCR_PAGE_GUIDANCE_RENDER_DIR` set, the note is also saved there as a PNG to look at.
-    private static func renderedInk(_ view: some View, saveAs name: String) -> Int {
-        let content = view
-            .frame(width: 420, alignment: .leading)
-            .padding(8)
-            .background(Color.white)
-            .environment(\.colorScheme, .light)
-        let renderer = ImageRenderer(content: content)
-        renderer.scale = 1
-        guard let cg = renderer.cgImage else { return 0 }
-        if let dir = ProcessInfo.processInfo.environment["OCR_PAGE_GUIDANCE_RENDER_DIR"],
-           let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) {
-            try? png.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).png"))
-        }
-        let w = cg.width, h = cg.height
-        var px = [UInt8](repeating: 0, count: w * h * 4)
-        guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
-                                  space: CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return 0 }
-        ctx.setFillColor(.white)
-        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
-        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
-        var ink = 0
-        for i in stride(from: 0, to: px.count, by: 4) {
-            let lum = (Int(px[i]) + Int(px[i + 1]) + Int(px[i + 2])) / 3
-            if lum < 160 { ink += 1 }
-        }
-        return ink
+           "Gemini 3.8 Flash 95.8 (not in this list yet)")
+        // 3. The note it fed is gone: what reads which pages best is the settings sheet's reading card, rendered by
+        // SettingsSheetTestDriver (W46.settings-sheet).
     }
 
     private static func finish() {

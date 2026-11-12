@@ -8,9 +8,9 @@
       "label": "Handwriting",
       "pages": 16,
       "picks": [
-        {"name": "Gemini 3.8 Flash", "nes": 96.0, "app_model": "gemini-3.8-flash",
+        {"name": "Gemini 3.8 Flash", "nes": 95.8, "app_model": "gemini-3.8-flash",
          "source": {"file": "ocr-panel-cloud-groups.csv", "route": "gemini3.8-flash", "attribute": "kind", "value": "handwritten"}},
-        {"name": "Gemini 3.1 Pro", "nes": 94.1, "app_model": "gemini-3.1-pro",
+        {"name": "Gemini 3.1 Pro", "nes": 94.0, "app_model": "gemini-3.1-pro",
          "source": {"file": "ocr-panel-cloud-groups.csv", "route": "gemini3.1-pro", "attribute": "kind", "value": "handwritten"}}
       ]
     },

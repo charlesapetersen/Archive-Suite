@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// The "Segmentation" setting (W36.seg-opt-chooser): who proposes the run's document boundaries, with each
-/// approach's measured figures scaled to the run and its cost. Shown in Settings and in Process Files; both bind
-/// the same `DefaultsKeys.segmentationApproach`, so changing either updates both. Live Capture does not show it:
-/// the phone already gives the boundaries. (`execution-plans/segmentation/04-options-build.md` Part 3 §1, §3, §4.)
+/// The "Segmentation" setting (W36.seg-opt-chooser): who proposes the run's document boundaries. Shown in Process
+/// Files; it binds `DefaultsKeys.segmentationApproach`, which the settings sheet's segmentation card also sets. The
+/// measured figures, the cost and the other choices are on the settings sheet (W46.settings-sheet), which the button
+/// here opens scaled to the run; this keeps only what the run needs: the choice, how it is paid for, and why it cannot
+/// run yet. Live Capture does not show it: the phone already gives the boundaries.
 struct SegmentationChooserView: View {
     @AppStorage(DefaultsKeys.segmentationApproach) private var approachRaw =
         SegmentationApproach.defaultApproach.rawValue
@@ -52,7 +53,7 @@ struct SegmentationChooserView: View {
             } label: {
                 HStack {
                     Text("Segmentation")
-                    HelpButton(text: "Who proposes where each document starts. Full manual proposes nothing: you group the pages yourself, as before. Every other choice is a first draft you review: the doubtful boundaries are put in front of you one at a time, and the rest stay visible for a skim. Nothing is filed unseen.\n\nThe figures were measured on real boxes and are scaled to your pages.")
+                    HelpButton(text: "Who proposes where each document starts. Full manual proposes nothing: you group the pages yourself, as before. Every other choice is a first draft you review: the doubtful boundaries are put in front of you one at a time, and the rest stay visible for a skim. Nothing is filed unseen.\n\nWhat each choice gets right, what it costs and how long it takes, measured on real boxes and scaled to your pages, is on the settings sheet: “Figures and other choices…”.")
                 }
             }
             .accessibilityIdentifier("ap.segmentation.picker")
@@ -81,13 +82,24 @@ struct SegmentationChooserView: View {
             }
 
             if let row = rows.first(where: { $0.approach == approach }) {
-                SegmentationRowCard(row: row, scaleCaption: scaleCaption) {
-                    wizardSpecs = row.missingKeys.compactMap(Self.keySpec)
+                if let reason = row.unavailableReason {
+                    Label(reason, systemImage: "exclamationmark.circle")
+                        .font(.caption).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ap.segmentation.unavailable")
+                    // ChatGPT's alternative to a key, "Continue with ChatGPT", sits above.
+                    if !row.missingKeys.isEmpty {
+                        Button("Add API key…") { wizardSpecs = row.missingKeys.compactMap(Self.keySpec) }
+                            .controlSize(.small)
+                    }
                 }
             } else {
                 Text("The segmentation figures are missing from this build; only Full manual is offered.")
                     .font(.caption2).foregroundStyle(.primary)
             }
+            SettingsSheetButton(title: "Figures and other choices…", pages: pageCount, pagesCaption: scaleCaption)
+                .controlSize(.small)
+                .accessibilityIdentifier("ap.segmentation.openSettingsSheet")
         }
         .sheet(isPresented: Binding(get: { !wizardSpecs.isEmpty }, set: { if !$0 { wizardSpecs = [] } })) {
             ProviderKeyWizard(specs: wizardSpecs) {
@@ -155,56 +167,5 @@ struct LocalSegmenterControls: View {
             }
             await MainActor.run { checkResult = text; checking = false }
         }
-    }
-}
-
-/// One approach's figures and cost. Greyed out, with its reason, when it cannot run.
-struct SegmentationRowCard: View {
-    let row: SegmentationRow
-    let scaleCaption: String
-    var onAddKeys: () -> Void = {}
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if let reason = row.unavailableReason {
-                Label(reason, systemImage: "exclamationmark.circle")
-                    .font(.caption).foregroundStyle(.orange)
-                    .accessibilityIdentifier("ap.segmentation.unavailable")
-                // ChatGPT's alternative to a key, "Continue with ChatGPT", sits above the card.
-                if !row.missingKeys.isEmpty {
-                    Button("Add API key…", action: onAddKeys).controlSize(.small)
-                }
-            }
-            if !row.toCheck.isEmpty {
-                Group {
-                    figure("Right with no checking", row.rightWithNoChecking ?? "nothing is proposed")
-                    figure("To check", row.toCheck)
-                    figure("Right after checking", row.rightAfterChecking)
-                    figure("Errors you will not be shown", row.unshownErrors)
-                    ForEach(row.costLines, id: \.self) { line in
-                        figure("Cost", line)
-                    }
-                    ForEach(row.priceNotes, id: \.self) { note in
-                        Text(note).font(.caption2).foregroundStyle(.primary)
-                    }
-                    ForEach(row.notes, id: \.self) { note in
-                        Text(note).font(.caption2).foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .opacity(row.canRun ? 1 : 0.5)
-                Text("Scaled \(scaleCaption). \(row.footnote)")
-                    .font(.caption2).foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("ap.segmentation.row")
-    }
-
-    private func figure(_ label: String, _ value: String) -> some View {
-        Text("\(Text(label + ": ").foregroundStyle(.primary))\(value)")
-            .font(.caption)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }

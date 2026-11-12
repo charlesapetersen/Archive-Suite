@@ -91,6 +91,7 @@ struct ContentView: View {
             SegmentationEngineTestDriver.runIfRequested()    // $0 W36 window segmenter on recorded answers
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SettingsSolverTestDriver.runIfRequested()        // $0 W46 settings solver on the profile cases
+            SettingsSheetTestDriver.runIfRequested()         // $0 W46 settings sheet: its words and its offscreen pages
             SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
             SettingsInterviewsTestDriver.runIfRequested()    // $0 W46 the general and the collection interviews, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage

@@ -215,6 +215,8 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let readingFallback = SettingsKey(rawValue: "readingFallback")
     static let checkingMinutes = SettingsKey(rawValue: "checkingMinutes")
     static let straightenReadingCopy = SettingsKey(rawValue: "straightenReadingCopy")
+    /// Placement's one switch (note 05, the settings sheet's rules tab): handwritten text on the page image.
+    static let placeHandOnImage = SettingsKey(rawValue: "placeHandOnImage")
 
     static let overridePrefix = "override."
     /// A stage card's chosen route, set when the user overrides the solver's pick.
@@ -228,6 +230,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
         .preference, .priorities, .weights, .staysOnMac, .readingFallback, .checkingMinutes, .straightenReadingCopy,
+        .placeHandOnImage,
     ]
     static let catalog: [SettingsKey] = generalOnly + anyLayer
 
@@ -264,6 +267,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         case .checkingMinutes: return .double(skipped.checkingMinutes)
         // Owner call 6: straightening on by default, switchable off.
         case .straightenReadingCopy: return .bool(true)
+        case .placeHandOnImage: return .bool(true)   // the table's default (05-placement.md)
         default: return .string("")   // an override: empty is the solver's pick
         }
     }
@@ -302,6 +306,7 @@ extension SettingsKey {
         case .readingFallback: return "A page that fails goes to another reader"
         case .checkingMinutes: return "Minutes you will spend checking where documents begin"
         case .straightenReadingCopy: return "Straighten the copy you read"
+        case .placeHandOnImage: return "Place handwritten text on the page image"
         default: return rawValue
         }
     }
@@ -320,6 +325,10 @@ extension SettingsKey {
             }
         case .string(let s):
             if s.isEmpty { return isOverride ? "the app's pick" : "not given" }
+            if isOverride {   // a route id: its name in the rule table
+                let stage = rawValue.dropFirst(Self.overridePrefix.count).split(separator: ".").first.map(String.init)
+                return stage.flatMap { SettingsRouteTable.bundled?.stage($0)?.route(s)?.name } ?? s
+            }
             switch self {
             case .moneyHabit:
                 switch MoneyHabit(rawValue: s) {

@@ -470,8 +470,12 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ap.settings.openRouterRoute")
                 }
-                if let guidance = OCRPageGuidance.bundled {
-                    OCRPageGuidanceNote(guidance: guidance)   // W41.app-ocr-hierarchy
+                // What reads which pages best is the settings sheet's reading card (W46.settings-sheet), in place of
+                // the guide that sat here (W41.app-ocr-hierarchy).
+                HStack {
+                    SettingsSheetButton(title: "What reads which pages best…", pages: 1000, pagesCaption: "for 1,000 pages")
+                        .accessibilityIdentifier("ap.settings.openSettingsSheet")
+                    HelpButton(text: "The settings sheet shows, for your collection and this Mac, which reader the measurements pick for each kind of page, what it gets right on test pages, what it costs and how long it takes, what a better figure would need, and the steps that are rules rather than choices. “Read with this” there sets the model above.")
                 }
                 if selectedModel.supportsThinking {
                     Picker(selection: $selectedThinking) {
@@ -523,12 +527,12 @@ struct SettingsView: View {
         }
     }
 
-    /// W41.app-page-kind — tell each page's kind on this Mac and preselect its reader from the guide above. Off by default.
+    /// W41.app-page-kind — tell each page's kind on this Mac and preselect its reader from the bench's guidance (`OCRPageGuidance`). Off by default.
     @ViewBuilder private var pageKindControls: some View {
         Toggle(isOn: $ocrPageKindRouting) {
             HStack {
                 Text("Choose each page's reader by its kind")
-                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind (handwritten, typewritten, printed, or a form or table) with Apple Vision, free, and the file list preselects the first model in the guide above for that kind that you have a key for. A page whose kind it is not sure of, or whose pick you have no key for, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. On the owner's bench pages it told the kind right on 137 of 141 (about 0.6 s a page), and routing by its calls read 1 NES point below choosing by the true kinds. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
+                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind (handwritten, typewritten, printed, or a form or table) with Apple Vision, free, and the file list preselects the best measured model for that kind that you have a key for (the settings sheet’s reading card shows the figures). A page whose kind it is not sure of, or whose pick you have no key for, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. On the owner's bench pages it told the kind right on 137 of 141 (about 0.6 s a page), and routing by its calls read 1 NES point below choosing by the true kinds. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
             }
         }
         .accessibilityIdentifier("ap.settings.pageKindRouting")
@@ -536,7 +540,7 @@ struct SettingsView: View {
         Toggle(isOn: $ocrHandwritingOnTyped) {
             HStack {
                 Text("Read handwriting on typed pages (signatures, dates, notes in the margin)")
-                HelpButton(text: "Sends every typewritten or printed page to the reader the guide above picks for handwriting, so a signature, a handwritten date or a note in the margin is read with the typed text. No check can tell a mixed page before it is read, so it acts on every typed or printed page. Measured level on typed pages, not measured on mixed pages: on the bench's 78 typed and printed pages the handwriting readers read the typed text no worse than Apple Vision on average (for the Mac reader a tie, 14 of 78 pages more than 2 points lower); on the 2 mixed pages scored, worse. Cost: hosted, about $0.002–0.004 a page; the estimate shows what it adds to your batch. Time: on an M3 Pro Mac with 18 GB the Mac handwriting reader took about 25 seconds a typed page where Apple Vision took 0.2, about 140 times as long; a hosted handwriting reader about 9 to 22 seconds a page, waiting on the service rather than this Mac. Acts only with “Choose each page's reader by its kind” on, since it uses the kind this Mac tells. Your own choice for a page or a batch in the file list wins.")
+                HelpButton(text: "Sends every typewritten or printed page to the reader picked for handwriting, so a signature, a handwritten date or a note in the margin is read with the typed text. No check can tell a mixed page before it is read, so it acts on every typed or printed page. Measured level on typed pages, not measured on mixed pages: on the bench's 78 typed and printed pages the handwriting readers read the typed text no worse than Apple Vision on average (for the Mac reader a tie, 14 of 78 pages more than 2 points lower); on the 2 mixed pages scored, worse. Cost: hosted, about $0.002–0.004 a page; the estimate shows what it adds to your batch. Time: on an M3 Pro Mac with 18 GB the Mac handwriting reader took about 25 seconds a typed page where Apple Vision took 0.2, about 140 times as long; a hosted handwriting reader about 9 to 22 seconds a page, waiting on the service rather than this Mac. Acts only with “Choose each page's reader by its kind” on, since it uses the kind this Mac tells. Your own choice for a page or a batch in the file list wins.")
             }
         }
         .disabled(!ocrPageKindRouting)

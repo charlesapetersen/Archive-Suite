@@ -179,6 +179,8 @@ final class VisualReviewUITests: XCTestCase {
             pause(0.5)
         }
 
+        settingsSheet(settings)
+
         let guided = element("ap.settings.guidedKeySetup")
         if guided.waitForExistence(timeout: 3) {
             guided.click()
@@ -371,6 +373,49 @@ final class VisualReviewUITests: XCTestCase {
         item.click()
         pause(1)
         return true
+    }
+
+    /// W46.settings-sheet: the settings sheet from Settings, both tabs, each scrolled through.
+    private func settingsSheet(_ settings: XCUIElement) {
+        let button = element("ap.settings.openSettingsSheet")
+        guard button.waitForExistence(timeout: 3) else { missing.append("settings sheet button"); return }
+        let form = settings.scrollViews.firstMatch
+        for _ in 0..<10 where !button.isHittable {
+            form.scroll(byDeltaX: 0, deltaY: -400)
+            pause(0.4)
+        }
+        guard button.isHittable else { missing.append("settings sheet button (not reachable)"); return }
+        button.click()
+        if waitForSheet(), element("ap.sheet").waitForExistence(timeout: 5) {
+            shoot("settings-sheet")
+            scrollSheet("settings-sheet")
+            let rules = app.sheets.firstMatch.radioButtons["Rules"]
+            if rules.waitForExistence(timeout: 2) {
+                rules.click()
+                pause(0.8)
+                shoot("settings-sheet-rules")
+                scrollSheet("settings-sheet-rules")
+            } else { missing.append("settings sheet Rules tab") }
+        } else { missing.append("settings sheet") }
+        if !clickButton("Done") { escape() }
+        pause(0.5)
+        form.scroll(byDeltaX: 0, deltaY: 4000)
+        pause(0.3)
+    }
+
+    /// The sheet's page scrolled a screenful at a time, one shot each, until it stops moving.
+    private func scrollSheet(_ name: String) {
+        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
+        guard scroll.exists else { missing.append("\(name) scroll view"); return }
+        for page in 1...10 {
+            let before = scroll.screenshot().pngRepresentation
+            scroll.scroll(byDeltaX: 0, deltaY: -480)
+            pause(0.6)
+            if scroll.screenshot().pngRepresentation == before { break }
+            shootOnce("\(name)-\(page)")
+        }
+        scroll.scroll(byDeltaX: 0, deltaY: 20000)
+        pause(0.3)
     }
 
     /// Page down through the Settings form, one shot per screenful, until it stops moving.

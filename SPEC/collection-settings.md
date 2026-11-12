@@ -44,7 +44,9 @@ into that folder. When a run is recorded:
 - A Live Capture session is recorded at Finalize, in each collection folder it filed documents into.
 
 `entries` maps a setting's name (`SettingsKey`: `hours`, `mix`, `languages`, `priorities`, `staysOnMac`, …; a stage
-card's override is `override.<stage>.<part>`) to `{ "value": V, "source": S }`. The collection holds only the values
+card's override is `override.<stage>.<part>`, a `string` naming a route id of `settings-routes.json`; the settings
+sheet writes `override.<stage>.all` for `reading`, `segmentation`, `dating` and `entities`, and an empty or unknown id is
+the app's own pick) to `{ "value": V, "source": S }`. The collection holds only the values
 it answered itself. Everything else is read from its project and then the general settings when a batch runs. A value
 a collection may not hold, such as a cluster or a key, is ignored on reading, and so is an entry of a value kind or
 source this build does not know. Adding a value kind therefore needs no schema bump. Changing the shape of a field
@@ -67,7 +69,7 @@ above), so a collection's mix is never read beside a project's `strata`.
 | `weights` | `numbers` | Each ranked priority's weight by the same names. Absent means 45, 30, 15, 10 by position. |
 | `batchCeilingUSD`, `hours`, `checkingMinutes` | `double` | This collection's batch limits. A ceiling has effect only when the general spending habit allows money. |
 | `preference` | `string` | `bestMeasured`, `cheapestWithinPoint` or `fastestWithinPoint`. |
-| `staysOnMac`, `straightenReadingCopy` | `bool` | The two switches. |
+| `staysOnMac`, `straightenReadingCopy`, `placeHandOnImage` | `bool` | The switches: pages stay on this Mac, straighten the copy you read (note 01), place handwritten text on the page image (note 05; the settings sheet's rules tab). |
 
 `V` is `{ "type": T, "value": … }`, with `T` one of `bool`, `int`, `double`, `string`, `strings` (a list) or `numbers`
 (a name → number map, such as the document mix in percent).
