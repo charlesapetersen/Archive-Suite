@@ -193,6 +193,12 @@ lanes spends most of its wall time waiting. While fixing or checking a test, run
 alone is a lane effect: note it for W40.vm-macos27-runtime rather than chasing it in the test. The full lane is the
 item's final proof, run once when the targeted runs pass; a second full lane needs a reason in the item's notes.
 
+**Reader passes over rendered screens stop early (owner, 2026-11-12).** A wording or layout item that has fresh
+readers judge its offscreen renders (a non-technical reader's pass, a plain-words pass) runs at most three passes,
+and stops after the first pass that finds nothing serious. A fourth needs a reason in the item's notes. List the
+minor findings of the last pass in the DONE entry instead of running another pass for them. W46.settings-sheet ran
+nine passes in 3.6 hours, and by the eighth the serious findings were down to one.
+
 **Unattended sessions: the host screen is off-limits, mechanically.** Whenever `ARCHIVE_UNATTENDED=1` (the
 daemon always sets it), `.claude/hooks/no-host-gui.sh` hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/
 `capture-window.sh`/`cliclick`/`osascript`, a windowed Android emulator (use `-no-window`), and the iOS
