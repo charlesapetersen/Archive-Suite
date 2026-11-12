@@ -507,8 +507,9 @@ tart_run_test() {
 # maxrun end is `unknown`: the run did not finish, so it says nothing either way.
 tart_test_verdict() {
   local log="$1" top exec_line
-  grep -q '\*\* TEST FAILED \*\*' "$log" 2>/dev/null && { echo failed; return 0; }
-  grep -q '\*\* TEST SUCCEEDED \*\*' "$log" 2>/dev/null && { echo succeeded; return 0; }
+  # `test-without-building` (VM_SPLIT's chunks) prints `** TEST EXECUTE SUCCEEDED|FAILED **` instead.
+  grep -qE '\*\* TEST (EXECUTE )?FAILED \*\*' "$log" 2>/dev/null && { echo failed; return 0; }
+  grep -qE '\*\* TEST (EXECUTE )?SUCCEEDED \*\*' "$log" 2>/dev/null && { echo succeeded; return 0; }
   if grep -q '^\[guard\] summary:' "$log" 2>/dev/null; then
     top="$(grep -nE "$TART_TEST_SUMMARY_RE" "$log" | tail -n 1)"
     exec_line="$(sed -n "$(( ${top%%:*} + 1 ))p" "$log")"
@@ -539,7 +540,7 @@ tart_sampler_start() {
         t=\$(ps -axo pcpu=,comm= | awk '/testmanagerd\$/{print \$1; exit}')
         a=\$(ps -axo rss=,comm= | awk '/\\/$proc\$/{print \$1; exit}')
         printf '%s\t%s\t%s\t%s\t%s\n' \"\$l\" \"\$v\" \"\${w:-\t}\" \"\$t\" \"\$a\"
-      " 2>/dev/null | tail -n 1)" || g=""
+      " 2>/dev/null | tail -n 1 2>/dev/null)" || g=""
       [ -n "$g" ] && printf '%s\t%s\t%s\t%s\n' "$(date +%s)" "$(sysctl -n vm.loadavg | awk '{print $2}')" \
         "$(sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null)" "$g" >>"$out"
       sleep "$every"

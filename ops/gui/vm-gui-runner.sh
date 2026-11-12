@@ -25,8 +25,8 @@
 #                companion on a headless AVD on the host; xcuitest lane only).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
-#                VM_KEEP=1 (W40.vm-macos27-runtime (4)): leave the guest booted for the next call, and skip the
-#                  build when the sources are unchanged since its last one — for a run of targeted tests. A
+#                VM_KEEP=1 (W40.vm-macos27-runtime (4)): leave the guest booted for the next call, for a run of
+#                  targeted tests (its warm DerivedData makes an unchanged build a few seconds). A
 #                  detached vm-keep-reaper.sh stops it after VM_KEEP_IDLE s (300) without a run, as soon as
 #                  the Mac's memory pressure leaves normal, or when the calling session exits. A call without
 #                  VM_KEEP=1 takes a kept guest over and stops it at the end; `vm-gui-runner.sh stop` stops it now.
@@ -88,8 +88,10 @@ mkdir -p "$APP_ART"
 # begins by stopping the VM and truncating logs. Without the lock a run started while the daemon's gate is
 # mid-flight kills it, and the gate reports "inconclusive" for work it was about to complete.
 VM_BOOTED=0
-KEEP_BUILT=""   # the source fingerprint this run built (VM_KEEP=1), carried into the keep state
 cleanup() {
+  # An EXIT trap must reach the lock release: under the script's `set -e` one failing line in here would end
+  # the trap early and leave the VM lock and the guest behind (it did, on a missing state file).
+  set +e
   tart_sampler_stop
   if [ "$VM_BOOTED" = 1 ] && [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then
     keep_guest; VM_BOOTED=0
@@ -100,6 +102,13 @@ cleanup() {
 }
 
 # --- VM_KEEP=1: leave the guest up for the next call, with a reaper that stops it (vm-keep-reaper.sh) ---
+# The kept guest and its reaper run in a POSIX session of their own (detached): heavy-run.py holds the Mac's
+# heavy lock until every process in the runner's session has ended, so a guest left in it would keep the
+# runner's call from returning and hold the lock while nobody tests. Between calls the guest is outside the
+# heavy lock by design (owner, 2026-11-12); the reaper's memory-pressure stop is what bounds it there.
+# Call it as `detached CMD… &`: the `&` forks a subshell, and `exec` makes that subshell the command itself, so $!
+# is the command's pid (the reaper checks its own pid against the state) and nothing is left waiting in our session.
+detached() { exec python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$@"; }
 # The session that keeps it: the nearest `claude` ancestor, so the guest goes when that session does.
 keep_owner() {
   local p="$$" c
@@ -110,36 +119,31 @@ keep_owner() {
   done
   return 0
 }
-keep_guest() {
-  # tart stop is a hard power-off on this guest (tart_stop_clean); if the session's process tree is killed
-  # with the guest still up, only what was synced survives. So sync after every kept run.
-  tart exec "$VM" sync >/dev/null 2>&1 || true
-  local old_built reaper
-  old_built="$(sed -n "s/^built_$APP=//p" "$KEEP_STATE" 2>/dev/null | tail -n 1)"
-  { echo "vm=$VM"; echo "repo=$REPO"; echo "rehearsal=$([ -d "$REHEARSAL" ] && echo 1 || echo 0)"
+keep_field() { sed -n "s/^$1=//p" "$KEEP_STATE" 2>/dev/null | tail -n 1 || true; }
+# write_keep_state — (re)write the state and make sure a live reaper watches it. Called right after a kept
+# boot (so a runner killed mid-run still leaves a guest the reaper stops after VM_KEEP_IDLE) and at the end.
+write_keep_state() {
+  local reaper
+  reaper="$(keep_field reaper)"
+  { echo "vm=$VM"; echo "repo=$REPO"; echo "art=$ART"; echo "rehearsal=$([ -d "$REHEARSAL" ] && echo 1 || echo 0)"
     echo "owner=$(keep_owner)"; echo "last=$(date +%s)"
-    sed -n '/^built_/p' "$KEEP_STATE" 2>/dev/null | grep -v "^built_$APP=" || true
-    echo "built_$APP=${KEEP_BUILT:-$old_built}"; } > "$KEEP_STATE.new"
-  reaper="$(sed -n 's/^reaper=//p' "$KEEP_STATE" 2>/dev/null | tail -n 1)"
-  if [ -n "$reaper" ] && kill -0 "$reaper" 2>/dev/null; then
-    echo "reaper=$reaper" >> "$KEEP_STATE.new"; mv "$KEEP_STATE.new" "$KEEP_STATE"
-  else
-    mv "$KEEP_STATE.new" "$KEEP_STATE"
-    VM_KEEP_STATE="$KEEP_STATE" nohup bash "$HERE/vm-keep-reaper.sh" >/dev/null 2>&1 &
+    [ -n "$reaper" ] && kill -0 "$reaper" 2>/dev/null && echo "reaper=$reaper"
+  } > "$KEEP_STATE.new" || true
+  mv "$KEEP_STATE.new" "$KEEP_STATE"
+  if [ -z "$(keep_field reaper)" ]; then
+    VM_KEEP_STATE="$KEEP_STATE" detached bash "$HERE/vm-keep-reaper.sh" </dev/null >/dev/null 2>&1 &
     echo "reaper=$!" >> "$KEEP_STATE"
   fi
+  return 0
+}
+keep_guest() {
+  # tart stop is a hard power-off on this guest (tart_stop_clean); if the guest is ever powered off without
+  # the reaper's clean stop, only what was synced survives. So sync after every kept run.
+  tart exec "$VM" sync >/dev/null 2>&1 || true
+  write_keep_state
   log "kept $VM up for the next call (stops after ${VM_KEEP_IDLE:-300} s idle, on memory pressure, or when this session ends; now: $0 stop)"
 }
 
-# Fingerprint of the sources a guest build would compile: HEAD, the working tree's changes and untracked
-# files' contents. Equal fingerprints mean `test-without-building` tests exactly what `test` would build.
-src_fingerprint() {
-  { git -C "$REPO" rev-parse HEAD
-    git -C "$REPO" status --porcelain=v1 -uall
-    git -C "$REPO" diff HEAD --binary
-    git -C "$REPO" ls-files -o --exclude-standard -z | (cd "$REPO" && xargs -0 shasum 2>/dev/null)
-  } | shasum | awk '{print $1}'
-}
 trap cleanup EXIT
 tart_lock_acquire "${LOCK_WAIT:-120}" \
   || die "the GUI VM is in use by another run (pid ${TART_LOCK_OWNER:-?}) — wait for it, or check: pgrep -fl gui-vm-gate"
@@ -267,6 +271,7 @@ ensure_vm() {
     # 2026-08-10 "missing its project.pbxproj file" read; see the GENERATE BEFORE BOOTING note). Else restart.
     local why=""
     [ "$(sed -n 's/^repo=//p' "$KEEP_STATE" | tail -n 1)" = "$REPO" ] || why="it mounts another checkout"
+    [ "$(sed -n 's/^art=//p' "$KEEP_STATE" | tail -n 1)" = "$ART" ] || why="it mounts another artifact directory"
     [ "$(sed -n 's/^rehearsal=//p' "$KEEP_STATE" | tail -n 1)" = "$([ -d "$REHEARSAL" ] && echo 1 || echo 0)" ] || why="its shares differ"
     [ "$LANE" = xcuitest ] || why="the $LANE lane needs a guest this run boots"
     [ "${PROJ_REWRITTEN:-0}" = 0 ] || why="xcodegen rewrote the project"
@@ -320,12 +325,16 @@ ensure_vm() {
   # guest's general pasteboard within seconds. G4/G5/G13/G16 seed that pasteboard and read it back moments
   # later, so a host copy in between swapped G4's PNG for text, the paste declined, and no asset appeared.
   # Tests need a pasteboard nothing outside the guest can write.
-  rm -f "$KEEP_STATE"   # a fresh boot: no kept guest, and no build fingerprint another run may have overtaken
+  rm -f "$KEEP_STATE"   # a fresh boot: whatever kept guest the state named is gone (its reaper exits)
   log "booting $VM (${gfx[*]} --no-clipboard) + repo/artifact shares…"
   VM_BOOTED=1
   # VM_KEEP=1: the guest must outlive this script, so it must not die with its process group either.
-  local keep=(); [ "$VM_KEEP" = 1 ] && keep=(nohup)
-  ${keep[@]+"${keep[@]}"} tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" >>"$runlog" 2>&1 &
+  # VM_KEEP=1: the guest must outlive this script, in a session of its own (→ detached, above).
+  if [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then
+    detached tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" </dev/null >>"$runlog" 2>&1 &
+  else
+    tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" >>"$runlog" 2>&1 &
+  fi
   echo $! > "$APP_ART/tart-run.pid"
   if [ "$LANE" != "xcuitest" ]; then
     # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
@@ -346,6 +355,7 @@ ensure_vm() {
   # see tart-lib.sh. Never exec after a boot without it.
   tart_wait_agent "$VM" "$AGENT_WAIT" || die "Tart Guest Agent never answered within ${AGENT_WAIT}s — check $runlog"
   log "VM up — guest agent ready after ${TART_AGENT_WAITED}s${VNC_PORT:+, VNC $VNC_HOST:$VNC_PORT}"
+  if [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then write_keep_state; fi
   ensure_display
 }
 
@@ -574,20 +584,13 @@ run_xcuitest() {
   if [ "$VM_SPLIT" -gt 0 ]; then
     run_split
   else
-    # VM_KEEP=1: test what the guest already built when the sources are the ones it built (src_fingerprint).
-    local action=test fp=""
-    if [ "$VM_KEEP" = 1 ]; then
-      fp="$(src_fingerprint)"
-      if [ -f "$KEEP_STATE" ] && [ "$(sed -n "s/^built_$APP=//p" "$KEEP_STATE" | tail -n 1)" = "$fp" ]; then
-        action=test-without-building
-      fi
-    fi
-    log "$action: $ONLY_TESTING for $APP in the VM…"
+    # Always `test`: on a kept guest the DerivedData is warm, and Xcode's incremental build of unchanged
+    # sources is the build reuse (measured 2026-11-12: 21 s for a whole Smoke call, as fast as
+    # `test-without-building`, which would also test a stale build after an edit).
+    log "test: $ONLY_TESTING for $APP in the VM…"
     video_start
     tart_crash_mark "$VM"
-    run_tests "$action" "$TEST_ARGS" xcuitest
-    # A build that got as far as running tests is the build these sources make; one that failed is not.
-    [ "$action" = test ] && [ -n "$fp" ] && grep -q "^Test Suite '" "$APP_ART/xcuitest.log" && KEEP_BUILT="$fp"
+    run_tests test "$TEST_ARGS" xcuitest
     [ "$PROCESSOR_LIVECAPTURE" = 1 ] && stop_phone_leg
     video_stop
     # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
@@ -838,6 +841,6 @@ case "$LANE" in
   sighted)  build_for_sighted; run_sighted ;;
   both)     run_xcuitest; build_for_sighted; run_sighted ;;
 esac
-log "done. Artifacts in $APP_ART"
+log "done in $SECONDS s (after the heavy lock). Artifacts in $APP_ART"
 [ "$CRASH_FOUND" = 0 ] || die "$APP left a crash or hang report in the guest — exiting non-zero (reports: $APP_ART/crashes*)"
 [ "$XCUITEST_FAILED" = 0 ] || die "$APP XCUITest run did not succeed — exiting non-zero (log: $APP_ART/xcuitest.log)"

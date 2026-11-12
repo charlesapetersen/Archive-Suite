@@ -353,6 +353,8 @@ grep -qF "is_fail()    { grep -qE '^CRASH_REPORT\[' \"\$(applog \"\$1\" \"\$2\")
   S="Test Suite 'Selected tests'"
   v succeeded "x\n** TEST SUCCEEDED **\n"
   v failed "x\n** TEST FAILED **\n"
+  v succeeded "x\n** TEST EXECUTE SUCCEEDED **\n"
+  v failed "x\n** TEST EXECUTE FAILED **\n"
   v unknown "$S passed at 1.\n\t Executed 3 tests, with 0 failures (0 unexpected) in 1 (1) seconds\n"
   v succeeded "$S passed at 1.\n\t Executed 3 tests, with 0 failures (0 unexpected) in 1 (1) seconds\n[guard] summary: x\n"
   v failed "$S failed at 1.\n\t Executed 3 tests, with 1 failure (0 unexpected) in 1 (1) seconds\n[guard] summary: x\n"
