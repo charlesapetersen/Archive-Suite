@@ -186,6 +186,13 @@ asking the owner for anything:
 | It **renders / behaves** (layout, interaction, a bug repro) | **Off-screen in the Tart VM** (macOS 27.2 with Xcode 27.2, matching the host) — `ops/gui/vm-gui-runner.sh reader\|notes\|processor xcuitest\|sighted\|both` (XCUITest + a VNC pixel grab; artifacts in `~/.tart-mirror/vm-artifacts/<app>/` → **read the shot**). See `ops/gui/README.md` §3. The host loop (`./launch.sh` + `cliclick` + `ops/gui/capture-window.sh`) does the same job but **takes over the physical screen** — interactive sessions only, with the owner's agreement. |
 | **Subjective taste** (does this look right?), an **API key**, or an **account/device** action | Genuinely owner-only — ask. |
 
+**Iterate on single tests in the VM; run a full lane once, at the end (owner, 2026-11-12).** A full app lane on the
+macOS 27.2 guest takes hours and slows as it runs (W40.vm-macos27-runtime), so a session that debugs against full
+lanes spends most of its wall time waiting. While fixing or checking a test, run only it, or its class, with
+`ONLY_TESTING=<App>UITests/<Class>[/<test>] ops/gui/vm-gui-runner.sh <app> xcuitest`. A test that fails in a lane but passes
+alone is a lane effect: note it for W40.vm-macos27-runtime rather than chasing it in the test. The full lane is the
+item's final proof, run once when the targeted runs pass; a second full lane needs a reason in the item's notes.
+
 **Unattended sessions: the host screen is off-limits, mechanically.** Whenever `ARCHIVE_UNATTENDED=1` (the
 daemon always sets it), `.claude/hooks/no-host-gui.sh` hard-DENIES host UITest runs, `launch.sh`/`gui-drive*`/
 `capture-window.sh`/`cliclick`/`osascript`, a windowed Android emulator (use `-no-window`), and the iOS
