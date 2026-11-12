@@ -1,0 +1,280 @@
+"""W46.place-hands-cost — the hand placement route's memory and time (05-placement.md §8).
+
+The shipped hand route, `hand-blla-ctc`, timed page by page in one process, as the Processor would run it: kraken
+blla lines, McCATMuS recognition of each line, the reading force-aligned by both matchers (one-to-one and a span of
+up to 8), the `conf` pick between them (place_hands.place_ctc, unchanged), and the lab writer
+(place_functional `oracle --fit`) writing the picked words onto the page as a PDF. Pages: the owner's 20 audited
+hand pages (place_hands.keep). Reading: Qwen3.6-27B's saved one, the row's non-drafter headline reading.
+
+Each run records per page the seconds of blla, recognition, alignment (both matchers and the pick) and the writer,
+the process's peak resident memory after each stage (getrusage), the writer's own peak (a child process), the two
+model loads, torch's thread count; the parent wraps the worker in /usr/bin/time -l for the whole process's peak
+memory footprint (the figure macOS's memory pressure counts). Parity: each page's blla line count and the conf
+pick's confidence against W46.place-hands' saved runs, so the timed route is the scored one.
+
+Usage (system python3; the worker runs itself under the kraken venv, through the heavy lock):
+  python3 ops/autonomous/heavy-run.py run -- python3 place_hands_cost.py run run1
+  python3 place_hands_cost.py report run1 run2     # segbench-results/place-hands-cost.json and .md
+Scratch: ~/Library/Caches/ArchiveSuiteRehearsal/place-hands/{lines,hyp,pdf}/*cost*, cost/ (the runs' raw records).
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import resource
+import statistics
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import place_hands as P  # noqa: E402
+
+READING = 'qwen3.6-27b'
+MODEL = 'mccatmus'
+COST = P.CACHE / 'cost'
+OUT = P.RESULTS / 'place-hands-cost'
+GB = 1024 ** 3
+
+
+def maxrss_gb(who=resource.RUSAGE_SELF):
+    return resource.getrusage(who).ru_maxrss / GB   # bytes on macOS
+
+
+ABORT_GB = 7.0   # the worker stops itself past this footprint, below the heavy lock's 60% guard, and says where
+
+
+def footprint(pid=None):
+    """phys_footprint in bytes (rusage_info_v0 field 7, as the heavy lock reads it): the memory macOS's pressure counts."""
+    import ctypes
+    import struct
+    buf = ctypes.create_string_buffer(256)
+    if ctypes.CDLL('/usr/lib/libproc.dylib').proc_pid_rusage(pid or os.getpid(), 0, buf) != 0:
+        return 0
+    return struct.unpack_from('<Q', buf.raw, 16 + 7 * 8)[0]
+
+
+class Sampler:
+    """The worker's own footprint every 0.1 s: the peak within each stage, the progress on disk (a killed run still
+    says which page and stage it was in), and a self-stop past ABORT_GB."""
+
+    def __init__(self, progress: Path):
+        self.progress, self.name, self.peak, self.all = progress, 'start', 0, 0
+        progress.parent.mkdir(parents=True, exist_ok=True)
+        progress.write_text('')
+        threading.Thread(target=self.loop, daemon=True).start()
+
+    def loop(self):
+        while True:
+            b = footprint()
+            self.peak, self.all = max(self.peak, b), max(self.all, b)
+            if b > ABORT_GB * GB:
+                self.log(f'ABORT footprint {b / GB:.2f} GB in {self.name}')
+                os._exit(3)
+            time.sleep(0.1)
+
+    def log(self, text):
+        with self.progress.open('a') as f:
+            f.write(f'{time.strftime("%H:%M:%S")} {text}\n')
+
+    def stage(self, name):
+        """Start a stage; returns the peak footprint (GB) of the one that ended."""
+        b = footprint()
+        ended = max(self.peak, b) / GB
+        self.log(f'{name} (footprint {b / GB:.2f} GB, previous stage peak {ended:.2f} GB)')
+        self.name, self.peak = name, b
+        return ended
+
+
+def todo():
+    return [t for t in P.pages() if t['group'] == 'owner-hand' and P.keep(t)]
+
+
+def worker(tag, device, empty_cache, repeat=1):
+    import torch
+    from kraken.configs import SegmentationInferenceConfig
+    from kraken.kraken import SEGMENTATION_DEFAULT_MODEL
+    from kraken.lib.util import open_image
+    from kraken.tasks import SegmentationTaskModel
+    rec = {'tag': tag, 'reading': READING, 'model': MODEL, 'torch_threads': torch.get_num_threads(),
+           'device': device, 'empty_cache': empty_cache, 'repeat': repeat,
+           'rss_start_gb': maxrss_gb(), 'pages': []}
+    smp = Sampler(COST / f'{tag}.progress')
+    smp.stage('load blla')
+    t0 = time.time()
+    seg_model = SegmentationTaskModel.load_model(SEGMENTATION_DEFAULT_MODEL)
+    seg_cfg = SegmentationInferenceConfig(accelerator=device)
+    rec['blla_load_s'], rec['rss_after_blla_load_gb'] = time.time() - t0, maxrss_gb()
+    smp.stage('load ctc')
+    t0 = time.time()
+    loaded = P.load_ctc(MODEL, device)
+    rec['ctc_load_s'], rec['rss_after_ctc_load_gb'] = time.time() - t0, maxrss_gb()
+    det = f'blla-cost-{tag}'
+    for rep, t in [(rep, t) for rep in range(repeat) for t in todo()]:
+        k, row = P.key(t), {'page': t['page'], 'rep': rep}
+        ended = smp.stage(f"{t['page']} blla")
+        rec.setdefault('loads_peak_fp_gb', ended)
+        t0 = time.time()
+        res = seg_model.predict(im=open_image(t['image']), config=seg_cfg)
+        lines = [{'baseline': ln.baseline, 'boundary': ln.boundary} for ln in res.lines if ln.baseline]
+        row['blla_s'] = time.time() - t0
+        P.save(P.CACHE / 'lines' / det / f'{k}.json', P.normalise(lines, t['width'], t['height'], row['blla_s']))
+        row['rss_after_blla_gb'] = maxrss_gb()
+        row['blla_fp_gb'] = smp.stage(f"{t['page']} align")
+        t0 = time.time()
+        P.place_ctc(MODEL, [t], det, [READING], loaded)
+        row['align_total_s'] = time.time() - t0
+        hyp_file = P.CACHE / 'hyp' / f'{det}.ctc-{MODEL}-conf.{READING}' / f'{k}.json'
+        meta = json.loads(hyp_file.read_text())['meta']
+        row['recognise_s'] = meta['recognise_s']
+        row['match_align_s'] = row['align_total_s'] - meta['recognise_s']
+        row['rss_after_align_gb'] = maxrss_gb()
+        row['align_fp_gb'] = smp.stage(f"{t['page']} writer")
+        pdf = P.CACHE / 'pdf' / f'cost-{tag}' / f'{k}.pdf'
+        pdf.parent.mkdir(parents=True, exist_ok=True)
+        t0 = time.time()
+        subprocess.run([str(P.FUNCTIONAL_BIN), 'oracle', str(P.place_truth.STORE / f'{k}.json'), str(pdf),
+                        '--words', str(hyp_file), '--fit'], check=True, stdout=subprocess.DEVNULL)
+        row['writer_s'] = time.time() - t0
+        row['writer_maxrss_gb'] = maxrss_gb(resource.RUSAGE_CHILDREN)   # the largest child so far
+        if empty_cache and device == 'mps':
+            torch.mps.empty_cache()
+        smp.stage(f"{t['page']} done")
+        row['total_s'] = row['blla_s'] + row['align_total_s'] + row['writer_s']
+        # parity with W46.place-hands' saved runs
+        saved_lines = P.CACHE / 'lines' / 'blla' / f'{k}.json'
+        saved_hyp = P.CACHE / 'hyp' / f'blla.ctc-{MODEL}-conf.{READING}' / f'{k}.json'
+        row['lines'] = len(lines)
+        row['saved_lines'] = len(json.loads(saved_lines.read_text())['lines']) if saved_lines.exists() else None
+        row['ctc_conf'] = meta['ctc_conf']
+        row['span'] = meta['span']
+        row['saved_ctc_conf'] = json.loads(saved_hyp.read_text())['meta']['ctc_conf'] if saved_hyp.exists() else None
+        rec['pages'].append(row)
+        print(f"{t['page']} blla {row['blla_s']:.1f}s align {row['align_total_s']:.1f}s writer {row['writer_s']:.2f}s "
+              f"footprint blla {row['blla_fp_gb']:.2f} align {row['align_fp_gb']:.2f} GB", flush=True)
+    rec['rss_peak_gb'], rec['fp_peak_gb'] = maxrss_gb(), smp.all / GB
+    P.save(COST / f'{tag}.worker.json', rec)
+
+
+def run(tag, device, empty_cache, repeat=1):
+    P.functional_bin()
+    env = dict(os.environ, PLACE_HANDS_WORKER='cost', PHC_DEVICE=device, PHC_EMPTY='1' if empty_cache else '',
+               PHC_REPEAT=str(repeat))
+    t0 = time.time()
+    p = subprocess.run(['/usr/bin/time', '-l', str(P.VENV['ctc']), __file__, 'run', tag], env=env,
+                       stderr=subprocess.PIPE, text=True)
+    wall = time.time() - t0
+    sys.stderr.write(p.stderr[-3000:])
+    if p.returncode:
+        sys.exit(p.returncode)
+    rec = json.loads((COST / f'{tag}.worker.json').read_text())
+
+    def stat(label):
+        m = re.search(r'^\s*(\d+)\s+' + re.escape(label) + r'\s*$', p.stderr, re.M)
+        return int(m.group(1)) if m else None
+    rec['process_wall_s'] = wall
+    rec['time_l'] = {'maximum_resident_set_size_gb': (stat('maximum resident set size') or 0) / GB,
+                     'peak_memory_footprint_gb': (stat('peak memory footprint') or 0) / GB}
+    P.save(COST / f'{tag}.json', rec)
+    print(json.dumps(rec['time_l']), f'wall {wall:.0f}s')
+
+
+def q(xs, f):
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(f * len(xs)))]
+
+
+def summarise(rec):
+    ps = rec['pages']
+    col = lambda k: [r[k] for r in ps]
+    out = {'tag': rec['tag'], 'pages': len(ps), 'torch_threads': rec['torch_threads'],
+           'blla_load_s': rec['blla_load_s'], 'ctc_load_s': rec['ctc_load_s'],
+           'peak_footprint_gb': rec['time_l']['peak_memory_footprint_gb'],
+           'peak_rss_gb': rec['time_l']['maximum_resident_set_size_gb'],
+           'writer_peak_rss_gb': max(col('writer_maxrss_gb')),
+           'process_wall_s': rec['process_wall_s'],
+           'lines_match_saved': sum(r['lines'] == r['saved_lines'] for r in ps),
+           'conf_match_saved': sum(r['saved_ctc_conf'] is not None and abs(r['ctc_conf'] - r['saved_ctc_conf']) < 1e-3
+                                   for r in ps)}
+    for k in ('blla_s', 'recognise_s', 'match_align_s', 'align_total_s', 'writer_s', 'total_s'):
+        v = col(k)
+        out[k] = {'median': statistics.median(v), 'mean': statistics.mean(v), 'max': max(v), 'min': min(v),
+                  'sum': sum(v)}
+    return out
+
+
+def report(tags):
+    runs = [json.loads((COST / f'{t}.json').read_text()) for t in tags]
+    S = [summarise(r) for r in runs]
+    by_page = {}
+    for r in runs:
+        for row in r['pages']:
+            by_page.setdefault(row['page'], []).append(row)
+    res = {'item': 'W46.place-hands-cost', 'route': 'hand-blla-ctc', 'reading': READING, 'machine': machine(),
+           'runs': S, 'pages': {p: [{k: v for k, v in row.items()} for row in rows] for p, rows in by_page.items()}}
+    OUT.with_suffix('.json').write_text(json.dumps(res, indent=1) + '\n')
+    OUT.with_suffix('.md').write_text(write_md(res))
+    print(OUT.with_suffix('.md'))
+
+
+def machine():
+    sh = lambda *a: subprocess.run(a, capture_output=True, text=True).stdout.strip()
+    return {'model': sh('sysctl', '-n', 'hw.model'), 'chip': sh('sysctl', '-n', 'machdep.cpu.brand_string'),
+            'memory_gb': int(sh('sysctl', '-n', 'hw.memsize')) / GB,
+            'cores': f"{sh('sysctl', '-n', 'hw.perflevel0.physicalcpu')}P+{sh('sysctl', '-n', 'hw.perflevel1.physicalcpu')}E"}
+
+
+def write_md(res):
+    S, m = res['runs'], res['machine']
+    f2 = lambda x: f'{x:.2f}'
+    L = ['# W46.place-hands-cost — the hand placement route\'s memory and time', '',
+         'Generated by `ArchiveProcessor/scripts/segbench/place_hands_cost.py report` (05-placement.md §8). The shipped '
+         'hand route `hand-blla-ctc` run page by page in one process: kraken blla lines, McCATMuS recognition, the '
+         'reading force-aligned by both matchers (one-to-one and a span of up to 8), the `conf` pick, and the lab '
+         f'writer (`place_functional oracle --fit`) writing the picked words into a PDF. Reading: {res["reading"]} '
+         f'(saved). Machine: {m["chip"]} ({m["cores"]}), {m["memory_gb"]:.0f} GB, {m["model"]}. No money, no cluster.',
+         '', '## Per run', '',
+         '| run | pages | torch threads | blla s/page (median) | recognition | matchers + pick | writer | whole route s/page (median, mean, max) | model loads s (blla, McCATMuS) | peak footprint GB | peak RSS GB | writer peak RSS GB | parity: lines, conf |',
+         '|---|---:|---:|---:|---:|---:|---:|---|---|---:|---:|---:|---|']
+    for s in S:
+        L.append(f"| {s['tag']} | {s['pages']} | {s['torch_threads']} | {s['blla_s']['median']:.2f} | "
+                 f"{s['recognise_s']['median']:.2f} | {s['match_align_s']['median']:.2f} | {s['writer_s']['median']:.2f} | "
+                 f"{s['total_s']['median']:.2f}, {s['total_s']['mean']:.2f}, {s['total_s']['max']:.2f} | "
+                 f"{s['blla_load_s']:.1f}, {s['ctc_load_s']:.1f} | {f2(s['peak_footprint_gb'])} | {f2(s['peak_rss_gb'])} | "
+                 f"{f2(s['writer_peak_rss_gb'])} | {s['lines_match_saved']}/{s['pages']}, {s['conf_match_saved']}/{s['pages']} |")
+    L += ['', '## Per page (seconds; first run, then second)', '',
+          '| page | lines | blla | recognition | matchers + pick | writer | whole |', '|---|---:|---|---|---|---|---|']
+    for p, rows in res['pages'].items():
+        c = lambda k: ' / '.join(f'{r[k]:.2f}' for r in rows)
+        L.append(f"| {p} | {rows[0]['lines']} | {c('blla_s')} | {c('recognise_s')} | {c('match_align_s')} | "
+                 f"{c('writer_s')} | {c('total_s')} |")
+    return '\n'.join(L) + '\n'
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    r = sub.add_parser('run')
+    r.add_argument('tag')
+    r.add_argument('--device', choices=('cpu', 'mps'), default='cpu')
+    r.add_argument('--repeat', type=int, default=1, help='the 20 pages this many times in one process (does the footprint level off?)')
+    r.add_argument('--empty-cache', action='store_true', help='torch.mps.empty_cache() after each page')
+    rp = sub.add_parser('report')
+    rp.add_argument('tags', nargs='+')
+    a = ap.parse_args()
+    if a.cmd == 'run':
+        if os.environ.get('PLACE_HANDS_WORKER') == 'cost':
+            worker(a.tag, os.environ['PHC_DEVICE'], bool(os.environ.get('PHC_EMPTY')), int(os.environ['PHC_REPEAT']))
+        else:
+            run(a.tag, a.device, a.empty_cache, a.repeat)
+    else:
+        report(a.tags)
+
+
+if __name__ == '__main__':
+    main()

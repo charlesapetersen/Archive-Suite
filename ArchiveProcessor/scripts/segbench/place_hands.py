@@ -520,19 +520,27 @@ def ctc_char_spans(net, logits_list, text, pad):
     return spans, [sg.score for sg in segs]
 
 
-def place_ctc(model_name, todo, det_name, routes):
-    """Runs under the kraken venv: recognise each detected line once (text, logits and line image), match the
-    reading's lines to the recognised ones by character error, and force-align each matched line's text on its
-    logits; every reading of the page shares the one recognition pass."""
-    from PIL import Image
-    from kraken.containers import Segmentation, BaselineLine
+def load_ctc(model_name, accelerator=None):
+    """The CTC recogniser and its inference config, loaded once (kraken venv). `accelerator` None is kraken's
+    'auto', which is MPS on a Mac (the W46.place-hands runs); place_hands_cost.py also sets 'cpu'."""
     from kraken.configs import RecognitionInferenceConfig
     from kraken.tasks import ForcedAlignmentTaskModel
     net = ForcedAlignmentTaskModel.load_model(MODELS[model_name]).net
-    cfg = RecognitionInferenceConfig()
+    cfg = RecognitionInferenceConfig(**({'accelerator': accelerator} if accelerator else {}))
     cfg.return_logits = True
     cfg.return_line_image = True
     net.prepare_for_inference(cfg)
+    return net, cfg
+
+
+def place_ctc(model_name, todo, det_name, routes, loaded=None):
+    """Runs under the kraken venv: recognise each detected line once (text, logits and line image), match the
+    reading's lines to the recognised ones by character error, and force-align each matched line's text on its
+    logits; every reading of the page shares the one recognition pass. `loaded` is load_ctc's pair, to reuse a
+    recogniser already in memory (place_hands_cost.py)."""
+    from PIL import Image
+    from kraken.containers import Segmentation, BaselineLine
+    net, cfg = loaded or load_ctc(model_name)
     for t in todo:
         det = json.loads((CACHE / 'lines' / det_name / f'{key(t)}.json').read_text())
         W, H = t['width'], t['height']
