@@ -605,7 +605,10 @@ def option_glm() -> dict:
         gv = E.fit_level(list(dev.values()), ("G",))
         g = O.figures(E.pooled([E.evaluate(boxes[n], ("G",), gv) for n in data.TEST]))
         shipped = next(a for a in out["approaches"] if a["id"] == "gemini")
-        if round(gv, 6) != round(shipped["level"], 6) or g != shipped["figures"]["test"]:
+        # Voter G here is 3.8 on g1 from its caches; since W46.seg-magazine-rule-app the row is 3.7's g2 figures and
+        # keeps the g1 row it replaced, which is what this path must reproduce.
+        g1 = shipped.get("replaces") or {"level": shipped["level"], "test": shipped["figures"]["test"]}
+        if round(gv, 6) != round(g1["level"], 6) or g != g1["test"]:
             raise SystemExit(f"this path does not reproduce options.json's gemini row: {gv} {g}")
         v = E.fit_level(list(dev.values()), code)
         if v is None or not 0 < v < 1:

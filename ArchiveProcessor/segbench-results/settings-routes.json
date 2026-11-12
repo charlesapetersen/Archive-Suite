@@ -7886,9 +7886,9 @@
    ],
    "rules": [
     {
-     "id": "magazine-ranks-nothing",
-     "text": "The magazine figures rank nothing until W46.seg-magazine-rule-app; shown with ranks nothing yet.",
-     "source": "seg-magazine-rule.md",
+     "id": "magazine-article-rule",
+     "text": "A magazine figure ranks only for a route whose prompt states the article-within-issue rule (Gemini 3.8 on g2, its figure Gemini 3.7's, since W46.seg-magazine-rule-app); every other route's is shown with ranks nothing yet.",
+     "source": "seg-magazine-rule-app.md",
      "switch": null
     },
     {
@@ -8017,58 +8017,69 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 87.3,
+       "value": 88.8,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Gemini only",
         "attribute": "pages in an exact document, no checking",
-        "value": "87.3%"
+        "value": "88.8%"
        }
       },
       "test-boxes.checks_per_100": {
-       "value": 24.2,
+       "value": 25.3,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Gemini only",
         "attribute": "boundaries to check per 100 pages",
-        "value": "24.2"
+        "value": "25.3"
        }
       },
       "test-boxes.after_checking": {
-       "value": 98.5,
+       "value": 100.0,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Gemini only",
         "attribute": "pages right after checking",
-        "value": "98.5%"
+        "value": "100.0%"
        }
       },
       "test-boxes.unflagged_per_500": {
-       "value": 2.8,
+       "value": 0.0,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Gemini only",
         "attribute": "unflagged errors per 500 pages (count)",
-        "value": "2.8 (2)"
+        "value": "0.0 (0)"
        }
       },
       "dev-boxes": {
-       "value": 90.7,
+       "value": 91.9,
        "n": 551,
        "truth": "owner-dev",
        "source": {
-        "file": "seg-scorers.md",
-        "route": "window-gemini-3.8-flash-low",
-        "attribute": "pages exact, development",
-        "value": "90.7%"
+        "file": "seg-magazine-rule-app.md",
+        "route": "g2 on 3.7, held out (pooled)",
+        "attribute": "pages exact, no checking",
+        "value": "91.9%"
+       }
+      },
+      "magazine.gap_acc": {
+       "value": 93.8,
+       "n": 146,
+       "truth": "owner-locked",
+       "source": {
+        "file": "seg-magazine-rule.md",
+        "route": "g2",
+        "attribute": "Gap accuracy",
+        "value": "93.8%"
        }
       }
      },
@@ -8102,14 +8113,13 @@
       "source": null
      },
      "caveats": [
-      "single run, no measured offset range (P7-4); 3.7's range at this level is 83.0-85.2% no checking",
-      "both unflagged errors are Stanton 101|102 and 102|103, merged by every cloud route with or without the magazine rule (P8-4)",
-      "introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md)",
-      "no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)"
+      "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)",
+      "single g2 run, no measured offset range (P7-4); 3.7's range on g1 at this level is 83.0-85.2% no checking",
+      "introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1",
+      "no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)",
+      "the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"
      ],
-     "kind_rules": [
-      "magazine: figures rank nothing until W46.seg-magazine-rule-app"
-     ],
+     "kind_rules": [],
      "fallback": "manual",
      "conditions": []
     },
@@ -8272,12 +8282,12 @@
       "source": null
      },
      "caveats": [
-      "3.7 at the level fitted for 3.8, not its own (P7-4)",
+      "g1 figures at 0.965, the level fitted for 3.8 on g1 (P7-4); fitted on 3.7's own g2 answers the level is also 0.965 (seg-magazine-rule-app.md)",
       "the app has no gateway route; its range is shown on the 3.8 card labelled as 3.7's, and Sasha's lead over the 2B stands on this card only (14-owner-calls.md call 8)",
       "gateway serves no batch"
      ],
      "kind_rules": [
-      "magazine: ranks nothing"
+      "magazine: g1's figure, on the old full-magazine rule, ranks nothing"
      ],
      "fallback": "manual",
      "conditions": []

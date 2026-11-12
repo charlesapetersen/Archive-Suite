@@ -21,9 +21,13 @@ import ensemble as E
 import method_gemini as G
 import method_window as W
 import method_window_cues as MWC
+import seg_magazine_rule_app as MRA
 from score import PHOTO
 
-VOTER_JUDGE = {"C": W.judge_window, "G": G.judge_window, "O": O.OPENAI_JUDGE}
+# W46.seg-magazine-rule-app: the app's Gemini voter sends g2, and its recorded answers are Gemini 3.7 Flash's g2
+# answers through the Stanford gateway (the gateway does not serve 3.8; MRA.EVIDENCE says so in the fixture).
+VOTER_JUDGE = {"C": W.judge_window, "G": MRA.answer, "O": O.OPENAI_JUDGE}
+VOTER_NAMES = {**O.VOTER_NAMES, "G": MRA.VOTER}
 
 
 def reply(j: dict, index: dict[int, int]) -> str:
@@ -35,7 +39,7 @@ def reply(j: dict, index: dict[int, int]) -> str:
 
 class _Synthetic:
     """A seven-page window with made-up text (one blank page, one past the truncation length), so the fixture
-    carries each prompt (w1, g1 and the Codex route's c1) exactly as the bench renders it and nothing from the archive."""
+    carries each prompt (w1, g2 and the Codex route's c1) exactly as the bench renders it and nothing from the archive."""
     name = "synthetic"
 
     def __init__(self):
@@ -55,7 +59,7 @@ def prompts() -> dict:
     files = "\n".join(f"- {W.fname(n)}  (page {n})" for n in nums)
     return {"texts": texts,
             "w1": W.PROMPT.format(k=7, files=files, texts=t, gaps=gaps, max_text=W.MAX_TEXT),
-            "g1": G.PROMPT.format(k=7, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
+            "g2": G.PROMPTS["g2"].format(k=7, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
                                   pages=", ".join(str(n) for n in nums)),
             "c1": MWC.prompt_template("codex").format(k=7, files=files, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
                                                       pages=", ".join(str(n) for n in nums))}
@@ -76,12 +80,15 @@ def main(argv) -> int:
                 raise SystemExit(f"{name} {code}: window {a}-{b} is not in the cache")
             ws.append({"start": a, "end": b, "reply": reply(j, index)})
         voters[code] = ws
-    box = E.Box(col, tuple(VOTER_JUDGE))
+    box = E.Box(col, ("C", "O"))
+    box.v["G"] = MRA.g2_box(name).v["G"]
     expected = {}
     for ap in spec["approaches"]:
         if not ap["available"] or not ap["voters"]:
             continue
-        codes = "".join(c for c, nm in O.VOTER_NAMES.items() if nm in ap["voters"])
+        codes = "".join(c for c, nm in VOTER_NAMES.items() if nm in ap["voters"])
+        if len(codes) != len(ap["voters"]):
+            continue   # a voter this fixture does not record (the OpenRouter and Mac-local routes have their own tests)
         with O.rule(ap["rule"]):
             verdict = E.judge(box, codes, ap["level"])
         expected[ap["id"]] = [{"gap": i, "decision": d, "flagged": f, "confidence": c, "agreed": g}
@@ -93,7 +100,8 @@ def main(argv) -> int:
         "source": "ArchiveProcessor/scripts/segbench/export_engine_fixture.py (bench response caches; no call)",
         "pages": n,
         "photo_kinds": photo,
-        "voters": {c: O.VOTER_NAMES[c] for c in VOTER_JUDGE},
+        "voters": {c: VOTER_NAMES[c] for c in VOTER_JUDGE},
+        "gemini_answers": MRA.EVIDENCE,
         "windows": voters,
         "expected": expected,
         "prompts": prompts(),

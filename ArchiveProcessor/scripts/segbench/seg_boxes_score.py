@@ -377,10 +377,11 @@ def offsets(js_gem):
         with O.rule(fz["rule"]):
             wrong38[b] = unflagged_gaps(E.Box(data.load(b), tuple(fz["voters"])), tuple(fz["voters"]), fz["level"])
     ref = next(x for x in json.loads((RESULTS / "options.json").read_text())["approaches"] if x["id"] == "gemini")
-    ref_fig = {**ref["figures"]["test"],
-               "usd_per_1000_pages": ref["cost"]["total"]["list_usd_per_1000_pages"]}
+    # 3.8 on g1: since W46.seg-magazine-rule-app the row's figures are 3.7's on g2 and the g1 row is its `replaces`.
+    g1 = ref.get("replaces") or {"test": ref["figures"]["test"], "test_by_box": ref["figures"]["test_by_box"]}
+    ref_fig = {**g1["test"], "usd_per_1000_pages": ref["cost"]["total"]["list_usd_per_1000_pages"]}
     return {"rule": fz["rule"], "level": fz["level"], "rows": rows, "gemini38_o0": ref_fig,
-            "gemini38_o0_by_box": ref["figures"]["test_by_box"], "gemini38_o0_unflagged_gaps": wrong38}
+            "gemini38_o0_by_box": g1["test_by_box"], "gemini38_o0_unflagged_gaps": wrong38}
 
 
 def cmd_score(a):
@@ -540,7 +541,9 @@ def newsletter_calls():
         if code.startswith("X:"):
             return E._from_bounds(col, R.W.assemble(col, R.W.combine(col, R.judge(code[2:])), True))
         return base(code, col)
-    aps = [a for a in json.loads(O.OUT_JSON.read_text())["approaches"] if a["id"] in APPROACH_CODES]
+    # Voter G is 3.8's g1 caches, so the Gemini row is read as the g1 row it replaced (W46.seg-magazine-rule-app).
+    aps = [{**a, **{k: a["replaces"][k] for k in ("voters", "rule", "level")}} if a.get("replaces") and a["id"] == "gemini"
+           else a for a in json.loads(O.OUT_JSON.read_text())["approaches"] if a["id"] in APPROACH_CODES]
     E.voter_gaps = voter_gaps
     try:
         box = E.Box(data.load("Stanton"), sorted({c for a in aps for c in APPROACH_CODES[a["id"]]}))

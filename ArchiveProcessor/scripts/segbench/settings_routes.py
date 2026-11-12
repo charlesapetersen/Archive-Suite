@@ -334,7 +334,7 @@ HEADERS = {
    "metric": {"id": "pages_exact", "label": "Pages in an exact document, no checking, on the two locked test boxes", "higher_is_better": True},
    "kinds": ["test-boxes", "letters", "magazine", "clippings-mixed", "manuscripts-public", "typed-gov-public"],
    "rules": [
-    {"id": "magazine-ranks-nothing", "text": "The magazine figures rank nothing until W46.seg-magazine-rule-app; shown with ranks nothing yet.", "source": "seg-magazine-rule.md", "switch": None},
+    {"id": "magazine-article-rule", "text": "A magazine figure ranks only for a route whose prompt states the article-within-issue rule (Gemini 3.8 on g2, its figure Gemini 3.7's, since W46.seg-magazine-rule-app); every other route's is shown with ranks nothing yet.", "source": "seg-magazine-rule-app.md", "switch": None},
     {"id": "clippings-owner-weighted", "text": "The clippings-mixed comparison uses the owner-ruled weighted figure, never the all-known diagnostic.", "source": "seg-boxes-score.md §SC0122 on its owner-ruled gaps", "switch": None},
     {"id": "manuscript-warning", "text": "On handwritten manuscripts a local or cluster Qwen route carries the warning that on Lincoln's manuscripts it put 35.6% of pages in the right document; a cloud voter is recommended where feasible.", "source": "seg-lincoln-cloud.md", "switch": None},
     {"id": "window-7-stride-3", "text": "Seven-page windows at stride 3 with images and Vision text, every route; no self-voting, no collection-facts block.", "source": "seg-window-modality.md", "switch": None},

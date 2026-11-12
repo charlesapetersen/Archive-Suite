@@ -84,7 +84,7 @@ enum WindowPromptRenderer {
         switch id {
         case .w1:
             values["files"] = nums.map { "- \(fileName($0))  (page \($0))" }.joined(separator: "\n")
-        case .g1:
+        case .g2:
             values["pages"] = nums.map(String.init).joined(separator: ", ")
         case .c1:
             values["files"] = nums.map { "- \(fileName($0))  (page \($0))" }.joined(separator: "\n")

@@ -233,10 +233,14 @@ struct SegmentationOptions: Decodable, Sendable {
         let tokensPer1000Pages: [String: Tokens]?
         /// A model run on the user's Mac: what it measured there (W41.app-local-seg).
         let mac: Mac?
+        /// What the figures were measured on when it is not the model the approach calls: Gemini 3.8 Flash's
+        /// figures are Gemini 3.7 Flash's on the same prompt (W46.seg-magazine-rule-app). Shown on the row.
+        let figuresNote: String?
 
         enum CodingKeys: String, CodingKey {
             case id, label, available, voters, rule, level, reason, figures, cost, mac
             case tokensPer1000Pages = "tokens_per_1000_pages"
+            case figuresNote = "figures_note"
         }
     }
 
@@ -455,7 +459,7 @@ struct WindowVoter: Sendable, Equatable {
         WindowVoter(name: "window-claude", provider: .anthropic, modelID: "claude-sonnet-5-5",
                     thinkingLevel: nil, prompt: .w1),
         WindowVoter(name: "window-gemini-3.8-flash-low", provider: .gemini, modelID: "gemini-3.8-flash",
-                    thinkingLevel: "low", prompt: .g1),
+                    thinkingLevel: "low", prompt: .g2),
         // Measured through `codex exec` on the ChatGPT subscription (W36.seg-opt-openai); the app's API route
         // sends the same prompt with the images inline. `W36.seg-opt-siwc` owns the subscription route.
         WindowVoter(name: "window-openai", provider: .openai, modelID: "gpt-6.1-sol",

@@ -1,7 +1,7 @@
 import Foundation
 
 /// The window prompts, copied verbatim from the bench (`scripts/segbench/method_window.py` `PROMPT`, id w1;
-/// `method_gemini.py` `PROMPT`, id g1) with Python `str.format` placeholders. Each approach in options.json names
+/// `method_gemini.py` `PROMPTS["g2"]`, id g2) with Python `str.format` placeholders. Each approach in options.json names
 /// its voter's prompt id, and `WindowVoter.resolve` fails if the two disagree; the engine test renders both
 /// prompts for a synthetic window and compares them with the bench's own rendering, byte for byte. Change a
 /// prompt only by changing the bench and re-measuring; then re-export the fixture
@@ -11,17 +11,23 @@ import Foundation
 /// figure was counted with that same text after the inline images (`options.py` `tokens_claude`), so the API
 /// route sends it unchanged.
 ///
-/// c1 is g1 with the image lines rewritten for `codex exec` (`method_window_cues.py` `prompt_template("codex")`,
+/// g2 is g1 with rule 10 on the owner's article-within-issue rule (`magazine_rule.py` `RULE10_G2`;
+/// W46.seg-magazine-rule-app). It is measured on Gemini 3.7 Flash through the Stanford gateway, not on the 3.8
+/// this voter calls (the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key): the
+/// shipped Gemini level is fitted on 3.7's g2 answers, and the engine fixture's Gemini answers are 3.7's
+/// (`segbench-results/seg-magazine-rule-app.md`).
+///
+/// c1 is g1 (the full-magazine rule 10, before g2) with the image lines rewritten for `codex exec` (`method_window_cues.py` `prompt_template("codex")`,
 /// the ChatGPT voter measured through Codex on the subscription): it says the images are attached and not to run
 /// commands. The app's API route attaches them inline, so the text stands as measured (`W36.seg-opt-siwc` owns the
 /// route).
 enum WindowPromptID: String, Sendable {
-    case w1, g1, c1
+    case w1, g2, c1
 
     var template: String {
         switch self {
         case .w1: return WindowPromptTemplates.w1
-        case .g1: return WindowPromptTemplates.g1
+        case .g2: return WindowPromptTemplates.g2
         case .c1: return WindowPromptTemplates.c1
         }
     }
@@ -96,7 +102,7 @@ cue is unambiguous, about 0.6 when you are close to guessing.
 
 """#
 
-    static let g1 = #"""
+    static let g2 = #"""
 You are helping an archivist split a stream of page photographs into documents.
 
 The photographs were taken one after another while working through an archive box, in box order. The
@@ -128,7 +134,11 @@ WHAT IS ONE DOCUMENT (the archive's rules)
    8") continues it; several articles in one photograph are one document.
 8. A photograph (a print) is its own document; a photo of its back (caption, stamp) continues it.
 9. A blank page or blank back of a sheet is part of the document it belongs to: continue.
-10. A full magazine is ONE document, cover to end; its articles are not separate clippings.
+10. A magazine or newsletter issue is split by article. Its cover or contents page (masthead, issue
+   date, table of contents) is one document; each article or editorial inside the issue starts a new one,
+   and a later page of the same article continues it. An advertisement photographed between two pages of
+   one article is part of that article: continue. Only where the articles cannot be told apart in photo
+   order (one article's pages interleaved with another's) is the whole issue one document, cover to end.
 11. A box or folder label photo is never part of a document: every gap next to one is "new".
 
 THINGS THAT MISLEAD, FROM THIS ARCHIVE

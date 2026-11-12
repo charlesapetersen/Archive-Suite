@@ -3996,11 +3996,11 @@
    "source": "options.md"
   },
   {
-   "name": "Gemini only",
-   "nocheck": 87.3,
-   "checks": 24.2,
-   "after": 98.5,
-   "unflagged": 2,
+   "name": "Gemini only (3.8 sends g2; figures are Gemini 3.7 Flash's g2, gateway)",
+   "nocheck": 88.8,
+   "checks": 25.3,
+   "after": 100.0,
+   "unflagged": 0,
    "std": 3.61,
    "batch": 1.81,
    "source": "options.md"

@@ -170,7 +170,8 @@ struct SegmentationRow: Equatable, Sendable {
             // An approach that cannot run adds nothing to a run's total; its row still shows what it would cost.
             apiDollars: reason == nil ? dollars : nil, footnote: footnote,
             unavailableReason: reason, missingKeys: missingKeys,
-            notes: providers.contains(.local) ? LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac) : [])
+            notes: (entry.figuresNote.map { [$0] } ?? [])
+                + (providers.contains(.local) ? LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac) : []))
     }
 
     static func all(options: SegmentationOptions, pageCount: Int, routes: SegmentationRoutes,

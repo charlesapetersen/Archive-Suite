@@ -1,0 +1,143 @@
+{
+ "tag": "W46.seg-magazine-rule-app",
+ "date": "2026-11-11",
+ "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",
+ "rule": "min",
+ "level": 0.965,
+ "level_g1_3_8": 0.965,
+ "dev_levels_held_out": {
+  "Dean": 0.95,
+  "Deaver": 0.965,
+  "Herrnstein": 0.965
+ },
+ "dev_held_out": {
+  "pages": 551,
+  "gaps": 494,
+  "flagged": 56,
+  "pages_exact_no_review": 0.918918918918919,
+  "flagged_per_100_pages": 10.163339382940109,
+  "pages_exact_after_review": 0.9864864864864865,
+  "unflagged_errors": 3,
+  "unflagged_errors_per_500_pages": 2.722323049001815
+ },
+ "dev_by_box": {
+  "Dean": {
+   "pages": 202,
+   "gaps": 191,
+   "flagged": 7,
+   "pages_exact_no_review": 0.9336734693877551,
+   "flagged_per_100_pages": 3.4653465346534653,
+   "pages_exact_after_review": 0.9795918367346939,
+   "unflagged_errors": 2,
+   "unflagged_errors_per_500_pages": 4.9504950495049505
+  },
+  "Deaver": {
+   "pages": 149,
+   "gaps": 136,
+   "flagged": 37,
+   "pages_exact_no_review": 0.9078014184397163,
+   "flagged_per_100_pages": 24.83221476510067,
+   "pages_exact_after_review": 1.0,
+   "unflagged_errors": 0,
+   "unflagged_errors_per_500_pages": 0.0
+  },
+  "Herrnstein": {
+   "pages": 200,
+   "gaps": 167,
+   "flagged": 12,
+   "pages_exact_no_review": 0.9116022099447514,
+   "flagged_per_100_pages": 6.0,
+   "pages_exact_after_review": 0.9834254143646409,
+   "unflagged_errors": 1,
+   "unflagged_errors_per_500_pages": 2.5
+  }
+ },
+ "dev_reached": 2,
+ "test": {
+  "test": {
+   "pages": 363,
+   "gaps": 315,
+   "flagged": 92,
+   "pages_exact_no_review": 0.8878787878787879,
+   "flagged_per_100_pages": 25.34435261707989,
+   "pages_exact_after_review": 1.0,
+   "unflagged_errors": 0,
+   "unflagged_errors_per_500_pages": 0.0
+  },
+  "test_by_box": {
+   "Stanton": {
+    "pages": 250,
+    "gaps": 238,
+    "flagged": 81,
+    "pages_exact_no_review": 0.8806584362139918,
+    "flagged_per_100_pages": 32.4,
+    "pages_exact_after_review": 1.0,
+    "unflagged_errors": 0,
+    "unflagged_errors_per_500_pages": 0.0
+   },
+   "RG165": {
+    "pages": 113,
+    "gaps": 77,
+    "flagged": 11,
+    "pages_exact_no_review": 0.9080459770114943,
+    "flagged_per_100_pages": 9.734513274336283,
+    "pages_exact_after_review": 1.0,
+    "unflagged_errors": 0,
+    "unflagged_errors_per_500_pages": 0.0
+   }
+  }
+ },
+ "test_at_g1_level": {
+  "pages": 363,
+  "gaps": 315,
+  "flagged": 92,
+  "pages_exact_no_review": 0.8878787878787879,
+  "flagged_per_100_pages": 25.34435261707989,
+  "pages_exact_after_review": 1.0,
+  "unflagged_errors": 0,
+  "unflagged_errors_per_500_pages": 0.0
+ },
+ "unflagged_gaps": {
+  "Stanton": [],
+  "RG165": []
+ },
+ "g1_3_8": {
+  "level": 0.965,
+  "test": {
+   "pages": 363,
+   "gaps": 315,
+   "flagged": 88,
+   "pages_exact_no_review": 0.8727272727272727,
+   "flagged_per_100_pages": 24.242424242424242,
+   "pages_exact_after_review": 0.9848484848484849,
+   "unflagged_errors": 2,
+   "unflagged_errors_per_500_pages": 2.7548209366391183
+  },
+  "dev_held_out": {
+   "pages": 551,
+   "gaps": 494,
+   "flagged": 57,
+   "pages_exact_no_review": 0.9073359073359073,
+   "flagged_per_100_pages": 10.344827586206897,
+   "pages_exact_after_review": 0.9864864864864865,
+   "unflagged_errors": 3,
+   "unflagged_errors_per_500_pages": 2.722323049001815
+  }
+ },
+ "gateway": {
+  "calls": 187,
+  "spent_usd": 1.9345305,
+  "billed": {
+   "calls": 187,
+   "estimate": 1.93453,
+   "gateway_calls": 187,
+   "gateway": 1.93453,
+   "gateway_over_estimate": 1.0,
+   "charged": 1.93453
+  },
+  "billed_note": "the gateway's own figure $1.9345 on 187 of 187 calls, 1.00 times the estimate on them",
+  "retained_usd": 0.0,
+  "invalid": 0,
+  "item_total_usd": 3.8665304999999996
+ }
+}

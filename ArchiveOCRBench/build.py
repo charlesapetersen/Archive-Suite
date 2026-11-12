@@ -307,6 +307,16 @@ def segmentation(op):
     cheap = CHEAP_MD.read_text()
     costs = {c[0]: c for c in table_after(cheap, "### The level fitted per model", 1)}
     gemini = next(a for a in seg if a["name"] == "Gemini only")
+    # W46.seg-magazine-rule-app: the app's Gemini voter sends g2, and options.md's row is Gemini 3.7 Flash's g2 answers
+    # through the gateway at a level fitted on them. The other reports' "Gemini 3.8 Flash" rows are 3.8 on g1, which
+    # options.json keeps as the row it replaced; they are checked against that.
+    replaced = next(a for a in json.loads((RESULTS / "options.json").read_text())["approaches"]
+                    if a["id"] == "gemini").get("replaces")
+    if replaced:
+        gemini["name"] = "Gemini only (3.8 sends g2; figures are Gemini 3.7 Flash's g2, gateway)"
+        t = replaced["test"]
+        gemini = {"nocheck": round(100 * t["pages_exact_no_review"], 1), "after": round(100 * t["pages_exact_after_review"], 1),
+                  "checks": round(t["flagged_per_100_pages"], 1), "unflagged": t["unflagged_errors"]}
     for c in table_after(cheap, "### The level fitted per model"):
         if c[1] != "98%":
             continue

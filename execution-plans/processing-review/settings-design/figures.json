@@ -1631,12 +1631,12 @@
    "s_page": 5.33,
    "s_est": true,
    "peak_gb": 0,
-   "note": "single run, no measured offset range (P7-4); 3.7's range at this level is 83.0-85.2% no checking; both unflagged errors are Stanton 101|102 and 102|103, merged by every cloud route with or without the magazine rule (P8-4)",
+   "note": "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key); single g2 run, no measured offset range (P7-4); 3.7's range on g1 at this level is 83.0-85.2% no checking",
    "source": "settings-routes.json, stage segmentation, row gemini3.8-flash",
-   "nocheck": 87.3,
-   "checks_per_100": 24.2,
-   "after": 98.5,
-   "unflagged_per_500": 2.8
+   "nocheck": 88.8,
+   "checks_per_100": 25.3,
+   "after": 100.0,
+   "unflagged_per_500": 0.0
   },
   {
    "id": "gemini3.7-flash-gateway",
@@ -1652,7 +1652,7 @@
    "s_page": 5.33,
    "s_est": false,
    "peak_gb": 0,
-   "note": "3.7 at the level fitted for 3.8, not its own (P7-4); the app has no gateway route; its range is shown on the 3.8 card labelled as 3.7's, and Sasha's lead over the 2B stands on this card only (14-owner-calls.md call 8)",
+   "note": "g1 figures at 0.965, the level fitted for 3.8 on g1 (P7-4); fitted on 3.7's own g2 answers the level is also 0.965 (seg-magazine-rule-app.md); the app has no gateway route; its range is shown on the 3.8 card labelled as 3.7's, and Sasha's lead over the 2B stands on this card only (14-owner-calls.md call 8)",
    "source": "settings-routes.json, stage segmentation, row gemini3.7-flash-gateway",
    "nocheck": 85.2,
    "checks_per_100": 25.9,

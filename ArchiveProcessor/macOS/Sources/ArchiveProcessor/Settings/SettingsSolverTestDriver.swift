@@ -249,8 +249,10 @@ enum SettingsSolverTestDriver {
         d5r.keys = ["gemini"]
         var cheap = SettingsAnswers()
         cheap.preference = .cheapestWithinPoint
-        eq("D5 segmentation: a tie at 3.2, the plan wins on money", pick(solve("D5", d5r, cheap), "segmentation"),
-           "claude-sonnet5.5")
+        // W46.seg-magazine-rule-app: Gemini's 88.8 (3.7's g2 answers) is 3.3 points over Claude's 85.5, past the
+        // 3.2 floor; on g1's 87.3 it was a tie and the plan won on money.
+        eq("D5 segmentation: Gemini 3.3 points ahead, beyond the 3.2 floor", pick(solve("D5", d5r, cheap), "segmentation"),
+           "gemini3.8-flash")
 
         // E. A cluster (Sherlock), two GPUs a job, no key; nothing downloaded to the Mac.
         var cl = mac(16, downloads: false)

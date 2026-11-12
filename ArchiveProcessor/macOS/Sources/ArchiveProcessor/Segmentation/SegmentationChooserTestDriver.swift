@@ -83,11 +83,14 @@ enum SegmentationChooserTestDriver {
         eq("2 claude to check @0 (at least 1)", row(.claude, 0).toCheck, "about 1 boundary to check")
 
         let gemini = row(.gemini, 1000)
-        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 87% of pages")
-        eq("2 gemini to check", gemini.toCheck, "about 242 boundaries to check")
-        eq("2 gemini after checking", gemini.rightAfterChecking, "about 98% of pages")
-        eq("2 gemini unshown", gemini.unshownErrors, "about 1 in 180 pages")
-        // Since the truth rescore (W46.seg-truth-rescore) ChatGPT is the approach with no unflagged error.
+        // W46.seg-magazine-rule-app: Gemini's figures are Gemini 3.7 Flash's on prompt g2, and the row says so.
+        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 89% of pages")
+        eq("2 gemini to check", gemini.toCheck, "about 253 boundaries to check")
+        eq("2 gemini after checking", gemini.rightAfterChecking, "about 100% of pages")
+        eq("2 gemini unshown", gemini.unshownErrors, "none in 363 test pages")
+        check("2 gemini names the model its figures were measured on",
+              gemini.notes.count == 1 && gemini.notes[0].contains("Gemini 3.7 Flash"), "\(gemini.notes)")
+        // Since the truth rescore (W46.seg-truth-rescore) ChatGPT has no unflagged error, and Gemini on g2 none either.
         eq("2 zero is not a promise", row(.openai, 1000).unshownErrors, "none in 363 test pages")
 
         let mix = row(.mix, 1000)
@@ -259,7 +262,7 @@ enum SegmentationChooserTestDriver {
         check("7 local at 8 GB: unmeasured, not recommended",
               row(.local, 1000, SegmentationRoutes(memoryGB: 8)).notes[1].contains("not been measured"))
         check("7 local at 64 GB: ample", row(.local, 1000, SegmentationRoutes(memoryGB: 64)).notes[1].contains("ample"))
-        eq("7 other rows carry no notes", row(.gemini, 1000).notes, [])
+        eq("7 other rows carry no notes", row(.claude, 1000).notes, [])
         let pricedLocal = mutateBundled { approaches in
             guard let i = approaches.firstIndex(where: { $0["id"] as? String == "local" }),
                   var cost = approaches[i]["cost"] as? [String: Any],

@@ -40,14 +40,17 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   trained on), `magazine` (Illustrated Review, articles within issues), `clippings-mixed` (SC0122, the review's
   clippings box: individual clippings taken in a reading room, mixed with other papers, 61% clipping-tagged; STATE.md
   "Locked boxes named"), and two public boxes, `manuscripts-public` (Lincoln, 19th-century handwritten
-  correspondence) and `typed-gov-public` (CREST) [M]. Rules: (a) the `magazine` figures rank nothing until
-  W46.seg-magazine-rule-app; the sheet shows them with "ranks nothing yet" and the solver never picks on them. The
-  reason is not the prompts (only Gemini's g1 carries the full-issue rule; Claude's w1 and GLM's c1 have none, and
+  correspondence) and `typed-gov-public` (CREST) [M]. Rules: (a) a `magazine` figure ranks only for a route whose
+  prompt states the article-within-issue rule: since W46.seg-magazine-rule-app that is Gemini 3.8 Flash on g2, whose
+  figure is Gemini 3.7's g2 answer (93.8% of the Illustrated Review's gaps), labelled as 3.7's. Every other route's
+  `magazine` figure (g1, w1, c1, and the students, which trained on the box) is shown with "ranks nothing yet" and the
+  solver never picks on it. Until then the reason was not the prompts (only Gemini's g1 carries the full-issue rule; Claude's w1 and GLM's c1 have none, and
   every cloud route merges the newsletter pair with or without it, P8-4, seg-boxes-score.md Reading): it is that the
   students trained on the box and the shipped routes' prompts do not state the article-within-issue rule. Measured
   since (W46.seg-magazine-rule-redo, seg-magazine-rule.md): Gemini 3.7 with g2, g1 with rule 10 on that rule, scores
   93.8% of the Illustrated Review's gaps against g1's 71.2% (false merges 40 to 0), so g1's rule caused its merges
-  there; the app's voters still send g1 and c1 until W46.seg-magazine-rule-app. (b) The
+  there. The app's Gemini voter sends g2 since W46.seg-magazine-rule-app (its level refit on 3.7's g2 answers is
+  0.965, unchanged); the ChatGPT voter's c1 keeps g1's rule 10 until W46.gateway-models-ok. (b) The
   `clippings-mixed` comparison uses the owner-ruled weighted figure, never the all-known diagnostic (P4-2). (c) On
   handwritten manuscript material a local or cluster Qwen route carries the warning "on Lincoln's manuscripts this
   model put 35.6% of pages in the right document" and the sheet recommends a cloud voter where one is feasible
@@ -91,16 +94,17 @@ segment figures conditional on each route's call at unsure gaps.
  "memory":{"peak_gb":0,"measured_on":null,"source":null},"caveats":["checking time unmeasured"],"kind_rules":[],"fallback":null,"conditions":[]},
 
 {"id":"gemini3.8-flash","name":"Gemini 3.8 Flash","family":"cloud","app_route":"gemini|gemini-3.8-flash","status":"shipped","needs":{"key":["gemini"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":87.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages in an exact document, no checking","value":"87.3%"}},
-  "test-boxes.checks_per_100":{"value":24.2,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"boundaries to check per 100 pages","value":"24.2"}},
-  "test-boxes.after_checking":{"value":98.5,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages right after checking","value":"98.5%"}},
-  "test-boxes.unflagged_per_500":{"value":2.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"unflagged errors per 500 pages (count)","value":"2.8 (2)"}},
-  "dev-boxes":{"value":90.7,"n":551,"truth":"owner-dev","source":{"file":"seg-scorers.md","route":"window-gemini-3.8-flash-low","attribute":"pages exact, development","value":"90.7%"}}},
+ "figures":{"test-boxes":{"value":88.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages in an exact document, no checking","value":"88.8%"}},
+  "test-boxes.checks_per_100":{"value":25.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"boundaries to check per 100 pages","value":"25.3"}},
+  "test-boxes.after_checking":{"value":100.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages right after checking","value":"100.0%"}},
+  "test-boxes.unflagged_per_500":{"value":0.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"unflagged errors per 500 pages (count)","value":"0.0 (0)"}},
+  "dev-boxes":{"value":91.9,"n":551,"truth":"owner-dev","source":{"file":"seg-magazine-rule-app.md","route":"g2 on 3.7, held out (pooled)","attribute":"pages exact, no checking","value":"91.9%"}},
+  "magazine.gap_acc":{"value":93.8,"n":146,"truth":"owner-locked","source":{"file":"seg-magazine-rule.md","route":"g2","attribute":"Gap accuracy","value":"93.8%"}}},
  "cost":{"usd_1000_list":3.61,"usd_1000_batch":1.81,"price_read":"2026-10-05","source":{"file":"options.md","route":"gemini-3.8-flash/low","attribute":"list $ / batch $","value":"$3.61 / $1.81"}},
  "time":{"per_unit_s":5.33,"per_window_s":16.0,"measured":false,"measured_on":"Gemini 3.7's gateway window call, lent to 3.8 (not timed on 3.8)","derived":"seconds a seven-page window call over 3, a window every 3 pages at stride 3","source":{"file":"seg-boxes-score.md","route":"Gateway line","attribute":"s a call","value":"16.0 s"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
- "caveats":["single run, no measured offset range (P7-4); 3.7's range at this level is 83.0-85.2% no checking","both unflagged errors are Stanton 101|102 and 102|103, merged by every cloud route with or without the magazine rule (P8-4)","introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md)","no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)"],
- "kind_rules":["magazine: figures rank nothing until W46.seg-magazine-rule-app"],"fallback":"manual","conditions":[]},
+ "caveats":["the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)","single g2 run, no measured offset range (P7-4); 3.7's range on g1 at this level is 83.0-85.2% no checking","introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1","no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)","the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"],
+ "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"gemini3.7-flash-gateway","name":"Gemini 3.7 Flash (Stanford gateway)","family":"cloud","app_route":null,"status":"measured","needs":{"key":["gateway"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
  "figures":{"test-boxes":{"value":85.2,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"pages in an exact document, no checking (range 83.0-85.2%)","value":"85.2%"}},
@@ -116,8 +120,8 @@ segment figures conditional on each route's call at unsure gaps.
  "cost":{"usd_1000_list":3.59,"usd_1000_batch":null,"price_read":"settled gateway charges","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"settled $ per 1,000 pages","value":"$3.59"}},
  "time":{"per_unit_s":5.33,"per_window_s":16.0,"measured":true,"measured_on":"gateway, a seven-page window call","derived":"seconds a seven-page window call over 3, a window every 3 pages at stride 3","source":{"file":"seg-boxes-score.md","route":"Gateway line","attribute":"s a call","value":"16.0 s"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
- "caveats":["3.7 at the level fitted for 3.8, not its own (P7-4)","the app has no gateway route; its range is shown on the 3.8 card labelled as 3.7's, and Sasha's lead over the 2B stands on this card only (14-owner-calls.md call 8)","gateway serves no batch"],
- "kind_rules":["magazine: ranks nothing"],"fallback":"manual","conditions":[]},
+ "caveats":["g1 figures at 0.965, the level fitted for 3.8 on g1 (P7-4); fitted on 3.7's own g2 answers the level is also 0.965 (seg-magazine-rule-app.md)","the app has no gateway route; its range is shown on the 3.8 card labelled as 3.7's, and Sasha's lead over the 2B stands on this card only (14-owner-calls.md call 8)","gateway serves no batch"],
+ "kind_rules":["magazine: g1's figure, on the old full-magazine rule, ranks nothing"],"fallback":"manual","conditions":[]},
 
 {"id":"gemini3.7-flash-text","name":"Gemini 3.7 Flash, text-only windows (cheaper tier lead)","family":"cloud","app_route":null,"status":"measured","needs":{"key":["gateway"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
  "figures":{"dev-boxes":{"value":89.6,"n":551,"truth":"owner-dev","source":{"file":"seg-window-gateway.md","route":"Gemini 3.7, text only","attribute":"pages exact, K = 7","value":"89.6% (control 92.3%, -2.7, -9.5 to +1.6)"}},
@@ -284,12 +288,13 @@ adaptation row).
 ## 6. What would change the rule
 
 - A 3.8 offsets run on the test boxes (declined for now, 14-owner-calls.md call 8): if its range moves the 3.8 pages exact more
-  than 3.2 points from 87.3%, the shown figure becomes the range and the cheap-API and premium picks are rechecked.
+  than 3.2 points from 88.8% (3.7's g2 figure, the card's), the shown figure becomes the range and the cheap-API and premium picks are rechecked.
 - The text-only Gemini window on the test boxes within 3.2 points of the image window, at about half the tokens
   (seg-window-gateway.md, 46% of the cost on dev): a text tier row becomes `shipped` for a budget setting.
 - W46.seg-magazine-rule-redo (done 2026-11-10, seg-magazine-rule.md): on Gemini 3.7, g2 splits Stanton 101|102 and
   102|103 and the route's unflagged count falls from 2 to 0 (pages exact 85.2% to 88.8% no checking, 98.5% to 100%
-  after). The `magazine` figures become rankable once the app sends the new rule (W46.seg-magazine-rule-app).
+  after). The app sends it since W46.seg-magazine-rule-app (seg-magazine-rule-app.md), so Gemini 3.8's `magazine`
+  figure ranks, labelled as 3.7's; a ChatGPT figure ranks once c1 states the rule.
 - A handwritten manuscript owner box locked and scored: the manuscript warning would then rest on owner material, not
   Lincoln, and may change kind rule (c).
 - A second material for the LoRA test with start recall held: the "measured on one material" label goes; a loss of
@@ -385,12 +390,14 @@ Pooled test boxes unless named; zero checking budget unless named; tie under 3.2
   calls it "local on a 32 GB Mac", unmeasured there) [?]. 8 GB: `manual`.
 - **Cheap API (OpenRouter only).** `glm5.3-flash` (80.6%, $1.16) against the 2B (80.3%): a tie, and the 2B wins on
   cost if the Mac has 16 GB [I]; without the Mac's memory, GLM. Manuscripts: no GLM figure, so the sheet shows the gap.
-- **Premium API (Gemini key).** `gemini3.8-flash` (87.3%, $3.61) over GLM (80.6%) and the 2B (80.3%), beyond the floor.
-  With full checking: 98.5%. Letters: no 3.8 figure; the 3.7 figure 96.0% gaps is shown on the card labelled as 3.7's
+- **Premium API (Gemini key).** `gemini3.8-flash` (88.8%, $3.61; Gemini 3.7's g2 figure, labelled as 3.7's) over GLM
+  (80.6%) and the 2B (80.3%), beyond the floor. With full checking: 100.0%. Letters: no 3.8 figure; the 3.7 figure 96.0% gaps is shown on the card labelled as 3.7's
   and decides no pick.
 - **Plans.** Claude only: `claude-sonnet5.5` (85.5%, 10.2 checks). Both plans: `mix-claude-chatgpt` (90.9%, 10.2
-  checks) over Claude alone (85.5%), a difference beyond the floor. Claude plan and a Gemini key: a tie (85.5 against
-  87.3), plan wins on money at the 3.2 tie.
+  checks) over Claude alone (85.5%), a difference beyond the floor. Claude plan and a Gemini key: 85.5 against 88.8 is
+  3.3 points, just beyond the 3.2 floor, so Gemini wins (W46.seg-magazine-rule-app; before it, 87.3 was a tie and the
+  plan won on money). The margin is 0.1 point over the floor from one g2 run on 3.7, which scored 2.1 points under
+  3.8 on g1; a rerun or a 3.8 figure could restore the tie.
 - **Cluster.** `seg-qwen3.5-2b-bf16-cluster`: 80.3% against the 4B's 80.0% and the teacher's 81.5%, ties, and the 2B is
   fastest (0.5 s a window); on Sasha it leads the teacher by 21.7 points on gap accuracy (44 gaps against 6, p 3.24e-08,
   seg-kit-gate-sherlock.md).

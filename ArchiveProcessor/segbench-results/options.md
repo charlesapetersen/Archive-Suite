@@ -2,7 +2,7 @@
 
 W36.seg-opt-measure, run 2026-10-11. Data for the app: `options.json` beside this file. Method: `scripts/segbench/options.py`; the development-set detail is `options-dev.md`.
 
-**Measured on the locked boxes, Stanton and RG 165 (363 pages, 315 gaps between two document pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made (`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's test-box windows are new. ChatGPT was measured afterwards (2026-10-12, W36.seg-opt-openai) the same way, its level frozen first (`options-frozen-openai.json`). Rescored 2026-10-31 from the same cached answers on a changed truth (W46.seg-truth-rescore: the owner split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule (W46.seg-truth-sheet)); nothing was refit or re-chosen.
+**Measured on the locked boxes, Stanton and RG 165 (363 pages, 315 gaps between two document pages), scored once**, with each approach's flag level and the mix rule frozen on the development boxes (Dean, Deaver, Herrnstein) before the test boxes' new calls were made (`options-frozen.json`, committed first). Truth photo labels. Claude's test-box answers were collected for W36.seg-ensemble at the same level (0.85), and its row here equals that record; Gemini 3.8 Flash's test-box windows are new. ChatGPT was measured afterwards (2026-10-12, W36.seg-opt-openai) the same way, its level frozen first (`options-frozen-openai.json`). Rescored 2026-10-31 from the same cached answers on a changed truth (W46.seg-truth-rescore: the owner split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule (W46.seg-truth-sheet)); nothing was refit or re-chosen. On 2026-11-11 the Gemini voter moved to prompt g2 (W46.seg-magazine-rule-app): its level (<= 0.965) and every Gemini only figure are Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10), fitted and scored as above; the figures it replaced (3.8 on g1) are kept in options.json as the row's `replaces`.
 
 Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, box and folder photos included; 'pages in an exact document' counts document pages only.
 
@@ -12,18 +12,20 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 |---|---:|---:|---:|---:|---:|
 | Full manual | — | 86.8 | 100.0% | 0.0 (0) | none |
 | Claude only | 85.5% | 10.2 | 97.3% | 4.1 (3) | $16.93 / $8.47 |
-| Gemini only | 87.3% | 24.2 | 98.5% | 2.8 (2) | $3.61 / $1.81 |
+| Gemini only | 88.8% | 25.3 | 100.0% | 0.0 (0) | $3.61 / $1.81 |
 | ChatGPT only | 90.9% | 79.1 | 100.0% | 0.0 (0) | $14.51 / $7.25 |
 | Claude and ChatGPT together | 90.9% | 10.2 | 97.3% | 4.1 (3) | $31.44 / $15.72 |
 | GLM-5.3 Flash only (budget) | 80.6% | 33.1 | 97.0% | 4.1 (3) | $1.16 / none |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | 80.3% | 78.8 | 98.8% | 1.4 (1) | $0.000 / none |
+
+Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and this row's level and figures are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them (segbench-results/seg-magazine-rule-app.md). Gemini 3.8 on g1 at <= 0.965 scored 87.3% no checking, 24.2 checks per 100 pages, 98.5% after checking and 2 unflagged errors. Its token and price row below is 3.8's, measured on g1.
 
 ## Held out on the development boxes (each box at the level fitted on the other two)
 
 | approach | rule, level for the test | no checking | to check per 100 pages | after checking | unflagged per 500 pages |
 |---|---|---:|---:|---:|---:|
 | Claude only | min, <= 0.850 | 90.7% | 5.8 | 99.0% | 1.8 |
-| Gemini only | min, <= 0.965 | 90.7% | 10.3 | 98.6% | 2.7 |
+| Gemini only | min, <= 0.965 | 91.9% | 10.2 | 98.6% | 2.7 |
 | ChatGPT only | min, <= 0.990 | 91.3% | 79.1 | 100.0% | 0.0 |
 | Claude and ChatGPT together | min, <= 0.850 | 91.1% | 5.8 | 99.0% | 1.8 |
 | GLM-5.3 Flash only (budget) | min, <= 0.925 | 90.2% | 17.1 | 97.3% | 2.7 |
@@ -35,8 +37,8 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 |---|---|---:|---:|---:|---:|---:|---:|
 | Claude only | Stanton | 250 | 84.8% | 32 | 12.8 | 97.1% | 2 |
 | Claude only | RG165 | 113 | 87.4% | 5 | 4.4 | 97.7% | 1 |
-| Gemini only | Stanton | 250 | 87.2% | 77 | 30.8 | 97.9% | 2 |
-| Gemini only | RG165 | 113 | 87.4% | 11 | 9.7 | 100.0% | 0 |
+| Gemini only | Stanton | 250 | 88.1% | 81 | 32.4 | 100.0% | 0 |
+| Gemini only | RG165 | 113 | 90.8% | 11 | 9.7 | 100.0% | 0 |
 | ChatGPT only | Stanton | 250 | 89.7% | 221 | 88.4 | 100.0% | 0 |
 | ChatGPT only | RG165 | 113 | 94.3% | 66 | 58.4 | 100.0% | 0 |
 | Claude and ChatGPT together | Stanton | 250 | 89.7% | 32 | 12.8 | 97.1% | 2 |
@@ -67,15 +69,15 @@ ChatGPT through `codex exec` (the ChatGPT subscription; no money): Codex reporte
 ## Reading
 
 - Manual asks about every gap between two document pages (87 per 100 pages on these boxes) and costs nothing; it is the floor the others are measured against.
-- On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors ChatGPT only's (0, at 79.1 checks per 100 pages). The trade-off is the level: a higher one flags more and leaves less.
-- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 2 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 3 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 1 on the test boxes, 0 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
+- On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors Gemini only's (0, at 25.3 checks per 100 pages; ChatGPT only ties it at 79.1). The trade-off is the level: a higher one flags more and leaves less.
+- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 3 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 1 on the test boxes, 0 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
 - The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took the same decision on every gap), which is why combining them adds little over Claude alone.
 
 ## Measurement card
 
-- **Truth.** The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development boxes (Dean, Deaver, Herrnstein). Gemini only's 2 unflagged errors (2.8 per 500 pages) are Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule. Every cloud route merges them with or without the magazine rule (only g1's rule 10 states it; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and only the 2B trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps), so they are the cloud models' own reading of those pages. Prompt g2, g1 with rule 10 on the article-within-issue rule, splits both on Gemini 3.7 through the gateway and takes that route's unflagged errors from 2 to 0 (seg-magazine-rule.md, W46.seg-magazine-rule-redo); the app's 3.8 voter still sends g1, so the Gemini figures here are g1's. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's 3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) do not include it (W46.seg-offsets-label, from the cached answers).
+- **Truth.** The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development boxes (Dean, Deaver, Herrnstein). Gemini only is Gemini 3.7 Flash's g2 answers through the gateway, at the level fitted on its own development answers (0.965, the level 3.8 had on g1; W46.seg-magazine-rule-app), so it has no unflagged error. Gemini 3.8 on g1, the row it replaced, had 2: Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule. Every cloud route on its old prompt merges them (g1's rule 10 stated the full-magazine rule; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and the 2B trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps). Prompt g2, g1 with rule 10 on the article-within-issue rule, splits both (seg-magazine-rule.md). ChatGPT's c1 still carries g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). GLM-5.3 Flash's 3 are that pair and 144|145; Claude's 3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) do not include it (W46.seg-offsets-label, from the cached answers).
 - **Selection.** Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not picked by their test score. Nothing was fitted, chosen or re-chosen on the test boxes.
 - **Comparison.** Every approach on the same 363 pages and gaps, with its own flag level frozen first (`options-frozen.json`) and its own route's request and settings as cached; costs at list token prices.
-- **Noise.** Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the no-review column. Gemini 3.8's five figures have no measured window-offset range: the gateway serves only 3.7, whose range at this 3.8-fitted level is in seg-boxes-score.md (83.0%-85.2% no checking).
+- **Noise.** Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the no-review column. Gemini only's five figures are one g2 run on 3.7 with no measured window-offset range; 3.7's range on g1 at the same level is in seg-boxes-score.md (83.0%-85.2% no checking).
 - **Scope.** The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material (the three locked owner boxes are scored in seg-boxes-score.md; Lincoln and CREST are not scored here), and not a forecast for a user's own corpus.
 

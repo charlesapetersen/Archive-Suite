@@ -73,8 +73,8 @@ hollow with the reason "stays on the Mac"; picks as B1.
 
 **D1. A Gemini key.** Reading `gemini3.8-flash` ($3.22, batch $1.61; 96.47) over `gemini3.1-pro` (96.85, $21.92), a
 tie, cheaper wins; handwritten `gemini3.8-flash` labelled "conditional on the truth" (OCR-1). Segmentation
-`gemini3.8-flash` (87.3%, $3.61; 24.2 checks per 100 pages; 98.5% after checking) with the card showing Gemini 3.7's
-measured range labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
+`gemini3.8-flash` (88.8%, $3.61; 25.3 checks per 100 pages; 100.0% after checking; prompt g2, every figure Gemini
+3.7's g2 answers, W46.seg-magazine-rule-app) with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
 on documents with no year in the text ($2.75 per 1,000, 5.3 s), step 4 `gemini3.7-flash-trace-neigh`. Entities
 `gemini-tagging-place`'s successor, the entity feature's own prompt (owner call 10), extracted always, shown when
 ranked. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
@@ -94,8 +94,9 @@ no plan rows (the Claude arms were dropped, owner 2026-10-30), so the Mac route 
 `chatgpt-only` as the app's table carries it. **Both plans:** segmentation `mix-claude-chatgpt` (90.9%, 10.2 checks)
 over Claude alone, beyond the floor.
 
-**D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Segmentation: 85.5 against 87.3 is a tie
-at 3.2 points, the plan route wins on money.
+**D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Segmentation: 85.5 against 88.8 is 3.3 points,
+just beyond the 3.2 floor, so `gemini3.8-flash` wins (W46.seg-magazine-rule-app; on g1's 87.3 it was a tie and the plan
+route won on money).
 
 ## E. A cluster (Sherlock), no key
 

@@ -102,6 +102,8 @@ PRICES = {
 
 APPROACHES = {"claude": ("C",), "gemini": ("G",)}
 VOTER_NAMES = {"C": "window-claude (Claude Sonnet 5.5, prompt w1)",
+               # voter G's caches are 3.8 on g1; the app's voter sends g2 since W46.seg-magazine-rule-app, and
+               # options.json's Gemini row (3.7's g2 figures) names it so, keeping this g1 row as `replaces`
                "G": "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)",
                "O": f"window-openai (OpenAI {WC.CODEX_MODEL} through Codex, reasoning {WC.CODEX_EFFORT}, "
                     f"prompt {WC.PROMPT_VERSION})"}
@@ -743,7 +745,12 @@ def render(out: dict) -> str:
             f"its level frozen first (`{out['openai_measured']['freeze']}`)." if out.get("openai_measured") else "")
          + (f" Rescored {out['rescored']['date']} from the same cached answers on a changed truth "
             f"({out['rescored']['item']}: {out['rescored']['why']}); nothing was refit or re-chosen."
-            if out.get("rescored") else ""),
+            if out.get("rescored") else "")
+         + (f" On {out['gemini_g2']['date']} the Gemini voter moved to prompt g2 ({out['gemini_g2']['item']}): its "
+            f"level ({E.lv(out['gemini_g2']['level'])}) and every Gemini only figure are "
+            f"{out['gemini_g2']['evidence']}, fitted and scored as above; the figures it replaced (3.8 on g1) are "
+            "kept in options.json as the row's `replaces`."
+            if out.get("gemini_g2") else ""),
          "",
          "Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, "
          "box and folder photos included; 'pages in an exact document' counts document pages only.", "",
@@ -753,6 +760,16 @@ def render(out: dict) -> str:
          "|---|---:|---:|---:|---:|---:|"]
     for ap in out["approaches"]:
         L.append(fig_row(ap) if ap["available"] else f"| {ap['label']} | not measured | | | | |")
+    if out.get("gemini_g2"):
+        g = aps["gemini"]
+        L += ["", f"Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and this row's level and "
+                  f"figures are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them "
+                  f"({out['gemini_g2']['result']}). Gemini 3.8 on g1 at {E.lv(g['replaces']['level'])} scored "
+                  f"{E.pct(g['replaces']['test']['pages_exact_no_review'])} no checking, "
+                  f"{g['replaces']['test']['flagged_per_100_pages']:.1f} checks per 100 pages, "
+                  f"{E.pct(g['replaces']['test']['pages_exact_after_review'])} after checking and "
+                  f"{g['replaces']['test']['unflagged_errors']} unflagged errors. Its token and price row below is "
+                  "3.8's, measured on g1."]
     L += ["", "## Held out on the development boxes (each box at the level fitted on the other two)", "",
           "| approach | rule, level for the test | no checking | to check per 100 pages | after checking | "
           "unflagged per 500 pages |", "|---|---|---:|---:|---:|---:|"]
@@ -814,6 +831,7 @@ def render(out: dict) -> str:
     df = {a["id"]: a["figures"]["dev_held_out"] for a in model_aps}
     lab = {a["id"]: a["label"] for a in model_aps}
     least_err = min(tf, key=lambda a: (tf[a]["unflagged_errors"], tf[a]["flagged_per_100_pages"]))
+    tied_err = [a for a in tf if a != least_err and tf[a]["unflagged_errors"] == tf[least_err]["unflagged_errors"]]
     least_chk = min(tf, key=lambda a: (tf[a]["flagged_per_100_pages"], tf[a]["unflagged_errors"]))
     L.append(f"- Manual asks about every gap between two document pages ({t0['flagged_per_100_pages']:.0f} per 100 "
              "pages on these boxes) and costs nothing; it is the floor the others are measured against.")
@@ -821,7 +839,8 @@ def render(out: dict) -> str:
              f"({tf[least_chk]['flagged_per_100_pages']:.1f} per 100 pages, {tf[least_chk]['unflagged_errors']} "
              f"unflagged errors), and the fewest unflagged errors {lab[least_err]}'s "
              f"({tf[least_err]['unflagged_errors']}, at {tf[least_err]['flagged_per_100_pages']:.1f} checks per 100 "
-             "pages). The trade-off is the level: a higher one flags more and leaves less.")
+             "pages" + "".join(f"; {lab[a]} ties it at {tf[a]['flagged_per_100_pages']:.1f}" for a in tied_err)
+             + "). The trade-off is the level: a higher one flags more and leaves less.")
     L.append("- Every count here is small (" + ", ".join(
         f"{lab[a]} {tf[a]['unflagged_errors']} on the test boxes, {df[a]['unflagged_errors']} held out on the "
         "development boxes" for a in tf) + "), so a difference of one or two errors is within noise, and a zero "
@@ -835,15 +854,16 @@ def render(out: dict) -> str:
         truth="The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, "
               "W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so "
               "every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development "
-              "boxes (Dean, Deaver, Herrnstein). Gemini only's 2 unflagged errors (2.8 per 500 pages) are Stanton "
-              "101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the "
-              "article-within-issue rule. Every cloud route merges them with or without the magazine rule (only g1's "
-              "rule 10 states it; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and only the 2B "
-              "trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps), so they are the "
-              "cloud models' own reading of those pages. Prompt g2, g1 with rule 10 on the article-within-issue rule, "
-              "splits both on Gemini 3.7 through the gateway and takes that route's unflagged errors from 2 to 0 "
-              "(seg-magazine-rule.md, W46.seg-magazine-rule-redo); the app's 3.8 voter still sends g1, so the Gemini "
-              "figures here are g1's. GLM-5.3 Flash's 3 are that pair and 144|145; Claude's "
+              "boxes (Dean, Deaver, Herrnstein). Gemini only is Gemini 3.7 Flash's g2 answers through the gateway, "
+              "at the level fitted on its own development answers (0.965, the level 3.8 had on g1; "
+              "W46.seg-magazine-rule-app), so it has no unflagged error. Gemini 3.8 on g1, the row it replaced, had "
+              "2: Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the "
+              "article-within-issue rule. Every cloud route on its old prompt merges them (g1's rule 10 stated the "
+              "full-magazine rule; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and the 2B "
+              "trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps). Prompt g2, g1 with "
+              "rule 10 on the article-within-issue rule, splits both (seg-magazine-rule.md). ChatGPT's c1 still "
+              "carries g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). GLM-5.3 Flash's 3 are "
+              "that pair and 144|145; Claude's "
               "3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) "
               "do not include it (W46.seg-offsets-label, from the cached answers).",
         selection="Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not "
@@ -853,8 +873,8 @@ def render(out: dict) -> str:
                    "token prices.",
         noise="Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is "
               "within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the "
-              "no-review column. Gemini 3.8's five figures have no measured window-offset range: the gateway serves "
-              "only 3.7, whose range at this 3.8-fitted level is in seg-boxes-score.md (83.0%-85.2% no checking).",
+              "no-review column. Gemini only's five figures are one g2 run on 3.7 with no measured window-offset "
+              "range; 3.7's range on g1 at the same level is in seg-boxes-score.md (83.0%-85.2% no checking).",
         scope="The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material "
               "(the three locked owner boxes are scored in seg-boxes-score.md; Lincoln and CREST are not scored "
               "here), and not a forecast for a user's own corpus.")

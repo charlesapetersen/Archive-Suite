@@ -144,7 +144,7 @@
    "label": "Gemini only",
    "available": true,
    "voters": [
-    "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
+    "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g2)"
    ],
    "rule": "min",
    "level": 0.965,
@@ -153,29 +153,29 @@
     "test": {
      "pages": 363,
      "gaps": 315,
-     "flagged": 88,
-     "pages_exact_no_review": 0.8727272727272727,
-     "flagged_per_100_pages": 24.242424242424242,
-     "pages_exact_after_review": 0.9848484848484849,
-     "unflagged_errors": 2,
-     "unflagged_errors_per_500_pages": 2.7548209366391183
+     "flagged": 92,
+     "pages_exact_no_review": 0.8878787878787879,
+     "flagged_per_100_pages": 25.34435261707989,
+     "pages_exact_after_review": 1.0,
+     "unflagged_errors": 0,
+     "unflagged_errors_per_500_pages": 0.0
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
-      "flagged": 77,
-      "pages_exact_no_review": 0.8724279835390947,
-      "flagged_per_100_pages": 30.8,
-      "pages_exact_after_review": 0.9794238683127572,
-      "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 4.0
+      "flagged": 81,
+      "pages_exact_no_review": 0.8806584362139918,
+      "flagged_per_100_pages": 32.4,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 11,
-      "pages_exact_no_review": 0.8735632183908046,
+      "pages_exact_no_review": 0.9080459770114943,
       "flagged_per_100_pages": 9.734513274336283,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -185,9 +185,9 @@
     "dev_held_out": {
      "pages": 551,
      "gaps": 494,
-     "flagged": 57,
-     "pages_exact_no_review": 0.9073359073359073,
-     "flagged_per_100_pages": 10.344827586206897,
+     "flagged": 56,
+     "pages_exact_no_review": 0.918918918918919,
+     "flagged_per_100_pages": 10.163339382940109,
      "pages_exact_after_review": 0.9864864864864865,
      "unflagged_errors": 3,
      "unflagged_errors_per_500_pages": 2.722323049001815
@@ -234,6 +234,58 @@
     "total": {
      "list_usd_per_1000_pages": 3.6108848468271337,
      "batch_usd_per_1000_pages": 1.8054424234135669
+    }
+   },
+   "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",
+   "note": "The app's voter is Gemini 3.8 Flash sending g2; its level and every figure here are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them on the development boxes (W46.seg-magazine-rule-app). Tokens and price are 3.8's, measured on g1.",
+   "figures_note": "These figures were measured on Gemini 3.7 Flash with the same prompt; Gemini 3.8 Flash, which this approach calls, has not been measured on it.",
+   "replaces": {
+    "voters": [
+     "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
+    ],
+    "rule": "min",
+    "level": 0.965,
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 88,
+     "pages_exact_no_review": 0.8727272727272727,
+     "flagged_per_100_pages": 24.242424242424242,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 2.7548209366391183
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 77,
+      "pages_exact_no_review": 0.8724279835390947,
+      "flagged_per_100_pages": 30.8,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 2,
+      "unflagged_errors_per_500_pages": 4.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 11,
+      "pages_exact_no_review": 0.8735632183908046,
+      "flagged_per_100_pages": 9.734513274336283,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 57,
+     "pages_exact_no_review": 0.9073359073359073,
+     "flagged_per_100_pages": 10.344827586206897,
+     "pages_exact_after_review": 0.9864864864864865,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 2.722323049001815
     }
    }
   },
@@ -696,5 +748,12 @@
   "date": "2026-10-31",
   "item": "W46.seg-truth-rescore",
   "why": "the owner split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule (W46.seg-truth-sheet)"
+ },
+ "gemini_g2": {
+  "date": "2026-11-11",
+  "item": "W46.seg-magazine-rule-app",
+  "level": 0.965,
+  "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",
+  "result": "segbench-results/seg-magazine-rule-app.md"
  }
 }
