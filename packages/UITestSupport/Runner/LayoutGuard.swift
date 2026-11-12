@@ -27,6 +27,7 @@
 // screens. The pure checker (`LayoutGuard.violations(in:)`) is also exercised on synthetic trees by each suite's
 // `testLayoutGuardCatchesPlantedDefects`, so a guard that silently stopped seeing anything fails there first.
 
+import AppKit
 import XCTest
 
 /// One element of a window's accessibility tree, copied out of an `XCUIElementSnapshot` so the checker is a pure
@@ -91,6 +92,11 @@ enum LayoutGuard {
 
     /// Geometry slack, in points. Accessibility frames are rounded and focus rings bleed a point or two.
     static let tolerance: CGFloat = 2
+    /// How near its typical size a restored window must come back. Wider than `tolerance`, which judges the app's
+    /// layout: this judges the harness's own pointer, and on macOS 27 a click drag lands a few points either side
+    /// of its aim (the Reader's restores, 2026-11-12, ended 3 to 5 pt off after follow-up drags). Two drag
+    /// thresholds; a later sweep at a window 8 pt off its typical size still checks that size's layout.
+    static let restoreTolerance: CGFloat = 8
 
     /// The shortest frame a line of legible text can have. MEASURED, not guessed (VM, 2026-10-11): the smallest
     /// legitimate labels in Notes (10-11 pt fonts: the sidebar counts, "Location") are 13 pt tall, and the
@@ -274,18 +280,44 @@ enum LayoutGuard {
         // On macOS 27 a click drag loses its first few points to the drag threshold (measured in the 27.2 guest,
         // 2026-11-10: about 3 pt short whatever the distance, and a 4 pt drag moved nothing), which left the
         // restored window a few points off its typical size. Close the gap with follow-up drags that aim past the
-        // corner by the gap (at most 4 pt, about what the threshold eats), while they still change the size; a
-        // corner the window cannot reach (past its minimum, or the screen's edge) stops at the first one that
-        // changes nothing.
+        // corner by what the threshold ate, measured per axis from each drag that moved (it is not constant: the
+        // Reader's tag-cloud restore, 2026-11-12, saw 1 to 4 pt, and a fixed 4 pt overshoot see-sawed around the
+        // target and ended 4 pt off). A drag that changes nothing aims 3 pt further; a corner the window cannot
+        // reach (past its minimum, or the screen's edge) stops at the second such drag in a row. An aim never
+        // crosses the screen's edge unless the corner itself is there: pushed against the edge, macOS 27 holds the
+        // window there, and the document viewer's restore (2026-11-12) then ended 4 pt wide of its 1914.
         guard let hit else { return window.frame }
+        let screen = NSScreen.main?.frame.size ?? CGSize(width: CGFloat.greatestFiniteMagnitude,
+                                                         height: CGFloat.greatestFiniteMagnitude)
+        func inside(_ aimed: CGFloat, _ target: CGFloat, _ edge: CGFloat) -> CGFloat {
+            target <= edge - 2 ? min(aimed, edge - 2) : aimed
+        }
         var last = window.frame
-        func past(_ gap: CGFloat) -> CGFloat { gap + (gap < 0 ? -1 : 1) * min(abs(gap), 4) }
-        for _ in 0..<3 {
+        func learn(_ aimed: CGFloat, _ moved: CGFloat, _ current: CGFloat) -> CGFloat {
+            guard abs(aimed) > 0.5, abs(moved) > 0.5, (aimed > 0) == (moved > 0) else { return current }
+            return min(max(abs(aimed) - abs(moved), 0), 8)
+        }
+        var loss = CGVector(dx: learn(corner.x - before.maxX, last.maxX - before.maxX, 3),
+                            dy: learn(corner.y - before.maxY, last.maxY - before.maxY, 3))
+        var still = 0
+        for _ in 0..<6 {
             let gapX = corner.x - last.maxX, gapY = corner.y - last.maxY
-            guard abs(gapX) > 0.5 || abs(gapY) > 0.5 else { break }
-            drag(hit, to: CGPoint(x: last.maxX + past(gapX), y: last.maxY + past(gapY)))
+            guard abs(gapX) > 1 || abs(gapY) > 1 else { break }
+            func aim(_ gap: CGFloat, _ eaten: CGFloat) -> CGFloat {
+                guard abs(gap) > 1 else { return 0 }
+                return gap + (gap < 0 ? -1 : 1) * (eaten + CGFloat(still) * 3)
+            }
+            let ax = inside(last.maxX + aim(gapX, loss.dx), corner.x, screen.width) - last.maxX
+            let ay = inside(last.maxY + aim(gapY, loss.dy), corner.y, screen.height) - last.maxY
+            drag(hit, to: CGPoint(x: last.maxX + ax, y: last.maxY + ay))
             let now = window.frame
-            if now.size == last.size { break }
+            if now.size == last.size {
+                still += 1
+                if still == 2 { break }
+                continue
+            }
+            still = 0
+            loss = CGVector(dx: learn(ax, now.maxX - last.maxX, loss.dx), dy: learn(ay, now.maxY - last.maxY, loss.dy))
             last = now
         }
         return last
@@ -397,7 +429,7 @@ enum LayoutGuard {
         if resized, window.frame.size != typical.size {
             let back = dragCorner(of: window, to: CGPoint(x: typical.maxX, y: typical.maxY))
             _ = waitUntilSettled(window, minimum: 1)
-            if abs(back.width - typical.width) > tolerance || abs(back.height - typical.height) > tolerance {
+            if abs(back.width - typical.width) > restoreTolerance || abs(back.height - typical.height) > restoreTolerance {
                 report.append("restore: the window ended at \(fmt(back)), not its typical \(fmt(typical))")
             }
         }

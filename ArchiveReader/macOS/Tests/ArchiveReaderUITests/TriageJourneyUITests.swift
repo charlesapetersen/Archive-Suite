@@ -357,9 +357,10 @@ final class TriageJourneyUITests: FixtureUITestCase {
             log("[d8]   existing-spelling note shown: \(shown ? "yes" : "NO")")
         }
         field.typeText("\r")   // Return adds the tag: there is no Add button
-        // The sheet writes on Return; give the write a moment before Done dismisses the sheet.
+        // The inspector writes on Return; give the write a moment before its close button hides it. The editor
+        // became the Inspector panel (W40.reader-commands-table): its close button is "Close", not "Done".
         RunLoop.current.run(until: Date().addingTimeInterval(1))
-        app.buttons["Done"].firstMatch.click()
+        app.buttons["ar.tagEditor.done"].firstMatch.click()
     }
 
     private func selectTagInCloud(_ tag: String) {

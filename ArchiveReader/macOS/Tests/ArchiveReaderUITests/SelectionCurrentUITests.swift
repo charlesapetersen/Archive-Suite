@@ -66,6 +66,10 @@ final class SelectionCurrentUITests: FixtureUITestCase {
     func testTheDocumentWindowsFileIsOnViewInTheList() throws {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(1)
+        // The launch restores the last run's selection, which the previous test leaves as a two-row run; a click
+        // inside a multi-row selection narrows it only after the mouse-up settles (NSTableView keeps it for a
+        // drag), and a ⌘O before that opens both rows. Open only once row 1 alone is selected.
+        wait("row 1 alone is selected") { selectedRows.count == 1 && table.tableRows.element(boundBy: 1).isSelected }
         pressKey("o", modifiers: .command)
         wait("a document window opens", timeout: 10) { app.windows.count >= 2 }
         RunLoop.current.run(until: Date().addingTimeInterval(1))
