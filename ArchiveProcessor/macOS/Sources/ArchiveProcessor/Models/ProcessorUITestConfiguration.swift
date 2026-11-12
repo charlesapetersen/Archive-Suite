@@ -36,6 +36,11 @@ enum ProcessorUITestConfiguration {
     }
     /// Opens the review of flagged boundaries (W36.seg-opt-review) on two synthetic gaps, with no run, OCR,
     /// model call or output behind it. The answers land in a DEBUG-only label once Done is pressed.
+    /// Opens the general interview as at first start (W46.settings-interviews); the UI suite's launches are headless,
+    /// which otherwise skips it.
+    static var showsGeneralInterview: Bool {
+        isActive && arguments.contains("-APUITestGeneralInterview")
+    }
     static var showsFlaggedReview: Bool {
         isActive && arguments.contains("-APUITestFlaggedReview")
     }

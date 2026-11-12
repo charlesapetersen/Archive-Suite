@@ -343,14 +343,40 @@ extension SettingsKey {
             }
         case .strings(let list):
             guard !list.isEmpty else { return "none" }
-            if self == .priorities {
+            switch self {
+            case .priorities:
                 return list.map { SettingsPriority(rawValue: $0)?.label ?? $0 }.joined(separator: ", then ")
+            case .languages:
+                return list.map { c in CollectionInterviewAnswers.languageChoices.first { $0.code == c }?.label ?? c }
+                    .joined(separator: ", ")
+            case .scripts:
+                return list.map { s -> String in
+                    let parts = s.split(separator: ":", maxSplits: 1).map(String.init)
+                    let name = CollectionScript(rawValue: parts[0])?.label ?? parts[0]
+                    return parts.count > 1 ? "\(name) \(parts[1])%" : name
+                }.joined(separator: ", ")
+            default:
+                return list.joined(separator: ", ")
             }
-            return list.joined(separator: ", ")
         case .numbers(let n):
             guard !n.isEmpty else { return "none" }
-            return n.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
-                .map { "\($0.key) \(String(format: "%g", $0.value))%" }.joined(separator: ", ")
+            let sorted = n.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            func number(_ x: Double) -> String { String(format: "%.0f", x) }
+            switch self {
+            case .weights:
+                return sorted.map { "\(SettingsPriority(rawValue: $0.key)?.label ?? $0.key) \(number($0.value))" }
+                    .joined(separator: ", ")
+            case .strata:
+                return sorted.map { "\(number($0.value))% judged on \(PublicStratum.label($0.key))" }.joined(separator: "; ")
+            case .mix:
+                return sorted.map { kind in
+                    let name = CollectionInterviewAnswers.measuredKinds.contains(kind.key)
+                        ? PageKind.label(kind.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(kind.key).lowercased()
+                    return "\(name) \(number(kind.value))%"
+                }.joined(separator: ", ")
+            default:
+                return sorted.map { "\($0.key) \(String(format: "%g", $0.value))%" }.joined(separator: ", ")
+            }
         }
     }
 }
@@ -450,14 +476,21 @@ struct SettingsResolver: Sendable {
         a.pages = max(1, pages)
         a.documents = documents
         a.mix = resolve(.mix).value.numbers ?? a.mix
+        // Registers are asked apart (they are not measured) and read as forms and tables (the public set L4).
+        if let r = a.mix.removeValue(forKey: "registers") { a.mix["forms", default: 0] += r }
         a.strata = resolve(.strata).value.numbers ?? [:]
         let ceiling = ceilingUSD(spentThisMonthUSD: spentThisMonthUSD)
         a.ceilingUSD = ceiling.isFinite ? ceiling : nil
         a.hours = resolve(.hours).value.double ?? a.hours
         a.preference = resolve(.preference).value.string.flatMap(SettingsPreference.init(rawValue:)) ?? .bestMeasured
         a.priorities = (resolve(.priorities).value.strings ?? []).compactMap(SettingsPriority.init(rawValue:))
-        for (name, w) in resolve(.weights).value.numbers ?? [:] {
-            if let p = SettingsPriority(rawValue: name), w >= 0 { a.weights[p.stage] = w }
+        // The weights count only beside the order they were given with, from the same layer.
+        let weights = resolve(.weights)
+        let order = resolve(.priorities)
+        if weights.layer == order.layer, weights.layerName == order.layerName {
+            for (name, w) in weights.value.numbers ?? [:] {
+                if let p = SettingsPriority(rawValue: name), w >= 0 { a.weights[p.stage] = w }
+            }
         }
         a.staysOnMac = resolve(.staysOnMac).value.bool ?? true
         a.readingFallback = resolve(.readingFallback).value.bool ?? true
@@ -468,14 +501,15 @@ struct SettingsResolver: Sendable {
 
     /// This batch's ceiling. Under the money habit "none" nothing is spent, whatever a collection says (§3.1: the
     /// cheapest safe answer where money is involved). Per batch, the nearest layer's batch ceiling. Per month, what
-    /// is left of the month's ceiling, and no more than a batch ceiling a layer set. No ceiling is infinity.
+    /// is left of the month's ceiling, and no more than a batch ceiling a layer set. No ceiling is infinity, unless a
+    /// project or collection set its own batch ceiling, which then holds.
     func ceilingUSD(spentThisMonthUSD: Double = 0) -> Double {
         func usable(_ v: Double?) -> Double { (v ?? 0).isFinite ? max(0, v ?? 0) : 0 }
         let habit = resolve(.moneyHabit).value.string.flatMap(MoneyHabit.init(rawValue:)) ?? MoneyHabit.none
         let batch = resolve(.batchCeilingUSD)
         switch habit {
         case .none: return 0
-        case .noCeiling: return .infinity
+        case .noCeiling: return batch.layer == nil ? .infinity : usable(batch.value.double)
         case .perBatch: return usable(batch.value.double)
         case .perMonth:
             let left = max(0, usable(resolve(.monthCeilingUSD).value.double) - usable(spentThisMonthUSD))

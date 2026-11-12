@@ -107,13 +107,6 @@ struct ContentView: View {
             }
         }
 #endif
-        .sheet(isPresented: $showGeneralInterview) {
-            GeneralInterviewView {
-                showGeneralInterview = false
-                hasSeenGeneralInterview = true
-                hasSeenKeyOnboarding = true   // the interview offers the key wizard itself
-            }
-        }
         .sheet(isPresented: $showKeyOnboarding) {
             ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
         }
@@ -155,6 +148,14 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 700)
+        // On this view rather than beside the key wizard's sheet, so neither is a second sheet on one view.
+        .sheet(isPresented: $showGeneralInterview) {
+            GeneralInterviewView {
+                showGeneralInterview = false
+                hasSeenGeneralInterview = true
+                hasSeenKeyOnboarding = true   // the interview offers the key wizard itself
+            }
+        }
     }
 
     /// At first launch, the general interview (W46.settings-interviews), which shows the keys found and offers the
@@ -162,8 +163,15 @@ struct ContentView: View {
     /// always re-openable from Settings). Only whether a key exists is checked, so no Keychain prompt. Skipped in the
     /// headless test modes.
     private func maybePresentKeyOnboarding() {
+        var askedByUITest = false
+#if DEBUG
+        askedByUITest = ProcessorUITestConfiguration.showsGeneralInterview
+#endif
+        if askedByUITest || (!hasSeenGeneralInterview && !KeychainHelper.isHeadlessTestMode) {
+            showGeneralInterview = true
+            return
+        }
         guard !KeychainHelper.isHeadlessTestMode else { return }
-        if !hasSeenGeneralInterview { showGeneralInterview = true; return }
         guard !hasSeenKeyOnboarding else { return }
         let hasAnyKey = MacInventory.keyAccounts.contains { KeychainHelper.exists(account: $0.account) }
         if !hasAnyKey { showKeyOnboarding = true }

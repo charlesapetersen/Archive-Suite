@@ -71,8 +71,9 @@ struct KeychainHelper {
 
     /// Whether the account holds an item, without reading the secret and without ever asking the user: only the
     /// item's attributes are requested, under a context that may not interact (W46.settings-interviews, which lists
-    /// the keys it finds at first start; reading them would pop the Keychain prompt for each one). An item the
-    /// Keychain will not describe without asking still exists, so it counts.
+    /// the keys it finds at first start; reading them would pop the Keychain prompt for each one). A Keychain that will
+    /// not answer without asking (locked) says nothing about the item, so it counts as not found: a key not listed is
+    /// one that is not used.
     static func exists(account: String) -> Bool {
         if isHeadlessTestMode { return false }
         let context = LAContext()
@@ -87,7 +88,7 @@ struct KeychainHelper {
         ]
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        return status == errSecSuccess || status == errSecInteractionNotAllowed
+        return status == errSecSuccess
     }
 
     static func delete(account: String) {

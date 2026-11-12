@@ -4,10 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## ⚠️ LIMITATION (W46.settings-layers, 2026-11-11): what the settings layers do not yet cover
 
-- **Nothing fills the layers yet but the project picker.** The general and collection interviews
-  (`W46.settings-interviews`) ask the questions, and the settings sheet (`W46.settings-sheet`) shows every value with
-  its source. Until then the layers resolve to the built-in "Free, on this Mac", and Settings' "This collection"
-  section lists only the values a collection holds. Its project picker and New project… are the only writers today.
+- **The interviews fill the layers; nothing shows the picks yet.** The general and collection interviews
+  (`W46.settings-interviews`, 2026-11-11) write their answers, and the settings sheet (`W46.settings-sheet`) is what
+  will show every value with its source and the solver's pick per stage. Until then Settings' "This collection"
+  section lists only the values a collection holds.
+- **The interviews' known gaps (W46.settings-interviews).** The kind sample reads photographs only (JPEG, PNG,
+  HEIC, TIFF), not PDF pages, and needs macOS 26 for the classifier. A Claude plan counts only after "Check the
+  sign-in" passes (one short message on the plan). The period, language and script rules that pick a public test set
+  are the bench's strata read by the period's middle year; they are a reading, not a measurement. The money habit
+  "No limit" can be chosen only in the general settings.
 - **The run still reads the app's processing settings, not the solver's picks.** The frozen record carries both: the
   resolved layers and the `UserDefaults` processing settings the run actually used. Running a batch from the
   solver's picks is the sheet's job.

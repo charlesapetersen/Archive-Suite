@@ -477,6 +477,11 @@ existing scratch, key-free, no-network execution remains unchanged.
   with sources and resets, the money habit's ceiling, the solver's inputs, the general store, and the collection's
   settings document writer on scratch folders (atomic, never through a link, an unreadable file set aside with its
   bytes, a newer one left alone, run records appended). No Keychain read, no window, never the app's own store.
+- **`test-settings-interviews.sh`** — the W46 interviews: what the general one finds (a fake Keychain probe) and
+  writes, the skipped interview's "Free, on this Mac" solved with keys present, the starting points as fills, the
+  kind sample and tally, the mix and public test sets the period, languages and scripts select, the priority
+  weights the solver reads, both interviews' writes to a scratch store and collection folder, and a jargon check of
+  their words. No Keychain read, no window, never the app's own store.
 - **`test-segmentation-chooser.sh`** — the W36 approach chooser: each approach's figures and cost as the user reads
   them at several page counts and routes (key, `claude` plan, mix), price-change and stale-price notes, unavailable
   rows and the keys they offer, and a render guard that each row card draws non-blank pixels offscreen. No Keychain

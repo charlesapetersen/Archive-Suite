@@ -466,6 +466,58 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Escape must cancel the sheet")
     }
 
+    /// W46.settings-interviews: the general interview opens at first start, shows what it found on this Mac, fills
+    /// from a starting point, and Skip closes it.
+    func testGeneralInterviewOpensAtFirstStart() throws {
+        relaunch(extra: ["-APUITestGeneralInterview"])
+        let save = element("ap.generalInterview.save")
+        XCTAssertTrue(save.waitForExistence(timeout: 10), "the general interview must open at first start")
+        XCTAssertTrue(app.staticTexts["Found on this Mac"].exists, "it must show what it found on this Mac")
+        let fill = app.buttons["Fill in"].firstMatch
+        XCTAssertTrue(fill.exists, "the starting points must be offered")
+        attachScreenshot("processor-general-interview")
+        let skip = app.buttons["Skip: free, on this Mac"]
+        XCTAssertTrue(skip.exists, "the interview must offer a skip that stays free")
+        skip.click()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
+    }
+
+    /// W46.settings-interviews: Settings' collection section opens the collection interview, and Skip saves nothing.
+    func testCollectionInterviewOpensFromSettings() throws {
+        openSettings()
+        let answer = app.buttons["Answer…"]
+        XCTAssertTrue(answer.waitForExistence(timeout: 10), "a collection with no answers must offer the interview")
+        answer.click()
+        let save = element("ap.collectionInterview.save")
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "the collection interview must open")
+        XCTAssertTrue(app.buttons["Measure from photos…"].exists, "it must offer to measure the kinds of document")
+        attachScreenshot("processor-collection-interview")
+        app.buttons["Skip"].click()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
+        XCTAssertTrue(app.buttons["Answer…"].exists, "a skipped interview leaves the collection without answers")
+    }
+
+    /// W46.settings-interviews: a new project is asked about its material as soon as it is named.
+    func testNewProjectAsksAboutItsMaterial() throws {
+        openSettings()
+        let newProject = app.buttons["New project…"]
+        XCTAssertTrue(newProject.waitForExistence(timeout: 10), "Settings must offer New project")
+        newProject.click()
+        let field = element("ap.nameSheet.field")
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "New project must open the name sheet")
+        Thread.sleep(forTimeInterval: 0.5)
+        app.typeText("Letters\r")
+        let save = element("ap.collectionInterview.save")
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "the new project's interview must open after the name sheet")
+        XCTAssertTrue(app.staticTexts["About the project “Letters”"].exists, "the interview must name the project")
+        attachScreenshot("processor-project-interview")
+        app.buttons["Skip"].click()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
+    }
+
     /// W40.fix-processor-visual-polish: the Files header with Add Files… stays put when the list scrolls.
     func testFilesHeaderStaysAboveTheScrolledList() throws {
         relaunch(extra: ["-APUITestSyntheticVolume"])

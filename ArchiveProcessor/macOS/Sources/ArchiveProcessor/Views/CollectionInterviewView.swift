@@ -24,15 +24,21 @@ struct CollectionInterviewView: View {
     @State private var measureTotal = 0
     @State private var measureTask: Task<Void, Never>?
     @State private var problem: String?
+    /// The collection's document, read once when the sheet opens rather than on every redraw.
+    @State private var doc: CollectionSettingsDocument?
 
     private var resolver: SettingsResolver {
         switch target {
-        case .collection(let folder):
-            var doc: CollectionSettingsDocument?
-            if case .document(let d) = CollectionSettingsFile.read(in: folder) { doc = d }
-            return store.resolver(for: doc)
-        case .project(let id):
-            return SettingsResolver(general: store.general, project: store.project(id))
+        case .collection: return store.resolver(for: doc)
+        case .project(let id): return SettingsResolver(general: store.general, project: store.project(id))
+        }
+    }
+
+    /// The layer this interview writes.
+    private var own: SettingsLayer? {
+        switch target {
+        case .collection: return doc?.collection
+        case .project(let id): return store.project(id)
         }
     }
 
@@ -84,7 +90,8 @@ struct CollectionInterviewView: View {
         .onAppear {
             guard !loaded else { return }
             loaded = true
-            answers = CollectionInterviewAnswers(resolver: resolver)
+            if case .collection(let folder) = target, case .document(let d) = CollectionSettingsFile.read(in: folder) { doc = d }
+            answers = CollectionInterviewAnswers(resolver: resolver, own: own)
             if answers.measuredShares.isEmpty, !photos.isEmpty { measure(photos) }
         }
         .onDisappear { measureTask?.cancel() }
@@ -131,12 +138,12 @@ struct CollectionInterviewView: View {
             ForEach(CollectionInterviewAnswers.measuredKinds, id: \.self) { kind in
                 percentRow(PageKind.label(kind), value: Binding(
                     get: { answers.measuredShares[kind] ?? 0 },
-                    set: { answers.measuredShares[kind] = $0; answers.correctedMix = true }))
+                    set: { answers.measuredShares[kind] = $0; answers.correctedMix = true; answers.touch(.mix) }))
             }
             ForEach(CollectionInterviewAnswers.unmeasuredKinds, id: \.self) { kind in
-                percentRow(Self.unmeasuredLabel(kind), note: "not measured", value: Binding(
+                percentRow(CollectionInterviewAnswers.unmeasuredLabel(kind), note: "not measured", value: Binding(
                     get: { answers.unmeasuredShares[kind] ?? 0 },
-                    set: { answers.unmeasuredShares[kind] = $0 }))
+                    set: { answers.unmeasuredShares[kind] = $0; answers.touch(.mix) }))
             }
         } header: {
             Text("Kinds of document")
@@ -158,15 +165,6 @@ struct CollectionInterviewView: View {
         return s
     }
 
-    static func unmeasuredLabel(_ kind: String) -> String {
-        switch kind {
-        case "clippings": return "Newspaper clippings"
-        case "newspapers": return "Whole newspaper pages"
-        case "registers": return "Registers and ledgers"
-        case "mixed": return "Typed pages with handwriting on them"
-        default: return kind
-        }
-    }
 
     private func percentRow(_ label: String, note: String? = nil, value: Binding<Double>) -> some View {
         LabeledContent {
@@ -189,10 +187,10 @@ struct CollectionInterviewView: View {
         Section {
             LabeledContent("Period") {
                 HStack(spacing: 4) {
-                    TextField("from", value: $answers.periodFrom, format: .number.grouping(.never))
+                    TextField("from", value: derives(\.periodFrom, .period), format: .number.grouping(.never))
                         .labelsHidden().frame(width: 70)
                     Text("to")
-                    TextField("to", value: $answers.periodTo, format: .number.grouping(.never))
+                    TextField("to", value: derives(\.periodTo, .period), format: .number.grouping(.never))
                         .labelsHidden().frame(width: 70)
                 }
             }
@@ -203,6 +201,7 @@ struct CollectionInterviewView: View {
                         set: { on in
                             answers.languages.removeAll { $0 == choice.code }
                             if on { answers.languages.append(choice.code) }
+                            answers.touch(.languages); answers.touch(.mix)
                         }))
                 }
             }
@@ -210,11 +209,14 @@ struct CollectionInterviewView: View {
                 ForEach([CollectionScript.kurrent, .fraktur], id: \.self) { s in
                     Toggle(s.label, isOn: Binding(
                         get: { answers.latinForms.contains(s) },
-                        set: { if $0 { answers.latinForms.insert(s) } else { answers.latinForms.remove(s) } }))
+                        set: {
+                            if $0 { answers.latinForms.insert(s) } else { answers.latinForms.remove(s) }
+                            answers.touch(.scripts); answers.touch(.mix)
+                        }))
                 }
                 ForEach(CollectionScript.allCases.filter { !$0.isLatinForm }, id: \.self) { s in
                     percentRow(s.label, value: Binding(get: { answers.scriptShares[s] ?? 0 },
-                                                       set: { answers.scriptShares[s] = $0 }))
+                                                       set: { answers.scriptShares[s] = $0; answers.touch(.scripts); answers.touch(.mix) }))
                 }
             }
             Text(judgedOnText).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -257,11 +259,15 @@ struct CollectionInterviewView: View {
             if habit == .none {
                 Text("Your general settings spend nothing, so this limit has no effect until Spending is changed there.")
                     .font(.caption).foregroundStyle(.secondary)
+            } else if !answers.isAnswered(.batchCeilingUSD) {
+                Text(habit == .noCeiling ? "No limit, from your general settings, unless you type one here."
+                                         : "From your general settings unless you type one here.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Stepper(value: bind(\.hours, .hours), in: 1...168) {
                 LabeledContent("How long it may run", value: answers.hours == 1 ? "1 hour" : "\(Int(answers.hours)) hours")
             }
-            Stepper(value: $answers.checkingMinutes, in: 0...600, step: 5) {
+            Stepper(value: bind(\.checkingMinutes, .checkingMinutes), in: 0...600, step: 5) {
                 LabeledContent("Minutes you will spend checking where documents begin",
                                value: "\(Int(answers.checkingMinutes))")
             }
@@ -276,17 +282,17 @@ struct CollectionInterviewView: View {
             ForEach(Array(answers.order.enumerated()), id: \.element) { i, p in
                 HStack {
                     Text("\(i + 1).").monospacedDigit().foregroundStyle(.secondary)
-                    Text(Self.priorityLabel(p))
+                    Text(CollectionInterviewAnswers.priorityLabel(p))
                     Spacer()
                     TextField("weight", value: Binding(get: { answers.weights[p] ?? 0 },
                                                        set: { answers.weights[p] = max(0, $0); answers.touch(.priorities) }),
                               format: .number.precision(.fractionLength(0)))
                         .labelsHidden().multilineTextAlignment(.trailing).frame(width: 50)
                     Button { answers.move(p, by: -1) } label: { Image(systemName: "chevron.up") }
-                        .buttonStyle(.borderless).disabled(i == 0).accessibilityLabel("Move \(Self.priorityLabel(p)) up")
+                        .buttonStyle(.borderless).disabled(i == 0).accessibilityLabel("Move \(CollectionInterviewAnswers.priorityLabel(p)) up")
                     Button { answers.move(p, by: 1) } label: { Image(systemName: "chevron.down") }
                         .buttonStyle(.borderless).disabled(i == answers.order.count - 1)
-                        .accessibilityLabel("Move \(Self.priorityLabel(p)) down")
+                        .accessibilityLabel("Move \(CollectionInterviewAnswers.priorityLabel(p)) down")
                 }
             }
             Picker("When two choices are close", selection: bind(\.preference, .preference)) {
@@ -302,20 +308,12 @@ struct CollectionInterviewView: View {
         }
     }
 
-    static func priorityLabel(_ p: SettingsPriority) -> String {
-        switch p {
-        case .reading: return "Reading the text"
-        case .findingDocuments: return "Finding where each document begins"
-        case .dates: return "Dates"
-        case .names: return "Names of people and places"
-        }
-    }
 
     // MARK: Switches
 
     private var switchesSection: some View {
         Section {
-            Toggle("Straighten the copy you read", isOn: $answers.straightenReadingCopy)
+            Toggle("Straighten the copy you read", isOn: bind(\.straightenReadingCopy, .straightenReadingCopy))
                 .help("Turns a page photographed at a slant level in the PDF you read. Nothing on the page is removed.")
             Toggle("Keep these pages on this Mac", isOn: bind(\.staysOnMac, .staysOnMac))
                 .help("For sensitive material: every page is read here, even when a key or a plan would read it better.")
@@ -324,6 +322,11 @@ struct CollectionInterviewView: View {
 
     private func bind<T>(_ path: WritableKeyPath<CollectionInterviewAnswers, T>, _ key: SettingsKey) -> Binding<T> {
         Binding(get: { answers[keyPath: path] }, set: { answers[keyPath: path] = $0; answers.touch(key) })
+    }
+
+    /// A value the public test sets are derived from: the mix is written with it.
+    private func derives<T>(_ path: WritableKeyPath<CollectionInterviewAnswers, T>, _ key: SettingsKey) -> Binding<T> {
+        Binding(get: { answers[keyPath: path] }, set: { answers[keyPath: path] = $0; answers.touch(key); answers.touch(.mix) })
     }
 
     // MARK: Measuring

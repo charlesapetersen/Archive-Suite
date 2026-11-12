@@ -163,6 +163,14 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
     /// A changed answer is the user's own from then on.
     mutating func touch(_ key: SettingsKey) { filled.remove(key.rawValue) }
 
+    /// Money can only be spent off this Mac, so choosing to spend lets pages leave, and choosing to spend nothing
+    /// keeps them here, until the user sets that switch themselves.
+    mutating func setMoneyHabit(_ habit: MoneyHabit) {
+        moneyHabit = habit
+        touch(.moneyHabit)
+        if !staysOnMacChosen { staysOnMac = habit == .none }
+    }
+
     /// Write the answers and what was found into the general layer. The money a habit does not use is not written,
     /// so the general layer holds only what this interview actually answered.
     func apply(to layer: inout SettingsLayer, inventory: MacInventory, now: Date = Date()) {
@@ -190,8 +198,19 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
         put(.preference, .string(preference.rawValue))
     }
 
-    /// What a skipped interview writes: only what was found on the Mac, so the sheet can list it. Nothing else is
-    /// answered, so every other value is the built-in "Free, on this Mac" and nothing is spent (owner call 3).
+    /// What a skipped interview writes: only what was found on the Mac, so the sheet can list it. Every answer an
+    /// earlier run gave is removed, so every other value is the built-in "Free, on this Mac" and nothing is spent
+    /// (owner call 3), also when the interview is skipped from Settings after it was once answered.
+    static func skip(_ inventory: MacInventory, layer: inout SettingsLayer, now: Date = Date()) {
+        for key in SettingsKey.catalog where key != .keys && key != .plans { layer.reset(key) }
+        applyFound(inventory, to: &layer, now: now)
+    }
+
+    /// Whether the general layer holds any answer beyond what was found on the Mac.
+    static func hasAnswers(_ layer: SettingsLayer) -> Bool {
+        layer.entries.keys.contains { $0 != SettingsKey.keys.rawValue && $0 != SettingsKey.plans.rawValue }
+    }
+
     static func applyFound(_ inventory: MacInventory, to layer: inout SettingsLayer, now: Date = Date()) {
         layer.set(.keys, .strings(inventory.keys), source: .detected(now))
         layer.set(.plans, .strings(inventory.plans), source: .detected(now))
@@ -304,15 +323,21 @@ enum PublicStratum {
     }
 }
 
-/// The collection interview's answers (§3.2).
+/// The collection interview's answers (§3.2). The interview shows every value as the layers resolve it now, but writes
+/// only what this interview answered (the user changed it, a starting point filled it, or the layer already held it):
+/// everything else stays inherited live from the project and the general settings (owner, 2026-11-04, "Layers").
 struct CollectionInterviewAnswers: Equatable, Sendable {
     static let measuredKinds = ["typewritten", "printed", "handwritten", "forms"]
-    /// Kinds the classifier does not measure, asked and labelled "not measured" (owner, 2026-11-06).
+    /// Kinds the classifier does not measure, asked and labelled "not measured" (owner, 2026-11-06). `registers` is
+    /// kept under its own name and read as forms (`SettingsResolver.answers`).
     static let unmeasuredKinds = ["clippings", "newspapers", "registers", "mixed"]
     static let languageChoices: [(code: String, label: String)] = [
         ("en", "English"), ("fr", "French"), ("de", "German"), ("nl", "Dutch"), ("es", "Spanish"),
         ("pt", "Portuguese"), ("it", "Italian"), ("la", "Latin"), ("other", "Another language"),
     ]
+    /// The values the interview may write; the mix, the strata and the scripts go together under `mix`.
+    static let keys: [SettingsKey] = [.mix, .period, .languages, .scripts, .batchCeilingUSD, .hours, .checkingMinutes,
+                                      .priorities, .preference, .straightenReadingCopy, .staysOnMac]
 
     /// The mix in percent by measured kind: the measurement's shares until the user corrects them.
     var measuredShares: [String: Double] = [:]
@@ -337,10 +362,14 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     var straightenReadingCopy = true
     var staysOnMac = true
     var startingPoint: SettingsStartingPoint?
+    /// The keys this interview will write (`SettingsKey.rawValue`).
+    var answered: Set<String> = []
+    /// The answered keys whose value a starting point filled and the user has not changed since.
     var filled: Set<String> = []
 
-    /// Start from what the layers resolve to now (the general layer's habits, an earlier answer of this collection).
-    init(resolver: SettingsResolver? = nil) {
+    /// Start from what the layers resolve to now; `own` is the layer the interview writes (the collection's or the
+    /// project's), whose values count as already answered.
+    init(resolver: SettingsResolver? = nil, own: SettingsLayer? = nil) {
         guard let r = resolver else { return }
         batchCeilingUSD = r.resolve(.batchCeilingUSD).value.double ?? batchCeilingUSD
         hours = r.resolve(.hours).value.double ?? hours
@@ -351,10 +380,11 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         languages = r.resolve(.languages).value.strings ?? []
         (periodFrom, periodTo) = Self.parsePeriod(r.resolve(.period).value.string ?? "")
         let ranked = (r.resolve(.priorities).value.strings ?? []).compactMap(SettingsPriority.init(rawValue:))
-        let stored = r.resolve(.weights).value.numbers ?? [:]
+        let w = r.resolve(.weights)
+        let stored = w.layer == r.resolve(.priorities).layer ? w.value.numbers ?? [:] : [:]
         order = ranked + SettingsPriority.allCases.filter { !ranked.contains($0) }
         weights = Dictionary(uniqueKeysWithValues: order.enumerated().map { i, p in
-            (p, stored[p.rawValue] ?? (ranked.contains(p) && i < SettingsSolver.weights.count ? SettingsSolver.weights[i] : 0))
+            (p, ranked.contains(p) ? stored[p.rawValue] ?? (i < SettingsSolver.weights.count ? SettingsSolver.weights[i] : 0) : 0)
         })
         for s in r.resolve(.scripts).value.strings ?? [] {
             let parts = s.split(separator: ":", maxSplits: 1)
@@ -364,15 +394,31 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         }
         let mix = r.resolve(.mix)
         if mix.layer != nil, let n = mix.value.numbers {
-            measuredShares = n.filter { Self.measuredKinds.contains($0.key) }
-            unmeasuredShares = n.filter { Self.unmeasuredKinds.contains($0.key) }
+            // Undo what `mixAndStrata` did, so answering again and saving unchanged writes the same mix: the hands
+            // and prints that went to a public set come back as handwriting and print, and every kind is put back on
+            // the Latin pages' scale.
+            let strata = r.resolve(.strata).value.numbers ?? [:]
+            let nonLatin = min(99.999, scriptShares.values.reduce(0) { $0 + max(0, $1) })
+            let unscale = 100 / (100 - nonLatin)
+            measuredShares = n.filter { Self.measuredKinds.contains($0.key) }.mapValues { $0 * unscale }
+            let hands = ["L5", "L6", "L7"].reduce(0) { $0 + (strata[$1] ?? 0) }
+            if hands > 0 { measuredShares["handwritten", default: 0] += hands * unscale }
+            if let print = strata["L8"], print > 0 { measuredShares["printed", default: 0] += print * unscale }
+            unmeasuredShares = n.filter { Self.unmeasuredKinds.contains($0.key) }.mapValues { $0 * unscale }
+            if case .measured(let date, let sample)? = mix.source {
+                measurement = KindMeasurement(sample: sample, counts: [:], unsure: 0, unknown: 0, date: date)
+            } else {
+                correctedMix = true
+            }
         }
+        if let own { answered = Set(Self.keys.map(\.rawValue).filter { own.entries[$0] != nil }) }
     }
 
     mutating func take(_ m: KindMeasurement) {
         measurement = m
         measuredShares = m.shares
         correctedMix = false
+        touch(.mix)
     }
 
     /// The order fills the default weights by position (45, 30, 15, then 10 when names are ranked); a weight the user
@@ -390,16 +436,48 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         touch(.priorities)
     }
 
+    /// A starting point fills only the limits it means: its ceiling only when it spends ("A few dollars, overnight"),
+    /// so the others keep the ceiling the layers give.
     mutating func fill(_ point: SettingsStartingPoint) {
-        batchCeilingUSD = point.batchCeilingUSD
+        var keys: [SettingsKey] = [.hours, .preference, .staysOnMac]
+        if point.moneyHabit == .perBatch {
+            batchCeilingUSD = point.batchCeilingUSD
+            keys.append(.batchCeilingUSD)
+        }
         hours = point.hours
         preference = point.preference
         staysOnMac = point.staysOnMac
         startingPoint = point
-        filled = Set([SettingsKey.batchCeilingUSD, .hours, .preference, .staysOnMac].map(\.rawValue))
+        filled = Set(keys.map(\.rawValue))
+        answered.formUnion(filled)
     }
 
-    mutating func touch(_ key: SettingsKey) { filled.remove(key.rawValue) }
+    /// The user answered `key`: it is written, and is theirs rather than a starting point's.
+    mutating func touch(_ key: SettingsKey) {
+        answered.insert(key.rawValue)
+        filled.remove(key.rawValue)
+    }
+
+    func isAnswered(_ key: SettingsKey) -> Bool { answered.contains(key.rawValue) }
+
+    static func unmeasuredLabel(_ kind: String) -> String {
+        switch kind {
+        case "clippings": return "Newspaper clippings"
+        case "newspapers": return "Whole newspaper pages"
+        case "registers": return "Registers and ledgers"
+        case "mixed": return "Typed pages with handwriting on them"
+        default: return kind
+        }
+    }
+
+    static func priorityLabel(_ p: SettingsPriority) -> String {
+        switch p {
+        case .reading: return "Reading the text"
+        case .findingDocuments: return "Finding where each document begins"
+        case .dates: return "Dates"
+        case .names: return "Names of people and places"
+        }
+    }
 
     /// A starting point cannot change the general spending habit from a collection; say so when the two disagree, so
     /// a filled ceiling is never silently without effect.
@@ -407,7 +485,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         guard let point else { return nil }
         switch (point.moneyHabit, habit) {
         case (.perBatch, .none):
-            return "Your general settings spend nothing, so this collection's $\(Int(point.batchCeilingUSD)) ceiling has no effect until Spending is changed there."
+            return "Your general settings spend nothing, so this collection's $\(Int(point.batchCeilingUSD)) limit has no effect until Spending is changed there."
         case (.noCeiling, .none), (.noCeiling, .perBatch), (.noCeiling, .perMonth):
             return "“No limit” is a general setting: this collection keeps the spending limit your general settings give."
         default:
@@ -442,11 +520,12 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
 
     /// The mix and the public strata the solver reads, both on one scale of 100 (`SettingsAnswers.mix`/`strata`).
     ///
-    /// The measured kinds share what the unmeasured kinds leave; registers are judged with forms and tables (the public
-    /// set L4 is ledgers, forms and tables). Pages in a non-Latin script move to that script's public set. Of the Latin
-    /// pages, handwriting moves to the period's and language's own set where the bench has one (L5 Dutch, Spanish or
-    /// Portuguese hands 1600-1850, L6 German hands 1500-1900 or Kurrent, L7 charters before 1600), and print to L8 when it
-    /// is Fraktur or from before 1700; everything else keeps its kind, read by the owner's measured pages.
+    /// The measured kinds share what the unmeasured kinds leave. Pages in a non-Latin script move to that script's
+    /// public set. Of the Latin pages, handwriting moves to the period's and language's own set where the bench has one
+    /// (L5 Dutch, Spanish or Portuguese hands 1600-1850, L6 German hands 1500-1900 or Kurrent, L7 charters before
+    /// 1600), and print to L8 when it is Fraktur or from before 1700; everything else keeps its kind, read by the
+    /// owner's measured pages. Registers keep their name here and are read as forms (the public set L4 is ledgers,
+    /// forms and tables).
     func mixAndStrata() -> (mix: [String: Double], strata: [String: Double]) {
         let unmeasured = Self.unmeasuredKinds.reduce(0) { $0 + max(0, unmeasuredShares[$1] ?? 0) }
         let measuredTotal = measuredShares.values.reduce(0) { $0 + max(0, $1) }
@@ -458,16 +537,15 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         for k in Self.unmeasuredKinds {
             let v = max(0, unmeasuredShares[k] ?? 0)
             guard v > 0 else { continue }
-            kinds[k == "registers" ? "forms" : k, default: 0] += measuredTotal > 0 ? v : v * 100 / max(unmeasured, 100)
+            kinds[k, default: 0] += measuredTotal > 0 ? v : v * 100 / max(unmeasured, 100)
         }
         var strata: [String: Double] = [:]
-        let nonLatin = min(100, scriptShares.filter { !$0.key.isLatinForm }.values.reduce(0) { $0 + max(0, $1) })
+        let nonLatin = min(100, scriptShares.values.reduce(0) { $0 + max(0, $1) })
         if nonLatin > 0 {
-            let total = kinds.values.reduce(0, +)
-            let scale = total > 0 ? (total - total * nonLatin / 100) / total : 0
-            kinds = kinds.mapValues { $0 * scale }
-            let base = total > 0 ? total : 100
-            for (s, v) in scriptShares where v > 0 { if let id = s.stratum { strata[id, default: 0] += base * v / 100 } }
+            kinds = kinds.mapValues { $0 * (100 - nonLatin) / 100 }
+            for (s, v) in scriptShares where v > 0 {
+                if let id = s.stratum { strata[id, default: 0] += 100 * v / max(100, nonLatin) }
+            }
         }
         let mid = periodMiddle
         let langs = Set(languages)
@@ -496,34 +574,44 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         return out
     }
 
-    /// Write the answers into a project's or a collection's layer. The mix is "measured from N photos" while it is the
-    /// classifier's, and the user's once a share was corrected or an unmeasured kind given.
+    /// Write what this interview answered into a project's or a collection's layer, and remove the rest, so it is
+    /// read live from above. The mix is "measured from N photos" while it is the classifier's, and the user's once a
+    /// share was corrected, an unmeasured kind given, or a script's share set.
     func apply(to layer: inout SettingsLayer, now: Date = Date()) {
         func source(_ key: SettingsKey) -> SettingsSource {
             if let p = startingPoint, filled.contains(key.rawValue) { return .startingPoint(p.name, now) }
             return .setByUser(now)
         }
-        func put(_ key: SettingsKey, _ value: SettingsValue) { layer.set(key, value, source: source(key)) }
+        func put(_ key: SettingsKey, _ value: SettingsValue) {
+            if isAnswered(key) { layer.set(key, value, source: source(key)) } else { layer.reset(key) }
+        }
         let (mix, strata) = mixAndStrata()
-        if mix.isEmpty && strata.isEmpty {
+        if !isAnswered(.mix) || (mix.isEmpty && strata.isEmpty) {
             layer.reset(.mix); layer.reset(.strata)
         } else {
-            let unmeasured = unmeasuredShares.values.contains { $0 > 0 }
-            let mixSource: SettingsSource = (measurement != nil && !correctedMix && !unmeasured && scriptShares.values.allSatisfy { $0 <= 0 })
-                ? .measured(measurement!.date, sample: measurement!.sample) : .setByUser(now)
+            let given = correctedMix || unmeasuredShares.values.contains { $0 > 0 } || scriptShares.values.contains { $0 > 0 }
+            let mixSource: SettingsSource
+            if let m = measurement, !given { mixSource = .measured(m.date, sample: m.sample) } else { mixSource = .setByUser(now) }
             layer.set(.mix, .numbers(mix), source: mixSource)
-            if strata.isEmpty { layer.reset(.strata) } else { layer.set(.strata, .numbers(strata), source: .setByUser(now)) }
+            if strata.isEmpty { layer.reset(.strata) } else { layer.set(.strata, .numbers(strata), source: mixSource) }
         }
         if periodText.isEmpty { layer.reset(.period) } else { put(.period, .string(periodText)) }
         if languages.isEmpty { layer.reset(.languages) } else { put(.languages, .strings(languages)) }
-        if scriptsValue.isEmpty { layer.reset(.scripts) } else { put(.scripts, .strings(scriptsValue)) }
+        // The scripts go with the mix: the strata were derived from them.
+        if scriptsValue.isEmpty || !(isAnswered(.scripts) || isAnswered(.mix)) { layer.reset(.scripts) }
+        else { layer.set(.scripts, .strings(scriptsValue), source: source(.scripts)) }
         put(.batchCeilingUSD, .double(max(0, batchCeilingUSD)))
         put(.hours, .double(max(1, hours)))
         put(.checkingMinutes, .double(max(0, checkingMinutes)))
-        let ranked = order.filter { (weights[$0] ?? 0) > 0 }
-            .sorted { (weights[$0] ?? 0) > (weights[$1] ?? 0) }
-        put(.priorities, .strings(ranked.map(\.rawValue)))
-        put(.weights, .numbers(Dictionary(uniqueKeysWithValues: ranked.map { ($0.rawValue, weights[$0] ?? 0) })))
+        if isAnswered(.priorities) {
+            let ranked = order.filter { (weights[$0] ?? 0) > 0 }
+                .sorted { (weights[$0] ?? 0) > (weights[$1] ?? 0) }
+            layer.set(.priorities, .strings(ranked.map(\.rawValue)), source: source(.priorities))
+            layer.set(.weights, .numbers(Dictionary(uniqueKeysWithValues: ranked.map { ($0.rawValue, weights[$0] ?? 0) })),
+                      source: source(.priorities))
+        } else {
+            layer.reset(.priorities); layer.reset(.weights)
+        }
         put(.preference, .string(preference.rawValue))
         put(.straightenReadingCopy, .bool(straightenReadingCopy))
         put(.staysOnMac, .bool(staysOnMac))

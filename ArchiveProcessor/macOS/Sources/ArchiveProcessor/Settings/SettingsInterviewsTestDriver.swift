@@ -51,6 +51,7 @@ enum SettingsInterviewsTestDriver {
         measurement(root)
         mixAndStrata()
         collection()
+        inheritance()
         weights()
         stores(root)
         plainWords()
@@ -116,9 +117,12 @@ enum SettingsInterviewsTestDriver {
         eq("answers are the user's", layer.entry(.hours)?.source, .setByUser(day))
 
         var a = GeneralInterviewAnswers()
-        a.moneyHabit = .perBatch
+        a.setMoneyHabit(.perBatch)
+        check("choosing to spend lets pages leave the Mac", !a.staysOnMac)
+        a.setMoneyHabit(.none)
+        check("choosing to spend nothing again keeps them here", a.staysOnMac)
+        a.setMoneyHabit(.perBatch)
         a.batchCeilingUSD = 5
-        a.staysOnMac = false
         a.cluster = true
         a.gpusPerJob = 2
         a.apply(to: &layer, inventory: fakeMac([]), now: day)
@@ -144,6 +148,20 @@ enum SettingsInterviewsTestDriver {
         check("running the interview again starts from the last answers",
               back.moneyHabit == .noCeiling && back.cluster && back.gpusPerJob == 2 && !back.staysOnMac && back.staysOnMacChosen)
         check("a first run has not chosen whether pages leave", !GeneralInterviewAnswers().staysOnMacChosen)
+        var chosen = back
+        chosen.setMoneyHabit(.none)
+        check("a switch the user set is not moved by the spending answer", !chosen.staysOnMac)
+
+        let coll = SettingsLayer(kind: .collection, name: "c", entries: [
+            SettingsKey.batchCeilingUSD.rawValue: SettingsEntry(value: .double(2), source: .setByUser(day))])
+        eq("under no limit, a collection's own ceiling holds", SettingsResolver(general: layer, collection: coll).ceilingUSD(), 2)
+
+        check("the general layer now holds answers", GeneralInterviewAnswers.hasAnswers(layer))
+        GeneralInterviewAnswers.skip(fakeMac(["Gemini"]), layer: &layer, now: day)
+        eq("skipping after answering clears every earlier answer", Set(layer.entries.keys), ["keys", "plans"])
+        let rs = SettingsResolver(general: layer)
+        check("…so it is free again: nothing spent, no page leaves",
+              rs.ceilingUSD() == 0 && rs.answers(pages: 10).staysOnMac && rs.resources(macMemoryGB: 16).cluster == false)
     }
 
     private static func startingPoints() {
@@ -171,6 +189,13 @@ enum SettingsInterviewsTestDriver {
         var c = CollectionInterviewAnswers()
         c.fill(.fewDollars)
         eq("a collection's fill sets its own ceiling", c.batchCeilingUSD, 5)
+        var best = CollectionInterviewAnswers()
+        best.batchCeilingUSD = 50
+        best.fill(.best)
+        var bl = SettingsLayer(kind: .collection, name: "c")
+        best.apply(to: &bl, now: day)
+        check("a fill that does not spend leaves the inherited ceiling alone", bl.entry(.batchCeilingUSD) == nil)
+        eq("…and fills what it means", bl.entry(.hours)?.source, .startingPoint("Best measured, no limit", day))
         check("a collection's money fill under 'spend nothing' says it has no effect",
               CollectionInterviewAnswers.moneyNote(point: .fewDollars, habit: .none) != nil)
         check("a collection's money fill under a per-batch habit needs no note",
@@ -214,7 +239,24 @@ enum SettingsInterviewsTestDriver {
     private static func base() -> CollectionInterviewAnswers {
         var a = CollectionInterviewAnswers()
         a.measuredShares = ["typewritten": 50, "printed": 25, "handwritten": 25]
+        a.touch(.mix)
         return a
+    }
+
+    /// Save, answer again from the saved layer, and save unchanged: the same layer.
+    private static func roundTrip(_ a: CollectionInterviewAnswers) -> (SettingsLayer, SettingsLayer) {
+        var first = SettingsLayer(kind: .collection, name: "c")
+        a.apply(to: &first, now: day)
+        let g = SettingsLayer(kind: .general, name: "G")
+        let again = CollectionInterviewAnswers(resolver: SettingsResolver(general: g, collection: first), own: first)
+        var second = first
+        again.apply(to: &second, now: day)
+        return (first, second)
+    }
+
+    private static func sameNumbers(_ a: SettingsValue?, _ b: SettingsValue?) -> Bool {
+        guard let x = a?.numbers, let y = b?.numbers, Set(x.keys) == Set(y.keys) else { return a == nil && b == nil }
+        return x.allSatisfy { abs($0.value - (y[$0.key] ?? .nan)) < 0.0001 }
     }
 
     private static func mixAndStrata() {
@@ -227,8 +269,12 @@ enum SettingsInterviewsTestDriver {
         let um = u.mixAndStrata()
         near("measured kinds share what the unmeasured leave", um.mix["typewritten"], 42.5)
         near("newspapers are their own kind", um.mix["newspapers"], 10)
-        near("registers are judged with forms and tables", um.mix["forms"], 5)
+        near("registers keep their name in the document", um.mix["registers"], 5)
         near("the mix still adds to 100", um.mix.values.reduce(0, +), 100)
+        var ul = SettingsLayer(kind: .collection, name: "c")
+        u.apply(to: &ul, now: day)
+        near("…and the solver reads registers as forms and tables",
+             SettingsResolver(general: SettingsLayer(kind: .general, name: "G"), collection: ul).answers(pages: 10).mix["forms"], 5)
 
         var n = base()
         n.scriptShares = [.arabic: 20]
@@ -292,6 +338,7 @@ enum SettingsInterviewsTestDriver {
         a.hours = 12
         a.checkingMinutes = 20
         a.staysOnMac = false
+        for key in [SettingsKey.languages, .period, .batchCeilingUSD, .hours, .checkingMinutes, .staysOnMac] { a.touch(key) }
         var layer = SettingsLayer(kind: .collection, name: "Box 1")
         a.apply(to: &layer, now: day)
         eq("an uncorrected mix is 'measured from 40 photos'", layer.entry(.mix)?.source, .measured(day, sample: 40))
@@ -313,6 +360,7 @@ enum SettingsInterviewsTestDriver {
         var s = base()
         s.scriptShares = [.greek: 10]
         s.latinForms = [.fraktur]
+        s.touch(.scripts)
         s.apply(to: &layer, now: day)
         eq("scripts are kept with their shares", layer.entry(.scripts)?.value, .strings(["fraktur", "greek:10"]))
         check("strata are written beside the mix", layer.entry(.strata)?.value.numbers?["N3"] != nil)
@@ -322,8 +370,69 @@ enum SettingsInterviewsTestDriver {
               back.scriptShares[.greek] == 10 && back.latinForms == [.fraktur] && back.measuredShares["typewritten"] != nil)
 
         var p = SettingsLayer(kind: .project, name: "Letters")
-        base().apply(to: &p, now: day)
-        check("a project holds the same answers", p.entry(.mix) != nil && p.entry(.priorities) != nil)
+        var pa = base()
+        pa.touch(.priorities)
+        pa.apply(to: &p, now: day)
+        check("a project holds the same answers", p.entry(.mix) != nil && p.entry(.priorities) != nil && p.entry(.weights) != nil)
+    }
+
+    /// The interview writes only what it answered; everything else stays inherited live (owner, 2026-11-04).
+    private static func inheritance() {
+        let general = SettingsLayer(kind: .general, name: "G", entries: [
+            SettingsKey.staysOnMac.rawValue: SettingsEntry(value: .bool(false), source: .setByUser(day)),
+            SettingsKey.batchCeilingUSD.rawValue: SettingsEntry(value: .double(20), source: .setByUser(day))])
+        let shown = CollectionInterviewAnswers(resolver: SettingsResolver(general: general), own: nil)
+        check("the interview shows the inherited values", !shown.staysOnMac && shown.batchCeilingUSD == 20)
+        var layer = SettingsLayer(kind: .collection, name: "c")
+        shown.apply(to: &layer, now: day)
+        check("saving an untouched interview copies nothing down", layer.entries.isEmpty, "\(layer.entries.keys.sorted())")
+        var lowered = general
+        lowered.set(.batchCeilingUSD, .double(2), source: .setByUser(day))
+        lowered.set(.moneyHabit, .string(MoneyHabit.perBatch.rawValue), source: .setByUser(day))
+        eq("…so a general change reaches the collection", SettingsResolver(general: lowered, collection: layer).ceilingUSD(), 2)
+
+        var touched = shown
+        touched.staysOnMac = true
+        touched.touch(.staysOnMac)
+        var t = SettingsLayer(kind: .collection, name: "c")
+        touched.apply(to: &t, now: day)
+        eq("a touched value is the collection's own", Set(t.entries.keys), ["staysOnMac"])
+        let again = CollectionInterviewAnswers(resolver: SettingsResolver(general: general, collection: t), own: t)
+        check("answering again keeps a value the collection held", again.isAnswered(.staysOnMac))
+        var reset = t
+        again.apply(to: &reset, now: day)
+        eq("…and still writes only it", Set(reset.entries.keys), ["staysOnMac"])
+
+        var german = base()
+        german.languages = ["de"]
+        german.periodFrom = 1700
+        german.periodTo = 1800
+        german.touch(.languages); german.touch(.period)
+        let (g1, g2) = roundTrip(german)
+        check("German hands saved to L6 come back as handwriting", sameNumbers(g1.entry(.strata)?.value, g2.entry(.strata)?.value)
+              && sameNumbers(g1.entry(.mix)?.value, g2.entry(.mix)?.value), "\(String(describing: g2.entry(.mix)?.value)) \(String(describing: g2.entry(.strata)?.value))")
+        var arabic = base()
+        arabic.unmeasuredShares = ["clippings": 20, "registers": 10]
+        arabic.scriptShares = [.arabic: 50]
+        arabic.touch(.scripts)
+        let (a1, a2) = roundTrip(arabic)
+        check("unmeasured kinds beside a non-Latin share do not shrink on each save",
+              sameNumbers(a1.entry(.mix)?.value, a2.entry(.mix)?.value) && sameNumbers(a1.entry(.strata)?.value, a2.entry(.strata)?.value),
+              "\(String(describing: a1.entry(.mix)?.value)) → \(String(describing: a2.entry(.mix)?.value))")
+        var print = base()
+        print.periodFrom = 1550
+        print.periodTo = 1650
+        print.touch(.period)
+        let (p1, p2) = roundTrip(print)
+        check("early print saved to L8 comes back as print", sameNumbers(p1.entry(.mix)?.value, p2.entry(.mix)?.value)
+              && sameNumbers(p1.entry(.strata)?.value, p2.entry(.strata)?.value))
+        let measured: CollectionInterviewAnswers = {
+            var m = CollectionInterviewAnswers()
+            m.take(KindMeasurement(sample: 12, counts: ["typewritten": 12], unsure: 0, unknown: 0, date: day))
+            return m
+        }()
+        let (m1, m2) = roundTrip(measured)
+        eq("a measured mix stays measured when saved again unchanged", m2.entry(.mix)?.source, m1.entry(.mix)?.source)
     }
 
     private static func weights() {
@@ -334,6 +443,7 @@ enum SettingsInterviewsTestDriver {
         eq("and the one it passed drops out", a.weights[.dates], 0)
         a.move(.names, by: -1)
         a.weights[.reading] = 60
+        a.touch(.priorities)
         var layer = SettingsLayer(kind: .collection, name: "c")
         a.apply(to: &layer, now: day)
         eq("ranked priorities are written by weight", layer.entry(.priorities)?.value,
@@ -355,6 +465,14 @@ enum SettingsInterviewsTestDriver {
                                                                          collection: layer))
         eq("the order reads back", back.order.prefix(3).map(\.self), [.reading, .names, .findingDocuments])
         eq("the weights read back", back.weights[.reading], 60)
+
+        var split = SettingsLayer(kind: .collection, name: "c")
+        split.set(.weights, .numbers(["reading": 5, "dates": 90]), source: .setByUser(day))
+        let project = SettingsLayer(kind: .project, name: "P", entries: [
+            SettingsKey.priorities.rawValue: SettingsEntry(value: .strings(["dates", "reading"]), source: .setByUser(day))])
+        let sa = SettingsResolver(general: SettingsLayer(kind: .general, name: "G"), project: project, collection: split)
+            .answers(pages: 10)
+        check("weights from another layer than the order are not used", sa.weights.isEmpty)
     }
 
     private static func stores(_ root: URL) {
@@ -396,11 +514,19 @@ enum SettingsInterviewsTestDriver {
         var words: [String] = []
         words += SettingsStartingPoint.allCases.flatMap { [$0.name, $0.summary] }
         words += CollectionScript.allCases.map(\.label)
-        words += CollectionInterviewAnswers.unmeasuredKinds.map(CollectionInterviewView.unmeasuredLabel)
-        words += SettingsPriority.allCases.map(CollectionInterviewView.priorityLabel)
+        words += CollectionInterviewAnswers.unmeasuredKinds.map(CollectionInterviewAnswers.unmeasuredLabel)
+        words += SettingsPriority.allCases.map(CollectionInterviewAnswers.priorityLabel)
         words += ["L4", "L5", "L6", "L7", "L8", "L9", "N1", "N2", "N3", "N4", "N5", "N6"].map(PublicStratum.label)
         words += [SettingsKey.weights.label, SettingsKey.moneyHabit.describe(.string(MoneyHabit.noCeiling.rawValue))]
         words += MacInventory.keyAccounts.map(\.label)
+        words += [SettingsKey.weights.describe(.numbers(["reading": 45, "findingDocuments": 30])),
+                  SettingsKey.strata.describe(.numbers(["L6": 25])),
+                  SettingsKey.languages.describe(.strings(["de", "nl"])),
+                  SettingsKey.scripts.describe(.strings(["kurrent", "arabic:30"])),
+                  SettingsKey.mix.describe(.numbers(["typewritten": 60, "registers": 5]))]
+        eq("weights read as words", SettingsKey.weights.describe(.numbers(["reading": 45, "findingDocuments": 30])),
+           "reading 45, finding documents 30")
+        eq("scripts read as words", SettingsKey.scripts.describe(.strings(["arabic:30"])), "Arabic 30%")
         let hits = words.filter { w in
             banned.contains { w.range(of: "\\b\($0)", options: [.regularExpression, .caseInsensitive]) != nil }
         }

@@ -8,7 +8,12 @@ struct GeneralInterviewView: View {
 
     @ObservedObject private var store = SettingsLayerStore.shared
     @State private var answers = GeneralInterviewAnswers(from: SettingsLayerStore.shared.general)
-    @State private var inventory = GeneralInterviewView.readMac()
+    /// Read once when the sheet opens (seven Keychain queries), not on every redraw.
+    @State private var inventory = MacInventory(chip: "this Mac", memoryGB: SettingsLayerStore.thisMacMemoryGB, keys: [],
+                                                claudePath: nil, claudeSignedIn: nil, chatGPTSignedIn: false)
+    @State private var readOnce = false
+    /// Run again from Settings after it was answered: Cancel then leaves the answers as they are.
+    @State private var rerun = GeneralInterviewAnswers.hasAnswers(SettingsLayerStore.shared.general)
     @State private var checkingClaude = false
     @State private var claudeMessage: String?
     @State private var showKeyWizard = false
@@ -42,8 +47,9 @@ struct GeneralInterviewView: View {
             Divider()
             HStack {
                 Button("Skip: free, on this Mac") { skip() }
-                    .help("Saves only what was found on this Mac. Nothing is spent and no page leaves it until you choose otherwise.")
+                    .help("Saves only what was found on this Mac and clears any earlier answers. Nothing is spent and no page leaves it until you choose otherwise.")
                 Spacer()
+                if rerun { Button("Cancel") { onDone() }.keyboardShortcut(.cancelAction) }
                 Button("Save") { save() }
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("ap.generalInterview.save")
@@ -52,6 +58,11 @@ struct GeneralInterviewView: View {
         }
         .frame(width: 600, height: 700)
         .accessibilityIdentifier("ap.generalInterview")
+        .onAppear {
+            guard !readOnce else { return }
+            readOnce = true
+            inventory = Self.readMac()
+        }
         .sheet(isPresented: $showKeyWizard) {
             ProviderKeyWizard {
                 showKeyWizard = false
@@ -131,12 +142,7 @@ struct GeneralInterviewView: View {
 
     private var questionsSection: some View {
         Section("Your answers") {
-            Picker("Spending", selection: Binding(get: { answers.moneyHabit }, set: { habit in
-                answers.moneyHabit = habit
-                answers.touch(.moneyHabit)
-                // Money can only be spent off this Mac, so allowing it lets pages leave unless the user said otherwise.
-                if habit != .none, !answers.staysOnMacChosen { answers.staysOnMac = false }
-            })) {
+            Picker("Spending", selection: Binding(get: { answers.moneyHabit }, set: { answers.setMoneyHabit($0) })) {
                 Text("Spend nothing").tag(MoneyHabit.none)
                 Text("A limit for each batch").tag(MoneyHabit.perBatch)
                 Text("A limit for each month").tag(MoneyHabit.perMonth)
@@ -169,7 +175,7 @@ struct GeneralInterviewView: View {
             Toggle("Models may be downloaded to this Mac", isOn: bind(\.downloadsAllowed, .downloadsAllowed))
                 .help("Some of the best free readers run on this Mac but need a download of a few gigabytes first.")
             Toggle("I can use a computing cluster", isOn: bind(\.cluster, .cluster))
-                .help("Shared computers with graphics cards, such as a university's, that take jobs through Slurm. The app prepares the job; you send it.")
+                .help("Shared computers with graphics cards, such as a university's, that take jobs through a queue (most use one called Slurm). The app prepares the job; you send it.")
             if answers.cluster {
                 Stepper(value: bind(\.gpusPerJob, .gpusPerJob), in: 1...16) {
                     LabeledContent("Graphics cards one job may use", value: "\(answers.gpusPerJob)")
@@ -225,7 +231,7 @@ struct GeneralInterviewView: View {
 
     private func skip() {
         var layer = store.general
-        GeneralInterviewAnswers.applyFound(inventory, to: &layer)
+        GeneralInterviewAnswers.skip(inventory, layer: &layer)
         write(layer)
     }
 

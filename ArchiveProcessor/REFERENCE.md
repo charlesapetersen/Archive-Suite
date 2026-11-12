@@ -336,7 +336,8 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   SystemTagsProvider.swift     Existing-subject autocomplete for tagging UIs, over the persisted
                                `ArchiveCore.TagVocabulary` (per-root CorpusWalker harvest + what the
                                operator types + every verified write). No Spotlight since W26.vocab.
-Settings/                      W46.settings-solver: the settings layer's solver; W46.settings-layers: its three layers.
+Settings/                      W46.settings-solver: the settings layer's solver; W46.settings-layers: its three layers;
+                               W46.settings-interviews: the two interviews that fill them.
   SettingsRouteTable.swift     Decodes the bundled `segbench-results/settings-routes.json` (the rule table,
                                `scripts/segbench/settings_routes.py`) and `ocr-pair-matrix.json` (reading ties).
   SettingsSolver.swift         `SettingsResources` + `SettingsAnswers` → one pick per stage and part (reading per kind
@@ -357,6 +358,16 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                every run start into the pending record; `record` once the run is committed (Process
                                Files, batch, re-OCR) or, for Live Capture, per collection folder at Finalize. Self-test: `SettingsLayersTestDriver`,
                                `scripts/test-settings-layers.sh`. UI: `Views/CollectionSettingsSection.swift`.
+  SettingsInterviews.swift     The two interviews' logic: `MacInventory` (memory, keys by `KeychainHelper.exists`,
+                               never the secret; `claude` a plan only once its sign-in check passes; a ChatGPT
+                               sign-in), the four starting points as fills, `GeneralInterviewAnswers` (skipping
+                               writes only what was found: "Free, on this Mac"), `KindMeasurement` (the kind
+                               classifier on up to 40 photographs spread through the batch), and
+                               `CollectionInterviewAnswers.mixAndStrata` (period, languages and scripts → the public
+                               test sets; `SPEC/collection-settings.md`). Views: `Views/GeneralInterviewView.swift`
+                               (first start, Settings), `Views/CollectionInterviewView.swift` (a new output folder,
+                               "This collection", a new project). Self-test: `SettingsInterviewsTestDriver`,
+                               `scripts/test-settings-interviews.sh`.
 Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
                                `execution-plans/segmentation/04-options-build.md` Part 3 §2. `TaggingMode` says who
                                tags, `SegmentationApproach` who segments; `SegmentationPlan` joins them.

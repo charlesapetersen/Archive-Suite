@@ -92,19 +92,22 @@ struct CollectionSettingsSection: View {
                            confirmLabel: "Create", name: $newProjectName) { name in
                 guard let project = store.addProject(named: name) else { return }
                 if let folder = outputFolder { update(folder) { $0.projectID = project.id } }
-                // A new project is asked about its material at once (12-settings-design.md §3.2).
-                DispatchQueue.main.async { interview = .project(project.id) }
+                // A new project is asked about its material at once (12-settings-design.md §3.2), once the name
+                // sheet has gone: a sheet asked for while another is closing is dropped.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { interview = .project(project.id) }
             }
-        }
-        .sheet(item: $interview) { target in
-            CollectionInterviewView(target: target) { interview = nil; reload() }
         }
     }
 
+    /// The New project… button, shown once in either branch, also anchors the interview's sheet: on its own view, so
+    /// it is not a second sheet on the section (only one of two presents).
     private var newProjectButton: some View {
         Button("New project…") {
             newProjectName = ""
             showNewProject = true
+        }
+        .sheet(item: $interview) { target in
+            CollectionInterviewView(target: target) { interview = nil; reload() }
         }
     }
 

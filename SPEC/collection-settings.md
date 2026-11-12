@@ -51,6 +51,21 @@ source this build does not know. Adding a value kind therefore needs no schema b
 does. A build that drops such an entry also drops it when it next writes the collection's layer, so an older Mac that
 edits a collection loses a newer build's entries of new kinds.
 
+The collection interview (W46.settings-interviews) writes these entries; the Reader and Notes may show them:
+
+| name | `V` | meaning |
+|---|---|---|
+| `mix` | `numbers` | Percent of the pages by kind: `typewritten`, `printed`, `handwritten`, `forms` (measured by the kind classifier on a sample, source `measured`, until the user corrects them), and `clippings`, `newspapers`, `mixed` (given by the user, not measured). Registers are counted under `forms`. Pages that moved to a public test set are in `strata` instead. |
+| `strata` | `numbers` | Percent of the pages judged on a public test set (`L4`-`L9`, `N1`-`N6`, as in `execution-plans/benchmark-corpus/00-plan.md`), on the same scale as `mix`; with `mix` it adds to 100. Derived from the mix, period, languages and scripts. |
+| `period` | `string` | `"<from>-<to>"` in years; either end may be missing. |
+| `languages` | `strings` | Codes: `en`, `fr`, `de`, `nl`, `es`, `pt`, `it`, `la`, `other`. |
+| `scripts` | `strings` | `kurrent` and `fraktur` as plain names; another script as `"<name>:<percent>"` (`greek`, `hebrew`, `arabic`, `cyrillic`, `chinese`, `devanagari`). The Latin alphabet is the rest. |
+| `priorities` | `strings` | The ranked priorities, most important first: `reading`, `findingDocuments`, `dates`, `names`. One not listed is not ranked. |
+| `weights` | `numbers` | Each ranked priority's weight by the same names. Absent means 45, 30, 15, 10 by position. |
+| `batchCeilingUSD`, `hours`, `checkingMinutes` | `double` | This collection's batch limits. A ceiling has effect only when the general spending habit allows money. |
+| `preference` | `string` | `bestMeasured`, `cheapestWithinPoint` or `fastestWithinPoint`. |
+| `staysOnMac`, `straightenReadingCopy` | `bool` | The two switches. |
+
 `V` is `{ "type": T, "value": … }`, with `T` one of `bool`, `int`, `double`, `string`, `strings` (a list) or `numbers`
 (a name → number map, such as the document mix in percent).
 
