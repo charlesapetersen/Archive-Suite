@@ -256,6 +256,10 @@ struct SettingsSheetPage: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("ap.sheet.totals")
 
+        if let n = m.notInUse {
+            Label(n, systemImage: "exclamationmark.circle").font(.caption).fixedSize(horizontal: false, vertical: true)
+        }
+
         if !m.toRelax.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
                 Text("To do better").font(.caption.weight(.semibold))
@@ -365,6 +369,8 @@ struct StageCardView: View {
                     ForEach(card.parts) { p in
                         GridRow {
                             Text(p.label).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: 250, alignment: .leading)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(p.figure + (p.routeName.map { $0 != card.routeName ? " — \($0)" : "" } ?? ""))
                                     .foregroundStyle(p.warning ? Color.orange : Color.primary)

@@ -236,6 +236,7 @@ enum SettingsSheetTestDriver {
     /// Every string the sheet shows in its own words (not the notes, which quote the bench).
     private static func visibleText(_ m: SettingsSheetModel) -> [String] {
         var out = m.limits.flatMap { [$0.label, $0.value] } + m.totals.flatMap { [$0.label, $0.value, $0.detail ?? ""] } + m.toRelax
+            + [m.notInUse ?? ""]
         for c in m.cards {
             out += [c.title, c.about, c.weight, c.family, c.why, c.cost, c.time, c.memory, c.runsNow ?? ""] + c.labels
             out += c.parts.flatMap { [$0.label, $0.figure, $0.sample ?? "", $0.label2 ?? ""] }
@@ -252,6 +253,7 @@ enum SettingsSheetTestDriver {
         for l in m.limits { dump.append("LIMIT \(l.label): \(l.value) [\(l.source)]") }
         for t in m.totals { dump.append("TOTAL \(t.label): \(t.value) \(t.detail ?? "")") }
         for r in m.toRelax { dump.append("RELAX \(r)") }
+        if let n = m.notInUse { dump.append("NOTINUSE \(n)") }
         for c in m.cards {
             dump.append("CARD \(c.title) | \(c.routeName) | \(c.family) | custom \(c.isCustom) | \(c.weight)")
             dump.append("  why: \(c.why)")

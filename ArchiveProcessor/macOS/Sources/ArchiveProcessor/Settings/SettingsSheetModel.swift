@@ -139,6 +139,8 @@ struct SettingsSheetModel {
     let limits: [Limit]
     let totals: [Total]
     let toRelax: [String]
+    /// Said above the totals when a card's pick is not what Process Files runs.
+    let notInUse: String?
     let cards: [Card]
     let ruleStages: [RuleStage]
 
@@ -183,6 +185,10 @@ struct SettingsSheetModel {
                           answers: answers, running: running, words: words)
             }
         }
+        let off = cards.filter { $0.apply != nil || $0.runsNow != nil }.map { $0.title.lowercased() }
+        notInUse = off.isEmpty ? nil
+            : "The totals are for the app's picks. Process Files does not use them yet for "
+                + off.joined(separator: " and ") + "; each card below says what it uses now, and its button switches it on."
         ruleStages = Self.ruleStageIDs.compactMap { id in table.stage(id).map { Self.ruleStage($0, resolver: resolver) } }
     }
 
@@ -240,7 +246,7 @@ struct SettingsSheetModel {
             out.append(Total(id: "accuracy", label: "Overall accuracy", value: String(format: "%.0f of 100", w),
                              detail: "reading, finding documents, dates and names together, each counted as much as you said it matters"
                                 + (unread ? "; pages that no reading program here can read count as 0" : "")
-                                + (byHand ? "; finding documents by hand counts as 0 before you check" : "")))
+                                + (byHand ? "; finding documents by hand counts as 0 before your checking, and 100% after it" : "")))
         }
         out.append(Total(id: "plan", label: "Your subscription plan", value: planInUse ? "In use" : "Not used",
                          detail: planInUse ? "its allowance is used, not money" : nil))
@@ -345,6 +351,10 @@ struct SettingsSheetModel {
         if stage.id == "dating" || stage.id == "entities", route?.id != "none" {
             labels.append("These figures were measured on the same checked text of each test document for every program; "
                           + "they do not change with the reading program chosen above.")
+            if s.picks.contains(where: { $0.stage == "reading" && $0.part == "handwritten" && $0.flag != nil }) {
+                labels.append("Handwritten pages your reading choice cannot read get no "
+                              + (stage.id == "dating" ? "date" : "names") + " from their text.")
+            }
         }
         if stage.id == "entities", let p = lead, !p.shown {
             labels.append(p.route.map { $0.family != .mac && $0.id != "none" } == true
@@ -370,7 +380,10 @@ struct SettingsSheetModel {
                             ? String(format: "finding the sender right about %.0f times in 100", v * 100)
                             : gain.map { words.gain(stage.id, $0) } ?? words.figure(stage.id, v),
                           reason: (tie ? "within the margin of error, so no real gain; " : "")
-                            + (b.isLimit ? words.limitPhrase(b.reason).lowercased() : words.reason(b.reason)))
+                            + (b.isLimit ? words.limitPhrase(b.reason).lowercased()
+                                : b.reason == "not in this comparison"
+                                    ? (appBlocked[b.id]?.first.map(words.reason) ?? words.reason(b.reason))
+                                    : words.reason(b.reason)))
         }
         .sorted { $0.order > $1.order }
         // A route on this Mac kept out only by its memory is named even when four others outrank it, so a user with a
@@ -403,7 +416,8 @@ struct SettingsSheetModel {
                     id: r.id, name: words.display(stage.id, r), family: r.id == "none" ? "nothing runs" : words.family(r.family),
                     figure: r.id == "none" ? "no names found"
                         : r.family == .manual ? "nothing is proposed"
-                        : words.figure(stage.id, v) + (stage.id == "reading" ? " on your mix of pages" : "")
+                        : words.figure(stage.id, v) + (stage.id == "reading" ? " on your mix of pages"
+                            : stage.id == "dating" ? " where the year is not in the text" : "")
                             + (tie ? " (a tie with the pick on this figure)" : ""),
                     cost: words.per1000(solver.usdPer1000(r, stage: stage.id), unit: stage.unit) + (pace.map { ", \($0)" } ?? ""))
             }
@@ -418,7 +432,14 @@ struct SettingsSheetModel {
             .sorted { ($0.blocked == nil ? 0 : 1, $0.name) < ($1.blocked == nil ? 0 : 1, $1.name) }
         _ = blocked
 
-        var why = lead.map { words.why($0) } ?? "Nothing in this stage runs here."
+        let hands = picks.first { $0.part == "handwritten" }
+        var why = lead.map {
+            words.why($0, handsName: hands?.flag == nil && hands?.route?.id != route?.id ? hands?.route.map { words.display(stage.id, $0) } : nil,
+                      handsUnread: hands?.flag != nil)
+        } ?? "Nothing in this stage runs here."
+        if stage.id == "segmentation", route?.family == .manual {
+            why = "Nothing that proposes where documents begin can run here, so you check every place yourself."
+        }
         var appPick: String?
         if let custom {
             let appLead = app.picks.first { $0.stage == stage.id && $0.part == leadPart }
@@ -450,13 +471,13 @@ struct SettingsSheetModel {
         case "reading":
             if let r = route, lead?.flag == nil, r.id != running.readingRouteID {
                 if r.id == "apple-vision" {
-                    runsNow = "Not switched on yet: the Processor now reads with \(running.readingName). “Read with this” switches it on."
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .appleVision
                 } else if let ar = r.appRoute, ar.contains("|") {
-                    runsNow = "Not switched on yet: the Processor now reads with \(running.readingName). “Read with this” switches it on."
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .reading(appRoute: ar)
                 } else {
-                    runsNow = "The Processor cannot run this reader yet; it reads with \(running.readingName)."
+                    runsNow = "The Processor cannot run this reading program yet; Process Files reads with \(running.readingName)."
                 }
             }
         default: break
@@ -471,6 +492,21 @@ struct SettingsSheetModel {
         // A pick that is several readers names each with what it reads (the free pick: Vision for typed and printed
         // pages, a downloaded reader for handwriting).
         var routeName = route.map { words.display(stage.id, $0) } ?? "Nothing"
+        if stage.id == "dating" {
+            let named = picks.filter { $0.flag == nil && $0.route != nil }
+            let what = ["step 1": "the year in the text", "step 2": "the page image", "step 4": "the folder estimate"]
+            let byRoute = Dictionary(grouping: named) { $0.route!.id }
+            if byRoute.count > 1 {
+                // "The year in the text: Gemini 3.8 Flash; the page image: Qwen3-VL 8B on this Mac; …", each program's
+                // short name (before its first comma).
+                let joined = named.compactMap { p -> String? in
+                    guard let w = what[p.part], let r = p.route else { return nil }
+                    let d = words.display(stage.id, r)
+                    return w + ": " + (d.hasPrefix("Apple Vision's text") ? d : d.components(separatedBy: ",")[0])
+                }.joined(separator: "; ")
+                routeName = joined.prefix(1).uppercased() + joined.dropFirst()
+            }
+        }
         if stage.id == "reading" {
             let byRoute = Dictionary(grouping: picks.filter { $0.part != "all" && $0.flag == nil && $0.route != nil }) { $0.route!.id }
             if byRoute.count > 1 {
@@ -551,8 +587,8 @@ struct SettingsSheetModel {
                                 label2: "the boxes below are separate tests: on other material it varies", warning: false)]
             if let per100 {
                 let places = per100 * Double(a.pages) / 100
-                rows.append(PartRow(id: "checks", label: "Places it asks you to check", routeName: nil,
-                                    figure: r.family == .manual ? String(format: "every place between two document pages (about %.0f in every 100 pages; the rest sit next to box or folder covers)", per100)
+                rows.append(PartRow(id: "checks", label: "Places it asks you to check (a place is the gap between two pages, where a new document may start)", routeName: nil,
+                                    figure: r.family == .manual ? String(format: "every place between two document pages (about %.0f in every 100 pages; the rest are next to box or folder labels, which need no check)", per100)
                                         : String(format: "about %.0f in every 100 pages", per100),
                                     sample: nil, label2: nil, warning: false))
                 rows.append(PartRow(id: "checking", label: "Your own checking time", routeName: nil,
@@ -622,15 +658,10 @@ struct SettingsSheetModel {
                     row("step 2", label, "unprinted_122_doc_year",
                         "test documents of another study, with no year anywhere in their text")
                 case "step 4":
-                    if r.id == first {
-                        rows.append(PartRow(id: "step 4", label: label, routeName: name(r),
-                                            figure: "done by the program above, from the folder and nearby documents",
-                                            sample: nil, label2: "always marked Date Uncertain", warning: false))
-                    } else {
-                        row("step 4", label, "not_in_text",
-                            "test documents whose year is not in their text, dated this way (with the folder and nearby documents)",
-                            "always marked Date Uncertain")
-                    }
+                    rows.append(PartRow(id: "step 4", label: label, routeName: r.id == first ? nil : name(r),
+                                        figure: r.id == first ? "done by the program above; not measured on its own"
+                                            : "not measured on its own",
+                                        sample: nil, label2: "always marked Date Uncertain", warning: false))
                 default: break
                 }
             }
@@ -775,7 +806,7 @@ struct SettingsSheetWords {
                 + "Uncertain, and no year is written without the words it came from."
         case "entities":
             return "Who sent each letter, to whom, and from where. Each name is shown with the words it was read from, or "
-                + "marked inferred. On a cloud reader it comes free in the same request that reads each document; on this Mac it needs a local "
+                + "marked inferred. With an online reading program it comes at no extra cost, in the same request; on this Mac it needs a downloaded "
                 + "model and typed pages."
         default: return ""
         }
@@ -978,7 +1009,9 @@ struct SettingsSheetWords {
         case "no reader": return "no reading program can run here"
         case "none": return "not run"
         default:
-            let g = f.replacingOccurrences(of: "goes on to step 4", with: "goes on to the folder estimate below")
+            let g = f.replacingOccurrences(of: "no image pass; the document goes on to step 4",
+                                           with: "no program looks at the page image here; such documents go on to the folder estimate below")
+                .replacingOccurrences(of: "goes on to step 4", with: "goes on to the folder estimate below")
             return g.prefix(1).uppercased() + g.dropFirst()
         }
     }
@@ -1016,15 +1049,20 @@ struct SettingsSheetWords {
         return r.prefix(1).uppercased() + r.dropFirst()
     }
 
-    func why(_ p: SettingsPick) -> String {
+    func why(_ p: SettingsPick, handsName: String? = nil, handsUnread: Bool = false) -> String {
         let r = p.reason
         if p.flag != nil, p.route == nil { return "Nothing can run this here." }
         if r.contains("free default") {
-            let bigger = p.better.contains { $0.reason.contains("GB of memory") || $0.reason.contains("GB Mac") }
-            return "The app's free default, chosen by its makers: Apple Vision is built into macOS, needs no download and "
+            let head = "The app's free default, chosen by its makers: Apple Vision is built into macOS, needs no download and "
                 + "reads a typed or printed page in under a second; nothing is spent and no page leaves this Mac. "
-                + (bigger ? "The programs that read better need more memory than this Mac has."
-                    : "Some downloaded programs score a little higher (see the alternatives) and can be chosen with “Use instead…”.")
+            if let hands = handsName {
+                return head + "\(hands), a free download that stays on this Mac, reads the handwriting and takes most of the "
+                    + "memory and time. Some downloaded programs score a little higher on typed pages (see the "
+                    + "alternatives) and can be chosen with “Use instead…”."
+            }
+            return head + (handsUnread
+                ? "Handwritten pages are not read: the programs that read them need a key, or more memory than this Mac has."
+                : "Some downloaded programs score a little higher (see the alternatives) and can be chosen with “Use instead…”.")
         }
         if r.contains("no route fits the ceiling and the hours") {
             return "Nothing fits both your spending and your time, so the cheapest choice that can run is used."
@@ -1071,7 +1109,7 @@ struct SettingsSheetWords {
         if routes.contains(where: { $0.family == .plan }) { return "no money: it uses your plan's allowance" }
         if routes.contains(where: { $0.family == .cluster }) { return "no money: it runs on your cluster" }
         if routes.contains(where: { $0.family == .cloud }) && stage.id == "entities" {
-            return "no extra money: it comes with the tagging call"
+            return "no extra money: it comes in the same request that labels each document"
         }
         return "free"
     }
