@@ -22,7 +22,9 @@ public struct CollectionRecordView: View {
     }
 
     public var body: some View {
-        Group {
+        // A VStack, not a Group: a Group's modifiers go to its children, and with no record yet there are none, so
+        // the task would never run.
+        VStack(alignment: .leading, spacing: 0) {
             if let record {
                 CollectionRecordContent(record: record, id: identifierPrefix + ".collectionRecord")
             }
@@ -35,7 +37,7 @@ public struct CollectionRecordView: View {
                 }
                 return CollectionSettingsRecord.load(collectionFolder: folder)
             }.value
-            if !Task.isCancelled { record = found }
+            if !Task.isCancelled, found != record { record = found }
         }
     }
 }
@@ -78,6 +80,8 @@ public struct CollectionRecordContent: View {
                     DisclosureGroup("The Processor's own settings") { settingsList(run.processing, plain: true) }
                         .font(.caption).accessibilityIdentifier(id + ".processing")
                 }
+            } else if record.runFileCount > 0 {
+                note("None of its run records could be read.")
             } else if !record.documentIsNewer {
                 note("No run has been recorded for it yet.")
             }
@@ -87,18 +91,18 @@ public struct CollectionRecordContent: View {
                 }
                 .font(.caption).accessibilityIdentifier(id + ".own")
             }
-            if record.runs.count > 1 || record.runFileCount > record.runs.count {
-                DisclosureGroup("Earlier run records (\(record.runFileCount - 1))") {
+            // Runs past the newest `maxRunsRead` are counted, not read.
+            let notRead = record.runFileCount - record.runs.count - record.unreadableRunCount
+            if record.runs.count > 1 || (!record.runs.isEmpty && notRead > 0) {
+                DisclosureGroup("Earlier runs (\(record.runs.count - 1 + notRead))") {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(record.runs.dropFirst()) { runSummary($0, latest: false) }
-                        if record.runFileCount > record.runs.count + record.unreadableRunCount {
-                            note("\(record.runFileCount - record.runs.count - record.unreadableRunCount) older not shown.")
-                        }
+                        if notRead > 0 { note("\(notRead) older not shown.") }
                     }
                 }
                 .font(.caption).accessibilityIdentifier(id + ".earlier")
             }
-            if record.unreadableRunCount > 0 {
+            if record.unreadableRunCount > 0, !record.runs.isEmpty {
                 note("\(record.unreadableRunCount) run record\(record.unreadableRunCount == 1 ? "" : "s") could not be read.")
             }
         }

@@ -413,11 +413,20 @@ enum SettingsLayersTestDriver {
               mismatched.joined(separator: ","))
         let override = SettingsKey(rawValue: "override.ocr.handwritten")
         eq("an override's label matches", CollectionSettingsVocabulary.label(override.rawValue), override.label)
-        let samples: [(SettingsKey, SettingsValue)] = [
-            (.moneyHabit, .string("perMonth")), (.preference, .string("cheapestWithinPoint")),
-            (.fineTuning, .string("cluster")), (.priorities, .strings(["names", "reading"])),
-            (.hours, .double(1)), (.batchCeilingUSD, .double(2.5)), (.mix, .numbers(["a": 10, "b": 90])),
+        eq("the Reader and Notes know every catalog key's label",
+           Set(CollectionSettingsVocabulary.labels.keys), Set(SettingsKey.catalog.map(\.rawValue)))
+        eq("the Reader and Notes ignore the same general-only values in a collection",
+           CollectionSettingsVocabulary.generalOnlyKeys, Set(SettingsKey.generalOnly.map(\.rawValue)))
+        // Every answer's words: a case added on this side and not the other shows as its raw name there.
+        var samples: [(SettingsKey, SettingsValue)] = [
+            (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue))),
+            (.hours, .double(1)), (.hours, .double(8)), (.batchCeilingUSD, .double(2.5)),
+            (.checkingMinutes, .double(20)), (.mix, .numbers(["a": 10, "b": 90])), (.weights, .numbers([:])),
+            (override, .string("")), (.period, .string("")),
         ]
+        samples += MoneyHabit.allCases.map { (.moneyHabit, .string($0.rawValue)) }
+        samples += SettingsPreference.allCases.map { (.preference, .string($0.rawValue)) }
+        samples += FineTuningAnswer.allCases.map { (.fineTuning, .string($0.rawValue)) }
         let words = samples.allSatisfy { key, value in
             let core: CollectionSettingValue
             switch value {
@@ -430,7 +439,7 @@ enum SettingsLayersTestDriver {
             }
             return CollectionSettingsVocabulary.describe(key.rawValue, core) == key.describe(value)
         }
-        check("the Reader and Notes put a value in the same words", words)
+        check("the Reader and Notes put every answer in the same words", words)
     }
 
     /// The snapshot rides in the pending run and batch, survives a write and a read, and changes neither fingerprint.

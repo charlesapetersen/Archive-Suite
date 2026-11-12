@@ -40,6 +40,35 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertEqual(app.windows["Archive Reader"].frame.width, closedWidth, accuracy: 1)
     }
 
+    /// W46.settings-reader-notes: a file in a Processor collection shows what produced it in the inspector; a file
+    /// outside one shows nothing.
+    func testInspectorShowsWhatProducedTheCollection() throws {
+        waitForRows(minimum: 5, timeout: 10)
+        let record = app.descendants(matching: .any)["ar.collectionRecord"]
+        let year = app.textFields["ar.tagEditor.year"]
+        if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
+        let table = app.tables["ar.table"]
+        visiblePoint(of: table.tableRows.element(boundBy: 0)).click()
+        XCTAssertTrue(year.waitForExistence(timeout: 5))
+        XCTAssertFalse(record.waitForExistence(timeout: 2), "a top-level fixture file is in no collection")
+
+        let allFiles = app.staticTexts.matching(identifier: "ar.sidebar.allFiles").firstMatch
+        if !allFiles.exists { toolbarButton("ar.toolbar.sidebar").click() }
+        let folder = app.descendants(matching: .any).matching(identifier: "ar.sidebar.folder").firstMatch
+        XCTAssertTrue(folder.waitForExistence(timeout: 5))
+        folder.click()
+        XCTAssertTrue(waitForRowCount(1), "Box 2 contains one fixture file")
+        visiblePoint(of: table.tableRows.element(boundBy: 0)).click()
+        XCTAssertTrue(record.waitForExistence(timeout: 10), "Box 2 is a Processor collection")
+        let latest = app.descendants(matching: .any)["ar.collectionRecord.latest"]
+        XCTAssertTrue(latest.waitForExistence(timeout: 5))
+        let words = latest.label + " " + (latest.value as? String ?? "")
+        XCTAssertTrue(words.contains("Processed files") && words.contains("Gemini"), "the last run in words: \(words)")
+        // The record sits under the tags; scroll the inspector down for the screenshot.
+        year.scroll(byDeltaX: 0, deltaY: -800)
+        captureScreenshot("w46-collection-record-inspector")
+    }
+
     /// A departing field must commit to its original file, including when a filter removes that row.
     func testInspectorDraftTargetsAndHiddenInvalidDraft() throws {
         try requireGeneratedScratchFixtureForTagWrites()

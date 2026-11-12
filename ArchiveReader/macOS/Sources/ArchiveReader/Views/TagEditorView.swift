@@ -72,12 +72,16 @@ struct TagEditorView: View {
     }
 
     /// The file whose collection record the inspector shows (W46.settings-reader-notes): the selection's when every
-    /// selected file sits in one folder, else none.
+    /// selected file sits in one folder, else none. A selection over `maxCollectionCheck` files shows none, so the
+    /// body never walks a huge selection's paths on each redraw.
     private var collectionRecordFile: URL? {
-        let folders = Set(targetPaths.map { ($0 as NSString).deletingLastPathComponent })
-        guard folders.count == 1, let first = targetPaths.first else { return nil }
+        guard let first = targetPaths.first, targetPaths.count <= Self.maxCollectionCheck else { return nil }
+        let folder = (first as NSString).deletingLastPathComponent
+        guard targetPaths.allSatisfy({ ($0 as NSString).deletingLastPathComponent == folder }) else { return nil }
         return URL(fileURLWithPath: first)
     }
+
+    private static let maxCollectionCheck = 500
 
     // MARK: Subjects
 

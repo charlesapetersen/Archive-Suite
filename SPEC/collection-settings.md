@@ -2,8 +2,8 @@
 
 ## Purpose & status
 
-The Processor writes this document. The Reader and Notes read it (`W46.settings-reader-notes`, after the settings
-build; owner, 2026-11-06) to show what produced a collection. It sits with the collection, in its output folder, so a
+The Processor writes this document. The Reader and Notes read it to show what produced a collection
+(`W46.settings-reader-notes`; owner, 2026-11-06). The reader they share is `packages/ArchiveCore/Sources/ArchiveCore/Collections/CollectionSettingsRecord.swift`. It sits with the collection, in its output folder, so a
 second Mac can read it too. Written by `W46.settings-layers`: the writer is
 `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Settings/SettingsLayerStore.swift` (`CollectionSettingsFile`) and the
 types are in `Settings/SettingsLayers.swift`. When this file and the code disagree, fix one of them in the same commit.
@@ -88,6 +88,24 @@ The collection interview (W46.settings-interviews) writes these entries; the Rea
 The same snapshot is kept in the run's pending record (`pending_run.json` / `pending_batch.json`,
 `resolvedSettings`), outside its fingerprint. It is a record. Nothing reads it to decide how a run goes. The pending
 record encodes its dates as that file's other dates are (seconds since 2001), not as ISO 8601.
+
+## How the Reader and Notes read it
+
+Read-only, in ArchiveCore's `CollectionSettingsRecord`, shown by ArchiveCoreUI's `CollectionRecordView`:
+
+- **Where.** The nearest folder at or above the file's own folder whose `.archivesuite` holds the document or a `runs`
+  folder. The archive root bounds the walk, so a record above the root is not found. The Reader shows the record in
+  its inspector when the selection is in one folder. Notes shows it on a note for the collections its linked PDFs
+  come from, at most four. Notes reads only under Reader roots that have already been granted, and it never prompts.
+- **Safety.** It never writes. It looks with `lstat` and opens with `O_NOFOLLOW`. A `.archivesuite`, `runs` or record
+  file that is a link, or anything other than an ordinary folder or file, is not read. A file over 1 MB is not read.
+  Only the 20 newest run records are read, newest by file name; any others are only counted.
+- **Leniency.** An entry or value of a kind it does not know is dropped and the rest are shown. A document or run with a
+  larger `schemaVersion` is not interpreted. The view says it was written by a newer Processor. A run's date and
+  kind are still shown.
+- **Words.** Each value is shown in the Processor's own Settings words (`CollectionSettingsVocabulary`). The
+  Processor's settings-layers test driver reads the writer's output back through this reader. It checks that every
+  catalog key's label and value words match, so a label changed on one side and not the other fails the test.
 
 ## How the Processor writes it
 

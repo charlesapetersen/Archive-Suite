@@ -553,6 +553,8 @@ Views/
   SimilarTagsSheet.swift      Near-duplicate tag finder (TagSimilarity clusters): pick a canonical +
                               Merge drives the corpus-wide rename (→ RenameTagSheet → TagWriter). Advisory only.
   TagEditorView.swift         Group-aware Inspector editor (⌥⌘I); immutable `targetPaths` protect drafts across selection changes.
+                              Under the tags, ArchiveCoreUI's CollectionRecordView shows what produced the selection's
+                              collection (SPEC/collection-settings.md; W46.settings-reader-notes), read-only.
   TagInspectorView.swift      Right-hand column for the visible selection or document; keeps drafts while hidden.
                               Equatable, unobserved; `InspectorFeed` follows the model only while shown.
   IndexProgress.swift         The index pass's count, observed only by the status bar's label.

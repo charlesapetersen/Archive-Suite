@@ -439,6 +439,10 @@ macOS/Sources/ArchiveNotes/
                                    ticks can't inflate the next one's count) (W23.m14).
                                    SourceBlockPreviewState (ObservableObject bridge for @EnvironmentObject;
                                    archive grant revisions refresh round-up year suggestions)
+    CollectionRecordLookup.swift   W46.settings-reader-notes: the Processor's record of each collection a note's
+                                   linked PDFs sit in (ArchiveCore CollectionSettingsRecord), under granted roots
+                                   only, with RoundupYearSuggestion's scope lease and checks; at most four; the
+                                   inspector shows them with ArchiveCoreUI's CollectionRecordContent
     RoundupYearSuggestion.swift    Exact linked-PDF year reads in already-granted roots; own short scopes,
                                    marker/containment checks, cancellation, no scans or automatic writes
   Zotero/

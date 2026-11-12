@@ -15,8 +15,8 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
     public static let fileName = "collection-settings.json"
     public static let runsFolderName = "runs"
     public static let schemaVersion = 1
-    /// The writer's own cap; a bigger file is left alone on both sides.
-    public static let maxFileBytes = 1_000_000
+    /// The writer's own cap (`CollectionSettingsFile.maxBytes`); a bigger file is left alone on both sides.
+    public static let maxFileBytes = 1024 * 1024
     /// The newest runs read; older ones are only counted.
     public static let maxRunsRead = 20
 
@@ -87,9 +87,11 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
     /// The nearest collection folder holding a settings document or run records, from the folder that contains
     /// `fileURL` upward. With a `root`, the walk stops at it (inclusive) and a file outside it finds nothing; without
     /// one, only the file's own folder is looked at.
+    /// Both sides are put through `resolvingSymlinksInPath` first, so a root spelled through a link (or `/var` for
+    /// `/private/var`) still contains its files, and a file whose folders lead out of the root finds nothing.
     public static func locate(from fileURL: URL, within root: URL? = nil) -> URL? {
-        var folder = fileURL.deletingLastPathComponent().standardizedFileURL
-        guard let root = root?.standardizedFileURL else {
+        var folder = fileURL.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL
+        guard let root = root?.resolvingSymlinksInPath().standardizedFileURL else {
             return hasRecord(folder) ? folder : nil
         }
         let rootParts = root.pathComponents
@@ -120,8 +122,8 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
 
         var doc: DocumentDTO?
         var docNewer = false, docUnreadable = false
-        if fileType(docURL) != nil {
-            if let data = readSmallFile(docURL) {
+        if let type = fileType(docURL) {
+            if type == S_IFREG, let data = readSmallFile(docURL) {
                 if let v = try? decoder.decode(VersionDTO.self, from: data), v.schemaVersion > schemaVersion {
                     docNewer = true
                 } else if let d = try? decoder.decode(DocumentDTO.self, from: data) {
@@ -159,8 +161,12 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
         }
 
         guard doc != nil || docNewer || docUnreadable || !runFiles.isEmpty else { return nil }
-        let own = (doc?.collection?.entries ?? [:]).compactMap { key, e -> Setting? in
-            guard let value = e.value?.value else { return nil }
+        // As the Processor reads a collection's layer: a value only the general layer may hold is ignored.
+        let ownEntries = doc?.collection?.kind == "collection" ? doc?.collection?.entries ?? [:] : [:]
+        let own = ownEntries.compactMap { key, e -> Setting? in
+            guard !CollectionSettingsVocabulary.generalOnlyKeys.contains(key), let value = e.value?.value else {
+                return nil
+            }
             return Setting(key: key, label: CollectionSettingsVocabulary.label(key),
                            value: CollectionSettingsVocabulary.describe(key, value),
                            source: "set for this collection" + (e.source.map { ", \($0.phrase)" } ?? ""))
@@ -181,7 +187,8 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
 
     /// The file's bytes when it is an ordinary file of at most `maxFileBytes`, opened without following a link.
     private static func readSmallFile(_ url: URL) -> Data? {
-        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+        // O_NONBLOCK: a FIFO swapped in after the lstat must not park the thread in open().
+        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
         guard fd >= 0 else { return nil }
         let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         var st = stat()
@@ -290,12 +297,14 @@ private struct EntryDTO: Decodable {
 
 private struct LayerDTO: Decodable {
     let id: String?
+    let kind: String?
     let name: String?
     let entries: [String: EntryDTO]
-    private enum CodingKeys: String, CodingKey { case id, name, entries }
+    private enum CodingKeys: String, CodingKey { case id, kind, name, entries }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try? c.decodeIfPresent(String.self, forKey: .id)
+        kind = try? c.decodeIfPresent(String.self, forKey: .kind)
         name = try? c.decodeIfPresent(String.self, forKey: .name)
         entries = ((try? c.decodeIfPresent([String: Lenient<EntryDTO>].self, forKey: .entries)) ?? [:])
             .compactMapValues(\.value)
@@ -410,7 +419,8 @@ private struct RunDTO: Decodable {
 // MARK: - Words
 
 /// The labels and value words the Processor's Settings window uses (`SettingsKey.label` / `describe`), kept in step
-/// with it by the Processor's settings-layers test driver, which checks every catalog key against this table.
+/// with it by the Processor's settings-layers test driver, which checks every catalog key and every answer's words
+/// against this table.
 public enum CollectionSettingsVocabulary {
     public static let labels: [String: String] = [
         "keys": "API keys found",
@@ -431,10 +441,16 @@ public enum CollectionSettingsVocabulary {
         "scripts": "Scripts",
         "preference": "When two choices are close",
         "priorities": "What matters most",
+        "weights": "How much each one counts",
         "staysOnMac": "Pages stay on this Mac",
         "readingFallback": "A page that fails goes to another reader",
         "checkingMinutes": "Minutes you will spend checking where documents begin",
         "straightenReadingCopy": "Straighten the copy you read",
+    ]
+
+    /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.
+    public static let generalOnlyKeys: Set<String> = [
+        "keys", "plans", "cluster", "gpusPerJob", "downloadsAllowed", "moneyHabit", "monthCeilingUSD", "fineTuning",
     ]
 
     static let overridePrefix = "override."
@@ -466,7 +482,7 @@ public enum CollectionSettingsVocabulary {
             switch key {
             case "moneyHabit":
                 words = ["none": "Nothing is spent", "perBatch": "A ceiling for each batch",
-                         "perMonth": "A ceiling for each month"]
+                         "perMonth": "A ceiling for each month", "noCeiling": "No ceiling"]
             case "preference":
                 words = ["bestMeasured": "The best measured", "cheapestWithinPoint": "The cheaper, within a point",
                          "fastestWithinPoint": "The faster, within a point"]

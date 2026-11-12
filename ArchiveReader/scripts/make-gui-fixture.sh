@@ -253,6 +253,15 @@ SUBDIR="$DST/Box 2"
 mkdir -p "$SUBDIR"
 write_text_pdf "$SUBDIR/00011 IMG — Box Two.pdf" "Reader synthetic fixture page 11"
 set_tags "Box 2/00011 IMG — Box Two.pdf" "1977,Subfolder Fixture,Read"
+# W46.settings-reader-notes: Box 2 is a Processor collection, so the inspector shows what produced it. The record is
+# in the Processor's shape (SPEC/collection-settings.md); `.archivesuite` is hidden, so no count above changes.
+mkdir -p "$SUBDIR/.archivesuite/runs"
+cat > "$SUBDIR/.archivesuite/collection-settings.json" <<'JSON'
+{"collection":{"entries":{"hours":{"source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}}},"id":"6F1C2E9A-0000-4000-8000-000000000001","kind":"collection","name":"Box 2"},"createdAt":"2026-11-04T09:59:00Z","projectName":"Fixture Project","schemaVersion":1}
+JSON
+cat > "$SUBDIR/.archivesuite/runs/20261105-100000-6F1C2E9A-0000-4000-8000-000000000003.json" <<'JSON'
+{"fileCount":1,"id":"6F1C2E9A-0000-4000-8000-000000000003","kind":"processFiles","schemaVersion":1,"settings":{"macMemoryGB":16,"processing":{"selectedModelId_Gemini":{"type":"string","value":"gemini-3.7-flash"},"selectedProvider":{"type":"string","value":"Gemini"}},"projectName":"Fixture Project","resolvedAt":"2026-11-05T10:00:00Z","runID":"6F1C2E9A-0000-4000-8000-000000000003","schemaVersion":1,"values":{"hours":{"layer":"collection","source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}},"moneyHabit":{"value":{"type":"string","value":"none"}}}},"startedAt":"2026-11-05T10:00:00Z"}
+JSON
 
 # --- another app's quarantine stamp on half the files (W40.fix-reader-tag-quarantine) ---
 # The real corpus carries thousands of `com.apple.quarantine` stamps from Preview, Photos and PDFpen. A

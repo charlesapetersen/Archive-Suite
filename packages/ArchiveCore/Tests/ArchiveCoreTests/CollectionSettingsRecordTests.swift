@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 @testable import ArchiveCore
@@ -20,6 +21,7 @@ import Testing
     private let document = """
     {"collection":{"entries":{"hours":{"source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}},\
     "mix":{"source":{"measured":{"_0":"2026-11-04T10:00:00Z","sample":40}},"value":{"type":"numbers","value":{"handwritten":40,"typewritten":60}}},\
+    "cluster":{"source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"bool","value":true}},\
     "future":{"source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"matrix","value":[1]}}},\
     "id":"6F1C2E9A-0000-4000-8000-000000000001","kind":"collection","name":"Letters 1952"},\
     "createdAt":"2026-11-04T09:59:00Z","projectID":"6F1C2E9A-0000-4000-8000-000000000002","projectName":"Correspondence","schemaVersion":1}
@@ -53,7 +55,7 @@ import Testing
         #expect(r.collectionName == "Letters 1952")
         #expect(r.projectName == "Correspondence")
         #expect(!r.documentIsNewer && !r.documentUnreadable)
-        // The unknown value kind is dropped; the rest survive, by label.
+        // The unknown value kind is dropped, and so is a value only the general layer holds; the rest survive.
         #expect(r.ownSettings.map(\.key) == ["hours", "mix"])
         #expect(r.ownSettings.last?.value == "typewritten 60%, handwritten 40%")
         #expect(r.ownSettings.last?.source == "set for this collection, measured on 2026-11-04 from 40 photos")
@@ -110,6 +112,17 @@ import Testing
         #expect(CollectionSettingsRecord.load(collectionFolder: big)?.documentUnreadable == true)
     }
 
+    @Test func aFIFOIsNeverOpened() throws {
+        let root = try scratch()
+        let dir = root.appendingPathComponent(".archivesuite/runs", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        #expect(mkfifo(root.appendingPathComponent(".archivesuite/collection-settings.json").path, 0o600) == 0)
+        #expect(mkfifo(dir.appendingPathComponent("20261104-F.json").path, 0o600) == 0)
+        // Returns at once rather than blocking in open().
+        let r = try #require(CollectionSettingsRecord.load(collectionFolder: root))
+        #expect(r.documentUnreadable && r.runs.isEmpty && r.unreadableRunCount == 1)
+    }
+
     @Test func locateWalksUpToTheRootAndNoFurther() throws {
         let root = try scratch()
         let collection = root.appendingPathComponent("Box 3", isDirectory: true)
@@ -126,6 +139,10 @@ import Testing
         #expect(CollectionSettingsRecord.locate(from: deep, within: deep.deletingLastPathComponent()) == nil)
         // A file outside the root finds nothing.
         #expect(CollectionSettingsRecord.locate(from: deep, within: try scratch()) == nil)
+        // A root spelled through a link still contains its files.
+        let alias = try scratch().appendingPathComponent("alias")
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: root)
+        #expect(CollectionSettingsRecord.locate(from: deep, within: alias)?.lastPathComponent == "Box 3")
         // A folder with no record loads nothing.
         #expect(CollectionSettingsRecord.load(collectionFolder: root) == nil)
     }

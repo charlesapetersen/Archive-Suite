@@ -129,7 +129,7 @@ plan's `## WORK QUEUE` (`ops/autonomous/next-queue-item.sh` walks only that).
 
 - **`SPEC/tag-format.md`** — the tag/PDF contract. A change here means the Processor *writer* and Reader
   *reader/editor* both change, together, in one reviewed unit. Highest‑risk shared surface.
-- **`packages/ArchiveCore/`** — the shared read-side contract (tags, PDF, durable links, suite marker).
+- **`packages/ArchiveCore/`** — the shared read-side contract (tags, PDF, durable links, suite marker, the collection settings record).
   Cross-app surface: changes here affect Reader, Processor, and Notes.
 - **Each app's `project.yml`** — the XcodeGen source of truth (schemes, targets, entitlements).
 - **`release/build-suite-dmg.sh`** — the single build/packaging path.

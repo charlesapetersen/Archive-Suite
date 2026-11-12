@@ -36,7 +36,7 @@ enum SettingsPriority: String, CaseIterable, Sendable {
     }
 }
 
-enum SettingsPreference: String, Sendable {
+enum SettingsPreference: String, CaseIterable, Sendable {
     /// The best measured route; a tie under the stage's rule goes to the cheaper, then the faster.
     case bestMeasured
     /// A point of accuracy is traded for money: a gap under a point is a tie too.
@@ -46,7 +46,7 @@ enum SettingsPreference: String, Sendable {
 }
 
 /// Whether the user can run the training kit (the general interview).
-enum FineTuningAnswer: String, Sendable {
+enum FineTuningAnswer: String, CaseIterable, Sendable {
     case no, codingAgent, cluster
 }
 

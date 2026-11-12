@@ -42,6 +42,7 @@ struct NoteMetadataInspector: View {
     @State private var roundupYear: Int?
     /// What produced the collections this note's linked PDFs sit in (W46.settings-reader-notes).
     @State private var collectionRecords: [CollectionSettingsRecord] = []
+    @State private var collectionRecordsFor: UUID?
     @State private var showsRoundupExplanation = false
 
     private enum DateRole: Hashable { case own, sentWith }
@@ -137,12 +138,13 @@ struct NoteMetadataInspector: View {
         }
         .task(id: RoundupLoadKey(source: SourceLoadKey(id: item.id, mtime: item.mtime),
                                 archiveAccessRevision: sourcePreview.archiveAccessRevision)) {
-            collectionRecords = []
-            guard item.kind == .note else { return }
+            // Kept while a save of the same note re-reads them, so the section neither flickers nor folds shut.
+            if collectionRecordsFor != item.id { collectionRecords = [] }
+            collectionRecordsFor = item.id
+            guard item.kind == .note else { collectionRecords = []; return }
             let links = await nav.model.loadReaderSourceLinks(for: item.id)
-            guard !links.isEmpty else { return }
-            let found = await sourcePreview.collectionRecords(for: links)
-            guard !Task.isCancelled else { return }
+            let found = links.isEmpty ? [] : await sourcePreview.collectionRecords(for: links)
+            guard !Task.isCancelled, found != collectionRecords else { return }
             collectionRecords = found
         }
     }
@@ -240,7 +242,7 @@ struct NoteMetadataInspector: View {
     /// The Processor's record of each collection the note's linked PDFs come from, read-only.
     private var collectionRecordsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(collectionRecords.enumerated()), id: \.offset) { index, record in
+            ForEach(Array(collectionRecords.enumerated()), id: \.element.collectionFolder) { index, record in
                 CollectionRecordContent(record: record, id: "an.detail.collectionRecord" + (index == 0 ? "" : ".\(index)"))
             }
         }
