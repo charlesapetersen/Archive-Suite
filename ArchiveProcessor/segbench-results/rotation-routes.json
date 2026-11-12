@@ -153,25 +153,25 @@
    },
    "heldout": {
     "n": 476,
-    "exact": 436,
-    "axis": 9,
-    "flip": 9,
+    "exact": 448,
+    "axis": 5,
+    "flip": 1,
     "abstain": 22,
-    "pct": 91.6,
-    "lo": 88.8,
-    "hi": 93.8,
+    "pct": 94.1,
+    "lo": 91.6,
+    "hi": 95.9,
     "seconds": 0.203,
     "usd_per_page": 0.0
    },
    "heldout_boxes": {
     "n": 400,
-    "exact": 378,
-    "axis": 8,
-    "flip": 9,
+    "exact": 390,
+    "axis": 4,
+    "flip": 1,
     "abstain": 5,
-    "pct": 94.5,
-    "lo": 91.8,
-    "hi": 96.3,
+    "pct": 97.5,
+    "lo": 95.5,
+    "hi": 98.6,
     "seconds": 0.152,
     "usd_per_page": 0.0
    },
@@ -312,25 +312,25 @@
    },
    "heldout": {
     "n": 476,
-    "exact": 245,
-    "axis": 63,
-    "flip": 131,
+    "exact": 261,
+    "axis": 55,
+    "flip": 123,
     "abstain": 37,
-    "pct": 51.5,
-    "lo": 47.0,
-    "hi": 55.9,
+    "pct": 54.8,
+    "lo": 50.3,
+    "hi": 59.2,
     "seconds": 0.43,
     "usd_per_page": 0.0
    },
    "heldout_boxes": {
     "n": 400,
-    "exact": 231,
-    "axis": 44,
-    "flip": 119,
+    "exact": 247,
+    "axis": 36,
+    "flip": 111,
     "abstain": 6,
-    "pct": 57.8,
-    "lo": 52.9,
-    "hi": 62.5,
+    "pct": 61.8,
+    "lo": 56.9,
+    "hi": 66.4,
     "seconds": 0.453,
     "usd_per_page": 0.0
    },
@@ -471,25 +471,25 @@
    },
    "heldout": {
     "n": 476,
-    "exact": 422,
-    "axis": 28,
-    "flip": 26,
+    "exact": 438,
+    "axis": 20,
+    "flip": 18,
     "abstain": 0,
-    "pct": 88.7,
-    "lo": 85.5,
-    "hi": 91.2,
+    "pct": 92.0,
+    "lo": 89.2,
+    "hi": 94.1,
     "seconds": 0.026,
     "usd_per_page": 0.0
    },
    "heldout_boxes": {
     "n": 400,
-    "exact": 373,
-    "axis": 16,
-    "flip": 11,
+    "exact": 389,
+    "axis": 8,
+    "flip": 3,
     "abstain": 0,
-    "pct": 93.2,
-    "lo": 90.4,
-    "hi": 95.3,
+    "pct": 97.2,
+    "lo": 95.1,
+    "hi": 98.5,
     "seconds": 0.027,
     "usd_per_page": 0.0
    },
@@ -1764,25 +1764,25 @@
    },
    "heldout": {
     "n": 476,
-    "exact": 443,
-    "axis": 21,
-    "flip": 12,
+    "exact": 459,
+    "axis": 13,
+    "flip": 4,
     "abstain": 0,
-    "pct": 93.1,
-    "lo": 90.4,
-    "hi": 95.0,
+    "pct": 96.4,
+    "lo": 94.4,
+    "hi": 97.8,
     "seconds": 0.204,
     "usd_per_page": 0.0
    },
    "heldout_boxes": {
     "n": 400,
-    "exact": 379,
-    "axis": 12,
-    "flip": 9,
+    "exact": 395,
+    "axis": 4,
+    "flip": 1,
     "abstain": 0,
-    "pct": 94.8,
-    "lo": 92.1,
-    "hi": 96.5,
+    "pct": 98.8,
+    "lo": 97.1,
+    "hi": 99.5,
     "seconds": 0.152,
     "usd_per_page": 0.0
    },
@@ -1932,25 +1932,25 @@
    },
    "heldout": {
     "n": 476,
-    "exact": 448,
-    "axis": 16,
-    "flip": 12,
+    "exact": 464,
+    "axis": 8,
+    "flip": 4,
     "abstain": 0,
-    "pct": 94.1,
-    "lo": 91.6,
-    "hi": 95.9,
+    "pct": 97.5,
+    "lo": 95.6,
+    "hi": 98.6,
     "seconds": 0.789,
     "usd_per_page": 0.00035
    },
    "heldout_boxes": {
     "n": 400,
-    "exact": 380,
-    "axis": 12,
-    "flip": 8,
+    "exact": 396,
+    "axis": 4,
+    "flip": 0,
     "abstain": 0,
-    "pct": 95.0,
-    "lo": 92.4,
-    "hi": 96.7,
+    "pct": 99.0,
+    "lo": 97.5,
+    "hi": 99.6,
     "seconds": 0.335,
     "usd_per_page": 0.00012
    },
@@ -2496,25 +2496,25 @@
    },
    "heldout": {
     "n": 476,
-    "exact": 414,
-    "axis": 9,
-    "flip": 8,
+    "exact": 426,
+    "axis": 5,
+    "flip": 0,
     "abstain": 45,
-    "pct": 87.0,
-    "lo": 83.7,
-    "hi": 89.7,
+    "pct": 89.5,
+    "lo": 86.4,
+    "hi": 91.9,
     "seconds": 0.229,
     "usd_per_page": 0.0
    },
    "heldout_boxes": {
     "n": 400,
-    "exact": 371,
-    "axis": 8,
-    "flip": 8,
+    "exact": 383,
+    "axis": 4,
+    "flip": 0,
     "abstain": 13,
-    "pct": 92.8,
-    "lo": 89.8,
-    "hi": 94.9,
+    "pct": 95.8,
+    "lo": 93.3,
+    "hi": 97.3,
     "seconds": 0.178,
     "usd_per_page": 0.0
    },
@@ -3293,7 +3293,8 @@
      "tesseract",
      "vision"
     ],
-    "gemini": 180
+    "gemini": 180,
+    "owner": 180
    },
    "box:IllustratedReview:016": {
     "offset": 180,
@@ -3303,7 +3304,8 @@
      "tesseract",
      "vision"
     ],
-    "gemini": 180
+    "gemini": 180,
+    "owner": 180
    },
    "box:SC0122:027": {
     "offset": 90,
@@ -3312,7 +3314,8 @@
      "paddle",
      "tesseract"
     ],
-    "gemini": 90
+    "gemini": 90,
+    "owner": 90
    },
    "box:SC0122:182": {
     "offset": 270,
@@ -3322,7 +3325,8 @@
      "tesseract",
      "vision"
     ],
-    "gemini": 270
+    "gemini": 270,
+    "owner": 270
    },
    "box:SC0122:002": {
     "offset": 90,
@@ -3331,7 +3335,8 @@
      "paddle",
      "vision"
     ],
-    "gemini": 90
+    "gemini": 90,
+    "owner": 0
    }
   },
   "routes": {
@@ -3425,16 +3430,16 @@
     "IllustratedReview": {
      "pages": {
       "n": 19,
-      "right": 17,
-      "wrong": 2,
+      "right": 19,
+      "wrong": 0,
       "flagged": 0,
       "right_ci": [
-       68.6,
-       97.1
+       83.2,
+       100.0
       ],
       "wrong_ci": [
-       2.9,
-       31.4
+       0.0,
+       16.8
       ],
       "flagged_ci": [
        0.0,
@@ -3443,18 +3448,18 @@
      },
      "turns": {
       "exact": {
-       "k": 68,
+       "k": 76,
        "n": 76,
-       "pct": 89.5,
-       "lo": 73.7,
+       "pct": 100.0,
+       "lo": 100.0,
        "hi": 100.0
       },
       "wrong": {
-       "k": 8,
+       "k": 0,
        "n": 76,
-       "pct": 10.5,
+       "pct": 0.0,
        "lo": 0.0,
-       "hi": 26.3
+       "hi": 0.0
       },
       "flagged": {
        "k": 0,
@@ -3468,16 +3473,16 @@
     "SC0122": {
      "pages": {
       "n": 38,
-      "right": 33,
-      "wrong": 3,
+      "right": 34,
+      "wrong": 2,
       "flagged": 2,
       "right_ci": [
-       72.7,
-       94.2
+       75.9,
+       95.8
       ],
       "wrong_ci": [
-       2.7,
-       20.8
+       1.5,
+       17.3
       ],
       "flagged_ci": [
        1.5,
@@ -3486,18 +3491,18 @@
      },
      "turns": {
       "exact": {
-       "k": 138,
+       "k": 142,
        "n": 152,
-       "pct": 90.8,
-       "lo": 81.6,
-       "hi": 98.7
+       "pct": 93.4,
+       "lo": 85.5,
+       "hi": 99.3
       },
       "wrong": {
-       "k": 9,
+       "k": 5,
        "n": 152,
-       "pct": 5.9,
+       "pct": 3.3,
        "lo": 0.0,
-       "hi": 13.8
+       "hi": 9.2
       },
       "flagged": {
        "k": 5,
@@ -3511,16 +3516,16 @@
     "boxes": {
      "pages": {
       "n": 100,
-      "right": 93,
-      "wrong": 5,
+      "right": 96,
+      "wrong": 2,
       "flagged": 2,
       "right_ci": [
-       86.3,
-       96.6
+       90.2,
+       98.4
       ],
       "wrong_ci": [
-       2.2,
-       11.2
+       0.6,
+       7.0
       ],
       "flagged_ci": [
        0.6,
@@ -3529,18 +3534,18 @@
      },
      "turns": {
       "exact": {
-       "k": 378,
+       "k": 390,
        "n": 400,
-       "pct": 94.5,
-       "lo": 89.8,
-       "hi": 98.2
+       "pct": 97.5,
+       "lo": 94.2,
+       "hi": 99.8
       },
       "wrong": {
-       "k": 17,
+       "k": 5,
        "n": 400,
-       "pct": 4.2,
-       "lo": 1.0,
-       "hi": 8.5
+       "pct": 1.2,
+       "lo": 0.0,
+       "hi": 3.8
       },
       "flagged": {
        "k": 5,
@@ -3552,6 +3557,49 @@
      }
     },
     "heldout": {
+     "pages": {
+      "n": 119,
+      "right": 110,
+      "wrong": 3,
+      "flagged": 7,
+      "right_ci": [
+       86.2,
+       96.0
+      ],
+      "wrong_ci": [
+       0.9,
+       7.2
+      ],
+      "flagged_ci": [
+       2.9,
+       11.6
+      ]
+     },
+     "turns": {
+      "exact": {
+       "k": 448,
+       "n": 476,
+       "pct": 94.1,
+       "lo": 89.7,
+       "hi": 97.9
+      },
+      "wrong": {
+       "k": 6,
+       "n": 476,
+       "pct": 1.3,
+       "lo": 0.0,
+       "hi": 3.2
+      },
+      "flagged": {
+       "k": 22,
+       "n": 476,
+       "pct": 4.6,
+       "lo": 1.5,
+       "hi": 8.4
+      }
+     }
+    },
+    "as_stored": {
      "pages": {
       "n": 119,
       "right": 107,
@@ -3594,71 +3642,28 @@
       }
      }
     },
-    "upright": {
-     "pages": {
-      "n": 114,
-      "right": 107,
-      "wrong": 2,
-      "flagged": 6,
-      "right_ci": [
-       87.9,
-       97.0
-      ],
-      "wrong_ci": [
-       0.5,
-       6.2
-      ],
-      "flagged_ci": [
-       2.4,
-       11.0
-      ]
-     },
-     "turns": {
-      "exact": {
-       "k": 436,
-       "n": 456,
-       "pct": 95.6,
-       "lo": 91.9,
-       "hi": 98.7
-      },
-      "wrong": {
-       "k": 2,
-       "n": 456,
-       "pct": 0.4,
-       "lo": 0.0,
-       "hi": 1.1
-      },
-      "flagged": {
-       "k": 18,
-       "n": 456,
-       "pct": 3.9,
-       "lo": 0.9,
-       "hi": 7.5
-      }
-     }
-    },
     "bench": {
      "heldout": {
       "n": 476,
-      "exact": 436,
-      "axis": 9,
-      "flip": 9,
+      "exact": 448,
+      "axis": 5,
+      "flip": 1,
       "abstain": 22,
-      "pct": 91.6,
-      "lo": 88.8,
-      "hi": 93.8,
+      "pct": 94.1,
+      "lo": 91.6,
+      "hi": 95.9,
       "seconds": 0.203,
       "usd_per_page": 0.0
      },
      "heldout_boxes": {
       "n": 400,
-      "exact": 378,
-      "axis": 8,
-      "flip": 9,
+      "exact": 390,
+      "axis": 4,
+      "flip": 1,
       "abstain": 5,
-      "pct": 94.5,
-      "lo": 91.8,
-      "hi": 96.3,
+      "pct": 97.5,
+      "lo": 95.5,
+      "hi": 98.6,
       "seconds": 0.152,
       "usd_per_page": 0.0
      },
@@ -3676,23 +3681,11 @@
      }
     },
     "misses": [
-     "box:IllustratedReview:016@0:flip",
-     "box:IllustratedReview:016@90:flip",
-     "box:IllustratedReview:016@180:flip",
-     "box:IllustratedReview:016@270:flip",
-     "box:IllustratedReview:074@0:flip",
-     "box:IllustratedReview:074@90:flip",
-     "box:IllustratedReview:074@180:flip",
-     "box:IllustratedReview:074@270:flip",
      "box:SC0122:002@0:axis",
      "box:SC0122:002@90:axis",
      "box:SC0122:002@180:axis",
      "box:SC0122:002@270:axis",
      "box:SC0122:159@180:flip",
-     "box:SC0122:182@0:axis",
-     "box:SC0122:182@90:axis",
-     "box:SC0122:182@180:axis",
-     "box:SC0122:182@270:axis",
      "replaced:840dcd77e3a75661@90:axis"
     ]
    },
@@ -3786,16 +3779,16 @@
     "IllustratedReview": {
      "pages": {
       "n": 19,
-      "right": 17,
-      "wrong": 2,
+      "right": 19,
+      "wrong": 0,
       "flagged": 0,
       "right_ci": [
-       68.6,
-       97.1
+       83.2,
+       100.0
       ],
       "wrong_ci": [
-       2.9,
-       31.4
+       0.0,
+       16.8
       ],
       "flagged_ci": [
        0.0,
@@ -3804,18 +3797,18 @@
      },
      "turns": {
       "exact": {
-       "k": 68,
+       "k": 76,
        "n": 76,
-       "pct": 89.5,
-       "lo": 73.7,
+       "pct": 100.0,
+       "lo": 100.0,
        "hi": 100.0
       },
       "wrong": {
-       "k": 8,
+       "k": 0,
        "n": 76,
-       "pct": 10.5,
+       "pct": 0.0,
        "lo": 0.0,
-       "hi": 26.3
+       "hi": 0.0
       },
       "flagged": {
        "k": 0,
@@ -3829,16 +3822,16 @@
     "SC0122": {
      "pages": {
       "n": 38,
-      "right": 34,
-      "wrong": 4,
+      "right": 36,
+      "wrong": 2,
       "flagged": 0,
       "right_ci": [
-       75.9,
-       95.8
+       82.7,
+       98.5
       ],
       "wrong_ci": [
-       4.2,
-       24.1
+       1.5,
+       17.3
       ],
       "flagged_ci": [
        0.0,
@@ -3847,18 +3840,18 @@
      },
      "turns": {
       "exact": {
-       "k": 137,
+       "k": 145,
        "n": 152,
-       "pct": 90.1,
-       "lo": 79.6,
-       "hi": 98.0
+       "pct": 95.4,
+       "lo": 88.2,
+       "hi": 100.0
       },
       "wrong": {
-       "k": 15,
+       "k": 7,
        "n": 152,
-       "pct": 9.9,
-       "lo": 2.0,
-       "hi": 20.4
+       "pct": 4.6,
+       "lo": 0.0,
+       "hi": 11.8
       },
       "flagged": {
        "k": 0,
@@ -3872,16 +3865,16 @@
     "boxes": {
      "pages": {
       "n": 100,
-      "right": 93,
-      "wrong": 7,
+      "right": 97,
+      "wrong": 3,
       "flagged": 0,
       "right_ci": [
-       86.3,
-       96.6
+       91.5,
+       99.0
       ],
       "wrong_ci": [
-       3.4,
-       13.7
+       1.0,
+       8.5
       ],
       "flagged_ci": [
        0.0,
@@ -3890,18 +3883,18 @@
      },
      "turns": {
       "exact": {
-       "k": 373,
+       "k": 389,
        "n": 400,
-       "pct": 93.2,
-       "lo": 88.0,
-       "hi": 97.2
+       "pct": 97.2,
+       "lo": 93.8,
+       "hi": 100.0
       },
       "wrong": {
-       "k": 27,
+       "k": 11,
        "n": 400,
-       "pct": 6.8,
-       "lo": 2.8,
-       "hi": 12.0
+       "pct": 2.8,
+       "lo": 0.0,
+       "hi": 6.2
       },
       "flagged": {
        "k": 0,
@@ -3913,6 +3906,49 @@
      }
     },
     "heldout": {
+     "pages": {
+      "n": 119,
+      "right": 109,
+      "wrong": 10,
+      "flagged": 0,
+      "right_ci": [
+       85.2,
+       95.4
+      ],
+      "wrong_ci": [
+       4.6,
+       14.8
+      ],
+      "flagged_ci": [
+       0.0,
+       3.1
+      ]
+     },
+     "turns": {
+      "exact": {
+       "k": 438,
+       "n": 476,
+       "pct": 92.0,
+       "lo": 86.8,
+       "hi": 96.6
+      },
+      "wrong": {
+       "k": 38,
+       "n": 476,
+       "pct": 8.0,
+       "lo": 3.4,
+       "hi": 13.2
+      },
+      "flagged": {
+       "k": 0,
+       "n": 476,
+       "pct": 0.0,
+       "lo": 0.0,
+       "hi": 0.0
+      }
+     }
+    },
+    "as_stored": {
      "pages": {
       "n": 119,
       "right": 105,
@@ -3955,71 +3991,28 @@
       }
      }
     },
-    "upright": {
-     "pages": {
-      "n": 114,
-      "right": 105,
-      "wrong": 9,
-      "flagged": 0,
-      "right_ci": [
-       85.7,
-       95.8
-      ],
-      "wrong_ci": [
-       4.2,
-       14.3
-      ],
-      "flagged_ci": [
-       0.0,
-       3.3
-      ]
-     },
-     "turns": {
-      "exact": {
-       "k": 422,
-       "n": 456,
-       "pct": 92.5,
-       "lo": 87.7,
-       "hi": 96.9
-      },
-      "wrong": {
-       "k": 34,
-       "n": 456,
-       "pct": 7.5,
-       "lo": 3.1,
-       "hi": 12.3
-      },
-      "flagged": {
-       "k": 0,
-       "n": 456,
-       "pct": 0.0,
-       "lo": 0.0,
-       "hi": 0.0
-      }
-     }
-    },
     "bench": {
      "heldout": {
       "n": 476,
-      "exact": 422,
-      "axis": 28,
-      "flip": 26,
+      "exact": 438,
+      "axis": 20,
+      "flip": 18,
       "abstain": 0,
-      "pct": 88.7,
-      "lo": 85.5,
-      "hi": 91.2,
+      "pct": 92.0,
+      "lo": 89.2,
+      "hi": 94.1,
       "seconds": 0.026,
       "usd_per_page": 0.0
      },
      "heldout_boxes": {
       "n": 400,
-      "exact": 373,
-      "axis": 16,
-      "flip": 11,
+      "exact": 389,
+      "axis": 8,
+      "flip": 3,
       "abstain": 0,
-      "pct": 93.2,
-      "lo": 90.4,
-      "hi": 95.3,
+      "pct": 97.2,
+      "lo": 95.1,
+      "hi": 98.5,
       "seconds": 0.027,
       "usd_per_page": 0.0
      },
@@ -4037,29 +4030,13 @@
      }
     },
     "misses": [
-     "box:IllustratedReview:016@0:flip",
-     "box:IllustratedReview:016@90:flip",
-     "box:IllustratedReview:016@180:flip",
-     "box:IllustratedReview:016@270:flip",
-     "box:IllustratedReview:074@0:flip",
-     "box:IllustratedReview:074@90:flip",
-     "box:IllustratedReview:074@180:flip",
-     "box:IllustratedReview:074@270:flip",
      "box:SC0122:002@0:axis",
      "box:SC0122:002@90:axis",
      "box:SC0122:002@180:axis",
      "box:SC0122:002@270:axis",
-     "box:SC0122:027@0:axis",
-     "box:SC0122:027@90:axis",
-     "box:SC0122:027@180:axis",
-     "box:SC0122:027@270:axis",
      "box:SC0122:092@0:flip",
      "box:SC0122:092@180:flip",
      "box:SC0122:092@270:flip",
-     "box:SC0122:182@0:axis",
-     "box:SC0122:182@90:axis",
-     "box:SC0122:182@180:axis",
-     "box:SC0122:182@270:axis",
      "box:Sasha:164@0:axis",
      "box:Sasha:164@90:axis",
      "box:Sasha:164@180:axis",
@@ -4183,16 +4160,16 @@
     "IllustratedReview": {
      "pages": {
       "n": 19,
-      "right": 17,
-      "wrong": 2,
+      "right": 19,
+      "wrong": 0,
       "flagged": 0,
       "right_ci": [
-       68.6,
-       97.1
+       83.2,
+       100.0
       ],
       "wrong_ci": [
-       2.9,
-       31.4
+       0.0,
+       16.8
       ],
       "flagged_ci": [
        0.0,
@@ -4201,18 +4178,18 @@
      },
      "turns": {
       "exact": {
-       "k": 68,
+       "k": 76,
        "n": 76,
-       "pct": 89.5,
-       "lo": 73.7,
+       "pct": 100.0,
+       "lo": 100.0,
        "hi": 100.0
       },
       "wrong": {
-       "k": 8,
+       "k": 0,
        "n": 76,
-       "pct": 10.5,
+       "pct": 0.0,
        "lo": 0.0,
-       "hi": 26.3
+       "hi": 0.0
       },
       "flagged": {
        "k": 0,
@@ -4226,16 +4203,16 @@
     "SC0122": {
      "pages": {
       "n": 38,
-      "right": 26,
-      "wrong": 12,
+      "right": 28,
+      "wrong": 10,
       "flagged": 1,
       "right_ci": [
-       52.5,
-       80.9
+       58.0,
+       85.0
       ],
       "wrong_ci": [
-       19.1,
-       47.5
+       15.0,
+       42.0
       ],
       "flagged_ci": [
        0.5,
@@ -4244,18 +4221,18 @@
      },
      "turns": {
       "exact": {
-       "k": 116,
+       "k": 124,
        "n": 152,
-       "pct": 76.3,
-       "lo": 63.8,
-       "hi": 87.5
+       "pct": 81.6,
+       "lo": 69.7,
+       "hi": 91.4
       },
       "wrong": {
-       "k": 34,
+       "k": 26,
        "n": 152,
-       "pct": 22.4,
-       "lo": 11.8,
-       "hi": 33.6
+       "pct": 17.1,
+       "lo": 7.9,
+       "hi": 27.6
       },
       "flagged": {
        "k": 2,
@@ -4269,16 +4246,16 @@
     "boxes": {
      "pages": {
       "n": 100,
-      "right": 48,
-      "wrong": 51,
+      "right": 52,
+      "wrong": 47,
       "flagged": 2,
       "right_ci": [
-       38.5,
-       57.7
+       42.3,
+       61.5
       ],
       "wrong_ci": [
-       41.3,
-       60.6
+       37.5,
+       56.7
       ],
       "flagged_ci": [
        0.6,
@@ -4287,18 +4264,18 @@
      },
      "turns": {
       "exact": {
-       "k": 231,
+       "k": 247,
        "n": 400,
-       "pct": 57.8,
-       "lo": 49.0,
-       "hi": 66.5
+       "pct": 61.8,
+       "lo": 52.8,
+       "hi": 70.2
       },
       "wrong": {
-       "k": 163,
+       "k": 147,
        "n": 400,
-       "pct": 40.8,
-       "lo": 32.0,
-       "hi": 49.8
+       "pct": 36.8,
+       "lo": 28.5,
+       "hi": 45.5
       },
       "flagged": {
        "k": 6,
@@ -4310,6 +4287,49 @@
      }
     },
     "heldout": {
+     "pages": {
+      "n": 119,
+      "right": 54,
+      "wrong": 57,
+      "flagged": 12,
+      "right_ci": [
+       36.7,
+       54.3
+      ],
+      "wrong_ci": [
+       39.1,
+       56.8
+      ],
+      "flagged_ci": [
+       5.9,
+       16.8
+      ]
+     },
+     "turns": {
+      "exact": {
+       "k": 261,
+       "n": 476,
+       "pct": 54.8,
+       "lo": 46.6,
+       "hi": 63.0
+      },
+      "wrong": {
+       "k": 178,
+       "n": 476,
+       "pct": 37.4,
+       "lo": 29.8,
+       "hi": 45.0
+      },
+      "flagged": {
+       "k": 37,
+       "n": 476,
+       "pct": 7.8,
+       "lo": 3.6,
+       "hi": 12.6
+      }
+     }
+    },
+    "as_stored": {
      "pages": {
       "n": 119,
       "right": 50,
@@ -4352,71 +4372,28 @@
       }
      }
     },
-    "upright": {
-     "pages": {
-      "n": 114,
-      "right": 50,
-      "wrong": 56,
-      "flagged": 12,
-      "right_ci": [
-       35.1,
-       53.0
-      ],
-      "wrong_ci": [
-       40.1,
-       58.2
-      ],
-      "flagged_ci": [
-       6.1,
-       17.5
-      ]
-     },
-     "turns": {
-      "exact": {
-       "k": 245,
-       "n": 456,
-       "pct": 53.7,
-       "lo": 45.2,
-       "hi": 61.6
-      },
-      "wrong": {
-       "k": 174,
-       "n": 456,
-       "pct": 38.2,
-       "lo": 30.3,
-       "hi": 45.8
-      },
-      "flagged": {
-       "k": 37,
-       "n": 456,
-       "pct": 8.1,
-       "lo": 3.9,
-       "hi": 13.4
-      }
-     }
-    },
     "bench": {
      "heldout": {
       "n": 476,
-      "exact": 245,
-      "axis": 63,
-      "flip": 131,
+      "exact": 261,
+      "axis": 55,
+      "flip": 123,
       "abstain": 37,
-      "pct": 51.5,
-      "lo": 47.0,
-      "hi": 55.9,
+      "pct": 54.8,
+      "lo": 50.3,
+      "hi": 59.2,
       "seconds": 0.43,
       "usd_per_page": 0.0
      },
      "heldout_boxes": {
       "n": 400,
-      "exact": 231,
-      "axis": 44,
-      "flip": 119,
+      "exact": 247,
+      "axis": 36,
+      "flip": 111,
       "abstain": 6,
-      "pct": 57.8,
-      "lo": 52.9,
-      "hi": 62.5,
+      "pct": 61.8,
+      "lo": 56.9,
+      "hi": 66.4,
       "seconds": 0.453,
       "usd_per_page": 0.0
      },
@@ -4434,14 +4411,6 @@
      }
     },
     "misses": [
-     "box:IllustratedReview:016@0:flip",
-     "box:IllustratedReview:016@90:flip",
-     "box:IllustratedReview:016@180:flip",
-     "box:IllustratedReview:016@270:flip",
-     "box:IllustratedReview:074@0:flip",
-     "box:IllustratedReview:074@90:flip",
-     "box:IllustratedReview:074@180:flip",
-     "box:IllustratedReview:074@270:flip",
      "box:SC0122:002@0:axis",
      "box:SC0122:002@90:axis",
      "box:SC0122:002@180:axis",
@@ -4450,10 +4419,6 @@
      "box:SC0122:006@180:flip",
      "box:SC0122:012@0:flip",
      "box:SC0122:012@270:flip",
-     "box:SC0122:027@0:axis",
-     "box:SC0122:027@90:axis",
-     "box:SC0122:027@180:axis",
-     "box:SC0122:027@270:axis",
      "box:SC0122:030@0:flip",
      "box:SC0122:030@90:flip",
      "box:SC0122:030@180:flip",
@@ -4472,10 +4437,6 @@
      "box:SC0122:079@180:flip",
      "box:SC0122:083@0:flip",
      "box:SC0122:083@180:flip",
-     "box:SC0122:182@0:axis",
-     "box:SC0122:182@90:axis",
-     "box:SC0122:182@180:axis",
-     "box:SC0122:182@270:axis",
      "box:Sasha:002@0:flip",
      "box:Sasha:002@90:flip",
      "box:Sasha:002@180:flip",
@@ -4720,16 +4681,16 @@
     "IllustratedReview": {
      "pages": {
       "n": 19,
-      "right": 17,
-      "wrong": 2,
+      "right": 19,
+      "wrong": 0,
       "flagged": 0,
       "right_ci": [
-       68.6,
-       97.1
+       83.2,
+       100.0
       ],
       "wrong_ci": [
-       2.9,
-       31.4
+       0.0,
+       16.8
       ],
       "flagged_ci": [
        0.0,
@@ -4738,18 +4699,18 @@
      },
      "turns": {
       "exact": {
-       "k": 68,
+       "k": 76,
        "n": 76,
-       "pct": 89.5,
-       "lo": 73.7,
+       "pct": 100.0,
+       "lo": 100.0,
        "hi": 100.0
       },
       "wrong": {
-       "k": 8,
+       "k": 0,
        "n": 76,
-       "pct": 10.5,
+       "pct": 0.0,
        "lo": 0.0,
-       "hi": 26.3
+       "hi": 0.0
       },
       "flagged": {
        "k": 0,
@@ -4763,16 +4724,16 @@
     "SC0122": {
      "pages": {
       "n": 38,
-      "right": 34,
-      "wrong": 4,
+      "right": 36,
+      "wrong": 2,
       "flagged": 2,
       "right_ci": [
-       75.9,
-       95.8
+       82.7,
+       98.5
       ],
       "wrong_ci": [
-       4.2,
-       24.1
+       1.5,
+       17.3
       ],
       "flagged_ci": [
        1.5,
@@ -4781,18 +4742,18 @@
      },
      "turns": {
       "exact": {
-       "k": 139,
+       "k": 147,
        "n": 152,
-       "pct": 91.4,
-       "lo": 81.6,
-       "hi": 99.3
+       "pct": 96.7,
+       "lo": 90.8,
+       "hi": 100.0
       },
       "wrong": {
-       "k": 13,
+       "k": 5,
        "n": 152,
-       "pct": 8.6,
-       "lo": 0.7,
-       "hi": 18.4
+       "pct": 3.3,
+       "lo": 0.0,
+       "hi": 9.2
       },
       "flagged": {
        "k": 5,
@@ -4806,16 +4767,16 @@
     "boxes": {
      "pages": {
       "n": 100,
-      "right": 94,
-      "wrong": 6,
+      "right": 98,
+      "wrong": 2,
       "flagged": 2,
       "right_ci": [
-       87.5,
-       97.2
+       93.0,
+       99.4
       ],
       "wrong_ci": [
-       2.8,
-       12.5
+       0.6,
+       7.0
       ],
       "flagged_ci": [
        0.6,
@@ -4824,18 +4785,18 @@
      },
      "turns": {
       "exact": {
-       "k": 379,
+       "k": 395,
        "n": 400,
-       "pct": 94.8,
-       "lo": 89.8,
-       "hi": 98.5
+       "pct": 98.8,
+       "lo": 96.2,
+       "hi": 100.0
       },
       "wrong": {
-       "k": 21,
+       "k": 5,
        "n": 400,
-       "pct": 5.2,
-       "lo": 1.5,
-       "hi": 10.2
+       "pct": 1.2,
+       "lo": 0.0,
+       "hi": 3.8
       },
       "flagged": {
        "k": 5,
@@ -4847,6 +4808,49 @@
      }
     },
     "heldout": {
+     "pages": {
+      "n": 119,
+      "right": 114,
+      "wrong": 5,
+      "flagged": 7,
+      "right_ci": [
+       90.5,
+       98.2
+      ],
+      "wrong_ci": [
+       1.8,
+       9.5
+      ],
+      "flagged_ci": [
+       2.9,
+       11.6
+      ]
+     },
+     "turns": {
+      "exact": {
+       "k": 459,
+       "n": 476,
+       "pct": 96.4,
+       "lo": 92.9,
+       "hi": 99.2
+      },
+      "wrong": {
+       "k": 17,
+       "n": 476,
+       "pct": 3.6,
+       "lo": 0.8,
+       "hi": 7.1
+      },
+      "flagged": {
+       "k": 22,
+       "n": 476,
+       "pct": 4.6,
+       "lo": 1.5,
+       "hi": 8.4
+      }
+     }
+    },
+    "as_stored": {
      "pages": {
       "n": 119,
       "right": 110,
@@ -4889,71 +4893,28 @@
       }
      }
     },
-    "upright": {
-     "pages": {
-      "n": 114,
-      "right": 110,
-      "wrong": 4,
-      "flagged": 6,
-      "right_ci": [
-       91.3,
-       98.6
-      ],
-      "wrong_ci": [
-       1.4,
-       8.7
-      ],
-      "flagged_ci": [
-       2.4,
-       11.0
-      ]
-     },
-     "turns": {
-      "exact": {
-       "k": 443,
-       "n": 456,
-       "pct": 97.1,
-       "lo": 93.9,
-       "hi": 99.8
-      },
-      "wrong": {
-       "k": 13,
-       "n": 456,
-       "pct": 2.9,
-       "lo": 0.2,
-       "hi": 6.1
-      },
-      "flagged": {
-       "k": 18,
-       "n": 456,
-       "pct": 3.9,
-       "lo": 0.9,
-       "hi": 7.5
-      }
-     }
-    },
     "bench": {
      "heldout": {
       "n": 476,
-      "exact": 443,
-      "axis": 21,
-      "flip": 12,
+      "exact": 459,
+      "axis": 13,
+      "flip": 4,
       "abstain": 0,
-      "pct": 93.1,
-      "lo": 90.4,
-      "hi": 95.0,
+      "pct": 96.4,
+      "lo": 94.4,
+      "hi": 97.8,
       "seconds": 0.204,
       "usd_per_page": 0.0
      },
      "heldout_boxes": {
       "n": 400,
-      "exact": 379,
-      "axis": 12,
-      "flip": 9,
+      "exact": 395,
+      "axis": 4,
+      "flip": 1,
       "abstain": 0,
-      "pct": 94.8,
-      "lo": 92.1,
-      "hi": 96.5,
+      "pct": 98.8,
+      "lo": 97.1,
+      "hi": 99.5,
       "seconds": 0.152,
       "usd_per_page": 0.0
      },
@@ -4971,27 +4932,11 @@
      }
     },
     "misses": [
-     "box:IllustratedReview:016@0:flip",
-     "box:IllustratedReview:016@90:flip",
-     "box:IllustratedReview:016@180:flip",
-     "box:IllustratedReview:016@270:flip",
-     "box:IllustratedReview:074@0:flip",
-     "box:IllustratedReview:074@90:flip",
-     "box:IllustratedReview:074@180:flip",
-     "box:IllustratedReview:074@270:flip",
      "box:SC0122:002@0:axis",
      "box:SC0122:002@90:axis",
      "box:SC0122:002@180:axis",
      "box:SC0122:002@270:axis",
-     "box:SC0122:027@0:axis",
-     "box:SC0122:027@90:axis",
-     "box:SC0122:027@180:axis",
-     "box:SC0122:027@270:axis",
      "box:SC0122:159@180:flip",
-     "box:SC0122:182@0:axis",
-     "box:SC0122:182@90:axis",
-     "box:SC0122:182@180:axis",
-     "box:SC0122:182@270:axis",
      "replaced:1c4aea88c8356dcf@0:axis",
      "replaced:1c4aea88c8356dcf@90:axis",
      "replaced:1c4aea88c8356dcf@180:axis",
@@ -5096,16 +5041,16 @@
     "IllustratedReview": {
      "pages": {
       "n": 19,
-      "right": 17,
-      "wrong": 2,
+      "right": 19,
+      "wrong": 0,
       "flagged": 0,
       "right_ci": [
-       68.6,
-       97.1
+       83.2,
+       100.0
       ],
       "wrong_ci": [
-       2.9,
-       31.4
+       0.0,
+       16.8
       ],
       "flagged_ci": [
        0.0,
@@ -5114,18 +5059,18 @@
      },
      "turns": {
       "exact": {
-       "k": 68,
+       "k": 76,
        "n": 76,
-       "pct": 89.5,
-       "lo": 73.7,
+       "pct": 100.0,
+       "lo": 100.0,
        "hi": 100.0
       },
       "wrong": {
-       "k": 8,
+       "k": 0,
        "n": 76,
-       "pct": 10.5,
+       "pct": 0.0,
        "lo": 0.0,
-       "hi": 26.3
+       "hi": 0.0
       },
       "flagged": {
        "k": 0,
@@ -5139,16 +5084,16 @@
     "SC0122": {
      "pages": {
       "n": 38,
-      "right": 32,
-      "wrong": 2,
+      "right": 33,
+      "wrong": 1,
       "flagged": 4,
       "right_ci": [
-       69.6,
-       92.6
+       72.7,
+       94.2
       ],
       "wrong_ci": [
-       1.5,
-       17.3
+       0.5,
+       13.5
       ],
       "flagged_ci": [
        4.2,
@@ -5157,18 +5102,18 @@
      },
      "turns": {
       "exact": {
-       "k": 135,
+       "k": 139,
        "n": 152,
-       "pct": 88.8,
-       "lo": 78.9,
-       "hi": 96.7
+       "pct": 91.4,
+       "lo": 82.2,
+       "hi": 98.7
       },
       "wrong": {
-       "k": 8,
+       "k": 4,
        "n": 152,
-       "pct": 5.3,
+       "pct": 2.6,
        "lo": 0.0,
-       "hi": 13.2
+       "hi": 7.9
       },
       "flagged": {
        "k": 9,
@@ -5182,16 +5127,16 @@
     "boxes": {
      "pages": {
       "n": 100,
-      "right": 91,
-      "wrong": 4,
+      "right": 94,
+      "wrong": 1,
       "flagged": 5,
       "right_ci": [
-       83.8,
-       95.2
+       87.5,
+       97.2
       ],
       "wrong_ci": [
-       1.6,
-       9.8
+       0.2,
+       5.4
       ],
       "flagged_ci": [
        2.2,
@@ -5200,18 +5145,18 @@
      },
      "turns": {
       "exact": {
-       "k": 371,
+       "k": 383,
        "n": 400,
-       "pct": 92.8,
-       "lo": 87.5,
-       "hi": 97.0
+       "pct": 95.8,
+       "lo": 91.5,
+       "hi": 99.0
       },
       "wrong": {
-       "k": 16,
+       "k": 4,
        "n": 400,
-       "pct": 4.0,
-       "lo": 1.0,
-       "hi": 8.0
+       "pct": 1.0,
+       "lo": 0.0,
+       "hi": 3.0
       },
       "flagged": {
        "k": 13,
@@ -5223,6 +5168,49 @@
      }
     },
     "heldout": {
+     "pages": {
+      "n": 119,
+      "right": 104,
+      "wrong": 2,
+      "flagged": 14,
+      "right_ci": [
+       80.2,
+       92.2
+      ],
+      "wrong_ci": [
+       0.5,
+       5.9
+      ],
+      "flagged_ci": [
+       7.1,
+       18.8
+      ]
+     },
+     "turns": {
+      "exact": {
+       "k": 426,
+       "n": 476,
+       "pct": 89.5,
+       "lo": 83.8,
+       "hi": 94.5
+      },
+      "wrong": {
+       "k": 5,
+       "n": 476,
+       "pct": 1.1,
+       "lo": 0.0,
+       "hi": 2.9
+      },
+      "flagged": {
+       "k": 45,
+       "n": 476,
+       "pct": 9.5,
+       "lo": 4.8,
+       "hi": 14.7
+      }
+     }
+    },
+    "as_stored": {
      "pages": {
       "n": 119,
       "right": 101,
@@ -5265,71 +5253,28 @@
       }
      }
     },
-    "upright": {
-     "pages": {
-      "n": 114,
-      "right": 101,
-      "wrong": 1,
-      "flagged": 13,
-      "right_ci": [
-       81.5,
-       93.2
-      ],
-      "wrong_ci": [
-       0.2,
-       4.8
-      ],
-      "flagged_ci": [
-       6.8,
-       18.5
-      ]
-     },
-     "turns": {
-      "exact": {
-       "k": 414,
-       "n": 456,
-       "pct": 90.8,
-       "lo": 85.5,
-       "hi": 95.6
-      },
-      "wrong": {
-       "k": 1,
-       "n": 456,
-       "pct": 0.2,
-       "lo": 0.0,
-       "hi": 0.7
-      },
-      "flagged": {
-       "k": 41,
-       "n": 456,
-       "pct": 9.0,
-       "lo": 4.4,
-       "hi": 14.3
-      }
-     }
-    },
     "bench": {
      "heldout": {
       "n": 476,
-      "exact": 414,
-      "axis": 9,
-      "flip": 8,
+      "exact": 426,
+      "axis": 5,
+      "flip": 0,
       "abstain": 45,
-      "pct": 87.0,
-      "lo": 83.7,
-      "hi": 89.7,
+      "pct": 89.5,
+      "lo": 86.4,
+      "hi": 91.9,
       "seconds": 0.229,
       "usd_per_page": 0.0
      },
      "heldout_boxes": {
       "n": 400,
-      "exact": 371,
-      "axis": 8,
-      "flip": 8,
+      "exact": 383,
+      "axis": 4,
+      "flip": 0,
       "abstain": 13,
-      "pct": 92.8,
-      "lo": 89.8,
-      "hi": 94.9,
+      "pct": 95.8,
+      "lo": 93.3,
+      "hi": 97.3,
       "seconds": 0.178,
       "usd_per_page": 0.0
      },
@@ -5347,22 +5292,10 @@
      }
     },
     "misses": [
-     "box:IllustratedReview:016@0:flip",
-     "box:IllustratedReview:016@90:flip",
-     "box:IllustratedReview:016@180:flip",
-     "box:IllustratedReview:016@270:flip",
-     "box:IllustratedReview:074@0:flip",
-     "box:IllustratedReview:074@90:flip",
-     "box:IllustratedReview:074@180:flip",
-     "box:IllustratedReview:074@270:flip",
      "box:SC0122:002@0:axis",
      "box:SC0122:002@90:axis",
      "box:SC0122:002@180:axis",
      "box:SC0122:002@270:axis",
-     "box:SC0122:182@0:axis",
-     "box:SC0122:182@90:axis",
-     "box:SC0122:182@180:axis",
-     "box:SC0122:182@270:axis",
      "replaced:840dcd77e3a75661@90:axis"
     ]
    },
@@ -5456,16 +5389,16 @@
     "IllustratedReview": {
      "pages": {
       "n": 19,
-      "right": 17,
-      "wrong": 2,
+      "right": 19,
+      "wrong": 0,
       "flagged": 0,
       "right_ci": [
-       68.6,
-       97.1
+       83.2,
+       100.0
       ],
       "wrong_ci": [
-       2.9,
-       31.4
+       0.0,
+       16.8
       ],
       "flagged_ci": [
        0.0,
@@ -5474,18 +5407,18 @@
      },
      "turns": {
       "exact": {
-       "k": 68,
+       "k": 76,
        "n": 76,
-       "pct": 89.5,
-       "lo": 73.7,
+       "pct": 100.0,
+       "lo": 100.0,
        "hi": 100.0
       },
       "wrong": {
-       "k": 8,
+       "k": 0,
        "n": 76,
-       "pct": 10.5,
+       "pct": 0.0,
        "lo": 0.0,
-       "hi": 26.3
+       "hi": 0.0
       },
       "flagged": {
        "k": 0,
@@ -5499,16 +5432,16 @@
     "SC0122": {
      "pages": {
       "n": 38,
-      "right": 35,
-      "wrong": 3,
+      "right": 37,
+      "wrong": 1,
       "flagged": 4,
       "right_ci": [
-       79.2,
-       97.3
+       86.5,
+       99.5
       ],
       "wrong_ci": [
-       2.7,
-       20.8
+       0.5,
+       13.5
       ],
       "flagged_ci": [
        4.2,
@@ -5517,18 +5450,18 @@
      },
      "turns": {
       "exact": {
-       "k": 140,
+       "k": 148,
        "n": 152,
-       "pct": 92.1,
-       "lo": 84.2,
+       "pct": 97.4,
+       "lo": 92.1,
        "hi": 100.0
       },
       "wrong": {
-       "k": 12,
+       "k": 4,
        "n": 152,
-       "pct": 7.9,
+       "pct": 2.6,
        "lo": 0.0,
-       "hi": 15.8
+       "hi": 7.9
       },
       "flagged": {
        "k": 9,
@@ -5542,16 +5475,16 @@
     "boxes": {
      "pages": {
       "n": 100,
-      "right": 95,
-      "wrong": 5,
+      "right": 99,
+      "wrong": 1,
       "flagged": 5,
       "right_ci": [
-       88.8,
-       97.8
+       94.6,
+       99.8
       ],
       "wrong_ci": [
-       2.2,
-       11.2
+       0.2,
+       5.4
       ],
       "flagged_ci": [
        2.2,
@@ -5560,18 +5493,18 @@
      },
      "turns": {
       "exact": {
-       "k": 380,
+       "k": 396,
        "n": 400,
-       "pct": 95.0,
-       "lo": 90.0,
-       "hi": 99.0
+       "pct": 99.0,
+       "lo": 97.0,
+       "hi": 100.0
       },
       "wrong": {
-       "k": 20,
+       "k": 4,
        "n": 400,
-       "pct": 5.0,
-       "lo": 1.0,
-       "hi": 10.0
+       "pct": 1.0,
+       "lo": 0.0,
+       "hi": 3.0
       },
       "flagged": {
        "k": 13,
@@ -5583,6 +5516,49 @@
      }
     },
     "heldout": {
+     "pages": {
+      "n": 119,
+      "right": 116,
+      "wrong": 3,
+      "flagged": 14,
+      "right_ci": [
+       92.8,
+       99.1
+      ],
+      "wrong_ci": [
+       0.9,
+       7.2
+      ],
+      "flagged_ci": [
+       7.1,
+       18.8
+      ]
+     },
+     "turns": {
+      "exact": {
+       "k": 464,
+       "n": 476,
+       "pct": 97.5,
+       "lo": 94.1,
+       "hi": 100.0
+      },
+      "wrong": {
+       "k": 12,
+       "n": 476,
+       "pct": 2.5,
+       "lo": 0.0,
+       "hi": 5.9
+      },
+      "flagged": {
+       "k": 45,
+       "n": 476,
+       "pct": 9.5,
+       "lo": 4.8,
+       "hi": 14.7
+      }
+     }
+    },
+    "as_stored": {
      "pages": {
       "n": 119,
       "right": 112,
@@ -5625,71 +5601,28 @@
       }
      }
     },
-    "upright": {
-     "pages": {
-      "n": 114,
-      "right": 112,
-      "wrong": 2,
-      "flagged": 13,
-      "right_ci": [
-       93.8,
-       99.5
-      ],
-      "wrong_ci": [
-       0.5,
-       6.2
-      ],
-      "flagged_ci": [
-       6.8,
-       18.5
-      ]
-     },
-     "turns": {
-      "exact": {
-       "k": 448,
-       "n": 456,
-       "pct": 98.2,
-       "lo": 95.6,
-       "hi": 100.0
-      },
-      "wrong": {
-       "k": 8,
-       "n": 456,
-       "pct": 1.8,
-       "lo": 0.0,
-       "hi": 4.4
-      },
-      "flagged": {
-       "k": 41,
-       "n": 456,
-       "pct": 9.0,
-       "lo": 4.4,
-       "hi": 14.3
-      }
-     }
-    },
     "bench": {
      "heldout": {
       "n": 476,
-      "exact": 448,
-      "axis": 16,
-      "flip": 12,
+      "exact": 464,
+      "axis": 8,
+      "flip": 4,
       "abstain": 0,
-      "pct": 94.1,
-      "lo": 91.6,
-      "hi": 95.9,
+      "pct": 97.5,
+      "lo": 95.6,
+      "hi": 98.6,
       "seconds": 0.789,
       "usd_per_page": 0.00035
      },
      "heldout_boxes": {
       "n": 400,
-      "exact": 380,
-      "axis": 12,
-      "flip": 8,
+      "exact": 396,
+      "axis": 4,
+      "flip": 0,
       "abstain": 0,
-      "pct": 95.0,
-      "lo": 92.4,
-      "hi": 96.7,
+      "pct": 99.0,
+      "lo": 97.5,
+      "hi": 99.6,
       "seconds": 0.335,
       "usd_per_page": 0.00012
      },
@@ -5707,26 +5640,10 @@
      }
     },
     "misses": [
-     "box:IllustratedReview:016@0:flip",
-     "box:IllustratedReview:016@90:flip",
-     "box:IllustratedReview:016@180:flip",
-     "box:IllustratedReview:016@270:flip",
-     "box:IllustratedReview:074@0:flip",
-     "box:IllustratedReview:074@90:flip",
-     "box:IllustratedReview:074@180:flip",
-     "box:IllustratedReview:074@270:flip",
      "box:SC0122:002@0:axis",
      "box:SC0122:002@90:axis",
      "box:SC0122:002@180:axis",
      "box:SC0122:002@270:axis",
-     "box:SC0122:027@0:axis",
-     "box:SC0122:027@90:axis",
-     "box:SC0122:027@180:axis",
-     "box:SC0122:027@270:axis",
-     "box:SC0122:182@0:axis",
-     "box:SC0122:182@90:axis",
-     "box:SC0122:182@180:axis",
-     "box:SC0122:182@270:axis",
      "replaced:840dcd77e3a75661@0:axis",
      "replaced:840dcd77e3a75661@90:axis",
      "replaced:840dcd77e3a75661@180:axis",
@@ -6049,8 +5966,10 @@
    "gateway": 0.226333,
    "gateway_over_estimate": 1.0,
    "charged": 0.226341
-  }
+  },
+  "owner_checked": 10,
+  "owner_rule": "A page identified as a folder is oriented to the folder's own text (its tab label), not to a sheet inside it that is cut off (owner, 2026-11-11, on SC0122 002: the tab ADMISSIONS 1950-69 reads upright as stored)."
  },
  "bench_meta": "216 pages \u00d7 4 turns, and 119 held-out owner pages for the local routes \u00b7 Gemini through the gateway, the rest free on the Mac (W46.rotation-routes)",
- "bench_note": "Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini 3.7 Flash runs the app's comparative which-of-four prompt (llmSingle one call, llmMajority three, on a 108-page half); the local models ran on a 48-page subset. Vision is right on 99.0% of the owner's turns and never wrong there, but wrong-axis on charters; llmSingle is 100% on the 96 and 97.3% on the public strata; Vision and PP-LCNet agreeing, else llmSingle, is 100% on the 96 with 7 of 384 turns sent to the model, but the 96 are the shipped detector's development set: on 119 held-out owner pages Vision is right at all four turns on 107 and wrong on 6, and Vision with PP-LCNet flagging is wrong on 5 and flags 14. The small local models are at chance with a one-image prompt; Qwen3-VL 8B with the app's comparative prompt is 78.1%, below Vision on the owner's pages. Seconds were taken inside an unattended session (background QoS), so compare them, don't quote them. Detail: ArchiveProcessor/segbench-results/rotation-routes.md."
+ "bench_note": "Each upright page turned 0, 90, 180 and 270 degrees; a route is right when it gives the turn that makes it upright. Wrong axis = sideways, flip = upside down, abstain = no answer. The gateway's Gemini 3.7 Flash runs the app's comparative which-of-four prompt (llmSingle one call, llmMajority three, on a 108-page half); the local models ran on a 48-page subset. Vision is right on 99.0% of the owner's turns and never wrong there, but wrong-axis on charters; llmSingle is 100% on the 96 and 97.3% on the public strata; Vision and PP-LCNet agreeing, else llmSingle, is 100% on the 96 with 7 of 384 turns sent to the model, but the 96 are the shipped detector's development set: on 119 held-out owner pages Vision is right at all four turns on 110 and wrong on 3, and Vision with PP-LCNet flagging is wrong on 2 and flags 14. The small local models are at chance with a one-image prompt; Qwen3-VL 8B with the app's comparative prompt is 78.1%, below Vision on the owner's pages. Seconds were taken inside an unattended session (background QoS), so compare them, don't quote them. Detail: ArchiveProcessor/segbench-results/rotation-routes.md."
 }

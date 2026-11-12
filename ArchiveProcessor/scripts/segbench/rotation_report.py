@@ -41,15 +41,18 @@ set.** RotationDetector's policy was chosen on these 384 turns (W40.fix-processo
 96 were drawn through a 20-word Vision filter, so they hold no page where Vision's text, and its rotation vote, is
 weakest. By page it is 95 of 96 right at all four turns (p034 abstains at all four); zero wrong pages bounds its page
 error at 3.8%, not 1.0%. The held-out owner figure (below, W46.rotation-heldout) is the one a rule cites.
-__HELDOUT_VERDICT__ Four of its six wrong pages are among the five box pages every route, Gemini included, agrees the box stores
-turned (two magazine pages upside down, three clippings sideways); they are reported apart, not dropped. Set apart (an
-upper bound, since the routes' own answers chose them), Vision is wrong at one turn on 2 of 114 pages (a clipping's
-flip, a near-blank cover's axis) and abstains on 6, five of them pages the 20-word filter took out of the 96. So "never
+__HELDOUT_VERDICT__ These figures are against the owner's own turns for the five box pages every route, Gemini
+included, agrees the box stores turned (W46.rotation-setapart-sheet): four are stored turned as the routes say (two
+magazine pages upside down, two clippings sideways), and the fifth, SC0122 002, is a folder whose tab label reads upright
+as stored, so every route is wrong on it at all four turns (a page identified as a folder is oriented to the folder's
+own text, not to a cut-off sheet inside it). Vision's other two wrong pages are wrong at one turn (a clipping's flip, a
+near-blank cover's axis); it abstains on 7 pages, five of them pages the 20-word filter took out of the 96. So "never
 wrong" is the development set's figure, not a population one, and Vision's abstentions gather on exactly the pages the
-filter removed. The profile rules hold up held out: the free rule (Vision checked by PP-LCNet, else flag) is wrong on 1
-of 114 pages at one turn (that cover) and flags 13, nine of them filter-replaced; the cloud rule is wrong on 2 of 114,
-the two near-blank covers on which Gemini gives one constant wrong answer, with 45 calls for 476 turns. PP-LCNet alone is
-weaker held out (9 wrong pages of 114, seven of them filter-replaced), and Tesseract is not a route (56 wrong).
+filter removed. The profile rules hold up held out: the free rule (Vision checked by PP-LCNet, else flag) is wrong on 2
+of 119 pages (that cover at one turn, the folder) and flags 14, nine of them filter-replaced; the cloud rule is wrong on 3
+of 119, the folder and the two near-blank covers on which Gemini gives one constant wrong answer, with 45 calls for 476
+turns. PP-LCNet alone is weaker held out (10 wrong pages of 119, seven of them filter-replaced), and Tesseract is not a
+route (57 wrong).
 
 Its four misses on the 96 are abstentions (p034's two axes). It is also safe on L1 English handwriting and L4 ledgers (93.8% and 97.5%, abstentions only). It
 gives a confident **wrong axis** on charters (36 of L7's 80 turns), abstains on much of Hebrew (34 of 80) and Chinese
@@ -100,8 +103,9 @@ CARD = """- **Truth.** Constructed, not drafted: each page is taken as upright a
   the right correction is known exactly. The owner's 96 are his frozen originals, upright since W41.ocr-panel-cloud
   (the axis test's set). The public pages are upright as their datasets publish them; no one checked that.
   __SIDEWAYS__ They stay in every figure; the table without them is an upper bound for llmSingle, whose own answers
-  chose them. The held-out owner pages are upright as stored, unchecked; __HELDOUT_TURNED__ Nobody read a page to
-  rule on it.
+  chose them. The held-out owner pages are upright as stored, unchecked, except ten the owner turned upright on a
+  sheet (W46.rotation-setapart-sheet): __HELDOUT_TURNED__ The owner's turns are the truth for those ten
+  (`rotation-heldout-owner.json`, with his rule for folder pages); the as-stored figures are kept beside them.
 - **Selection.** The 96 entire, which are RotationDetector's development set: its policy was chosen on these 384
   turns (W40.fix-processor-rotation-axis), so its figure on them is not held out. __DRAW_96__ The held-out set is
   the 19 pages that filter replaced and 100 pages of the three locked segmentation boxes (527 pages, none
@@ -485,6 +489,23 @@ def stored_turned(pages, a, llm=None):
     return out
 
 
+OWNER_HELDOUT = RR.RESULTS / 'rotation-heldout-owner.json'   # W46.rotation-setapart-sheet: the owner's turns
+
+
+def owner_offsets():
+    """The stored turn of each held-out page the owner checked (W46.rotation-setapart-sheet), else {}."""
+    if not OWNER_HELDOUT.exists():
+        return {}
+    return {p: o % 360 for p, o in json.loads(OWNER_HELDOUT.read_text())['offsets'].items()}
+
+
+def rebase(ans, owner):
+    """A route's answers against the owner's truth: on a page stored turned by o, the right answer at turn t is
+    want(t) + o, so subtracting o from each answer leaves outcome() and every figure the same in form."""
+    return {k: ({**v, 'found': (v['found'] - owner[k[0]]) % 360} if owner.get(k[0]) and v['found'] is not None else v)
+            for k, v in ans.items()}
+
+
 def heldout_data(main_pages, main_a, main_casc):
     pages, a, spend = load_heldout()
     llm = a.pop('_llm')
@@ -494,21 +515,23 @@ def heldout_data(main_pages, main_a, main_casc):
     groups['boxes'] = [p for p in pages if pages[p]['set'] == 'boxes']
     groups['heldout'] = list(pages)
     turned = stored_turned(pages, a, llm)
+    owner = owner_offsets()
     for pid, v in turned.items():   # Gemini, another family, on every turn of these pages (gateway-escalations)
         if all((pid, t) in llm for t in RR.TURNS):
             v['gemini'] = offset(llm, pid) or 0
-    upright = [p for p in pages if p not in turned]
+        if pid in owner:
+            v['owner'] = owner[pid]
     routes = {}
     for r in HELDOUT_ROUTES:
         if r not in a:
             continue
-        routes[r] = {g: {'pages': page_figures(a[r], ps), 'turns': turn_figures(a[r], ps)} for g, ps in groups.items()}
-        routes[r]['upright'] = {'pages': page_figures(a[r], upright), 'turns': turn_figures(a[r], upright)}
-        keys = [(p, t) for p in pages for t in RR.TURNS]
-        routes[r]['bench'] = {g: score(pages, a[r], [(p, t) for p in ps for t in RR.TURNS])
+        t = rebase(a[r], owner)      # the figures are against the owner's truth; as stored is kept beside them
+        routes[r] = {g: {'pages': page_figures(t, ps), 'turns': turn_figures(t, ps)} for g, ps in groups.items()}
+        routes[r]['as_stored'] = {'pages': page_figures(a[r], list(pages)), 'turns': turn_figures(a[r], list(pages))}
+        routes[r]['bench'] = {g: score(pages, t, [(p, x) for p in ps for x in RR.TURNS])
                               for g, ps in (('heldout', list(pages)), ('heldout_boxes', groups['boxes']),
                                             ('heldout_replaced', groups['replaced']))}
-        routes[r]['misses'] = [f"{k[0]}@{k[1]}:{outcome(v['found'], k[1])}" for k, v in sorted(a[r].items())
+        routes[r]['misses'] = [f"{k[0]}@{k[1]}:{outcome(v['found'], k[1])}" for k, v in sorted(t.items())
                                if outcome(v['found'], k[1]) in ('axis', 'flip')]
     own = [p for p in main_pages if main_pages[p]['set'] == 'owner96']
     main_routes = {**main_a, **main_casc}
@@ -516,7 +539,9 @@ def heldout_data(main_pages, main_a, main_casc):
                for r in ('vision', 'paddle', 'tesseract', 'llm1', 'vision>paddle', 'vision=paddle>flag', 'vision=paddle>llm1')
                if r in main_routes}
     return {'pages': {g: len(ps) for g, ps in groups.items()}, 'stored_turned': turned, 'routes': routes,
-            'owner96': owner96, 'escalations': len(RR_escalated(a)), 'gateway_spend': spend}
+            'owner96': owner96, 'escalations': len(RR_escalated(a)), 'gateway_spend': spend,
+            'owner_checked': len(owner),
+            'owner_rule': json.loads(OWNER_HELDOUT.read_text())['rule'] if OWNER_HELDOUT.exists() else None}
 
 
 def RR_escalated(a):
@@ -567,11 +592,18 @@ def heldout_md(h, names):
                             'gives no constant correction' if v['gemini'] == 0 else f"+{v['gemini']}°") + ')'
                          for k, v in st.items()) or 'none')
             + ". Gemini 3.7 Flash (llmSingle, through the gateway) was asked every turn of them as a third family. "
-            "Nobody looked at them. They stay in every figure above, scored as stored. Without them (an upper bound for the routes that "
-            "named them, since their own answers chose the pages):", '', '| Route | Pages, without them | Turns, without them |',
-            '|---|---|---|']
+            + (f"The owner turned them upright on a sheet (W46.rotation-setapart-sheet, 2026-11-11, with "
+               f"{h['owner_checked'] - len(st)} controls every local route reads upright; no control was turned): "
+               + ', '.join(f"{k} " + ('agrees' if v['owner'] == v['offset'] else
+                                      'upright as stored' if v['owner'] == 0 else f"+{v['owner']}°")
+                           for k, v in st.items() if 'owner' in v)
+               + f". {h['owner_rule']} The figures above score every held-out page against the owner's turn; "
+               "the rest are upright as stored, unchecked. As stored, before his reading:"
+               if h.get('owner_checked') else
+               "Nobody looked at them. They stay in every figure above, scored as stored."),
+            '', '| Route | Pages, as stored | Turns, as stored |', '|---|---|---|']
     for r in R:
-        out.append(f"| {names[r]} | {page_cell(R[r]['upright']['pages'])} | {turn_cell(R[r]['upright']['turns'])} |")
+        out.append(f"| {names[r]} | {page_cell(R[r]['as_stored']['pages'])} | {turn_cell(R[r]['as_stored']['turns'])} |")
     out += ['', "**The 96 by page, beside the turn figures** (the development set; the same page and clustered-turn "
             "figures as the held-out table):", '', '| Route | Pages | Turns |', '|---|---|---|']
     for r, v in h['owner96'].items():
@@ -622,9 +654,12 @@ def fill(text, data):
         else:
             sub['__HELDOUT_CLOUD__'] = 'its held-out escalations were not asked (no figure).'
         both = sum(v.get('gemini') == v['offset'] for v in st.values())
+        mine = sum(v.get('owner') == v['offset'] for v in st.values() if 'owner' in v)
         sub['__HELDOUT_TURNED__'] = (f"{len(st)} of them two routes agree are stored turned (Gemini gives the same "
-                                     f"correction on {both} of the {len(st)}), reported apart in the held-out section, "
-                                     "never dropped." if st else "no two routes agree that any is stored turned.")
+                                     f"correction on {both} of the {len(st)}"
+                                     + (f"; the owner on {mine}" if any('owner' in v for v in st.values()) else '')
+                                     + "), and five controls every local route reads upright (none turned)."
+                                     if st else "no two routes agree that any is stored turned.")
         sub['__HELDOUT_NOTE__'] = (f"on {n} held-out owner pages Vision is right at all four turns on {v['right']} and "
                                    f"wrong on {v['wrong']}, and Vision with PP-LCNet flagging is wrong on {fr['wrong']} "
                                    f"and flags {fr['flagged']}.")

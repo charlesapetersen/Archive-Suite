@@ -1,0 +1,18 @@
+{
+ "item": "W46.rotation-setapart-sheet",
+ "source": "the owner's sheet answers, 2026-11-11 (~/Downloads/rotation-setapart-answers.json): the five held-out box pages every route agrees are stored turned, and five controls every local route reads upright, shown as stored; the owner turned each until it read upright",
+ "rule": "A page identified as a folder is oriented to the folder's own text (its tab label), not to a sheet inside it that is cut off (owner, 2026-11-11, on SC0122 002: the tab ADMISSIONS 1950-69 reads upright as stored).",
+ "offsets": {
+  "box:IllustratedReview:016": 180,
+  "box:IllustratedReview:074": 180,
+  "box:SC0122:002": 0,
+  "box:SC0122:027": 90,
+  "box:SC0122:182": 270,
+  "box:IllustratedReview:058": 0,
+  "box:IllustratedReview:071": 0,
+  "box:SC0122:105": 0,
+  "box:SC0122:158": 0,
+  "box:Sasha:073": 0
+ },
+ "notes": {}
+}

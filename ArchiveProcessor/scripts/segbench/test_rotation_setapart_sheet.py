@@ -44,6 +44,17 @@ class Score(unittest.TestCase):
         self.assertEqual(t['controls_turned'], ['box:A:2'])
         self.assertEqual(t['rules']['vision']['wrong_owner_truth'], 2)        # A:1 as stored, A:2 under its new truth
 
+    def test_the_report_scores_the_owner_truth_as_the_sheet_does(self):
+        # rotation_report.rebase is what the published held-out figures use; it must count what tally counts
+        for turns in ({'box:A:1': 180}, {}, {'box:A:2': 90}):
+            ans = {p: 'up' for p in self.pages} | {'_turns': turns}
+            t = S.tally(self.pages, self.a, self.turned, ans)
+            owner = S.owner_offsets(ans, list(self.pages))
+            for r in self.a:
+                f = S.REP.page_figures(S.REP.rebase(self.a[r], owner), list(self.pages))
+                self.assertEqual((f['wrong'], f['flagged']),
+                                 (t['rules'][r]['wrong_owner_truth'], t['rules'][r]['flagged_owner_truth']))
+
     def test_escalated_turns_count_flagged_and_their_answer_still_scores(self):
         a = route({'box:A:1': answers(0, escalate=(0,))})
         self.assertEqual(S.page_outcome(a, 'box:A:1', 0), {'right': True, 'wrong': False, 'flagged': True})

@@ -134,14 +134,25 @@
      },
      "figures": {
       "owner-heldout": {
-       "value": "6 of 119 pages wrong (<=10.6%), 7 flagged; 91.6% turns (86.3-96.2)",
+       "value": "3 of 119 pages wrong (<=7.2%), 7 flagged; 94.1% turns (89.7-97.9)",
        "n": 119,
-       "truth": "constructed turns",
+       "truth": "constructed turns; the 5 set-apart pages and 5 controls owner-checked (W46.rotation-setapart-sheet)",
        "source": {
         "file": "rotation-routes.md",
         "route": "Local Vision",
         "attribute": "held out, all 119",
-        "value": "107/119 right"
+        "value": "110/119 right, 3 wrong (≤7.2%), 7 flagged"
+       }
+      },
+      "owner-heldout-as-stored": {
+       "value": "6 of 119 wrong (<=10.6%)",
+       "n": 119,
+       "truth": "constructed turns, as stored",
+       "source": {
+        "file": "rotation-routes.md",
+        "route": "Local Vision",
+        "attribute": "Pages, as stored",
+        "value": "107/119 right, 6 wrong (≤10.6%), 7 flagged"
        }
       },
       "owner-96-dev": {
@@ -233,7 +244,7 @@
      },
      "memory": null,
      "caveats": [
-      "2 of 114 wrong when 5 agreement-only pages are set apart (unchecked, P10-7)",
+      "one of its 3 held-out wrong pages is a folder whose tab reads upright as stored; every route turns it (owner's folder rule, W46.rotation-setapart-sheet)",
       "confident wrong axis on charters: 36 of L7's 80 turns"
      ],
      "kind_rules": [],
@@ -257,25 +268,25 @@
      },
      "figures": {
       "owner-heldout": {
-       "value": "5 of 119 wrong (<=9.5%), 14 flagged; 414/476 turns (87.0%)",
+       "value": "2 of 119 wrong (<=5.9%), 14 flagged; 426/476 turns (89.5%)",
        "n": 119,
-       "truth": "constructed turns",
+       "truth": "constructed turns; the 5 set-apart pages and 5 controls owner-checked (W46.rotation-setapart-sheet)",
        "source": {
         "file": "rotation-routes.md",
         "route": "agree, else leave and flag",
         "attribute": "held out, all 119",
-        "value": "101/119 right, 5 wrong (≤9.5%), 14 flagged"
+        "value": "104/119 right, 2 wrong (≤5.9%), 14 flagged"
        }
       },
-      "owner-heldout-setapart": {
-       "value": "1 of 114 wrong, 13 flagged",
-       "n": 114,
-       "truth": "constructed turns, 5 pages set apart",
+      "owner-heldout-as-stored": {
+       "value": "5 of 119 wrong (<=9.5%), 14 flagged",
+       "n": 119,
+       "truth": "constructed turns, as stored",
        "source": {
         "file": "rotation-routes.md",
         "route": "agree, else leave and flag",
-        "attribute": "Pages, without them",
-        "value": "101/114 right, 1 wrong (≤4.8%), 13 flagged"
+        "attribute": "Pages, as stored",
+        "value": "101/119 right, 5 wrong (≤9.5%), 14 flagged"
        }
       },
       "L1+L4": {
@@ -346,25 +357,25 @@
      },
      "figures": {
       "owner-heldout": {
-       "value": "7 of 119 wrong (<=11.6%); 448/476 turns (94.1%, 89.9-97.5); 45 calls for 476 turns",
+       "value": "3 of 119 wrong (<=7.2%), two near-blank covers and a folder; 464/476 turns (97.5%, 94.1-100.0); 45 calls for 476 turns",
        "n": 119,
-       "truth": "constructed turns",
+       "truth": "constructed turns; the 5 set-apart pages and 5 controls owner-checked (W46.rotation-setapart-sheet)",
        "source": {
         "file": "rotation-routes.md",
         "route": "agree, else llmSingle",
         "attribute": "held out, all 119",
-        "value": "112/119 right, 7 wrong (≤11.6%)"
+        "value": "116/119 right, 3 wrong (≤7.2%)"
        }
       },
-      "owner-heldout-setapart": {
-       "value": "2 of 114 wrong (<=6.2%), both near-blank covers",
-       "n": 114,
-       "truth": "constructed turns, 5 pages set apart",
+      "owner-heldout-as-stored": {
+       "value": "7 of 119 wrong (<=11.6%)",
+       "n": 119,
+       "truth": "constructed turns, as stored",
        "source": {
         "file": "rotation-routes.md",
         "route": "agree, else llmSingle",
-        "attribute": "Pages, without them",
-        "value": "112/114 right, 2 wrong (≤6.2%)"
+        "attribute": "Pages, as stored",
+        "value": "112/119 right, 7 wrong (≤11.6%)"
        }
       },
       "public-6": {
