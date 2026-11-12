@@ -2200,8 +2200,8 @@
      "id": "qwen3.6-27b",
      "name": "Qwen3.6 27B (OpenRouter, hosted fp8)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3.6-27b",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -2334,8 +2334,8 @@
      "id": "qwen3-vl-235b",
      "name": "Qwen3-VL 235B (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3-vl-235b-a22b-instruct",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -2516,8 +2516,8 @@
      "id": "qwen3.8-flash",
      "name": "Qwen3.8 Flash (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3.8-flash",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -2651,8 +2651,8 @@
      "id": "gemini3.5-flash-lite",
      "name": "Gemini 3.5 Flash-Lite",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "gemini|gemini-3.5-flash-lite",
+     "status": "shipped",
      "needs": {
       "key": [
        "gemini",
@@ -2787,8 +2787,8 @@
      "id": "gemini3.1-flash-lite",
      "name": "Gemini 3.1 Flash-Lite",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "gemini|gemini-3.1-flash-lite",
+     "status": "shipped",
      "needs": {
       "key": [
        "gemini",
@@ -3308,8 +3308,8 @@
      "id": "qwen3.5-9b",
      "name": "Qwen3.5 9B (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3.5-9b",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -4089,8 +4089,8 @@
      "id": "gemini3.1-pro",
      "name": "Gemini 3.1 Pro",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "gemini|gemini-3.1-pro",
+     "status": "shipped",
      "needs": {
       "key": [
        "gemini",
@@ -4225,8 +4225,8 @@
      "id": "gemini3.5-flash",
      "name": "Gemini 3.5 Flash",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "gemini|gemini-3.5-flash",
+     "status": "shipped",
      "needs": {
       "key": [
        "gemini",
@@ -4361,8 +4361,8 @@
      "id": "gpt5.4-mini",
      "name": "GPT-5.4 Mini",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openai|gpt-5.4-mini",
+     "status": "shipped",
      "needs": {
       "key": [
        "openai",
@@ -4630,8 +4630,8 @@
      "id": "mistral-ocr-4-1",
      "name": "Mistral OCR 4.1 (vendor service)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "mistral|mistral-ocr-latest",
+     "status": "shipped",
      "needs": {
       "key": [
        "mistral"

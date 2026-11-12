@@ -7,7 +7,10 @@ import Foundation
 /// cascade that escalates failures, chosen on half the pages, beat a single route chosen the same way by 0.8 to
 /// 2.8 NES on the other half at every budget up to $5 per 1,000 pages, and on FarmShare's 2,000 corpus pages only
 /// 13 failed, so the dearer route sees about one page in 154. At the strongest-accuracy setting one strong reader
-/// alone stayed best, so the cascade is off by default and is a choice, not a replacement.
+/// alone stayed best, so the cascade is off by default and is a choice, not a replacement. Phase 4 kept that
+/// (owner call 5, 2026-11-06; `13-stage-rules/04-reading.md` §7.2, checked by W43.app-guide-refresh): each measured
+/// cascade is a route row the settings sheet picks when it beats the single routes within the user's limits, with no
+/// default of its own and failure as its only trigger.
 ///
 /// The optional second trigger (`onDisagreement`, off by default) also escalates a page whose word count and
 /// Apple Vision's differ by more than `disagreementRatio`. Vision runs on the Mac and costs nothing. The signal

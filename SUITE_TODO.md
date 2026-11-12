@@ -753,8 +753,6 @@ segmentation work, so that it sees the newest releases. It still runs before the
 results change the app's catalogue and model guide, and `W40.h2` has to verify that code at HEAD. `W40.h2` therefore
 waits on `W43.app-guide-refresh`.
 
-- [ ] **`W43.app-guide-refresh` — the sweep's results into the Processor's catalogue and model guide [S-M · ~1 session]** (lane: processor) (uses: build) (blocked-on: W46.review-done). **Owner, 2026-11-12:** W43.sweep was retired on 2026-10-21, so this no longer waits on it or on the integration; its source is the settings rule table (`execution-plans/processing-review/13-stage-rules/`), and it runs ahead of W44.reocr-processor, which waits on it. Edits to the provider catalogue may be redone by W42.int-s2. Make the changes the rule table supports: models added or retired in `ProviderModels.swift` with their pinned providers and prices, the page-kind model guide's picks, the local-model presets by memory size, and the cascade's defaults. Change only what the measured results support. Republishing ArchiveOCRBench is left to an interactive session, and the commit says it is behind. `W40.h2` waits on this item.
-
 ## Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16)
 
 The owner called Vision OCR's queue done on 2026-10-16 and moved its last open item here, to be worked on the engine

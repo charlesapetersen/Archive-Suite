@@ -31,12 +31,14 @@ struct CostEstimator {
     // Image token estimates per provider (calibrated from actual API costs).
     // Gemini tiles high-res images extensively (~40k tokens per archival photo).
     // Anthropic uses a more compact image encoding (~6k tokens per photo).
-    // Mistral OCR endpoint has flat per-page pricing reflected as ~1k equivalent tokens.
+    // Mistral OCR endpoint has flat per-page pricing, reflected as equivalent tokens at its $1 per million: OCR 4.1
+    // (what `mistral-ocr-latest` resolved to) is $4 per 1,000 pages (`settings-routes.json`, W43.app-guide-refresh),
+    // so 2,750 image tokens plus the prompt's 400 and the output's 850.
     static func estimatedImageTokens(for provider: LLMProvider) -> Double {
         switch provider {
         case .gemini: return 40_000
         case .anthropic: return 6_000
-        case .mistral: return 1_000
+        case .mistral: return 2_750
         case .openai: return 1_500   // OpenAI bills images as tokens via tiling; ~1.5k ≈ a full-page high-detail scan. Refine if the keyed live smoke shows drift.
         case .appleVision: return 0   // runs in-process; it has no billable image-token accounting
         // W41.app-openrouter: the OCR panel's logged prompt tokens on its pinned providers, less the ~400-token

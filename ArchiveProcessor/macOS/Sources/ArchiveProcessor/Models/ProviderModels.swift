@@ -230,10 +230,12 @@ struct LLMModel: Identifiable, Hashable, Codable {
     ]
 
     // The FIRST entry is the default OCR model (`ModelSelectionStore.model(for:)` falls back to `models[0]`).
-    // W41.app-ocr-default (2026-10-15), from the W41 OCR panel (`segbench-results/W41-answers.md` §2, NES on 96
-    // pages of one corpus): 3.8 Flash 94.47 at $3.22 per 1,000 pages, best of any route on handwriting (96.0) —
-    // but it is one of the truth's two drafters, so its lead may be partly flattery; say so wherever the figure is
-    // shown. 3.5 Flash-Lite 93.13 at $1.57, the budget choice; 3.1 Flash-Lite (the old default) 91.61 at $1.17.
+    // W41.app-ocr-default (2026-10-15), re-checked against the Phase 4 rule table by W43.app-guide-refresh
+    // (`segbench-results/settings-routes.json`, reading rows; NES on the pages a route answered of the owner's 96):
+    // 3.8 Flash 96.47 at $3.22 per 1,000 pages, the cheap-API pick (it ties 3.1 Pro's 96.85, at $21.92, under the
+    // 0.49 floor), and best of the app's routes on handwriting (95.81) — but it is one of the truth's two drafters,
+    // so its lead may be partly flattery; say so wherever the figure is shown. 3.5 Flash-Lite 95.17 at $1.57, the
+    // budget choice; 3.1 Flash-Lite 94.59 at $1.17. The 2.5 family and 3 Flash Preview were not read by the bench.
     // Prices checked 2026-10-15 on ai.google.dev/gemini-api/docs/pricing. 3.8 Flash's are INTRODUCTORY to
     // 31 Dec 2026 ($1.50/$7.50 from 1 Jan 2027) — update this entry then.
     // Every Gemini route refuses some reprinted printed text; `OCRRefusalFallback` reads those pages.
@@ -330,10 +332,12 @@ struct LLMModel: Identifiable, Hashable, Codable {
         ),
     ]
 
+    // `mistral-ocr-latest` resolved to Mistral OCR 4.1 when the bench read the 96 through this app's MistralClient
+    // (`ocr_cloud_mistral.py`): 93.01 NES at $4 per 1,000 pages, $2 in a batch (`settings-routes.json`).
     static let mistralModels: [LLMModel] = [
         LLMModel(
             id: "mistral-ocr-latest",
-            displayName: "Mistral OCR 3",
+            displayName: "Mistral OCR 4.1",
             provider: .mistral,
             supportsThinking: false,
             returnsMd: true,
@@ -349,14 +353,26 @@ struct LLMModel: Identifiable, Hashable, Codable {
     // those prices as authoritative.
     // `supportsThinking: true` marks the reasoning families (o-series / GPT-5) that require
     // `max_completion_tokens` — see `OpenAICompatibleClient.openAI(model:apiKey:)`. First entry is the
-    // default OCR model (cheapest capable vision model, analogous to Gemini Flash-Lite).
+    // default OCR model: GPT-5.4 mini, the only OpenAI model the bench read (W43.app-guide-refresh, from
+    // `settings-routes.json`: 94.81 NES on the pages it answered of the owner's 96, $5.55 per 1,000 pages, read at
+    // reasoning `minimal`); the others, cheapest to flagship, are unmeasured.
     // Model IDs + per-1M prices are the current GPT-5 generation, priced per the owner-provided source
     // (SoCOCRbench — https://noahdasanaike.github.io/posts/sococrbench.html, captured 2026-07-16), ordered
-    // cheapest→flagship. `supportsThinking` follows current API capability, not the reasoning mode selected
+    // cheapest→flagship after the default. `supportsThinking` follows current API capability, not the reasoning mode selected
     // by a benchmark run; GPT-5.4 mini supports `reasoning_effort` and defaults to `none`. IDs follow OpenAI's
     // lowercase-hyphen convention; live request confirmation for the remaining unverified entries remains
     // the keyed OCR smoke — a wrong ID surfaces there, not silently in the estimator.
     static let openaiModels: [LLMModel] = [
+        LLMModel(
+            id: "gpt-5.4-mini",
+            displayName: "GPT-5.4 mini",
+            provider: .openai,
+            supportsThinking: true,            // OpenAI lists reasoning-effort support; default is `none`.
+            returnsMd: false,
+            inputCostPer1M: 0.75,
+            outputCostPer1M: 4.50,
+            batchDiscount: 0.5
+        ),
         LLMModel(
             id: "gpt-5-nano",
             displayName: "GPT-5 nano",
@@ -375,16 +391,6 @@ struct LLMModel: Identifiable, Hashable, Codable {
             returnsMd: false,
             inputCostPer1M: 0.25,
             outputCostPer1M: 2.00,
-            batchDiscount: 0.5
-        ),
-        LLMModel(
-            id: "gpt-5.4-mini",
-            displayName: "GPT-5.4 mini",
-            provider: .openai,
-            supportsThinking: true,            // OpenAI lists reasoning-effort support; default is `none`.
-            returnsMd: false,
-            inputCostPer1M: 0.75,
-            outputCostPer1M: 4.50,
             batchDiscount: 0.5
         ),
         LLMModel(
@@ -409,11 +415,13 @@ struct LLMModel: Identifiable, Hashable, Codable {
         ),
     ]
 
-    // W41.app-openrouter, from the W41 OCR panel (`segbench-results/W41-answers.md` §2, NES on one corpus). Each
+    // W41.app-openrouter, from the W41 OCR panel; figures re-read from the Phase 4 rule table by W43.app-guide-refresh
+    // (`segbench-results/settings-routes.json`, reading rows: NES on the pages a route answered of the owner's 96). Each
     // model runs on ONE provider at ONE precision with fallbacks off (`OpenRouterRoute`), as the bench's
     // `ocr_panel.py` / `ocr_cloud.py` routes did, so the price here is that provider's and the figure is the
     // bench's. Prices are the pinned endpoint's, from the panel's frozen OpenRouter catalogs (2026-10-11/13).
-    // The first entry is the provider's default: the best value of the panel, and not one of the truth's drafters.
+    // The first entry is the provider's default: the rule table's pick for an OpenRouter key with no fallback for a
+    // failed page (strict NES, 94.01, every page answered), and not one of the truth's drafters.
     static let openrouterModels: [LLMModel] = OpenRouterRoute.catalog.map(\.model)
 }
 
@@ -453,20 +461,25 @@ struct OpenRouterRoute: Sendable, Equatable {
     }
 
     static let catalog: [OpenRouterRoute] = [
-        // Panel NES 93.95, $1.22 per 1,000 pages (ocr_cloud.py `qwen3-vl-235b`). Non-reasoning instruct.
+        // Rule table 94.01 NES, all 95 answered, $1.22 per 1,000 pages (ocr_cloud.py `qwen3-vl-235b`). Non-reasoning
+        // instruct. With no fallback for a failed page it ties Qwen3.6 27B (−0.37 strict, under the 0.49 floor) and
+        // is cheaper, so it is the pick (04-reading.md §9, profile 2).
         OpenRouterRoute(
             model: LLMModel(id: "qwen/qwen3-vl-235b-a22b-instruct", displayName: "Qwen3-VL 235B (deepinfra fp8)",
                             provider: .openrouter, supportsThinking: false, returnsMd: false,
                             inputCostPer1M: 0.20, outputCostPer1M: 0.88, batchDiscount: 1),
             providerTag: "deepinfra/fp8", precision: "fp8", reasoning: .none,
-            measured: "OCR panel (its prompt, close to the app's): 93.95 NES, $1.22 per 1,000 pages. The best value measured."),
-        // Panel NES 94.28 (ocr_panel.py `qwen3.6-27b`), reasoning off as the panel ran it.
+            measured: "Measured on the owner's 96 test pages: 94.01 NES, every page answered, $1.22 per 1,000 pages. "
+                + "The pick when a failed page has no second reader."),
+        // Rule table 95.38 NES on 94 of 95 (one transport error), $1.94 per 1,000 (ocr_panel.py `qwen3.6-27b`),
+        // reasoning off as the panel ran it. The open-weight pick for handwriting (92.61 on the 16; 04-reading.md §9).
         OpenRouterRoute(
             model: LLMModel(id: "qwen/qwen3.6-27b", displayName: "Qwen3.6 27B (chutes fp8)",
                             provider: .openrouter, supportsThinking: false, returnsMd: false,
                             inputCostPer1M: 0.25, outputCostPer1M: 2.00, batchDiscount: 1),
             providerTag: "chutes/fp8", precision: "fp8", reasoning: .off,
-            measured: "OCR panel (its prompt, close to the app's): 94.28 NES, $1.74 per 1,000 pages; second on printed pages, first on forms."),
+            measured: "Measured on the owner's 96 test pages: 95.38 NES on the pages it answered, $1.94 per 1,000 pages; "
+                + "the best reader of handwriting in this list (92.61 on 16 pages)."),
         // The budget segmentation voter (`cheap-models.md`, method_openrouter.py `glm5.3-flash`); offered for OCR
         // too, unmeasured there. Price worked out from the seg-cheap call log (cost against tokens, 2026-10-13).
         OpenRouterRoute(
@@ -475,6 +488,25 @@ struct OpenRouterRoute: Sendable, Equatable {
                             inputCostPer1M: 0.15, outputCostPer1M: 0.50, batchDiscount: 1),
             providerTag: "z-ai", precision: "fp8", reasoning: .effort("minimal"),
             measured: "Measured for segmentation only (the budget option); its OCR has not been measured."),
+        // W43.app-guide-refresh. Rule table 95.11 NES on 92 of 95 (3 refusals), $0.60 per 1,000 (ocr_cloud_full.py
+        // `qwen3.8-flash`, Alibaba's endpoint, which lists no precision, so the request pins "unknown" as listed).
+        // With a second reader for failed pages it ties Qwen3.6 27B (−0.08) and is cheaper: that profile's pick.
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3.8-flash", displayName: "Qwen3.8 Flash (alibaba, precision unknown)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.15, outputCostPer1M: 0.47, batchDiscount: 1),
+            providerTag: "alibaba", precision: "unknown", reasoning: .off,
+            measured: "Measured on the owner's 96 test pages: 95.11 NES on the pages it answered, $0.60 per 1,000 pages; "
+                + "it refused 3 pages, so give it a second reader for failed pages."),
+        // W43.app-guide-refresh. Rule table 93.38 NES on 91 of 95 (4 at the token cap), $0.25 per 1,000 (ocr_panel.py
+        // `qwen3.5-9b`), reasoning off: the pick under a price cap below $0.60 per 1,000 (04-reading.md §9).
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3.5-9b", displayName: "Qwen3.5 9B (deepinfra bf16)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.10, outputCostPer1M: 0.15, batchDiscount: 1),
+            providerTag: "deepinfra/bf16", precision: "bf16", reasoning: .off,
+            measured: "Measured on the owner's 96 test pages: 93.38 NES on the pages it answered, $0.25 per 1,000 pages, "
+                + "the cheapest measured reader; 4 pages ran to the token cap."),
     ]
 
     static func forModel(_ id: String) -> OpenRouterRoute? { catalog.first { $0.model.id == id } }
@@ -482,7 +514,8 @@ struct OpenRouterRoute: Sendable, Equatable {
     /// Under the Settings model picker: where the model runs, so the user knows the price and the precision.
     var settingsNote: String {
         let provider = providerTag.split(separator: "/").first.map(String.init) ?? providerTag
-        return measured + " Runs on \(provider) only, at \(precision), with OpenRouter's fallbacks off: the provider the bench "
+        let at = precision == "unknown" ? "at the precision it serves (it lists none)" : "at \(precision)"
+        return measured + " Runs on \(provider) only, \(at), with OpenRouter's fallbacks off: the provider the bench "
             + "measured, at its price ($\(Self.price(model.inputCostPer1M)) in, $\(Self.price(model.outputCostPer1M)) out "
             + "per million tokens). If that provider is down the page fails rather than going elsewhere."
     }

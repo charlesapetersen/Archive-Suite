@@ -224,7 +224,10 @@ enum LocalModelsTestDriver {
         let t = TimeEstimator.estimate(fileCount: 10, model: local.asLLMModel(), enableTagging: false,
                                        useGateway: true, ocrWorkers: 8,
                                        localSecondsPerPage: LocalModelRoute.secondsPerPage(modelID: local.modelID))
-        check("5 the estimate reads ten pages at 41 s, one at a time", t.totalSeconds >= 410, "\(t.totalSeconds)")
+        let perPage = LocalModelRoute.secondsPerPage(modelID: local.modelID)
+        eq("5 the LM Studio 8B is timed at its like-for-like seconds", perPage, 35.09)
+        check("5 the estimate reads ten pages at the pick's \(perPage) s, one at a time", t.totalSeconds >= 10 * perPage,
+              "\(t.totalSeconds)")
         let cost = CostEstimator.estimate(fileCount: 10, model: local.asLLMModel(), enableTagging: true,
                                           sendPreviousImage: false, contextCharCount: 0, useGateway: true)
         eq("5 a local run costs nothing", cost.totalStandard, 0)
@@ -439,21 +442,24 @@ enum LocalModelsTestDriver {
     private static func memoryChecks() {
         func first(_ gb: Double) -> String? { LocalModelRoute.picks(memoryGB: gb).first?.id }
         check("1 under 16 GB: nothing offered", LocalModelRoute.picks(memoryGB: 8).isEmpty)
-        eq("1 16 GB: Qwen3-VL 8B 4-bit", first(16), LocalModelRoute.qwen3VL8B4.id)
-        eq("1 18 GB (ours): Qwen3-VL 8B 4-bit", first(18), LocalModelRoute.qwen3VL8B4.id)
-        eq("1 32 GB: Qwen3.6 27B 4-bit", first(32), LocalModelRoute.qwen36_27B4.id)
-        check("1 32 GB: 35B-A3B offered for speed",
-              LocalModelRoute.picks(memoryGB: 32).contains(LocalModelRoute.qwen36_35BA3B4))
-        eq("1 48 GB: Qwen3.6 27B 8-bit", first(48), LocalModelRoute.qwen36_27B8.id)
-        check("1 64 GB: 27B 8-bit, then 35B-A3B 8-bit", LocalModelRoute.picks(memoryGB: 64).prefix(2)
-              == [LocalModelRoute.qwen36_27B8, LocalModelRoute.qwen36_35BA3B8])
+        // W43.app-guide-refresh: the rule table's laptop picks at every size (owner call 7.6: no 27B-class reader
+        // measured on a Mac, so 32 and 64 GB pick from the 16 GB rows).
+        for gb in [16.0, 18, 32, 48, 64, 128] {
+            eq("1 \(Int(gb)) GB: Qwen3.5 9B 4-bit, then Qwen3-VL 8B 4-bit", LocalModelRoute.picks(memoryGB: gb).map(\.id),
+               [LocalModelRoute.qwen35_9B4.id, LocalModelRoute.qwen3VL8B4.id])
+        }
+        let reading = SettingsRouteTable.bundled?.stage("reading")?.routes ?? []
+        func row(_ id: String) -> SettingsRouteTable.Route? { reading.first { $0.id == id } }
+        check("1 the picks are the rule table's Mac rows", row("qwen3.5-9b-mlx4")?.family == .mac
+              && row("qwen3-vl-8b-mlx4")?.family == .mac)
         check("1 every pick fits the memory it is offered at", [16.0, 18, 24, 32, 36, 48, 64, 128].allSatisfy { gb in
             LocalModelRoute.picks(memoryGB: gb).allSatisfy { $0.memoryGiB < gb * 0.9 } })
         check("1 the 16 GB note warns about room", LocalModelRoute.recommendationNote(memoryGB: 16).contains("little else"))
         check("1 the note below 16 GB points to Apple Vision", LocalModelRoute.recommendationNote(memoryGB: 8).contains("Apple Vision"))
         eq("1 the measured MLX build is the bench's", LocalModelRoute.qwen3VL8B4.modelID(for: .mlxVLM),
            "mlx-community/Qwen3-VL-8B-Instruct-4bit")
-        eq("1 an unknown model is timed at the one measurement", LocalModelRoute.secondsPerPage(modelID: "x"), 41)
+        eq("1 the 9B's measured MLX build", LocalModelRoute.qwen35_9B4.modelID(for: .mlxVLM), "mlx-community/Qwen3.5-9B-4bit")
+        eq("1 an unknown model is timed at the 8B's like-for-like figure", LocalModelRoute.secondsPerPage(modelID: "x"), 35.09)
         check("1 Settings warns that whole newspaper pages pass the cap",
               LocalModelRoute.newspaperNote.contains("18 of 32") && LocalModelRoute.newspaperNote.contains("4096"))
     }

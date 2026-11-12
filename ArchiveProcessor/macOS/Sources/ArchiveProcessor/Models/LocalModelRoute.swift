@@ -60,57 +60,39 @@ enum LocalModelRoute {
         func modelID(for server: Server) -> String { ids[server] ?? ids[.mlxVLM] ?? name }
     }
 
+    // W43.app-guide-refresh: the figures are the Phase 4 rule table's Mac rows (`segbench-results/settings-routes.json`,
+    // reading stage; NES on the owner's 96, time like for like on 16 of them on an 18 GB M3 Pro, model load apart,
+    // `ocr-time-like-for-like.md`; memory the whole process's peak, `ocr-mac-local*.md`).
+    static let qwen35_9B4 = Pick(
+        name: "Qwen3.5 9B", precision: "4-bit", memoryGiB: 9.1,
+        summary: "Measured on an 18 GB M3 Pro: 91.95 NES on the owner's 96 test pages counting a failed page as 0, the "
+            + "best reader measured on a Mac; about 34 s a page, 9.1 GB in use. Handwriting (88.1) still reads better in "
+            + "the cloud.",
+        secondsPerPage: 33.73,
+        ids: [.mlxVLM: "mlx-community/Qwen3.5-9B-4bit", .ollama: "qwen3.5:9b", .lmStudio: "qwen/qwen3.5-9b"])
     static let qwen3VL8B4 = Pick(
         name: "Qwen3-VL 8B", precision: "4-bit", memoryGiB: 8.4,
-        summary: "Measured on an 18 GB M3 Pro: 89.7 NES on the truth set at 4-bit (91.8 hosted at bf16; −0.17 where "
-            + "both finished a page), about 41 s a page, 8.4 GB in use. Close to the paid default; handwriting still "
-            + "reads better in the cloud.",
-        secondsPerPage: 41,
+        summary: "Measured on an 18 GB M3 Pro: 93.62 NES on the 91 of the owner's 96 test pages it finished (89.68 "
+            + "counting the 4 it failed as 0), about 35 s a page, 8.4 GB in use. Better than Qwen3.5 9B only when "
+            + "a failed page goes to a second reader.",
+        secondsPerPage: 35.09,
         ids: [.mlxVLM: "mlx-community/Qwen3-VL-8B-Instruct-4bit", .ollama: "qwen3-vl:8b", .lmStudio: "qwen/qwen3-vl-8b"])
-    static let qwen36_27B4 = Pick(
-        name: "Qwen3.6 27B", precision: "4-bit", memoryGiB: 22.9,
-        summary: "The best open-weight reader W41 measured: 94.3 NES hosted at fp8. Its 4-bit score is unmeasured "
-            + "(the 8B lost 0.17 where both finished). Needs about 23 GiB; estimated 1-2 minutes a page on an M4 Pro.",
-        secondsPerPage: 90,
-        ids: [.mlxVLM: "mlx-community/Qwen3.6-27B-4bit", .ollama: "qwen3.6:27b", .lmStudio: "qwen/qwen3.6-27b"])
-    static let qwen36_35BA3B4 = Pick(
-        name: "Qwen3.6 35B-A3B", precision: "4-bit", memoryGiB: 27.3,
-        summary: "For speed: 93.0 NES hosted at fp8, handwriting 88.8. It reads about 3B parameters a token, so it "
-            + "should be several times faster than the 27B (an estimate). Needs about 27 GiB.",
-        secondsPerPage: 30,
-        ids: [.mlxVLM: "mlx-community/Qwen3.6-35B-A3B-4bit", .ollama: "qwen3.6:35b-a3b",
-              .lmStudio: "qwen/qwen3.6-35b-a3b"])
-    static let qwen36_27B8 = Pick(
-        name: "Qwen3.6 27B", precision: "8-bit", memoryGiB: 37.8,
-        summary: "The nearest a Mac gets to the fp8 that scored 94.3 NES; a Mac's 8-bit build is a different format, "
-            + "so its score is unmeasured but expected close. Needs about 38 GiB.",
-        secondsPerPage: 90,
-        ids: [.mlxVLM: "mlx-community/Qwen3.6-27B-8bit", .ollama: "qwen3.6:27b-q8_0", .lmStudio: "qwen/qwen3.6-27b"])
-    static let qwen36_35BA3B8 = Pick(
-        name: "Qwen3.6 35B-A3B", precision: "8-bit", memoryGiB: 46.5,
-        summary: "The faster alternative at 8-bit: 93.0 NES hosted at fp8. Needs about 47 GiB.",
-        secondsPerPage: 30,
-        ids: [.mlxVLM: "mlx-community/Qwen3.6-35B-A3B-8bit", .ollama: "qwen3.6:35b-a3b-q8_0",
-              .lmStudio: "qwen/qwen3.6-35b-a3b"])
 
-    static let all = [qwen3VL8B4, qwen36_27B4, qwen36_35BA3B4, qwen36_27B8, qwen36_35BA3B8]
+    static let all = [qwen35_9B4, qwen3VL8B4]
 
-    /// Seconds a page for the time estimate of a run on `modelID`: its pick's figure, or the one measurement
-    /// (the 8B's 41 s on the M3 Pro) for a model W41 has no figure for.
+    /// Seconds a page for the time estimate of a run on `modelID`: its pick's figure, or the Qwen3-VL 8B's for a
+    /// model the bench has no Mac figure for.
     static func secondsPerPage(modelID: String) -> Double {
         all.first { $0.ids.values.contains(modelID) }?.secondsPerPage ?? qwen3VL8B4.secondsPerPage
     }
 
-    /// The models to offer for a Mac with this much memory, the recommended one first (W41-answers.md §1). Empty
-    /// below 16 GB, where no measured model leaves room for the rest of the Mac: Apple Vision is the local choice.
+    /// The models to offer for a Mac with this much memory, the recommended one first: the rule table's laptop picks
+    /// (`13-stage-rules/04-reading.md` §9, profile 1). With no fallback for a failed page (the default) the solver
+    /// ranks on strict NES, where Qwen3.5 9B leads. A 32 or 64 GB Mac gets the same picks (owner call 7.6, 2026-11-06):
+    /// no 27B-class reader has been measured on a Mac, so none is offered until one is (`W46.ocr-mac-27b`). Empty below
+    /// 16 GB, where no measured model leaves room for the rest of the Mac: Apple Vision is the local choice.
     static func picks(memoryGB: Double) -> [Pick] {
-        switch memoryGB {
-        case ..<16: return []
-        case ..<32: return [qwen3VL8B4]
-        case ..<48: return [qwen36_27B4, qwen36_35BA3B4, qwen3VL8B4]
-        case ..<64: return [qwen36_27B8, qwen36_27B4, qwen36_35BA3B4]
-        default: return [qwen36_27B8, qwen36_35BA3B8, qwen36_27B4, qwen36_35BA3B4]
-        }
+        memoryGB < 16 ? [] : [qwen35_9B4, qwen3VL8B4]
     }
 
     /// This Mac's memory as Apple sells it: an "18 GB" Mac reports 18 GiB.

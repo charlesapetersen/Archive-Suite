@@ -21,9 +21,9 @@ Process scanned images through any of five cloud LLM providers or the free, loca
 |----------|--------|---------------|------------------|
 | **Anthropic** | Claude Sonnet 4.6, Claude Opus 4.6 | Low / High | Yes |
 | **Google Gemini** | 3.8 Flash (default), 3.5 Flash Lite, 3.1 Flash Lite, 3.5 Flash, 3.1 Pro, 3 Flash Preview, 2.5 Flash, 2.5 Flash Lite, 2.5 Pro | Low / High | Yes |
-| **Mistral** | Mistral OCR 3 | — | Yes |
-| **OpenAI (ChatGPT)** | GPT-5 nano (default), GPT-5 mini, GPT-5.4 mini, GPT-5.4, GPT-5.5 | Low / High (reasoning models) | — |
-| **OpenRouter** | Qwen3-VL 235B (default), Qwen3.6 27B, GLM-5.3 Flash — each pinned to one host | — | — |
+| **Mistral** | Mistral OCR 4.1 (`mistral-ocr-latest`) | — | Yes |
+| **OpenAI (ChatGPT)** | GPT-5.4 mini (default), GPT-5 nano, GPT-5 mini, GPT-5.4, GPT-5.5 | Low / High (reasoning models) | — |
+| **OpenRouter** | Qwen3-VL 235B (default), Qwen3.6 27B, GLM-5.3 Flash, Qwen3.8 Flash, Qwen3.5 9B — each pinned to one host | — | — |
 | **Apple Vision** | macOS Vision | — | — |
 
 - Also supports an **OpenAI-compatible API Gateway** (custom base URL + model ID) for self-hosted or proxied endpoints, with user-supplied pricing for cost estimates — including a one-click **"Fill in OpenAI preset"** that prefills OpenAI's public endpoint, model, and pricing (a custom base URL then covers **Azure OpenAI** / proxies)

@@ -214,6 +214,9 @@ def reading_rows():
     rows = []
 
     def add(id, name, family, app_route, status, needs, F, cost_, time_, mem, caveats, kind_rules=(), fallback=None, conditions=()):
+        app_route = app_route or APP_ROUTES.get(id)
+        if app_route:
+            status = "shipped"
         rows.append({"id": id, "name": name, "family": family, "app_route": app_route, "status": status, "needs": needs, "figures": F,
                      "cost": cost_, "time": time_, "memory": mem, "caveats": list(caveats), "kind_rules": list(kind_rules), "fallback": fallback, "conditions": list(conditions)})
 
@@ -425,6 +428,24 @@ METRIC_FIGURE = {
 }
 
 ROW_KEYS = ["id", "name", "family", "app_route", "status", "needs", "figures", "cost", "time", "memory", "caveats", "kind_rules", "fallback", "conditions"]
+
+# W43.app-guide-refresh: the reading rows the Processor offers as the bench read them, `<provider>|<model id>` as
+# `ProviderModels.swift` names them (the provider's rawValue, lower-cased). A row here is "shipped". The Gemini and
+# OpenAI rows were read through the vendor's own endpoint on OpenRouter (`ocr_cloud.py`), the app calls the vendor
+# directly; Mistral OCR through the app's own MistralClient (`ocr_cloud_mistral.py`); each OpenRouter row on the
+# provider and precision `OpenRouterRoute.catalog` pins (`ocr_panel.py`, `ocr_cloud.py`, `ocr_cloud_full.py`).
+APP_ROUTES = {
+ "gemini3.5-flash-lite": "gemini|gemini-3.5-flash-lite",
+ "gemini3.1-flash-lite": "gemini|gemini-3.1-flash-lite",
+ "gemini3.5-flash": "gemini|gemini-3.5-flash",
+ "gemini3.1-pro": "gemini|gemini-3.1-pro",
+ "gpt5.4-mini": "openai|gpt-5.4-mini",
+ "mistral-ocr-4-1": "mistral|mistral-ocr-latest",
+ "qwen3-vl-235b": "openrouter|qwen/qwen3-vl-235b-a22b-instruct",
+ "qwen3.6-27b": "openrouter|qwen/qwen3.6-27b",
+ "qwen3.8-flash": "openrouter|qwen/qwen3.8-flash",
+ "qwen3.5-9b": "openrouter|qwen/qwen3.5-9b",
+}
 KEY_NAMES = {"stanford-gateway": "gateway"}
 
 

@@ -215,13 +215,19 @@ enum OpenRouterTestDriver {
 
     private static func catalogChecks() {
         let c = OpenRouterRoute.catalog
-        eq("1 models", c.map(\.model.id), ["qwen/qwen3-vl-235b-a22b-instruct", "qwen/qwen3.6-27b", "z-ai/glm-5.3-flash"])
-        eq("1 pinned providers", c.map(\.providerTag), ["deepinfra/fp8", "chutes/fp8", "z-ai"])
-        eq("1 precisions", c.map(\.precision), ["fp8", "fp8", "fp8"])
-        eq("1 reasoning as the bench sent it", c.map(\.reasoning), [.none, .off, .effort("minimal")])
+        eq("1 models", c.map(\.model.id), ["qwen/qwen3-vl-235b-a22b-instruct", "qwen/qwen3.6-27b", "z-ai/glm-5.3-flash",
+                                            "qwen/qwen3.8-flash", "qwen/qwen3.5-9b"])
+        eq("1 pinned providers", c.map(\.providerTag), ["deepinfra/fp8", "chutes/fp8", "z-ai", "alibaba", "deepinfra/bf16"])
+        eq("1 precisions", c.map(\.precision), ["fp8", "fp8", "fp8", "unknown", "bf16"])
+        eq("1 reasoning as the bench sent it", c.map(\.reasoning), [.none, .off, .effort("minimal"), .off, .off])
         // The pinned endpoints' prices: the panel's frozen catalogs, and GLM's from its seg-cheap call log.
-        eq("1 input prices", c.map(\.model.inputCostPer1M), [0.20, 0.25, 0.15])
-        eq("1 output prices", c.map(\.model.outputCostPer1M), [0.88, 2.00, 0.50])
+        eq("1 input prices", c.map(\.model.inputCostPer1M), [0.20, 0.25, 0.15, 0.15, 0.10])
+        eq("1 output prices", c.map(\.model.outputCostPer1M), [0.88, 2.00, 0.50, 0.47, 0.15])
+        // W43.app-guide-refresh: every measured model is a reading row of the rule table, linked by its app route.
+        let reading = SettingsRouteTable.bundled?.stage("reading")?.routes ?? []
+        check("1 every measured model is linked from the rule table",
+              c.filter { !$0.settingsNote.contains("not been measured") }.allSatisfy { r in
+                  reading.contains { $0.appRoute == "openrouter|\(r.model.id)" } })
         check("1 every model is an OpenRouter model", c.allSatisfy { $0.model.provider == .openrouter })
         eq("1 the provider's models are the catalog, no custom ones", LLMProvider.openrouter.models.map(\.id),
            c.map(\.model.id))
@@ -230,7 +236,8 @@ enum OpenRouterTestDriver {
               c.allSatisfy { $0.model.displayName.contains($0.providerTag.split(separator: "/")[0]) && $0.model.displayName.contains($0.precision) },
               c.map(\.model.displayName).joined(separator: ", "))
         check("1 the Settings note names provider, precision and fallbacks",
-              c.allSatisfy { $0.settingsNote.contains("fp8") && $0.settingsNote.contains("fallbacks off") })
+              c.allSatisfy { ($0.settingsNote.contains($0.precision) || $0.settingsNote.contains("lists none"))
+                  && $0.settingsNote.contains("fallbacks off") })
         check("1 GLM's note says its OCR is unmeasured", c[2].settingsNote.contains("not been measured"))
         check("1 the page guidance sees Qwen3.6 27B", OCRPageGuidance.builtInModelIDs.contains("qwen/qwen3.6-27b"))
         eq("1 the Keychain account is the bench's", LLMProvider.openrouter.rawValue, "OpenRouter")

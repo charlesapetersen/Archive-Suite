@@ -138,7 +138,7 @@ models. Drive the app by hand (`./launch.sh`). Each row: **do → expect**; note
 
 ### 2.1 Settings (⌘,) — every control, help, and gray-out
 Per the project convention, **every setting has a `?` help popover and grays out when irrelevant.**
-- [ ] **Provider** dropdown lists Anthropic / Gemini / Mistral / OpenAI / OpenRouter (Apple Vision, the API Gateway and the Local CLI Agent are chosen in the **OCR backend** picker); **Model** dropdown updates to that provider's built-ins (Gemini defaults to `gemini-3.8-flash`, OpenAI to `gpt-5-nano`).
+- [ ] **Provider** dropdown lists Anthropic / Gemini / Mistral / OpenAI / OpenRouter (Apple Vision, the API Gateway and the Local CLI Agent are chosen in the **OCR backend** picker); **Model** dropdown updates to that provider's built-ins (Gemini defaults to `gemini-3.8-flash`, OpenAI to `gpt-5.4-mini`).
 - [ ] **Thinking level** (Low/High) shows only for models that support it; grayed/hidden otherwise.
 - [ ] **API keys**: one field per provider (Anthropic, Gemini, Mistral, OpenAI, OpenRouter, plus Gateway when **Use gateway** is on); entering a key persists to Keychain; masked; not echoed.
 - [ ] **Use gateway** toggle: ON reveals base URL / model ID / Gateway key and **grays out** batch (unsupported on gateway path); **Detect rotation** stays enabled; a remote gateway's rotation calls ask Gemini 3.7 Flash, a model on this Mac falls back to local Vision; OFF hides them.
