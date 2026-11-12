@@ -4144,6 +4144,16 @@
    "batch": null,
    "mac": true,
    "source": "seg-adapt-curve-owner.json"
+  },
+  {
+   "name": "Gemini only, text alone (3.7 Flash, gateway; candidate budget tier, not in the app)",
+   "nocheck": 87.3,
+   "checks": 38.3,
+   "after": 98.5,
+   "unflagged": 1,
+   "std": 1.73,
+   "batch": 0.87,
+   "source": "seg-text-tier-test.json"
   }
  ],
  "handwriting": {

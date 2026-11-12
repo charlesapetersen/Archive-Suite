@@ -378,6 +378,21 @@ def segmentation(op):
             seg.append({"name": label, "nocheck": round(r["nocheck"], 1), "checks": round(r["checks"], 1),
                         "after": round(r["after"], 1), "unflagged": r["unflagged"], "std": None, "batch": None,
                         "mac": True, "source": adapt.name})
+    # W46.seg-text-tier-test: Gemini 3.7 Flash's g2 window with the images dropped, at the shipped Gemini level, its
+    # price from its own tokens on the test boxes (batch at half list, as options.md's Gemini row). Its image arm must
+    # reproduce options.md's Gemini only row, which checks it was scored the same way.
+    tier = RESULTS / "seg-text-tier-test.json"
+    if tier.exists():
+        d = json.loads(tier.read_text())
+        f = lambda x: {"nocheck": round(100 * x["pages_exact_no_review"], 1), "checks": round(x["flagged_per_100_pages"], 1),
+                       "after": round(100 * x["pages_exact_after_review"], 1), "unflagged": x["unflagged_errors"]}
+        shipped = next(a for a in seg if a["name"].startswith("Gemini only"))
+        if any(f(d["arms"]["image"]["figures"])[k] != shipped[k] for k in ("nocheck", "checks", "after", "unflagged")):
+            sys.exit(f"seg-text-tier-test.json's image arm no longer matches options.md: {d['arms']['image']['figures']}")
+        c = d["per_1000_pages"]["text"]
+        seg.append({"name": "Gemini only, text alone (3.7 Flash, gateway; candidate budget tier, not in the app)",
+                    **f(d["arms"]["text"]["figures"]), "std": cents(c["list"]), "batch": cents(c["batch"]),
+                    "source": tier.name})
     return seg
 
 
