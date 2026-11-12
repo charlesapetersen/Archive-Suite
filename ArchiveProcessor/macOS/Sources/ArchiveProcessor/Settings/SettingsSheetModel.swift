@@ -187,7 +187,7 @@ struct SettingsSheetModel {
         }
         let off = cards.filter { $0.apply != nil || $0.runsNow != nil }.map { $0.title.lowercased() }
         notInUse = off.isEmpty ? nil
-            : "The totals are for the app's picks. Process Files does not use them yet for "
+            : "These totals assume every pick is switched on. Process Files does not use the app's picks yet for "
                 + off.joined(separator: " and ") + "; each card below says what it uses now, and its button switches it on."
         ruleStages = Self.ruleStageIDs.compactMap { id in table.stage(id).map { Self.ruleStage($0, resolver: resolver) } }
     }
@@ -240,7 +240,8 @@ struct SettingsSheetModel {
                   detail: "\(Self.count(a.pages, "page")), at list prices"),
             Total(id: "time", label: "Machine time", value: "about " + words.hours(s.hours),
                   detail: (s.hours > a.hours + 1e-9 ? "more than the \(words.hours(a.hours)) allowed" : "within the \(words.hours(a.hours)) allowed")
-                    + "; steps on this Mac run one after another, online ones alongside them"
+                    + (s.picks.contains { $0.flag == nil && [.cloud, .plan].contains($0.route?.family) }
+                        ? "; steps on this Mac run one after another, online ones alongside them" : "")
                     + (Self.checkingHours(s, answers: a).map { "; plus about \(words.hours($0)) of your own checking, not counted in the time allowed" } ?? "")),
         ]
         if let w = s.weightedAccuracy {
@@ -362,8 +363,8 @@ struct SettingsSheetModel {
                           + "3.7 Flash with the same instructions; Gemini 3.8 itself has not been tested on this yet.")
         }
         if stage.id == "dating" || stage.id == "entities", route?.id != "none" {
-            labels.append("These figures were measured on the test documents' text as each test read it, not on text read by "
-                          + "your choice above; with a reading program that makes more mistakes, results may be lower.")
+            labels.append("These figures were measured on text read by the programs used in the tests, not by "
+                          + "your reading choice above; with a reading program that makes more mistakes, results may be lower.")
             if s.picks.contains(where: { $0.stage == "reading" && $0.part == "handwritten" && $0.flag != nil }) {
                 labels.append("Handwritten pages your reading choice cannot read get no "
                               + (stage.id == "dating" ? "date" : "names") + " from their text.")
@@ -394,13 +395,16 @@ struct SettingsSheetModel {
                           gain: stage.id == "segmentation" && base == 0
                             ? String(format: "about %.0f%% of pages in the right document before you check (by hand: none)", v)
                             : stage.id == "entities" && base == 0
-                            ? String(format: "finding the sender right about %.0f times in 100", v * 100)
+                            ? String(format: "about %.0f senders right in 100", v * 100)
                             : gain.map { words.gain(stage.id, $0) } ?? words.figure(stage.id, v),
                           reason: (tie ? "within the margin of error, so no real gain; " : "")
                             + (b.isLimit ? words.limitPhrase(b.reason).lowercased()
                                 : b.reason == "not in this comparison"
                                     ? (appBlocked[b.id]?.first.map(words.reason)
-                                        ?? (app.pick(stage.id, leadPart)?.routeID == b.id ? "this is the app's pick; you replaced it" : words.reason(b.reason)))
+                                        ?? (app.pick(stage.id, leadPart)?.routeID == b.id ? "this is the app's pick; you replaced it"
+                                            : app.pick(stage.id, leadPart)?.better.first { $0.id == b.id }.map {
+                                                $0.isLimit ? words.limitPhrase($0.reason).lowercased() : words.reason($0.reason)
+                                            } ?? words.reason(b.reason)))
                                     : words.reason(b.reason)))
         }
         .sorted { $0.order > $1.order }
@@ -417,9 +421,9 @@ struct SettingsSheetModel {
                                     gain: stage.id == "segmentation" && base == 0
                                         ? String(format: "about %.0f%% of pages in the right document before you check (by hand: none)", m.1)
                                         : stage.id == "entities" && base == 0
-                                        ? String(format: "finding the sender right about %.0f times in 100", m.1 * 100)
+                                        ? String(format: "about %.0f senders right in 100", m.1 * 100)
                                         : words.gain(stage.id, m.1 - base),
-                                    reason: (appBlocked[m.0.id] ?? []).first { $0.contains("GB") } ?? "needs a bigger Mac"))
+                                    reason: (appBlocked[m.0.id] ?? []).first { $0.contains("GB") }.map(words.reason) ?? "needs a bigger Mac"))
         }
         let pickFigure = base
         let used = Set(usedRoutes.map(\.id))
@@ -614,8 +618,9 @@ struct SettingsSheetModel {
             var rows = [PartRow(id: "all", label: before, routeName: name(r),
                                 figure: r.family == .manual ? "nothing is proposed: you check every place yourself"
                                     : p.figure.map { String(format: "%.0f%% of pages in the right document", $0) } ?? "no figure",
-                                sample: "on two test boxes of typed letters, 363 pages checked by hand",
-                                label2: "the boxes below are separate tests: on other material it varies", warning: false)]
+                                sample: r.family == .manual ? nil : "on two test boxes of typed letters, 363 pages checked by hand",
+                                label2: r.family == .manual ? nil : "the boxes below are separate tests: on other material it varies",
+                                warning: false)]
             if let per100 {
                 let places = per100 * Double(a.pages) / 100
                 rows.append(PartRow(id: "checks", label: "Places it asks you to check (a place is the gap between two pages, where a new document may start)", routeName: nil,
@@ -632,9 +637,16 @@ struct SettingsSheetModel {
                                     label2: nil, warning: false))
             }
             if let after = r.figure("test-boxes.after_checking") {
+                let hidden = r.figure("test-boxes.unflagged_per_500")
                 rows.append(PartRow(id: "after", label: "After you check them all", routeName: nil,
                                     figure: String(format: "%.0f%% of pages in the right document", after),
-                                    sample: nil, label2: nil, warning: false))
+                                    sample: nil,
+                                    label2: after < 99.95 && r.family != .manual
+                                        ? "places the model is sure of are not shown to you, and a few of them are wrong"
+                                            + (hidden.map { String(format: " (about %.0f in every 500 pages)", $0) } ?? "")
+                                            + "; to be fully certain, check every place yourself"
+                                        : nil,
+                                    warning: false))
             }
             let boxes: [(String, String)] = [("letters", "A box of typed and handwritten letters"), ("magazine", "A magazine, articles within issues"),
                                              ("clippings-mixed", "Clippings mixed with other papers"),
@@ -690,7 +702,7 @@ struct SettingsSheetModel {
                         "test documents whose year is not in their text")
                 case "step 2":
                     row("step 2", label, "unprinted_122_doc_year",
-                        "a second set of test documents, with no year anywhere in their text")
+                        "other test documents, with no year anywhere in their text")
                 case "step 4":
                     rows.append(PartRow(id: "step 4", label: label, routeName: r.id == first ? nil : name(r),
                                         figure: r.id == first ? "done by the program above; not measured on its own"
@@ -710,9 +722,16 @@ struct SettingsSheetModel {
                                          sample: r.figures[key]?["n"]?.double.map { "on \(Int($0)) letters" }, label2: nil, warning: false))
                 }
             }
-            let senders = picks.map { p in
-                let label = ["correspondence-typed": "Typed letters", "correspondence-handwritten": "Handwritten letters",
-                             "non-correspondence": "Everything that is not a letter"][p.part] ?? p.part
+            // One row for all letters when handwriting was not measured apart and is read.
+            let typed = picks.first { $0.part == "correspondence-typed" }
+            let hand = picks.first { $0.part == "correspondence-handwritten" }
+            let merged = !handsUnread && typed?.flag == nil && hand?.flag == nil && typed?.route?.id == hand?.route?.id
+                && typed?.route?.figure("handwritten_or_mixed") == nil
+            let senders = picks.compactMap { p -> PartRow? in
+                if merged && p.part == "correspondence-handwritten" { return nil }
+                let label = merged && p.part == "correspondence-typed" ? "All letters, typed and handwritten"
+                    : ["correspondence-typed": "Typed letters", "correspondence-handwritten": "Handwritten letters",
+                       "non-correspondence": "Everything that is not a letter"][p.part] ?? p.part
                 if p.part == "correspondence-handwritten", handsUnread, p.flag == nil {
                     return PartRow(id: p.part, label: label, routeName: nil,
                                    figure: "none found: your reading choice cannot read handwriting",
@@ -876,7 +895,7 @@ struct SettingsSheetWords {
         case "placement":
             return "On typed and printed pages the text is laid over the page image line by line, so you can select and "
                 + "search it where it sits; this is free. On handwritten pages the lines are found on the page and the "
-                + "text is fitted to them; a page where the fit is unsure, or where the program returns whole paragraphs instead of lines, "
+                + "text is fitted to them; a page where the fit is unsure, or where the program cannot say where each line is, "
                 + "gets a separate text page instead."
         case "marks":
             return "Finding and listing marks (stamps, signatures, handwritten notes) is not offered yet. Your page images are never altered to "
@@ -1092,17 +1111,18 @@ struct SettingsSheetWords {
         let r = p.reason
         if p.flag != nil, p.route == nil { return "Nothing can run this here." }
         if r.contains("free default") {
-            let head = "The app's free default, chosen by its makers: Apple Vision is built into macOS, needs no download and "
-                + "reads a typed or printed page in under a second; nothing is spent and no page leaves this Mac. "
+            let head = "The app's free default, set by its makers rather than by the “higher wins” rule: Apple Vision is "
+                + "built into macOS and reads a typed or printed page in under a second; nothing is spent and no page "
+                + "leaves this Mac. "
             if let hands = handsName {
                 return head + "\(hands), a free download that stays on this Mac, reads the handwriting and takes most of the "
-                    + "memory and time. Some downloaded programs score slightly higher on your mix of pages (see the "
-                    + "alternatives), but each is a large download; any can be chosen with “Use instead…”."
+                    + "memory and time. The free programs listed below score slightly higher on your mix of pages; any "
+                    + "can be chosen with “Use instead…”."
             }
             return head + (handsUnread
                 ? "Handwritten pages are not read: the programs that read them need a key, or more memory than this Mac has."
-                : "Some downloaded programs score slightly higher (see the alternatives), but each is a large download; "
-                    + "any can be chosen with “Use instead…”.")
+                : "The free programs listed below score slightly higher on your mix of pages; any can be chosen with "
+                    + "“Use instead…”.")
         }
         if r.contains("no route fits the ceiling and the hours") {
             return "Nothing fits both your spending and your time, so the cheapest choice that can run is used."
