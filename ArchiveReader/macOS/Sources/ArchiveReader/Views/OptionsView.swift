@@ -11,6 +11,7 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.copyParagraph) private var copyParagraph: Bool = true
     @AppStorage(SettingsKey.copyDehyphenate) private var copyDehyphenate: Bool = true
     @AppStorage(SettingsKey.copyLayoutParagraph) private var copyLayoutParagraph: Bool = true
+    @AppStorage(SettingsKey.copyTitleCase) private var copyTitleCase: Bool = true
     @AppStorage(SettingsKey.viewerSplit) private var viewerSplit: Double = 0.667
     @AppStorage(SettingsKey.subjectCombineAny) private var subjectCombineAny: Bool = false
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
@@ -39,9 +40,10 @@ struct OptionsView: View {
             Section("Copying text") {
                 Toggle("Collapse single line breaks into spaces", isOn: $copyCollapse)
                 Toggle("Blank line = paragraph break", isOn: $copyParagraph)
-                Toggle("Find unmarked paragraph breaks from the layout (indent, short line, wider gap)",
+                Toggle("Find paragraphs, lists and headings from the layout (indent, gap, marker, short line)",
                        isOn: $copyLayoutParagraph)
                 Toggle("Rejoin hyphenated line-splits (wel-/fare → welfare)", isOn: $copyDehyphenate)
+                Toggle("Title-case text in capitals (BOX 12 → Box 12; UCLA, M/D kept)", isOn: $copyTitleCase)
             }
             Section("Document viewer") {
                 VStack(alignment: .leading) {

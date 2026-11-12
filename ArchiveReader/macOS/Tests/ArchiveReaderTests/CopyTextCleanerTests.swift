@@ -111,21 +111,23 @@ final class CopyTextCleanerTests: XCTestCase {
                      line("we cannot accept the", x: 40, width: 300, row: 2),
                      line("terms as they stand", x: 40, width: 300, row: 3),
                      line("without the Senate", x: 40, width: 300, row: 4)]
-        XCTAssertEqual(CopyTextCleaner.layoutBreaks(lines), [])
+        XCTAssertEqual(CopyTextCleaner.structure(lines, columns: true).count, 1)
     }
 
     func testHyphenatedContinuationNeverBreaks() {
         let lines = [line("The committee approved the", row: 0),
                      line("wel-", width: 60, row: 1),
                      line("fare reform bill and", row: 2), line("adjourned", row: 3)]
-        XCTAssertEqual(CopyTextCleaner.layoutBreaks(lines), [])
+        XCTAssertEqual(CopyTextCleaner.clean(lines.map(\.text).joined(separator: "\n"), lines: lines),
+                       "The committee approved the welfare reform bill and adjourned")
     }
 
     func testExistingBlankLinesKeptAndNotDoubled() {
         let lines = [line("First paragraph line one", row: 0), line("ends here.", width: 100, row: 1),
                      line("Second paragraph runs on", row: 3), line("to the end", row: 4)]
         let raw = "First paragraph line one\nends here.\n\nSecond paragraph runs on\nto the end"
-        XCTAssertEqual(CopyTextCleaner.markLayoutBreaks(raw, lines: lines), raw)
+        XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines),
+                       "First paragraph line one ends here.\n\nSecond paragraph runs on to the end")
     }
 
     func testMismatchedLinesFallBackToText() {
@@ -150,7 +152,7 @@ final class CopyTextCleanerTests: XCTestCase {
                      CopyTextLine(text: "right column one", box: CGRect(x: 260, y: 700, width: 180, height: 12), page: 0),
                      CopyTextLine(text: "right column two", box: CGRect(x: 260, y: 686, width: 180, height: 12), page: 0),
                      CopyTextLine(text: "right column three", box: CGRect(x: 260, y: 672, width: 180, height: 12), page: 0)]
-        XCTAssertEqual(CopyTextCleaner.layoutBreaks(lines), [])
+        XCTAssertEqual(CopyTextCleaner.structure(lines, columns: true).count, 1)
     }
 
     /// End to end through PDFKit: lines drawn at set positions (as the OCR text layer places them, no blank
@@ -204,5 +206,113 @@ final class CopyTextCleanerTests: XCTestCase {
                        "The committee met on Tuesday and agreed the terms of the settlement, which it then sent on to the Secretary for his signature without comment from the house.\n\n"
                        + "Mr. Smith then moved that the meeting adjourn until Friday at noon and",
                        "raw: \(raw.debugDescription) lines: \(lines.map { ($0.text, $0.box) })")
+    }
+
+    // MARK: - Paragraphs, lists and headings (W40.reader-prose-structure)
+    //
+    // The two page fixtures reproduce the geometry measured on two OCR'd corpus pages (a numbered list with
+    // lettered sub-items, and a typed memo), with invented text: the repo is public.
+
+    private func at(_ text: String, _ x: CGFloat, _ y: CGFloat, _ w: CGFloat, h: CGFloat = 8.5) -> CopyTextLine {
+        CopyTextLine(text: text, box: CGRect(x: x, y: y, width: w, height: h), page: 0)
+    }
+
+    /// The text PDFKit reports for `lines`: each line's text, with an embedded newline where the OCR's line
+    /// ended inside a word that the line geometry split.
+    private func rawText(_ lines: [CopyTextLine]) -> String {
+        var out = ""
+        for l in lines {
+            let parts = l.text.components(separatedBy: "\n")
+            out += parts.count > 1 ? parts.joined(separator: "\n") : (out.isEmpty || out.hasSuffix(" ") ? "" : "\n") + l.text
+        }
+        return out
+    }
+
+    /// A numbered list after a lead-in, items indented on their first line with continuations back at the
+    /// margin, lettered sub-items hanging; one marker its own selection on its item's baseline, and one word
+    /// whole at a line end that the selection splits ("consider" | "ing⏎the…").
+    func testNumberedListWithLetteredSubItems() {
+        let lines = [at("The program serves a number of ends. The most", 36, 600, 390),
+                     at("important of these are as follows:", 36, 581.7, 200),
+                     at("1. To keep the work of the group at the highest", 98, 563.4, 338),
+                     at("level we must find and keep people who are consider", 35, 545.1, 412),
+                     at("ing\nthe needs of the client first, and", 35, 526.8, 396),
+                     at("act on it.", 35, 508.5, 67),
+                     at("2. To meet these ends we must:", 96, 490.2, 306),
+                     at("(a) Offer work that is varied and", 119, 471.9, 268),
+                     at("useful", 141, 453.6, 49),
+                     at("(b) Keep a fair and open", 118, 435.3, 260),
+                     at("way of working", 141, 417.0, 180),
+                     at("(c) ", 117.5, 398.7, 12.4),
+                     at("Offer room to grow", 140.6, 398.7, 228),
+                     at("3. To share the rewards fairly among all", 93, 380.4, 340),
+                     at("members of the group.", 30, 362.1, 150)]
+        let raw = rawText(lines)
+        XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines),
+                       "The program serves a number of ends. The most important of these are as follows:\n\n"
+                       + "1. To keep the work of the group at the highest level we must find and keep people who are "
+                       + "considering the needs of the client first, and act on it.\n"
+                       + "2. To meet these ends we must:\n"
+                       + "    (a) Offer work that is varied and useful\n"
+                       + "    (b) Keep a fair and open way of working\n"
+                       + "    (c) Offer room to grow\n"
+                       + "3. To share the rewards fairly among all members of the group.")
+    }
+
+    /// A typed memo: a header of short lines, a centred heading in capitals, paragraphs marked only by a
+    /// first-line indent, a word split by the selection, and an image's place in the text.
+    func testMemoHeadingAndIndentedParagraphs() {
+        let lines = [at("TO:", 107, 686, 19, h: 10), at("FROM:", 86, 658, 39, h: 10),
+                     at("The Committee", 157, 687, 121, h: 10), at("Jane Writer", 156, 658, 82, h: 10),
+                     at("27 December 1966", 457, 657, 108, h: 10),
+                     at("QUALIFICATIONS OF THE UCLA M/D", 192, 615, 250, h: 10),
+                     at("On the assumption that we will not decide this matter", 121, 580, 422, h: 10),
+                     at("for a while, here is the draft of what we hope for, a list of the qualifica", 86, 566, 469, h: 10),
+                     at("tions\nwe want in the M/D.", 85, 552, 100, h: 10),
+                     at("This version adds the points made at the", 120.5, 523, 402, h: 10),
+                     at("meeting and a few more of my own, set out in", 85.5, 509, 441, h: 10),
+                     at("full as before.", 84, 495, 192, h: 10),
+                     at("\u{FFFC}", 61, 118, 381, h: 202)]
+        let raw = rawText(lines)
+        XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines),
+                       "To:\nFrom:\nThe Committee\nJane Writer\n\n27 December 1966\n\n"
+                       + "Qualifications of the UCLA M/D\n\n"
+                       + "On the assumption that we will not decide this matter for a while, here is the draft of "
+                       + "what we hope for, a list of the qualifications we want in the M/D.\n\n"
+                       + "This version adds the points made at the meeting and a few more of my own, set out in "
+                       + "full as before.")
+    }
+
+    func testTextPaneListFromLineBreaksAndIndent() {
+        let raw = "INTRODUCTION\nThe steps we agreed on at the meeting were these:\n1. Write to the board\n"
+            + "2. Ask for the papers\n   a) the minutes\n   b) the accounts\n3. Report back by Friday."
+        XCTAssertEqual(CopyTextCleaner.clean(raw),
+                       "Introduction\n\nThe steps we agreed on at the meeting were these:\n\n1. Write to the board\n"
+                       + "2. Ask for the papers\n    a) the minutes\n    b) the accounts\n3. Report back by Friday.")
+    }
+
+    func testBulletsAndAWrappedNumberThatIsNotAnItem() {
+        XCTAssertEqual(CopyTextCleaner.clean("Bring:\n• the letters\n• the ledger"),
+                       "Bring:\n\n• the letters\n• the ledger")
+        // "12." at a line start mid-sentence is the end of a page reference, not an item.
+        let raw = "The figures he cited in the report are on page\n12. They show a rise over the year\nbefore it."
+        XCTAssertEqual(CopyTextCleaner.clean(raw),
+                       "The figures he cited in the report are on page 12. They show a rise over the year before it.")
+    }
+
+    func testCapitalsTitleCasedOnlyWhenWhollyCapitals() {
+        XCTAssertEqual(CopyTextCleaner.clean("A LETTER FROM THE UCLA\nLIBRARY TO MR. J. W. SMITH"),
+                       "A Letter from the UCLA Library to Mr. J. W. Smith")
+        XCTAssertEqual(CopyTextCleaner.clean("He wrote to the UCLA\nLIBRARY at once."), "He wrote to the UCLA LIBRARY at once.")
+        var opts = CopyTextOptions(); opts.titleCaseCapitals = false
+        XCTAssertEqual(CopyTextCleaner.clean("BOX 12\nFOLDER 3", options: opts), "BOX 12 FOLDER 3")
+        XCTAssertEqual(CopyTextCleaner.clean("(A) THE MINUTES\n(B) THE ACCOUNTS"), "(A) The Minutes\n(B) The Accounts")
+    }
+
+    /// The structure pass may only regroup: a result whose letters differ from the selection's is refused.
+    func testAssemblyRefusesChangedWords() {
+        let units = [CopyTextCleaner.Unit(kind: .paragraph, lines: ["other words"])]
+        XCTAssertNil(CopyTextCleaner.assemble(units, raw: "the words", options: CopyTextOptions()))
+        XCTAssertEqual(CopyTextCleaner.assemble(units, raw: "OTHER\nwords", options: CopyTextOptions()), "other words")
     }
 }
