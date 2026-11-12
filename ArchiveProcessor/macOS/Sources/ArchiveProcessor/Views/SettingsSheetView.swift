@@ -243,6 +243,7 @@ struct SettingsSheetPage: View {
             ForEach(m.totals) { t in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(t.label).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(t.value).font(.title3.weight(.semibold))
                     if let d = t.detail {
                         Text(d).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

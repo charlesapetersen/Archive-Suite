@@ -258,7 +258,7 @@ struct SettingsSheetModel {
                              value: String(format: "%.0f of 100", w),
                              detail: (wAfter.map { String(format: "%.0f of 100 after you check every place it asks; ", $0) } ?? "")
                                 + "reading, finding documents, dates and names together, each counted as much as you said it matters"
-                                + (unread ? "; pages that no reading program here can read count as 0" : "")
+                                + (unread ? "; pages your reading choice cannot read count as 0" : "")
                                 + (byHand ? "; finding documents by hand counts as 0 before your checking" : "")))
         }
         out.append(Total(id: "plan", label: "Your subscription plan", value: planInUse ? "In use" : "Not used",
@@ -362,8 +362,8 @@ struct SettingsSheetModel {
                           + "3.7 Flash with the same instructions; Gemini 3.8 itself has not been tested on this yet.")
         }
         if stage.id == "dating" || stage.id == "entities", route?.id != "none" {
-            labels.append("These figures were measured on the test documents' text as each study read it, not on your "
-                          + "reading choice above; with a reading program that makes more mistakes, results may be lower.")
+            labels.append("These figures were measured on the test documents' text as each test read it, not on text read by "
+                          + "your choice above; with a reading program that makes more mistakes, results may be lower.")
             if s.picks.contains(where: { $0.stage == "reading" && $0.part == "handwritten" && $0.flag != nil }) {
                 labels.append("Handwritten pages your reading choice cannot read get no "
                               + (stage.id == "dating" ? "date" : "names") + " from their text.")
@@ -376,7 +376,9 @@ struct SettingsSheetModel {
                 : "Names are not among what matters most for this collection, so they are not looked for.")
         }
 
-        let parts = Self.parts(stage, picks: picks, answers: a, words: words, cmpBase: Self.comparable(stage.id, s, words: words).base)
+        let handsUnread = s.picks.contains { $0.stage == "reading" && $0.part == "handwritten" && $0.flag != nil }
+        let parts = Self.parts(stage, picks: picks, answers: a, words: words, cmpBase: Self.comparable(stage.id, s, words: words).base,
+                               handsUnread: handsUnread)
         let blocked = s.blocked[stage.id] ?? [:]
         let appBlocked = app.blocked[stage.id] ?? [:]
         // Every figure the card compares is on one basis (`comparable`): segmentation's no-checking figure, reading on
@@ -412,7 +414,9 @@ struct SettingsSheetModel {
                    && (appBlocked[r.id] ?? []).allSatisfy { $0.contains("GB") || $0.contains("download") }
            }).compactMap({ r in cmp.of(r).map { (r, $0) } }).filter({ $0.1 > base }).max(by: { $0.1 < $1.1 }) {
             betterAll.append(Better(id: m.0.id, name: words.display(stage.id, m.0), order: m.1 - base,
-                                    gain: stage.id == "entities" && base == 0
+                                    gain: stage.id == "segmentation" && base == 0
+                                        ? String(format: "about %.0f%% of pages in the right document before you check (by hand: none)", m.1)
+                                        : stage.id == "entities" && base == 0
                                         ? String(format: "finding the sender right about %.0f times in 100", m.1 * 100)
                                         : words.gain(stage.id, m.1 - base),
                                     reason: (appBlocked[m.0.id] ?? []).first { $0.contains("GB") } ?? "needs a bigger Mac"))
@@ -551,7 +555,7 @@ struct SettingsSheetModel {
     }
 
     private static func parts(_ stage: SettingsRouteTable.Stage, picks: [SettingsPick], answers a: SettingsAnswers,
-                              words: Words, cmpBase: Double?) -> [PartRow] {
+                              words: Words, cmpBase: Double?, handsUnread: Bool = false) -> [PartRow] {
         func name(_ r: SettingsRouteTable.Route?) -> String? { r.map { words.display(stage.id, $0) } }
         switch stage.id {
         case "reading":
@@ -560,16 +564,24 @@ struct SettingsSheetModel {
             // The pick on the user's own mix of pages: the figure "better" and the alternatives are read against.
             if let v = cmpBase {
                 let unread = picks.contains { $0.part != "all" && $0.flag != nil }
+                // Shares of the whole mix, so the kinds shown and the rest add to 100.
+                let whole = max(1e-9, a.mix.values.filter { $0 > 0 }.reduce(0, +))
                 let mix = ["typewritten", "printed", "handwritten"].compactMap { k -> String? in
                     guard let x = a.mix[k], x > 0 else { return nil }
-                    return String(format: "%.0f%% \(k)", x)
+                    return String(format: "%.0f%% \(k)", x / whole * 100)
                 }.joined(separator: ", ")
-                    + (["typewritten", "printed", "handwritten"].reduce(0) { $0 + (a.mix[$1] ?? 0) } < 99.5 ? ", the rest other kinds" : "")
+                    + {
+                        let rest = a.mix.filter { !["typewritten", "printed", "handwritten"].contains($0.key) && $0.value > 0 }
+                            .sorted { $0.value > $1.value }
+                            .map { k in String(format: "%.0f%% ", k.value / whole * 100) + (CollectionInterviewAnswers.measuredKinds.contains(k.key)
+                                ? PageKind.label(k.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(k.key).lowercased()) }
+                        return rest.isEmpty ? "" : ", " + rest.joined(separator: ", ")
+                    }()
                 rows.append(PartRow(id: "all", label: "On your mix of pages", routeName: nil,
                                     figure: words.figure("reading", v),
                                     sample: mix.isEmpty ? "on 96 test pages whose text was checked by hand"
                                         : "\(mix), from the figures below",
-                                    label2: unread ? "pages this choice cannot read count as 0" : nil, warning: false))
+                                    label2: unread ? "pages your reading choice cannot read count as 0" : nil, warning: false))
             }
             rows += picks.filter { $0.part != "all" }.map { p in
                 let isHands = p.part == "handwritten"
@@ -609,7 +621,9 @@ struct SettingsSheetModel {
                 rows.append(PartRow(id: "checks", label: "Places it asks you to check (a place is the gap between two pages, where a new document may start)", routeName: nil,
                                     figure: r.family == .manual ? String(format: "every place between two document pages (about %.0f in every 100 pages; the rest are next to box or folder labels, which need no check)", per100)
                                         : String(format: "about %.0f in every 100 pages", per100)
-                                            + (stage.route("manual")?.figure("test-boxes.checks_per_100").map { String(format: " (by hand: about %.0f)", $0) } ?? ""),
+                                            + (stage.route("manual")?.figure("test-boxes.checks_per_100").map {
+                                                String(format: " (by hand with no model: about %.0f; places next to box or folder labels need no check)", $0)
+                                            } ?? ""),
                                     sample: nil, label2: nil, warning: false))
                 rows.append(PartRow(id: "checking", label: "Your own checking time", routeName: nil,
                                     figure: "about \(SettingsSheetModel.count(Int(places.rounded()), "place")), roughly "
@@ -699,6 +713,11 @@ struct SettingsSheetModel {
             let senders = picks.map { p in
                 let label = ["correspondence-typed": "Typed letters", "correspondence-handwritten": "Handwritten letters",
                              "non-correspondence": "Everything that is not a letter"][p.part] ?? p.part
+                if p.part == "correspondence-handwritten", handsUnread, p.flag == nil {
+                    return PartRow(id: p.part, label: label, routeName: nil,
+                                   figure: "none found: your reading choice cannot read handwriting",
+                                   sample: nil, label2: nil, warning: true)
+                }
                 let r = p.route
                 // Handwriting apart only where the bench scored it apart; else the figure is all 138 letters together.
                 let hands = p.part == "correspondence-handwritten" ? r?.figure("handwritten_or_mixed") : nil
@@ -860,7 +879,7 @@ struct SettingsSheetWords {
                 + "text is fitted to them; a page where the fit is unsure, or where the program returns whole paragraphs instead of lines, "
                 + "gets a separate text page instead."
         case "marks":
-            return "Marks (stamps, signatures, handwritten notes): not offered yet. Your page images are never altered to "
+            return "Finding and listing marks (stamps, signatures, handwritten notes) is not offered yet. Your page images are never altered to "
                 + "hide them, and the page's text includes them where the reading program can read them."
         case "capture":
             return "The capture app photographs each page at the camera's full quality with the flash off, keeps the original "
@@ -894,14 +913,14 @@ struct SettingsSheetWords {
             "vision-rules-t3": "Apple Vision's text and fixed rules (built in)",
             "mlx-date-2b-8bit": "A small dating model on this Mac, reading the year by itself",
             "mix-claude-chatgpt": "Claude and ChatGPT together, comparing their answers",
-            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, in the same step that labels each document with its date and names",
-            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), in the same step that labels each document with its date and names",
+            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, reading each document once more for its date and names",
+            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), reading each document once more for its date and names",
             "gemini3.7-flash-trace-neigh": "Gemini 3.7 Flash (Stanford gateway), quoting its evidence and nearby dates",
             "gemini3.7-flash-image": "Gemini 3.7 Flash (Stanford gateway), looking at the page image",
             "qwen3.6-27b-image": "Qwen3.6 27B on a computing cluster, looking at the page image",
             "qwen3-vl-8b-image-mac": "Qwen3-VL 8B on this Mac, looking at the page image",
             "qwen3.6-27b-trace-neigh-vision": "Qwen3.6 27B on a computing cluster, quoting its evidence",
-            "gemini-tagging-place": "Gemini, in the same step that labels each document with its date and names",
+            "gemini-tagging-place": "Gemini, reading each document once more for its date and names",
             "gemini-entity8k": "Gemini, with a request of its own for names",
             "qwen3.6-27b": stage == "entities" ? "Qwen3.6 27B (a computing cluster or OpenRouter)" : r.name,
             "qwen3-vl-8b-mac": "Qwen3-VL 8B on this Mac",
@@ -1077,12 +1096,13 @@ struct SettingsSheetWords {
                 + "reads a typed or printed page in under a second; nothing is spent and no page leaves this Mac. "
             if let hands = handsName {
                 return head + "\(hands), a free download that stays on this Mac, reads the handwriting and takes most of the "
-                    + "memory and time. Some downloaded programs score a little higher on your mix of pages but take "
-                    + "longer (see the alternatives); any can be chosen with “Use instead…”."
+                    + "memory and time. Some downloaded programs score slightly higher on your mix of pages (see the "
+                    + "alternatives), but each is a large download; any can be chosen with “Use instead…”."
             }
             return head + (handsUnread
                 ? "Handwritten pages are not read: the programs that read them need a key, or more memory than this Mac has."
-                : "Some downloaded programs score a little higher (see the alternatives) and can be chosen with “Use instead…”.")
+                : "Some downloaded programs score slightly higher (see the alternatives), but each is a large download; "
+                    + "any can be chosen with “Use instead…”.")
         }
         if r.contains("no route fits the ceiling and the hours") {
             return "Nothing fits both your spending and your time, so the cheapest choice that can run is used."
@@ -1131,7 +1151,7 @@ struct SettingsSheetWords {
         if routes.contains(where: { $0.family == .plan }) { return "no money: it uses your plan's allowance" }
         if routes.contains(where: { $0.family == .cluster }) { return "no money: it runs on your cluster" }
         if routes.contains(where: { $0.family == .cloud }) && stage.id == "entities" {
-            return "no extra money: it comes in the same request that labels each document"
+            return "no extra money: the names come in the same request that finds each document's date"
         }
         return "free"
     }
