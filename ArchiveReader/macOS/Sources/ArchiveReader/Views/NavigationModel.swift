@@ -75,6 +75,9 @@ final class NavigationModel: ObservableObject {
     /// The text field binds to this; a debounce pipeline copies it into `filter.searchText` after
     /// a 150 ms pause so recompute doesn't fire on every keystroke at 40k+ rows.
     @Published var filterSearchText = ""
+    /// W40.suite-item-types: the list marker's colour per item type (Options ▸ Item types); none shows the
+    /// type's name instead.
+    @Published private(set) var itemTypeMarkerColours = ItemTypePreferences.markerColours()
     @Published var sort = LibrarySort.default
     @Published var selection = Set<ArchiveFile.ID>() {
         didSet {
@@ -383,10 +386,59 @@ final class NavigationModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.objectWillChange.send() } }
             .store(in: &cancellables)
+        // W40.suite-item-types: the root's older-material colours, before its rows are built, and again
+        // whenever the root or either setting changes.
+        applyItemTypePreferences()
+        rootStore.$preferenceGUID
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.applyItemTypePreferences() } }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: ItemTypePreferences.didChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.applyItemTypePreferences() } }
+            .store(in: &cancellables)
         if let root = rootStore.root {
             library.start(scope: root, markerGUID: rootStore.rootMarker?.guid)
+            // A root granted before the question existed is asked once too, after launch; never under a
+            // test host or a fixture root, where nobody is there to answer.
+            if !ArchiveTestHost.isUnitTestHost, !ProcessInfo.processInfo.arguments.contains("-ARUITestRootPath") {
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated { self?.askItemTypeColoursIfNeeded() }
+                }
+            }
         }
         refreshUndoHistory()
+    }
+
+    /// W40.suite-item-types: read both item-type settings and give the library the root's colours. Writes
+    /// nothing; a root with no answer reads a type from its tag alone.
+    func applyItemTypePreferences() {
+        let marker = ItemTypePreferences.markerColours()
+        if marker != itemTypeMarkerColours { itemTypeMarkerColours = marker }
+        let id = rootStore.preferenceGUID
+        let name = rootStore.root?.lastPathComponent
+        // Published on the next turn: the model can be made inside a view update, which may not publish.
+        DispatchQueue.main.async {
+            let active = ActiveRootItemTypes.shared
+            if active.rootID != id { active.rootID = id }
+            if active.rootName != name { active.rootName = name }
+        }
+        library.setRootItemTypeColours(ItemTypePreferences.rootColours(for: id) ?? .none)
+    }
+
+    /// Asked once, when the user chooses a root that has no answer yet: older material may carry the
+    /// type only as a Finder colour. The answer is kept app-side, per root; Options ▸ Item types changes it.
+    private func askItemTypeColoursIfNeeded() {
+        guard let id = rootStore.preferenceGUID, ItemTypePreferences.rootColours(for: id) == nil else { return }
+        let alert = NSAlert()
+        alert.messageText = "Did this folder mark box and folder photos with a colour?"
+        alert.informativeText = "Box and Folder items are tagged “Box” and “Folder”. Material made before that "
+            + "may carry only a Finder colour. Nothing is written to your files; you can change this in "
+            + "Settings ▸ Item types."
+        alert.addButton(withTitle: "Red Means Box, Purple Means Folder")
+        alert.addButton(withTitle: "No Colours")
+        let colours: ItemTypeColors = alert.runModal() == .alertFirstButtonReturn ? .redBoxPurpleFolder : .none
+        ItemTypePreferences.setRootColours(colours, for: id)
     }
 
     /// Retry a root bookmark after an ejection/mount event, then apply the no-timer fallback for a
@@ -1936,6 +1988,9 @@ final class NavigationModel: ObservableObject {
             ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
                                  // (which passes the `generation == ftsGeneration` guard) can't repopulate
                                  // ftsPaths with stale old-root paths after the new library loads.
+            // Asked before the scan, so the first rows are read through the answer.
+            askItemTypeColoursIfNeeded()
+            applyItemTypePreferences()
             library.start(scope: adopted, markerGUID: rootStore.rootMarker?.guid)
         }
     }
@@ -2460,7 +2515,7 @@ final class NavigationModel: ObservableObject {
             if f.tags.year == nil { q.noDate += 1 }
             if f.tags.quality == nil { q.noQuality += 1 }
             if f.tags.dateUncertain { q.dateUncertain += 1 }
-            if f.color != nil { q.markers += 1 }
+            if f.itemType != nil { q.markers += 1 }
             let hasRead = f.tags.raw.contains { $0.caseInsensitiveCompare("Read") == .orderedSame }
             let hasUnread = f.tags.raw.contains { $0.caseInsensitiveCompare("Unread") == .orderedSame }
             if hasRead && hasUnread { q.bothReadUnread += 1 }   // corruption: both state tokens

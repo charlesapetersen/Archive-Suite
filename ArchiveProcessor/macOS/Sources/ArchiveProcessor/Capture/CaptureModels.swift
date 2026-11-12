@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// The kind of thing a captured photo (and its group) represents. Mirrors the on-phone
 /// grouping controls and the app's existing box/folder classification.
@@ -7,14 +8,17 @@ enum CaptureGroupType: String, Codable, CaseIterable {
     case box
     case folder
 
-    /// macOS color tag applied to box/folder outputs (nil for ordinary documents).
-    var colorTag: String? {
+    /// The item type a box/folder group's outputs carry (nil for ordinary documents).
+    var itemType: ItemType? {
         switch self {
-        case .box: return "Red"
-        case .folder: return "Purple"
+        case .box: return .box
+        case .folder: return .folder
         case .document: return nil
         }
     }
+
+    /// The Finder colour the user chose for this type, if any (W40.suite-item-types; none by default).
+    var colorTag: String? { itemType.flatMap(ItemTypeColourSetting.colorTag(for:)) }
 }
 
 /// One photo received from the phone during a live-capture session, already written to the

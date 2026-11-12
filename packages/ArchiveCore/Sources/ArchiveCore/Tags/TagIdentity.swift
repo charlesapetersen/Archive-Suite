@@ -10,8 +10,8 @@ import Foundation
 /// which already treats canonically equivalent spellings (composed and decomposed é) as equal.
 ///
 /// A token shaped like a facet the parser reads by its exact spelling keeps that spelling as its key
-/// (`keepsExactCase`): `Q2` is a rating but `q2` is a fiscal-quarter subject, and `Red` is the box
-/// marker's colour token while `red` may be a subject, so folding them together would let a rating or
+/// (`keepsExactCase`): `Q2` is a rating but `q2` is a fiscal-quarter subject, `Red` is a Finder label's
+/// colour token while `red` may be a subject, and `Box` is the item type while `box` is a subject, so folding them together would let a rating or
 /// colour edit add, skip or remove the other token (the Tier-2 review of this change). Such a key is
 /// marked so it can never equal a folded one: the decade `1970s` and a subject `1970S`, folded to
 /// "1970s", stay two tags.
@@ -20,12 +20,14 @@ public func tagKey(_ s: String) -> String {
 }
 
 /// Whether `s` keeps its exact case as its tag identity: a rating (`Q1`–`Q3`, `P7`–`P10`), a date facet
-/// (year, decade, `MM Month`, `Day N`, `Date Uncertain`, `Sent With …`), or a marker colour name.
+/// (year, decade, `MM Month`, `Day N`, `Date Uncertain`, `Sent With …`), a Finder colour name as Finder
+/// spells it (`Red`, `Green`…), or the item-type token `Box`/`Folder`. Other spellings (`red`, `BOX`) are
+/// ordinary subjects and fold.
 /// `Read`/`Unread` fold like any subject: the parser and the writer already match them in any case.
 public func keepsExactCase(_ s: String) -> Bool {
     let t = s.trimmingCharacters(in: .whitespaces)
     return DocumentTags.isRatingToken(t) || DocumentTags.isDateFacetLike(t)
-        || [ArchiveColor.box, .folder].contains { $0.tokenName.caseInsensitiveCompare(t) == .orderedSame }
+        || FinderLabel.isColourName(s) || ItemType(token: s) != nil
 }
 
 /// `tagKey` is asked for every subject of every row when a library of ~10^5 files loads, but a library

@@ -20,7 +20,7 @@ public struct GeneratedTags: Codable, Sendable {
     public var subjectTags: [String]
     /// Human-set 0...3 rating. Zero is deliberately represented by the absence of a Finder tag.
     public var quality: Int
-    public var colorTag: String?         // "Red" or "Purple"
+    public var colorTag: String?         // the Finder colour the user chose for a Box/Folder item, if any
 
     // Extended metadata for JSON export
     public var format: String?           // e.g. "letter", "memo", "newspaper article"

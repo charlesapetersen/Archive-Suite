@@ -41,7 +41,7 @@ final class RedoTagChangeTests: XCTestCase {
 
     func testRedoReappliesTheUndoneChangeAndSurvivesARelaunch() throws {
         let url = try file(tags: ["Unread", "A", "A"])
-        _ = try TagWriter.apply(TagDelta(add: ["B"], remove: ["A"], color: .set(.box)), to: url)
+        _ = try TagWriter.apply(TagDelta(add: ["B"], remove: ["A"], color: .set(.red)), to: url)
         let changed = try tags(url), changedLabel = try label(url)
         let first = model()
         XCTAssertEqual(first.redoDepth, 0, "nothing undone yet")

@@ -45,7 +45,7 @@ struct TagEditorView: View {
                     Divider()
                     qualitySection(s)
                     Divider()
-                    colorSection(s)
+                    itemTypeSection(s, files)
                     Divider()
                     readStateSection(s)
                     Divider()
@@ -355,15 +355,23 @@ struct TagEditorView: View {
         }
     }
 
-    // MARK: Color
+    // MARK: Item type
 
-    @ViewBuilder private func colorSection(_ s: GroupTagSummary) -> some View {
+    /// W40.suite-item-types: Box and Folder are item types, written as their `Box`/`Folder` tag. A type read
+    /// from the folder's older colours (Options ▸ Item types) is shown as such, and choosing it writes the tag.
+    @ViewBuilder private func itemTypeSection(_ s: GroupTagSummary, _ files: [ArchiveFile]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            title("Color / marker" + (s.commonColor == nil ? "  (mixed)" : ""))
+            title("Item type" + (s.commonItemType == nil ? "  (mixed)" : ""))
             HStack {
-                facetButton("None", current: s.commonColor == .some(nil)) { apply(.setColor(nil)) }
-                facetButton("Box (Red)", current: s.commonColor == .some(.box)) { apply(.setColor(.box)) }
-                facetButton("Folder (Purple)", current: s.commonColor == .some(.folder)) { apply(.setColor(.folder)) }
+                facetButton("None", current: s.commonItemType == .some(nil)) { apply(.setItemType(nil)) }
+                ForEach(ItemType.allCases, id: \.self) { type in
+                    facetButton(type.displayName, current: s.commonItemType == .some(type)) { apply(.setItemType(type)) }
+                }
+            }
+            if files.contains(where: { $0.tags.itemTypeToken == nil && $0.tags.itemTypeFromColour != nil }) {
+                Text("Read from this folder’s older colours. Choosing a type writes its tag.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

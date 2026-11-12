@@ -748,6 +748,16 @@ enum LiveCaptureRecoveryTestDriver {
         check("a box segment still gets the Finder RED label from the app's own colour", labelOf(boxPDF) == 6)
         check("...and \"Red\" appears exactly once in its tags",
               tagsOf(boxPDF).filter { $0 == "Red" }.count == 1)
+        // W40.suite-item-types: with no colour chosen (the default), a box is its Box token and no label.
+        let plainBoxSrc = makeJPEG("boxlabel-plain.jpg", in: tagDir)
+        let plainBoxSeg = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [plainBoxSrc], stagingDir: tagDir, model: stubModel,
+            type: .box, baseTags: ["Box"],
+            jsonTags: GeneratedTags(subjectTags: ["Box"], colorTag: nil), stampUnread: true)
+        let plainBoxPDF = plainBoxSeg.pdfURLs.first ?? tagDir
+        check("a box with no colour chosen carries its Box token and no Finder label",
+              tagsOf(plainBoxPDF).contains("Box") && labelOf(plainBoxPDF) == 0
+              && DocumentTags.parse(raw: tagsOf(plainBoxPDF), labelNumber: nil).itemType == .box)
 
         // (c) No false positives: a write that succeeded records nothing, and the tags really are on disk.
         check("a successful staging reports no untagged artifact",

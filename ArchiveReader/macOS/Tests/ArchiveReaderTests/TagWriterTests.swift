@@ -210,7 +210,7 @@ final class TagWriterTests: XCTestCase {
 
     func testColorSetAndClearKeepsTokenAndLabelConsistent() throws {
         let url = try makeFile("color.pdf", tags: ["Unread", "DP chapters"])
-        _ = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        _ = try TagWriter.apply(TagDelta(color: .set(.red)), to: url)
         XCTAssertEqual(try readLabel(url), 6)
         XCTAssertTrue(Set(try readTags(url)).contains("Red"))
 
@@ -242,7 +242,7 @@ final class TagWriterTests: XCTestCase {
     func testSetColorSwapsPreviousLabelToken() throws {
         // Purple folder marker → set to box: "Purple" token dropped, "Red" added, label 6.
         let url = try makeFile("swapcolor.pdf", tags: ["Purple", "Unread"], label: 3)
-        _ = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        _ = try TagWriter.apply(TagDelta(color: .set(.red)), to: url)
         let after = Set(try readTags(url))
         XCTAssertTrue(after.contains("Red"))
         XCTAssertFalse(after.contains("Purple"))
@@ -264,7 +264,7 @@ final class TagWriterTests: XCTestCase {
 
     func testInverseUndoesColorChange() throws {
         let url = try makeFile("undocolor.pdf", tags: ["Unread"])
-        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        let r = try TagWriter.apply(TagDelta(color: .set(.red)), to: url)
         XCTAssertEqual(try readLabel(url), 6)
         _ = try TagWriter.apply(r.inverse, to: url)
         XCTAssertEqual(try readLabel(url) ?? 0, 0)
@@ -275,7 +275,7 @@ final class TagWriterTests: XCTestCase {
     // label verbatim and never adds/removes a token beyond the recorded diff.
     func testUndoColorSwapRestoresLabelAndTokensExactly() throws {
         let url = try makeFile("boxswap.pdf", tags: ["Red", "Jerry Brown"], label: 6)   // box
-        let r = try TagWriter.apply(TagDelta(color: .set(.folder)), to: url)
+        let r = try TagWriter.apply(TagDelta(color: .set(.purple)), to: url)
         XCTAssertEqual(try readLabel(url), 3)
         XCTAssertTrue(Set(try readTags(url)).contains("Purple"))
         XCTAssertFalse(Set(try readTags(url)).contains("Red"))
@@ -286,7 +286,7 @@ final class TagWriterTests: XCTestCase {
 
     func testUndoSetColorOnUncoloredRemovesTokenAndLabel() throws {
         let url = try makeFile("plaincolor.pdf", tags: ["Jerry Brown", "Unread"], label: nil)
-        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        let r = try TagWriter.apply(TagDelta(color: .set(.red)), to: url)
         XCTAssertTrue(Set(try readTags(url)).contains("Red"))
         _ = try TagWriter.apply(r.inverse, to: url)
         let after = Set(try readTags(url))
@@ -483,7 +483,7 @@ final class TagWriterTests: XCTestCase {
     /// color token (carried in the multiset) and restores the original label.
     func testOccurrenceUndoRestoresColorLabel() throws {
         let url = try makeFile("occ-color.pdf", tags: ["Unread"], label: nil)
-        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)
+        let r = try TagWriter.apply(TagDelta(color: .set(.red)), to: url)
         XCTAssertEqual(try readLabel(url), 6)
         XCTAssertTrue(Set(try readTags(url)).contains("Red"))
 
@@ -562,7 +562,7 @@ final class TagWriterTests: XCTestCase {
     /// A colour someone changed since is kept: neither the old label nor the old colour token is put back.
     func testUndoLeavesAColourChangedSince() throws {
         let url = try makeFile("recolour.pdf", tags: ["Purple", "Unread"], label: 3)
-        let r = try TagWriter.apply(TagDelta(color: .set(.box)), to: url)                // Purple → Red, 3 → 6
+        let r = try TagWriter.apply(TagDelta(color: .set(.red)), to: url)                // Purple → Red, 3 → 6
         try editElsewhere(url, tags: ["Unread"], label: 0)                                // colour cleared elsewhere
 
         _ = try TagWriter.applyOccurrence(r.occurrenceInverse, to: url, undoing: .init(r))

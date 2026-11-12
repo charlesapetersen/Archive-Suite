@@ -92,9 +92,10 @@ extension OCRProcessor {
     /// fresh write intended, which is also why the fix is not simply `colorIsAuthoritative: true` with
     /// no colour: that would STRIP the label off every genuine box/folder PDF.
     nonisolated static func authoritativeColor(for classification: DocumentClassification?) -> String? {
+        // W40.suite-item-types: the user's colour for the type, none by default.
         switch classification {
-        case .boxLabel: return "Red"
-        case .folderLabel: return "Purple"
+        case .boxLabel: return ItemTypeColourSetting.colorTag(for: .box)
+        case .folderLabel: return ItemTypeColourSetting.colorTag(for: .folder)
         default: return nil            // ordinary document, or not classified → no colour
         }
     }
@@ -114,8 +115,8 @@ extension OCRProcessor {
     /// the complete set a **re**-classification is entitled to take away again.
     nonisolated static func structureTag(for classification: DocumentClassification?) -> String? {
         switch classification {
-        case .boxLabel: return "Box"
-        case .folderLabel: return "Folder"
+        case .boxLabel: return ItemType.box.tokenName
+        case .folderLabel: return ItemType.folder.tokenName
         default: return nil            // ordinary document, or not classified → no structure tag
         }
     }
@@ -274,8 +275,9 @@ extension OCRProcessor {
             guard let classification = job.result?.classification else { continue }
             let tags: GeneratedTags
             switch classification {
-            case .boxLabel: tags = GeneratedTags(subjectTags: ["Box"], colorTag: "Red")
-            case .folderLabel: tags = GeneratedTags(subjectTags: ["Folder"], colorTag: "Purple")
+            case .boxLabel, .folderLabel:
+                tags = GeneratedTags(subjectTags: [Self.structureTag(for: classification)].compactMap { $0 },
+                                     colorTag: Self.authoritativeColor(for: classification))
             default: continue
             }
             if let outputPDF = outputURLMap[job.sourceURL] {
@@ -1387,8 +1389,7 @@ extension OCRProcessor {
                     }
                     // Derive the authoritative color from the classification so a subject
                     // tag "Red"/"Purple" isn't promoted to a Finder color label.
-                    let color: String? = tagged.classification == .boxLabel ? "Red" :
-                                         tagged.classification == .folderLabel ? "Purple" : nil
+                    let color = Self.authoritativeColor(for: tagged.classification)
                     if let tagWriter {
                         try tagWriter(tagsToApply, mergedURL, color, true)
                     } else {

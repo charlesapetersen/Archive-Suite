@@ -657,7 +657,7 @@ final class AuditLedger: @unchecked Sendable {
     private static func label(of color: TagDelta.ColorChange?) -> Int? {
         switch color {
         case .restoreLabel(let lbl): return lbl ?? 0
-        case .set(let c): return c.labelNumber
+        case .set(let c): return c.rawValue
         case .clear: return 0
         case nil: return nil
         }

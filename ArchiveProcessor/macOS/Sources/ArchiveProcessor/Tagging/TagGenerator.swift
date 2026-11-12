@@ -15,9 +15,14 @@ class TagGenerator: ObservableObject {
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil
     ) async -> GeneratedTags {
-        // Box/folder: just a color tag
-        if segment.isBox { return GeneratedTags(subjectTags: ["Box"], colorTag: "Red") }
-        if segment.isFolder { return GeneratedTags(subjectTags: ["Folder"], colorTag: "Purple") }
+        // Box/folder: the item-type token, and the user's colour for it if any (W40.suite-item-types)
+        if segment.isBox {
+            return GeneratedTags(subjectTags: [ItemType.box.tokenName], colorTag: ItemTypeColourSetting.colorTag(for: .box))
+        }
+        if segment.isFolder {
+            return GeneratedTags(subjectTags: [ItemType.folder.tokenName],
+                                 colorTag: ItemTypeColourSetting.colorTag(for: .folder))
+        }
 
         let text = segment.combinedText
         guard !text.isEmpty else { return GeneratedTags(ocrFailed: true) }

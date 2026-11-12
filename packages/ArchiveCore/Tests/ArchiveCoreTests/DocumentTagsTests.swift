@@ -15,17 +15,21 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertEqual(t.month?.name, "January")
         XCTAssertEqual(t.quality, 2)
         XCTAssertEqual(t.readState, .unread)
-        XCTAssertNil(t.color)
+        XCTAssertNil(t.itemType)
         XCTAssertFalse(t.dateIsSpeculative)
         XCTAssertEqual(t.sortDate, 19_830_100)
         XCTAssertEqual(Set(t.subjects), ["DP chapters", "Jerry Brown", "Speeches", "NCII"])
     }
 
-    // Real box marker 00001: Red label + "Red" token, no date/quality.
+    // Real box marker 00001: Red label + "Red" token, no date/quality. Made before the Box token: the
+    // colour gives the type only through the root's colours (W40.suite-item-types).
     func testBoxMarkerFoldsColorAndIsUndated() {
         let raw = ["Red", "Unread", "DP chapters", "Jerry Brown"]
-        let t = DocumentTags.parse(raw: raw, labelNumber: 6)
-        XCTAssertEqual(t.color, .box)
+        XCTAssertNil(DocumentTags.parse(raw: raw, labelNumber: 6).itemType, "a colour alone is not a type")
+        let t = DocumentTags.parse(raw: raw, labelNumber: 6, colours: .redBoxPurpleFolder)
+        XCTAssertEqual(t.itemType, .box)
+        XCTAssertEqual(t.itemTypeFromColour, .box)
+        XCTAssertNil(t.itemTypeToken)
         XCTAssertNil(t.year)
         XCTAssertNil(t.quality)
         XCTAssertEqual(t.readState, .unread)
@@ -49,8 +53,8 @@ final class DocumentTagsTests: XCTestCase {
     // A subject literally "Red" with NO red label must stay a subject (no color inference).
     func testSubjectNamedRedWithoutLabelStaysSubject() {
         let raw = ["Red", "Cold War", "1950", "Unread"]
-        let t = DocumentTags.parse(raw: raw, labelNumber: nil)
-        XCTAssertNil(t.color)
+        let t = DocumentTags.parse(raw: raw, labelNumber: nil, colours: .redBoxPurpleFolder)
+        XCTAssertNil(t.itemType)
         XCTAssertTrue(t.subjects.contains("Red"))
         XCTAssertEqual(t.year, 1950)
     }
@@ -160,7 +164,7 @@ final class DocumentTagsTests: XCTestCase {
     func testOffScaleQualityNormalizesToUnratedInTheInitializer() {
         func made(_ q: Int?) -> DocumentTags {
             DocumentTags(raw: [], labelNumber: nil, year: nil, month: nil, day: nil,
-                         dateUncertain: false, decade: nil, quality: q, readState: nil, color: nil,
+                         dateUncertain: false, decade: nil, quality: q, readState: nil, itemType: nil,
                          subjects: [], yearToken: nil, monthToken: nil, dayToken: nil,
                          decadeToken: nil, qualityToken: nil)
         }
@@ -249,36 +253,54 @@ final class DocumentTagsTests: XCTestCase {
         XCTAssertEqual(t.displayDate, "970s")
     }
 
-    // SPEC/tag-format.md discrepancy #3: Archive Processor emits literal `Box`/`Folder` (on marker
-    // pages, alongside the color) and `OCR Failed` (on OCR failures) as ordinary subject tokens. They
-    // must classify as plain SUBJECTS — never a facet, never the color token — so they can't drive a
-    // destructive write and stay visible for filtering.
-    func testProcessorLiteralSubjectTokensClassifyAsSubjects() {
-        // Box marker: Red label (6) + "Red" color token + literal "Box" subject.
+    // W40.suite-item-types: `Box`/`Folder` are the item type, read from the token whatever the colour, and
+    // not subjects. `OCR Failed` (on OCR failures) stays an ordinary subject token.
+    func testItemTypeTokensAreTheTypeAndColourIsDisplay() {
+        // Box: a "Red" label the user chose + the Box token. The colour token is the label's, not a subject.
         let box = DocumentTags.parse(raw: ["Red", "Box", "Unread", "DP chapters"], labelNumber: 6)
-        XCTAssertEqual(box.color, .box)
-        XCTAssertFalse(box.subjects.contains("Red"))   // color token folded, not a subject
-        XCTAssertTrue(box.subjects.contains("Box"))    // literal marker word stays a subject
+        XCTAssertEqual(box.itemType, .box)
+        XCTAssertEqual(box.itemTypeToken, "Box")
+        XCTAssertEqual(box.finderLabel, .red)
+        XCTAssertFalse(box.subjects.contains("Red"))
+        XCTAssertFalse(box.subjects.contains("Box"))
+        XCTAssertFalse(box.topicalTags.contains("Box"), "the type has its own column")
         XCTAssertNil(box.year)
         XCTAssertNil(box.quality)
 
-        // Folder marker: Purple label (3) + "Purple" color token + literal "Folder" subject.
-        let folder = DocumentTags.parse(raw: ["Purple", "Folder", "Unread"], labelNumber: 3)
-        XCTAssertEqual(folder.color, .folder)
-        XCTAssertFalse(folder.subjects.contains("Purple"))
-        XCTAssertTrue(folder.subjects.contains("Folder"))
+        // Folder with no colour at all: the default for a new user.
+        let folder = DocumentTags.parse(raw: ["Folder", "Unread"], labelNumber: nil)
+        XCTAssertEqual(folder.itemType, .folder)
+        XCTAssertFalse(folder.subjects.contains("Folder"))
+
+        // Any Finder colour the user picked is the label's token, not a subject.
+        let green = DocumentTags.parse(raw: ["Green", "Folder"], labelNumber: 2)
+        XCTAssertEqual(green.itemType, .folder)
+        XCTAssertEqual(green.subjects, [])
+
+        // The token wins over what the colour meant under the root's setting.
+        let both = DocumentTags.parse(raw: ["Red", "Folder"], labelNumber: 6, colours: .redBoxPurpleFolder)
+        XCTAssertEqual(both.itemType, .folder)
+        XCTAssertEqual(both.itemTypeFromColour, .box)
+
+        // Exact spelling only: a subject `box` or `" Box "` is a subject; two type tokens, the last wins.
+        let lower = DocumentTags.parse(raw: ["box", "folder", " Box "], labelNumber: nil)
+        XCTAssertNil(lower.itemType)
+        XCTAssertEqual(lower.subjects, ["box", "folder", " Box "])
+        // A colour word in another spelling is a subject even under its label.
+        XCTAssertEqual(DocumentTags.parse(raw: ["red"], labelNumber: 6).subjects, ["red"])
+        let two = DocumentTags.parse(raw: ["Box", "Folder"], labelNumber: nil)
+        XCTAssertEqual(two.itemType, .folder)
+        XCTAssertEqual(two.subjects, ["Box"])
 
         // OCR failure: literal "OCR Failed" subject, alongside a normal year.
         let failed = DocumentTags.parse(raw: ["OCR Failed", "Unread", "1980"], labelNumber: nil)
         XCTAssertTrue(failed.subjects.contains("OCR Failed"))
         XCTAssertEqual(failed.year, 1980)              // the literal subject doesn't disturb real facets
 
-        // Each literal token is preserved verbatim and surfaces in topicalTags (never silently dropped).
-        for t in [box, folder, failed] {
-            for token in ["Box", "Folder", "OCR Failed"] where t.raw.contains(token) {
-                XCTAssertTrue(t.topicalTags.contains(token), "\(token) should surface in topicalTags")
-            }
-        }
+        // Each literal token is preserved verbatim; `OCR Failed` surfaces in topicalTags (never silently
+        // dropped), while the type token is shown by the type's own marker.
+        XCTAssertTrue(failed.topicalTags.contains("OCR Failed"))
+        XCTAssertEqual(box.raw, ["Red", "Box", "Unread", "DP chapters"])
     }
 
     // MARK: - Shared sort-date combiner (reused by Reader's DocumentTags.sortDate + Notes' Item.sortDate)

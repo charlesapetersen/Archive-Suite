@@ -15,26 +15,6 @@ public enum ReadState: String, Sendable, CaseIterable {
     case unread = "Unread"
 }
 
-/// Finder color-label meanings assigned by Archive Processor.
-public enum ArchiveColor: Sendable, Equatable {
-    case box     // Red,    Finder labelNumber 6
-    case folder  // Purple, Finder labelNumber 3
-
-    public init?(labelNumber: Int) {
-        switch labelNumber {
-        case 6: self = .box
-        case 3: self = .folder
-        default: return nil
-        }
-    }
-
-    /// The color-name token Archive Processor also stores in the tag array.
-    public var tokenName: String { self == .box ? "Red" : "Purple" }
-
-    /// The Finder label number for this color (box = Red = 6, folder = Purple = 3).
-    public var labelNumber: Int { self == .box ? 6 : 3 }
-}
-
 /// A single-valued date facet, for naming what the last-wins rule set aside.
 public enum DateFacet: String, Sendable, CaseIterable {
     case year = "Year", month = "Month", day = "Day", decade = "Decade", sentWith = "Sent With"
@@ -78,7 +58,15 @@ public struct DocumentTags: Sendable, Equatable {
     public var decade: Int?           // decade START year, e.g. 1970 (from "1970s"); nil when absent
     public var quality: Int?          // 1...3; nil = unrated (the wire never carries Q0)
     public var readState: ReadState?
-    public var color: ArchiveColor?
+    /// The item type (W40.suite-item-types): the `Box`/`Folder` token when the file has one, else what its
+    /// Finder label means under the root's `ItemTypeColors` (`itemTypeFromColour`). The token wins.
+    public var itemType: ItemType?
+    /// The verbatim `Box`/`Folder` token consumed for the type (last wins; an earlier one is a subject).
+    public var itemTypeToken: String?
+    /// The type the file's Finder label means under the colours `parse` was given; nil without them.
+    public var itemTypeFromColour: ItemType?
+    /// The file's Finder colour label, if any (display only; it is not the type).
+    public var finderLabel: FinderLabel? { FinderLabel(labelNumber: labelNumber) }
     /// Human-set Subject flag, independent of Q1–Q3 importance and execution failure.
     /// The raw subject occurrences and spellings remain intact; this never drives a write.
     public static let poorOCRTag = "OCR Poor"
@@ -107,10 +95,11 @@ public struct DocumentTags: Sendable, Equatable {
     public init(
         raw: [String], labelNumber: Int?,
         year: Int?, month: Month?, day: Int?, dateUncertain: Bool, decade: Int?,
-        quality: Int?, readState: ReadState?, color: ArchiveColor?, subjects: [String],
+        quality: Int?, readState: ReadState?, itemType: ItemType?, subjects: [String],
         yearToken: String?, monthToken: String?, dayToken: String?, decadeToken: String?,
         qualityToken: String?,
-        sentWith: ArchiveDate? = nil, sentWithUncertain: Bool = false, sentWithToken: String? = nil
+        sentWith: ArchiveDate? = nil, sentWithUncertain: Bool = false, sentWithToken: String? = nil,
+        itemTypeToken: String? = nil, itemTypeFromColour: ItemType? = nil
     ) {
         self.raw = raw; self.labelNumber = labelNumber
         self.year = year; self.month = month; self.day = day
@@ -118,7 +107,8 @@ public struct DocumentTags: Sendable, Equatable {
         // Normalize off-scale values to unrated so `Q0` — which the wire never carries — cannot enter
         // the model through a hand-built value either.
         self.quality = quality.flatMap { (1...3).contains($0) ? $0 : nil }
-        self.readState = readState; self.color = color
+        self.readState = readState; self.itemType = itemType
+        self.itemTypeToken = itemTypeToken; self.itemTypeFromColour = itemTypeFromColour
         self.subjects = subjects
         self.yearToken = yearToken; self.monthToken = monthToken; self.dayToken = dayToken
         self.decadeToken = decadeToken
@@ -222,8 +212,8 @@ public struct DocumentTags: Sendable, Equatable {
     public var dateIsSpeculative: Bool { dateUncertain || (year == nil && decade != nil) }
 
     /// Tokens for the "File tags" column and the tag cloud: the raw tags minus the WINNING date facets
-    /// (yearToken / monthToken / dayToken / `Date Uncertain`) and read-state (`Read`/`Unread`), since
-    /// those have their own columns. Demoted same-facet tokens (e.g. "1984" when year=1980) stay visible.
+    /// (yearToken / monthToken / dayToken / `Date Uncertain`), the item-type token and read-state
+    /// (`Read`/`Unread`), since those have their own columns. Demoted same-facet tokens (e.g. "1984" when year=1980) stay visible.
     public var topicalTags: [String] {
         let excluded: Set<String> = {
             var s = Set<String>()
@@ -232,6 +222,7 @@ public struct DocumentTags: Sendable, Equatable {
             if let t = dayToken { s.insert(t) }
             if let t = decadeToken { s.insert(t) }
             if let t = sentWithToken { s.insert(t) }
+            if let t = itemTypeToken { s.insert(t) }
             return s
         }()
         return raw.filter { token in
@@ -261,8 +252,10 @@ public struct DocumentTags: Sendable, Equatable {
 extension DocumentTags {
     /// Classify a raw tag array (+ optional Finder label number) into facets.
     /// Order of checks matters: read-state / quality (including the current phone P wire spellings) / month / day
-    /// are recognized before the generic bare-number "year" test.
-    public static func parse(raw: [String], labelNumber: Int?) -> DocumentTags {
+    /// are recognized before the generic bare-number "year" test. `colours` says which Finder colour meant
+    /// which item type for material marked before the `Box`/`Folder` tokens (the root's setting); with
+    /// `.none`, only a token gives a type.
+    public static func parse(raw: [String], labelNumber: Int?, colours: ItemTypeColors = .none) -> DocumentTags {
         var year: Int?
         var month: Month?
         var day: Int?
@@ -284,7 +277,9 @@ extension DocumentTags {
         var sentWithUncertain = false
         var sentWithToken: String?
 
-        let color = labelNumber.flatMap(ArchiveColor.init(labelNumber:))
+        var itemTypeToken: String?
+        var tokenType: ItemType?
+        let label = FinderLabel(labelNumber: labelNumber)
 
         for token in raw {
             let s = token.trimmingCharacters(in: .whitespaces)
@@ -344,22 +339,31 @@ extension DocumentTags {
                 year = y; yearToken = token
                 continue
             }
-            // A color-name token that matches the file's actual Finder label is the marker color,
+            // Item type — the exact reserved token `Box` / `Folder`; last wins, an earlier one is a subject.
+            if let t = ItemType(token: token) {
+                if let prev = itemTypeToken { subjects.append(prev) }
+                tokenType = t; itemTypeToken = token
+                continue
+            }
+            // A colour-name token that matches the file's actual Finder label is the label's own token,
             // not a subject (a doc about the "Red Scare" with NO red label keeps "Red" as a subject).
-            if let color, color.tokenName.caseInsensitiveCompare(s) == .orderedSame {
+            // Exact spelling, as Finder writes it and as a colour edit removes it.
+            if let label, label.tokenName == token {
                 continue
             }
             // Everything else is a subject — kept verbatim.
             subjects.append(token)
         }
 
+        let fromColour = colours.type(forLabel: labelNumber)
         return DocumentTags(
             raw: raw, labelNumber: labelNumber,
             year: year, month: month, day: day, dateUncertain: dateUncertain, decade: decade,
-            quality: quality, readState: readState, color: color, subjects: subjects,
+            quality: quality, readState: readState, itemType: tokenType ?? fromColour, subjects: subjects,
             yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, decadeToken: decadeToken,
             qualityToken: qualityToken,
-            sentWith: sentWith, sentWithUncertain: sentWithUncertain, sentWithToken: sentWithToken
+            sentWith: sentWith, sentWithUncertain: sentWithUncertain, sentWithToken: sentWithToken,
+            itemTypeToken: itemTypeToken, itemTypeFromColour: fromColour
         )
     }
 

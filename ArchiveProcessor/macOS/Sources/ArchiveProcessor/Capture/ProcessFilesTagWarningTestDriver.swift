@@ -48,6 +48,23 @@ enum ProcessFilesTagWarningTestDriver {
             NSLog("TAGWARN \(ok ? "PASS" : "FAIL"): \(name)")
         }
 
+        // W40.suite-item-types: with no colour chosen (the default) a box or folder is its token alone.
+        ItemTypeColourSetting.driverOverride = ItemTypeColors.none
+        check("no colour chosen: box and folder labels get no colour",
+              OCRProcessor.authoritativeColor(for: .boxLabel) == nil
+              && OCRProcessor.authoritativeColor(for: .folderLabel) == nil)
+        check("...but keep their item-type token",
+              OCRProcessor.structureTag(for: .boxLabel) == "Box"
+              && OCRProcessor.structureTag(for: .folderLabel) == "Folder")
+        check("...and a promotion to a box adds the token alone",
+              OCRProcessor.reclassifiedTags(["1948"], from: .documentStart, to: .boxLabel) == ["Box", "1948"])
+        check("a colour chosen for a type is any Finder colour, written beside the token",
+              { ItemTypeColourSetting.driverOverride = ItemTypeColors(box: .green)
+                return OCRProcessor.authoritativeColor(for: .boxLabel) == "Green"
+                    && OCRProcessor.authoritativeColor(for: .folderLabel) == nil }())
+        // The rest of this driver proves the label mechanics with the colours the app used to fix.
+        ItemTypeColourSetting.driverOverride = .redBoxPurpleFolder
+
         let tmp = fm.temporaryDirectory.appendingPathComponent("APTagWarn-\(UUID().uuidString)",
                                                                isDirectory: true)
         try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)

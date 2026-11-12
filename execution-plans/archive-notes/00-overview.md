@@ -361,7 +361,7 @@ Notes-specific work.** Detailed in `00a-archivecore-refactor.md`.
 
 - Introduce a **`ArchiveCore` Swift package** (`packages/ArchiveCore/`) seeded **from Reader's & Processor's
   existing, tested** code, containing the **UI-free** shared contract: the tag vocabulary + facet model +
-  parser (`DocumentTags`, `sortDate`, `isDateFacetLike`, `ArchiveColor`), the tag **read + write** path
+  parser (`DocumentTags`, `sortDate`, `isDateFacetLike`, `ItemType`), the tag **read + write** path
   (`TagReading`, `TagWriter`, `TagEditing` — the audited choke-point with all seven invariants),
   `PDFTextExtractor` + `PDFFormatStatus`, the Processor's tag **vocabulary/formatting** (title-casing, month/
   day/decade token builders, `GeneratedTags` emit order), and the new `RootMarker`/`DurableLink` types.

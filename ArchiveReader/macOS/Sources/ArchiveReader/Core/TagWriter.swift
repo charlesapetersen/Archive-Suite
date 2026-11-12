@@ -29,12 +29,12 @@ enum TagWriter {
             switch delta.color {
             case .set(let c):
                 additions.append(c.tokenName)
-                if let current = ArchiveColor(labelNumber: label ?? 0), current != c {
+                if let current = FinderLabel(labelNumber: label), current != c {
                     removals.append(current.tokenName)
                 }
-                targetLabel = c.labelNumber
+                targetLabel = c.rawValue
             case .clear:
-                if let current = ArchiveColor(labelNumber: label ?? 0) {
+                if let current = FinderLabel(labelNumber: label) {
                     removals.append(current.tokenName)
                 }
                 targetLabel = 0
@@ -94,14 +94,14 @@ enum TagWriter {
             var targetLabel = label
             switch delta.color {
             case .restoreLabel(let lbl): targetLabel = lbl
-            case .set(let c):            targetLabel = c.labelNumber   // never produced by an inverse; defensive
+            case .set(let c):            targetLabel = c.rawValue      // never produced by an inverse; defensive
             case .clear:                 targetLabel = 0               // "
             case nil:                    break
             }
             let colourChangedSince = delta.color != nil
                 && normalizedLabel(label) != normalizedLabel(change.afterLabel)
             if colourChangedSince { targetLabel = label }
-            let colourTokens: Set<String> = colourChangedSince ? [ArchiveColor.box.tokenName, ArchiveColor.folder.tokenName] : []
+            let colourTokens: Set<String> = colourChangedSince ? Set(FinderLabel.allCases.map(\.tokenName)) : []
 
             // §9 occurrence-precise reconcile against the FRESH read: strip at most the listed number of
             // occurrences of each removed token (a copy a concurrent edit added survives), keep every other

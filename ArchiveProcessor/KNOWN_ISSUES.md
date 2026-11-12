@@ -2,6 +2,17 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W40.suite-item-types, 2026-11-11): a box/folder colour changed in Settings mid-batch can leave the old colour word behind
+
+Box and Folder are item types, written as the `Box`/`Folder` tag; the Finder colour beside them is the user's
+choice in Settings ▸ Tagging (none by default). A reclassification takes back the colour word the app added
+(`OCRProcessor.reclassifiedTags`) by asking which colour that type has **now**. If the user changes a type's
+colour between tagging a page and reclassifying it, the old colour word stays on the page as a subject (the
+label itself is rewritten correctly). Nothing is lost and the type is unaffected; remove the word in the Reader.
+Not fixed by also dropping the token of the file's current label: that would take an operator's own subject
+`Red` off a demoted "Red Scare" box page (`ProcessFilesTagWarningTestDriver` §8b), which is worse. A fix would
+record on the job the colour it was tagged with.
+
 ## ⚠️ LIMITATION (W46.settings-layers, 2026-11-11): what the settings layers do not yet cover
 
 - **The interviews fill the layers; nothing shows the picks yet.** The general and collection interviews

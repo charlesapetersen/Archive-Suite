@@ -119,7 +119,8 @@ struct ArchiveFile: Identifiable, Sendable {
     var subjects: [String] { tags.subjects }
     /// Whether the file carries `tag` in any case (W40.fix-tags-case-insensitive).
     func hasSubject(_ tag: String) -> Bool { subjectKeys.contains(tagKey(tag)) }
-    var color: ArchiveColor? { tags.color }
+    /// W40.suite-item-types: Box or Folder, from the token or the root's older-material colours.
+    var itemType: ItemType? { tags.itemType }
 }
 
 // Row *identity* is the file URL (see `id`); row *equality* is by VALUE and must include `tags`.

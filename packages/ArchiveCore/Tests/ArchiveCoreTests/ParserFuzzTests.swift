@@ -52,7 +52,7 @@ final class ParserFuzzTests: XCTestCase {
                 // A consumed sent-with token re-spells to exactly itself: the parser accepted only canonical form.
                 XCTAssertEqual(t.sentWith.map(SentWithTag.token(for:)), tok.trimmingCharacters(in: .whitespaces), ctx)
             }
-            if let c = t.color { XCTAssertEqual(c.labelNumber, label, ctx) }
+            if let tok = t.itemTypeToken { XCTAssertEqual(ItemType(token: tok), t.itemType, ctx) }
 
             // Nothing invented: every subject and every winner is a token the file really carries.
             var pool = raw
@@ -122,7 +122,7 @@ final class ParserFuzzTests: XCTestCase {
         for i in 0..<5_000 {
             let state = FacetState.random(&rng)
             let raw = state.tokens().shuffled(using: &rng)
-            XCTAssertEqual(FacetState(parsing: DocumentTags.parse(raw: raw, labelNumber: state.color?.labelNumber)),
+            XCTAssertEqual(FacetState(parsing: DocumentTags.parse(raw: raw, labelNumber: nil)),
                            state, "iteration \(i), raw \(raw.debugDescription)")
         }
     }
@@ -141,11 +141,11 @@ final class ParserFuzzTests: XCTestCase {
         for i in 0..<150 {
             var state = FacetState.random(&rng)
             let first = state.tokens().shuffled(using: &rng)
-            _ = try CoordinatedTagWriter.write(url) { _, _ in (first, state.color?.labelNumber) }
+            _ = try CoordinatedTagWriter.write(url) { _, _ in (first, nil) }
             XCTAssertEqual(try readBack(url), state, "iteration \(i): written \(first.debugDescription)")
 
             let op = state.randomEdit(&rng)
-            let before = DocumentTags.parse(raw: first, labelNumber: state.color?.labelNumber)
+            let before = DocumentTags.parse(raw: first, labelNumber: nil)
             let delta = TagEditing.delta(for: op, given: before)
             _ = try CoordinatedTagWriter.write(url) { tags, label in Self.apply(delta, to: tags, label: label) }
             state.apply(op)
@@ -275,10 +275,11 @@ final class ParserFuzzTests: XCTestCase {
         var newLabel = label
         switch d.color {
         case .set(let c)?:
-            out.removeAll { $0 == "Red" || $0 == "Purple" }
-            out.append(c.tokenName); newLabel = c.labelNumber
+            if let cur = FinderLabel(labelNumber: label), cur != c { out.removeAll { $0 == cur.tokenName } }
+            if !out.contains(c.tokenName) { out.append(c.tokenName) }
+            newLabel = c.rawValue
         case .clear?:
-            if let cur = label.flatMap(ArchiveColor.init(labelNumber:)) { out.removeAll { $0 == cur.tokenName } }
+            if let cur = FinderLabel(labelNumber: label) { out.removeAll { $0 == cur.tokenName } }
             newLabel = 0
         case .restoreLabel(let l)?: newLabel = l
         case nil: break
@@ -337,19 +338,19 @@ struct FacetState: Equatable, CustomStringConvertible {
     var dateUncertain = false
     var quality: Int?
     var readState: ReadState?
-    var color: ArchiveColor?
+    var itemType: ItemType?
     var sentWith: ArchiveDate?
     var subjects: [String] = []
 
     var description: String {
         "y\(year as Any) m\(month as Any) d\(day as Any) dec\(decade as Any) u\(dateUncertain) q\(quality as Any) "
-            + "r\(readState?.rawValue as Any) c\(color as Any) sw\(sentWith?.wireValue as Any) s\(subjects.sorted())"
+            + "r\(readState?.rawValue as Any) t\(itemType as Any) sw\(sentWith?.wireValue as Any) s\(subjects.sorted())"
     }
 
     init(parsing t: DocumentTags) {
         year = t.year; month = t.month?.number; day = t.day; decade = t.decade
         dateUncertain = t.dateUncertain; quality = t.quality; readState = t.readState
-        color = t.color; sentWith = t.sentWith; subjects = t.subjects.sorted()
+        itemType = t.itemType; sentWith = t.sentWith; subjects = t.subjects.sorted()
     }
 
     private init() {}
@@ -362,7 +363,7 @@ struct FacetState: Equatable, CustomStringConvertible {
         s.dateUncertain = rng.chance(0.2)
         if rng.chance(0.5) { s.quality = rng.int(1...3) }
         if rng.chance(0.6) { s.readState = rng.chance(0.5) ? .read : .unread }
-        if rng.chance(0.3) { s.color = rng.chance(0.5) ? .box : .folder }
+        if rng.chance(0.3) { s.itemType = rng.chance(0.5) ? .box : .folder }
         if rng.chance(0.3) { s.sentWith = FuzzTokens.archiveDate(&rng) }
         var subjects = Set<String>()
         for _ in 0..<rng.int(0...4) {
@@ -385,7 +386,7 @@ struct FacetState: Equatable, CustomStringConvertible {
         if dateUncertain { t.append("Date Uncertain") }
         if let q = DocumentTags.qualityTag(for: quality) { t.append(q) }
         if let readState { t.append(readState.rawValue) }
-        if let color { t.append(color.tokenName) }
+        if let itemType { t.append(itemType.tokenName) }
         if let sentWith { t.append(SentWithTag.token(for: sentWith)) }
         return t
     }
@@ -397,7 +398,7 @@ struct FacetState: Equatable, CustomStringConvertible {
         case 2: return .setDay(rng.chance(0.8) ? rng.int(1...31) : nil)
         case 3: return .setQuality(rng.chance(0.8) ? rng.int(1...3) : nil)
         case 4: return .setDateUncertain(rng.chance(0.5))
-        case 5: return .setColor(rng.chance(0.3) ? nil : (rng.chance(0.5) ? .box : .folder))
+        case 5: return .setItemType(rng.chance(0.3) ? nil : (rng.chance(0.5) ? .box : .folder))
         case 6: return .setSentWith(rng.chance(0.8) ? FuzzTokens.archiveDate(&rng) : nil)
         case 7:
             let c = FuzzTokens.subject(&rng)
@@ -415,7 +416,7 @@ struct FacetState: Equatable, CustomStringConvertible {
         case .setDay(let d): day = d
         case .setQuality(let q): quality = q
         case .setDateUncertain(let on): dateUncertain = on
-        case .setColor(let c): color = c
+        case .setItemType(let t): itemType = t
         case .setSentWith(let d): sentWith = d
         case .setSentWithUncertain: break
         case .addSubject(let s):
@@ -489,7 +490,7 @@ struct PageTwo {
 enum FuzzTokens {
     static let atoms = ["0", "1", "2", "5", "9", "00", "10", "19", "58", "+", "-", " ", "  ", "s", "S", "Q", "P", "p",
                         "Day", "day ", "March", "march", "Sent With ", "Date Uncertain", "Read", "Red", "Purple",
-                        "\u{00A0}", "\t", "é", "\u{0663}", "\u{FF11}", "\u{FEFF}", "\u{200B}", "·", "s ", "e", "x", "0x"]
+                        "Box", "Folder", "box", "\u{00A0}", "\t", "é", "\u{0663}", "\u{FF11}", "\u{FEFF}", "\u{200B}", "·", "s ", "e", "x", "0x"]
 
     static func token(_ rng: inout FuzzRNG) -> String {
         switch rng.int(0...3) {
@@ -508,7 +509,8 @@ enum FuzzTokens {
         case 3: return "Day \(rng.int(1...31))"
         case 4: return ["Q1", "Q2", "Q3", "P7", "P8", "P9", "P10", "Q0", "P07"][rng.int(0...8)]
         case 5: return SentWithTag.token(for: archiveDate(&rng))
-        case 6: return ["Read", "Unread", "Date Uncertain", SentWithTag.uncertainToken, "Red", "Purple"][rng.int(0...5)]
+        case 6: return ["Read", "Unread", "Date Uncertain", SentWithTag.uncertainToken, "Red", "Purple",
+                         "Box", "Folder"][rng.int(0...7)]
         case 7: return wireDate(&rng)
         default: return subject(&rng)
         }

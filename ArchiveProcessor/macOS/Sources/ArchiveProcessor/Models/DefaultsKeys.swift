@@ -77,6 +77,9 @@ enum DefaultsKeys {
 
     // Tagging & segmentation
     static let taggingModeRaw = "taggingModeRaw"
+    /// W40.suite-item-types: the Finder label (1–7; 0 or absent = none) written beside a Box / Folder item.
+    static let itemTypeColourBox = "itemTypeColourBox"
+    static let itemTypeColourFolder = "itemTypeColourFolder"
     /// `SegmentationApproach` rawValue: who proposes the run's boundaries (W36.seg-opt-engine). Absent ⇒ manual.
     static let segmentationApproach = "segmentationApproach"
     /// `ClaudeRoute` rawValue: Claude's windows by API key or by the user's own `claude` plan, asked only when both

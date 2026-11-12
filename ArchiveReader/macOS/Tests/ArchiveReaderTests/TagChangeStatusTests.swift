@@ -37,7 +37,12 @@ final class TagChangeStatusTests: XCTestCase {
         XCTAssertEqual(TagChangeStatus.reversal([result(["Red"], [])], redo: false),
                        "Undid 1 change in letter.pdf: Subjects: removed “Red”")
         XCTAssertTrue(TagChangeStatus.reversal([result([], [], labels: (nil, 2))], redo: true)
-            .contains("Color: none → Finder label 2"))
+            .contains("Color: none → Green"))
+        XCTAssertTrue(TagChangeStatus.reversal([result([], [], labels: (nil, 9))], redo: true)
+            .contains("Color: none → Finder label 9"))
+        // W40.suite-item-types: the type is its own field, never called a colour.
+        XCTAssertEqual(TagChangeStatus.reversal([result(["Folder"], ["Box"])], redo: false),
+                       "Undid 1 change in letter.pdf: Item type: “Folder” → “Box”")
     }
 
     func testGroupCountsDistinctFilesAndGroupsTheirActualTransitions() {
@@ -70,6 +75,6 @@ final class TagChangeStatusTests: XCTestCase {
         let labels = [result([], [], labels: (6, 3)), result([], ["X"], labels: (4, 4))]
         let status = TagChangeStatus.reversal(labels, redo: true)
         XCTAssertTrue(status.contains("Color: Red → Purple"), status)
-        XCTAssertFalse(status.contains("Finder label 4"), "the external label change was not redone: \(status)")
+        XCTAssertFalse(status.contains("Blue"), "the external label change was not redone: \(status)")
     }
 }

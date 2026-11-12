@@ -772,11 +772,24 @@ struct LiveCaptureView: View {
         .disabled(liveProc.stagingRecoveryBlocked)
     }
 
+    /// The dot for the Finder colour the user chose for a group's item type (W40.suite-item-types).
+    private static func swatch(_ label: FinderLabel) -> Color {
+        switch label {
+        case .gray: return .gray
+        case .green: return .green
+        case .purple: return .purple
+        case .blue: return .blue
+        case .yellow: return .yellow
+        case .red: return .red
+        case .orange: return .orange
+        }
+    }
+
     private func groupSection(index: Int, group: CaptureGroup) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                if let color = group.type.colorTag {
-                    Circle().fill(color == "Red" ? .red : .purple).frame(width: 8, height: 8)
+                if let type = group.type.itemType, let label = ItemTypeColourSetting.colour(for: type) {
+                    Circle().fill(Self.swatch(label)).frame(width: 8, height: 8)
                 }
                 Text("Group \(index) · \(group.type.rawValue.capitalized)")
                     .font(.subheadline).fontWeight(.medium)

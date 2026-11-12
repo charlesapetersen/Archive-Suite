@@ -115,15 +115,18 @@ struct MacOSTagger {
                 // The caller (GeneratedTags) supplies the authoritative color; never treat a subject
                 // string as a color even when it's nil — a document about the "Red Scare" keeps
                 // "Red" as a text tag.
-                colorTagName = (appColor == "Red" || appColor == "Purple") ? appColor : nil
+                // W40.suite-item-types: any Finder colour the user chose for the item type.
+                colorTagName = appColor.flatMap { c in FinderLabel.allCases.first { $0.tokenName == c }?.tokenName }
                 if let c = colorTagName, let idx = filtered.firstIndex(of: c) {
                     var t = filtered; t.remove(at: idx); textTags = t
                 } else {
                     textTags = filtered
                 }
             } else {
-                // Raw [String] callers: detect Red/Purple within the array (never other color words).
-                let detected = filtered.first { ["Red", "Purple"].contains($0) }
+                // Raw [String] callers: detect a colour the user chose for an item type within the array
+                // (never other color words; with no colour chosen, none — W40.suite-item-types).
+                let chosen = ItemTypeColourSetting.chosenColourNames
+                let detected = filtered.first { chosen.contains($0) }
                 colorTagName = detected
                 textTags = filtered.filter { $0 != detected }
             }

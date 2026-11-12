@@ -81,6 +81,9 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
 
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    // W40.suite-item-types: the Finder colour written beside a Box / Folder item; 0 = none (the default).
+    @AppStorage(DefaultsKeys.itemTypeColourBox) private var itemTypeColourBox: Int = 0
+    @AppStorage(DefaultsKeys.itemTypeColourFolder) private var itemTypeColourFolder: Int = 0
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
@@ -943,6 +946,19 @@ struct SettingsView: View {
         } header: { Text("Segmentation") }
     }
 
+    /// W40.suite-item-types: a box or folder photo is tagged "Box" or "Folder"; its Finder colour is optional.
+    private func itemTypeColourPicker(_ title: String, selection: Binding<Int>) -> some View {
+        Picker(selection: selection) {
+            Text("None").tag(0)
+            ForEach(FinderLabel.allCases, id: \.self) { Text($0.tokenName).tag($0.rawValue) }
+        } label: {
+            HStack {
+                Text(title)
+                HelpButton(text: "Box and folder photos are always tagged “Box” or “Folder”. A colour here is also written as the file's Finder colour label, for your own browsing; it is not what marks the type.")
+            }
+        }
+    }
+
     @ViewBuilder private var taggingSection: some View {
         Section {
             Picker(selection: $taggingModeRaw) {
@@ -953,6 +969,8 @@ struct SettingsView: View {
                     HelpButton(text: "\(taggingMode.detail)\n\nLinked to the Tagging dropdown in Process Files — changing either updates both. Shown here so you can see the cost/time effect of each mode.")
                 }
             }
+            itemTypeColourPicker("Box colour", selection: $itemTypeColourBox)
+            itemTypeColourPicker("Folder colour", selection: $itemTypeColourFolder)
             Toggle(isOn: $enableCollectionSegmentation) {
                 HStack {
                     Text("Collection ID + file renaming")

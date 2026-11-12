@@ -13,7 +13,9 @@ public enum TagEditOp: Sendable, Equatable {
     case setDay(Int?)           // 1...31, or nil to clear
     case setDateUncertain(Bool)
     case setQuality(Int?)       // 1...3, or nil to clear (unrated writes NO token — never `Q0`)
-    case setColor(ArchiveColor?)// box / folder, or nil to clear
+    /// W40.suite-item-types: box / folder, or nil to clear. Writes the `Box`/`Folder` token; a Finder label
+    /// that still reads as another type through the root's colours is cleared, so the file reads as asked.
+    case setItemType(ItemType?)
     /// W37: the covering letter's date, one whole `Sent With …` token; nil clears it. Clearing it also
     /// clears its uncertain flag, which means nothing on its own.
     case setSentWith(ArchiveDate?)
@@ -53,8 +55,11 @@ public enum TagEditing {
             // retires that token instead of leaving two ratings on the same file.
             return TagDelta(add: DocumentTags.qualityTag(for: q).map { [$0] } ?? [],
                             remove: tags.qualityToken.map { [$0] } ?? [])
-        case .setColor(let c):
-            return TagDelta(color: c.map { .set($0) } ?? .clear)
+        case .setItemType(let t):
+            let remove = ItemType.allCases.filter { $0 != t }.map(\.tokenName)
+            let staleColour = tags.itemTypeFromColour.map { $0 != t } ?? false
+            return TagDelta(add: t.map { [$0.tokenName] } ?? [], remove: remove,
+                            color: staleColour ? .clear : nil)
         case .setSentWith(let d):
             // Names ONLY the one token this file consumed for the facet, so a malformed lookalike or a
             // different demoted date is untouched. The writer matches by VALUE, so an identical demoted
@@ -112,14 +117,14 @@ public struct GroupTagSummary: Sendable, Equatable {
     public var commonYear: Int??
     public var commonQuality: Int??
     public var commonReadState: ReadState??
-    public var commonColor: ArchiveColor??
+    public var commonItemType: ItemType??
 
     public init(_ files: [DocumentTags]) {
         count = files.count
         guard let first = files.first else {
             subjectsOnAll = []; subjectsOnSome = []
             commonYear = nil; commonQuality = nil
-            commonReadState = nil; commonColor = nil
+            commonReadState = nil; commonItemType = nil
             return
         }
         // By tag identity (`tagKey`): "Lincoln" on one file and "lincoln" on another are on both, shown
@@ -138,7 +143,7 @@ public struct GroupTagSummary: Sendable, Equatable {
         commonYear = Self.common(files.map(\.year))
         commonQuality = Self.common(files.map(\.quality))
         commonReadState = Self.common(files.map(\.readState))
-        commonColor = Self.common(files.map(\.color))
+        commonItemType = Self.common(files.map(\.itemType))
         _ = first
     }
 

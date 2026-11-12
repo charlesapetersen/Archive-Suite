@@ -20,7 +20,7 @@ struct DateSortParityTests {
             year: year,
             month: month.map { DocumentTags.Month(number: $0, name: "") },
             day: day, dateUncertain: uncertain, decade: decade,
-            quality: nil, readState: nil, color: nil, subjects: [],
+            quality: nil, readState: nil, itemType: nil, subjects: [],
             yearToken: nil, monthToken: nil, dayToken: nil, decadeToken: nil, qualityToken: nil
         )
     }

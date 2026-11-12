@@ -79,6 +79,7 @@ struct OptionsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            ItemTypeSettingsSection()
             Section("Excluded folders") {
                 Text("Files in these folders are hidden from the library and not indexed for search.")
                     .font(.callout)
@@ -106,8 +107,9 @@ struct OptionsView: View {
             }
         }
         .formStyle(.grouped)
-        // 40 pt taller for the Appearance row at the top (W48.appearance-reader).
-        .frame(width: 500, height: 660)
+        // 40 pt taller for the Appearance row at the top (W48.appearance-reader); the Form scrolls, so
+        // Item types (W40.suite-item-types) adds 80 pt rather than its whole height.
+        .frame(width: 500, height: 740)
     }
 
     private func addExcludedFolder() {

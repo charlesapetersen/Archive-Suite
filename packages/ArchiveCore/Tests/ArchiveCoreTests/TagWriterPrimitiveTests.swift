@@ -144,13 +144,17 @@ final class TagWriterPrimitiveTests: XCTestCase {
     func testFacetShapedTokensKeepTheirExactCase() {
         for (facet, subject) in [("Q2", "q2"), ("P9", "p9 "), ("Red", "red"), ("Purple", "PURPLE"),
                                  ("03 March", "03 march"), ("Sent With 1958", "sent with 1958"),
-                                 ("Date Uncertain", "date uncertain"), ("1970s", "1970S")] {
+                                 ("Date Uncertain", "date uncertain"), ("1970s", "1970S"),
+                                 ("Box", "box"), ("Folder", "FOLDER"), ("Green", "green")] {
             XCTAssertFalse(isSameTag(facet, subject), "\(facet) / \(subject)")
             XCTAssertFalse(shouldRemoveTag(subject, matching: facet), "\(facet) / \(subject)")
             XCTAssertFalse(shouldRemoveTag(facet, matching: subject), "\(facet) / \(subject)")
             XCTAssertNotEqual(tagKey(subject), tagKey(facet), "\(facet) / \(subject)")
         }
-        XCTAssertTrue(keepsExactCase("Q2") && keepsExactCase("Red") && keepsExactCase("1958"))
+        XCTAssertTrue(keepsExactCase("Q2") && keepsExactCase("Red") && keepsExactCase("1958") && keepsExactCase("Box"))
+        XCTAssertTrue(isSameTag("box", "BOX"), "a subject box is not the type and folds like any subject")
+        XCTAssertTrue(isSameTag("green", "GREEN"), "a colour word in another spelling folds like any subject")
+        XCTAssertFalse(keepsExactCase(" Box ") || keepsExactCase("red"))
         XCTAssertFalse(keepsExactCase("Lincoln") || keepsExactCase("Red Scare") || keepsExactCase("Read"))
         XCTAssertTrue(isSameTag("Red Scare", "red scare"), "a subject merely starting with a colour folds")
     }
@@ -242,7 +246,7 @@ final class TagWriterPrimitiveTests: XCTestCase {
         XCTAssertEqual(tags?.year, 1980)
         XCTAssertEqual(tags?.quality, 2)
         XCTAssertEqual(tags?.readState, .unread)
-        XCTAssertEqual(tags?.color, .box)
+        XCTAssertEqual(tags?.finderLabel, .red)
     }
 
     // MARK: §6 Write-target identity re-verification

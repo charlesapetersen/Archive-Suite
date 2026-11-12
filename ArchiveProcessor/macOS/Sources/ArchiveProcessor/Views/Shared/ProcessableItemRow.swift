@@ -111,7 +111,7 @@ struct ProcessableItemRow: View {
             // Applied-tags capsule list (Files final-review layout).
             if showTagsList, !item.appliedTags.isEmpty {
                 FlowLayout(spacing: 4) {
-                    ForEach(item.appliedTags.filter { $0 != "Red" && $0 != "Purple" }, id: \.self) { tag in
+                    ForEach(item.appliedTags.filter { !ItemTypeColourSetting.chosenColourNames.contains($0) }, id: \.self) { tag in
                         Text(tag)
                             .font(.caption2)
                             .padding(.horizontal, 5).padding(.vertical, 1)

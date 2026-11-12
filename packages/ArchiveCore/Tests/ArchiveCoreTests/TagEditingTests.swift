@@ -184,9 +184,20 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(TagEditing.delta(for: .setDateUncertain(false), given: tags(["1980", "Date Uncertain"])).remove, ["Date Uncertain"])
     }
 
-    func testSetColor() {
-        XCTAssertEqual(TagEditing.delta(for: .setColor(.box), given: tags(["Unread"])).color, .set(.box))
-        XCTAssertEqual(TagEditing.delta(for: .setColor(nil), given: tags(["Unread"])).color, .clear)
+    func testSetItemType() {
+        // A type is its token; the colour is left alone.
+        let set = TagEditing.delta(for: .setItemType(.box), given: tags(["Unread"]))
+        XCTAssertEqual(set, TagDelta(add: ["Box"], remove: ["Folder"]))
+        XCTAssertEqual(TagEditing.delta(for: .setItemType(nil), given: tags(["Box"])),
+                       TagDelta(remove: ["Box", "Folder"]))
+        // A label that reads as another type through the root's colours is cleared; one that reads as the
+        // type asked for is kept.
+        let red = DocumentTags.parse(raw: ["Red"], labelNumber: 6, colours: .redBoxPurpleFolder)
+        XCTAssertEqual(TagEditing.delta(for: .setItemType(.folder), given: red).color, .clear)
+        XCTAssertNil(TagEditing.delta(for: .setItemType(.box), given: red).color)
+        XCTAssertEqual(TagEditing.delta(for: .setItemType(nil), given: red).color, .clear)
+        // Without the root's colours a Red label means nothing and stays.
+        XCTAssertNil(TagEditing.delta(for: .setItemType(nil), given: tags(["Red"])).color)
     }
 
     // MARK: GroupTagSummary

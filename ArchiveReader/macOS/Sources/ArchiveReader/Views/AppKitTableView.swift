@@ -211,6 +211,16 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
+        // W40.suite-item-types: a new marker colour redraws the visible names.
+        if coordinator.currentMarkerColours != model.itemTypeMarkerColours {
+            coordinator.currentMarkerColours = model.itemTypeMarkerColours
+            let visRange = tableView.rows(in: tableView.visibleRect)
+            if visRange.length > 0 {
+                tableView.reloadData(forRowIndexes: IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length)),
+                                     columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+            }
+        }
+
         // Only diff the snapshot when `displayed` actually changed.
         let gen = model.displayedGeneration
         var rowsChanged = false
@@ -312,6 +322,7 @@ struct AppKitTableView: NSViewRepresentable {
         weak var tableView: NSTableView?
         var dataSource: NSTableViewDiffableDataSource<Int, ArchiveFile.ID>?
         var currentFontSize: CGFloat = 13
+        var currentMarkerColours = ItemTypeColors.none
         var lastPushedSelection: Set<ArchiveFile.ID> = []
         var isUpdatingSelection = false
         var isSortingFromModel = false
@@ -639,10 +650,14 @@ struct AppKitTableView: NSViewRepresentable {
                 }
 
             case "name":
-                let dotColor: NSColor? = file.color.map { $0 == .box ? .systemRed : .systemPurple }
+                // W40.suite-item-types: the type's marker is the user's colour for it, or the type's name.
+                let type = file.itemType
+                let dotColor = type.flatMap { parent.model.itemTypeMarkerColours.colour(for: $0) }
+                    .map(ItemTypePreferences.nsColor)
                 let disambiguator = parent.model.isDuplicatedName(file.name)
                     ? DuplicateNames.disambiguator(for: file.url) : nil
                 Self.configureNameTextField(tf, name: file.name, dotColor: dotColor,
+                                            typeLabel: dotColor == nil ? type?.displayName : nil,
                                             disambiguator: disambiguator,
                                             snippet: parent.model.searchSnippet(for: file.path),
                                             fontSize: currentFontSize)
@@ -805,6 +820,7 @@ struct AppKitTableView: NSViewRepresentable {
         /// The field now yields horizontally, and every line carries its own truncating paragraph style
         /// (an `attributedStringValue` without one ignores the field's `lineBreakMode`: no ellipsis).
         static func configureNameTextField(_ tf: NSTextField, name: String, dotColor: NSColor?,
+                                           typeLabel: String? = nil,
                                            disambiguator: String?, snippet: [SearchSnippet.Segment]?,
                                            fontSize: CGFloat) {
             let nameLine = NSMutableAttributedString()
@@ -812,6 +828,11 @@ struct AppKitTableView: NSViewRepresentable {
                 nameLine.append(NSAttributedString(string: "● ", attributes: [
                     .foregroundColor: dotColor,
                     .font: NSFont.systemFont(ofSize: fontSize * 0.7),
+                ]))
+            } else if let typeLabel {
+                nameLine.append(NSAttributedString(string: "\(typeLabel) · ", attributes: [
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .font: NSFont.systemFont(ofSize: fontSize * 0.85, weight: .medium),
                 ]))
             }
             nameLine.append(NSAttributedString(string: name, attributes: [

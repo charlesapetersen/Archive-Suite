@@ -29,7 +29,7 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
 |---|---|---|
 | Read tag names | `url.resourceValues(forKeys: [.tagNamesKey]).tagNames` → `[String]` | `MacOSTagger.readTags`, `TagWriter.mutate` |
 | Write tag names | `(url as NSURL).setResourceValue([String], forKey: .tagNamesKey)` | `MacOSTagger.applyTags`, `TagWriter.mutate` |
-| Read/write color label | `.labelNumberKey` (Int) | both (`finderLabelIndex` / `ArchiveColor`) |
+| Read/write color label | `.labelNumberKey` (Int) | both (`finderLabelIndex` / `FinderLabel`) |
 | Discover tagged files | walk the granted root; read `.tagNamesKey` per file | Reader `ArchiveCore.CorpusWalker` (+ `ArchiveLibrary` cache) |
 
 - The tag array is an **ordered `[String]`**; macOS may reorder on write, so consumers compare as a
@@ -42,11 +42,12 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
   (above) and why occurrence-aware undo/restore must carry per-token **multiplicity** (ArchiveCore
   `tagOccurrenceInverse`, Wave 15) — a `Set`-collapse would silently drop a duplicate on undo.
 - **Color-name-token preserves labelNumber.** The color label (`.labelNumberKey`) and a color-name
-  token (`"Red"`/`"Purple"`) in the tag array are two representations of the same fact. **Verified:**
-  keeping the color-name token in the array and writing only `.tagNamesKey` **preserves the existing
-  `labelNumber`** without writing it. Processor still writes `.labelNumberKey` explicitly
-  (`MacOSTagger.applyTags`, lines 72–76: set to 6/3, or `0` when no color); Reader writes it **only**
-  when a delta changes color (`TagWriter` §7), otherwise restores drift.
+  token (`"Red"`, `"Green"`, …, one of Finder's seven) in the tag array are two representations of the
+  same fact. **Verified:** keeping the color-name token in the array and writing only `.tagNamesKey`
+  **preserves the existing `labelNumber`** without writing it. Processor still writes `.labelNumberKey`
+  explicitly (`MacOSTagger.applyTags`: the colour the user chose for the item type, or `0` when none);
+  Reader writes it **only** when a delta changes color (`TagWriter` §7), otherwise restores drift. The
+  colour is the user's display choice, never the item type (§Item type).
 - **No search index is ever tag truth.** The filesystem xattr read through `.tagNamesKey` is the only
   authority. Spotlight's `kMDItemUserTags` was the Reader's discovery mechanism until `W26.walk2` replaced
   it with a direct walk (`ArchiveCore.CorpusWalker`) plus a disposable `LibraryIndex` cache and FSEvents;
@@ -59,7 +60,7 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
 
 A file's tag array intermixes the facets below. Classification into facets is **display / sort /
 filter only** and **must never drive a destructive write** — subjects can collide with any facet
-token (a subject literally `1984`, `P7`, `Read`, `Box`), so a mis-classified facet is acceptable
+token (a subject literally `1984`, `P7`, `Read`, `Folder`), so a mis-classified facet is acceptable
 (the user corrects it in the UI) but a facet-driven token removal is not. Reader's canonical parser
 is `DocumentTags.parse` (`Core/DocumentTags.swift`); Processor emits them from `GeneratedTags.allTags`
 (`Tagging/TagGenerator.swift`).
@@ -79,8 +80,9 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Quality** *(the rating facet)* | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **The single importance/quality rating (W19, 2026-07-18) — MERGED with + supersedes the legacy Priority facet** (`Q3` = old `P10`). A human 0–3 rating; **`Q0`/unrated writes NO tag** (absence *is* 0 stars, so the wire only ever carries `Q1`/`Q2`/`Q3`). Human-set everywhere, **never LLM-emitted**: Notes (front-matter `quality`), Reader (edit), Processor's interactive tagging (Live Capture tag card + Process Files manual tagging), and the **phone companions** (per-page/segment — the old priority control now emits `Q`). Q-prefix can never collide with the digits-only Year test. |
 | **Priority** *(legacy → Quality)* | `P7`–`P10`, on pre-W19 files only | 0–1 | **RETIRED — merged into Quality (W19, 2026-07-18).** No longer written by any app or companion. **Read-only alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3` and `P7` as unrated, so pre-W19 phone-captured files still resolve without a corpus rewrite. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
-| **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). Box/folder pages carry the literal subjects `Box`/`Folder`. OCR failures carry `OCR Failed`; a person flags inadequate transcription with `OCR Poor` (below). |
-| **Color label** | `.labelNumberKey` + color-name token | 0–1 | **Red = 6 ⇒ box** photo; **Purple = 3 ⇒ folder** photo. Only these two are meaningful to the Suite. |
+| **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). OCR failures carry `OCR Failed`; a person flags inadequate transcription with `OCR Poor` (below). |
+| **Item type** | literal `Box` or `Folder` (exact spelling) | 0–1 | A photo of a box label or of a folder label (§Item type). Last token wins; an earlier one reads as a subject, but the words are reserved, so setting the type removes every `Box`/`Folder` token. `box`, `BOX`, `" Box "` are subjects. |
+| **Color label** | `.labelNumberKey` + color-name token | 0–1 | The user's own display choice, any of Finder's seven, **none by default**. It never marks the item type, except in material made before the type tokens, read through a per-root setting (§Item type). |
 
 **Poor OCR (W44.reocr-spec).** `OCR Poor` is an ordinary Subject token, independent of the
 Q1–Q3 importance rating and the execution-failure subject `OCR Failed`. Only an explicit person's
@@ -110,6 +112,36 @@ array is the source of truth. A subject that happens to equal a facet token must
 document about the "Red Scare" with **no** red label keeps `Red` as a subject (Processor
 `MacOSTagger.applyTags` `colorIsAuthoritative` path; Reader `DocumentTags.parse` color check gated on
 the file's actual `labelNumber`).
+
+### Item type
+
+W40.suite-item-types (owner's Reader notes, 2026-11-10, point 15). **Box and Folder are item types, and
+colour is the user's choice.**
+
+- **The record is the token.** A box-label photo carries the tag `Box`, a folder-label photo `Folder`:
+  exact case, whole token, the same words as the page-2 Classification values `Box` / `Folder` (§2-page
+  PDF). `ArchiveCore.ItemType` reads it; `DocumentTags.itemType` / `itemTypeToken`. The Processor writes
+  it on every real-tagging path (it already wrote these words as subjects); the Reader writes it only on a
+  deliberate user action (Inspector ▸ Item type) through `TagWriter`, as a token delta.
+- **Colour is a display setting.** Processor ▸ Settings ▸ Tagging has a Box colour and a Folder colour,
+  each none (the default for a new user) or one of Finder's seven; the chosen colour is written as the
+  label beside the token. The Reader's list marker uses its own Options ▸ Item types colour per type, or
+  the type's name when none. No app names the type by a colour.
+- **Material made before the tokens.** Before this change the Processor marked the type only with the
+  label (Red = 6 a box, Purple = 3 a folder); on the owner's 5,000-file sample 75 files carry Red and 186
+  Purple, and none a `Box` or `Folder` tag. The Reader keeps, per archive root (app-side, keyed by the
+  root's preference GUID, never in the corpus), which colour meant which type, asked once when a root is
+  chosen and changeable in Options; `DocumentTags.parse(…, colours:)` reads a type from the label through
+  it (`itemTypeFromColour`). The token wins over the colour. Setting a type in the Reader writes the token
+  and clears a label that still reads as another type under that setting, so the file reads as asked;
+  clearing the type clears such a label too. No migration is written: no app output is kept (owner,
+  2026-08-01), and the pre-app corpus is read through the setting rather than rewritten.
+- **One vocabulary with the page kinds.** The item type says what a whole file is (a label photo, not a
+  document); it is the file-level form of the Classification's `Box` / `Folder`, while `Document Start` /
+  `Continuation` say where a document's pages begin and stay page-level. **Kind** (W44, per text page:
+  handwritten, typewritten, printed, forms) and W42.int-s3's kinds of page (adding clippings, newspapers,
+  registers) describe how a page's text is written and which reader suits it; they are a separate axis. A
+  Box or Folder item may carry a Kind for its label's text, and a Kind never implies an item type.
 
 ---
 
@@ -285,8 +317,9 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    a subject `"Read later"`, removing `Lincoln` never touches `Lincolnshire`. Tokens compare by their
    identity key, `tagKey` (full Unicode case folding, no locale; accents are not folded), **except a
    facet-shaped token**, whose key is its exact spelling (`keepsExactCase`: a rating `Q1`–`Q3`/`P7`–`P10`,
-   a date facet incl. `Date Uncertain` and `Sent With …`, a marker colour name `Red`/`Purple`), so the
-   rating `Q2` and a fiscal-quarter subject `q2`, or the box marker `Red` and a subject `red`, stay two
+   a date facet incl. `Date Uncertain` and `Sent With …`, a Finder colour name as Finder spells it
+   (`Red`, `Green`…), the item type `Box`/`Folder`), so the rating `Q2` and a fiscal-quarter subject `q2`, the
+   colour token `Red` and a subject `red`, or the type `Box` and a subject `box`, stay two
    tags and a facet edit never adds, skips or removes the other; `Read`/`Unread` fold as before. Add-dedup
    (`isSameTag`: adding `lincoln` to a file carrying `Lincoln` writes nothing), removal and rename
    (`shouldRemoveTag`: every case of the tag goes), and every grouping, count, filter and suggestion
@@ -310,12 +343,13 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
    "No tagging" means no *generated* tag (no LLM subject or date, no app colour, no `Unread`); in
    Live Capture it still writes what a person set: the tag card's subjects, date and Quality, and the
    phone's date and Quality (W40.fix-live-vision-drops-card-tags). With nothing set, no write at all.
-   Box and folder photos stay untagged in this mode: without their colour, a year or Q would make a
+   Box and folder photos stay untagged in this mode: without their type token, a year or Q would make a
    label photo read as a rated document.
-7. **App-authoritative color.** In real-tagging modes Processor assigns exactly one of Red(box)/
-   Purple(folder) and writes `.labelNumberKey` accordingly (or `0` to clear a stale swatch). A
-   subject string equal to `"Red"`/`"Purple"` is **never** promoted to a color label
-   (`colorIsAuthoritative` path). Reader writes `.labelNumberKey` only when a delta changes color.
+7. **App-authoritative type and color.** In real-tagging modes Processor writes the `Box`/`Folder` token
+   for a label photo, and `.labelNumberKey` from the colour the user chose for that type (or `0` to clear
+   a stale swatch, which is also what a new user, with no colour chosen, gets). A subject string equal to
+   a colour name is **never** promoted to a color label (`colorIsAuthoritative` path). Reader writes
+   `.labelNumberKey` only when a delta changes color.
 
 ---
 
@@ -330,7 +364,7 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 | **Notes date facets** (Year/Month/Day/Decade) | (n/a) | **Deferred — W19.date.** Notes currently keeps front-matter `date`+`datePrecision` authoritative; the queued projector work will reuse the existing date facets and `ArchiveCore.DocumentTags.sortDateKey` (no new vocabulary). |
 | Read/Unread + `Unread`-last | `Tagging/MacOSTagger.swift` (`stampUnread`) | `Core/DocumentTags.swift` (`ReadState`), `Core/TagWriter.swift` (`setReadState`) |
 | Subjects | `Tagging/TagGenerator.swift` | `Core/DocumentTags.swift` (`subjects`) |
-| Color label (Red=6/Purple=3) | `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | `Core/DocumentTags.swift` (`ArchiveColor`), `Core/TagWriter.swift` |
+| Item type (`Box`/`Folder`) + the user's colour | `Tagging/TagGenerator.swift`, `OCR/OCRProcessor+Tagging.swift` (`structureTag`, `authoritativeColor`), `Tagging/ItemTypeColourSetting.swift`, `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | ArchiveCore `Tags/ItemType.swift` (`ItemType`, `FinderLabel`, `ItemTypeColors`) + `DocumentTags.itemType`; Reader `Core/ItemTypePreferences.swift`, `Core/TagWriter.swift`, `Views/TagEditorView.swift` (Item type) |
 | **Sent With** date (W37) | `Tagging/DocumentSegmenter.swift` (`enclosureOf`), `OCR/OCRProcessor+Tagging.swift` (cover date → `GeneratedTags.sentWith`), `Views/ManualTaggingSheet.swift` | ArchiveCore `Tags/ArchiveDate.swift` (`ArchiveDate`, `SentWithTag`, `DateRangeFilter`) + `DocumentTags.sentWith`; Reader `Core/LibraryFilter.swift` (year range), `Views/TagEditorView.swift` (⌘I sheet); Notes front-matter `additional_dates` → `NotesTagProjector` |
 | Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`; own date, sent-with fallback) |
 | 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`, structured per-page metadata and summaries). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |

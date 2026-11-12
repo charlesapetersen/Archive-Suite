@@ -1448,7 +1448,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var imageURLs: [URL] = []
         var placeholderSources: [URL] = []
         var untaggedOutputs: [URL] = []
-        // W3.cap-r1 — the app's OWN colour for this segment (Red = box, Purple = folder, nil = document),
+        // W3.cap-r1 — the app's OWN colour for this segment (the user's colour for a box/folder, if any;
+        // nil for a document or no colour chosen — W40.suite-item-types),
         // passed to every tag write below so a *subject* string is never mistaken for one. See
         // `tagStagedArtifact`.
         let appColor = jsonTags.colorTag

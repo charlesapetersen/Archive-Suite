@@ -43,7 +43,7 @@ public struct TagDelta: Sendable, Equatable {
     public var color: ColorChange?
 
     public enum ColorChange: Sendable, Equatable {
-        case set(ArchiveColor)   // box = Red(6) / folder = Purple(3)
+        case set(FinderLabel)    // the label and its colour-name token (a display colour, not the item type)
         case clear               // label 0, and drop the color token matching the current label
         case restoreLabel(Int?)  // undo only: set the label verbatim WITHOUT touching the tag array
                                  // (the delta's add/remove already carries the exact token changes)

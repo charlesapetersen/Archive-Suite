@@ -84,7 +84,7 @@ final class LedgerUndoHistoryTests: XCTestCase {
 
     func testRelaunchRestoresOccurrenceCountsAndLabelAndNeverReplays() throws {
         let url = try file(tags: ["Unread", "A", "A"])
-        _ = try TagWriter.apply(TagDelta(remove: ["A"], color: .set(.box)), to: url)
+        _ = try TagWriter.apply(TagDelta(remove: ["A"], color: .set(.red)), to: url)
         let defaults = fixtureDefaults(pinnedTo: root)
         NavigationModel(defaults: defaults).undoLast()
         let tags = try XCTUnwrap(TagReading.read(URL(fileURLWithPath: url.path)).tagNames)

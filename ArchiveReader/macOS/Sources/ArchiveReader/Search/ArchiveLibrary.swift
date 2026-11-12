@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os
 import ArchiveCore
 
 struct ResolvedLibraryRoot: Sendable {
@@ -1560,11 +1561,39 @@ final class ArchiveLibrary: ObservableObject {
 
     // MARK: - Row construction
 
+    /// W40.suite-item-types: which Finder colour meant which item type in the root's older material
+    /// (`ItemTypePreferences.rootColours`). One root is open at a time, and rows are built in static
+    /// functions, some off the main actor, so the value is process-wide behind a lock.
+    nonisolated private static let rootItemTypeColoursLock = OSAllocatedUnfairLock<ItemTypeColors>(initialState: .none)
+    nonisolated static var rootItemTypeColours: ItemTypeColors {
+        rootItemTypeColoursLock.withLock { $0 }
+    }
+
+    /// Set the root's colours and re-read every listed row's type through them. Reads nothing from disk:
+    /// each row's raw tags and label are re-parsed as they are.
+    func setRootItemTypeColours(_ colours: ItemTypeColors) {
+        let changed = Self.rootItemTypeColoursLock.withLock { state -> Bool in
+            defer { state = colours }
+            return state != colours
+        }
+        guard changed, !files.isEmpty else { return }
+        commit(files.map { f in
+            (f.path, ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
+                                 tags: Self.parse(f.tags.raw, f.tags.labelNumber),
+                                 contentModified: f.contentModified, isDataless: f.isDataless,
+                                 provenance: f.provenance))
+        })
+    }
+
+    nonisolated static func parse(_ raw: [String], _ labelNumber: Int?) -> DocumentTags {
+        DocumentTags.parse(raw: raw, labelNumber: labelNumber, colours: rootItemTypeColours)
+    }
+
     static func row(_ entry: CorpusEntry, tagNames: [String], labelNumber: Int?) -> ArchiveFile {
         ArchiveFile(url: entry.url,
                     name: entry.url.lastPathComponent,
                     fileType: shortType(uti: entry.contentTypeIdentifier, url: entry.url),
-                    tags: DocumentTags.parse(raw: tagNames, labelNumber: labelNumber),
+                    tags: parse(tagNames, labelNumber),
                     // `.contentModificationDateKey`, deliberately: a Finder-tag write changes ctime,
                     // not mtime, so this is the right key for the content-index freshness check and
                     // the wrong one for detecting a tag change (plan §5.12).
@@ -1579,8 +1608,7 @@ final class ArchiveLibrary: ObservableObject {
         return ArchiveFile(url: url,
                            name: entry.name,
                            fileType: shortType(uti: nil, url: url),
-                           tags: DocumentTags.parse(raw: entry.tagNames,
-                                                    labelNumber: entry.labelNumber),
+                           tags: parse(entry.tagNames, entry.labelNumber),
                            contentModified: Date(timeIntervalSince1970: entry.fingerprint.mtime),
                            isDataless: entry.fingerprint.isDataless,
                            provenance: provenance)
@@ -1588,7 +1616,7 @@ final class ArchiveLibrary: ObservableObject {
 
     private static func rebuilt(_ f: ArchiveFile, after: [String], afterLabel: Int?) -> ArchiveFile {
         ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
-                    tags: DocumentTags.parse(raw: after, labelNumber: afterLabel),
+                    tags: parse(after, afterLabel),
                     contentModified: f.contentModified,
                     isDataless: f.isDataless,
                     provenance: .disk(readAt: Date()))

@@ -42,7 +42,7 @@ enum TagChangeStatus {
 
     private static func describe(before: [String], after: [String], beforeLabel: Int?, afterLabel: Int?) -> String {
         let markerTokens = Set([beforeLabel, afterLabel].compactMap { label in
-            label.flatMap(ArchiveColor.init(labelNumber:))?.tokenName
+            FinderLabel(labelNumber: label)?.tokenName
         })
         func fields(_ tags: [String]) -> [Field: [String]] {
             Dictionary(grouping: tags) { token in
@@ -56,6 +56,7 @@ enum TagChangeStatus {
                 if parsed.sentWithToken != nil { return .sentWith }
                 if parsed.sentWithUncertain { return .sentWithUncertain }
                 if parsed.qualityToken != nil { return .quality }
+                if parsed.itemTypeToken != nil { return .itemType }
                 if markerTokens.contains(where: { isSameTag($0, token) }) { return .colorTags }
                 return .subjects
             }
@@ -83,7 +84,7 @@ enum TagChangeStatus {
     private enum Field: String, CaseIterable {
         case readState = "Read state", year = "Year", month = "Month", day = "Day", decade = "Decade"
         case dateUncertain = "Date uncertain", sentWith = "Sent with", sentWithUncertain = "Sent with uncertain"
-        case quality = "Quality", colorTags = "Color tags", subjects = "Subjects"
+        case quality = "Quality", itemType = "Item type", colorTags = "Color tags", subjects = "Subjects"
     }
 
     private static func values(_ tokens: [String]) -> String {
@@ -100,6 +101,6 @@ enum TagChangeStatus {
 
     private static func color(_ label: Int?) -> String {
         guard let label, label != 0 else { return "none" }
-        return ArchiveColor(labelNumber: label)?.tokenName ?? "Finder label \(label)"
+        return FinderLabel(labelNumber: label)?.tokenName ?? "Finder label \(label)"
     }
 }
