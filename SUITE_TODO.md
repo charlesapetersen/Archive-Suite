@@ -626,7 +626,6 @@ since the solver, the sheet and the stage rules all read it.
 
 - [ ] **`W46.settings-range-view` — the range view [M]** (lane: processor) (uses: build,vm) (blocked-on: W46.settings-sheet) — One chart per stage: cost per 1,000 units at list price on a log scale with a band for free routes, accuracy for the user's mix, one mark per route shaped by family, hollow when infeasible with the reason in the tooltip, faded when outside the limits, the undominated line, the line for what is left of the ceiling once the other stages are paid, click to choose; the full table beneath; after-training points when the fine-tuning answer allows them, with the kit's conditions.
 
-- [ ] **`W46.settings-ledger-more` — the month's ledger counts every paid run [S]** (lane: processor) (uses: build) — Filed by W46.settings-ledger (2026-11-12), which writes a line only when a Process Files batch finishes. Also count what these spend: a run stopped and never resumed (its finished pages' share), a stop before segmentation (`stopRunAfterWindowStage`), a mixed run whose PDF half was read before the image half failed a safety check, a batch-API job left to finish at the provider, and a Live Capture session (at Finalize). Each line once, by its run id; `ArchiveProcessor/KNOWN_ISSUES.md` lists them under the settings layers' limitations.
 
 ## Archival containers — W47 (owner, 2026-10-21)
 

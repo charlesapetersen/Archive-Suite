@@ -70,7 +70,7 @@ struct RunHistorySnapshot {
     let contextCharCount: Int
     let imageScale: Double
     let rotationMode: RotationMode
-    let fileCount: Int
+    var fileCount: Int
     /// Multi-page PDFs among `fileCount` and their total pages. Those pages go to `model` directly, one
     /// call each, so they are priced apart from the image subset (never at batch rates).
     var pdfFileCount: Int = 0
@@ -79,6 +79,10 @@ struct RunHistorySnapshot {
     /// of a run that predates the frozen settings.
     var ledgerRunID: UUID? = nil
     var outputDirectory: URL? = nil
+    /// The multi-page PDFs among the files, and whether they have all been read (a mixed run's PDF half is read
+    /// before its images; a resume starts after it). What a run that ends early has spent is priced from these.
+    var pdfSources: [URL] = []
+    var pdfHalfRead = false
 
     /// Cost of this run using the exact same per-model math the pre-run estimator uses: the image subset
     /// at the standard or batch total picked by `batchMode`, plus any direct PDF pages at standard.
@@ -110,6 +114,24 @@ struct RunHistorySnapshot {
             gatewayRotation: gatewayRotation
         )
         return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode)
+    }
+
+    /// What a run that ends before its success tail has spent (W46.settings-ledger-more): the estimate for the pages
+    /// it read (`readSources`, a job with a result or a failure; the PDF half whole once read), plus their second
+    /// and routed readers. Overcounts a page that failed before any call, the safe side for a monthly limit.
+    func spentSoFar(readSources: Set<URL>, secondReaders: [SecondReader] = [],
+                    pageReaders: [PageReaderRecord] = []) -> Double {
+        var part = self
+        let pdfRead = pdfHalfRead ? pdfSources : pdfSources.filter { readSources.contains($0) }
+        let images = min(readSources.subtracting(pdfSources).count, max(0, fileCount - pdfFileCount))
+        part.pdfFileCount = pdfRead.count
+        part.pdfPageCount = pdfHalfRead ? pdfPageCount : Self.directPDFPageCount(pdfRead)
+        part.fileCount = pdfRead.count + images
+        guard part.fileCount > 0 || !secondReaders.isEmpty || !pageReaders.isEmpty else { return 0 }
+        let base = part.fileCount > 0 ? part.estimatedCost : 0
+        let extra = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
+            + pageReaders.filter(\.isRouted).reduce(0) { $0 + ($1.estimatedCost ?? 0) - ($1.replacedCost ?? 0) }
+        return max(0, base + extra)
     }
 
     /// The run's rotation calls went to the gateway's model (W46.rotation-default).
@@ -200,7 +222,9 @@ extension RunHistorySnapshot {
             pdfFileCount: run.mixedPDFOutcomes?.count ?? 0,
             pdfPageCount: Self.directPDFPageCount(run.mixedPDFOutcomes?.map(\.sourceURL) ?? []),
             ledgerRunID: run.resolvedSettings?.runID,
-            outputDirectory: run.outputDirectory
+            outputDirectory: run.outputDirectory,
+            pdfSources: run.mixedPDFOutcomes?.map(\.sourceURL) ?? [],
+            pdfHalfRead: run.mixedPDFOutcomes != nil
         )
     }
 
@@ -231,7 +255,9 @@ extension RunHistorySnapshot {
             pdfFileCount: batch.mixedPDFOutcomes?.count ?? 0,
             pdfPageCount: Self.directPDFPageCount(batch.mixedPDFOutcomes?.map(\.sourceURL) ?? []),
             ledgerRunID: batch.resolvedSettings?.runID,
-            outputDirectory: batch.outputDirectory
+            outputDirectory: batch.outputDirectory,
+            pdfSources: batch.mixedPDFOutcomes?.map(\.sourceURL) ?? [],
+            pdfHalfRead: batch.mixedPDFOutcomes != nil
         )
     }
 }

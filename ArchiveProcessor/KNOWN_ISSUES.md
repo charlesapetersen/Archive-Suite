@@ -30,14 +30,17 @@ record on the job the colour it was tagged with.
 - **A Live Capture session's layers resolve at Finalize.** The session cannot know its collection folders before
   then, so each folder's record uses that folder's layers as they are at Finalize. The processing settings are the
   ones the session took when it started.
-- **The month's ledger counts finished Process Files batches only (W46.settings-ledger, 2026-11-12).** Each line
-  is the list-price estimate the processing history shows, not a billed figure, dated when the batch finished (the
-  history dates it when it started). These spend money and write no line, so a monthly limit can be passed by what
-  they spent (`W46.settings-ledger-more`): a run stopped and never resumed, a stop before segmentation
-  (`stopRunAfterWindowStage`), a mixed run whose PDF half was read and whose image half then failed a safety check,
-  a batch-API job left to finish at the provider, and a Live Capture session. A resumed run counts once, its whole
-  estimate, when it finishes. The limit itself shapes only the settings sheet's choices: Process Files does not yet
-  stop a batch at it (it runs the app's processing settings, above).
+- **The month's ledger is an estimate, and a few runs are priced roughly (W46.settings-ledger, W46.settings-ledger-more,
+  2026-11-12).** Each line is the list-price estimate the processing history uses, not a billed figure, dated when the
+  run was last counted. A run that ends early (Stop, a stop before segmentation, a mixed run whose image half failed
+  a safety check after its PDF half was read) counts the pages it read, a page that failed before any call included;
+  a resume that finishes it adds only the rest, by its run id. A batch-API job left to finish at the provider (an
+  interrupted poll, a Stop the provider did not confirm, a dismissed pending batch) counts its whole estimate, even
+  when only part of it was submitted or a confirmed cancel left its journal for results still being saved; a Stop the provider confirmed counts nothing for its images, though a provider
+  may bill requests it finished first. Live Capture counts the pages it files, at Finalize, without their second
+  readers; pages read and then discarded are not counted. A run quit or crashed mid-way counts nothing unless it
+  is resumed. A headless test launch keeps the app's own ledger in memory and never writes its lines. The limit itself shapes only the settings sheet's choices:
+  Process Files does not yet stop a batch at it (it runs the app's processing settings, above).
 - **The guarded writer checks, then writes.** A local process that swaps `.archivesuite` for a link between the
   check and the write could redirect one write (`SPEC/collection-settings.md`). Accepted: it needs a hostile local
   process.

@@ -48,6 +48,7 @@ enum SettingsLayersTestDriver {
         freezing(root)
         generalStore(root)
         ledger(root)
+        ledgerUnfinished(root)
         processingCapture()
         finish()
     }
@@ -588,6 +589,80 @@ enum SettingsLayersTestDriver {
         check("a read-only store counts the batch in memory and writes nothing",
               !wrote && ro.spentThisMonthUSD(now: day, calendar: cal) == 3
               && (try? Data(contentsOf: odd.appendingPathComponent("settings-general.json"))) == future)
+    }
+
+    // MARK: Runs that end early (W46.settings-ledger-more)
+
+    private static func ledgerUnfinished(_ root: URL) {
+        let store = SettingsLayerStore(directory: folder(root, "ledger-more-store"))
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let run = UUID()
+
+        // A run stopped part-way, then resumed and finished: the stop's share, then only the rest.
+        check("a stopped run's share is a line",
+              store.recordSpend(usd: 0.4, runID: run, outputDirectory: nil, files: 10, now: day, calendar: cal))
+        check("its resume adds the rest to the same line",
+              store.recordSpend(usd: 1.0, runID: run, outputDirectory: nil, files: 10, now: day.addingTimeInterval(60),
+                                calendar: cal)
+              && store.file.ledger.count == 1 && abs((store.file.ledger.first?.usd ?? 0) - 1.0) < 1e-9)
+        check("the same total again adds nothing",
+              !store.recordSpend(usd: 1.0, runID: run, outputDirectory: nil, files: 10, now: day, calendar: cal))
+        check("a smaller total (an earlier stop recorded late) takes nothing back",
+              !store.recordSpend(usd: 0.4, runID: run, outputDirectory: nil, files: 10, now: day, calendar: cal)
+              && abs(store.spentThisMonthUSD(now: day, calendar: cal) - 1.0) < 1e-9)
+        check("a cent's fraction from a resume's re-estimate is not new spend",
+              !store.recordSpend(usd: 1.0004, runID: run, outputDirectory: nil, files: 10, now: day, calendar: cal))
+        check("a new run smaller than that fraction is still counted",
+              store.recordSpend(usd: 0.0002, runID: UUID(), outputDirectory: nil, files: 1, now: day, calendar: cal))
+
+        // Stopped last month, finished this month: the rest is this month's.
+        let carried = UUID()
+        let lastMonth = day.addingTimeInterval(-20 * 86_400)
+        store.recordSpend(usd: 2, runID: carried, outputDirectory: nil, files: 4, now: lastMonth, calendar: cal)
+        store.recordSpend(usd: 3, runID: carried, outputDirectory: nil, files: 4, now: day, calendar: cal)
+        eq("a run finished in a later month adds the rest there",
+           store.file.ledger.filter { $0.runID == carried }.map(\.usd), [2, 1])
+        eq("last month keeps what it spent", store.monthSpend(now: lastMonth, calendar: cal).usd, 2)
+        check("this month counts the rest", abs(store.spentThisMonthUSD(now: day, calendar: cal) - 2.0002) < 1e-9)
+
+        // The share a run's read pages account for.
+        let model = LLMModel.geminiModels[0]
+        let images = (0..<4).map { URL(fileURLWithPath: "/tmp/ledger-more/img\($0).jpg") }
+        let pdfs = (0..<2).map { URL(fileURLWithPath: "/tmp/ledger-more/doc\($0).pdf") }
+        func snapshot(files: Int, pdfSources: [URL] = [], pdfPages: Int = 0, localAgent: LocalAgentConfig? = nil)
+            -> RunHistorySnapshot {
+            RunHistorySnapshot(
+                startedAt: day, provider: .gemini, gatewayConfig: nil, localAgent: localAgent, imageTokenProvider: nil,
+                model: model, visionTextProvider: nil, visionTextModel: nil, batchMode: false, enableTagging: true,
+                enableCollectionSegmentation: false, preOCRedInput: false, reOCRMultiPagePDF: !pdfSources.isEmpty,
+                mixedReOCR: !pdfSources.isEmpty, sendPreviousImage: false, contextCharCount: 0, imageScale: 1,
+                rotationMode: .off, fileCount: files, pdfFileCount: pdfSources.count, pdfPageCount: pdfPages,
+                pdfSources: pdfSources)
+        }
+        let plain = snapshot(files: 4)
+        check("the model the checks price is not free", plain.estimatedCost > 0)
+        check("every page read is the whole estimate",
+              abs(plain.spentSoFar(readSources: Set(images)) - plain.estimatedCost) < 1e-12)
+        check("two pages of four read is the estimate for two pages",
+              abs(plain.spentSoFar(readSources: Set(images.prefix(2))) - snapshot(files: 2).estimatedCost) < 1e-12
+              && snapshot(files: 2).estimatedCost < plain.estimatedCost)
+        eq("no page read is nothing", plain.spentSoFar(readSources: []), 0)
+        var mixed = snapshot(files: 6, pdfSources: pdfs, pdfPages: 7)
+        let pdfOnly = snapshot(files: 2, pdfSources: pdfs, pdfPages: 7)
+        mixed.pdfHalfRead = true
+        check("a mixed run whose images failed a check spent its PDF half",
+              abs(mixed.spentSoFar(readSources: []) - pdfOnly.estimatedCost) < 1e-12 && pdfOnly.estimatedCost > 0
+              && pdfOnly.estimatedCost < mixed.estimatedCost)
+        check("and with every image read, the whole run",
+              abs(mixed.spentSoFar(readSources: Set(images)) - mixed.estimatedCost) < 1e-12)
+        mixed.pdfHalfRead = false
+        let onePDF = snapshot(files: 1, pdfSources: [pdfs[0]],
+                              pdfPages: RunHistorySnapshot.directPDFPageCount([pdfs[0]]))
+        check("a PDF half stopped part-way counts the PDFs it read",
+              abs(mixed.spentSoFar(readSources: [pdfs[0]]) - onePDF.estimatedCost) < 1e-12)
+        let agent = LocalAgentConfig(tool: .claude)
+        eq("a Local Agent run spends nothing", snapshot(files: 4, localAgent: agent).spentSoFar(readSources: Set(images)), 0)
     }
 
     // MARK: Processing capture

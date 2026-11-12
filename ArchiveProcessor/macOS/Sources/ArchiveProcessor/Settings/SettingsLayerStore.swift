@@ -298,6 +298,8 @@ final class SettingsLayerStore: ObservableObject {
 
     init(directory: URL) {
         self.directory = directory
+        ledgerStaysInMemory = directory.standardizedFileURL == Self.realDirectory.standardizedFileURL
+            && KeychainHelper.isHeadlessTestMode
         let url = directory.appendingPathComponent("settings-general.json")
         file = GeneralSettingsFile()
         switch CollectionSettingsFile.probe(url) {
@@ -309,6 +311,7 @@ final class SettingsLayerStore: ObservableObject {
            let decoded = try? CollectionSettingsFile.decoder().decode(GeneralSettingsFile.self, from: data),
            decoded.schemaVersion <= GeneralSettingsFile.currentSchemaVersion, decoded.general.kind == .general {
             file = decoded
+            diskLedger = decoded.ledger
             return
         }
         // Not this build's file, or one that could not be opened: start from the built-in values but never write over
@@ -384,15 +387,28 @@ final class SettingsLayerStore: ObservableObject {
         // Kept in memory even when it cannot be saved (a read-only store, a failed write), so this session's next
         // batch still counts it against the month.
         file.ledger.append(entry)
-        return saveGeneral()
+        return saveLedger()
+    }
+
+    /// A headless test launch keeps the app's own ledger in memory (W46.settings-ledger-more): its runs are the
+    /// test drivers' stand-ins, and their spend must never reach the user's month. Any save in that launch writes
+    /// the ledger as it was read.
+    private let ledgerStaysInMemory: Bool
+    private var diskLedger: [SettingsLedgerEntry] = []
+
+    private func saveLedger() -> Bool {
+        ledgerStaysInMemory ? false : saveGeneral()
     }
 
     @discardableResult
     private func saveGeneral() -> Bool {
         guard !readOnly else { return false }
+        var out = file
+        if ledgerStaysInMemory { out.ledger = diskLedger }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            try CollectionSettingsFile.encoder().encode(file).write(to: generalURL, options: .atomic)
+            try CollectionSettingsFile.encoder().encode(out).write(to: generalURL, options: .atomic)
+            diskLedger = out.ledger
             lastProblem = nil
             return true
         } catch {
@@ -493,15 +509,36 @@ final class SettingsLayerStore: ObservableObject {
     /// is kept for the user to look over.
     static let ledgerKeepDays = 400
 
-    /// Record what a finished batch spent (W46.settings-ledger), whatever the money habit is, so switching to a
+    /// Record what a batch spent (W46.settings-ledger), whatever the money habit is, so switching to a
     /// monthly limit later starts from what this month really spent. A free batch writes nothing; a run already in
     /// the ledger (by its id) is not counted twice. The collection is read from its folder, so a batch that created it
     /// has its id. Returns whether a line was written.
+    ///
+    /// `usd` is the run's whole spend so far (W46.settings-ledger-more), so a run can be recorded more than once: when
+    /// it stops and again when a resume finishes it. Only the part not yet counted is added, to the run's line in this
+    /// month, or as a new line for the run when the earlier line is in another month.
     @discardableResult
     func recordSpend(usd: Double, runID: UUID?, outputDirectory: URL?, files: Int,
-                     now: Date = Date()) -> Bool {
+                     now: Date = Date(), calendar: Calendar = .current) -> Bool {
         guard usd.isFinite, usd > 0 else { return false }
-        if let runID, file.ledger.contains(where: { $0.runID == runID }) { return false }
+        if let runID {
+            let counted = file.ledger.filter { $0.runID == runID && $0.usd.isFinite }.reduce(0) { $0 + max(0, $1.usd) }
+            // A cent's fraction is an estimate's rounding (a resume prices with the live image scale), not new spend.
+            guard usd - counted > (counted > 0 ? 0.000_5 : 0) else { return false }
+            if let i = file.ledger.lastIndex(where: {
+                $0.runID == runID && calendar.isDate($0.date, equalTo: now, toGranularity: .month)
+            }) {
+                file.ledger[i].usd += usd - counted
+                file.ledger[i].date = now
+                file.ledger[i].files = max(file.ledger[i].files ?? 0, files)
+                return saveLedger()
+            }
+            if let prior = file.ledger.last(where: { $0.runID == runID }) {
+                return appendLedger(SettingsLedgerEntry(date: now, usd: usd - counted, collectionID: prior.collectionID,
+                                                        runID: runID, collectionName: prior.collectionName,
+                                                        files: files))
+            }
+        }
         var collectionID: UUID?
         var name = outputDirectory?.lastPathComponent
         if let outputDirectory, case .document(let d) = CollectionSettingsFile.read(in: outputDirectory) {

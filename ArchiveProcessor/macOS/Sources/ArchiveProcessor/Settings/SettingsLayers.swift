@@ -412,8 +412,9 @@ enum MoneyHabit: String, Codable, CaseIterable, Sendable {
 }
 
 /// What a batch spent, in the general layer, so a per-month ceiling can be tracked (W46.settings-ledger). Written
-/// when a batch finishes, at the same list-price estimate the processing history shows; `date` is when it finished,
-/// which is the month it counts against.
+/// when a batch finishes, at the same list-price estimate the processing history shows, and for the pages it read
+/// when it ends early or a Live Capture session files (W46.settings-ledger-more); `date` is when it was last counted,
+/// which is the month it counts against. One line per run and month.
 struct SettingsLedgerEntry: Codable, Equatable, Sendable {
     var date: Date
     var usd: Double

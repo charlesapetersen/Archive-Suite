@@ -879,6 +879,35 @@ extension OCRProcessor {
         activeRunHistory = nil
     }
 
+    /// A run that ends without reaching a success tail still spent money on the pages it read
+    /// (W46.settings-ledger-more): a Stop, a stop before segmentation, a mixed run whose image half failed a safety
+    /// check. Records that share in the ledger under the run's id, so a resume that finishes it adds only the rest,
+    /// and clears the snapshot so nothing else records it. `wholeRun` counts every page, for a batch job left to
+    /// finish at the provider, which bills it whether or not the app collects the results.
+    func recordUnfinishedRunSpend(wholeRun: Bool = false) {
+        guard let snapshot = activeRunHistory else { return }
+        activeRunHistory = nil
+        Self.recordLedgerSpend(snapshot, jobs: jobs, wholeRun: wholeRun)
+    }
+
+    static func recordLedgerSpend(_ snapshot: RunHistorySnapshot, jobs: [OCRJob], wholeRun: Bool) {
+        let usd: Double
+        var files = snapshot.fileCount
+        if wholeRun {
+            usd = snapshot.makeRun(succeeded: 0, secondReaders: jobs.compactMap { $0.result?.secondReader },
+                                   pageReaders: jobs.compactMap { $0.result?.pageReader }).cost
+        } else {
+            let read = jobs.filter { $0.result != nil || $0.status == .succeeded || $0.status == .failed }
+            let sources = Set(read.map(\.sourceURL))
+            files = snapshot.pdfHalfRead ? sources.union(snapshot.pdfSources).count : sources.count
+            usd = snapshot.spentSoFar(readSources: sources,
+                                      secondReaders: read.compactMap { $0.result?.secondReader },
+                                      pageReaders: read.compactMap { $0.result?.pageReader })
+        }
+        SettingsLayerStore.shared.recordSpend(usd: usd, runID: snapshot.ledgerRunID,
+                                              outputDirectory: snapshot.outputDirectory, files: min(files, snapshot.fileCount))
+    }
+
     /// The run summary's last line: the counts, and how many pages a second reader read (W41.app-ocr-default-fu1).
     func runDoneMessage(succeeded: Int, failed: Int) -> String {
         let secondRead = jobs.filter { $0.result?.secondReader != nil }.count
@@ -1444,6 +1473,8 @@ extension OCRProcessor {
     /// the fifth, `guard markBatchSubmissionComplete()`, only started reporting itself in W16.bat3-fu).
     /// Pinned headlessly by `BatchInterruptTailContract` (W16.bat4).
     func finishInterruptedBatchPoll() {
+        // The job goes on at the provider and is billed whether or not it is resumed (W46.settings-ledger-more).
+        recordUnfinishedRunSpend(wholeRun: true)
         activeBatch = nil
         activePendingBatch = nil
         isProcessing = false
@@ -1466,6 +1497,13 @@ extension OCRProcessor {
     }
     /// Dismiss a pending batch notification (deletes local state only — server-side batch continues).
     func dismissPendingBatch() {
+        // The provider still runs and bills the job (W46.settings-ledger-more); a Stop or an interruption that
+        // already counted it, by its run id, is not counted again.
+        if let pending = Self.loadPendingBatch() {
+            let config = makePendingBatchResumeConfig(pending, apiKey: "")
+            Self.recordLedgerSpend(RunHistorySnapshot(resuming: pending, rotationMode: config.rotationMode,
+                                                      imageScale: config.imageScale), jobs: [], wholeRun: true)
+        }
         Self.deletePendingBatch()
         pendingBatchInfo = nil
     }
@@ -2576,6 +2614,10 @@ extension OCRProcessor {
         let interruptedRun = processingTask
         processingTask?.cancel()
         processingTask = nil
+        // What the stopped run has read so far goes into the ledger (W46.settings-ledger-more); a batch job's whole
+        // estimate is added below if the provider does not confirm its cancellation.
+        let unfinishedRun = activeRunHistory
+        recordUnfinishedRunSpend()
         if activePendingMixedPDF != nil, interruptedRun != nil {
             mixedPDFCancellationUnwinding = true
             Task {
@@ -2651,6 +2693,9 @@ extension OCRProcessor {
                     canceller: canceller, chunkIds: chunkIds,
                     submissionInFlight: submissionInFlight,
                     materializationInFlight: materializationInFlight, deleteJournal: deleteJournal)
+                if !outcome.confirmed, let unfinishedRun {
+                    Self.recordLedgerSpend(unfinishedRun, jobs: [], wholeRun: true)
+                }
                 // The cancelled run is still unwinding, and it writes `statusMessage` too: a poll whose
                 // status check was in flight when Stop landed still reports "Batch processing… n/m" or
                 // "Error checking batch… Retrying…" once that request resolves. Wait for it to finish
@@ -2878,6 +2923,8 @@ extension OCRProcessor {
         let imageIndices = files.indices.filter { !pdfIndexSet.contains($0) }
         let autoReOCR = !pdfIndices.isEmpty
         let mixedReOCR = autoReOCR && !imageIndices.isEmpty
+        // One id for the run across a resume from its PDF recovery record (W46.settings-ledger-more).
+        let runID = resumingMixedPDF?.ledgerRunID ?? UUID()
         if let resumingMixedPDF {
             guard mixedReOCR && pdfIndices == resumingMixedPDF.pdfIndices else {
                 isProcessing = false
@@ -2895,7 +2942,7 @@ extension OCRProcessor {
                 confirmCollectionIDs: confirmCollectionIDs,
                 reviewDocumentSegmentation: reviewDocumentSegmentation,
                 segmentationContext: segmentationContext, gatewayConfig: gatewayConfig,
-                localAgent: localAgent, runConfig: runConfig) else {
+                localAgent: localAgent, runConfig: runConfig, ledgerRunID: runID) else {
                 isProcessing = false
                 return
             }
@@ -2943,14 +2990,15 @@ extension OCRProcessor {
             rotationMode: rotationMode,
             fileCount: files.count,
             pdfFileCount: pdfIndices.count,
-            pdfPageCount: RunHistorySnapshot.directPDFPageCount(pdfIndices.map { files[$0] })
+            pdfPageCount: RunHistorySnapshot.directPDFPageCount(pdfIndices.map { files[$0] }),
+            pdfSources: pdfIndices.map { files[$0] }
         )
 
         // W46.settings-layers: resolve the general, project and collection layers once and freeze them for this run's
         // pending record. The run is recorded in the collection's folder only once it is committed to start
         // (`recordActiveRunInCollection`), and a resumed mixed-PDF run was recorded when it first started.
         let frozen = SettingsLayerStore.shared.snapshot(
-            outputDirectory: outputDirectory, runID: UUID(), processing: ProcessingSettingsCapture.capture())
+            outputDirectory: outputDirectory, runID: runID, processing: ProcessingSettingsCapture.capture())
         activeResolvedSettings = frozen
         activeRunHistory?.ledgerRunID = frozen.runID
         activeRunHistory?.outputDirectory = outputDirectory
@@ -2977,7 +3025,7 @@ extension OCRProcessor {
             )
             guard !Task.isCancelled else { cleanupTempFiles(); return }
             guard pdfIndices.allSatisfy({ jobs[$0].status == .succeeded || jobs[$0].status == .failed }) else {
-                activeRunHistory = nil
+                recordUnfinishedRunSpend()
                 isProcessing = false
                 checkForPendingBatch()
                 return
@@ -2985,19 +3033,20 @@ extension OCRProcessor {
             if mixedReOCR {
                 guard let pending = activePendingMixedPDF,
                       Self.mixedPDFOutputsMatchJournal(pending) else {
-                    activeRunHistory = nil
+                    recordUnfinishedRunSpend()
                     isProcessing = false
                     statusMessage = "A rebuilt PDF changed before image processing. The recovery record was kept for review."
                     checkForPendingBatch()
                     return
                 }
                 guard let outcomes = captureMixedPDFOutcomes(indices: pdfIndices) else {
-                    activeRunHistory = nil
+                    recordUnfinishedRunSpend()
                     isProcessing = false
                     statusMessage = "The rebuilt PDF results could not be recorded safely. No images were processed."
                     return
                 }
                 mixedPDFOutcomes = outcomes
+                activeRunHistory?.pdfHalfRead = true
                 fullJobsAfterPDF = jobs
                 jobs = imageIndices.map { jobs[$0] }
                 editingImageSubset = true
@@ -3106,7 +3155,7 @@ extension OCRProcessor {
                 pendingRun.resolvedSettings = activeResolvedSettings
                 guard let fingerprint = Self.pendingRunFingerprintV2(pendingRun) else {
                     cleanupTempFiles()
-                    activeRunHistory = nil
+                    recordUnfinishedRunSpend()
                     isProcessing = false
                     statusMessage = "Could not create a safe resume snapshot. No OCR requests were sent."
                     return
@@ -3114,7 +3163,7 @@ extension OCRProcessor {
                 pendingRun.runFingerprint = fingerprint
                 guard Self.pendingRunIsSelfConsistent(pendingRun) else {
                     cleanupTempFiles()
-                    activeRunHistory = nil
+                    recordUnfinishedRunSpend()
                     isProcessing = false
                     statusMessage = "The run settings could not be captured safely. No OCR requests were sent."
                     return
@@ -3123,7 +3172,7 @@ extension OCRProcessor {
                 guard Self.savePendingRun(pendingRun) else {
                     cleanupTempFiles()
                     activePendingRun = nil
-                    activeRunHistory = nil
+                    recordUnfinishedRunSpend()
                     isProcessing = false
                     statusMessage = "Could not save the resume snapshot. No OCR requests were sent."
                     return

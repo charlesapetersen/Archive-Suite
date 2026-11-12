@@ -331,7 +331,8 @@ extension OCRProcessor {
         // a success tail that only those guards stop), and no completion is recorded.
         processingTask?.cancel()
         processingTask = nil
-        activeRunHistory = nil
+        // The OCR it stops after was paid for (W46.settings-ledger-more); a resume that finishes the run adds the rest.
+        recordUnfinishedRunSpend()
         activePendingRun = nil
         isProcessing = false
         cleanupTempFiles()

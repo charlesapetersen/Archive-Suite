@@ -2081,17 +2081,43 @@ final class LiveCaptureProcessor: ObservableObject {
         // Two drafts may file into one existing folder: one record per folder, counting every filed document in it.
         var order: [URL] = []
         var counts: [String: Int] = [:]
+        var pages: [String: Int] = [:]
         for plan in plans {
             let key = plan.folder.standardizedFileURL.path
             if counts[key] == nil { order.append(plan.folder) }
-            counts[key, default: 0] += plan.segments.filter { filed.contains($0.groupId) }.count
+            let filedSegments = plan.segments.filter { filed.contains($0.groupId) }
+            counts[key, default: 0] += filedSegments.count
+            pages[key, default: 0] += filedSegments.reduce(0) {
+                $0 + max(retained[$1.groupId]?.pages.count ?? 0, max($1.imageURLs.count, $1.pdfURLs.count))
+            }
         }
         let store = SettingsLayerStore.shared
         for folder in order {
             guard let count = counts[folder.standardizedFileURL.path], count > 0 else { continue }
             let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), processing: processing)
             store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder)
+            // The month's ledger (W46.settings-ledger-more): the pages filed here, priced as Process Files prices a
+            // run of them. Filed pages only, so a finalize retried after a failure counts each page once.
+            if let config, let filedPages = pages[folder.standardizedFileURL.path] {
+                store.recordSpend(usd: Self.estimatedSpend(config, pages: filedPages), runID: snapshot.runID,
+                                  outputDirectory: folder, files: count)
+            }
         }
+    }
+
+    /// The list-price estimate for `pages` pages read with the session's settings, by the same math as the
+    /// processing history (a Local Agent session costs nothing; Apple Vision alone costs nothing).
+    static func estimatedSpend(_ config: SessionProcessingConfig, pages: Int) -> Double {
+        guard pages > 0 else { return 0 }
+        return RunHistorySnapshot(
+            startedAt: Date(), provider: config.provider, gatewayConfig: config.gateway, localAgent: config.localAgent,
+            imageTokenProvider: config.gateway != nil ? OCRProcessor.gatewayUpstreamProviderFromDefaults() : nil,
+            model: config.model, visionTextProvider: config.visionTextLLM?.provider,
+            visionTextModel: config.visionTextLLM?.model, batchMode: false,
+            enableTagging: config.taggingMode.llmTags, enableCollectionSegmentation: false, preOCRedInput: false,
+            reOCRMultiPagePDF: false, mixedReOCR: false, sendPreviousImage: false, contextCharCount: 0,
+            imageScale: config.imageScale, rotationMode: config.rotationMode, fileCount: pages
+        ).estimatedCost
     }
 
     func beginFinalize() {

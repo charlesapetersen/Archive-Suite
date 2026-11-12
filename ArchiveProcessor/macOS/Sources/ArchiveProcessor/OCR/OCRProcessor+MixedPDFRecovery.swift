@@ -36,6 +36,9 @@ extension OCRProcessor {
         /// Digest of each completed output; existence alone cannot prove the saved association.
         var outputDigests: [String: String] = [:]
         var completedOutcomes: [MixedPDFOutcome] = []
+        /// The run's settings id, so a resume keeps it and the month's ledger counts the run once
+        /// (W46.settings-ledger-more): a Stop counts the PDFs read, the finished resume only the rest.
+        var ledgerRunID: UUID? = nil
         var integrity: String? = nil
     }
 
@@ -177,7 +180,7 @@ extension OCRProcessor {
         enableCollectionSegmentation: Bool, confirmCollectionIDs: Bool,
         reviewDocumentSegmentation: Bool, segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig?, localAgent: LocalAgentConfig?,
-        runConfig: SessionProcessingConfig
+        runConfig: SessionProcessingConfig, ledgerRunID: UUID = UUID()
     ) -> Bool {
         var digests: [String: String] = [:]
         for index in pdfIndices {
@@ -203,7 +206,7 @@ extension OCRProcessor {
             runtimeConfig: makePendingRunRuntimeConfig(
                 imageScale: segmentationContext.imageScale,
                 gatewayConfig: gatewayConfig, runConfig: runConfig),
-            startedAt: Date(), sourceDigests: digests)
+            startedAt: Date(), sourceDigests: digests, ledgerRunID: ledgerRunID)
         guard let signed = Self.savePendingMixedPDF(pending) else {
             statusMessage = "Could not create the mixed PDF recovery record. No paid requests were sent."
             return false

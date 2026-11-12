@@ -157,7 +157,8 @@ struct GeneralInterviewView: View {
                     Text("and \(month.batches - Self.ledgerLines) earlier this month").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Text("Each batch counts at the list prices the app estimates when it finishes; a provider's bill may differ a little.")
+            Text("Each batch counts at the list prices the app estimates: when it finishes, or for the pages it read when it"
+                 + " stops early; a Live Capture session counts at Finalize. A provider's bill may differ a little.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .accessibilityIdentifier("ap.interview.monthLedger")
