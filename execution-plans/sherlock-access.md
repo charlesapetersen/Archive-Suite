@@ -48,6 +48,11 @@ The copy has gaps a pack's paths can fall into (2026-10-23, 23 jobs failed on th
   `~/fs-cleanpack` links there, so data.json files that record `/home/users/cp1/fs-cleanpack/images` resolve unchanged.
 - FarmShare's venvs carried packages the vLLM image does not (scipy); `$SH_ENH_EXTRA` holds them for the
   enhancement arms.
+- The model cache `$HF_HOME` (`$SCRATCH/fs-ocr/hf`) was gone on 2026-11-12, and a pack manifest's `creates` does not
+  list it, so `batch.sh check` refuses a pack whose stage job would download the model itself (batch
+  20261112-071750: both 27B packs, on `models--Qwen--Qwen3.6-27B-FP8`). The session fetched the model once in a CPU
+  job with the stage job's own `hf download` command (job 52062853, 29 GB in 5 minutes), and the check then passed.
+  A manifest whose stage job downloads a model should list `$HF_HOME` in `creates`.
 Before a submission, check every path the pack's json, jsonl, tsv and sh files name, home paths included, not only
 `/scratch` ones. `sherlock/resubmit-20261023.sh` checks its own inputs before it queues anything.
 
