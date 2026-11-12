@@ -11,7 +11,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "ArchiveCore"),
-        .target(name: "ArchiveCoreUI"),
+        .target(name: "ArchiveCoreUI", dependencies: ["ArchiveCore"]),
         .testTarget(name: "ArchiveCoreTests", dependencies: ["ArchiveCore"]),
     ]
 )

@@ -50,6 +50,10 @@ struct TagEditorView: View {
                     readStateSection(s)
                     Divider()
                     flagSection
+                    if let file = collectionRecordFile {
+                        Divider()
+                        CollectionRecordView(fileURL: file, root: model.rootStore.root, identifierPrefix: "ar")
+                    }
                 }
                 .padding()
             }
@@ -65,6 +69,14 @@ struct TagEditorView: View {
                 commitDateFields()
             }
         }
+    }
+
+    /// The file whose collection record the inspector shows (W46.settings-reader-notes): the selection's when every
+    /// selected file sits in one folder, else none.
+    private var collectionRecordFile: URL? {
+        let folders = Set(targetPaths.map { ($0 as NSString).deletingLastPathComponent })
+        guard folders.count == 1, let first = targetPaths.first else { return nil }
+        return URL(fileURLWithPath: first)
     }
 
     // MARK: Subjects

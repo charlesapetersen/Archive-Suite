@@ -1,5 +1,6 @@
 import SwiftUI
 import ArchiveCore
+import ArchiveCoreUI
 
 /// The **inspector panel**'s fields for the selected note/extract (W40.notes-detail-layout): Round-up or
 /// Sources, document DATE (one typed field + a "date uncertain" toggle), QUALITY, the item's
@@ -39,6 +40,8 @@ struct NoteMetadataInspector: View {
     @State private var extractSources: [ExtractSourceUsage]?
     @State private var extractSourcesFailed = false
     @State private var roundupYear: Int?
+    /// What produced the collections this note's linked PDFs sit in (W46.settings-reader-notes).
+    @State private var collectionRecords: [CollectionSettingsRecord] = []
     @State private var showsRoundupExplanation = false
 
     private enum DateRole: Hashable { case own, sentWith }
@@ -76,6 +79,10 @@ struct NoteMetadataInspector: View {
             } else {
                 roundupSection
                 Divider()
+                if !collectionRecords.isEmpty {
+                    collectionRecordsSection
+                    Divider()
+                }
             }
             dateSection
             Divider()
@@ -127,6 +134,16 @@ struct NoteMetadataInspector: View {
             let year = await sourcePreview.roundupYear(for: links)
             guard !Task.isCancelled else { return }
             roundupYear = year
+        }
+        .task(id: RoundupLoadKey(source: SourceLoadKey(id: item.id, mtime: item.mtime),
+                                archiveAccessRevision: sourcePreview.archiveAccessRevision)) {
+            collectionRecords = []
+            guard item.kind == .note else { return }
+            let links = await nav.model.loadReaderSourceLinks(for: item.id)
+            guard !links.isEmpty else { return }
+            let found = await sourcePreview.collectionRecords(for: links)
+            guard !Task.isCancelled else { return }
+            collectionRecords = found
         }
     }
 
@@ -216,6 +233,15 @@ struct NoteMetadataInspector: View {
                 Text("Sources could not be loaded.").font(.caption).foregroundStyle(.primary)
             } else {
                 ProgressView("Loading sources…").controlSize(.small)
+            }
+        }
+    }
+
+    /// The Processor's record of each collection the note's linked PDFs come from, read-only.
+    private var collectionRecordsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(collectionRecords.enumerated()), id: \.offset) { index, record in
+                CollectionRecordContent(record: record, id: "an.detail.collectionRecord" + (index == 0 ? "" : ".\(index)"))
             }
         }
     }

@@ -1362,6 +1362,17 @@ final class NotesModel: ObservableObject {
 
     /// Read every Reader source from the current round-up body. A malformed/missing source must not
     /// be skipped when deciding whether ALL linked PDFs share a year.
+    /// Every Reader link in a note's source blocks, for what produced their collections (W46.settings-reader-notes).
+    /// A block without a link is skipped.
+    func loadReaderSourceLinks(for id: UUID) async -> [String] {
+        guard let noteStore else { return [] }
+        do {
+            let item = try await noteStore.load(id)
+            guard item.kind == .note else { return [] }
+            return item.blocks.filter { $0.kind == .readerDoc || $0.kind == .readerPage }.compactMap { $0.source?.link }
+        } catch { report(error, "read source links"); return [] }
+    }
+
     func loadRoundupSourceLinks(for id: UUID) async -> [String]? {
         guard let noteStore else { return nil }
         do {

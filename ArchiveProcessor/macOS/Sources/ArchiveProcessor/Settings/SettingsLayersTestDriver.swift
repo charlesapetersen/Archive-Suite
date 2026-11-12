@@ -1,4 +1,5 @@
 #if DEBUG // a test driver, compiled out of Release
+import ArchiveCore
 import Foundation
 
 /// Headless, $0 self-test of the settings layers and the collection's settings document (W46.settings-layers), gated
@@ -357,6 +358,8 @@ enum SettingsLayersTestDriver {
               store.record(s1, kind: "processFiles", fileCount: 3, in: out) != nil
               && CollectionSettingsFile.runs(in: out).count == 2)
 
+        readByReaderAndNotes(out, runs: [run1, run2])
+
         let fresh = folder(root, "freeze-fresh")
         let s3 = store.snapshot(outputDirectory: fresh, runID: UUID(), processing: [:], macMemoryGB: 16, now: day)
         store.record(s3, kind: "processFiles", fileCount: 1, in: fresh)
@@ -384,6 +387,50 @@ enum SettingsLayersTestDriver {
               && CollectionSettingsFile.runs(in: newer).isEmpty)
 
         pendingRecords(root, snapshot: s1)
+    }
+
+    /// What this writer wrote, read back by the Reader's and Notes' reader in ArchiveCore (W46.settings-reader-notes),
+    /// in the words this app's Settings window uses: the contract test for `SPEC/collection-settings.md`.
+    private static func readByReaderAndNotes(_ out: URL, runs: [UUID]) {
+        guard let record = CollectionSettingsRecord.load(collectionFolder: out) else {
+            check("the Reader and Notes read the collection's record", false, "nothing read")
+            return
+        }
+        check("the Reader and Notes read the collection's record, newest run first",
+              !record.documentIsNewer && !record.documentUnreadable && record.unreadableRunCount == 0
+              && record.runs.map(\.id) == runs.reversed().map(\.uuidString) && record.projectName == "Letters"
+              && record.ownSettings.map(\.key) == ["languages"] && record.runs.first?.fileCount == 5
+              && record.runs.first?.kind == "batch")
+        let latest = record.runs.first
+        let shown = Dictionary(uniqueKeysWithValues: (latest?.settings ?? []).map { ($0.key, $0) })
+        var mismatched: [String] = []
+        for key in SettingsKey.catalog {
+            let resolved = CollectionSettingsFile.runs(in: out).last?.settings.values[key.rawValue]
+            guard let resolved, let row = shown[key.rawValue] else { mismatched.append(key.rawValue); continue }
+            if row.label != key.label || row.value != key.describe(resolved.value) { mismatched.append(key.rawValue) }
+        }
+        check("the Reader and Notes show every value in this app's own words", mismatched.isEmpty,
+              mismatched.joined(separator: ","))
+        let override = SettingsKey(rawValue: "override.ocr.handwritten")
+        eq("an override's label matches", CollectionSettingsVocabulary.label(override.rawValue), override.label)
+        let samples: [(SettingsKey, SettingsValue)] = [
+            (.moneyHabit, .string("perMonth")), (.preference, .string("cheapestWithinPoint")),
+            (.fineTuning, .string("cluster")), (.priorities, .strings(["names", "reading"])),
+            (.hours, .double(1)), (.batchCeilingUSD, .double(2.5)), (.mix, .numbers(["a": 10, "b": 90])),
+        ]
+        let words = samples.allSatisfy { key, value in
+            let core: CollectionSettingValue
+            switch value {
+            case .bool(let b): core = .bool(b)
+            case .int(let i): core = .int(i)
+            case .double(let d): core = .double(d)
+            case .string(let t): core = .string(t)
+            case .strings(let t): core = .strings(t)
+            case .numbers(let n): core = .numbers(n)
+            }
+            return CollectionSettingsVocabulary.describe(key.rawValue, core) == key.describe(value)
+        }
+        check("the Reader and Notes put a value in the same words", words)
     }
 
     /// The snapshot rides in the pending run and batch, survives a write and a read, and changes neither fingerprint.

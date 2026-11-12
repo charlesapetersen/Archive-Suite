@@ -431,6 +431,11 @@ final class SourceBlockPreviewState: ObservableObject {
         await RoundupYearSuggestion.commonYear(links: links, roots: rootStore.knownRoots)
     }
 
+    /// What produced the collections a note's linked PDFs sit in, under the roots already granted.
+    func collectionRecords(for links: [String]) async -> [CollectionSettingsRecord] {
+        await CollectionRecordLookup.records(links: links, roots: rootStore.knownRoots)
+    }
+
     /// The Reader archive folders granted so far. Choose Store Folder… refuses any of them, or a folder
     /// inside one, as the notes store (W40.fix-notes-choose-store).
     var grantedArchiveFolders: [URL] { Array(rootStore.knownRoots.values) }
