@@ -1,0 +1,617 @@
+{
+ "sets": {
+  "owner": 300,
+  "undated": 100
+ },
+ "readable": {
+  "owner": 272,
+  "undated": 90
+ },
+ "models": {
+  "gemini3.7-flash-gw": {
+   "documents": 362,
+   "owner_scored": 227,
+   "by_stratum": {
+    "in text": {
+     "n": 136,
+     "exact": {
+      "k": 131,
+      "n": 136,
+      "pct": 96.3,
+      "ci": [
+       91.7,
+       98.4
+      ]
+     },
+     "wrong": {
+      "k": 5,
+      "n": 136,
+      "pct": 3.7,
+      "ci": [
+       1.6,
+       8.3
+      ]
+     },
+     "no_year": {
+      "k": 0,
+      "n": 136,
+      "pct": 0.0,
+      "ci": [
+       0.0,
+       2.7
+      ]
+     }
+    },
+    "on the page": {
+     "n": 30,
+     "exact": {
+      "k": 22,
+      "n": 30,
+      "pct": 73.3,
+      "ci": [
+       55.6,
+       85.8
+      ]
+     },
+     "wrong": {
+      "k": 8,
+      "n": 30,
+      "pct": 26.7,
+      "ci": [
+       14.2,
+       44.4
+      ]
+     },
+     "no_year": {
+      "k": 0,
+      "n": 30,
+      "pct": 0.0,
+      "ci": [
+       -0.0,
+       11.4
+      ]
+     }
+    },
+    "not on the page": {
+     "n": 61,
+     "exact": {
+      "k": 31,
+      "n": 61,
+      "pct": 50.8,
+      "ci": [
+       38.6,
+       62.9
+      ]
+     },
+     "wrong": {
+      "k": 24,
+      "n": 61,
+      "pct": 39.3,
+      "ci": [
+       28.1,
+       51.9
+      ]
+     },
+     "no_year": {
+      "k": 6,
+      "n": 61,
+      "pct": 9.8,
+      "ci": [
+       4.6,
+       19.8
+      ]
+     }
+    }
+   },
+   "not_in_text": {
+    "k": 53,
+    "n": 91,
+    "pct": 58.2,
+    "ci": [
+     48.0,
+     67.8
+    ]
+   },
+   "step2_paired": {
+    "n": 91,
+    "a_exact": 53,
+    "b_exact": 48,
+    "a_only": 5,
+    "b_only": 0,
+    "sign_p": 0.0625
+   },
+   "all_owner": {
+    "k": 184,
+    "n": 227,
+    "pct": 81.1,
+    "ci": [
+     75.5,
+     85.6
+    ]
+   },
+   "by_class": {
+    "text": {
+     "n": 158,
+     "exact": {
+      "k": 139,
+      "n": 158,
+      "pct": 88.0,
+      "ci": [
+       82.0,
+       92.2
+      ]
+     }
+    },
+    "image": {
+     "n": 12,
+     "exact": {
+      "k": 10,
+      "n": 12,
+      "pct": 83.3,
+      "ci": [
+       55.2,
+       95.3
+      ]
+     }
+    },
+    "estimate": {
+     "n": 51,
+     "exact": {
+      "k": 35,
+      "n": 51,
+      "pct": 68.6,
+      "ci": [
+       55.0,
+       79.7
+      ]
+     }
+    },
+    "none": {
+     "n": 6,
+     "exact": {
+      "k": 0,
+      "n": 6,
+      "pct": 0.0,
+      "ci": [
+       0.0,
+       39.0
+      ]
+     }
+    }
+   },
+   "du_vs_owner": {
+    "certain_flagged": {
+     "k": 26,
+     "n": 181,
+     "pct": 14.4,
+     "ci": [
+      10.0,
+      20.2
+     ]
+    },
+    "uncertain_unflagged": {
+     "k": 15,
+     "n": 40,
+     "pct": 37.5,
+     "ci": [
+      24.2,
+      53.0
+     ]
+    }
+   },
+   "estimate_interval": {
+    "covered": {
+     "k": 44,
+     "n": 51,
+     "pct": 86.3,
+     "ci": [
+      74.3,
+      93.2
+     ]
+    },
+    "median_width": 1
+   },
+   "checker": {
+    "counts": {
+     "valid": 239,
+     "wrong years accepted": 30,
+     "unsupported": 31,
+     "right years refused": 12
+    },
+    "by": {
+     "four digits": {
+      "valid": 214,
+      "wrong accepted": 27
+     },
+     "two digits": {
+      "valid": 25,
+      "wrong accepted": 3
+     },
+     "cited document is not in the context given": {
+      "right refused": 3,
+      "refused": 6
+     },
+     "quote does not carry the year given": {
+      "right refused": 8,
+      "refused": 24
+     },
+     "quote is not in the cited document's text": {
+      "right refused": 1,
+      "refused": 1
+     }
+    }
+   },
+   "checker_by_stratum": {
+    "in text": {
+     "valid": 130,
+     "unsupported": 6,
+     "right years refused": 4,
+     "wrong years accepted": 3
+    },
+    "on the page": {
+     "valid": 26,
+     "wrong years accepted": 9,
+     "unsupported": 4,
+     "right years refused": 4
+    },
+    "not on the page": {
+     "valid": 49,
+     "wrong years accepted": 18,
+     "unsupported": 11,
+     "right years refused": 4
+    }
+   },
+   "decade": {
+    "n": 45,
+    "in_decade": 23,
+    "year_written": 40,
+    "flagged": 20
+   },
+   "undated": {
+    "n": 90,
+    "by_class": {
+     "estimate": 28,
+     "none": 7,
+     "text": 51,
+     "image": 4
+    },
+    "explicit": 55,
+    "owner_ruled": {
+     "documents_ruled": 20,
+     "explicit_ruled": 17,
+     "false": 4
+    },
+    "model_scored": {
+     "explicit_unruled": 38,
+     "false": 10
+    },
+    "false_year": {
+     "k": 14,
+     "n": 90,
+     "pct": 15.6,
+     "ci": [
+      9.5,
+      24.4
+     ]
+    },
+    "estimates": 28
+   },
+   "intext_image": {
+    "n": 172,
+    "own_date_found": 142,
+    "changes_year": 11,
+    "change_right": 7,
+    "change_wrong_to_right": 7,
+    "change_right_to_wrong": 2,
+    "stamp_dates": 24
+   },
+   "calls": {
+    "trace": 362,
+    "image": 115
+   },
+   "self_only": {
+    "by_stratum": {
+     "in text": {
+      "n": 136,
+      "exact": {
+       "k": 131,
+       "n": 136,
+       "pct": 96.3,
+       "ci": [
+        91.7,
+        98.4
+       ]
+      },
+      "wrong": {
+       "k": 5,
+       "n": 136,
+       "pct": 3.7,
+       "ci": [
+        1.6,
+        8.3
+       ]
+      },
+      "no_year": {
+       "k": 0,
+       "n": 136,
+       "pct": 0.0,
+       "ci": [
+        0.0,
+        2.7
+       ]
+      }
+     },
+     "on the page": {
+      "n": 30,
+      "exact": {
+       "k": 22,
+       "n": 30,
+       "pct": 73.3,
+       "ci": [
+        55.6,
+        85.8
+       ]
+      },
+      "wrong": {
+       "k": 8,
+       "n": 30,
+       "pct": 26.7,
+       "ci": [
+        14.2,
+        44.4
+       ]
+      },
+      "no_year": {
+       "k": 0,
+       "n": 30,
+       "pct": 0.0,
+       "ci": [
+        -0.0,
+        11.4
+       ]
+      }
+     },
+     "not on the page": {
+      "n": 61,
+      "exact": {
+       "k": 31,
+       "n": 61,
+       "pct": 50.8,
+       "ci": [
+        38.6,
+        62.9
+       ]
+      },
+      "wrong": {
+       "k": 24,
+       "n": 61,
+       "pct": 39.3,
+       "ci": [
+        28.1,
+        51.9
+       ]
+      },
+      "no_year": {
+       "k": 6,
+       "n": 61,
+       "pct": 9.8,
+       "ci": [
+        4.6,
+        19.8
+       ]
+      }
+     }
+    },
+    "not_in_text": {
+     "k": 53,
+     "n": 91,
+     "pct": 58.2,
+     "ci": [
+      48.0,
+      67.8
+     ]
+    },
+    "all_owner": {
+     "k": 184,
+     "n": 227,
+     "pct": 81.1,
+     "ci": [
+      75.5,
+      85.6
+     ]
+    },
+    "by_class": {
+     "text": {
+      "n": 155,
+      "exact": {
+       "k": 137,
+       "n": 155,
+       "pct": 88.4,
+       "ci": [
+        82.4,
+        92.5
+       ]
+      }
+     },
+     "image": {
+      "n": 12,
+      "exact": {
+       "k": 10,
+       "n": 12,
+       "pct": 83.3,
+       "ci": [
+        55.2,
+        95.3
+       ]
+      }
+     },
+     "estimate": {
+      "n": 54,
+      "exact": {
+       "k": 37,
+       "n": 54,
+       "pct": 68.5,
+       "ci": [
+        55.3,
+        79.3
+       ]
+      }
+     },
+     "none": {
+      "n": 6,
+      "exact": {
+       "k": 0,
+       "n": 6,
+       "pct": 0.0,
+       "ci": [
+        0.0,
+        39.0
+       ]
+      }
+     }
+    },
+    "du_vs_owner": {
+     "certain_flagged": {
+      "k": 28,
+      "n": 181,
+      "pct": 15.5,
+      "ci": [
+       10.9,
+       21.4
+      ]
+     },
+     "uncertain_unflagged": {
+      "k": 14,
+      "n": 40,
+      "pct": 35.0,
+      "ci": [
+       22.1,
+       50.5
+      ]
+     }
+    },
+    "undated": {
+     "n": 90,
+     "by_class": {
+      "estimate": 31,
+      "none": 7,
+      "text": 48,
+      "image": 4
+     },
+     "explicit": 52,
+     "owner_ruled": {
+      "documents_ruled": 20,
+      "explicit_ruled": 16,
+      "false": 3
+     },
+     "model_scored": {
+      "explicit_unruled": 36,
+      "false": 9
+     },
+     "false_year": {
+      "k": 12,
+      "n": 90,
+      "pct": 13.3,
+      "ci": [
+       7.8,
+       21.9
+      ]
+     },
+     "estimates": 31
+    },
+    "paired_all_owner": {
+     "n": 227,
+     "a_exact": 184,
+     "b_exact": 184,
+     "a_only": 0,
+     "b_only": 0,
+     "sign_p": 1.0
+    }
+   },
+   "flag_demotes": {
+    "du_vs_owner": {
+     "certain_flagged": {
+      "k": 30,
+      "n": 181,
+      "pct": 16.6,
+      "ci": [
+       11.9,
+       22.7
+      ]
+     },
+     "uncertain_unflagged": {
+      "k": 8,
+      "n": 40,
+      "pct": 20.0,
+      "ci": [
+       10.5,
+       34.8
+      ]
+     }
+    },
+    "undated": {
+     "n": 90,
+     "by_class": {
+      "estimate": 28,
+      "none": 7,
+      "text": 51,
+      "image": 4
+     },
+     "explicit": 45,
+     "owner_ruled": {
+      "documents_ruled": 20,
+      "explicit_ruled": 15,
+      "false": 2
+     },
+     "model_scored": {
+      "explicit_unruled": 30,
+      "false": 3
+     },
+     "false_year": {
+      "k": 5,
+      "n": 90,
+      "pct": 5.6,
+      "ci": [
+       2.4,
+       12.4
+      ]
+     },
+     "estimates": 28
+    },
+    "owner_text_flagged": 11,
+    "owner_text_flagged_exact": 5,
+    "owner_text_flagged_owner_du": 7
+   },
+   "cost": {
+    "trace-neigh": {
+     "calls": 362,
+     "usd": 0.002205,
+     "median_s": 3.85
+    },
+    "image": {
+     "calls": 366,
+     "usd": 0.002836,
+     "median_s": 5.64
+    },
+    "item_spent": 1.2845,
+    "billed_note": "the gateway's own figure $1.2844 on 516 of 516 calls, 1.00 times the estimate on them"
+   },
+   "per_1000": {
+    "usd": 3.11,
+    "seconds": 5642,
+    "image_share": 0.318
+   }
+  }
+ },
+ "vision": {
+  "pages_read": 3404,
+  "pages_imaged": 583,
+  "oriented_now": 2495,
+  "read_now": 1972,
+  "orient_s": 828.1,
+  "read_s": 378.8,
+  "have_text": 3010,
+  "have_image": 525,
+  "os": "27.2"
+ }
+}

@@ -72,6 +72,13 @@ class Route(unittest.TestCase):
         r = P.route(doc("Report of 1958"), "not json", None)
         self.assertEqual((r["year"], r["cls"]), (1958, "text"))
 
+    def test_self_only_makes_a_mentioned_year_cited_from_a_neighbour_an_estimate(self):
+        d = doc("Since the 1947 report, the board has met.", near=[("P1", 1, "Letter of May 2, 1947")])
+        raw = trace(1947, "May 2, 1947", "P1")
+        self.assertEqual(P.route(d, raw, None)["cls"], "text")
+        r = P.route(d, raw, None, self_only=True)
+        self.assertEqual((r["year"], r["du"], r["cls"]), (1947, True, "estimate"))
+
     def test_the_models_own_flag_is_never_used(self):
         d = doc("March 3, 1958")
         raw = json.dumps({"year": 1958, "lo": 1958, "hi": 1958, "date_uncertain": True,

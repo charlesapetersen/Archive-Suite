@@ -391,10 +391,12 @@ def cmd_export(a):
 
 # --- the route --------------------------------------------------------------------------------------------------
 
-def route(doc, trace_raw, image_rec):
+def route(doc, trace_raw, image_rec, self_only=False):
     """The route's answer for one document: {year, du, cls, evidence, ...}. cls is the evidence class: "text"
     (explicit from the own text), "image" (explicit from the page image), "estimate" (from a neighbour, checked,
-    Date Uncertain), or "none" (no year written). image_rec is None where the image pass was not sent."""
+    Date Uncertain), or "none" (no year written). image_rec is None where the image pass was not sent. self_only: step 1
+    also needs the reply to cite the document itself ("self"), as the trace prompt asks for a printed own date; by
+    default a year any own rule candidate carries is explicit whatever the reply cites (08-dating.md section 3, step 1)."""
     cands = T.candidates(doc["text"])
     own = {c["year"] for c in cands}
     tr = T.parse_trace(trace_raw)
@@ -402,8 +404,9 @@ def route(doc, trace_raw, image_rec):
         "none", "unparsed")
     cited = (tr["evidence"] or {}).get("neighbour", "self") if tr["evidence"] else None
     base = {"trace_y": tr["y"], "verdict": verdict, "reason": reason, "cited": cited, "lo": tr["lo"], "hi": tr["hi"],
-            "has_candidate": bool(cands), "image_sent": image_rec is not None}
-    if tr["y"] is not None and (tr["y"] in own or (verdict == "valid" and cited == "self")):
+            "has_candidate": bool(cands), "image_sent": image_rec is not None, "model_du": tr["du"] if tr["parsed"] else None}
+    if tr["y"] is not None and (tr["y"] in own or verdict == "valid") and (cited == "self" or (
+            not self_only and tr["y"] in own)):
         return {**base, "year": tr["y"], "du": False, "cls": "text", "step": 1}
     if cands:
         if tr["y"] is not None and verdict == "valid":
@@ -525,6 +528,9 @@ def score_model(model, ts, gem_image):
             continue
         sent = im if (im is not None and not T.candidates(doc["text"])) else None
         r = route(doc, traw, sent)
+        r["trace_only_year"] = route(doc, traw, None)["year"]     # the same route without step 2, paired
+        v = route(doc, traw, sent, self_only=True)                  # step 1 needing a quote from "self"
+        r["self_only"] = {"year": v["year"], "du": v["du"], "cls": v["cls"]}
         truth = d.get("truth") or {}
         r.update({"id": d["id"], "set": d["set"], "kind": d.get("kind"), "truth_y": truth.get("year"),
                   "truth_du": truth.get("du"), "decade": truth.get("decade")})
@@ -550,6 +556,7 @@ def summarise(model, rows, ts):
                        for s in STRATA for g in [[r for r in owner if r.get("stratum") == s]]}
     nit = [r for r in owner if r.get("stratum") in ("on the page", "not on the page")]
     S["not_in_text"] = frac(sum(r["year"] == r["truth_y"] for r in nit), len(nit))
+    S["step2_paired"] = paired(nit, "year", "trace_only_year")
     S["all_owner"] = frac(sum(r["year"] == r["truth_y"] for r in owner), len(owner))
     S["by_class"] = {c: {"n": len(g), "exact": frac(sum(r["year"] == r["truth_y"] for r in g), len(g))}
                      for c in CLASSES for g in [[r for r in owner if r["cls"] == c]]}
@@ -572,6 +579,18 @@ def summarise(model, rows, ts):
     S["intext_image"] = intext_image([r for r in owner if "intext_image" in r])
     S["calls"] = route_calls(rows)
     return S
+
+
+def paired(rows, a, b):
+    """Exact year with a against b on the same documents: both counts, the discordant pairs and a two-sided exact sign
+    test on them."""
+    ra = sum(r[a] == r["truth_y"] for r in rows)
+    rb = sum(r[b] == r["truth_y"] for r in rows)
+    up = sum(r[a] == r["truth_y"] and r[b] != r["truth_y"] for r in rows)
+    down = sum(r[b] == r["truth_y"] and r[a] != r["truth_y"] for r in rows)
+    n, k = up + down, min(up, down)
+    p = min(1.0, 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2 ** n) if n else 1.0
+    return {"n": len(rows), "a_exact": ra, "b_exact": rb, "a_only": up, "b_only": down, "sign_p": round(p, 4)}
 
 
 def undated_summary(rows):
@@ -656,6 +675,26 @@ def cmd_score(a):
         if rows is None:
             continue
         S = summarise(model, rows, ts)
+        alt = [{**r, **r["self_only"], "image_sent": r["image_sent"]} for r in rows]
+        A = summarise(model, alt, ts)
+        S["self_only"] = {k: A[k] for k in ("by_stratum", "not_in_text", "all_owner", "by_class", "du_vs_owner",
+                                            "undated")}
+        # The model's own flag demoting an explicit text year to Date Uncertain (one way only; the year is kept).
+        flg = [{**r, "du": r["du"] or (r["cls"] == "text" and r["model_du"] is True)} for r in rows]
+        F = summarise(model, flg, ts)
+        S["flag_demotes"] = {"du_vs_owner": F["du_vs_owner"], "undated": F["undated"],
+                             "owner_text_flagged": sum(1 for r in rows if r["set"] == "owner" and r["truth_y"] is not None
+                                                       and r["cls"] == "text" and r["model_du"] is True),
+                             "owner_text_flagged_exact": sum(1 for r in rows if r["set"] == "owner" and r["cls"] == "text"
+                                                             and r["model_du"] is True and r["truth_y"] is not None
+                                                             and r["year"] == r["truth_y"]),
+                             "owner_text_flagged_owner_du": sum(1 for r in rows if r["set"] == "owner" and r["cls"] == "text"
+                                                                and r["model_du"] is True and r["truth_du"] is True
+                                                                and r["truth_y"] is not None)}
+        own = [r for r in rows if r["set"] == "owner" and r["truth_y"] is not None]
+        for r in own:
+            r["self_only_year"] = r["self_only"]["year"]
+        S["self_only"]["paired_all_owner"] = paired(own, "year", "self_only_year")
         if model == GEMINI:
             S["cost"] = gemini_cost()
             S["per_1000"] = per_1000(S, S["cost"])
@@ -663,9 +702,218 @@ def cmd_score(a):
         with open(CACHE / f"rows-{model}.jsonl", "w", encoding="utf-8") as fh:
             fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
     RESULTS_JSON.write_text(json.dumps(out, indent=1) + "\n")
+    write_md(out)
     print(json.dumps({m: {"not_in_text": s["not_in_text"], "by_class": s["by_class"]} for m, s in out["models"].items()},
                      indent=1))
     print(f"-> {RESULTS_JSON}")
+
+
+# --- the report -------------------------------------------------------------------------------------------------
+
+LABELS = {GEMINI: "Gemini 3.7 Flash (gateway)", QWEN: "Qwen3.6 27B (Sherlock)"}
+
+
+def pc(f):
+    return f"{f['pct']:.1f}% ({f['k']}/{f['n']})" if f and f["n"] else "–"
+
+
+def ci(f):
+    return f"{f['ci'][0]:.0f}-{f['ci'][1]:.0f}" if f and f.get("ci") else "–"
+
+
+def write_md(out):
+    from seg_card import card, keep_card
+    M = out["models"]
+    L = ["# The restated dating route end to end (W46.date-route-pipeline)", "",
+         "Written by `scripts/segbench/date_route_pipeline.py score`. The route of `13-stage-rules/08-dating.md` section 3 "
+         "as one pipeline: (1) the trace prompt with the neighbours' dates on the app's own OCR text, the year explicit when "
+         "the document's own text carries it; (2) the image pass (first two pages, images alone) only where the own text "
+         "has no year candidate; (3) inheritance, not measured; (4) the same trace reply's neighbour estimate, written only "
+         "when `date_scorers.evidence_check` passes, always with Date Uncertain. Date Uncertain is set by the step, never by "
+         "the model's flag. Text: Apple Vision (macOS 27.2) on the JPEG originals, upright, 2,400 px; no ABBYY text is an "
+         f"input. Sets: the owner's 300 ({out['readable'].get('owner', 0)} with a confirmed JPEG original of the first page; "
+         f"the rest are left out) and the undated 100 of W46.date-undated ({out['readable'].get('undated', 0)} readable).", ""]
+    if QWEN not in M:
+        L += ["The 27B half runs on Sherlock and is not in yet: `export` wrote its pack, held as "
+              "W46.date-route-pipeline-27b; `score` adds its rows when its answers land in the cache.", ""]
+    L += findings(out)
+    L += ["## Exact year by where the year is (the owner's documents)", "",
+          "\"In text\": the owner's year is written in the document's own Vision text (3,000 characters). \"On the page\": "
+          "not in the text, but the Gemini image pass (sent on every owner document for this split) quotes a date with "
+          "that year. \"Not on the page\": neither. \"Not in text\" is the last two together, the stage's metric, now "
+          "defined from the app's own text and the image pass, not from the ABBYY text (DAT-1). Decade-tagged documents "
+          "are scored apart. 95% Wilson intervals.", "",
+          "| route | in text | on the page | not on the page | not in text | interval | wrong year written, not in text |",
+          "|---|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        b = S["by_stratum"]
+        nitw = sum(b[s]["wrong"]["k"] for s in STRATA[1:])
+        L.append(f"| {LABELS[m]} | {pc(b['in text']['exact'])} | {pc(b['on the page']['exact'])} | "
+                 f"{pc(b['not on the page']['exact'])} | {pc(S['not_in_text'])} | {ci(S['not_in_text'])} | "
+                 f"{nitw}/{S['not_in_text']['n']} |")
+    L += ["", "## By evidence class (the owner's documents)", "",
+          "The class is the step that wrote the year: explicit from the text or the image (no Date Uncertain), estimated "
+          "from a neighbour with checked evidence (Date Uncertain), or none written.", "",
+          "| route | text | image | estimate | none | certain years flagged | uncertain years unflagged | estimate interval covers, median width |",
+          "|---|---|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        c, du, ei = S["by_class"], S["du_vs_owner"], S["estimate_interval"]
+        L.append(f"| {LABELS[m]} | " + " | ".join(
+            f"{c[k]['n']}, {pc(c[k]['exact'])} exact" if k != "none" else f"{c[k]['n']}" for k in CLASSES) +
+            f" | {pc(du['certain_flagged'])} | {pc(du['uncertain_unflagged'])} | "
+            f"{pc(ei['covered'])}, {ei['median_width']} y |")
+    L += ["", "## Step 1 needing a quote from the document itself (a variant, in-sample)", "",
+          "Section 3 makes a year explicit when any rule candidate in the own text carries it, whatever the reply cites. "
+          "The variant also needs the reply to cite \"self\", as the trace prompt asks for a printed own date; a year "
+          "the reply takes from a neighbour is then an estimate, with Date Uncertain, even when the text mentions it. "
+          "Chosen after reading this run's undated false years, so it is an in-sample comparison, not a tested rule.", "",
+          "| route | step 1 | in text | not in text | all owner, paired: default only / variant only, p | explicit / estimated years on the undated | false-year rate |",
+          "|---|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        for lab, X in (("any own candidate (section 3)", S), ("a quote from self", S["self_only"])):
+            p2 = S["self_only"]["paired_all_owner"]
+            pair = f"{X['all_owner']['k']}/{X['all_owner']['n']}" + (
+                f"; {p2['a_only']} / {p2['b_only']}, p {p2['sign_p']}" if X is not S else "")
+            u = X["undated"]
+            L.append(f"| {LABELS[m]} | {lab} | {pc(X['by_stratum']['in text']['exact'])} | {pc(X['not_in_text'])} | "
+                     f"{pair} | {u['explicit']} / {u['estimates']} | {pc(u['false_year'])} |")
+    L += ["", "## The model's own flag on an explicit text year (a variant)", "",
+          "Section 3 never takes Date Uncertain from the model. Here the trace reply's own `date_uncertain` is allowed one "
+          "thing only: to add Date Uncertain to a year step 1 made explicit (the year is kept, nothing is removed). A year "
+          "with Date Uncertain is not a false year.", "",
+          "| route | owner text years the model flagged: n, exact, owner-uncertain | certain years flagged | uncertain years unflagged | false-year rate, undated |",
+          "|---|---|---|---|---|"]
+    for m, S in M.items():
+        F = S["flag_demotes"]
+        L.append(f"| {LABELS[m]}, section 3 | – | {pc(S['du_vs_owner']['certain_flagged'])} | "
+                 f"{pc(S['du_vs_owner']['uncertain_unflagged'])} | {pc(S['undated']['false_year'])} |")
+        L.append(f"| {LABELS[m]}, the flag demotes | {F['owner_text_flagged']}, {F['owner_text_flagged_exact']}, "
+                 f"{F['owner_text_flagged_owner_du']} | {pc(F['du_vs_owner']['certain_flagged'])} | "
+                 f"{pc(F['du_vs_owner']['uncertain_unflagged'])} | {pc(F['undated']['false_year'])} |")
+    L += ["", "## What the image step adds (paired, not in text)", "",
+          "The same documents and trace replies, the route with and without step 2.", "",
+          "| route | with step 2 | without | only with | only without | sign test p |", "|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        p = S["step2_paired"]
+        L.append(f"| {LABELS[m]} | {p['a_exact']}/{p['n']} | {p['b_exact']}/{p['n']} | {p['a_only']} | {p['b_only']} | "
+                 f"{p['sign_p']} |")
+    L += ["", "## The evidence checker on fresh replies (P13-5)", "",
+          "Every trace reply with a year on the owner's documents, checked by the widened checker of "
+          "W46.date-evidence-check, which was written on the 27B's earlier replies: these are its first counts off them. "
+          "\"Right refused\": the year is the owner's but the citation fails; \"wrong accepted\": the citation passes but "
+          "the year is not the owner's.", "",
+          "| route | valid | unsupported | none | right years refused | wrong years accepted | valid by form |",
+          "|---|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        c, by = S["checker"]["counts"], S["checker"]["by"]
+        forms = ", ".join(f"{k} {by[k].get('valid', 0)} ({by[k].get('wrong accepted', 0)} wrong)"
+                          for k in QUOTE_CLASSES if k in by)
+        L.append(f"| {LABELS[m]} | {c.get('valid', 0)} | {c.get('unsupported', 0)} | {c.get('none', 0)} | "
+                 f"{c.get('right years refused', 0)} | {c.get('wrong years accepted', 0)} | {forms} |")
+    for m, S in M.items():
+        refused = {k: v["right refused"] for k, v in S["checker"]["by"].items() if v.get("right refused")}
+        if refused:
+            L.append(f"\n{LABELS[m]}, right years refused by reason: " +
+                     "; ".join(f"{k} {v}" for k, v in sorted(refused.items(), key=lambda x: -x[1])) + ".")
+    L += ["", "## The undated documents (false years)", "",
+          "A false year is a year written without Date Uncertain where the document has no own date of that year. Truth: "
+          "the owner's ruling on the documents he ruled (W46.date-undated-fold), else the Gemini image pass's reading of "
+          "the page (model-scored).", "",
+          "| route | documents | years written, explicit / estimated | false, owner-ruled | false, model-scored | false-year rate | interval |",
+          "|---|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        u = S["undated"]
+        L.append(f"| {LABELS[m]} | {u['n']} | {u['explicit']} / {u['estimates']} | "
+                 f"{u['owner_ruled']['false']} of {u['owner_ruled']['explicit_ruled']} ruled explicit "
+                 f"({u['owner_ruled']['documents_ruled']} ruled) | {u['model_scored']['false']} of "
+                 f"{u['model_scored']['explicit_unruled']} | {pc(u['false_year'])} | {ci(u['false_year'])} |")
+    L += ["", "## The image pass where the text has a year (item 8.2)", "",
+          "Sent on the owner's documents whose own text has a year candidate, which the route does not send it to. "
+          "\"Changes the year\": the pass names a document date, written in a date it quoted, other than the route's year.", "",
+          "| route | documents | own date found | changes the year | of them right | wrong → right | right → wrong | a stamp date found |",
+          "|---|---|---|---|---|---|---|---|"]
+    for m, S in M.items():
+        x = S["intext_image"]
+        L.append(f"| {LABELS[m]} | {x['n']} | {x['own_date_found']} | {x['changes_year']} | {x['change_right']} | "
+                 f"{x['change_wrong_to_right']} | {x['change_right_to_wrong']} | {x['stamp_dates']} |")
+    if GEMINI in M:
+        c, p = M[GEMINI]["cost"], M[GEMINI]["per_1000"]
+        L += ["", "## Cost and time (Gemini)", "",
+              f"Per call, from every ledger row behind the replies used: trace {c['trace-neigh']['calls']} calls, "
+              f"${c['trace-neigh']['usd']:.5f} mean, {c['trace-neigh']['median_s']} s median; image {c['image']['calls']} "
+              f"calls, ${c['image']['usd']:.5f} mean, {c['image']['median_s']} s median (3.8's list price as a ceiling; "
+              f"{c['billed_note']}). Per 1,000 documents of the owner's mix, one trace call each and the image pass on "
+              f"{100 * p['image_share']:.0f}% of them: about ${p['usd']:.2f} and {p['seconds']:,} s of calls in sequence. "
+              f"This item spent ${c['item_spent']:.2f}.", ""]
+    v = out.get("vision")
+    if v:
+        L += [f"Vision: {v['read_now']} pages read now in {v['read_s']} s on macOS {v['os']} "
+              f"(the rest reused from date_undated's 27.2 readings), {v['oriented_now']} oriented in {v['orient_s']} s.", ""]
+    L += card(
+        "the owner's date tags on his 300 (year, and Date Uncertain for the two flag rates); for the undated set, his "
+        "page-date rulings on the documents he ruled and the Gemini image pass's own reading on the rest, the latter "
+        "the scored model's own reader and reported apart. The tag differs from the page for 4 of 26 own-page cases "
+        "(date-truth-sets.md), so a route quoting the page can score wrong against the tag.",
+        "the owner's 300 as date_tagging drew them and the undated 100 as W46.date-undated drew them, never by a tested "
+        "route or the ABBYY text; documents whose first page has no confirmed JPEG original are left out (the app would "
+        "have its own photo). The strata come from the app's own Vision text and the Gemini image pass, so \"on the "
+        "page\" is defined by the Gemini reader that one route uses as its step 2.",
+        "every route on the same documents, the same Vision text, the same prompts and images; the step-2 effect is "
+        "paired on the same trace replies. The older step rows were on ABBYY-defined sets and corpus text and are not "
+        "compared figure for figure.",
+        "one run (temperature 0, reasoning low); the dating rerun floor is a same-year rate of 94% (85/90) between two "
+        "identical runs (date-undated.md), so a gap of a few points between routes is inside it. Wilson intervals on "
+        "single rates; the step-2 gap by an exact sign test on its discordant pairs.",
+        "Gemini 3.7 on the gateway (3.8 on a direct key is unmeasured here); inheritance (step 3) is not measured; "
+        "the checker counts are off its writing set but on one prompt; the false-year rate is a share of the "
+        "collection-balanced undated sample, not a corpus rate (P3-1).")
+    RESULTS.write_text(keep_card(RESULTS, "\n".join(L) + "\n"))
+    print(f"-> {RESULTS}")
+
+
+def findings(out):
+    """The run's reading, from the figures in `out` (Gemini; the 27B's rows are read the same way when they land)."""
+    S = out["models"].get(GEMINI)
+    if not S:
+        return []
+    b, c, u, F = S["by_stratum"], S["by_class"], S["undated"], S["flag_demotes"]
+    p2, x, k, cost = S["step2_paired"], S["intext_image"], S["checker"], S["per_1000"]
+    kc, ref = k["counts"], {r: v["right refused"] for r, v in k["by"].items() if v.get("right refused")}
+    return ["## Findings", "",
+            f"- **The route on Gemini 3.7: {pc(S['not_in_text'])} where the year is not in the app's own text, "
+            f"{pc(b['in text']['exact'])} where it is.** Not in text splits into the year on the page "
+            f"({pc(b['on the page']['exact'])}) and nowhere on the page ({pc(b['not on the page']['exact'])}). By the "
+            f"step that wrote the year: {c['text']['n']} explicit from the text ({pc(c['text']['exact'])} exact), "
+            f"{c['image']['n']} from the image ({pc(c['image']['exact'])}), {c['estimate']['n']} estimated from a "
+            f"neighbour with checked evidence ({pc(c['estimate']['exact'])}), {c['none']['n']} with no year written. "
+            "These combined rows replace the hand-summed one-shot-plus-image row (F-1); they are on Vision-defined sets "
+            "and not comparable figure for figure with the ABBYY-defined 131.",
+            f"- **The image step adds a little and takes nothing:** {p2['a_exact']} against {p2['b_exact']} of "
+            f"{p2['n']} with and without it, {p2['a_only']} documents right only with it, {p2['b_only']} only without "
+            f"(sign test p {p2['sign_p']}), a direction inside the rerun floor.",
+            f"- **Undated documents get a false year {pc(u['false_year'])} of the time under section 3's rule**, against "
+            "6.7% for the app's own call restated on the owner's rulings (date-undated.md): step 1 writes any year a rule "
+            "candidate in the own text carries as explicit, and an undated document's text often mentions a year (a "
+            "citation, a table heading). Requiring the reply to quote it from the document itself changes little (see "
+            f"the variant). The model knew on most of them: letting its own flag add Date Uncertain to an explicit text "
+            f"year, never remove it, gives {pc(F['undated']['false_year'])} false years, and on the owner's documents "
+            f"flags {F['owner_text_flagged']} more text years, of which {F['owner_text_flagged_exact']} are the "
+            f"owner's year and {F['owner_text_flagged_owner_du']} he himself marked uncertain (uncertain years left "
+            f"unflagged {pc(S['du_vs_owner']['uncertain_unflagged'])} to {pc(F['du_vs_owner']['uncertain_unflagged'])}). "
+            "Section 3 forbids taking the flag from the model; whether this one-way use is allowed is the owner's call.",
+            f"- **The evidence checker off its writing set (P13-5):** {kc.get('valid', 0)} valid, "
+            f"{kc.get('unsupported', 0)} unsupported, {kc.get('none', 0)} with no evidence on Gemini's replies; "
+            f"{kc.get('right years refused', 0)} right years refused ("
+            + "; ".join(f"{r} {v}" for r, v in sorted(ref.items(), key=lambda z: -z[1])) +
+            f"), {kc.get('wrong years accepted', 0)} wrong years accepted, since the check is for traceability, not truth.",
+            f"- **The image pass on documents whose text has a year (item 8.2):** on {x['n']} it finds an own date on "
+            f"{x['own_date_found']}; that date differs from the route's year on {x['changes_year']}, of which "
+            f"{x['change_right']} are the owner's year ({x['change_wrong_to_right']} wrong to right, "
+            f"{x['change_right_to_wrong']} right to wrong); it quotes a stamp date on {x['stamp_dates']} (second-role "
+            "dates for the sidecar). Sending it everywhere would cost the image call on every document.",
+            f"- **Cost and time:** about ${cost['usd']:.2f} per 1,000 documents of the owner's mix at 3.8's list price "
+            f"as a ceiling, and {cost['seconds'] / 1000:.1f} s of calls a document in sequence (one trace call each, the "
+            f"image pass on {100 * cost['image_share']:.0f}% of them).", ""]
 
 
 def main():
