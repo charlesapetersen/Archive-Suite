@@ -16,6 +16,8 @@
 # about these tools (grep, ls, cat, pip show) is untouched, since none of them is the program of its segment.
 # A script that runs a heavy tool itself is not seen: the session prompt tells sessions to wrap the script.
 #
+# Codex sessions do not run Claude hooks: ops/autonomous/pyguard/sitecustomize.py, on every engine session's
+# PYTHONPATH (owner, 2026-11-12), refuses the same Python programs for any agent at interpreter start.
 # SCOPE: unattended only (ARCHIVE_UNATTENDED=1). CONTRACT: exit 0 allow, exit 2 deny with the reason on stderr.
 # Fail-open on any internal error: a broken hook must never wedge a run.
 set -uo pipefail

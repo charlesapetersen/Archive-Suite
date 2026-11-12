@@ -39,6 +39,8 @@ are more specific; the prompt that follows was written for Claude Code and binds
    segmenter run (kraken, ketos, layout-order, mlx_vlm, or a script that runs one) takes the same lock:
    `python3 ops/autonomous/heavy-run.py run -- <command>`, background runs included (2026-10-31: two unlocked
    background runs beside other sessions exhausted memory and the Mac panicked).
+   Python enforces it for kraken, ketos and `python -m mlx_vlm|kraken|ketos`: run outside the lock they exit 2
+   with "heavy-lock guard: refused" (ops/autonomous/pyguard/sitecustomize.py, on your PYTHONPATH). Wrap and rerun.
 
 5. CLAUDE-ONLY TOOLS. Where the prompt names the Agent or Task tool, `Workflow`, a skill such as `lean-review`,
    or a per-subagent model or effort, use codex's own equivalent if you have one, or do the work yourself. The
