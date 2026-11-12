@@ -28,7 +28,7 @@ enum SettingsSheetTestDriver {
         }
     }
 
-    private static let date = Date(timeIntervalSince1970: 1_762_819_200)   // 2025-11-11, fixed for the sources' words
+    private static let date = Date(timeIntervalSince1970: 1_794_355_200)   // 2026-11-11, fixed for the sources' words
 
     private static func layer(_ kind: SettingsLayerKind, _ values: [(SettingsKey, SettingsValue)]) -> SettingsLayer {
         var l = SettingsLayer(kind: kind, name: kind == .general ? "General" : "Letters")

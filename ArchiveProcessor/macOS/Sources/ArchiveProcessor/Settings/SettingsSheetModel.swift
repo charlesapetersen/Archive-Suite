@@ -343,8 +343,8 @@ struct SettingsSheetModel {
                           + "3.7 Flash with the same instructions; Gemini 3.8 itself has not been tested on this yet.")
         }
         if stage.id == "dating" || stage.id == "entities", route?.id != "none" {
-            labels.append("These figures were measured on a fixed text of each test document; they do not change with "
-                          + "the reading program chosen above.")
+            labels.append("These figures were measured on the same checked text of each test document for every program; "
+                          + "they do not change with the reading program chosen above.")
         }
         if stage.id == "entities", let p = lead, !p.shown {
             labels.append(p.route.map { $0.family != .mac && $0.id != "none" } == true
@@ -367,7 +367,7 @@ struct SettingsSheetModel {
             let tie = gain.map { $0 < Self.tieFloor(stage.id) } ?? false
             return Better(id: b.id, name: words.name(stage.id, b.id), order: gain ?? v,
                           gain: stage.id == "entities" && base == 0
-                            ? String(format: "the sender found about %.0f times in 100", v * 100)
+                            ? String(format: "finding the sender right about %.0f times in 100", v * 100)
                             : gain.map { words.gain(stage.id, $0) } ?? words.figure(stage.id, v),
                           reason: (tie ? "within the margin of error, so no real gain; " : "")
                             + (b.isLimit ? words.limitPhrase(b.reason).lowercased() : words.reason(b.reason)))
@@ -384,7 +384,7 @@ struct SettingsSheetModel {
            }).compactMap({ r in cmp.of(r).map { (r, $0) } }).filter({ $0.1 > base }).max(by: { $0.1 < $1.1 }) {
             betterAll.append(Better(id: m.0.id, name: words.display(stage.id, m.0), order: m.1 - base,
                                     gain: stage.id == "entities" && base == 0
-                                        ? String(format: "the sender found about %.0f times in 100", m.1 * 100)
+                                        ? String(format: "finding the sender right about %.0f times in 100", m.1 * 100)
                                         : words.gain(stage.id, m.1 - base),
                                     reason: (appBlocked[m.0.id] ?? []).first { $0.contains("GB") } ?? "needs a bigger Mac"))
         }
@@ -547,12 +547,12 @@ struct SettingsSheetModel {
             var rows = [PartRow(id: "all", label: before, routeName: name(r),
                                 figure: r.family == .manual ? "nothing is proposed: you check every place yourself"
                                     : p.figure.map { String(format: "%.0f%% of pages in the right document", $0) } ?? "no figure",
-                                sample: "on the two main test boxes together, 363 pages checked by hand",
+                                sample: "on two test boxes of typed letters, 363 pages checked by hand",
                                 label2: "the boxes below are separate tests: on other material it varies", warning: false)]
             if let per100 {
                 let places = per100 * Double(a.pages) / 100
                 rows.append(PartRow(id: "checks", label: "Places it asks you to check", routeName: nil,
-                                    figure: r.family == .manual ? String(format: "every place between pages (about %.0f in every 100 pages)", per100)
+                                    figure: r.family == .manual ? String(format: "every place between two document pages (about %.0f in every 100 pages; the rest sit next to box or folder covers)", per100)
                                         : String(format: "about %.0f in every 100 pages", per100),
                                     sample: nil, label2: nil, warning: false))
                 rows.append(PartRow(id: "checking", label: "Your own checking time", routeName: nil,
@@ -566,7 +566,7 @@ struct SettingsSheetModel {
                                     figure: String(format: "%.0f%% of pages in the right document", after),
                                     sample: nil, label2: nil, warning: false))
             }
-            let boxes: [(String, String)] = [("letters", "A box of letters"), ("magazine", "A magazine, articles within issues"),
+            let boxes: [(String, String)] = [("letters", "A box of typed and handwritten letters"), ("magazine", "A magazine, articles within issues"),
                                              ("clippings-mixed", "Clippings mixed with other papers"),
                                              ("manuscripts-public", "Handwritten letters (a published test collection)"),
                                              ("typed-gov-public", "Typed government files (a published test collection)")]
@@ -587,7 +587,8 @@ struct SettingsSheetModel {
                 let ranks = key != "magazine" || r.id == "gemini3.8-flash"
                 rows.append(PartRow(id: key, label: label, routeName: nil,
                                     figure: String(format: "%.0f%%", v)
-                                        + (pagesFigure ? " of pages in the right document" : " of the places between pages judged right (a new document or not)"),
+                                        + (pagesFigure ? " of pages in the right document"
+                                            : " of the places between pages judged right (a new document or not; a different measure from the rows above)"),
                                     sample: n.map { "on \(Int($0)) \(pagesFigure ? "pages" : "places between pages"), before checking" },
                                     label2: ranks ? nil : "ranks nothing yet: not used to choose, because this model was not told that each magazine article is a document of its own",
                                     warning: false))
@@ -598,7 +599,7 @@ struct SettingsSheetModel {
             let first = picks.first { $0.part == "step 1" }?.route?.id
             for p in picks {
                 let label = ["step 1": "When the year is written in the text",
-                             "step 2": "When the text shows no year at all: looked for on the page image (a stamp, a handwritten date)",
+                             "step 2": "When the text has no year-like number at all: the page image is searched (a stamp, a handwritten date)",
                              "step 4": "When no year is found anywhere: estimated from the folder or nearby documents"][p.part] ?? p.part
                 guard let r = p.route, p.flag == nil else {
                     rows.append(PartRow(id: p.part, label: label, routeName: nil, figure: words.flag(p.flag ?? ""),
@@ -615,7 +616,7 @@ struct SettingsSheetModel {
                 switch p.part {
                 case "step 1":
                     row("step 1", label, "in_text", "documents whose year is in the text")
-                    row("step 1b", "When the year is not in the text, so it has to be inferred from other clues", "not_in_text",
+                    row("step 1b", "When the year is not written out in the text: inferred from other clues (people, events, a weekday)", "not_in_text",
                         "test documents whose year is not in their text")
                 case "step 2":
                     row("step 2", label, "unprinted_122_doc_year",
@@ -635,7 +636,16 @@ struct SettingsSheetModel {
             }
             return rows
         case "entities":
-            return picks.map { p in
+            var extra: [PartRow] = []
+            if let p = picks.first(where: { $0.part == "correspondence-typed" }), p.flag == nil, let r = p.route {
+                for (key, label) in [("recipient", "the recipient"), ("place_city", "the sending place (its city)")] {
+                    guard let v = r.figure(key) else { continue }
+                    extra.append(PartRow(id: key, label: "Letters: \(label)", routeName: nil,
+                                         figure: String(format: "finds \(label) right about %.0f times in 100", v * 100),
+                                         sample: r.figures[key]?["n"]?.double.map { "on \(Int($0)) letters" }, label2: nil, warning: false))
+                }
+            }
+            let senders = picks.map { p in
                 let label = ["correspondence-typed": "Typed letters", "correspondence-handwritten": "Handwritten letters",
                              "non-correspondence": "Everything that is not a letter"][p.part] ?? p.part
                 let r = p.route
@@ -653,6 +663,7 @@ struct SettingsSheetModel {
                                } : nil,
                                label2: nil, warning: false)
             }
+            return senders + extra
         default:
             return []
         }
@@ -795,8 +806,8 @@ struct SettingsSheetWords {
         case "placement":
             return "On typed and printed pages the text is laid over the page image line by line, so you can select and "
                 + "search it where it sits; this is free. On handwritten pages the lines are found on the page and the "
-                + "text is fitted to them; a page where the fit is unsure, or whose reading program joins its lines into "
-                + "paragraphs, gets a separate text page instead."
+                + "text is fitted to them; a page where the fit is unsure, or where the program returns whole paragraphs instead of lines, "
+                + "gets a separate text page instead."
         case "marks":
             return "Marks (stamps, signatures, handwritten notes): not offered yet. Your page images are never altered to "
                 + "hide them, and the page's text includes them where the reading program can read them."
@@ -832,14 +843,14 @@ struct SettingsSheetWords {
             "vision-rules-t3": "Apple Vision's text and fixed rules (built in)",
             "mlx-date-2b-8bit": "A small dating model on this Mac, reading the year by itself",
             "mix-claude-chatgpt": "Claude and ChatGPT together, comparing their answers",
-            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, in the request that tags each document",
-            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), in the request that tags each document",
+            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, in the same step that labels each document with its date and names",
+            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), in the same step that labels each document with its date and names",
             "gemini3.7-flash-trace-neigh": "Gemini 3.7 Flash (Stanford gateway), quoting its evidence and nearby dates",
             "gemini3.7-flash-image": "Gemini 3.7 Flash (Stanford gateway), looking at the page image",
             "qwen3.6-27b-image": "Qwen3.6 27B on a computing cluster, looking at the page image",
             "qwen3-vl-8b-image-mac": "Qwen3-VL 8B on this Mac, looking at the page image",
             "qwen3.6-27b-trace-neigh-vision": "Qwen3.6 27B on a computing cluster, quoting its evidence",
-            "gemini-tagging-place": "Gemini, in the request that tags each document",
+            "gemini-tagging-place": "Gemini, in the same step that labels each document with its date and names",
             "gemini-entity8k": "Gemini, with a request of its own for names",
             "qwen3.6-27b": stage == "entities" ? "Qwen3.6 27B (a computing cluster or OpenRouter)" : r.name,
             "qwen3-vl-8b-mac": "Qwen3-VL 8B on this Mac",
@@ -983,6 +994,10 @@ struct SettingsSheetWords {
         if r.hasPrefix("not offered") { return "not offered" }
         if r.hasPrefix("useful as a disagreement partner") { return "only useful beside another model, not on its own" }
         if r == "not in the app yet" { return "the Processor cannot run it yet" }
+        if let m = r.range(of: #"^needs about (\d+) GB of memory \([\d.]+ GB measured\)$"#, options: .regularExpression) {
+            let gb = r[m].split(separator: " ")[2]
+            return "needs about \(gb) GB of memory while it works; this Mac has \(Int(resources.macMemoryGB.rounded())) GB"
+        }
         if r.hasPrefix("needs ") {
             return r.replacingOccurrences(of: #"\ba ([AEIOU])"#, with: "an $1", options: .regularExpression)
         }
@@ -992,7 +1007,9 @@ struct SettingsSheetWords {
 
     func limitPhrase(_ r: String) -> String {
         if r.hasPrefix("raise the ceiling by ") {
-            return "Raise the most to spend by " + r.dropFirst("raise the ceiling by ".count)
+            let by = String(r.dropFirst("raise the ceiling by ".count))
+            let to = Double(by.dropFirst()).flatMap { x in answers.ceilingUSD.map { money($0 + x) } }
+            return "Raise the most to spend by \(by)" + (to.map { ", to \($0)" } ?? "")
                 + " (the less important steps would then have to be free)"
         }
         if r.hasPrefix("allow about ") { return "Allow about " + r.dropFirst("allow about ".count) }
@@ -1003,9 +1020,11 @@ struct SettingsSheetWords {
         let r = p.reason
         if p.flag != nil, p.route == nil { return "Nothing can run this here." }
         if r.contains("free default") {
-            return "The free choice on this Mac: Apple Vision is built in and reads a typed or printed page in under a "
-                + "second, where the downloaded reading programs that score a little higher take many seconds a page; nothing is "
-                + "spent and no page leaves this Mac."
+            let bigger = p.better.contains { $0.reason.contains("GB of memory") || $0.reason.contains("GB Mac") }
+            return "The app's free default, chosen by its makers: Apple Vision is built into macOS, needs no download and "
+                + "reads a typed or printed page in under a second; nothing is spent and no page leaves this Mac. "
+                + (bigger ? "The programs that read better need more memory than this Mac has."
+                    : "Some downloaded programs score a little higher (see the alternatives) and can be chosen with “Use instead…”.")
         }
         if r.contains("no route fits the ceiling and the hours") {
             return "Nothing fits both your spending and your time, so the cheapest choice that can run is used."
