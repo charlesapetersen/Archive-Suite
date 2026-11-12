@@ -2109,17 +2109,17 @@
    },
    "usd_1000": 0.0,
    "usd_1000_batch": 0.0,
-   "s_doc": 8.0,
-   "s_est": true,
-   "peak_gb": 7.6,
-   "note": "old tagging prompt on ABBYY text; shipped prompt and Vision text unscored on this model; a pick on these figures is provisional until W46.ent-local-shipped-prompt; on Vision text: typed and printed pages only, never the sender, never handwritten (ent-robust.md)",
+   "s_doc": 7.76,
+   "s_est": false,
+   "peak_gb": 6.38,
+   "note": "shipped tagging prompt on Vision text, 138 documents (ent-local-shipped.md); against Gemini 3.7 on the same input: sender -0.105 (-0.173 to -0.045), recipient -0.110, place a tie; on the 82 the old prompt on ABBYY text also scored, a tie on every field (sender +0.065, -0.038 to +0.167)",
    "source": "settings-routes.json, stage entities, row qwen3-vl-8b-mac",
    "f1": {
-    "sender": 0.58,
-    "recipient": 0.55,
-    "place": 0.46
+    "sender": 0.6,
+    "recipient": 0.61,
+    "place": 0.54
    },
-   "n": 82
+   "n": 138
   },
   {
    "id": "qwen3.5-4b-mac",

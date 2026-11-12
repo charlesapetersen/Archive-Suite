@@ -11076,47 +11076,47 @@
      },
      "figures": {
       "sender": {
-       "value": 0.58,
-       "n": 82,
+       "value": 0.6,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3-vl-8b tagging reply, ABBYY (82)",
-        "attribute": "sender built -> owner",
-        "value": "0.56 -> 0.58"
+        "file": "ent-local-shipped.md",
+        "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)",
+        "attribute": "owner+rule sender",
+        "value": "0.60"
        }
       },
       "recipient": {
-       "value": 0.55,
-       "n": 82,
+       "value": 0.61,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3-vl-8b tagging reply, ABBYY (82)",
-        "attribute": "recipient",
-        "value": "0.55 -> 0.55"
+        "file": "ent-local-shipped.md",
+        "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)",
+        "attribute": "owner+rule recipient",
+        "value": "0.61"
        }
       },
       "sending_place": {
-       "value": 0.46,
-       "n": 82,
+       "value": 0.54,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3-vl-8b tagging reply, ABBYY (82)",
-        "attribute": "owner+rule F1",
-        "value": "0.46"
+        "file": "ent-local-shipped.md",
+        "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)",
+        "attribute": "owner+rule place",
+        "value": "0.54"
        }
       },
       "place_city": {
-       "value": 0.65,
-       "n": 82,
+       "value": 0.68,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3-vl-8b tagging reply, ABBYY (82)",
+        "file": "ent-local-shipped.md",
+        "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)",
         "attribute": "owner+rule city",
-        "value": "0.65"
+        "value": "0.68"
        }
       },
       "handwritten_or_mixed": {
@@ -11140,24 +11140,32 @@
       "estimate": "hand-entered in the 2026-11-04 settings prototype (build_figures.py, qwen8b-mac: 0.0); no measuring file"
      },
      "time": {
-      "per_unit_s": 8.0,
-      "measured": false,
-      "measured_on": "estimate",
-      "source": null,
-      "estimate": "hand-entered in the 2026-11-04 settings prototype (build_figures.py, qwen8b-mac: 8.0 [?]); no measuring file"
+      "per_unit_s": 7.76,
+      "measured": true,
+      "load_s": 2.4,
+      "measured_on": "M3 Pro 18 GB, text-only entity call, median of the 138 documents, load apart",
+      "source": {
+       "file": "ent-local-shipped.md",
+       "route": "Qwen3-VL 8B MLX 4-bit",
+       "attribute": "median s a document",
+       "value": "7.76"
+      }
      },
      "memory": {
-      "peak_gb": 7.6,
-      "measured_on": "M3 Pro 18 GB, reading page images, not a text-only entity call",
+      "peak_gb": 6.38,
+      "whole_process_gb": 6.98,
+      "measured_on": "M3 Pro 18 GB, text-only entity call (/usr/bin/time -l peak footprint)",
       "source": {
-       "file": "ocr-mac-local.md",
-       "route": "Qwen3-VL 8B 4-bit",
-       "attribute": "MLX peak",
-       "value": "7.6 GB"
+       "file": "ent-local-shipped.md",
+       "route": "Qwen3-VL 8B MLX 4-bit",
+       "attribute": "MLX peak / whole-process peak footprint",
+       "value": "6.38 / 6.98"
       }
      },
      "caveats": [
-      "old tagging prompt on ABBYY text; shipped prompt and Vision text unscored on this model; a pick on these figures is provisional until W46.ent-local-shipped-prompt",
+      "shipped tagging prompt on Vision text, 138 documents (ent-local-shipped.md); against Gemini 3.7 on the same input: sender -0.105 (-0.173 to -0.045), recipient -0.110, place a tie",
+      "on the 82 the old prompt on ABBYY text also scored, a tie on every field (sender +0.065, -0.038 to +0.167)",
+      "handwritten_or_mixed is the old ABBYY reply's (ent-score.md)",
       "on Vision text: typed and printed pages only, never the sender, never handwritten (ent-robust.md)"
      ],
      "kind_rules": [

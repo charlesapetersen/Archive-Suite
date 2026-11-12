@@ -27,8 +27,7 @@ report quotes from the run's log (RUNLOG).
 Scoring is ent_truth_owner.scores unchanged (ed2 F1 per field, the sending place also by its city) against the truth
 as built, with the owner's answers, and with the owner's answers and the written-place rule (the table's truth). The
 paired differences are ent_score_paid.paired (document bootstrap, 95%) over the documents both arms answered; the
-rerun floor is ent-prompt-app.md's Gemini one (a temperature-0 local model reruns byte-identical, so its own floor is
-0 and not measured). No money: the Mac run is local and the cluster run is on Sherlock. Replies stay in the bench
+rerun floor is ent-prompt-app.md's Gemini one (the local models' is not measured). No money: the Mac run is local and the cluster run is on Sherlock. Replies stay in the bench
 cache; the report has aggregates only.
 """
 from __future__ import annotations
@@ -221,6 +220,9 @@ def cmd_report(a):
         if m:
             metas[label] = m
             arms[f"{name} tagging, Vision ({len(m)})"] = P.preds(label, CACHE)[0]
+    on82 = {i for name in ("qwen3-vl-8b", "qwen3.6-27b") for i in old[name]}
+    for arm in list(arms):
+        arms[arm.rsplit(" (", 1)[0] + " on the 82"] = {i: p for i, p in arms[arm].items() if i in on82}
     for name in ("qwen3-vl-8b", "qwen3.6-27b"):
         arms[f"{name} tagging reply, ABBYY (82)"] = {i: p for i, p in old[name].items() if p is not None}
     s = {"docs": len(rs), "prompt_equals_app": same, "answered": {k: len(v) for k, v in metas.items()},
@@ -228,8 +230,8 @@ def cmd_report(a):
     for arm, pr in arms.items():
         s["scores"][arm] = {k: EO.scores(pr, T[k]) for k in TRUTHS}
     names = list(arms)
-    mac = next((x for x in names if x.startswith("qwen3-vl-8b MLX")), None)
-    clu = next((x for x in names if x.startswith("qwen3.6-27b tagging, Vision")), None)
+    mac = next((x for x in names if x.startswith("qwen3-vl-8b MLX") and not x.endswith("on the 82")), None)
+    clu = next((x for x in names if x.startswith("qwen3.6-27b tagging, Vision") and not x.endswith("on the 82")), None)
     pairs = []
     if mac:
         pairs += [("8B: Vision, shipped prompt vs ABBYY, old prompt (82)", "qwen3-vl-8b tagging reply, ABBYY (82)", mac),
@@ -290,8 +292,8 @@ def render(s):
         L.append(f"| {arm} | {o['n']} | {cell(b)} | {cell(o)} | {o['sending_place']['filled_when_empty']} |")
     L += ["", "## Paired differences", "",
           "b minus a in ed2 F1 over the documents both answered, with a document bootstrap's 95% interval; a gap whose "
-          "interval spans zero is a tie. The rerun floor of the Gemini arm is in ent-prompt-app.md; a local model at "
-          "temperature 0 repeats its reply, so its own floor is 0.", "",
+          "interval spans zero is a tie. The rerun floor of the Gemini arm is in ent-prompt-app.md; the local models' "
+          "floor is not measured.", "",
           "| comparison (a → b) | truth | n | sender | recipient | place | place by city |", "|---|---|---|---|---|---|---|"]
     for what, p in s["paired"].items():
         for k in TRUTHS:
@@ -313,17 +315,19 @@ def render(s):
                   f"{t.get('median_s', '–')} s a request in flight; finish {t['finish']}. Concurrent requests share the "
                   "GPU, so this is not a Mac's seconds a document.", ""]
     L += ["## Measurement card", "",
-          "- **Truth**: W46.fix-ent-truth's 138 correspondence documents (drafted by Claude Sonnet 5 and GPT 5.6 Luna "
-          "readers, neither a scored family), with the owner's answers and the written-place rule "
-          "(ent-truth-owner.md); scored also against the truth as built.",
-          "- **Selection**: the 138 are the correspondence of ent-truth's set, chosen before any route here ran; no "
-          "tested route or ABBYY text chose them.",
-          "- **Comparison**: one prompt, built by one function, for every Vision arm; temperature 0; the local "
-          f"models capped at {MAX_TOKENS} tokens and Gemini at 8,192 (no reply reached either cap unless counted "
-          "above). The ABBYY rows are the old prompt on the old text, shown as the rows these replace, not as a "
-          "like-for-like arm.",
-          "- **Noise**: n as given; paired bootstrap intervals; the Gemini rerun floor is ent-prompt-app.md's; a gap "
-          "inside its interval is a tie.",
+          "- **Truth**: W46.fix-ent-truth's 138 correspondence documents (model truth: GPT 5.6 Luna and Claude Sonnet 5 "
+          "drafts, Sonnet rulings; no Gemini or Qwen drafted or ruled), with the owner's answers on the fields his two "
+          "sheets asked and the written-place rule (ent-truth-owner.md); scored also against the truth as built.",
+          "- **Selection**: as W46.ent-score-paid: 82 correspondence documents of W41's date-tagging sample plus 56 "
+          "chosen by ABBYY text cues, so 56 of the 138 were chosen by the ABBYY text (owner, 2026-10-30); none by a "
+          "route tested here. The ABBYY-reply rows exist for the 82 only, so the like-for-like rows are \"on the 82\".",
+          "- **Comparison**: one prompt, built by one function, for every Vision arm, with the same text and context; "
+          f"temperature 0; the local models capped at {MAX_TOKENS} tokens (finish counts above) and Gemini at 8,192. "
+          "The ABBYY rows are the old prompt on the ABBYY text layer, shown as the rows these replace, not as a "
+          "like-for-like arm: prompt and text both differ.",
+          "- **Noise**: n as given; paired bootstrap intervals over the documents both arms answered. The Gemini rerun "
+          "floor is ent-prompt-app.md's; the local models' rerun floor is not measured (greedy decoding at "
+          "temperature 0). A gap whose interval spans zero is a tie.",
           "- **Scope**: correspondence only; text only (the 8B's own reading of the page image is ent-robust.md's "
           "route); one Mac (18 GB), so a 27B on a 32 GB Mac stays unmeasured; the 27B's cluster seconds are "
           "throughput under concurrency, not a per-document time on any Mac.", ""]

@@ -1,0 +1,708 @@
+{
+ "docs": 138,
+ "prompt_equals_app": 138,
+ "answered": {
+  "tagging-qwen3-vl-8b-mlx4": 138
+ },
+ "unparsed": {
+  "tagging-qwen3-vl-8b-mlx4": 0
+ },
+ "scores": {
+  "gemini-3.7 tagging, Vision (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.84,
+     "recall": 0.6086956521739131,
+     "f1": 0.7058823529411766,
+     "tp": 84,
+     "fp": 16,
+     "fn": 54,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 4,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.875,
+     "recall": 0.6069364161849711,
+     "f1": 0.7167235494880546,
+     "tp": 105,
+     "fp": 15,
+     "fn": 68,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.5974025974025974,
+     "recall": 0.6388888888888888,
+     "f1": 0.6174496644295301,
+     "tp": 46,
+     "fp": 31,
+     "fn": 26,
+     "wrong_when_filled_docs": 31,
+     "filled_when_empty": 1,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 64,
+     "fp": 7,
+     "fn": 8,
+     "f1": 0.8951048951048951,
+     "precision": 0.9014084507042254
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.83,
+     "recall": 0.6148148148148148,
+     "f1": 0.7063829787234042,
+     "tp": 83,
+     "fp": 17,
+     "fn": 52,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 4,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.8739495798319328,
+     "recall": 0.6081871345029239,
+     "f1": 0.7172413793103448,
+     "tp": 104,
+     "fp": 15,
+     "fn": 67,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.5925925925925926,
+     "recall": 0.6666666666666666,
+     "f1": 0.627450980392157,
+     "tp": 48,
+     "fp": 33,
+     "fn": 24,
+     "wrong_when_filled_docs": 33,
+     "filled_when_empty": 13,
+     "truth_nonempty": 72,
+     "docs": 138
+    },
+    "city": {
+     "tp": 63,
+     "fp": 18,
+     "fn": 9,
+     "f1": 0.8235294117647058,
+     "precision": 0.7777777777777778
+    },
+    "n": 138
+   }
+  },
+  "qwen3-vl-8b MLX 4-bit tagging, Vision (138)": {
+   "built": {
+    "sender": {
+     "precision": 0.7128712871287128,
+     "recall": 0.5217391304347826,
+     "f1": 0.602510460251046,
+     "tp": 72,
+     "fp": 29,
+     "fn": 66,
+     "wrong_when_filled_docs": 29,
+     "filled_when_empty": 1,
+     "truth_nonempty": 129,
+     "docs": 138
+    },
+    "recipient": {
+     "precision": 0.7416666666666667,
+     "recall": 0.5144508670520231,
+     "f1": 0.6075085324232082,
+     "tp": 89,
+     "fp": 31,
+     "fn": 84,
+     "wrong_when_filled_docs": 31,
+     "filled_when_empty": 1,
+     "truth_nonempty": 132,
+     "docs": 138
+    },
+    "sending_place": {
+     "precision": 0.49382716049382713,
+     "recall": 0.5555555555555556,
+     "f1": 0.5228758169934641,
+     "tp": 40,
+     "fp": 41,
+     "fn": 32,
+     "wrong_when_filled_docs": 41,
+     "filled_when_empty": 10,
+     "truth_nonempty": 104,
+     "docs": 138
+    },
+    "city": {
+     "tp": 53,
+     "fp": 24,
+     "fn": 19,
+     "f1": 0.7114093959731543,
+     "precision": 0.6883116883116883
+    },
+    "n": 138
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.7029702970297029,
+     "recall": 0.5259259259259259,
+     "f1": 0.6016949152542372,
+     "tp": 71,
+     "fp": 30,
+     "fn": 64,
+     "wrong_when_filled_docs": 30,
+     "filled_when_empty": 1,
+     "truth_nonempty": 127,
+     "docs": 136
+    },
+    "recipient": {
+     "precision": 0.7394957983193278,
+     "recall": 0.5146198830409356,
+     "f1": 0.6068965517241379,
+     "tp": 88,
+     "fp": 31,
+     "fn": 83,
+     "wrong_when_filled_docs": 31,
+     "filled_when_empty": 1,
+     "truth_nonempty": 130,
+     "docs": 137
+    },
+    "sending_place": {
+     "precision": 0.5,
+     "recall": 0.5972222222222222,
+     "f1": 0.5443037974683543,
+     "tp": 43,
+     "fp": 43,
+     "fn": 29,
+     "wrong_when_filled_docs": 43,
+     "filled_when_empty": 23,
+     "truth_nonempty": 72,
+     "docs": 138
+    },
+    "city": {
+     "tp": 54,
+     "fp": 32,
+     "fn": 18,
+     "f1": 0.6835443037974683,
+     "precision": 0.627906976744186
+    },
+    "n": 138
+   }
+  },
+  "gemini-3.7 tagging, Vision on the 82": {
+   "built": {
+    "sender": {
+     "precision": 0.8703703703703703,
+     "recall": 0.618421052631579,
+     "f1": 0.723076923076923,
+     "tp": 47,
+     "fp": 7,
+     "fn": 29,
+     "wrong_when_filled_docs": 7,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.8636363636363636,
+     "recall": 0.5089285714285714,
+     "f1": 0.6404494382022472,
+     "tp": 57,
+     "fp": 9,
+     "fn": 55,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 1,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.5714285714285714,
+     "recall": 0.6153846153846154,
+     "f1": 0.5925925925925927,
+     "tp": 24,
+     "fp": 18,
+     "fn": 15,
+     "wrong_when_filled_docs": 18,
+     "filled_when_empty": 1,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 35,
+     "fp": 4,
+     "fn": 4,
+     "f1": 0.8974358974358975,
+     "precision": 0.8974358974358975
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.8518518518518519,
+     "recall": 0.6301369863013698,
+     "f1": 0.7244094488188976,
+     "tp": 46,
+     "fp": 8,
+     "fn": 27,
+     "wrong_when_filled_docs": 8,
+     "filled_when_empty": 2,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.8636363636363636,
+     "recall": 0.5089285714285714,
+     "f1": 0.6404494382022472,
+     "tp": 57,
+     "fp": 9,
+     "fn": 55,
+     "wrong_when_filled_docs": 9,
+     "filled_when_empty": 1,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.5681818181818182,
+     "recall": 0.6578947368421053,
+     "f1": 0.6097560975609756,
+     "tp": 25,
+     "fp": 19,
+     "fn": 13,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 8,
+     "truth_nonempty": 38,
+     "docs": 82
+    },
+    "city": {
+     "tp": 34,
+     "fp": 10,
+     "fn": 4,
+     "f1": 0.8292682926829268,
+     "precision": 0.7727272727272727
+    },
+    "n": 82
+   }
+  },
+  "qwen3-vl-8b MLX 4-bit tagging, Vision on the 82": {
+   "built": {
+    "sender": {
+     "precision": 0.7413793103448276,
+     "recall": 0.5657894736842105,
+     "f1": 0.6417910447761195,
+     "tp": 43,
+     "fp": 15,
+     "fn": 33,
+     "wrong_when_filled_docs": 15,
+     "filled_when_empty": 0,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 1,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.4523809523809524,
+     "recall": 0.48717948717948717,
+     "f1": 0.4691358024691358,
+     "tp": 19,
+     "fp": 23,
+     "fn": 20,
+     "wrong_when_filled_docs": 23,
+     "filled_when_empty": 6,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 27,
+     "fp": 13,
+     "fn": 12,
+     "f1": 0.6835443037974683,
+     "precision": 0.675
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.7241379310344828,
+     "recall": 0.5753424657534246,
+     "f1": 0.6412213740458015,
+     "tp": 42,
+     "fp": 16,
+     "fn": 31,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 0,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 1,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.4666666666666667,
+     "recall": 0.5526315789473685,
+     "f1": 0.5060240963855421,
+     "tp": 21,
+     "fp": 24,
+     "fn": 17,
+     "wrong_when_filled_docs": 24,
+     "filled_when_empty": 13,
+     "truth_nonempty": 38,
+     "docs": 82
+    },
+    "city": {
+     "tp": 27,
+     "fp": 18,
+     "fn": 11,
+     "f1": 0.6506024096385542,
+     "precision": 0.6
+    },
+    "n": 82
+   }
+  },
+  "qwen3-vl-8b tagging reply, ABBYY (82)": {
+   "built": {
+    "sender": {
+     "precision": 0.6923076923076923,
+     "recall": 0.47368421052631576,
+     "f1": 0.5625,
+     "tp": 36,
+     "fp": 16,
+     "fn": 40,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.42857142857142855,
+     "recall": 0.46153846153846156,
+     "f1": 0.4444444444444445,
+     "tp": 18,
+     "fp": 24,
+     "fn": 21,
+     "wrong_when_filled_docs": 24,
+     "filled_when_empty": 3,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 28,
+     "fp": 11,
+     "fn": 11,
+     "f1": 0.717948717948718,
+     "precision": 0.717948717948718
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.6923076923076923,
+     "recall": 0.4931506849315068,
+     "f1": 0.576,
+     "tp": 36,
+     "fp": 16,
+     "fn": 37,
+     "wrong_when_filled_docs": 16,
+     "filled_when_empty": 1,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7246376811594203,
+     "recall": 0.44642857142857145,
+     "f1": 0.5524861878453039,
+     "tp": 50,
+     "fp": 19,
+     "fn": 62,
+     "wrong_when_filled_docs": 19,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.4222222222222222,
+     "recall": 0.5,
+     "f1": 0.4578313253012048,
+     "tp": 19,
+     "fp": 26,
+     "fn": 19,
+     "wrong_when_filled_docs": 26,
+     "filled_when_empty": 14,
+     "truth_nonempty": 38,
+     "docs": 82
+    },
+    "city": {
+     "tp": 27,
+     "fp": 18,
+     "fn": 11,
+     "f1": 0.6506024096385542,
+     "precision": 0.6
+    },
+    "n": 82
+   }
+  },
+  "qwen3.6-27b tagging reply, ABBYY (82)": {
+   "built": {
+    "sender": {
+     "precision": 0.76,
+     "recall": 0.5,
+     "f1": 0.6031746031746031,
+     "tp": 38,
+     "fp": 12,
+     "fn": 38,
+     "wrong_when_filled_docs": 12,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "recipient": {
+     "precision": 0.7605633802816901,
+     "recall": 0.48214285714285715,
+     "f1": 0.5901639344262295,
+     "tp": 54,
+     "fp": 17,
+     "fn": 58,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.43137254901960786,
+     "recall": 0.5641025641025641,
+     "f1": 0.48888888888888893,
+     "tp": 22,
+     "fp": 29,
+     "fn": 17,
+     "wrong_when_filled_docs": 29,
+     "filled_when_empty": 3,
+     "truth_nonempty": 58,
+     "docs": 82
+    },
+    "city": {
+     "tp": 31,
+     "fp": 19,
+     "fn": 8,
+     "f1": 0.6966292134831461,
+     "precision": 0.62
+    },
+    "n": 82
+   },
+   "owner+rule": {
+    "sender": {
+     "precision": 0.76,
+     "recall": 0.5205479452054794,
+     "f1": 0.6178861788617885,
+     "tp": 38,
+     "fp": 12,
+     "fn": 35,
+     "wrong_when_filled_docs": 12,
+     "filled_when_empty": 2,
+     "truth_nonempty": 75,
+     "docs": 80
+    },
+    "recipient": {
+     "precision": 0.7605633802816901,
+     "recall": 0.48214285714285715,
+     "f1": 0.5901639344262295,
+     "tp": 54,
+     "fp": 17,
+     "fn": 58,
+     "wrong_when_filled_docs": 17,
+     "filled_when_empty": 2,
+     "truth_nonempty": 77,
+     "docs": 82
+    },
+    "sending_place": {
+     "precision": 0.46153846153846156,
+     "recall": 0.631578947368421,
+     "f1": 0.5333333333333333,
+     "tp": 24,
+     "fp": 28,
+     "fn": 14,
+     "wrong_when_filled_docs": 28,
+     "filled_when_empty": 17,
+     "truth_nonempty": 38,
+     "docs": 82
+    },
+    "city": {
+     "tp": 30,
+     "fp": 22,
+     "fn": 8,
+     "f1": 0.6666666666666666,
+     "precision": 0.5769230769230769
+    },
+    "n": 82
+   }
+  }
+ },
+ "paired": {
+  "8B: Vision, shipped prompt vs ABBYY, old prompt (82)": {
+   "a": "qwen3-vl-8b tagging reply, ABBYY (82)",
+   "b": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)",
+   "built": {
+    "sender": {
+     "n": 82,
+     "diff": 0.07929104477611937,
+     "lo": -0.032762096774193505,
+     "hi": 0.18097188605473835
+    },
+    "recipient": {
+     "n": 82,
+     "diff": 0.0,
+     "lo": -0.06756756756756754,
+     "hi": 0.06469932055572458
+    },
+    "sending_place": {
+     "n": 82,
+     "diff": 0.024691358024691357,
+     "lo": -0.07484407484407485,
+     "hi": 0.12683823529411764
+    },
+    "city": {
+     "n": 82,
+     "diff": -0.03440441415124962,
+     "lo": -0.13489409141583053,
+     "hi": 0.06153846153846154
+    }
+   },
+   "owner+rule": {
+    "sender": {
+     "n": 82,
+     "diff": 0.06522137404580153,
+     "lo": -0.037869704236610735,
+     "hi": 0.16666666666666663
+    },
+    "recipient": {
+     "n": 82,
+     "diff": 0.0,
+     "lo": -0.06756756756756754,
+     "hi": 0.06469932055572458
+    },
+    "sending_place": {
+     "n": 82,
+     "diff": 0.04819277108433734,
+     "lo": -0.038796646391583145,
+     "hi": 0.14245014245014243
+    },
+    "city": {
+     "n": 82,
+     "diff": 0.0,
+     "lo": -0.0903369122547204,
+     "hi": 0.08918128654970758
+    }
+   }
+  },
+  "8B on the Mac vs Gemini 3.7, both Vision": {
+   "a": "gemini-3.7 tagging, Vision (138)",
+   "b": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)",
+   "built": {
+    "sender": {
+     "n": 138,
+     "diff": -0.10337189269013047,
+     "lo": -0.1704420793317808,
+     "hi": -0.0444444444444444
+    },
+    "recipient": {
+     "n": 138,
+     "diff": -0.10921501706484638,
+     "lo": -0.19062144430726025,
+     "hi": -0.029728526924788667
+    },
+    "sending_place": {
+     "n": 138,
+     "diff": -0.09457384743606612,
+     "lo": -0.19442222577720897,
+     "hi": 0.004040404040404011
+    },
+    "city": {
+     "n": 138,
+     "diff": -0.18369549913174077,
+     "lo": -0.27288794627076707,
+     "hi": -0.09725696730305022
+    }
+   },
+   "owner+rule": {
+    "sender": {
+     "n": 138,
+     "diff": -0.10468806346916704,
+     "lo": -0.17271030913952645,
+     "hi": -0.04488273344180327
+    },
+    "recipient": {
+     "n": 138,
+     "diff": -0.1103448275862069,
+     "lo": -0.19229936189000507,
+     "hi": -0.029995162070633796
+    },
+    "sending_place": {
+     "n": 138,
+     "diff": -0.08314718292380241,
+     "lo": -0.17600674678473532,
+     "hi": 0.016292524878500303
+    },
+    "city": {
+     "n": 138,
+     "diff": -0.1399851079672375,
+     "lo": -0.2235872235872236,
+     "hi": -0.05559038662486937
+    }
+   }
+  }
+ },
+ "time": {
+  "tagging-qwen3-vl-8b-mlx4": {
+   "n": 138,
+   "finish": {
+    "stop": 138
+   },
+   "median_s": 7.76,
+   "p90_s": 8.66,
+   "max_s": 10.41,
+   "total_s": 1059.1,
+   "mlx_peak_gb_max": 6.38,
+   "mlx_peak_gb_median": 6.26,
+   "load_s": 2.4,
+   "prompt_tokens_median": 1359.5,
+   "completion_tokens_median": 112.0,
+   "footprint_gb": 6.98
+  }
+ }
+}

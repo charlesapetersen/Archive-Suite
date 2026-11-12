@@ -13,7 +13,8 @@ an input to dating and segmentation. The user chooses which route extracts the f
 ## 2. Is there a choice?
 
 Yes. The shipped cloud call reaches sender 0.73, recipient 0.82 and place 0.72 (`ent-place-rule.md`); the best Mac model
-0.58, 0.55 and 0.46 (`ent-truth-owner.md`, on ABBYY text) [M]. Inside the API family the shipped tagging call and the
+0.60, 0.61 and 0.54 (`ent-local-shipped.md`, the shipped prompt on Vision text, n 138; 0.58, 0.55 and 0.46 on ABBYY
+text before) [M]. Inside the API family the shipped tagging call and the
 dedicated prompt at the same length tie on every field once both carry the place rule [M, `ent-place-rule.md`]; the
 8,000-character dedicated prompt was not paired with the shipped call (0.76 against 0.73 on the sender, unpaired), so
 the real choice is family, not prompt [I].
@@ -47,10 +48,11 @@ pages."
   text (rule c), and with the `none` route. When it runs (owner call 11): on a cloud route names are extracted always,
   since they come with the call at no cost, and shown when the collection interview ranks names; on the Mac the local
   extractor runs only when names are ranked, on typed and printed correspondence.
-- **The provisional picks.** The Mac pick (`qwen3-vl-8b-mac`, sender 0.58) and the cluster pick (`qwen3.6-27b`, 0.62)
-  rest on replies made from ABBYY text (`ent-truth-owner.md`, routes "tagging reply, ABBYY (82)"), and the app never
-  has ABBYY text (owner, 2026-10-30). They are provisional until `W46.ent-local-shipped-prompt` (item 4) scores both on
-  Vision text with the shipped prompt; the solver shows them labelled so.
+- **The provisional pick.** The Mac pick (`qwen3-vl-8b-mac`) is scored on the shipped prompt over Vision text
+  (`ent-local-shipped.md`: sender 0.60, recipient 0.61, place 0.54, n 138; on the 82, a tie with its old ABBYY-reply
+  row on every field). The cluster pick (`qwen3.6-27b`, 0.62) still rests on replies made from ABBYY text
+  (`ent-truth-owner.md`, "tagging reply, ABBYY (82)"), which the app never has (owner, 2026-10-30); it is provisional
+  until `W46.ent-local-shipped-prompt` (item 4) collects its Sherlock pack, and the solver shows it labelled so.
 - **The prompt the figures belong to** (owner call 10). The person-only sender rule and the heading-or-address place
   rule (4cdbba41, 4374254d) move to the entity feature's own prompt, and the tagging prompt is reverted to its
   pre-November name behaviour. The `gemini-tagging-place` figures were measured with both rules in the tagging prompt,
@@ -139,15 +141,17 @@ The stage header above is kept apart from the route rows, which follow as a list
   "app_route": null, "status": "measured",
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 16, "gpus": 0},
   "figures": {
-   "sender": {"value": 0.58, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3-vl-8b tagging reply, ABBYY (82)", "attribute": "sender built -> owner", "value": "0.56 -> 0.58"}},
-   "recipient": {"value": 0.55, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3-vl-8b tagging reply, ABBYY (82)", "attribute": "recipient", "value": "0.55 -> 0.55"}},
-   "sending_place": {"value": 0.46, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3-vl-8b tagging reply, ABBYY (82)", "attribute": "owner+rule F1", "value": "0.46"}},
-   "place_city": {"value": 0.65, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3-vl-8b tagging reply, ABBYY (82)", "attribute": "owner+rule city", "value": "0.65"}},
+   "sender": {"value": 0.60, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)", "attribute": "owner+rule sender", "value": "0.60"}},
+   "recipient": {"value": 0.61, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)", "attribute": "owner+rule recipient", "value": "0.61"}},
+   "sending_place": {"value": 0.54, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)", "attribute": "owner+rule place", "value": "0.54"}},
+   "place_city": {"value": 0.68, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3-vl-8b MLX 4-bit tagging, Vision (138)", "attribute": "owner+rule city", "value": "0.68"}},
    "handwritten_or_mixed": {"value": 0.485, "n": 22, "truth": "ent-built", "source": {"file": "ent-score.md", "route": "qwen3-vl-8b", "attribute": "handwritten or mixed hand, sender / recipient / place", "value": "0.485 / 0.727 / 0.385"}}},
   "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": {"file": "settings-design/build_figures.py", "route": "qwen8b-mac", "attribute": "usd_1000", "value": "0.0"}},
-  "time": {"per_unit_s": 8.0, "measured": false, "measured_on": "estimate", "source": {"file": "settings-design/build_figures.py", "route": "qwen8b-mac", "attribute": "s_doc", "value": "8.0 [?]"}},
-  "memory": {"peak_gb": 7.6, "measured_on": "M3 Pro 18 GB, reading page images, not a text-only entity call", "source": {"file": "ocr-mac-local.md", "route": "Qwen3-VL 8B 4-bit", "attribute": "MLX peak", "value": "7.6 GB"}},
-  "caveats": ["old tagging prompt on ABBYY text; shipped prompt and Vision text unscored on this model; a pick on these figures is provisional until W46.ent-local-shipped-prompt",
+  "time": {"per_unit_s": 7.76, "measured": true, "load_s": 2.4, "measured_on": "M3 Pro 18 GB, text-only entity call, median of the 138 documents, load apart", "source": {"file": "ent-local-shipped.md", "route": "Qwen3-VL 8B MLX 4-bit", "attribute": "median s a document", "value": "7.76"}},
+  "memory": {"peak_gb": 6.38, "whole_process_gb": 6.98, "measured_on": "M3 Pro 18 GB, text-only entity call (/usr/bin/time -l peak footprint)", "source": {"file": "ent-local-shipped.md", "route": "Qwen3-VL 8B MLX 4-bit", "attribute": "MLX peak / whole-process peak footprint", "value": "6.38 / 6.98"}},
+  "caveats": ["shipped tagging prompt on Vision text, 138 documents (ent-local-shipped.md); against Gemini 3.7 on the same input: sender -0.105 (-0.173 to -0.045), recipient -0.110, place a tie",
+   "on the 82 the old prompt on ABBYY text also scored, a tie on every field (sender +0.065, -0.038 to +0.167)",
+   "handwritten_or_mixed is the old ABBYY reply's (ent-score.md)",
    "on Vision text: typed and printed pages only, never the sender, never handwritten (ent-robust.md)"],
   "kind_rules": ["handwritten: only on the 8B's own reading, with the quote check (ent-robust.md: 0.79)", "handwritten via Vision text: do not show"],
   "fallback": "none", "conditions": []},
@@ -298,7 +302,7 @@ keys are field names (`sender`, `recipient`, `sending_place`, `place_city`) and 
 5. **The Mac routes' standing.** Names survive Vision text on typed pages and not on hands: the 27B extractor keeps
    0.88 of its names on typed and 0.85 on printed Vision pages, 0.52 on handwritten; through Vision 8 of 17 senders
    match (`ent-robust.md`, consistency, 26.6 text). The Mac LLM's accuracy is 0.58 / 0.55 / 0.46 for the 8B
-   (`ent-truth-owner.md`, ABBYY text). Options: offer the 8B on typed and printed pages with the evidence rule and
+   (`ent-truth-owner.md`, ABBYY text; since restated as 0.60 / 0.61 / 0.54 on Vision text, `ent-local-shipped.md`). Options: offer the 8B on typed and printed pages with the evidence rule and
    no Vision sender (the ent-robust rule); offer nothing on the Mac; offer it everywhere marked low confidence. Also
    whether a floor applies (the 4B at 0.51 sender, wrong more often than empty). Recommendation: the ent-robust rule
    as written, the 4B not offered [I]. Decided as recommended (owner call 11; section 2).
@@ -336,8 +340,8 @@ on 35,563 gaps, G-entities) belongs to `07-segmentation.md`.
 
 Kinds: T typed or printed correspondence, H handwritten correspondence, N non-correspondence (always `none`).
 
-- **1. Laptop, open weights, 16 GB.** Only when names are ranked (owner call 11). T: `qwen3-vl-8b-mac` (sender 0.58,
-  on ABBYY-input figures, provisional until item 4; the only Mac row above the 4B), Vision text, sender hidden. H: `qwen3-vl-8b-mac` only if the 8B also reads the page, with the quote check; on Vision text,
+- **1. Laptop, open weights, 16 GB.** Only when names are ranked (owner call 11). T: `qwen3-vl-8b-mac` (sender 0.60
+  on Vision text; the only Mac row above the 4B), Vision text, sender hidden. H: `qwen3-vl-8b-mac` only if the 8B also reads the page, with the quote check; on Vision text,
   `none` (rule `ent-vision-hands`). N: `none`.
 - **1. 32 GB and 64 GB.** Same as 16 GB until item 4 measures the 27B on the Mac [I].
 - **1. 8 GB** (not a plan tier, a solver edge): `none`, since `qwen3.5-4b-mac` is conditioned off.
