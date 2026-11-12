@@ -75,6 +75,10 @@ struct RunHistorySnapshot {
     /// call each, so they are priced apart from the image subset (never at batch rates).
     var pdfFileCount: Int = 0
     var pdfPageCount: Int = 0
+    /// The settings run id and the output folder, for the money ledger's line (W46.settings-ledger); nil on a resume
+    /// of a run that predates the frozen settings.
+    var ledgerRunID: UUID? = nil
+    var outputDirectory: URL? = nil
 
     /// Cost of this run using the exact same per-model math the pre-run estimator uses: the image subset
     /// at the standard or batch total picked by `batchMode`, plus any direct PDF pages at standard.
@@ -194,7 +198,9 @@ extension RunHistorySnapshot {
             rotationMode: rotationMode,
             fileCount: run.fileURLs.count + (run.mixedPDFOutcomes?.count ?? 0),
             pdfFileCount: run.mixedPDFOutcomes?.count ?? 0,
-            pdfPageCount: Self.directPDFPageCount(run.mixedPDFOutcomes?.map(\.sourceURL) ?? [])
+            pdfPageCount: Self.directPDFPageCount(run.mixedPDFOutcomes?.map(\.sourceURL) ?? []),
+            ledgerRunID: run.resolvedSettings?.runID,
+            outputDirectory: run.outputDirectory
         )
     }
 
@@ -223,7 +229,9 @@ extension RunHistorySnapshot {
             rotationMode: rotationMode,
             fileCount: batch.fileURLs.count + (batch.mixedPDFOutcomes?.count ?? 0),
             pdfFileCount: batch.mixedPDFOutcomes?.count ?? 0,
-            pdfPageCount: Self.directPDFPageCount(batch.mixedPDFOutcomes?.map(\.sourceURL) ?? [])
+            pdfPageCount: Self.directPDFPageCount(batch.mixedPDFOutcomes?.map(\.sourceURL) ?? []),
+            ledgerRunID: batch.resolvedSettings?.runID,
+            outputDirectory: batch.outputDirectory
         )
     }
 }

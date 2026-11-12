@@ -47,6 +47,7 @@ enum SettingsLayersTestDriver {
         documentWrites(root)
         freezing(root)
         generalStore(root)
+        ledger(root)
         processingCapture()
         finish()
     }
@@ -518,6 +519,74 @@ enum SettingsLayersTestDriver {
         let saved = c.setGeneral(.hours, .double(3), source: .setByUser(day))
         check("an unreadable general file is never written over",
               !saved && c.lastProblem != nil
+              && (try? Data(contentsOf: odd.appendingPathComponent("settings-general.json"))) == future)
+    }
+
+    // MARK: The money ledger (W46.settings-ledger)
+
+    private static func ledger(_ root: URL) {
+        let dir = folder(root, "ledger-store")
+        let out = folder(root, "ledger-output")
+        let store = SettingsLayerStore(directory: dir)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        let lastMonth = day.addingTimeInterval(-20 * 86_400)   // 2026-10-15
+        let old = day.addingTimeInterval(-500 * 86_400)
+
+        check("a free batch writes no ledger line",
+              !store.recordSpend(usd: 0, runID: UUID(), outputDirectory: out, files: 3, now: day) && store.file.ledger.isEmpty)
+        check("a batch's cost that is not a number writes nothing",
+              !store.recordSpend(usd: .nan, runID: UUID(), outputDirectory: out, files: 3, now: day))
+
+        // A batch whose collection has a settings document: the line carries its id and name.
+        let doc = store.updateCollection(in: out) { $0.collection.name = "Box 12" }
+        let run1 = UUID()
+        check("a paid batch writes a line", store.recordSpend(usd: 1.5, runID: run1, outputDirectory: out, files: 40, now: day))
+        let line = store.file.ledger.last
+        check("the line names the batch's collection and its run",
+              line?.collectionID == doc?.collection.id && doc != nil && line?.collectionName == "Box 12"
+              && line?.runID == run1 && line?.files == 40 && line?.date == day)
+        check("the same run is never counted twice",
+              !store.recordSpend(usd: 1.5, runID: run1, outputDirectory: out, files: 40, now: day) && store.file.ledger.count == 1)
+        let bare = folder(root, "ledger-bare")
+        store.recordSpend(usd: 0.25, runID: UUID(), outputDirectory: bare, files: 2, now: day.addingTimeInterval(60))
+        eq("a folder with no settings document is named by the folder", store.file.ledger.last?.collectionName, "ledger-bare")
+        store.appendLedger(SettingsLedgerEntry(date: lastMonth, usd: 9, collectionID: nil, runID: nil))
+        store.appendLedger(SettingsLedgerEntry(date: old, usd: 4, collectionID: nil, runID: nil))
+
+        let month = store.monthSpend(now: day, calendar: cal)
+        eq("the month counts only its own batches", month.usd, 1.75)
+        eq("the month's batches, newest first", month.entries.map(\.usd), [0.25, 1.5])
+        eq("the month in words", month.summary, "$1.75 by 2 batches")
+        eq("the month before is its own", store.monthSpend(now: lastMonth, calendar: cal).usd, 9)
+        eq("an empty month", SettingsMonthSpend().summary, "nothing yet")
+        eq("an empty month against its limit", SettingsMonthSpend().summary(of: 20), "$0.00 of $20.00, no batches yet")
+        eq("the month against its limit", month.summary(of: 20), "$1.75 of $20.00, from 2 batches")
+        eq("spentThisMonthUSD is the month's total", store.spentThisMonthUSD(now: day, calendar: cal), 1.75)
+
+        store.recordSpend(usd: 2, runID: UUID(), outputDirectory: nil, files: 5, now: day.addingTimeInterval(120))
+        check("a line older than the keeping time is dropped when a batch is recorded",
+              !store.file.ledger.contains { $0.date == old } && store.file.ledger.contains { $0.date == lastMonth })
+        eq("a batch with no output folder is still counted", store.file.ledger.last?.collectionName, nil as String?)
+        let back = SettingsLayerStore(directory: dir)
+        eq("the ledger persists in the app's store", back.file.ledger, store.file.ledger)
+
+        // What the solver reads: the remainder of the month, through the resolver.
+        var general = SettingsLayer(kind: .general, name: "General")
+        general.set(.moneyHabit, .string(MoneyHabit.perMonth.rawValue), source: .setByUser(day))
+        general.set(.monthCeilingUSD, .double(5), source: .setByUser(day))
+        let spent = back.spentThisMonthUSD(now: day, calendar: cal)
+        eq("the solver's ceiling is what the ledger leaves of the month",
+           SettingsResolver(general: general).answers(pages: 10, spentThisMonthUSD: spent).ceilingUSD, 1.25)
+
+        // A store that cannot write keeps the line in memory, so the session's next batch still counts it.
+        let odd = folder(root, "ledger-newer")
+        let future = Data(#"{"schemaVersion": 9}"#.utf8)
+        try? future.write(to: odd.appendingPathComponent("settings-general.json"))
+        let ro = SettingsLayerStore(directory: odd)
+        let wrote = ro.recordSpend(usd: 3, runID: UUID(), outputDirectory: nil, files: 1, now: day)
+        check("a read-only store counts the batch in memory and writes nothing",
+              !wrote && ro.spentThisMonthUSD(now: day, calendar: cal) == 3
               && (try? Data(contentsOf: odd.appendingPathComponent("settings-general.json"))) == future)
     }
 

@@ -60,7 +60,7 @@ struct SettingsSheetView: View {
             provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table)
         return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
                                   macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
-                                  spentThisMonthUSD: store.spentThisMonthUSD(), running: running)
+                                  month: store.monthSpend(), running: running)
     }
 
     var body: some View {

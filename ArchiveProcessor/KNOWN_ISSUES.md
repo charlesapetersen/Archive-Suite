@@ -30,6 +30,14 @@ record on the job the colour it was tagged with.
 - **A Live Capture session's layers resolve at Finalize.** The session cannot know its collection folders before
   then, so each folder's record uses that folder's layers as they are at Finalize. The processing settings are the
   ones the session took when it started.
+- **The month's ledger counts finished Process Files batches only (W46.settings-ledger, 2026-11-12).** Each line
+  is the list-price estimate the processing history shows, not a billed figure, dated when the batch finished (the
+  history dates it when it started). These spend money and write no line, so a monthly limit can be passed by what
+  they spent (`W46.settings-ledger-more`): a run stopped and never resumed, a stop before segmentation
+  (`stopRunAfterWindowStage`), a mixed run whose PDF half was read and whose image half then failed a safety check,
+  a batch-API job left to finish at the provider, and a Live Capture session. A resumed run counts once, its whole
+  estimate, when it finishes. The limit itself shapes only the settings sheet's choices: Process Files does not yet
+  stop a batch at it (it runs the app's processing settings, above).
 - **The guarded writer checks, then writes.** A local process that swaps `.archivesuite` for a link between the
   check and the write could redirect one write (`SPEC/collection-settings.md`). Accepted: it needs a hostile local
   process.

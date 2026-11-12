@@ -866,12 +866,16 @@ extension OCRProcessor {
     /// provider/model + file counts), then clear the in-memory snapshot so it can't be double-logged.
     /// A no-op when no snapshot was captured (e.g. a cancelled run cleared it, or an unexpected path).
     /// Called only from genuine success tails, never on cancel/interruption.
+    /// The same cost goes into the settings ledger (W46.settings-ledger), which a per-month ceiling is read against.
     func recordRunHistory(succeeded: Int) {
         guard let snapshot = activeRunHistory else { return }
-        ProcessingHistoryStore.shared.record(snapshot.makeRun(
+        let run = snapshot.makeRun(
             succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader },
             pageReaders: jobs.compactMap { $0.result?.pageReader },
-            rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count))
+            rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count)
+        ProcessingHistoryStore.shared.record(run)
+        SettingsLayerStore.shared.recordSpend(usd: run.cost, runID: snapshot.ledgerRunID,
+                                              outputDirectory: snapshot.outputDirectory, files: run.fileCount)
         activeRunHistory = nil
     }
 
@@ -2948,6 +2952,8 @@ extension OCRProcessor {
         let frozen = SettingsLayerStore.shared.snapshot(
             outputDirectory: outputDirectory, runID: UUID(), processing: ProcessingSettingsCapture.capture())
         activeResolvedSettings = frozen
+        activeRunHistory?.ledgerRunID = frozen.runID
+        activeRunHistory?.outputDirectory = outputDirectory
         activeRunToRecord = resumingMixedPDF == nil
             ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil
 

@@ -48,10 +48,11 @@ enum SettingsSheetTestDriver {
         }
         let pairs = OCRPairMatrix.bundled
         func sheet(_ name: String, general: SettingsLayer, collection: SettingsLayer? = nil, gb: Double = 16,
-                   pages: Int = 1000, running: SettingsSheetModel.Running = running) -> SettingsSheetModel {
+                   pages: Int = 1000, month: SettingsMonthSpend = .init(),
+                   running: SettingsSheetModel.Running = running) -> SettingsSheetModel {
             let m = SettingsSheetModel(table: table, pairs: pairs,
                                        resolver: SettingsResolver(general: general, project: nil, collection: collection),
-                                       macMemoryGB: gb, pages: pages, running: running)
+                                       macMemoryGB: gb, pages: pages, month: month, running: running)
             record(name, m)
             return m
         }
@@ -127,6 +128,26 @@ enum SettingsSheetTestDriver {
             check("3 a reading pick the app runs can be applied", r.routeID == "gemini3.8-flash" ? r.apply == .reading(appRoute: "gemini|gemini-3.8-flash") : true)
         }
         check("3 limits: the ceiling", paid.limits.first { $0.id == "ceiling" }?.value == "$10.00")
+        check("3 a batch limit shows no month line", paid.limits.first { $0.id == "month" } == nil)
+
+        // 3b. A limit for each month (W46.settings-ledger): the batch gets what the ledger leaves, shown beside it.
+        let spentLines = [SettingsLedgerEntry(date: Date(), usd: 7.5, collectionID: nil, runID: nil),
+                          SettingsLedgerEntry(date: Date(), usd: 4.5, collectionID: nil, runID: nil)]
+        let monthly = layer(.general, [(.keys, .strings(["gemini"])), (.moneyHabit, .string(MoneyHabit.perMonth.rawValue)),
+                                       (.monthCeilingUSD, .double(20)), (.staysOnMac, .bool(false))])
+        let pm = sheet("per-month", general: monthly, month: SettingsMonthSpend(usd: 12, entries: spentLines))
+        let pmCeiling = pm.limits.first { $0.id == "ceiling" }
+        check("3b the batch's limit is what is left of the month",
+              pmCeiling?.value == "$8.00" && pmCeiling?.source.hasPrefix("what is left of the month's limit") == true,
+              "\(pmCeiling?.value ?? "") [\(pmCeiling?.source ?? "")]")
+        let pmMonth = pm.limits.first { $0.id == "month" }
+        check("3b the month's spending is shown against its limit",
+              pmMonth?.value == "$12.00 of $20.00, from 2 batches", pmMonth?.value ?? "none")
+        let spentOut = sheet("per-month-spent", general: monthly,
+                             month: SettingsMonthSpend(usd: 25, entries: spentLines))
+        check("3b a spent month leaves free choices only",
+              spentOut.limits.first { $0.id == "ceiling" }?.value.hasPrefix("Nothing") == true
+              && spentOut.solution.usd == 0, "\(spentOut.solution.usd)")
 
         // 4. Override and the way back.
         let custom = sheet("custom", general: gem,

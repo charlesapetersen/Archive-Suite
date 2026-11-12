@@ -152,10 +152,10 @@ struct SettingsSheetModel {
     static let ruleStageIDs = ["reading-copy", "ocr-input", "layout", "placement", "marks", "capture"]
 
     init(table: SettingsRouteTable, pairs: OCRPairMatrix?, resolver: SettingsResolver, macMemoryGB: Double,
-         pages: Int, spentThisMonthUSD: Double = 0, running: Running) {
+         pages: Int, month: SettingsMonthSpend = .init(), running: Running) {
         self.table = table
         let resources = resolver.resources(macMemoryGB: macMemoryGB)
-        let base = resolver.answers(pages: pages, spentThisMonthUSD: spentThisMonthUSD)
+        let base = resolver.answers(pages: pages, spentThisMonthUSD: month.usd)
         var answers = base
         var custom: [String: String] = [:]
         var held = Set<String>()
@@ -176,7 +176,7 @@ struct SettingsSheetModel {
         self.appSolution = appSolution
 
         let words = Words(table: table, answers: answers, resources: resources)
-        limits = Self.limits(resolver, answers: answers, words: words)
+        limits = Self.limits(resolver, answers: answers, month: month, words: words)
         totals = Self.totals(solution, answers: answers, words: words)
         toRelax = Self.relax(solution, answers: answers, words: words)
         cards = Self.cardStages.compactMap { stage in
@@ -199,8 +199,10 @@ struct SettingsSheetModel {
         r.layer == nil ? "set by the app (its default)" : r.sourceText
     }
 
-    private static func limits(_ r: SettingsResolver, answers a: SettingsAnswers, words: Words) -> [Limit] {
+    private static func limits(_ r: SettingsResolver, answers a: SettingsAnswers, month: SettingsMonthSpend,
+                               words: Words) -> [Limit] {
         let habit = r.resolve(.moneyHabit)
+        let perMonth = habit.value.string == MoneyHabit.perMonth.rawValue
         let ceilingSource: ResolvedSetting = (habit.value.string == MoneyHabit.none.rawValue) ? habit : r.resolve(.batchCeilingUSD)
         let ceiling: String = {
             guard let c = a.ceilingUSD else { return "No ceiling" }
@@ -210,8 +212,25 @@ struct SettingsSheetModel {
         let weights = SettingsSolver.stageOrder.filter { solver.weight($0) > 0 }
             .map { "\(words.stageWord($0)) \(Int(solver.weight($0).rounded()))" }.joined(separator: ", ")
         let unweighted = SettingsSolver.stageOrder.filter { solver.weight($0) <= 0 }.map(words.stageWord)
-        return [
-            Limit(id: "ceiling", label: "Most to spend on this batch", value: ceiling, source: Self.sourceWords(ceilingSource)),
+        // W46.settings-ledger: under a monthly limit the batch gets what is left of the month, and the month's spending
+        // is shown beside it.
+        let monthCeiling = r.resolve(.monthCeilingUSD)
+        let batchCap = r.resolve(.batchCeilingUSD)
+        let ceilingWords = perMonth
+            ? "what is left of the month's limit" + (batchCap.layer == nil ? "" : ", and no more than "
+                + String(format: "$%.2f", max(0, batchCap.value.double ?? 0)) + " a batch (" + Self.sourceWords(batchCap) + ")")
+            : Self.sourceWords(ceilingSource)
+        var out = [
+            Limit(id: "ceiling", label: "Most to spend on this batch", value: ceiling, source: ceilingWords),
+        ]
+        if perMonth {
+            let limit = monthCeiling.value.double.map { $0.isFinite ? max(0, $0) : 0 } ?? 0
+            out.append(Limit(id: "month", label: "Spent this month",
+                             value: month.summary(of: limit),
+                             source: "the app's record of what each finished batch cost at list prices; the limit "
+                                + Self.sourceWords(monthCeiling)))
+        }
+        return out + [
             Limit(id: "hours", label: "How long it may run", value: SettingsKey.hours.describe(.double(a.hours)),
                   source: Self.sourceWords(r.resolve(.hours))),
             Limit(id: "preference", label: "When two choices are close",

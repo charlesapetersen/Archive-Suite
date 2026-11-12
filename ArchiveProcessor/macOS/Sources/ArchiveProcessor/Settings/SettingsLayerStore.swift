@@ -380,7 +380,9 @@ final class SettingsLayerStore: ObservableObject {
 
     @discardableResult
     func appendLedger(_ entry: SettingsLedgerEntry) -> Bool {
-        guard !readOnly, entry.usd.isFinite else { return false }
+        guard entry.usd.isFinite else { return false }
+        // Kept in memory even when it cannot be saved (a read-only store, a failed write), so this session's next
+        // batch still counts it against the month.
         file.ledger.append(entry)
         return saveGeneral()
     }
@@ -477,8 +479,39 @@ final class SettingsLayerStore: ObservableObject {
 
     /// What the ledger records for the current calendar month, which a per-month ceiling is read against.
     func spentThisMonthUSD(now: Date = Date(), calendar: Calendar = .current) -> Double {
-        file.ledger.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) && $0.usd.isFinite }
-            .reduce(0) { $0 + max(0, $1.usd) }
+        monthSpend(now: now, calendar: calendar).usd
+    }
+
+    /// The current calendar month's ledger lines and their total.
+    func monthSpend(now: Date = Date(), calendar: Calendar = .current) -> SettingsMonthSpend {
+        let lines = file.ledger.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) && $0.usd.isFinite }
+        return SettingsMonthSpend(usd: lines.reduce(0) { $0 + max(0, $1.usd) },
+                                  entries: lines.sorted { $0.date > $1.date })
+    }
+
+    /// Lines older than this are dropped when a batch is recorded: only the current month is read, and a year back
+    /// is kept for the user to look over.
+    static let ledgerKeepDays = 400
+
+    /// Record what a finished batch spent (W46.settings-ledger), whatever the money habit is, so switching to a
+    /// monthly limit later starts from what this month really spent. A free batch writes nothing; a run already in
+    /// the ledger (by its id) is not counted twice. The collection is read from its folder, so a batch that created it
+    /// has its id. Returns whether a line was written.
+    @discardableResult
+    func recordSpend(usd: Double, runID: UUID?, outputDirectory: URL?, files: Int,
+                     now: Date = Date()) -> Bool {
+        guard usd.isFinite, usd > 0 else { return false }
+        if let runID, file.ledger.contains(where: { $0.runID == runID }) { return false }
+        var collectionID: UUID?
+        var name = outputDirectory?.lastPathComponent
+        if let outputDirectory, case .document(let d) = CollectionSettingsFile.read(in: outputDirectory) {
+            collectionID = d.collection.id
+            name = d.collection.name
+        }
+        let cutoff = now.addingTimeInterval(-Double(Self.ledgerKeepDays) * 86_400)
+        file.ledger.removeAll { $0.date < cutoff }
+        return appendLedger(SettingsLedgerEntry(date: now, usd: usd, collectionID: collectionID, runID: runID,
+                                                collectionName: name, files: files))
     }
 
     nonisolated static var thisMacMemoryGB: Double {

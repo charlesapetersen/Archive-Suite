@@ -137,6 +137,43 @@ struct GeneralInterviewView: View {
         }
     }
 
+    // MARK: The month's ledger (W46.settings-ledger)
+
+    /// This month's spending against the limit being set, and the batches behind it.
+    private var monthLedger: some View {
+        let month = store.monthSpend()
+        let left = max(0, answers.monthCeilingUSD - month.usd)
+        return VStack(alignment: .leading, spacing: 4) {
+            LabeledContent("Spent this month", value: month.summary)
+            if !month.entries.isEmpty {
+                Text(String(format: "$%.2f", left) + " left of " + String(format: "$%.2f", max(0, answers.monthCeilingUSD))
+                     + " for the rest of the month. The settings sheet chooses within what is left; Process Files"
+                     + " does not yet stop a batch at the limit.")
+                    .font(.caption).foregroundStyle(.secondary)
+                ForEach(Array(month.entries.prefix(Self.ledgerLines).enumerated()), id: \.offset) { _, e in
+                    Text(Self.ledgerLine(e)).font(.caption).foregroundStyle(.secondary)
+                }
+                if month.batches > Self.ledgerLines {
+                    Text("and \(month.batches - Self.ledgerLines) earlier this month").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Text("Each batch counts at the list prices the app estimates when it finishes; a provider's bill may differ a little.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .accessibilityIdentifier("ap.interview.monthLedger")
+    }
+
+    static let ledgerLines = 5
+
+    /// "12 Nov · Letters, 40 files · $1.20".
+    static func ledgerLine(_ e: SettingsLedgerEntry) -> String {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("d MMM")
+        var what = e.collectionName ?? "a batch"
+        if let n = e.files { what += ", \(n) \(n == 1 ? "file" : "files")" }
+        return f.string(from: e.date) + " · " + what + " · " + String(format: "$%.2f", e.usd)
+    }
+
     // MARK: The questions
 
     private var questionsSection: some View {
@@ -155,6 +192,7 @@ struct GeneralInterviewView: View {
                 dollars("Most to spend in a month", bind(\.monthCeilingUSD, .monthCeilingUSD))
                 Text("What each batch spends is added up for the month, and the next batch gets what is left.")
                     .font(.caption).foregroundStyle(.secondary)
+                monthLedger
             case .none, .noCeiling:
                 EmptyView()
             }
