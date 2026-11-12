@@ -114,6 +114,8 @@ enum DefaultsKeys {
     // Onboarding / key wizard
     static let hasSeenKeyOnboarding = "hasSeenKeyOnboarding"
     static let keychainExplained = "keychainExplained"
+    /// The general interview (W46.settings-interviews) has been shown once, answered or skipped.
+    static let hasSeenGeneralInterview = "hasSeenGeneralInterview"
 
     // Tools
     static let modelTestSelections = "modelTestSelections"

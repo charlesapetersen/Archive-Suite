@@ -91,6 +91,9 @@ struct OCRView: View {
     // Initialized from persisted state in init()
     @State private var apiKey: String
     @State private var outputDirectory: URL?
+    /// A newly chosen output folder with no settings of its own is a new collection: it is asked about its material
+    /// (W46.settings-interviews).
+    @State private var collectionInterview: CollectionInterviewView.Target?
 
     @AppStorage(DefaultsKeys.keychainExplained) private var keychainExplained: Bool = false
 
@@ -428,6 +431,9 @@ struct OCRView: View {
             if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
             }
+        }
+        .sheet(item: $collectionInterview) { target in
+            CollectionInterviewView(target: target, photos: droppedFiles) { collectionInterview = nil }
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet
@@ -1355,7 +1361,9 @@ struct OCRView: View {
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true
         panel.prompt = "Select Output Folder"
-        if panel.runModal() == .OK { outputDirectory = panel.url }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        outputDirectory = url
+        if CollectionSettingsFile.read(in: url) == .missing { collectionInterview = .collection(url) }
     }
 
     private func isImageFile(_ url: URL) -> Bool {

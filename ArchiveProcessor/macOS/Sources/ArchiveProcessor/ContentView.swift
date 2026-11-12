@@ -15,6 +15,8 @@ struct ContentView: View {
 #endif
     @AppStorage(DefaultsKeys.hasSeenKeyOnboarding) private var hasSeenKeyOnboarding = false
     @State private var showKeyOnboarding = false
+    @AppStorage(DefaultsKeys.hasSeenGeneralInterview) private var hasSeenGeneralInterview = false
+    @State private var showGeneralInterview = false
 
     enum Mode: String, CaseIterable { case files = "Process Files", live = "Live Capture", tools = "Tools" }
 
@@ -90,6 +92,7 @@ struct ContentView: View {
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SettingsSolverTestDriver.runIfRequested()        // $0 W46 settings solver on the profile cases
             SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
+            SettingsInterviewsTestDriver.runIfRequested()    // $0 W46 the general and the collection interviews, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
             SegmentationPlanTestDriver.runIfRequested()      // $0 W36 Claude plan route: meter, calibration, cancel
             SegmentationChatGPTTestDriver.runIfRequested()   // $0 W36 ChatGPT plan route: Sign in with ChatGPT, fake server
@@ -104,6 +107,13 @@ struct ContentView: View {
             }
         }
 #endif
+        .sheet(isPresented: $showGeneralInterview) {
+            GeneralInterviewView {
+                showGeneralInterview = false
+                hasSeenGeneralInterview = true
+                hasSeenKeyOnboarding = true   // the interview offers the key wizard itself
+            }
+        }
         .sheet(isPresented: $showKeyOnboarding) {
             ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
         }
@@ -147,17 +157,15 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 700)
     }
 
-    /// On first launch with no API key of any kind, present the guided key wizard (dismissible;
-    /// always re-openable from Settings). Skipped in the headless test modes.
+    /// At first launch, the general interview (W46.settings-interviews), which shows the keys found and offers the
+    /// key wizard. After it, the key wizard alone still opens once for a Mac with no key of any kind (dismissible;
+    /// always re-openable from Settings). Only whether a key exists is checked, so no Keychain prompt. Skipped in the
+    /// headless test modes.
     private func maybePresentKeyOnboarding() {
-        guard !hasSeenKeyOnboarding,
-              !KeychainHelper.isHeadlessTestMode else { return }
-        let hasAnyKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) != nil
-            || KeychainHelper.load(account: LLMProvider.mistral.rawValue) != nil
-            || KeychainHelper.load(account: LLMProvider.anthropic.rawValue) != nil
-            || KeychainHelper.load(account: LLMProvider.openai.rawValue) != nil
-            || KeychainHelper.load(account: LLMProvider.openrouter.rawValue) != nil
-            || KeychainHelper.load(account: "Gateway") != nil
+        guard !KeychainHelper.isHeadlessTestMode else { return }
+        if !hasSeenGeneralInterview { showGeneralInterview = true; return }
+        guard !hasSeenKeyOnboarding else { return }
+        let hasAnyKey = MacInventory.keyAccounts.contains { KeychainHelper.exists(account: $0.account) }
         if !hasAnyKey { showKeyOnboarding = true }
     }
 }

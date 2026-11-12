@@ -1,4 +1,5 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Stores and retrieves API keys from the macOS Keychain.
@@ -66,6 +67,27 @@ struct KeychainHelper {
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    /// Whether the account holds an item, without reading the secret and without ever asking the user: only the
+    /// item's attributes are requested, under a context that may not interact (W46.settings-interviews, which lists
+    /// the keys it finds at first start; reading them would pop the Keychain prompt for each one). An item the
+    /// Keychain will not describe without asking still exists, so it counts.
+    static func exists(account: String) -> Bool {
+        if isHeadlessTestMode { return false }
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationContext as String: context
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        return status == errSecSuccess || status == errSecInteractionNotAllowed
     }
 
     static func delete(account: String) {

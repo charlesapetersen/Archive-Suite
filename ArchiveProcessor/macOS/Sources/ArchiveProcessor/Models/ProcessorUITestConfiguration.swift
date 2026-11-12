@@ -96,6 +96,7 @@ enum ProcessorUITestConfiguration {
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: DefaultsKeys.hasSeenKeyOnboarding)
         defaults.set(true, forKey: DefaultsKeys.keychainExplained)
+        defaults.set(!arguments.contains("-APUITestGeneralInterview"), forKey: DefaultsKeys.hasSeenGeneralInterview)
         defaults.set(false, forKey: DefaultsKeys.useGateway)
         defaults.set(arguments.contains("-APUITestLocalAgent"), forKey: DefaultsKeys.useLocalAgent)
         defaults.set(LocalAgentTool.claude.rawValue, forKey: DefaultsKeys.localAgentTool)

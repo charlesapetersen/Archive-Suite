@@ -66,6 +66,8 @@ struct SettingsAnswers: Sendable {
     var hours: Double = 8
     var preference: SettingsPreference = .bestMeasured
     var priorities: [SettingsPriority] = SettingsPriority.allCases
+    /// The collection interview's weights by stage, for the ranked priorities; empty is 45, 30, 15, 10 by position.
+    var weights: [String: Double] = [:]
     /// The per-batch "stays on the Mac" switch (owner call 2): no page leaves this Mac.
     var staysOnMac = false
     /// A failed page goes on to another reader, so readers are ranked on answered pages; off, on strict NES.
@@ -186,9 +188,9 @@ struct SettingsSolver {
     static let entitiesTie = 0.05
 
     func weight(_ stage: String) -> Double {
-        guard let i = answers.priorities.firstIndex(where: { $0.stage == stage }), i < Self.weights.count
-        else { return 0 }
-        return Self.weights[i]
+        guard let i = answers.priorities.firstIndex(where: { $0.stage == stage }) else { return 0 }
+        if !answers.weights.isEmpty { return max(0, answers.weights[stage] ?? 0) }
+        return i < Self.weights.count ? Self.weights[i] : 0
     }
 
     // MARK: Solve

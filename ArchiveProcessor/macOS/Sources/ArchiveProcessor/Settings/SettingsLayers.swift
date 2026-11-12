@@ -205,6 +205,8 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let scripts = SettingsKey(rawValue: "scripts")
     static let preference = SettingsKey(rawValue: "preference")
     static let priorities = SettingsKey(rawValue: "priorities")
+    /// Each ranked priority's stage weight, by `SettingsPriority` name; empty is 45, 30, 15, 10 by position.
+    static let weights = SettingsKey(rawValue: "weights")
     static let staysOnMac = SettingsKey(rawValue: "staysOnMac")
     static let readingFallback = SettingsKey(rawValue: "readingFallback")
     static let checkingMinutes = SettingsKey(rawValue: "checkingMinutes")
@@ -221,7 +223,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     ]
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
-        .preference, .priorities, .staysOnMac, .readingFallback, .checkingMinutes, .straightenReadingCopy,
+        .preference, .priorities, .weights, .staysOnMac, .readingFallback, .checkingMinutes, .straightenReadingCopy,
     ]
     static let catalog: [SettingsKey] = generalOnly + anyLayer
 
@@ -252,6 +254,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         case .period: return .string("")
         case .preference: return .string(skipped.preference.rawValue)
         case .priorities: return .strings(skipped.priorities.map(\.rawValue))
+        case .weights: return .numbers([:])
         case .staysOnMac: return .bool(skipped.staysOnMac)
         case .readingFallback: return .bool(skipped.readingFallback)
         case .checkingMinutes: return .double(skipped.checkingMinutes)
@@ -290,6 +293,7 @@ extension SettingsKey {
         case .scripts: return "Scripts"
         case .preference: return "When two choices are close"
         case .priorities: return "What matters most"
+        case .weights: return "How much each one counts"
         case .staysOnMac: return "Pages stay on this Mac"
         case .readingFallback: return "A page that fails goes to another reader"
         case .checkingMinutes: return "Minutes you will spend checking where documents begin"
@@ -318,6 +322,7 @@ extension SettingsKey {
                 case .none?: return "Nothing is spent"
                 case .perBatch?: return "A ceiling for each batch"
                 case .perMonth?: return "A ceiling for each month"
+                case .noCeiling?: return "No ceiling"
                 default: return s
                 }
             case .preference:
@@ -361,9 +366,10 @@ extension SettingsPriority {
     }
 }
 
-/// The money habit (§3.1): none, a ceiling per batch, or a ceiling per month tracked against the ledger.
+/// The money habit (§3.1): none, a ceiling per batch, or a ceiling per month tracked against the ledger; or no ceiling,
+/// the starting point "Best measured, no limit" (owner, 2026-11-04), which only the general layer can choose.
 enum MoneyHabit: String, Codable, CaseIterable, Sendable {
-    case none, perBatch, perMonth
+    case none, perBatch, perMonth, noCeiling
 }
 
 /// What a batch spent, in the general layer, so a per-month ceiling can be tracked (W46.settings-ledger shows it).
@@ -445,10 +451,14 @@ struct SettingsResolver: Sendable {
         a.documents = documents
         a.mix = resolve(.mix).value.numbers ?? a.mix
         a.strata = resolve(.strata).value.numbers ?? [:]
-        a.ceilingUSD = ceilingUSD(spentThisMonthUSD: spentThisMonthUSD)
+        let ceiling = ceilingUSD(spentThisMonthUSD: spentThisMonthUSD)
+        a.ceilingUSD = ceiling.isFinite ? ceiling : nil
         a.hours = resolve(.hours).value.double ?? a.hours
         a.preference = resolve(.preference).value.string.flatMap(SettingsPreference.init(rawValue:)) ?? .bestMeasured
         a.priorities = (resolve(.priorities).value.strings ?? []).compactMap(SettingsPriority.init(rawValue:))
+        for (name, w) in resolve(.weights).value.numbers ?? [:] {
+            if let p = SettingsPriority(rawValue: name), w >= 0 { a.weights[p.stage] = w }
+        }
         a.staysOnMac = resolve(.staysOnMac).value.bool ?? true
         a.readingFallback = resolve(.readingFallback).value.bool ?? true
         a.checkingMinutes = max(0, resolve(.checkingMinutes).value.double ?? 0)
@@ -458,13 +468,14 @@ struct SettingsResolver: Sendable {
 
     /// This batch's ceiling. Under the money habit "none" nothing is spent, whatever a collection says (§3.1: the
     /// cheapest safe answer where money is involved). Per batch, the nearest layer's batch ceiling. Per month, what
-    /// is left of the month's ceiling, and no more than a batch ceiling a layer set.
+    /// is left of the month's ceiling, and no more than a batch ceiling a layer set. No ceiling is infinity.
     func ceilingUSD(spentThisMonthUSD: Double = 0) -> Double {
         func usable(_ v: Double?) -> Double { (v ?? 0).isFinite ? max(0, v ?? 0) : 0 }
         let habit = resolve(.moneyHabit).value.string.flatMap(MoneyHabit.init(rawValue:)) ?? MoneyHabit.none
         let batch = resolve(.batchCeilingUSD)
         switch habit {
         case .none: return 0
+        case .noCeiling: return .infinity
         case .perBatch: return usable(batch.value.double)
         case .perMonth:
             let left = max(0, usable(resolve(.monthCeilingUSD).value.double) - usable(spentThisMonthUSD))

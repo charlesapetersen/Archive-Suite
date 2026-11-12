@@ -16,6 +16,7 @@ struct CollectionSettingsSection: View {
     @State private var problem: String?
     @State private var showNewProject = false
     @State private var newProjectName = ""
+    @State private var interview: CollectionInterviewView.Target?
 
     /// The folder Process Files writes into, resolved exactly as it resolves it (the saved folder, else Downloads; the
     /// UI suite's own folder under test). `outputPath` is read so a change of folder redraws the section.
@@ -52,6 +53,9 @@ struct CollectionSettingsSection: View {
                     Text("The project “\(doc?.projectName ?? "")” is not on this Mac, so your general settings apply.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                LabeledContent("Questions about this material") {
+                    Button(heldKeys.isEmpty ? "Answer…" : "Answer again…") { interview = .collection(folder) }
+                }
                 if heldKeys.isEmpty {
                     Text("This collection has no settings of its own yet. Everything comes from "
                          + (resolver.project != nil ? "its project and " : "") + "your general settings.")
@@ -86,9 +90,14 @@ struct CollectionSettingsSection: View {
                            message: "A project groups similar collections so they can share answers. A collection in it uses the project's answers unless it has its own.",
                            placeholder: "Project name",
                            confirmLabel: "Create", name: $newProjectName) { name in
-                guard let project = store.addProject(named: name), let folder = outputFolder else { return }
-                update(folder) { $0.projectID = project.id }
+                guard let project = store.addProject(named: name) else { return }
+                if let folder = outputFolder { update(folder) { $0.projectID = project.id } }
+                // A new project is asked about its material at once (12-settings-design.md §3.2).
+                DispatchQueue.main.async { interview = .project(project.id) }
             }
+        }
+        .sheet(item: $interview) { target in
+            CollectionInterviewView(target: target) { interview = nil; reload() }
         }
     }
 

@@ -340,6 +340,16 @@ final class SettingsLayerStore: ObservableObject {
         return saveGeneral()
     }
 
+    /// Put a whole general layer in place, as an interview writes it (W46.settings-interviews).
+    @discardableResult
+    func replaceGeneral(_ layer: SettingsLayer) -> Bool {
+        guard !readOnly, layer.kind == .general else { return false }
+        var l = layer
+        l.id = file.general.id
+        file.general = l
+        return saveGeneral()
+    }
+
     @discardableResult
     func addProject(named name: String) -> SettingsLayer? {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -108,6 +108,7 @@ struct SettingsView: View {
     @State private var showKeyWizard = false
     @State private var showLocalAgentWizard = false
     @State private var showManageModels = false
+    @State private var showGeneralInterview = false
     // Cloud-relay Google sign-in (transport = cloud). The secret lives in the Keychain, not @AppStorage.
     @State private var driveClientSecret = ""
     @State private var driveSignedIn = false
@@ -1028,7 +1029,12 @@ struct SettingsView: View {
                 ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .accessibilityIdentifier("ap.settings.appearance")
+            LabeledContent("This Mac and how you work") {
+                Button("Answer the setup questions…") { showGeneralInterview = true }
+            }
+            .help("The questions asked at first start: what this Mac has, spending, how long a batch may run.")
         }
+        .sheet(isPresented: $showGeneralInterview) { GeneralInterviewView { showGeneralInterview = false } }
     }
 
     @ViewBuilder private var liveCaptureSection: some View {
