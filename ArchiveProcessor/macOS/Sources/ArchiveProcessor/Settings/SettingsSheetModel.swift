@@ -186,6 +186,11 @@ struct SettingsSheetModel {
 
     // MARK: Limits and totals
 
+    /// A value's source in the sheet's words; the built-in default reads as a setting name otherwise.
+    static func sourceWords(_ r: ResolvedSetting) -> String {
+        r.layer == nil ? "the app's default: free, nothing leaves this Mac" : r.sourceText
+    }
+
     private static func limits(_ r: SettingsResolver, answers a: SettingsAnswers, words: Words) -> [Limit] {
         let habit = r.resolve(.moneyHabit)
         let ceilingSource: ResolvedSetting = (habit.value.string == MoneyHabit.none.rawValue) ? habit : r.resolve(.batchCeilingUSD)
@@ -198,18 +203,18 @@ struct SettingsSheetModel {
             return "\(words.stageWord(s)) \(Int(w.rounded()))"
         }.joined(separator: ", ")
         return [
-            Limit(id: "ceiling", label: "Most to spend on this batch", value: ceiling, source: ceilingSource.sourceText),
+            Limit(id: "ceiling", label: "Most to spend on this batch", value: ceiling, source: Self.sourceWords(ceilingSource)),
             Limit(id: "hours", label: "How long it may run", value: SettingsKey.hours.describe(.double(a.hours)),
-                  source: r.resolve(.hours).sourceText),
+                  source: Self.sourceWords(r.resolve(.hours))),
             Limit(id: "preference", label: "When two choices are close",
                   value: SettingsKey.preference.describe(.string(a.preference.rawValue)),
-                  source: r.resolve(.preference).sourceText),
+                  source: Self.sourceWords(r.resolve(.preference))),
             Limit(id: "priorities", label: "What matters most",
                   value: a.priorities.isEmpty ? "nothing ranked"
                     : a.priorities.map(\.label).joined(separator: ", then ") + " (counts out of 100: \(weights))",
-                  source: r.resolve(.priorities).sourceText),
+                  source: Self.sourceWords(r.resolve(.priorities))),
             Limit(id: "staysOnMac", label: "Pages stay on this Mac", value: a.staysOnMac ? "Yes" : "No",
-                  source: r.resolve(.staysOnMac).sourceText),
+                  source: Self.sourceWords(r.resolve(.staysOnMac))),
         ]
     }
 
@@ -223,11 +228,16 @@ struct SettingsSheetModel {
             Total(id: "money", label: "Money for this batch", value: words.money(s.usd),
                   detail: "\(Self.count(a.pages, "page")), at list prices"),
             Total(id: "time", label: "It takes about", value: words.hours(s.hours),
-                  detail: s.hours > a.hours + 1e-9 ? "more than the \(words.hours(a.hours)) allowed" : "within the \(words.hours(a.hours)) allowed"),
+                  detail: (s.hours > a.hours + 1e-9 ? "more than the \(words.hours(a.hours)) allowed" : "within the \(words.hours(a.hours)) allowed")
+                    + "; steps on this Mac run one after another, online ones alongside them"),
         ]
         if let w = s.weightedAccuracy {
+            let unread = s.picks.contains { $0.stage == "reading" && $0.flag != nil && $0.part != "all" }
+            let byHand = s.pick("segmentation", "all")?.route?.family == .manual
             out.append(Total(id: "accuracy", label: "Overall accuracy", value: String(format: "%.0f of 100", w),
-                             detail: "reading, finding documents, dates and names together, each counted as much as you said it matters"))
+                             detail: "reading, finding documents, dates and names together, each counted as much as you said it matters"
+                                + (unread ? "; pages no reader here can read count as 0" : "")
+                                + (byHand ? "; finding documents by hand counts as 0 before you check" : "")))
         }
         out.append(Total(id: "plan", label: "Your subscription plan", value: planInUse ? "In use" : "Not used",
                          detail: planInUse ? "its allowance is used, not money" : nil))
@@ -247,7 +257,8 @@ struct SettingsSheetModel {
         for p in s.picks {
             for b in p.better where b.isLimit && seen.insert("\(p.stage)|\(b.id)").inserted {
                 out.append("\(words.limitPhrase(b.reason)) to let \(words.name(p.stage, b.id)) "
-                           + "\(words.verb(p.stage)) \(words.partObject(p.stage, p.part)).")
+                           + "\(words.verb(p.stage)) \(words.partObject(p.stage, p.part))"
+                           + (b.reason.hasPrefix("raise the ceiling") ? " (the steps that matter less then share what is left)." : "."))
             }
         }
         return out
@@ -276,8 +287,8 @@ struct SettingsSheetModel {
 
         var labels: [String] = []
         for r in usedRoutes where r.id.contains("3.8") && r.caveats.contains(where: { $0.contains("3.7") }) {
-            labels.append("\(r.name): these figures were measured with Gemini 3.7 Flash, the model before it, and are "
-                          + "labelled as 3.7's; Gemini 3.8 was not run on this.")
+            labels.append("\(words.display(stage.id, r)): these are Gemini 3.7's figures, measured on the earlier Gemini "
+                          + "3.7 Flash with the same instructions; Gemini 3.8 itself has not been tested on this yet.")
         }
         if stage.id == "segmentation" {
             labels.append("The figure assumes about 20 seconds to check each boundary; nobody has timed it yet.")
@@ -305,16 +316,17 @@ struct SettingsSheetModel {
             .sorted { abs($0.1 - (pickFigure ?? 0)) < abs($1.1 - (pickFigure ?? 0)) }
             .prefix(3)
             .map { r, v in
-                Alternative(id: r.id, name: r.name, family: r.id == "none" ? "nothing runs" : words.family(r.family),
+                Alternative(id: r.id, name: words.display(stage.id, r), family: r.id == "none" ? "nothing runs" : words.family(r.family),
                             figure: r.id == "none" ? "no names found"
-                                : r.family == .manual ? "you check every boundary yourself" : words.figure(stage.id, v),
+                                : r.family == .manual ? "you check every boundary yourself"
+                                : words.figure(stage.id, v) + (stage.id == "reading" ? " on average" : ""),
                             cost: words.per1000(solver.usdPer1000(r, stage: stage.id), unit: stage.unit))
             }
         // Names on this Mac run only when names are ranked (owner call 11), which the solver applies by leaving them out.
         let namesUnranked = stage.id == "entities" && !a.priorities.contains(.names)
         let options = stage.routes.filter { !$0.afterTraining && $0.offered && words.mainFigure(stage, $0, solver: solver) != nil }
             .map { r in
-                Option(id: r.id, name: r.name,
+                Option(id: r.id, name: words.display(stage.id, r),
                        blocked: appBlocked[r.id]?.first.map(words.reason)
                         ?? (namesUnranked && r.family == .mac ? "on this Mac names are found only when they are among what matters most" : nil))
             }
@@ -325,7 +337,7 @@ struct SettingsSheetModel {
         var appPick: String?
         if let custom {
             let appLead = app.picks.first { $0.stage == stage.id && $0.part == leadPart }
-            let pickName = appLead?.route.map { $0.name } ?? "nothing"
+            let pickName = appLead?.route.map { words.display(stage.id, $0) } ?? "nothing"
             appPick = pickName
             why = "You chose \(words.name(stage.id, custom)) here. The app's own pick is \(pickName)."
             // "No names" runs as asked even though its pick carries the "none" flag.
@@ -342,7 +354,7 @@ struct SettingsSheetModel {
             if let r = route, lead?.flag == nil {
                 if let approach = r.appRoute.flatMap(SegmentationApproach.init(appRoute:)) {
                     if approach != running.segmentation {
-                        runsNow = "Process Files now uses \(running.segmentation.sheetLabel)."
+                        runsNow = "Not switched on yet: Process Files, where you add pages to process, uses \(running.segmentation.sheetLabel) now."
                         apply = .segmentation(approach)
                     }
                 } else {
@@ -352,10 +364,10 @@ struct SettingsSheetModel {
         case "reading":
             if let r = route, lead?.flag == nil, r.id != running.readingRouteID {
                 if r.id == "apple-vision" {
-                    runsNow = "The Processor reads with \(running.readingName) now."
+                    runsNow = "Not switched on yet: the Processor reads with \(running.readingName) now."
                     apply = .appleVision
                 } else if let ar = r.appRoute, ar.contains("|") {
-                    runsNow = "The Processor reads with \(running.readingName) now."
+                    runsNow = "Not switched on yet: the Processor reads with \(running.readingName) now."
                     apply = .reading(appRoute: ar)
                 } else {
                     runsNow = "The Processor cannot run this reader yet; it reads with \(running.readingName)."
@@ -370,9 +382,23 @@ struct SettingsSheetModel {
             for f in Self.sourceFiles(r) where !sources.contains(f) { sources.append(f) }
         }
 
+        // A pick that is several readers names each with what it reads (the free pick: Vision for typed and printed
+        // pages, a downloaded reader for handwriting).
+        var routeName = route.map { words.display(stage.id, $0) } ?? "Nothing"
+        if stage.id == "reading" {
+            let byRoute = Dictionary(grouping: picks.filter { $0.part != "all" && $0.flag == nil && $0.route != nil }) { $0.route!.id }
+            if byRoute.count > 1 {
+                routeName = byRoute.values
+                    .sorted { ($0.first?.route?.id == route?.id ? 0 : 1) < ($1.first?.route?.id == route?.id ? 0 : 1) }
+                    .map { ps in
+                        "\(words.display(stage.id, ps[0].route!)) for "
+                            + ps.map { words.readingPart($0.part).lowercased() }.joined(separator: " and ")
+                    }.joined(separator: "; ")
+            }
+        }
         return Card(
             id: stage.id, title: words.stageTitle(stage.id), about: words.stageAbout(stage.id), weight: weightText,
-            routeID: route?.id, routeName: route?.name ?? "Nothing", family: familyText, isCustom: custom != nil,
+            routeID: route?.id, routeName: routeName, family: familyText, isCustom: custom != nil,
             hasOverride: held,
             why: why, evidence: lead?.reason ?? "", parts: parts,
             cost: words.cost(usd, routes: usedRoutes, stage: stage, solver: solver, answers: a),
@@ -385,31 +411,33 @@ struct SettingsSheetModel {
 
     private static func parts(_ stage: SettingsRouteTable.Stage, picks: [SettingsPick], answers a: SettingsAnswers,
                               words: Words) -> [PartRow] {
+        func name(_ r: SettingsRouteTable.Route?) -> String? { r.map { words.display(stage.id, $0) } }
         switch stage.id {
         case "reading":
-            var rows: [PartRow] = picks.filter { $0.part != "all" }.map { p in
+            let main = picks.first { $0.part == "all" }
+            var rows: [PartRow] = []
+            // The batch reader's average over all 96 pages: the figure "better" and the alternatives are read against.
+            if let main, let r = main.route, main.flag == nil, let v = words.mainFigure(stage, r, solver: nil) {
+                rows.append(PartRow(id: "all", label: "Average over all test pages", routeName: name(r),
+                                    figure: words.figure("reading", v), sample: "on 96 test pages whose text was checked by hand",
+                                    label2: nil, warning: false))
+            }
+            rows += picks.filter { $0.part != "all" }.map { p in
                 let isHands = p.part == "handwritten"
-                let sample = p.route.flatMap { words.readingSample($0, part: p.part) }
                 return PartRow(
-                    id: p.part, label: words.readingPart(p.part), routeName: p.flag == nil ? p.route?.name : nil,
-                    figure: p.flag.map(words.flag) ?? p.figure.map { words.figure("reading", $0) } ?? "not read",
-                    sample: sample,
+                    id: p.part, label: words.readingPart(p.part), routeName: p.flag == nil ? name(p.route) : nil,
+                    figure: p.flag.map { words.flag($0, part: p.part) } ?? p.figure.map { words.figure("reading", $0) } ?? "not read",
+                    sample: p.flag == nil ? p.route.flatMap { words.readingSample($0, part: p.part) } : nil,
                     label2: isHands && p.flag == nil
-                        ? "conditional on the truth: the handwriting truth was drafted with Claude and Gemini models, so this is agreement with that draft more than proof"
+                        ? "conditional on the truth: the correct text of these pages was first drafted with Claude and Gemini, so this figure may read a little high"
                         : nil,
                     warning: p.flag != nil)
-            }
-            let main = picks.first { $0.part == "all" }
-            if rows.isEmpty, let main {
-                rows.append(PartRow(id: "all", label: "All pages", routeName: main.route?.name,
-                                    figure: main.figure.map { words.figure("reading", $0) } ?? words.flag(main.flag ?? ""),
-                                    sample: "on the owner's 96 test pages", label2: nil, warning: main.flag != nil))
             }
             for kind in CollectionInterviewAnswers.unmeasuredKinds where (a.mix[kind] ?? 0) > 0
                 && stage.kindStrata[kind] == nil && kind != "registers" {
                 rows.append(PartRow(id: kind, label: CollectionInterviewAnswers.unmeasuredLabel(kind),
-                                    routeName: main?.route?.name, figure: "unmeasured",
-                                    sample: nil, label2: "no reader was measured on this kind; the batch's reader reads it",
+                                    routeName: name(main?.route), figure: "unmeasured",
+                                    sample: nil, label2: "no reader was measured on this kind of page; the main reader reads it",
                                     warning: false))
             }
             return rows
@@ -419,11 +447,15 @@ struct SettingsSheetModel {
                 return [PartRow(id: "all", label: "All pages", routeName: nil, figure: words.flag(p.flag ?? ""),
                                 sample: nil, label2: nil, warning: true)]
             }
-            var rows = [PartRow(id: "all", label: "Your pages, with your checking time", routeName: r.name,
-                                figure: p.figure.map { String(format: "%.0f%% of pages in the right document", $0) } ?? "no figure",
-                                sample: "measured on 363 pages of two boxes the owner checked", label2: nil, warning: false)]
+            let before = a.checkingMinutes > 0
+                ? "With the \(SettingsSolver.num(a.checkingMinutes)) minutes you will spend checking" : "Before you check anything"
+            var rows = [PartRow(id: "all", label: before, routeName: name(r),
+                                figure: r.family == .manual ? "nothing is proposed: you check every boundary yourself"
+                                    : p.figure.map { String(format: "%.0f%% of pages in the right document", $0) } ?? "no figure",
+                                sample: "measured on 363 pages of two boxes of real papers, checked by hand",
+                                label2: nil, warning: false)]
             if let per100 = r.figure("test-boxes.checks_per_100") {
-                rows.append(PartRow(id: "checks", label: "Boundaries to check", routeName: nil,
+                rows.append(PartRow(id: "checks", label: "Places it asks you to check", routeName: nil,
                                     figure: String(format: "about %.0f in every 100 pages", per100),
                                     sample: nil, label2: nil, warning: false))
             }
@@ -432,28 +464,32 @@ struct SettingsSheetModel {
                                     figure: String(format: "%.0f%% of pages in the right document", after),
                                     sample: nil, label2: nil, warning: false))
             }
-            let boxes: [(String, String)] = [("letters", "Letters"), ("magazine", "A magazine, articles within issues"),
+            let boxes: [(String, String)] = [("letters", "A box of letters"), ("magazine", "A magazine, articles within issues"),
                                              ("clippings-mixed", "Clippings mixed with other papers"),
-                                             ("manuscripts-public", "Handwritten letters (public)"),
-                                             ("typed-gov-public", "Typed government files (public)")]
+                                             ("manuscripts-public", "Handwritten letters (a published test collection)"),
+                                             ("typed-gov-public", "Typed government files (a published test collection)")]
             for (key, label) in boxes {
                 let v = r.figure(key) ?? r.figure("\(key).gap_acc") ?? r.figure("\(key).owner_weighted")
                 guard let v else { continue }
+                let pagesFigure = r.figures[key] != nil
                 let n = (r.figures[key] ?? r.figures["\(key).gap_acc"] ?? r.figures["\(key).owner_weighted"])?["n"]?.double
                 let ranks = key != "magazine" || r.id == "gemini3.8-flash"
                 rows.append(PartRow(id: key, label: label, routeName: nil,
-                                    figure: String(format: "%.0f%%", v) + (r.figures[key] == nil ? " of boundaries right" : " of pages right"),
-                                    sample: n.map { "on \(Int($0)) \(r.figures[key] == nil ? "boundaries" : "pages")" },
-                                    label2: ranks ? nil : "ranks nothing yet: this model's instructions do not yet say that an article inside an issue is its own document",
+                                    figure: String(format: "%.0f%%", v)
+                                        + (pagesFigure ? " of pages in the right document" : " of the places between pages judged right"),
+                                    sample: n.map { "on \(Int($0)) \(pagesFigure ? "pages" : "places between pages"), before checking" },
+                                    label2: ranks ? nil : "ranks nothing yet: this model was not told that an article inside a magazine issue is a document of its own, so this figure is not used to choose",
                                     warning: false))
             }
             return rows
         case "dating":
             var rows: [PartRow] = []
+            let first = picks.first { $0.part == "step 1" }?.route?.id
             for p in picks {
+                let label = ["step 1": "When the year is written in the text",
+                             "step 2": "When the text has no year: read from the page image",
+                             "step 4": "When no year is found anywhere: estimated from the folder or nearby documents"][p.part] ?? p.part
                 guard let r = p.route, p.flag == nil else {
-                    let label = ["step 1": "Year written in the text", "step 2": "Year only on the page image",
-                                 "step 4": "No year found"][p.part] ?? p.part
                     rows.append(PartRow(id: p.part, label: label, routeName: nil, figure: words.flag(p.flag ?? ""),
                                         sample: nil, label2: nil, warning: false))
                     continue
@@ -461,20 +497,23 @@ struct SettingsSheetModel {
                 func row(_ id: String, _ label: String, _ key: String, _ sample: String, _ note: String? = nil) {
                     guard let v = r.figure(key) else { return }
                     let n = r.figures[key]?["n"]?.double
-                    rows.append(PartRow(id: id, label: label, routeName: r.name,
+                    rows.append(PartRow(id: id, label: label, routeName: name(r),
                                         figure: String(format: "%.0f%% get the exact year", v),
                                         sample: n.map { "on \(Int($0)) \(sample)" }, label2: note, warning: false))
                 }
                 switch p.part {
                 case "step 1":
-                    row("step 1", "Year written in the text", "in_text", "documents whose year is in the text")
-                    row("step 1b", "Year not in the text", "not_in_text", "documents whose year is not in the text")
+                    row("step 1", label, "in_text", "documents whose year is in the text")
+                    row("step 1b", "When the year is not in the text", "not_in_text", "documents whose year is not in the text")
                 case "step 2":
-                    row("step 2", "Year only on the page image", "unprinted_122_doc_year",
-                        "documents whose text holds no year")
+                    row("step 2", label, "unprinted_122_doc_year", "documents whose text has no year at all")
                 case "step 4":
-                    row("step 4", "No year found: estimated from its folder or neighbours", "not_in_text",
-                        "documents whose year is not in the text", "always marked Date Uncertain")
+                    if r.id == first {
+                        rows.append(PartRow(id: "step 4", label: label, routeName: name(r), figure: "the same reader",
+                                            sample: nil, label2: "always marked Date Uncertain", warning: false))
+                    } else {
+                        row("step 4", label, "not_in_text", "documents whose year is not in the text", "always marked Date Uncertain")
+                    }
                 default: break
                 }
             }
@@ -483,11 +522,19 @@ struct SettingsSheetModel {
             return picks.map { p in
                 let label = ["correspondence-typed": "Typed letters", "correspondence-handwritten": "Handwritten letters",
                              "non-correspondence": "Everything that is not a letter"][p.part] ?? p.part
-                let n = p.route?.figures["sender"]?["n"]?.double
-                return PartRow(id: p.part, label: label, routeName: p.flag == nil ? p.route?.name : nil,
+                let r = p.route
+                // Handwriting apart only where the bench scored it apart; else the figure is all 138 letters together.
+                let hands = p.part == "correspondence-handwritten" ? r?.figure("handwritten_or_mixed") : nil
+                let figure = hands ?? p.figure
+                let n = (hands != nil ? r?.figures["handwritten_or_mixed"] : r?.figures["sender"])?["n"]?.double
+                return PartRow(id: p.part, label: label, routeName: p.flag == nil ? name(r) : nil,
                                figure: p.flag == "none" ? (p.part == "non-correspondence" ? "unmeasured, not run" : "not run")
-                                   : p.figure.map { String(format: "finds the sender right about %.0f times in 100", $0 * 100) } ?? "no figure",
-                               sample: p.flag == nil ? n.map { "on \(Int($0)) letters" } : nil,
+                                   : figure.map { String(format: "finds the sender right about %.0f times in 100", $0 * 100) } ?? "no figure",
+                               sample: p.flag == nil ? n.map {
+                                   p.part == "correspondence-handwritten" && hands == nil
+                                       ? "on \(Int($0)) letters, typed and handwritten together (not measured apart)"
+                                       : "on \(Int($0)) letters"
+                               } : nil,
                                label2: nil, warning: false)
             }
         default:
@@ -501,8 +548,8 @@ struct SettingsSheetModel {
         let switches: [SwitchRow] = stage.rules.compactMap { rule in
             guard let sw = rule.switchSetting, let key = Self.switchKey(sw.id) else { return nil }
             let resolved = resolver.resolve(key)
-            return SwitchRow(id: sw.id, key: key, label: sw.label, isOn: resolved.value.bool ?? sw.defaultValue,
-                             source: resolved.sourceText, note: Self.switchPending.contains(key) ? Self.pendingNote : nil)
+            return SwitchRow(id: sw.id, key: key, label: Self.switchLabel(key) ?? sw.label, isOn: resolved.value.bool ?? sw.defaultValue,
+                             source: Self.sourceWords(resolved), note: Self.switchPending.contains(key) ? Self.pendingNote : nil)
         }
         return RuleStage(id: stage.id, title: Words.ruleTitle(stage.id), text: Words.ruleText(stage.id),
                          switches: switches,
@@ -512,7 +559,15 @@ struct SettingsSheetModel {
 
     /// Switches the run does not read yet: the new page output (W42.int-s5) applies them.
     static let switchPending: Set<SettingsKey> = [.straightenReadingCopy, .placeHandOnImage]
-    static let pendingNote = "Saved with this collection's settings now; the Processor follows it once its new page output is built."
+    static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
+
+    static func switchLabel(_ key: SettingsKey) -> String? {
+        switch key {
+        case .straightenReadingCopy: return "Straighten sloping pages"
+        case .placeHandOnImage: return "Put handwritten text on the page image (a page where the fit is unsure gets a separate text page)"
+        default: return nil
+        }
+    }
 
     /// The layered setting a table switch is stored in.
     static func switchKey(_ id: String) -> SettingsKey? {
@@ -578,13 +633,13 @@ struct SettingsSheetWords {
     func stageAbout(_ s: String) -> String {
         switch s {
         case "reading":
-            return "Each reader's accuracy on the owner's 96 test pages (typewritten, printed, handwritten) and, where it "
-                + "was run, on public pages of the same kind. Figures within the bench's margin of error count as ties. "
-                + "The test pages' text was drafted with Claude and Gemini models, so close figures among those "
-                + "families are provisional."
+            return "Each reader's accuracy on 96 test pages whose text was checked by hand (typewritten, printed, "
+                + "handwritten) and, where it was run, on published test pages of the same kind. Figures closer than the "
+                + "measurements can tell apart count as ties. The checked text was first drafted with Claude and "
+                + "Gemini, so close figures for those two are provisional."
         case "segmentation":
             return "Pages are grouped into documents by a model reading seven pages at a time. The figure is pages in "
-                + "exactly the right document, measured on the owner's checked boxes; it is not a forecast for your "
+                + "exactly the right document, measured on boxes of real papers checked by hand; it is not a forecast for your "
                 + "collection. Boundaries the model is unsure of are shown to you to check, and checking every one is "
                 + "always possible."
         case "dating":
@@ -613,14 +668,14 @@ struct SettingsSheetWords {
         switch s {
         case "reading-copy":
             return "Pages are turned upright before reading. A page whose lines slope by 1 degree or more is turned level "
-                + "after reading, unless you switch Straighten off; nothing is cropped or cut, and marks stay. Dewarping, "
-                + "cropping and shading correction are not applied to the page you see."
+                + "after reading, unless you switch straightening off; nothing is cropped or cut, and marks stay. Curved "
+                + "pages are not flattened, and nothing is cropped or evened out on the page you see."
         case "ocr-input":
-            return "Pages are read from the image as captured. No cleaning, binarising or mark removal is applied to what "
-                + "a reader sees, and none helped any reader tested."
+            return "Pages are read from the image as captured. No cleaning, conversion to black and white, or removal of "
+                + "marks is applied to what a reader sees: none of these helped any reader tested."
         case "layout":
             return "Newspapers and other dense multi-column pages are read in regions, column by column. Everything else "
-                + "is read as a whole page. Handwriting and registers are never split into regions."
+                + "is read as a whole page. Handwriting, registers and ledgers are never split into regions."
         case "placement":
             return "On typed and printed pages the text is laid over the page image line by line, so you can select and "
                 + "search it where it sits; this is free. On handwritten pages the lines are found on the page and the "
@@ -632,8 +687,8 @@ struct SettingsSheetWords {
         case "capture":
             return "The capture app photographs each page at full sensor quality with the flash off, keeps the original "
                 + "JPEG untouched, and tells you when the frame is likely to read badly. Hold the phone still, avoid "
-                + "reflections, keep the page edges and only that page in the frame. The Mac reads a copy sized to "
-                + "2,048 pixels on the long side at JPEG quality 0.85."
+                + "reflections, keep the page edges and only that page in the frame. The Mac sends readers a copy "
+                + "2,048 pixels on its long side; larger copies read no better in the tests."
         default: return ""
         }
     }
@@ -649,7 +704,43 @@ struct SettingsSheetWords {
         }
     }
 
-    func name(_ stage: String, _ id: String) -> String { table.stage(stage)?.route(id)?.name ?? id }
+    func name(_ stage: String, _ id: String) -> String {
+        table.stage(stage)?.route(id).map { display(stage, $0) } ?? id
+    }
+
+    /// A route's name in the sheet's words: the table's name for a reader or a segmenter, with the bench's
+    /// precision tags and "your" dropped; a plain description for the dating and names pipelines.
+    func display(_ stage: String, _ r: SettingsRouteTable.Route) -> String {
+        let plain: [String: String] = [
+            "vision-2b-chooser-t3": "Apple Vision's text, with a small model on this Mac choosing the year",
+            "vision-rules-t3": "Apple Vision's text and fixed rules (built in)",
+            "mlx-date-2b-8bit": "A small dating model on this Mac",
+            "gemini3.8-flash-oneshot": "Gemini 3.8 Flash, in the request that tags each document",
+            "gemini3.7-flash-oneshot-vision": "Gemini 3.7 Flash (Stanford gateway), in the request that tags each document",
+            "gemini3.7-flash-trace-neigh": "Gemini 3.7 Flash (Stanford gateway), quoting its evidence and nearby dates",
+            "gemini3.7-flash-image": "Gemini 3.7 Flash (Stanford gateway), looking at the page image",
+            "qwen3.6-27b-image": "Qwen3.6 27B on a computing cluster, looking at the page image",
+            "qwen3-vl-8b-image-mac": "Qwen3-VL 8B on this Mac, looking at the page image",
+            "qwen3.6-27b-trace-neigh-vision": "Qwen3.6 27B on a computing cluster, quoting its evidence",
+            "gemini-tagging-place": "Gemini, in the request that tags each document",
+            "gemini-entity8k": "Gemini, with a request of its own for names",
+            "qwen3.6-27b": stage == "entities" ? "Qwen3.6 27B (a computing cluster or OpenRouter)" : r.name,
+            "qwen3-vl-8b-mac": "Qwen3-VL 8B on this Mac",
+            "qwen3.5-4b-mac": "Qwen3.5 4B on this Mac",
+            "nltagger": "Apple's built-in name finder",
+            "gliner2.5-base-spans-rule": "GLiNER, a small name finder",
+            "manual": "No model: you check every boundary",
+        ]
+        if r.id == "none" { return stage == "dating" ? "No dating" : "No names" }
+        if let p = plain[r.id], stage == "dating" || stage == "entities" || r.id == "manual" { return p }
+        var n = r.name
+        for (a, b) in [(" bf16", ""), (" 8-bit", ""), (" 4-bit", ""), (" fp8", ""), (", hosted fp8", ""),
+                       (" (Mac CPU)", " (on this Mac)"), (" (Mac)", ""), ("(your Claude plan)", "(a Claude subscription)"),
+                       ("(your cluster)", "(on a computing cluster)"), ("(your cluster or OpenRouter)", "(a computing cluster or OpenRouter)")] {
+            n = n.replacingOccurrences(of: a, with: b)
+        }
+        return n
+    }
 
     func verb(_ stage: String) -> String {
         ["reading": "read", "segmentation": "group", "dating": "date", "entities": "find names in"][stage] ?? "handle"
@@ -680,9 +771,9 @@ struct SettingsSheetWords {
     func readingSample(_ r: SettingsRouteTable.Route, part: String) -> String? {
         switch part {
         case "typewritten", "printed":
-            return r.figures[part]?["n"]?.double.map { "on \(Int($0)) of the owner's test pages" }
+            return r.figures[part]?["n"]?.double.map { "on \(Int($0)) \(part) test pages" }
         case "handwritten":
-            return r.figures["hands16"]?["n"]?.double.map { "on \(Int($0)) of the owner's handwritten test pages" }
+            return r.figures["hands16"]?["n"]?.double.map { "on \(Int($0)) handwritten test pages" }
         default:
             if case .string(let s)? = r.figures["public"]?[part]?.array?.last, let n = s.split(separator: "/").last {
                 return "on \(n) public test pages, whose text was checked independently"
@@ -691,10 +782,10 @@ struct SettingsSheetWords {
         }
     }
 
-    func mainFigure(_ stage: SettingsRouteTable.Stage, _ r: SettingsRouteTable.Route, solver: SettingsSolver) -> Double? {
+    func mainFigure(_ stage: SettingsRouteTable.Stage, _ r: SettingsRouteTable.Route, solver: SettingsSolver?) -> Double? {
         switch stage.id {
         case "reading": return answers.readingFallback ? r.figure("overall") : r.strict("overall")
-        case "segmentation": return solver.segmentationFigure(r)
+        case "segmentation": return r.figure("test-boxes") ?? (r.family == .manual ? 0 : nil)   // the solver's own figure
         case "dating": return r.figure("not_in_text")
         case "entities": return r.figure("sender") ?? (r.id == "none" ? 0 : nil)
         default: return nil
@@ -714,15 +805,19 @@ struct SettingsSheetWords {
     func gain(_ stage: String, _ d: Double) -> String {
         switch stage {
         case "reading":
-            return d < 0.05 ? "less than 0.1 more characters right in 100" : String(format: "%.1f more characters right in 100", d)
-        case "segmentation": return String(format: "%.0f points more pages in the right document", d)
-        case "dating": return String(format: "%.0f points more exact years", d)
+            return d < 0.05 ? "less than 0.1 more characters right in 100, on average"
+                : String(format: "%.1f more characters right in 100, on average over all pages", d)
+        case "segmentation": return String(format: "%.0f percentage points more pages in the right document", d)
+        case "dating": return String(format: "%.0f percentage points more exact years where the year is not in the text", d)
         case "entities": return String(format: "%.0f more senders right in 100", d * 100)
         default: return SettingsSolver.num(d)
         }
     }
 
-    func flag(_ f: String) -> String {
+    func flag(_ f: String, part: String = "") -> String {
+        if f == "needs a download or a key", part == "handwritten" {
+            return "not read: this choice cannot read handwriting; a downloaded reader or a key would"
+        }
         switch f {
         case "needs a download or a key": return "not read here: it needs a downloaded reader or a key"
         case "no figure": return "no figure for this kind"
@@ -770,7 +865,7 @@ struct SettingsSheetWords {
                 : r.contains("carry checked evidence") ? "its years come with the words they were read from."
                 : r.contains("better where the year is in the text") ? "better where the year is written in the text."
                 : "better on the stage's other measures."
-            return "As good as the best choice this collection can use, within the bench's margin of error, and " + tail
+            return "As good as the best choice this collection can use, within the measurements' margin of error, and " + tail
         }
         if r.contains("is the best route") { return "The best measured choice this collection can use." }
         if r.contains("No names") { return "No names are found for this collection." }
@@ -791,12 +886,16 @@ struct SettingsSheetWords {
     func cost(_ usd: Double, routes: [SettingsRouteTable.Route], stage: SettingsRouteTable.Stage, solver: SettingsSolver,
               answers a: SettingsAnswers) -> String {
         guard !routes.isEmpty else { return "nothing" }
-        let units = stage.unit == "documents" ? SettingsSheetModel.count(a.documentCount, "document")
+        let units = stage.unit == "documents"
+            ? (a.documents == nil ? "about \(SettingsSheetModel.count(a.documentCount, "document")) (about 3 pages each)"
+               : SettingsSheetModel.count(a.documentCount, "document"))
             : SettingsSheetModel.count(a.pages, "page")
         if usd >= 0.005 {
             let paid = routes.map { solver.usdPer1000($0, stage: stage.id) }.filter { $0 > 0 }
             let per = Self.uniqueStrings(paid.map { per1000($0, unit: stage.unit) })
-            return "\(money(usd)) for \(units)" + (per.isEmpty ? "" : " (\(per.joined(separator: "; ")))")
+            // The rate is worth saying only when it is not the same figure again.
+            let same = stage.unit == "pages" && a.pages == 1000 && per.count == 1
+            return "\(money(usd)) for \(units)" + (per.isEmpty || same ? "" : " (\(per.joined(separator: "; ")))")
         }
         if routes.contains(where: { $0.family == .plan }) { return "no money: it uses your plan's allowance" }
         if routes.contains(where: { $0.family == .cluster }) { return "no money: it runs on your cluster" }
