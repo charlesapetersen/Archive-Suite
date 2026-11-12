@@ -102,7 +102,8 @@ enum SettingsSheetTestDriver {
             check("2 a magazine figure off the article rule ranks nothing yet",
                   s.routeID != "gemini3.8-flash" && s.parts.contains { $0.id == "magazine" && $0.label2?.hasPrefix("ranks nothing yet") == true },
                   s.routeID ?? "nil")
-            check("2 the checking-time assumption labelled", s.labels.contains { $0.contains("20 seconds") })
+            check("2 the user's own checking time shown, with its 20 s assumption",
+                  s.parts.contains { $0.id == "checking" && $0.sample?.contains("20 seconds") == true })
             check("2 a segmentation pick Process Files can run is offered to it",
                   s.routeID == "seg-qwen3.5-2b-8bit" ? s.apply == .segmentation(.local) : true, "\(s.apply as Any)")
         } else { check("2 segmentation card", false) }
@@ -181,8 +182,13 @@ enum SettingsSheetTestDriver {
             check("6 \(name): no bench ids in the sheet's own words", hits.isEmpty, hits.prefix(3).joined(separator: " || "))
         }
 
-        // 7. Render: each page draws, both tabs.
-        for (name, m) in [("free", free), ("gemini", paid), ("custom", custom)] {
+        // 7. Render: each page draws, both tabs. An 8 GB Mac: segmentation by hand, handwriting unread.
+        let small = sheet("small", general: SettingsLayer(kind: .general, name: "General"), gb: 8)
+        check("7 an 8 GB Mac: segmentation by hand says nothing is proposed",
+              card(small, "segmentation")?.parts.first?.figure.hasPrefix("nothing is proposed") == true)
+        check("7 an 8 GB Mac: the overall figure says what counts as 0",
+              small.totals.first { $0.id == "accuracy" }?.detail?.contains("count as 0") == true)
+        for (name, m) in [("free", free), ("gemini", paid), ("custom", custom), ("small", small)] {
             for tab in SettingsSheetView.Tab.allCases {
                 let ink = renderedInk(SettingsSheetPage(model: m, tab: tab), saveAs: "\(name)-\(tab.rawValue.lowercased())")
                 check("7 \(name) \(tab.rawValue) renders (\(ink) dark px)", ink > 20_000)

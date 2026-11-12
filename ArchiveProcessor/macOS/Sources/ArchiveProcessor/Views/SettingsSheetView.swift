@@ -226,7 +226,7 @@ struct SettingsSheetPage: View {
                         GridRow {
                             Text(l.label).foregroundStyle(.secondary)
                             VStack(alignment: .leading, spacing: 0) {
-                                Text(l.value)
+                                Text(l.value).fixedSize(horizontal: false, vertical: true)
                                 Text(l.source).font(.caption2).foregroundStyle(.secondary)
                             }
                         }
@@ -354,6 +354,7 @@ struct StageCardView: View {
                 Text(card.about).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(card.routeName).font(.title3.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                     chip(card.family)
                     chip(card.isCustom ? "Custom" : "The app's pick", highlight: card.isCustom)
                 }
@@ -368,7 +369,7 @@ struct StageCardView: View {
                                 Text(p.figure + (p.routeName.map { $0 != card.routeName ? " — \($0)" : "" } ?? ""))
                                     .foregroundStyle(p.warning ? Color.orange : Color.primary)
                                     .fixedSize(horizontal: false, vertical: true)
-                                if let s = p.sample { Text(s).font(.caption2).foregroundStyle(.secondary) }
+                                if let s = p.sample { Text(s).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
                                 if let l = p.label2 {
                                     Text(l).font(.caption2).italic().foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
