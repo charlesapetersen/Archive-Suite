@@ -22,9 +22,8 @@ import Foundation
 //      moved/replaced under the same path is never tagged. Uses `fileResourceIdentifier` (a pure
 //      read), NEVER `.documentIdentifierKey` (which assigns & persists an id — a mutation).
 //   §7 label written only when the transform changes it; drift otherwise restored.
-//   §7a tag colours: Finder's colour-named tags carry their own colour ("Purple\n3") and every other
-//       surviving tag the colour it had. macOS 27 gives a sandboxed names-only write no colours, so they
-//       are put back in the tag attribute itself.
+//   §7a every tag the write leaves alone keeps its own colour ("Purple\n3"): macOS 27 gives a sandboxed
+//       names-only write no colours, so they are put back in the tag attribute itself.
 //   §8 verify by re-read — multiset equality (order-independent) + label check.
 //   §9 inverse delta derived from the actual before/after diff.
 //   §10 in-process per-resolved-path serialization — the whole read→modify→verify→write above is
@@ -318,8 +317,8 @@ public enum CoordinatedTagWriter {
 
                 // §7a tag-colour defense (W40.vm-macos27-reader): a names-only write lets macOS pick each tag's
                 // colour, and on macOS 27 a sandboxed app gets none, so every untouched "Purple\n3" came back
-                // "Purple\n0". Finder's colour-named tags get their own colour and every other surviving tag
-                // the colour it had (`TagXattr.keepingColours`), then re-read: the checks below judge the file
+                // "Purple\n0". Every tag that survived the write gets back the colour it had
+                // (`TagXattr.keepingColours`), then re-read: the checks below judge the file
                 // as it is after this, not as we meant it to be. A failure here is reported after the names
                 // were written, and says so.
                 if let beforeRaw, let afterRaw = TagXattr.rawEntries(target),

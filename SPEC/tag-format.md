@@ -54,8 +54,10 @@ Tags are **macOS Finder tags** — file extended-attribute metadata, not file co
   A names-only `.tagNamesKey` write lets macOS choose those colours, and **on macOS 27 a sandboxed app
   gets none** (measured 2026-11-12, host and VM: `"Purple\n3"` → `"Purple\n0"`; unsandboxed, any tag not
   in the local Finder tag list lost its colour too). So `CoordinatedTagWriter` (§7a) puts back, exact
-  name and occurrence by occurrence, the entry each surviving tag had before the write; a tag the write
-  adds keeps whatever macOS gave it. This is separate from `labelNumber` above, which lives in the
+  name and occurrence by occurrence, the entry each surviving tag had before the write, Finder's colour
+  names included (a colourless `"Red\n0"` stays colourless: the name never sets the colour, §Item type);
+  a tag the write adds keeps whatever macOS gave it, so an undo that re-adds a removed tag does not bring
+  back its own colour in a sandboxed app. This is separate from `labelNumber` above, which lives in the
   file's Finder info.
 - **No search index is ever tag truth.** The filesystem xattr read through `.tagNamesKey` is the only
   authority. Spotlight's `kMDItemUserTags` was the Reader's discovery mechanism until `W26.walk2` replaced

@@ -100,13 +100,14 @@ final class TagWriterPrimitiveTests: XCTestCase {
 
     // MARK: §7a — tag colours survive a names-only write (W40.vm-macos27-reader)
 
-    func testKeepingColoursRestoresTheTagsThatSurvivedAndColoursFindersOwn() {
-        let before = ["Purple\n3", "Read\n0", "Mytag\n4", "Plain"]
-        // macOS dropped the colours; the write removed "Plain" and added "New" and "Red".
-        let after = ["Purple\n0", "Read\n0", "Mytag\n0", "New\n5", "Red\n0"]
+    func testKeepingColoursRestoresTheTagsThatSurvived() {
+        let before = ["Purple\n3", "Read\n0", "Mytag\n4", "Plain", "Red\n0"]
+        // macOS dropped the colours, gave the kept colourless "Red" one, and the write removed "Plain" and
+        // added "New" and "Green".
+        let after = ["Purple\n0", "Read\n0", "Mytag\n0", "Red\n6", "New\n5", "Green\n0"]
         XCTAssertEqual(TagXattr.keepingColours(before: before, after: after),
-                       ["Purple\n3", "Read\n0", "Mytag\n4", "New\n5", "Red\n6"],
-                       "kept tags their own colour, Finder's colour names theirs, other added tags macOS's")
+                       ["Purple\n3", "Read\n0", "Mytag\n4", "Red\n0", "New\n5", "Green\n0"],
+                       "kept tags their own colour, a colour name included; added tags macOS's")
         XCTAssertNil(TagXattr.keepingColours(before: before, after: before), "nothing to correct")
         XCTAssertNil(TagXattr.keepingColours(before: ["Plain"], after: ["Plain\n0"]),
                      "no colour and colour 0 are the same colour")
@@ -125,8 +126,8 @@ final class TagWriterPrimitiveTests: XCTestCase {
         // A composed "Café" replacing a decomposed one is a different name: the new spelling stays.
         let decomposed = "Cafe\u{301}", composed = "Caf\u{E9}"
         XCTAssertNil(TagXattr.keepingColours(before: [decomposed + "\n4"], after: [composed + "\n0"]))
-        // "red" is not Finder's "Red".
-        XCTAssertNil(TagXattr.keepingColours(before: [], after: ["red\n0"]))
+        // Nor does "red" take Red's.
+        XCTAssertNil(TagXattr.keepingColours(before: ["Red\n6"], after: ["red\n0"]))
     }
 
     /// The write itself. A tag whose colour does not come from Finder's colour names ("Mytag\n4") loses it to
@@ -134,17 +135,17 @@ final class TagWriterPrimitiveTests: XCTestCase {
     /// strips "Purple" too (the Reader bundle's test covers that).
     func testAWriteKeepsTheColoursOfTheTagsItLeavesAlone() throws {
         let url = try makeFile("colours.pdf", tags: [], label: 3)
-        try TagXattr.writeRawEntries(["Purple\n3", "Mytag\n4", "Unread\n0"], to: url)
+        try TagXattr.writeRawEntries(["Purple\n3", "Mytag\n4", "Red\n0", "Unread\n0"], to: url)
         let bytes = try Data(contentsOf: url)
         let result = try CoordinatedTagWriter.write(url) { names, label in
-            (names.filter { $0 != "Unread" } + ["Read", "Red"], label)
+            (names.filter { $0 != "Unread" } + ["Read"], label)
         }
         XCTAssertEqual(result.after.sorted(), ["Mytag", "Purple", "Read", "Red"])
         XCTAssertEqual(result.afterLabel, 3, "the label is not changed by putting the colours back")
         let raw = try XCTUnwrap(TagXattr.rawEntries(url))
         XCTAssertTrue(raw.contains("Purple\n3"), "Purple keeps its colour: \(raw)")
         XCTAssertTrue(raw.contains("Mytag\n4"), "Mytag keeps its colour: \(raw)")
-        XCTAssertTrue(raw.contains("Red\n6"), "an added Red is red: \(raw)")
+        XCTAssertTrue(raw.contains("Red\n0"), "a colourless Red stays colourless: \(raw)")
         XCTAssertEqual(try Data(contentsOf: url), bytes, "the file's bytes are never touched")
     }
 

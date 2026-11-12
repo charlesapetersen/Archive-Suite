@@ -145,13 +145,11 @@ enum TagXattr {
 
     /// The colour-preserving half of a tag write (W40.vm-macos27-reader). `before` and `after` are the raw
     /// entries around a `.tagNamesKey` write; returns the corrected entries, or nil when nothing needs it.
-    /// - One of Finder's seven colour-named tags ("Purple") gets its own colour ("Purple\n3"), whether the
-    ///   write kept it or added it: that is the colour Finder gives it, and what a write before macOS 27
-    ///   left it with. It follows the name, never the label, so it cannot fight an intended label change.
-    /// - Any other tag that was there before and is still there keeps the entry it had, occurrence by
-    ///   occurrence, matched on the name's exact bytes ("Café" composed and decomposed are two names).
-    /// - Any other tag the write added keeps what macOS gave it.
-    /// Only colours change: every corrected entry has the same name as the entry it replaces.
+    /// Every tag that was there before and is still there keeps the entry it had, occurrence by occurrence,
+    /// matched on the name's exact bytes ("Café" composed and decomposed are two names). That includes
+    /// Finder's colour names: a colourless "Red\n0" stays colourless, since the colour is the user's display
+    /// choice and never follows from the name (SPEC §Item type). A tag the write added keeps what macOS gave
+    /// it. Only colours change: every corrected entry has the same name as the entry it replaces.
     ///
     /// Why: writing names only lets macOS choose each tag's colour, and on macOS 27 a SANDBOXED app (all
     /// three of ours) gets none, so every write turned "Purple\n3" into "Purple\n0" (measured 2026-11-12 on
@@ -169,18 +167,11 @@ enum TagXattr {
         let corrected = after.map { entry -> String in
             let (name, colour) = split(entry)
             let bytes = Array(name.utf8)
-            let earlier = kept[bytes]?.first
-            if earlier != nil { kept[bytes]?.removeFirst() }
-            let replacement: String
-            if let label = FinderLabel.allCases.first(where: { Array($0.tokenName.utf8) == bytes }) {
-                guard colour != label.rawValue else { return entry }
-                replacement = "\(name)\n\(label.rawValue)"
-            } else {
-                guard let earlier, split(earlier).colour != colour else { return entry }
-                replacement = earlier
-            }
+            guard let earlier = kept[bytes]?.first else { return entry }
+            kept[bytes]?.removeFirst()
+            guard split(earlier).colour != colour else { return entry }
             changed = true
-            return replacement
+            return earlier
         }
         return changed ? corrected : nil
     }
