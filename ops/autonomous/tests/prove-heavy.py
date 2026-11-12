@@ -556,6 +556,20 @@ echo "gate-rc=$GATE_RC"
                 second, beside, took = pair(False)
                 check(second.returncode == 0 and not beside and took >= 2.5,
                       "with heavy_share off, the second job waits for the holder as before")
+                # Slot 2 names a live session whose supervisor is gone (its kernel lock is free): no job may start
+                # in slot 1 beside it, as the single slot always waited for such a session.
+                registry.write_text(json.dumps({"projects": [{"name": "Archive Suite", "policy": {"heavy_share": True}}]}))
+                orphan = subprocess.Popen(["sleep", "3"], start_new_session=True)
+                children.append(orphan)
+                helper.publish(share_state / "owner.2.json", {
+                    "token": "c" * 32, "owner": orphan.pid, "owner_start": helper.identity(orphan.pid),
+                    "child": orphan.pid, "child_start": helper.identity(orphan.pid)})
+                t0 = time.monotonic()
+                late = subprocess.run([sys.executable, str(HELPER), "--state", str(share_state), "run", "--", "sleep", "1"],
+                                      env=share_env, capture_output=True, text=True, timeout=60)
+                check(late.returncode == 0 and time.monotonic() - t0 >= 2.5 and orphan.poll() is not None,
+                      "a session left running in slot 2 by a dead supervisor holds back a job in slot 1")
+                (share_state / "owner.2.json").unlink(missing_ok=True)
             else:
                 print("SKIP shared lock: the Agent Manager heavy-lock at " + str(source) + " cannot share", flush=True)
         else:

@@ -77,6 +77,25 @@ def owner_paths(state):
     return [state / owner for _, owner in SLOTS]
 
 
+def orphaned_elsewhere(state, locks, slot_paths, mine):
+    """True when a slot other than mine has a live owner record but a free kernel lock: its supervisor died and
+    its session runs on unguarded by the Mac lock, so no job may start beside it (one slot always waited for it)."""
+    for i, (other_lock, (_, other_owner)) in enumerate(zip(locks, slot_paths)):
+        if i == mine:
+            continue
+        try:
+            fcntl.flock(other_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            continue   # held: its supervisor is alive, and the Mac lock speaks for it
+        try:
+            r = read(other_owner)
+            if r and active(state, r):
+                return True
+        finally:
+            fcntl.flock(other_lock, fcntl.LOCK_UN)
+    return False
+
+
 def try_mac(taker, label):
     """One try at the Mac-wide lock: 'taken' (release it), 'nested', or the record of what blocks it."""
     if taker is None:
@@ -431,7 +450,10 @@ def run(state, command, ready):
     sampler = None
     manager = manager_lock()
     taker = manager.Taker("archive-suite", label) if manager else None
-    slot_paths = [(state / lock_name, state / owner_name) for lock_name, owner_name in SLOTS[:slot_count(manager)]]
+    # Every slot is opened, so a session orphaned in slot 2 is seen even once sharing is off; only the first
+    # slot_count are taken.
+    slot_paths = [(state / lock_name, state / owner_name) for lock_name, owner_name in SLOTS]
+    takeable = slot_count(manager)
     owner_path = slot_paths[0][1]
 
     with contextlib.ExitStack() as slot_files:
@@ -443,8 +465,8 @@ def run(state, command, ready):
             orphans_checked = time.monotonic()
             while not interrupted:
                 blocker = None
-                tried = taken = False
-                for slot_lock, (_, slot_owner) in zip(locks, slot_paths):
+                tried = taken = orphan = False
+                for index, (slot_lock, (_, slot_owner)) in enumerate(zip(locks[:takeable], slot_paths)):
                     try:
                         fcntl.flock(slot_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     except BlockingIOError:
@@ -452,7 +474,9 @@ def run(state, command, ready):
                     tried = True
                     with metadata_lock(state):
                         old = read(slot_owner)
-                        if not old or not active(state, old):
+                        if old and active(state, old) or orphaned_elsewhere(state, locks, slot_paths, index):
+                            orphan = True   # a session whose supervisor is gone still runs: wait, as one slot did
+                        else:
                             if old:
                                 retire_members(state, old["token"])
                             # W35.machine-lock: then the Mac-wide lock shared with Vision OCR, tried
@@ -479,8 +503,8 @@ def run(state, command, ready):
                     if taken:
                         break
                     fcntl.flock(slot_lock, fcntl.LOCK_UN)
-                    if blocker:
-                        break   # the Mac lock gives every slot the same answer
+                    if blocker or orphan:
+                        break   # the Mac lock gives every slot the same answer; an orphaned session waits for all
                 if taken:
                     break
                 if tried:
