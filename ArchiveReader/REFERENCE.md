@@ -277,6 +277,7 @@ Contact Sheet (`W40.reader-page-views`, as in Preview).
 - `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
 - `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
   double-click or `⌘O` open in the document window (`⏎` has no handler; ledger R-35)
+- `⌃⌘P` Tags ▸ Flag as Poor OCR / Remove Poor OCR Flag (the `OCR Poor` tag, through `TagWriter`; W44.reocr-reader)
 - `⌘R` Mark Read · `⌘U` Mark Unread · `⌥⌘I` View ▸ Show/Hide Inspector (Edit Info until `W40.reader-commands-table`; `⌘I` is now free, as in Notes, where it is Italic) · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped) · `⇧⌘Z` Redo tag change (the newest undo, until a new change; `W40.fix-reader-redo`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
 - **Keyboard triage (G4):** `⌘]`/`⌘[` Next/Previous Unread · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
@@ -460,6 +461,14 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   AuditLedger.swift           Safety §12 append-only JSON-lines record of every tag write (container,
                               never the archive); @TaskLocal group per action, `undoes` on undo;
                               reconstructs the latest 100 groups for durable inverse-delta undo.
+  PoorOCRFlagGuard.swift      W44.reocr-reader: a TagWriter write whose delta names `OCR Poor` runs the shared flag
+                              protocol (lock before coordination, begin, write, commit what reads back;
+                              `SPEC/improve-ocr.md` §3); the ledger line carries the record (`Entry.flag`).
+  ImproveOCRSupport.swift     The Reader's own security-scoped connection to the shared folder (store ID checked on
+                              every use) + `ImproveOCRArchive`: a file's archive = the nearest marker above it.
+  ImproveOCRHandoff.swift     The archiveprocessor://improve-ocr link: inline ≤ 8 files, else a staged manifest
+                              (inode, size, SHA-256). Reads files to hash them; writes nothing in the archive.
+  ImproveOCRReceiptInbox.swift The Processor's receipts → which granted-root file to re-index; seen IDs in defaults.
   TagSimilarity.swift         Pure near-duplicate subject clustering (normalize + length-scaled
                               Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort
@@ -505,6 +514,10 @@ Search/                       Discovery + disposable caches (never the corpus):
   FlagStore.swift             Per-file flag in UserDefaults (outside the corpus); notes are Archive Notes' job.
   SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
 Views/
+  NavigationModel+ImproveOCR.swift  W44.reocr-reader: Flag as Poor OCR (off the main thread, one ledger group;
+                              a stale batch result never overwrites a newer row), Connect Improve OCR Folder…,
+                              Improve OCR… (ImproveOCROpener: Launch Services, or the DEBUG recorder), receipts →
+                              ContentIndexer.forget + the ordinary pass + `.readerFileContentsReplaced`.
   NavigationModel.swift       Nav view model: filter/sort/selection, folder tree, smart-folder counts,
                               view-state persistence, inline + corpus-wide edits — all via TagWriter.
                               Smart-folder scope: `scope`/`baseFtsPaths`/`applyScope`/`clearUserFilters`;

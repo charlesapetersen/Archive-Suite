@@ -1,6 +1,6 @@
 // ImproveOCRReceipt.swift — the Processor's record that a file's text was replaced, for the Reader (ArchiveCore)
 //
-// `execution-plans/reocr/00-plan.md` §7. Written to `<shared support>/Receipts/<operation UUID>.json` once a
+// `SPEC/improve-ocr.md` §4. Written to `<shared support>/Receipts/<operation UUID>.json` once a
 // replacement is published and verified, independently of whether the flag could be cleared. The Reader reads it on
 // launch, root activation or a wake-up hint, checks it against its own granted root and the file's current bytes,
 // re-extracts the text and acknowledges it. A receipt carries no OCR text and no credentials, and grants no access:

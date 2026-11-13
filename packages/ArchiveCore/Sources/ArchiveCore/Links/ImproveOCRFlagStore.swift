@@ -1,6 +1,6 @@
 // ImproveOCRFlagStore.swift — the shared "OCR Poor" flag generations for Improve OCR (ArchiveCore)
 //
-// `execution-plans/reocr/00-plan.md` §6. The Reader flags and unflags a file; the Processor clears the flag when the
+// `SPEC/improve-ocr.md` §3. The Reader flags and unflags a file; the Processor clears the flag when the
 // person accepts a better reading, and puts it back on a restore. Both apps record each such action here, in the
 // connected shared support folder, so an acceptance can tell whether the flag it reviewed is still the flag on the
 // file: every action advances the file's generation, even when the tag already had the requested value.

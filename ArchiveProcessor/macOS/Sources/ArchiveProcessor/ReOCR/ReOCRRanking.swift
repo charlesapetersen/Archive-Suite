@@ -4,7 +4,7 @@ import Foundation
 // MARK: - Improve OCR: the readers ranked for one kind of page (W44.reocr-processor)
 
 /// The readers the Improve OCR dialog offers for one kind of page, best measured first, from the same rule table, pair
-/// matrix and feasibility checks the settings solver uses (`execution-plans/reocr/00-plan.md` §4; W46.settings-solver).
+/// matrix and feasibility checks the settings solver uses (`SPEC/improve-ocr.md` §6; W46.settings-solver).
 /// Pure: the caller reads the Keychain and the settings layers once, outside any view body, and passes the resources.
 ///
 /// Only routes the app can run are rows. A cluster reading is an export and import, never one click, so those routes

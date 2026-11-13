@@ -2,6 +2,33 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Improve OCR in the Reader: flag, filter, hand-off, receipts — the limits (W44.reocr-reader, 2026-11-13)
+
+Shipped: Tags ▸ Flag as Poor OCR / Remove Poor OCR Flag (⌃⌘P, also in the row menu and the document window),
+Sort & Filter ▸ Show Poor OCR Only, Tags ▸ Improve OCR…, File ▸ Connect Improve OCR Folder…, the text page's reader
+and Kind in the document window's status bar, and receipt-driven re-indexing. Contract: `SPEC/improve-ocr.md`.
+What it does not do, deliberately or not yet:
+- **The index notices a suite replacement only through its receipt.** The content index skips a file whose
+  modification date is unchanged, and the Processor keeps the date. A replacement made outside the suite that
+  restores the date, or a receipt the Reader never reads (its folder disconnected), leaves the old text searchable
+  until the index is rebuilt. Strengthening the skip with the file's inode and size is `W44.reocr-reader-freshness`.
+- **Generic edits that name `OCR Poor` run on the main thread**, as every Reader tag write does, and wait at most 1 s
+  for the file's flag lock (`SPEC/improve-ocr.md` §3 states the exception). The Flag command runs off it.
+- **Never connected, a generic edit of the tag is not recorded**, like an edit in Finder; the Flag command asks for
+  the folder first. Connected but unusable (moved, replaced by another store, no root marker): every write that names
+  the tag is refused with the reason, and unrelated edits go ahead.
+- **The command's direction comes from the list's rows** (flag unless every target is flagged), which lag a change
+  made in another app until the watcher sees it; the write itself re-reads the file.
+- **Receipts are read on library changes, on activation and every 20 s**; the Processor sends no wake-up. Seen IDs are
+  kept in the Reader's own defaults, all of them; receipts stay in the shared folder. An index pass already running
+  when a receipt is handled can write the file's old text back after the row was dropped; the date-only skip then
+  keeps it until `W44.reocr-reader-freshness` (the next receipt or a rebuild also fixes it).
+- **A reload after a receipt rebuilds the document's panes** on the same page pair; zoom and find highlights in that
+  window start again.
+- **Not exercised by automation:** the real Launch Services launch of Archive Processor (no Processor is installed in
+  the test VM, so `ImproveOCRUITests` uses the DEBUG hand-off recorder) and the Connect panel itself (the test connects
+  the fixture's folder by path). The hand-off link and manifest are unit-tested against the Processor's decoder rules.
+
 ## ✅ CLOSED (W40.fix-reader-inspector-narrow, 2026-11-11) — the window makes room for the Inspector
 
 At the navigation window's 900-pt minimum with the sidebar shown, the Inspector ran past the window's right edge and its
@@ -199,7 +226,7 @@ Plain arrows pan the focused PDF page, bounded at its edges; modified arrows ret
 Core now uses one structured parse for stripping and header metadata; `Kind:` and reader provenance
 are per physical text page, with unknown/mixed summaries for merged files. Reader's existing FTS
 still indexes all text including headers; its existing stripped display remains page 2 only. The
-feature's menus, filter, hand-off and completion refresh are separate queued W44 items.
+feature's menus, filter, hand-off and completion refresh shipped in W44.reocr-reader (entry at the top).
 
 PDFKit can omit the blank separator below the header. A body whose first line looks exactly like the
 next optional header field can therefore be interpreted as metadata. A filename indistinguishable

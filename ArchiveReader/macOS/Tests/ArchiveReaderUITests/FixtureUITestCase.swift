@@ -45,6 +45,9 @@ class FixtureUITestCase: XCTestCase {
 
     var app: XCUIApplication!
 
+    /// Launch arguments a subclass adds before the app starts (W44.reocr-reader's shared folder, for one).
+    var extraLaunchArguments: [String] { [] }
+
     /// The table that holds the file list rows.
     var table: XCUIElement { app.tables["ar.table"] }
 
@@ -66,6 +69,7 @@ class FixtureUITestCase: XCTestCase {
             app.launchArguments += ["-ARUITestContentIndexPath",
                                    Self.canonicalFixturePath + "/content-index-v2.sqlite3"]
         }
+        app.launchArguments += extraLaunchArguments
         app.launch()
         app.activate()   // bring to front so row/header clicks are hittable even if another app had focus
 

@@ -3,7 +3,7 @@ import Foundation
 
 // MARK: - Improve OCR: the Processor's connection to the shared support folder (W44.reocr-processor)
 
-/// The Processor's own saved connection to the shared support folder (`execution-plans/reocr/00-plan.md` §3): a
+/// The Processor's own saved connection to the shared support folder (`SPEC/improve-ocr.md` §1–2): a
 /// bookmark to the folder the person chose in the Processor's panel, and the folder's identity
 /// (`ImproveOCRSupportIdentity`) as it was when connected. Every use resolves the bookmark and checks that identity
 /// again, so a moved, replaced or different folder is reported ("reconnect") instead of silently starting a second

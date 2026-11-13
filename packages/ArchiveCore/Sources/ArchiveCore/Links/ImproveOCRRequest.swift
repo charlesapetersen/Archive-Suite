@@ -1,5 +1,5 @@
 // ImproveOCRRequest.swift — the Reader → Processor "Improve OCR" hand-off values (ArchiveCore)
-// Design: execution-plans/reocr/00-plan.md §3. Values and validation only: the request store (its private
+// Design: SPEC/improve-ocr.md §1–2. Values and validation only: the request store (its private
 // directory, file ownership, symlink refusal, replay record) belongs to each app's audited adapter.
 // An incoming request only opens the review dialog; it never authorizes OCR spending, a flag change
 // or a replacement.

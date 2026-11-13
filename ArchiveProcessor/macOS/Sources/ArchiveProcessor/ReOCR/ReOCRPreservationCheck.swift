@@ -4,7 +4,7 @@ import Foundation
 // MARK: - Improve OCR: proving a candidate kept the original (W44.reocr-processor)
 
 /// Checks a re-read candidate against the file it replaces, independently of whatever wrote it
-/// (`execution-plans/reocr/00-plan.md` §5). A candidate passes only when:
+/// (`SPEC/improve-ocr.md` §5). A candidate passes only when:
 ///
 /// 1. it holds the entire original byte for byte as its prefix, followed by an incremental revision;
 /// 2. both open, neither is encrypted, and they have the same number of pages;

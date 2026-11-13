@@ -1,6 +1,6 @@
 // ImproveOCRSupportIdentity.swift — which shared support folder this is, for Improve OCR (ArchiveCore)
 //
-// `execution-plans/reocr/00-plan.md` §3. The Reader and the Processor each connect the shared support folder through
+// `SPEC/improve-ocr.md` §1–2. The Reader and the Processor each connect the shared support folder through
 // their own folder panel and keep their own bookmark. The folder's identity is a UUID in `store.json`, made once by
 // whichever app connects first; each app saves it on connecting and checks it every time it resolves its bookmark,
 // so two apps pointed at two different folders (or a folder replaced by a copy) refuse to coordinate instead of each

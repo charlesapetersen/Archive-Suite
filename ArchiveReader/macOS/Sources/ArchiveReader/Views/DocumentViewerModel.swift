@@ -179,7 +179,7 @@ final class DocumentViewerModel: ObservableObject {
         replacedObserver = NotificationCenter.default.publisher(for: .readerFileContentsReplaced)
             .sink { [weak self] note in
                 guard let paths = note.userInfo?[ReaderFileContentsReplaced.pathsKey] as? [String] else { return }
-                MainActor.assumeIsolated { self?.reloadReplaced(paths: Set(paths)) }
+                Task { @MainActor in self?.reloadReplaced(paths: Set(paths)) }
             }
         textController.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
         textController.userSelected = { [weak self] in self?.userSelected(in: .right) }
@@ -412,7 +412,7 @@ final class DocumentViewerModel: ObservableObject {
     /// `PDFPaneView.updateNSView`'s reuse fallback compares `page.string`, which is `nil` for both an old
     /// and a new *image* page — so without the pair in the identity the left pane would keep showing the
     /// previous scan.
-    var pageIdentity: String { "\(index)#\(pair)#r\(contentRevision)" }
+    var pageIdentity: String { contentRevision == 0 ? "\(index)#\(pair)" : "\(index)#\(pair)#r\(contentRevision)" }
     /// The image pane's identity also covers the PDF / JPEG switch, so the swap always builds a fresh view
     /// that takes the carried zoom and region, rather than leaning on `updateNSView`'s text comparison
     /// (an image page and a JPEG both have no text, so it cannot tell them apart).

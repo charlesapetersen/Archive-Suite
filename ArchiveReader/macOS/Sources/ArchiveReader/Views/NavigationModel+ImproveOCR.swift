@@ -177,28 +177,30 @@ extension NavigationModel {
     /// replacement kept the file's dates, so an ordinary pass would skip it), starts the incremental pass that
     /// extracts it again, and reloads a document window showing it. Called on each library change and when the app
     /// comes forward; also every 20 seconds while a folder is connected. Cheap when there is nothing new: one
-    /// folder listing.
-    func checkImproveOCRReceipts() {
+    /// folder listing. A receipt that is not for this library now is not looked at again until the library changes
+    /// (`libraryChanged`).
+    func checkImproveOCRReceipts(libraryChanged: Bool = false) {
+        if libraryChanged { ImproveOCRReceiptCheck.notHere = [] }
         let support = ImproveOCRSupport.shared
         guard support.isConnected, !ImproveOCRReceiptCheck.running else { return }
         ImproveOCRReceiptCheck.startTimer { [weak self] in self?.checkImproveOCRReceipts() }
         guard let folder = try? support.resolve() else { return }
         let inbox = ImproveOCRReceiptInbox(defaults: support.defaults)
-        let unseen = inbox.unseen(in: folder)
+        let unseen = inbox.unseen(in: folder, skipping: ImproveOCRReceiptCheck.notHere)
         guard !unseen.isEmpty else { return }
         var refresh: [String] = [], seen: [UUID] = []
-        var paths: [String]?
-        let candidates: () -> [String] = { [library] in
-            if let paths { return paths }
-            let all = library.files.map(\.path)
-            paths = all
+        var built: [(path: String, nfc: String)]?
+        let rows: () -> [(path: String, nfc: String)] = { [library] in
+            if let built { return built }
+            let all = library.files.map { ($0.path, $0.path.precomposedStringWithCanonicalMapping) }
+            built = all
             return all
         }
         for item in unseen {
-            switch ImproveOCRReceiptInbox.disposition(of: item.receipt, archive: .shared, candidates: candidates) {
+            switch ImproveOCRReceiptInbox.disposition(of: item.receipt, archive: .shared, rows: rows) {
             case .refresh(let path): refresh.append(path); seen.append(item.id)
             case .drop: seen.append(item.id)
-            case .notHere: break
+            case .notHere: ImproveOCRReceiptCheck.notHere.insert(item.id)
             }
         }
         let unique = Array(Set(refresh))
@@ -220,6 +222,8 @@ extension NavigationModel {
 @MainActor
 enum ImproveOCRReceiptCheck {
     static var running = false
+    /// Receipts that were not for this library at the last check; cleared when the library changes.
+    static var notHere: Set<UUID> = []
     private static var timer: Timer?
 
     static func startTimer(_ check: @escaping @MainActor () -> Void) {

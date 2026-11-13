@@ -9,7 +9,7 @@ import Foundation
 /// by `PDFGenerator.textPageData` at its old position, the old page leaves the page tree, and PDFium saves with
 /// `FPDF_INCREMENTAL`, which writes the original file first and appends the revision after it.
 ///
-/// What PDFium writes is not trusted on its own (`execution-plans/reocr/00-plan.md` §5): `candidate` always runs
+/// What PDFium writes is not trusted on its own (`SPEC/improve-ocr.md` §5): `candidate` always runs
 /// `ReOCRPreservationCheck` on the result and checks every replaced page now carries the new text page's content,
 /// and returns the bytes only when both hold. It works in memory and writes no file; publication is
 /// `ReOCRFileWriter`'s job.

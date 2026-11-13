@@ -391,7 +391,7 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                app's own pick clears it. View: `Views/SettingsRangeView.swift` (plain shapes, so the
                                offscreen render sees it); self-test section 8 of `SettingsSheetTestDriver`.
 ReOCR/                         W44 Improve OCR (Tier-2: it replaces archive PDFs' text pages). Contract:
-                               `SPEC/improve-ocr.md`; design: `execution-plans/reocr/00-plan.md`.
+                               `SPEC/improve-ocr.md`; why: its §6.
   ReOCRPairs.swift             Positive validation of suite image/text pairs; the replacement text page (header kept).
   ReOCRIncrementalWriter.swift The candidate: an incremental revision on the pinned static PDFium
                                (`scripts/bootstrap-pdfium.sh`, `macOS/PDFium/module.modulemap`), proven by

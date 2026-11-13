@@ -5,7 +5,7 @@ import Foundation
 
 // MARK: - Improve OCR: publishing an accepted candidate (W44.reocr-processor)
 
-/// One file's recoverable Improve OCR transaction (`execution-plans/reocr/00-plan.md` §5). The only code that replaces
+/// One file's recoverable Improve OCR transaction (`SPEC/improve-ocr.md` §5). The only code that replaces
 /// a PDF's contents for this feature; it writes nothing else in the archive.
 ///
 /// 1. `prepare` snapshots the target under a coordinated read (identity, change time, size, SHA-256, metadata) and

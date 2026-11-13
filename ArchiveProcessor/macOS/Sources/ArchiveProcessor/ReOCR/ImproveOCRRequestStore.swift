@@ -4,7 +4,7 @@ import Foundation
 
 // MARK: - Improve OCR: receiving a hand-off (W44.reocr-processor)
 
-/// Receives an `archiveprocessor://improve-ocr` request (`execution-plans/reocr/00-plan.md` §3). A request only opens
+/// Receives an `archiveprocessor://improve-ocr` request (`SPEC/improve-ocr.md` §1–2). A request only opens
 /// the review dialog: nothing here reads a corpus file, spends money, changes a flag or writes a PDF.
 ///
 /// A manifest is resolved by its UUID under `<shared support>/Requests/`, never by a path from the URL. The folder

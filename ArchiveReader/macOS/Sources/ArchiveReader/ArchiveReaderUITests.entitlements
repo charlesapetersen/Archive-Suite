@@ -9,5 +9,10 @@
 	<array>
 		<string>/Users/admin/Library/Application Support/ArchiveReader/AR-GUI-Fixture/</string>
 	</array>
+	<!-- W44.reocr-reader: the runner reads the Improve OCR shared folder's flag records; the app writes them. -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/Users/admin/Library/Application Support/ArchiveReader/AR-GUI-ImproveOCR/</string>
+	</array>
 </dict>
 </plist>

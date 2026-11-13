@@ -88,7 +88,6 @@ concentrate on:** LAN transport (`Net/CaptureServer.swift`, `CaptureReceiver`, n
   literature and the current models, measured in Phase 3 (74 items plus the measurement audit's), and decided in Phase
   4 as the rules the settings layer applies: `13-stage-rules/` (one note per stage, the table schema, the owner's calls,
   the solver's test cases). `00-plan.md`; `STATE.md`. Kept until the settings build ships, as its source; delete then.
-- `reocr/` — **DESIGNED 2026-11-07 (W44, Reader ↔ Processor)**: person-set OCR Poor flag, per-page Kind/provenance, sandbox-compatible hand-off, ranked re-read and recoverable text-only replacement. `00-plan.md`; retained until the three implementation items ship.
 - `integration/` — **APPROVED 2026-10-14 (W42.int, the suite)**: Vision OCR's engine inside Archive Processor. Stages 1-3,
   5 and 7 filed 2026-11-06 in §"Vision OCR's engine"; stages 4 and 6 replaced by §"The settings layer — W46.settings".
 - `reader-owner-notes-2026-11-10.md` — **FILED 2026-11-10 (Archive Reader, with Processor and suite items)**: the owner's fifteen points from using the Reader on the full corpus, read and measured, their shared causes, and which item answers which; items in §"Archive Reader at corpus size, and the owner's notes of 2026-11-10".
@@ -696,34 +695,10 @@ read again by a better model, picked from a ranked list. The ranking depends on 
 the user corrects the kind, for example from typewritten to handwritten. He called it an important integration between
 the two apps, outlined the features, and left the design to us.
 
-**What exists (checked 2026-10-16).**
-- **No link between the apps.** The Reader and the Processor share only the files, with their Finder tags and PDF
-  headers. Reader has a URL scheme (`archivereader://`, used by Notes' citations). Processor has none.
-- **No OCR quality in the Reader.** Its "Quality" is your Q1-Q3 importance rating, not OCR quality. The only
-  OCR-related tag is the Subject `OCR Failed`.
-- **Ranked readers already exist in the Processor.** The page-kind classifier (`OCR/PageKindClassifier.swift`: handwritten,
-  typewritten, printed, forms) and the ranked picks per kind (`OCR/OCRPageGuidance.swift`, reading
-  `segbench-results/ocr-page-guidance.json`, best first by NES) supply the ranked list.
-- **The page kind is not stored.** It is kept only in run history (`PageReaderRecord`), not in the PDF or the tags.
-- **Re-OCR mode would read the wrong page.** The Processor's "Re-OCR multi-page PDF" mode reads every page of a PDF, so
-  on a processed two-page file (image plus text) it would also read the text page.
+All four items shipped (W44.reocr-plan, -spec, -processor, -reader; `SUITE_TODO_DONE.md`); the contract and its design
+record are `SPEC/improve-ocr.md`. One follow-up remains:
 
-**The design (decided here, per the owner's "do it however seems best").**
-- **The dialog lives in the Processor.** The Processor holds the API keys, the model catalogue, the ranked guidance,
-  prices and the OCR engine. The Reader gets the easy way in: flag a file, and "Improve OCR…", which opens the Processor
-  at that dialog with the files selected.
-- **A flag the user sets** is stored with the file, so it survives without either app open. It can be set in a moment
-  while reading, filtered on in the Reader, and dealt with in a batch later.
-
-Design shipped as W44.reocr-plan; the implementation plan is `execution-plans/reocr/00-plan.md`.
-The three remaining items follow it in order; Processor also waits for the shared settings/ranking work.
-
-- [ ] **`W44.reocr-reader` — flag poor OCR in the Reader and hand it to the Processor [M · ~1-2 sessions · Tier-2]** (lane: reader) (uses: build,vm) (blocked-on: W44.reocr-processor, W46.review-done). Put it in the row menu, the document window and the menu bar with a keyboard shortcut, for one or many selected files:
-  - **Flag as poor OCR, and unflag.** This writes the tag through the shared tag writer, under the Reader's file-safety Core Directive.
-  - **A filter for flagged files.**
-  - **The page kind,** shown where the provider is shown.
-  - **"Improve OCR…",** which hands the selection to the Processor's dialog. When the Processor rewrites a file, the Reader picks up the new text through its existing re-scan, with the document window refreshed if it is open.
-  - **Tests.** VM UI tests for flag, filter and hand-off, on the fixture only.
+- [ ] **`W44.reocr-reader-freshness` — the Reader's index notices a replaced file even when its date is kept [S · ~1 session · Tier-1]** (lane: reader) (uses: build). The content index skips a file whose modification date is unchanged (`ContentIndexer.launch`), and an Improve OCR publication keeps the date, so today only the Processor's receipt makes the Reader read the new text (`ArchiveReader/KNOWN_ISSUES.md`, W44). A replacement outside the suite that restores the date, or a receipt the Reader never sees, leaves the old text searchable. Add the file's inode and size to the stored freshness key (the index is a disposable cache: change the schema, no migration), without making a tag-only change re-extract. Tests: a same-date replacement is re-indexed; a tag edit is not.
 
 ## Archive Processor — a broader benchmark corpus and the pre-release model sweep (owner, 2026-10-16)
 

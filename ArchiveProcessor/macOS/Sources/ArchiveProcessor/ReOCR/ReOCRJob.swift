@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Improve OCR: one file's run, behind the dialog (W44.reocr-processor)
 
-/// One file through Improve OCR (`execution-plans/reocr/00-plan.md` §4–5), without any UI:
+/// One file through Improve OCR (`SPEC/improve-ocr.md` §5–6), without any UI:
 ///
 /// 1. `start` validates the pairs, then `ReOCRFileWriter.prepare` keeps a verified copy of the file and journals it
 ///    before anything is read. Everything after works from that copy's bytes, so the candidate is built on exactly

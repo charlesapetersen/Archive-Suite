@@ -1742,7 +1742,7 @@ final class NavigationModel: ObservableObject {
         // Filter excluded folders before indexing so excluded files are never added to the content index.
         let filesToIndex = indexableFiles(files)
         indexer.startIndexing(filesToIndex)             // incremental; no-op if running
-        checkImproveOCRReceipts()                       // W44.reocr-reader: replaced files keep their dates
+        checkImproveOCRReceipts(libraryChanged: true)   // W44.reocr-reader: replaced files keep their dates
         if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
         restoreSelectionIfNeeded()                      // reading-session resume
         applyPendingRevealIfPossible()                  // deep-link reveal deferral

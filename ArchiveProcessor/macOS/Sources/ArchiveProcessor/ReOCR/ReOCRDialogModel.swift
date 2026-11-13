@@ -3,7 +3,7 @@ import Foundation
 
 // MARK: - Improve OCR: the dialog's state, without views (W44.reocr-processor)
 
-/// What the Improve OCR dialog shows and decides (`execution-plans/reocr/00-plan.md` §4), kept apart from its views so
+/// What the Improve OCR dialog shows and decides (`SPEC/improve-ocr.md` §6), kept apart from its views so
 /// it can be tested headless: each file's eligibility and current reader, each page's Kind (its header's, or the
 /// person's choice; a page with neither must be given one), the pages grouped by Kind, the ranked readers for each group
 /// and the one chosen, the estimate, and the run that sends every page to its group's reader. Changing a Kind re-groups

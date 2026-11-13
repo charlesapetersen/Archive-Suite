@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Improve OCR: the history of kept versions (W44.reocr-processor)
 
-/// What Improve OCR has kept (`execution-plans/reocr/00-plan.md` §5): one entry per operation under `Versions/`, with
+/// What Improve OCR has kept (`SPEC/improve-ocr.md` §5): one entry per operation under `Versions/`, with
 /// its file, date, what happened and how much it keeps. Kept copies stay until the person removes them here; nothing
 /// expires on its own. Restore is `ReOCRJob.restore`; removal deletes only that operation's own kept copy and records.
 struct ReOCRHistory {

@@ -62,6 +62,15 @@ fi
 rm -rf "$DST"
 mkdir -p "$DST"
 
+# W44.reocr-reader: the Improve OCR shared folder `ImproveOCRUITests` connects by path. Beside the archive, never
+# inside it (the flag store refuses a folder under a root marker), private (0700), and rebuilt empty with the
+# fixture. Only when the fixture folder is named AR-GUI-Fixture (the canonical one, in the Reader's scratch folder).
+if [ "$(basename "$DST")" = "AR-GUI-Fixture" ]; then
+  SUPPORT_DIR="$(dirname "$DST")/AR-GUI-ImproveOCR"
+  rm -rf "$SUPPORT_DIR"
+  mkdir -p -m 700 "$SUPPORT_DIR"
+fi
+
 # --- optional sample copy or synthetic text-bearing PDFs ---------------------------
 # The canonical fixture names the tag assignments + UITests expect. The default
 # fixture writes its own small, uncompressed two-page text PDFs, so the VM can

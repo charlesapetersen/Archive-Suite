@@ -244,6 +244,50 @@ final class PoorOCRFlagGuardTests: XCTestCase {
         }
     }
 
+    // MARK: Receipts
+
+    private func receipt(_ path: String, guid: UUID? = nil) throws -> ImproveOCRReceipt {
+        let g = try guid ?? XCTUnwrap(try RootMarker.read(at: root)).guid
+        let data = try JSONSerialization.data(withJSONObject: [
+            "operationID": UUID().uuidString, "rootGUID": g.uuidString, "relativePath": path, "textPages": [1],
+            "beforeSHA256": String(repeating: "a", count: 64), "afterSHA256": String(repeating: "b", count: 64),
+            "outcome": "published", "date": "2026-11-13T00:00:00Z"])
+        let d = JSONDecoder(); d.dateDecodingStrategy = .iso8601
+        return try d.decode(ImproveOCRReceipt.self, from: data)
+    }
+
+    func testAReceiptFindsTheLibraryRowEvenInAnotherUnicodeSpelling() throws {
+        let decomposed = "Cafe\u{301}.pdf"          // as a walker may list it
+        let url = try makeFile(decomposed, tags: [])
+        let rows = [(path: url.path, nfc: url.path.precomposedStringWithCanonicalMapping)]
+        let r = try receipt("Box 1/Caf\u{e9}.pdf")   // FileKey spells it as stored, NFC in the receipt
+        let got = ImproveOCRReceiptInbox.disposition(of: r, archive: .shared, rows: { rows })
+        guard case .refresh(let path) = got else { return XCTFail("\(got)") }
+        XCTAssertEqual(URL(fileURLWithPath: path).standardizedFileURL, url.standardizedFileURL)
+    }
+
+    func testAReceiptForAGoneFileIsDroppedAndOneForAnotherArchiveWaits() throws {
+        XCTAssertEqual(ImproveOCRReceiptInbox.disposition(of: try receipt("Box 1/gone.pdf"), archive: .shared, rows: { [] }), .drop)
+        XCTAssertEqual(ImproveOCRReceiptInbox.disposition(of: try receipt("Box 1/a.pdf", guid: UUID()), archive: .shared,
+                                                          rows: { [] }), .notHere)
+        XCTAssertEqual(ImproveOCRReceiptInbox.disposition(of: try receipt("../escape.pdf"), archive: .shared, rows: { [] }), .drop)
+        XCTAssertEqual(ImproveOCRReceiptInbox.disposition(of: nil, archive: .shared, rows: { [] }), .notHere,
+                       "a receipt this build cannot read is left for a later one")
+    }
+
+    func testSeenReceiptsAreKeptAllAndSkippedOnesAreNotRead() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "PoorOCRGuardTests-\(UUID().uuidString)"))
+        let inbox = ImproveOCRReceiptInbox(defaults: defaults)
+        let folder = support.appendingPathComponent(ImproveOCRReceipt.folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let a = UUID(), b = UUID()
+        for id in [a, b] { try Data("{}".utf8).write(to: folder.appendingPathComponent("\(id.uuidString).json")) }
+        XCTAssertEqual(Set(inbox.unseen(in: support, skipping: []).map(\.id)), [a, b])
+        XCTAssertEqual(inbox.unseen(in: support, skipping: [a]).map(\.id), [b])
+        inbox.markSeen((0..<6000).map { _ in UUID() } + [a])
+        XCTAssertEqual(inbox.unseen(in: support, skipping: []).map(\.id), [b], "no seen ID is ever forgotten")
+    }
+
     // MARK: The filter
 
     func testPoorOCRFilterChipAndSmartFolderRule() {

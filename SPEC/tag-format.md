@@ -106,9 +106,9 @@ a new facet, and does not consume those subjects.
 
 Writes use the apps' audited tag adapters and occurrence-aware deltas/undo. A read error is never an
 empty list. Removal targets only that token's identity, preserving unrelated subjects (including
-`OCR Failed`), dates, ratings, Read/Unread, colour and PDF bytes. Feature flagging/filtering, the shared
-flag-generation protocol and acceptance clearing ship in W44.reocr-processor/reader; this contract
-alone does not authorize an automatic flag clear. Acceptance may clear only the reviewed generation;
+`OCR Failed`), dates, ratings, Read/Unread, colour and PDF bytes. Flagging and its filter (the Reader),
+the shared flag-generation protocol and acceptance clearing (the Processor) are in
+[`improve-ocr.md`](improve-ocr.md); this contract alone does not authorize an automatic flag clear. Acceptance may clear only the reviewed generation;
 cancel/reject/failure leaves the flag. Improve OCR also works without a flag and never adds it implicitly.
 
 **Two tokens for one date facet.** Year, Month, Day, Decade and Sent With are 0–1. When a file carries
