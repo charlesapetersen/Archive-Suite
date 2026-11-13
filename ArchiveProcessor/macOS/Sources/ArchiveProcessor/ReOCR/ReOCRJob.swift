@@ -89,7 +89,9 @@ struct ReOCRJob {
 
     /// `textPages` selects pairs by their text page's 0-based index (nil: every pair); `kinds` overrides a pair's
     /// Kind by the same index (absent: the header's own).
+    /// `pageModels` names, by text page, the model a page's reader is (for its header) when it is not `model`.
     func start(file: URL, root: Root, textPages: Set<Int>? = nil, kinds: [Int: OCRPageKind] = [:], model: LLMModel,
+               pageModels: [Int: LLMModel] = [:],
                gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                read: Reader) async throws -> Review {
         try flags.checkSuitable()
@@ -134,7 +136,7 @@ struct ReOCRJob {
                 let reading = await read(image, pair, kind)
                 try? FileManager.default.removeItem(at: image)   // a page of the archive; not kept past its reading
                 do {
-                    let page = try ReOCRPairs.replacementPage(for: pair, result: reading, model: model, kind: kind,
+                    let page = try ReOCRPairs.replacementPage(for: pair, result: reading, model: pageModels[pair.textIndex] ?? model, kind: kind,
                                                               gatewayDisplayName: gatewayDisplayName,
                                                               localAgentDisplayName: localAgentDisplayName,
                                                               localAgentModelName: localAgentModelName)

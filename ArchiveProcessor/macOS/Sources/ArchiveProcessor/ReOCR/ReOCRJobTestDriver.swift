@@ -25,6 +25,7 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   13. The dialog's model: Kind groups, a Kind change re-ranks, the estimate, Run's blocker, per-Kind readers and models.
 ///   12. A real reader on this Mac (Apple Vision, $0) through the row factory reads the page and is named in the header.
 ///   11. The saved support connection resolves, follows a moved folder, refuses a different store, forgets on disconnect.
 ///   10. Restore puts the original back with later tag edits kept and the flag re-added; refused on a changed file or
@@ -535,6 +536,59 @@ enum ReOCRJobTestDriver {
                                             figure: nil, sample: nil, caveats: [], usdPer1000: nil, estimateUSD: nil,
                                             readiness: .needsSetup("needs a Gemini key"), tie: .notMeasured, isCurrent: false)
                 check("12 a row that needs setup has no reader", ReOCRJob.reader(for: notReady, apiKey: "k") == nil)
+            }
+
+            // 13. The dialog's model: groups by Kind, a Kind change re-ranks, the estimate, Run's blocker, the run.
+            do {
+                guard let table = SettingsRouteTable.bundled else { check("13 the bundled route table loads", false); return }
+                let d = try folder("dialog"), reader = FakeReader()
+                let typed = try file(d, pairs: 1)
+                let unknown = d.appendingPathComponent("Unknown.pdf")
+                let img = d.appendingPathComponent("u.jpg"); try jpeg(img, seed: 9)
+                try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "old", classification: nil, errorMessage: nil,
+                                            errorCode: nil), model: model, outputURL: unknown, originalFileName: "u.jpg")
+                let raw = d.appendingPathComponent("raw.pdf")
+                let one = PDFDocument(); one.insert(PDFPage(), at: 0); try one.dataRepresentation()?.write(to: raw)
+                var res = SettingsResources(macMemoryGB: 16)
+                res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
+                let m = ReOCRDialogModel(files: [typed, unknown, raw], table: table, pairs: OCRPairMatrix.bundled,
+                                         resources: res, staysOnMac: false)
+                check("13 every file is listed, the raw one refused", m.files.count == 3
+                      && { if case .failure = m.files[2].eligibility { return true }; return false }())
+                check("13 the header's Kind is used, the unknown page waits", m.groups.map(\.kind) == [.typewritten, nil], "\(m.groups.map(\.kind))")
+                check("13 Run waits for a Kind", m.runBlocker?.contains("Kind") == true, m.runBlocker ?? "")
+                m.setKind(.handwritten, file: unknown.path)
+                check("13 choosing a Kind re-groups", m.groups.map(\.kind) == [.handwritten, .typewritten] || m.groups.map(\.kind) == [.typewritten, .handwritten],
+                      "\(m.groups.map(\.kind))")
+                let hand = m.groups.first { $0.kind == .handwritten }
+                let direct = ReOCRRanking.rank(kind: .handwritten, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
+                                               resources: res, staysOnMac: false)
+                check("13 and re-ranks for the new Kind", hand?.ranking?.kind == .handwritten
+                      && hand?.ranking?.rows.map(\.id) == direct.rows.map(\.id) && !(direct.rows.isEmpty))
+                m.setKind(.forms, file: unknown.path)
+                let forms = ReOCRRanking.rank(kind: .forms, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
+                                              resources: res, staysOnMac: false)
+                check("13 a second change re-ranks again", m.groups.first { $0.kind == .forms }?.ranking?.rows.map(\.id) == forms.rows.map(\.id))
+                let est = m.estimate
+                check("13 the estimate is a sum or says what is unpriced", est.usd >= 0 && est.unpricedPages >= 0)
+                lines.append("INFO 13 estimate: $\(est.usd), \(est.unpricedPages) unpriced; blocker: \(m.runBlocker ?? "none")")
+                if m.runBlocker == nil {
+                    let j = job(d)
+                    let runs = await m.run(job: j, root: archive(d), model: model, readerFor: { _ in reader.read })
+                    check("13 Run reads the two eligible files", runs.count == 2 && runs.allSatisfy { (try? $0.outcome.get())?.candidate != nil },
+                          "\(runs.map { $0.error ?? "\($0.outcome)" })")
+                    check("13 each page reaches its reader with its Kind", Set(reader.calls.compactMap(\.kind)) == [.typewritten, .forms])
+                    if let r = runs.first(where: { $0.fileID == unknown.path }), let review = try? r.outcome.get(),
+                       let row = m.groups.first(where: { $0.kind == .forms }).flatMap({ m.chosenRow($0) }) {
+                        _ = try j.accept(review)
+                        let h = PDFDocument(url: unknown)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
+                        check("13 the new header names the chosen row's model and the Kind",
+                              h?.kind == .forms && h?.provenance?.model == row.provider.models.first { $0.id == row.modelID }?.displayName,
+                              "\(String(describing: h)) \(row.id)")
+                    }
+                } else {
+                    check("13 with every key, a ready reader exists for each Kind", false, m.runBlocker ?? "")
+                }
             }
 
             // 7. A rotated image page.
