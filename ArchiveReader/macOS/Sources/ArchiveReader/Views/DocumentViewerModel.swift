@@ -300,8 +300,8 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var textScale: CGFloat = 1
     static let textScaleRange: ClosedRange<CGFloat> = 0.5...4
 
-    func zoomTextIn()  { hasTextPage ? rightController.zoomIn()  : setTextScale(textScale * 1.25) }
-    func zoomTextOut() { hasTextPage ? rightController.zoomOut() : setTextScale(textScale / 1.25) }
+    func zoomTextIn()  { hasTextPage ? rightController.zoomIn()  : setTextScale(ZoomLevels.zoomIn(from: textScale)) }
+    func zoomTextOut() { hasTextPage ? rightController.zoomOut() : setTextScale(ZoomLevels.zoomOut(from: textScale)) }
     func fitText()     { hasTextPage ? rightController.fit()     : setTextScale(1) }
 
     /// Both pages fitted and the text at its normal size: Reset Zoom has nothing to do, so the toolbar shows

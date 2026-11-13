@@ -79,8 +79,10 @@ final class PDFPaneController {
         }
     }
 
-    func zoomIn()  { setScale(currentScale * 1.25) }
-    func zoomOut() { setScale(currentScale / 1.25) }
+    /// One step of `ZoomLevels`, measured in the zoom unit so a JPEG shown in place of its PDF page steps
+    /// through the same on-screen sizes.
+    func zoomIn()  { setScale(ZoomLevels.zoomIn(from: currentScale / scaleUnit) * scaleUnit) }
+    func zoomOut() { setScale(ZoomLevels.zoomOut(from: currentScale / scaleUnit) * scaleUnit) }
     func fit() {
         guard let v = pdfView else { return }
         savedScale = nil

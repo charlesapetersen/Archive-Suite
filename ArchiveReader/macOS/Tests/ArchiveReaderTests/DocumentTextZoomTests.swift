@@ -47,10 +47,10 @@ final class DocumentTextZoomTests: XCTestCase {
 
         model.focusPane(.right)
         model.zoomFocusedIn()
-        XCTAssertEqual(model.textScale, 1.25, accuracy: 0.0001, "Zoom In on the text pane enlarges its text")
+        XCTAssertEqual(model.textScale, 1.1, accuracy: 0.0001, "Zoom In on the text pane enlarges its text, one step")
         model.zoomFocusedIn()
         model.zoomFocusedOut()
-        XCTAssertEqual(model.textScale, 1.25, accuracy: 0.0001)
+        XCTAssertEqual(model.textScale, 1.1, accuracy: 0.0001)
         model.fitFocused()
         XCTAssertEqual(model.textScale, 1, "Fit Page (⌘0) resets the text size")
     }
@@ -128,7 +128,7 @@ final class DocumentTextZoomTests: XCTestCase {
         let view = ReaderPDFView()
         view.paneController = model.leftController
         XCTAssertTrue(view.performKeyEquivalent(with: key("=", .command)))
-        XCTAssertEqual(model.textScale, 1.25, accuracy: 0.0001)
+        XCTAssertEqual(model.textScale, 1.1, accuracy: 0.0001)
         XCTAssertTrue(view.performKeyEquivalent(with: key("-", .command)))
         XCTAssertEqual(model.textScale, 1, accuracy: 0.0001)
         XCTAssertFalse(view.performKeyEquivalent(with: key("0", .command)), "⌘0 is the menu's Fit Page")

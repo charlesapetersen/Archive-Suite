@@ -109,7 +109,7 @@ final class DocumentPaneInputTests: XCTestCase {
         XCTAssertEqual(model.focusedPane, .right)
         XCTAssertEqual(text.selectedRange().length, 0)
         model.zoomFocusedIn()
-        XCTAssertEqual(model.textScale, 1.25, accuracy: 0.001, "zoom now follows the clicked text pane")
+        XCTAssertEqual(model.textScale, 1.1, accuracy: 0.001, "zoom now follows the clicked text pane")
     }
 
     /// The window becomes its own responder when the old PDF view leaves it. A replacement takes that

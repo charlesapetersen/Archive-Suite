@@ -122,7 +122,7 @@ final class PDFPaneViewportTests: XCTestCase {
         let host = NSHostingView(rootView: SwapHost(state: state, pdf: pdfPage, jpeg: jpegPage, controller: controller))
         host.frame = CGRect(x: 0, y: 0, width: 600, height: 500)
         host.layoutSubtreeIfNeeded(); settle()
-        controller.zoomIn(); controller.zoomIn(); settle()
+        for _ in 0..<4 { controller.zoomIn() }; settle()
         let pdfScale = try XCTUnwrap(controller.pdfView?.scaleFactor)
         controller.captureViewport()
         let before = try XCTUnwrap(controller.pendingViewport)
@@ -162,7 +162,7 @@ final class PDFPaneViewportTests: XCTestCase {
         defer { window.close() }
         window.contentView = host
         host.layoutSubtreeIfNeeded(); settle()
-        controller.zoomOut(); settle(); controller.zoomOut(); settle()
+        for _ in 0..<4 { controller.zoomOut(); settle() }
         let pdfScale = try XCTUnwrap(controller.pdfView?.scaleFactor)
         controller.captureViewport()
         state.jpeg = true

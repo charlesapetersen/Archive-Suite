@@ -168,7 +168,7 @@ final class DocumentPaneKeysUITests: XCTestCase {
     /// Zoom In on the image page until it overflows its pane both ways, so every arrow has somewhere to go.
     private func zoomImageBeyondFit() throws {
         let fitted = try pageFrame().width
-        for _ in 0..<10 {
+        for _ in 0..<20 {
             let page = try pageFrame(), pane = imagePane.frame
             if page.width > pane.width * 1.3, page.height > pane.height * 1.3 { break }
             documentMenuItem("Zoom In").click()
