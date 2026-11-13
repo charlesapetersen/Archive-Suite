@@ -411,26 +411,32 @@ Every call below was decided on 2026-11-06 (14-owner-calls.md); each ends with i
 
 ## 9. Profile test expectations
 
-Pooled test boxes unless named; zero checking budget unless named; tie under 4.2 points (twice the larger offset
-range, section 3), cheaper wins.
+Pooled test boxes unless named; zero checking budget unless named; tie under 10.4 points (twice the larger offset
+range, section 3; 4.2 before the owner's 2026-11-13 truth corrections, W46.seg-truth-owner-fixes), cheaper wins.
 
-- **Laptop, 16 GB.** `seg-qwen3.5-2b-8bit` (80.3% against manual's none; $0; 4.4 GB). Manuscripts: same pick with the
+- **Laptop, 16 GB.** `seg-qwen3.5-2b-8bit` (79.7% against manual's none; $0; 4.4 GB). Manuscripts: same pick with the
   warning (35.6%). Letters: same (89.7% gaps). Magazine: same, shown with "ranks nothing yet". Clippings mixed: same
   (98.1%, a tie with every route).
 - **Laptop, 32 and 64 GB.** `seg-qwen3.5-2b-8bit`; the teacher as a local partner is not a row (seg-adapt-curve.md
   calls it "local on a 32 GB Mac", unmeasured there) [?]. 8 GB: `manual`.
-- **Cheap API (OpenRouter only).** `glm5.3-flash` (80.6%, $1.16) against the 2B (80.3%): a tie, and the 2B wins on
+- **Cheap API (OpenRouter only).** `glm5.3-flash` (83.0%, $1.16) against the 2B (79.7%): a tie, and the 2B wins on
   cost if the Mac has 16 GB [I]; without the Mac's memory, GLM. Manuscripts: no GLM figure, so the sheet shows the gap.
-- **Premium API (Gemini key).** `gemini3.8-flash` (88.8%, 88.8-89.1% over three offsets, $3.61; Gemini 3.7's g2
-  figures, labelled as 3.7's) over GLM (80.6%) and the 2B (80.3%), beyond the 4.2 floor. With full checking: 100.0%. Letters: no 3.8 figure; the 3.7 figure 96.0% gaps is shown on the card labelled as 3.7's
-  and decides no pick.
-- **Plans.** Claude only: `claude-sonnet5.5` (85.5%, 10.2 checks). Both plans: `mix-claude-chatgpt` (90.9%, 10.2
-  checks) over Claude alone (85.5%), 5.4 points, beyond the 4.2 floor. Claude plan and a Gemini key: Gemini's
-  88.8-89.1% over three offsets against Claude's 85.5 is 3.3 to 3.6 points, under the 4.2 floor (Claude has no
-  measured range and is held to the largest, 2.1), so a tie and the plan route wins on money (W46.seg-g2-offsets; on
-  the 3.2 floor, W46.seg-magazine-rule-app had picked Gemini by 0.1). Claude's w1 carries no article rule, which g2
-  states, so a like-for-like Claude arm (W46.gateway-models-ok) could move the gap either way.
-- **Cluster.** `seg-qwen3.5-2b-bf16-cluster`: 80.3% against the 4B's 80.0% and the teacher's 81.5%, ties, and the 2B is
+- **Premium API (Gemini key).** On a 16 GB Mac `seg-qwen3.5-2b-8bit` (79.7%, $0): 8.2 points under the text alone's
+  87.9% and 7.9 under the image window's 87.6% (84.8-90.0% over three offsets), inside the 10.4 floor, so a tie and the
+  free route wins (W46.seg-truth-owner-fixes; on the earlier truth Gemini led by 8.5, beyond the 4.2 floor). On an 8 GB
+  Mac `gemini3.8-flash-text` (87.9%, $1.68; W46.seg-text-tier-default), the image window `gemini3.8-flash` ($3.61) the
+  user's choice; both Gemini 3.7's g2 figures, labelled as 3.7's. With full checking: 100.0%. Letters: no 3.8 figure;
+  the 3.7 figure 96.0% gaps is shown on the card labelled as 3.7's and decides no pick.
+- **Plans.** Claude only: `claude-sonnet5.5` (89.1%, 10.2 checks). Both plans: `claude-sonnet5.5`: the mix's 90.3% is
+  1.2 points over it, inside the 10.4 floor, so a tie and one plan wins on cost (on the earlier truth the mix led by
+  5.4). Claude plan and a Gemini key: Gemini's 84.8-90.0% over three offsets against Claude's 89.1 is -4.3 to +0.9
+  points, under the floor (Claude has no measured range and is held to the largest, 5.2), so a tie and the plan route
+  wins on money. Claude's w1 carries no article rule, which g2 states, so a like-for-like Claude arm
+  (W46.gateway-models-ok) could move the gap either way.
+- **Keys for Anthropic, OpenAI and OpenRouter, no Gemini key.** `glm5.3-flash` (83.0%, $1.16): ChatGPT's 90.3% is 7.3
+  points over it, inside the 10.4 floor, so a tie and the cheapest key route is preselected (W46.seg-truth-owner-fixes;
+  on the earlier truth ChatGPT led by 10.3, beyond the floor).
+- **Cluster.** `seg-qwen3.5-2b-bf16-cluster`: 79.7% against the 4B's 83.0% and the teacher's 81.5%, ties, and the 2B is
   fastest (0.5 s a window); on Sasha it leads the teacher by 21.7 points on gap accuracy (44 gaps against 6, p 3.24e-08,
   seg-kit-gate-sherlock.md).
 - **A cluster profile, with or without a coding agent.** After about 200 corrected gaps on a box: `seg-2b-lora-k200`
