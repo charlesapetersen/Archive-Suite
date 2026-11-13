@@ -25,6 +25,7 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   11. The saved support connection resolves, follows a moved folder, refuses a different store, forgets on disconnect.
 ///   10. Restore puts the original back with later tag edits kept and the flag re-added; refused on a changed file or
 ///       a second time; no re-flag after a later flag action or when the original was not flagged.
 @MainActor
@@ -461,6 +462,32 @@ enum ReOCRJobTestDriver {
                 let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
                 let r = try j.restore(done.journal.operationID)
                 check("10 an original that was not flagged is not flagged", r.flag == .notNeeded && tags(f).isEmpty)
+            }
+
+            // 11. The saved connection to the shared support folder.
+            do {
+                let suite = "ImproveOCR.test.\(UUID().uuidString)"
+                guard let defaults = UserDefaults(suiteName: suite) else { check("11 a scratch defaults suite", false); return }
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let c = ReOCRSupportConnection(defaults: defaults)
+                check("11 nothing connected yet", (try? c.resolve()) == nil && { do { _ = try c.resolve(); return false }
+                    catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
+                let d = try folder("support-conn")
+                let made = try c.connect(d)
+                check("11 connecting makes the store's identity", (try? ImproveOCRSupportIdentity.identity(of: d, create: false)) == made.storeID)
+                check("11 it resolves to the same store", (try? c.resolve())?.storeID == made.storeID)
+                let moved = root.appendingPathComponent("support-conn-moved", isDirectory: true)
+                try FileManager.default.moveItem(at: d, to: moved)
+                let afterMove = try? c.resolve()
+                check("11 a moved folder is followed", afterMove?.storeID == made.storeID
+                      && afterMove?.url.standardizedFileURL.lastPathComponent == "support-conn-moved", "\(String(describing: afterMove))")
+                try FileManager.default.removeItem(at: moved.appendingPathComponent(ImproveOCRSupportIdentity.file))
+                _ = try ImproveOCRSupportIdentity.identity(of: moved, create: true)   // replaced by another store
+                do { _ = try c.resolve(); check("11 a different store is refused", false) }
+                catch { check("11 a different store is refused", (error as? ReOCRSupportConnection.Problem) == .differentStore, "\(error)") }
+                c.disconnect()
+                check("11 disconnecting forgets it", { do { _ = try c.resolve(); return false }
+                    catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
             }
 
             // 7. A rotated image page.
