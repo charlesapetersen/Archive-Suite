@@ -2,12 +2,13 @@ import SwiftUI
 
 /// The settings sheet, shape A (W46.settings-sheet; `12-settings-design.md` §3.3): the limits and this batch's totals at
 /// the top, one card per stage with the app's pick and what a better figure would need, an override with a way back,
-/// and a tab of the stages that are rules rather than choices. Replaces the segmentation chooser's figures and the OCR
+/// the range tab's charts one tab away (`SettingsRangeTab`, §3.4), and a tab of the stages that are rules rather than
+/// choices. Replaces the segmentation chooser's figures and the OCR
 /// model guide; a card whose pick the Processor can run offers to apply it to what Process Files runs. Everything shown is built by
 /// `SettingsSheetModel`, which the self-test reads.
 struct SettingsSheetView: View {
     enum Tab: String, CaseIterable, Identifiable {
-        case choices = "Choices", rules = "Rules"
+        case choices = "Choices", range = "Range", rules = "Rules"
         var id: String { rawValue }
     }
 
@@ -112,7 +113,7 @@ struct SettingsSheetView: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .frame(width: 180)
+            .frame(width: 240)
             .accessibilityIdentifier("ap.sheet.tab")
         }
         .padding(16)
@@ -207,6 +208,7 @@ struct SettingsSheetPage: View {
         VStack(alignment: .leading, spacing: 12) {
             switch tab {
             case .choices: choices(model)
+            case .range: SettingsRangeTab(model: model, choose: choose)
             case .rules: rules(model)
             }
         }

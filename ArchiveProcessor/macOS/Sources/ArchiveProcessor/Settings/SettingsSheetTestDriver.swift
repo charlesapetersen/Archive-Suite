@@ -203,8 +203,53 @@ enum SettingsSheetTestDriver {
             check("6 \(name): no bench ids in the sheet's own words", hits.isEmpty, hits.prefix(3).joined(separator: " || "))
         }
 
-        // 7. Render: each page draws, both tabs. An 8 GB Mac: segmentation by hand, handwriting unread.
         let small = sheet("small", general: SettingsLayer(kind: .general, name: "General"), gb: 8)
+
+        // 8. The range tab (W46.settings-range-view): one chart per card, the picks marked, the undominated line, the
+        // red line, hollow and faded marks with their reasons, the full table, the after-training points.
+        let onMac = sheet("stays-on-mac-with-key", general: layer(.general, [(.keys, .strings(["gemini"])),
+                                                                              (.staysOnMac, .bool(true))]))
+        let agent = sheet("kit-agent", general: layer(.general, [(.fineTuning, .string(FineTuningAnswer.codingAgent.rawValue))]))
+        let clusterKit = sheet("kit-cluster", general: layer(.general, [(.fineTuning, .string(FineTuningAnswer.cluster.rawValue)),
+                                                                          (.cluster, .bool(true))]))
+        for (name, m) in [("free", free), ("gemini", paid), ("custom", custom), ("small", small), ("stays-on-mac", onMac),
+                          ("kit-cluster", clusterKit)] {
+            range(name, m, table: table)
+        }
+        if let r = custom.ranges.first(where: { $0.id == "reading" }) {
+            let app = r.points.first { $0.id == r.appPickID }
+            check("8 custom: the app's own pick is on the chart and can be clicked as the way back",
+                  r.appPickID != nil && r.appPickID != "apple-vision" && app?.choosable == true, r.appPickID ?? "nil")
+            check("8 custom: the chosen route is marked, and clicking it again does nothing",
+                  r.points.first { $0.id == "apple-vision" }.map { $0.picked && !$0.choosable } == true)
+        } else { check("8 custom reading chart", false) }
+        if let r = onMac.ranges.first(where: { $0.id == "reading" }) {
+            let net = r.points.filter { $0.family == .cloud }
+            check("8 G2 stays on the Mac with a key: every online mark is hollow and says why",
+                  !net.isEmpty && net.allSatisfy { $0.state == .unusable && $0.tooltip.contains("keep them on this Mac") },
+                  net.first { $0.state != .unusable }?.id ?? "")
+        } else { check("8 stays-on-mac reading chart", false) }
+        check("8 F no: no after-training point anywhere", (free.ranges + paid.ranges).allSatisfy { $0.kit.isEmpty })
+        let agentSeg = agent.ranges.first { $0.id == "segmentation" }?.kit ?? []
+        check("8 F coding agent: the Mac LoRA listed as not offered, no cluster rows",
+              agentSeg.map(\.id) == ["kit-seg-lora-mac"] && agentSeg.first?.condition.hasPrefix("Not offered") == true,
+              agentSeg.map(\.id).joined(separator: ","))
+        let handKit = agent.ranges.first { $0.id == "reading" }?.kit ?? []
+        let handPick = agent.solution.pick("reading", "handwritten")?.routeID
+        check("8 F coding agent: the handwriting fine-tune only where kraken reads the handwriting, and off the chart below 80 lines",
+              handPick == "ppocrv6-kraken-blla"
+                ? handKit.first.map { $0.y == nil && $0.condition.contains("80 lines") } == true
+                : handKit.allSatisfy { $0.y == nil }, "\(handPick ?? "nil") \(handKit.map(\.condition))")
+        let clusterSeg = clusterKit.ranges.first { $0.id == "segmentation" }?.kit ?? []
+        check("8 F cluster: the student and the continuation listed with their conditions",
+              Set(clusterSeg.map(\.id)) == ["kit-seg-lora-mac", "kit-seg-student-tags", "seg-2b-lora-k200"]
+                && clusterSeg.first { $0.id == "seg-2b-lora-k200" }?.condition.contains("200 places") == true
+                && clusterSeg.first { $0.id == "kit-seg-student-tags" }?.condition.contains("tags") == true,
+              clusterSeg.map { "\($0.id): \($0.condition)" }.joined(separator: " | "))
+        check("8 F: an after-training row is never a mark to choose",
+              clusterKit.ranges.allSatisfy { c in c.points.allSatisfy { p in !(table.stage(c.id)?.route(p.id)?.afterTraining ?? false) } })
+
+        // 7. Render: each page draws, both tabs. An 8 GB Mac: segmentation by hand, handwriting unread.
         check("7 an 8 GB Mac: segmentation by hand says nothing is proposed",
               card(small, "segmentation")?.parts.first?.figure.hasPrefix("nothing is proposed") == true)
         check("7 an 8 GB Mac: the overall figure says what counts as 0",
@@ -215,6 +260,8 @@ enum SettingsSheetTestDriver {
                 check("7 \(name) \(tab.rawValue) renders (\(ink) dark px)", ink > 20_000)
             }
         }
+        let kitInk = renderedInk(SettingsSheetPage(model: clusterKit, tab: .range), saveAs: "kit-cluster-range")
+        check("7 the after-training points render (\(kitInk) dark px)", kitInk > 20_000)
         let dark = renderedInk(SettingsSheetPage(model: free, tab: .choices), saveAs: "free-choices-dark", dark: true)
         check("7 dark appearance renders (\(dark) light px)", dark > 20_000)
     }
@@ -252,6 +299,72 @@ enum SettingsSheetTestDriver {
         check("4b with no folder the general settings take it", none.ok && store.general.entry(SettingsSheetModel.overrideKey("dating")) != nil)
         _ = g.clear(SettingsSheetModel.overrideKey("dating"), doc: nil)
         check("4b and give it back", store.general.entry(SettingsSheetModel.overrideKey("dating")) == nil)
+    }
+
+    /// The range tab's checks for one profile.
+    private static func range(_ name: String, _ m: SettingsSheetModel, table: SettingsRouteTable) {
+        check("8 \(name): one chart per card", m.ranges.map(\.id) == m.cards.map(\.id), m.ranges.map(\.id).joined(separator: ","))
+        for c in m.ranges {
+            guard let card = m.cards.first(where: { $0.id == c.id }) else { continue }
+            let tag = "8 \(name) \(c.id)"
+            if let pick = card.routeID, c.points.contains(where: { $0.id == pick }) {
+                check("\(tag): the card's pick is marked", c.points.first { $0.id == pick }?.picked == true)
+            }
+            let used = c.points.filter { $0.state != .unusable }
+            func beats(_ q: SettingsRangeChart.Point, _ p: SettingsRangeChart.Point) -> Bool {
+                q.id != p.id && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y)
+            }
+            check("\(tag): nothing usable beats a mark on the dashed line",
+                  c.frontier.allSatisfy { p in !used.contains { beats($0, p) } })
+            check("\(tag): every usable mark off the line is beaten",
+                  used.filter { !$0.onFrontier }.allSatisfy { p in used.contains { beats($0, p) } })
+            check("\(tag): hollow and faded marks say why",
+                  c.points.allSatisfy { p in
+                      p.state == .usable || p.tooltip.lowercased().contains(p.state == .unusable ? "cannot be used here: " : "outside your limits: ")
+                  })
+            check("\(tag): a hollow mark cannot be chosen", c.points.allSatisfy { $0.state != .unusable || !$0.choosable })
+            let rows = table.stage(c.id)?.routes.filter { r in !r.afterTraining && c.rows.contains { $0.id == r.id } }.count ?? -1
+            check("\(tag): the table has a row for every charted route",
+                  c.points.allSatisfy { p in c.rows.contains { $0.id == p.id } } && rows == c.rows.count)
+            // The red line: the ceiling less what the other stages' picks spend, per 1,000 units.
+            if let ceiling = m.answers.ceilingUSD {
+                let others = m.solution.picks.filter { $0.stage != c.id }.reduce(0) { $0 + $1.usd }
+                let units = c.unit == "documents" ? Double(m.answers.documentCount) : Double(m.answers.pages)
+                let want = max(0, ceiling - others) / units * 1000
+                check("\(tag): the red line is what is left of the ceiling", abs((c.ceilingPer1000 ?? -1) - want) < 1e-6,
+                      "\(c.ceilingPer1000 ?? -1) vs \(want)")
+            } else {
+                check("\(tag): no ceiling, no red line", c.ceilingPer1000 == nil && c.ceilingText == nil)
+            }
+            for p in c.points where p.state == .outsideLimits {
+                check("\(tag) \(p.id): a faded mark is usable", m.appSolution.blockers(c.id, p.id).isEmpty)
+            }
+        }
+        let jargon = try! NSRegularExpression(pattern: #"owner96|public895|\bNES\b|hands16|_|\bL[1-9]\b|\bN[1-6]\b|test-boxes|\bp\d{3}\b|\bg[12]\b|\bc1\b|blla|CTC|ed2|F1\b|\.md\b|owner call"#)
+        var shown: [String] = []
+        for c in m.ranges {
+            shown += [c.caption, c.yLabel, c.ceilingText ?? ""]
+            shown += c.offChart
+            for p in c.points { shown += [p.name, p.tooltip] }
+            for r in c.rows {
+                shown += [r.name, r.familyWord, r.figures, r.publicFigure ?? ""]
+                shown += [r.listPrice, r.batchCost, r.time, r.canUse]
+            }
+            for k in c.kit { shown += [k.name, k.measured ?? "", k.condition] }
+        }
+        shown = shown.filter { !$0.isEmpty }
+        let hits = shown.filter { jargon.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
+        check("8 \(name): no bench ids in the range tab's words", hits.isEmpty, hits.prefix(3).joined(separator: " || "))
+        dump.append("=== range \(name)")
+        for c in m.ranges {
+            dump.append("CHART \(c.title) | now \(c.pickName) | red \(c.ceilingText ?? "-")")
+            for p in c.points.sorted(by: { $0.y > $1.y }) {
+                dump.append("  mark \(p.id) x \(p.x) y \(p.y) \(p.state)\(p.onFrontier ? " frontier" : "")\(p.picked ? " PICK" : "")\(p.choosable ? "" : " fixed") :: \(p.tooltip)")
+            }
+            for r in c.rows { dump.append("  row \(r.name) (\(r.familyWord)): \(r.figures) | \(r.publicFigure ?? "-") | \(r.listPrice); \(r.batchCost); \(r.time); \(r.canUse)") }
+            for k in c.kit { dump.append("  kit \(k.name): \(k.measured ?? "-") | \(k.condition) | y \(k.y.map { "\($0)" } ?? "-")") }
+            if !c.offChart.isEmpty { dump.append("  off chart: \(c.offChart.joined(separator: "; "))") }
+        }
     }
 
     /// Every string the sheet shows in its own words (not the notes, which quote the bench).

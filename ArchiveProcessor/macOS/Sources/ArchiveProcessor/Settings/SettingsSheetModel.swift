@@ -142,6 +142,8 @@ struct SettingsSheetModel {
     /// Said above the totals when a card's pick is not what Process Files runs.
     let notInUse: String?
     let cards: [Card]
+    /// The range tab: one chart per card stage (W46.settings-range-view).
+    let ranges: [SettingsRangeChart]
     let ruleStages: [RuleStage]
 
     /// The stage cards' override keys, one per card.
@@ -185,6 +187,7 @@ struct SettingsSheetModel {
                           answers: answers, running: running, words: words)
             }
         }
+        ranges = Self.ranges(table: table, solution: solution, app: appSolution, answers: answers, cards: cards, words: words)
         let off = cards.filter { $0.apply != nil || $0.runsNow != nil }.map { $0.title.lowercased() }
         notInUse = off.isEmpty ? nil
             : "These totals assume every pick is switched on. Process Files does not use the app's picks yet for "
