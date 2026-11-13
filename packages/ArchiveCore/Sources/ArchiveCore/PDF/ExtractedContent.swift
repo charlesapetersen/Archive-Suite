@@ -209,7 +209,7 @@ public enum PDFHeaderParser {
            (first.raw.components(separatedBy: " · ").count < 3 || looksLikeFilename(first.raw)),
            let afterFilename = candidates.first(where: { $0.start == 2 }) {
             selected = afterFilename
-        } else { selected = first }
+        } else { selected = first ?? longFilenameCandidate(lines) }
         guard let meta = selected else {
             header.diagnostics = [.missingProvenance, .missingKind]
             return ParsedPDFTextPage(header: header, body: lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines))
@@ -286,6 +286,31 @@ public enum PDFHeaderParser {
         }
         let count = raw.components(separatedBy: " · ").count
         return ProvenanceCandidate(start: start, end: end, raw: raw, complete: count >= 3 && endsWithYear(raw))
+    }
+
+    /// A filename PDFKit reads back as three or more lines (a long name wrapped, or split at
+    /// underscores) pushes provenance past the fixed slots. Only when those slots hold no candidate:
+    /// the filename lines must be nonempty, not fields, no longer together than one file name
+    /// (255 bytes), contain no provenance separator, and end in an extension; the line after them
+    /// must be well-formed provenance. Anything else leaves provenance missing, never a body search.
+    static let maxFilenameBytes = 255
+
+    private static func longFilenameCandidate(_ lines: [String]) -> ProvenanceCandidate? {
+        var bytes = 0
+        var start = 1
+        while start < lines.count {
+            let line = lines[start].trimmingCharacters(in: .whitespaces)
+            if start >= 4, let candidate = provenanceCandidate(lines, at: start) {
+                let previous = lines[start - 1].trimmingCharacters(in: .whitespaces)
+                guard looksLikeFilename(previous), parseProvenance(candidate.raw) != nil else { return nil }
+                return candidate
+            }
+            bytes += line.utf8.count
+            guard !line.isEmpty, start == 1 || !isField(line), !line.contains(" · "), !line.hasSuffix(" ·"),
+                  bytes <= maxFilenameBytes else { return nil }
+            start += 1
+        }
+        return nil
     }
 
     private static func looksLikeFilename(_ line: String) -> Bool {

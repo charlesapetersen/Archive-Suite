@@ -174,16 +174,18 @@ enum ReOCRPairsTestDriver {
             try PDFGenerator().generate(imageURL: jpeg("long.jpg"), result: OCRResult(text: "x", classification: nil,
                                         errorMessage: nil, errorCode: nil), model: model, outputURL: long,
                                         originalFileName: longName)
-            if case .success(let pl) = ReOCRPairs.validate(try Data(contentsOf: long)) {
+            // However many lines PDFKit reads the name back as, the reader line under it is found
+            // (W44.reocr-header-longname), so the replacement page keeps the name.
+            switch ReOCRPairs.validate(try Data(contentsOf: long)) {
+            case .success(let pl):
                 check("3 a long underscored name is read", pl[0].header.originalFilename?.replacingOccurrences(of: "\n", with: "") == longName,
                       "\(String(describing: pl[0].header.originalFilename))")
                 let made = try? ReOCRPairs.replacementPage(for: pl[0], result: reading, model: model, kind: nil)
-                check("3 a long underscored name is kept", made != nil)
-            } else if case .failure(let r) = ReOCRPairs.validate(try Data(contentsOf: long)) {
-                // Core's parser looks for the reader line only in the first three header slots, so a name that wraps
-                // onto three lines hides it (W44.reocr-header-longname). Refusing is the safe answer until then.
-                check("3 a long name that hides the reader line is refused, not guessed", r == .textPageWithoutProvenance(page: 1), "\(r)")
-                lines.append("INFO 3 long underscored name: refused (\(r)); see W44.reocr-header-longname")
+                let kept = made.flatMap { PDFDocument(data: $0)?.page(at: 0) }.map { PDFHeaderParser.parse($0) }
+                check("3 a long underscored name is kept", kept?.header?.originalFilename?.replacingOccurrences(of: "\n", with: "") == longName
+                      && kept?.header?.provenance != nil, "\(String(describing: kept?.header))")
+            case .failure(let r):
+                check("3 a long underscored name is read", false, "\(r)")
             }
 
             // 4. End to end on the middle pair.

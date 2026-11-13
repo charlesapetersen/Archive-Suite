@@ -263,6 +263,10 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
   parsing. Require the exact sentinel as the first physical line.
   Inspect only the immediately following provenance slots (one optional filename, allowing PDFKit's
   two-line filename split), with at most one provenance continuation completing the processing date.
+  Only when those slots hold no provenance candidate (W44.reocr-header-longname), a filename read
+  back as three or more lines is accepted: its lines must be nonempty, not fields after the first,
+  free of ` · `, at most 255 UTF-8 bytes together, and the last must end in an extension; the next
+  line must be well-formed provenance. Otherwise provenance is missing.
   A completed provenance line may follow a dot-containing filename in the first prefix slot;
   a malformed three-position line is retained unless an explicit filename extension disambiguates it;
   once the slot after the filename contains provenance, even malformed, it cannot be replaced by later
@@ -277,7 +281,9 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
   that case. A later lookalike, or a field following a retained blank separator, stays in the body.
   The filename slot is opaque, even when it starts `Kind:` or `Classification:`. A filename that is
   itself indistinguishable from a complete provenance line has the same prefix ambiguity; the first
-  complete candidate wins. These are parser limits, not evidence of another classifier result.
+  complete candidate wins. A page with no provenance whose body opens, with no separator, on
+  short lines ending in an extension-like line and then a well-formed provenance-looking line
+  reads that text as filename and provenance. These are parser limits, not evidence of another classifier result.
 - **Source-date lines (W37.dual-date).** `Document date:` / `Sent with:` are the SOURCE document's dates
   (`ArchiveDate.display` form), distinct from the processing date. They are output-time snapshots;
   fresh Finder tags remain authoritative. Exact case-sensitive prefixes, after Classification/Kind,

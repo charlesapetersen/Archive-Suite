@@ -181,6 +181,50 @@ final class ReOCRHeaderTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), bytes)
     }
 
+    /// W44.reocr-header-longname: a filename PDFKit reads back as three or more lines still has its
+    /// provenance, but the longer scan never reaches into a body or accepts malformed provenance.
+    func testLongFilenameOfManyLinesKeepsProvenanceWithoutReadingTheBody() throws {
+        let parts = ["Herrnstein_Papers_Box_12_", "Folder_3_Correspondence_", "with_the_Dean_1952_", "IMG_0042.jpg"]
+        let long = PDFHeaderParser.parse("Extracted text.\n\(parts.joined(separator: "\n"))\n\(meta)\nKind: printed\nLetter")
+        let header = try XCTUnwrap(long.header)
+        XCTAssertEqual(header.originalFilename, parts.joined(separator: "\n"))
+        XCTAssertEqual(header.provenance?.provider, "Atlas Cluster")
+        XCTAssertEqual(header.kind, .printed)
+        XCTAssertEqual(long.body, "Letter")
+        // A Kind:-looking first slot stays opaque, as for a short filename.
+        XCTAssertEqual(PDFHeaderParser.parse("Extracted text.\nKind: a\nb\nc.jpg\n\(meta)\nBody").header?.provenance?.provider,
+                       "Atlas Cluster")
+        // A name of exactly 255 bytes is accepted; one byte more is not a filename.
+        let max = String(repeating: "a", count: 251) + ".jpg"
+        let split = stride(from: 0, to: 255, by: 64).map { i -> String in
+            let s = max.index(max.startIndex, offsetBy: i), e = max.index(s, offsetBy: min(64, 255 - i))
+            return String(max[s..<e])
+        }
+        XCTAssertEqual(PDFHeaderParser.parse("Extracted text.\n\(split.joined(separator: "\n"))\n\(meta)\nBody").header?.provenance?.provider,
+                       "Atlas Cluster")
+        let over = ["b" + split[0]] + split.dropFirst()
+        let tooLong = PDFHeaderParser.parse("Extracted text.\n\(over.joined(separator: "\n"))\n\(meta)\nBody")
+        XCTAssertNil(tooLong.header?.provenance)
+        XCTAssertTrue(tooLong.header?.diagnostics.contains(.missingProvenance) == true)
+        // Each refusal leaves provenance missing rather than guessed from later text.
+        for refused in [
+            "scan.jpg\nMemo\nKind: printed\nmore\n\(meta)",                 // a field ends the header
+            "scan.jpg\nMemo\n\nmore.jpg\n\(meta)",                          // a blank separator ends it
+            "a_very_long_name_\nwith_no_\nextension\n\(meta)",              // no extension before provenance
+            "a_\nb_\nc.jpg\nA · B · not a date",                             // malformed provenance is never taken
+            "a_\nb_\nc.jpg\nA · B · 7 November 2026 extra",                  // nor an incomplete one
+            "a_\nb_\nc.jpg\nnot provenance\n\(meta)",                       // provenance must follow the name
+        ] {
+            let parsed = PDFHeaderParser.parse("Extracted text.\n\(refused)\nBody")
+            let h = try XCTUnwrap(parsed.header, refused)
+            XCTAssertNil(h.provenance, refused)
+            XCTAssertNil(h.rawProvenance, refused)
+            XCTAssertNil(h.originalFilename, refused)
+            XCTAssertTrue(h.diagnostics.contains(.missingProvenance), refused)
+            XCTAssertEqual(parsed.body, "Extracted text.\n\(refused)\nBody", "nothing is stripped")
+        }
+    }
+
     func testPoorOCRRemainsASubjectWithWholeTokenCaseIdentity() {
         let raw = ["OCR Failed", "oCr pOoR", "OCR Poor", "OCR Poorly", "Q3", "Unread"]
         let tags = DocumentTags.parse(raw: raw, labelNumber: nil)

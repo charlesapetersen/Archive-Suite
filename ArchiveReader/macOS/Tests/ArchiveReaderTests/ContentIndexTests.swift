@@ -486,6 +486,22 @@ final class ContentIndexTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: url), before)
     }
 
+    /// W44.reocr-header-longname: a filename read back as several lines still shows its provider.
+    func testLongFilenameOverSeveralLinesKeepsTheProviderInTheReader() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ReaderLongName-\(UUID()).pdf")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let name = "Herrnstein_Papers_Box_12_\nFolder_3_Correspondence_\nwith_the_Dean_1952_\nIMG_0042.jpg"
+        let header = "Extracted text.\n\(name)\nAtlas · Qwen fp8 · 7 November 2026\nKind: typewritten\n\nDear Dean,"
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["Scan text layer", header], to: url))
+        let content = try XCTUnwrap(PDFTextExtractor.extract(url))
+        let parsed = try XCTUnwrap(content.textPages.first?.header)
+        XCTAssertEqual(parsed.provenance?.provider, "Atlas")
+        XCTAssertEqual(parsed.kind, .typewritten)
+        XCTAssertEqual(parsed.originalFilename?.replacingOccurrences(of: "\n", with: ""),
+                       name.replacingOccurrences(of: "\n", with: ""))
+        XCTAssertEqual(content.strippedBody, "Dear Dean,")
+    }
+
     func testClassificationParsing() {
         let page2 = "Extracted text.\n00023 IMG — Brown.jpg\nGemini · Gemini 2.5 · 19 June 2026\nClassification: Document Start\nINTRODUCTION"
         XCTAssertEqual(PDFHeaderParser.parseClassification(from: page2), "Document Start")

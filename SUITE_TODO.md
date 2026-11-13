@@ -724,7 +724,6 @@ The three remaining items follow it in order; Processor also waits for the share
   - **The page kind,** shown where the provider is shown.
   - **"Improve OCR…",** which hands the selection to the Processor's dialog. When the Processor rewrites a file, the Reader picks up the new text through its existing re-scan, with the document window refreshed if it is open.
   - **Tests.** VM UI tests for flag, filter and hand-off, on the fixture only.
-- [ ] **`W44.reocr-header-longname` — the header parser misses the reader line under a long filename [S · ~1 session · Tier-2]** (lane: suite) (uses: build). Core `PDFHeaderParser.parse` looks for the provenance line only in header slots 1–3, so an original filename that PDFKit reads back as three or more lines (a long name, wrapped or split at underscores) hides the reader line: the page reads as having no provenance, the Reader shows no provider, and Improve OCR refuses the file ("no reader line"). Found by W44.reocr-processor's `ReOCRPairsTestDriver` (case 3, an 82-character underscored name). Fix the scan to accept a filename of any number of lines before a well-formed provenance line without reading into the body, keep the SPEC's stated ambiguity honest, test in Core and both apps, and flip that test case to expect the name kept.
 
 ## Archive Processor — a broader benchmark corpus and the pre-release model sweep (owner, 2026-10-16)
 
