@@ -1,7 +1,8 @@
 import XCTest
 
-/// W40.reader-page-views: View ▸ Thumbnails (⌥⌘2) and Contact Sheet (⌥⌘6), with ⌥⌘1 back to the page alone, across
-/// the files of a two-file selection, in the document window and the preview sheet. Read-only on the fixture.
+/// W40.reader-page-views: View ▸ Show/Hide Thumbnails (⌥⌘2, one item that toggles: W40.reader-thumbnails-toggle) and
+/// Contact Sheet (⌥⌘6), across the files of a two-file selection, in the document window and the preview sheet.
+/// Read-only on the fixture.
 final class PageViewsUITests: FixtureUITestCase {
 
     private func settle(_ seconds: TimeInterval) { RunLoop.current.run(until: Date().addingTimeInterval(seconds)) }
@@ -9,6 +10,13 @@ final class PageViewsUITests: FixtureUITestCase {
     private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
     private func isCurrent(_ id: String) -> Bool { (app.buttons[id].value as? String) == "current" }
     private var selectedRows: XCUIElementQuery { table.tableRows.matching(NSPredicate(format: "isSelected == true")) }
+    private func viewMenuItem(_ title: String) -> XCUIElement { app.menuBars.menuBarItems["View"].menuItems[title] }
+
+    /// The sidebar is remembered, so a failed run could leave it up: ⌥⌘2 hides it if it is showing.
+    private func hideThumbnailsIfShown(_ sidebar: XCUIElement) {
+        if sidebar.exists { pageViewKey("2") }
+        XCTAssertFalse(sidebar.exists)
+    }
 
     /// Waits for a condition the app reaches asynchronously, rather than a fixed pause.
     private func wait(_ what: String, timeout: TimeInterval = 5, until condition: () -> Bool) {
@@ -26,12 +34,15 @@ final class PageViewsUITests: FixtureUITestCase {
         pressKey("o", modifiers: .command)
         settle(2)
 
-        // The document window. ⌥⌘1 first: the sidebar is remembered, so a failed run could leave it up.
-        pageViewKey("1")
+        // The document window.
         let sidebar = element("ar.doc.thumbnails")
-        XCTAssertFalse(sidebar.exists)
+        hideThumbnailsIfShown(sidebar)
+        XCTAssertTrue(viewMenuItem("Show Thumbnails").exists, "one item, named by the hidden sidebar")
+        XCTAssertFalse(viewMenuItem("Hide Thumbnails").exists)
         pageViewKey("2")
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "⌥⌘2 shows the thumbnails")
+        XCTAssertTrue(viewMenuItem("Hide Thumbnails").exists, "and the item now hides them")
+        XCTAssertFalse(viewMenuItem("Show Thumbnails").exists)
         let second = app.buttons["ar.doc.thumb.2.1"]
         XCTAssertTrue(second.waitForExistence(timeout: 5), "the second file has its thumbnail too")
         wait("the page on view is marked") { isCurrent("ar.doc.thumb.1.1") }
@@ -63,8 +74,9 @@ final class PageViewsUITests: FixtureUITestCase {
         settle(1)
         XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "a tile returns to the page, sidebar and all")
         wait("on the tile's file") { isCurrent("ar.doc.thumb.1.1") }
-        pageViewKey("1")
-        XCTAssertFalse(sidebar.exists, "⌥⌘1 hides the thumbnails")
+        pageViewKey("2")
+        XCTAssertFalse(sidebar.exists, "⌥⌘2 again hides the thumbnails")
+        XCTAssertTrue(viewMenuItem("Show Thumbnails").exists)
         pressKey("w", modifiers: .command)
         settle(1)
 
@@ -73,9 +85,10 @@ final class PageViewsUITests: FixtureUITestCase {
         let done = app.buttons["ar.preview.done"]
         XCTAssertTrue(done.waitForExistence(timeout: 5), "the preview sheet opens")
         settle(1)
-        pageViewKey("1")
+        hideThumbnailsIfShown(element("ar.preview.thumbnails"))
         pageViewKey("2")
         XCTAssertTrue(element("ar.preview.thumbnails").waitForExistence(timeout: 5), "⌥⌘2 reaches the preview sheet")
+        XCTAssertTrue(viewMenuItem("Hide Thumbnails").exists, "with the item named by the sheet's sidebar")
         XCTAssertTrue(app.buttons["ar.preview.thumb.2.1"].waitForExistence(timeout: 5))
         settle(2)
         captureScreenshot("w40-page-views-preview-thumbnails")
@@ -83,9 +96,11 @@ final class PageViewsUITests: FixtureUITestCase {
         XCTAssertTrue(element("ar.preview.pageOverview").waitForExistence(timeout: 5), "and so does ⌥⌘6")
         settle(2)
         captureScreenshot("w40-page-views-preview-contact-sheet")
-        pageViewKey("1")
-        XCTAssertFalse(element("ar.preview.thumbnails").exists)
-        XCTAssertFalse(element("ar.preview.pageOverview").exists)
+        pageViewKey("6")
+        XCTAssertFalse(element("ar.preview.pageOverview").exists, "⌥⌘6 again leaves the contact sheet")
+        XCTAssertTrue(element("ar.preview.thumbnails").waitForExistence(timeout: 5), "for the sidebar it came from")
+        pageViewKey("2")
+        XCTAssertFalse(element("ar.preview.thumbnails").exists, "⌥⌘2 hides the sheet's thumbnails")
         done.click()
     }
 }

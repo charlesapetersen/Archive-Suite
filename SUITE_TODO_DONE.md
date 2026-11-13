@@ -15708,3 +15708,13 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W42.int-s2 -->
 - [x] **W40.reader-contact-sheet-grid — the contact sheet as a grid of pages, as in Preview [M]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Owner, 2026-11-13: "Contact sheet should be implemented as with Preview — not a list of images but a spread or array." SHIPPED 2026-11-13. Cause, seen in the VM before the change: the sheet was already a `LazyVGrid`, but with a section per open file, so every file started a row of its own and a selection of the corpus's two-page files (scan + OCR) read as a list of pairs. Now one adaptive grid runs every page of every file in order (`ContactSheetCell.cells`), filling the width and reflowing on resize; each file's heading sits on its first tile (the other tiles keep its line so rows stay level), the file on view is tinted, and a file that cannot be opened has one tile saying so under its first page's id. Kept from W40.reader-page-views: the lazy on-disk thumbnail cache (only visible tiles hold bitmaps, 520 px), the turns, the tile ids and scroll-to-page, the memory budget. Tests: `PageViewsTests.testTheContactSheetRunsEveryFilesPagesInOneGrid`; `PageViewsUITests` in the VM now asserts the second file's first tile shares the first file's row, after its second page (frames 1.1 x29, 1.2 x240, 2.1 x450, all y134), screenshots of both windows read. No bench cache used.
   <!-- /W40.reader-contact-sheet-grid -->
+- [x] **W40.reader-thumbnails-toggle — Hide/Show Thumbnails as one menu item [S]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Owner, 2026-11-13: "Hide/show Thumbnails should be one item in the menu bar." SHIPPED 2026-11-13.
+  `ReaderCommand.singlePage` (Hide Thumbnails ⌥⌘1) and `.thumbnails` (Thumbnails ⌥⌘2) became one Show/Hide pair,
+  `.showThumbnails` on ⌥⌘2, named by `title(showing:)` as the other Show/Hide items are; ⌥⌘1 is free. View ▸ Show/Hide
+  Thumbnails is a plain item (no checkmark) in the document window and the preview sheet, and the toolbar button
+  calls the same `DocumentViewerModel.toggleThumbnails()`: it hides a showing sidebar, otherwise shows it, leaving the
+  contact sheet as Preview's ⌥⌘2 does. Contact Sheet ⌥⌘6 keeps its own checked item. Tests: `PageViewsTests`
+  (+`testShowHideThumbnailsIsOneToggle`), `ReaderCommandTableTests` (menu titles match the table), `DocumentPageOverviewTests`
+  green; `PageViewsUITests` green in the VM, now asserting the View menu reads Show then Hide Thumbnails in both windows.
+  No bench-cache scratch made.
+  <!-- /W40.reader-thumbnails-toggle -->

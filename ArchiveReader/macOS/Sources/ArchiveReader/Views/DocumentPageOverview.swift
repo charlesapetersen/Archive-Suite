@@ -179,19 +179,19 @@ struct PageThumbnailSidebar: View {
     }
 }
 
-/// The toolbar's (and the preview sheet's) two page-view buttons, beside View ▸ Thumbnails and Contact Sheet.
+/// The toolbar's (and the preview sheet's) two page-view buttons, beside View ▸ Show Thumbnails and Contact Sheet.
 struct PageViewButtons: View {
     @ObservedObject var model: DocumentViewerModel
     let idPrefix: String
 
     var body: some View {
-        Button { model.setPageView(model.pageView == .thumbnails ? .single : .thumbnails) } label: {
-            Label(ReaderCommand.thumbnails.title, systemImage: "sidebar.left")
+        Button { model.toggleThumbnails() } label: {
+            Label(ReaderCommand.showThumbnails.title(showing: model.pageView == .thumbnails), systemImage: "sidebar.left")
         }
         .disabled(!model.canShowThumbnails)
         .help(model.pageView == .thumbnails
-              ? "Hide the thumbnails (\(ReaderCommand.singlePage.glyph))"
-              : "Show a thumbnail of each scan of the open files beside the page (\(ReaderCommand.thumbnails.glyph))")
+              ? "Hide the thumbnails (\(ReaderCommand.showThumbnails.glyph))"
+              : "Show a thumbnail of each scan of the open files beside the page (\(ReaderCommand.showThumbnails.glyph))")
         .accessibilityIdentifier("\(idPrefix).thumbnailsButton")
         Button { model.setShowingAllPages(!model.showingAllPages) } label: {
             Label(model.showingAllPages ? "Read Selected Page" : ReaderCommand.contactSheet.title,

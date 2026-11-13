@@ -86,8 +86,9 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     case previewPreviousFile, previewNextFile, previewPreviousPage, previewNextPage, previewDone
     // The list's bare keys
     case listNextUnread, listPreviousUnread, listMarkReadAndNext, listPreview
-    // Preview's page views, on Preview's keys ⌥⌘1 / ⌥⌘2 / ⌥⌘6 (W40.reader-page-views).
-    case singlePage, thumbnails, contactSheet
+    // Preview's page views, on Preview's keys ⌥⌘2 / ⌥⌘6 (W40.reader-page-views). Show/Hide Thumbnails is one
+    // item that toggles the sidebar, as Preview's ⌥⌘2 does (W40.reader-thumbnails-toggle).
+    case showThumbnails, contactSheet
 
     var context: CommandContext {
         switch self {
@@ -166,8 +167,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return "Rotate Left"
         case .rotateRight: return "Rotate Right"
         case .resetRotation: return "Reset Rotation"
-        case .singlePage: return "Hide Thumbnails"
-        case .thumbnails: return "Thumbnails"
+        case .showThumbnails: return "Show Thumbnails"
         case .contactSheet: return "Contact Sheet"
         }
     }
@@ -246,8 +246,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return CommandKey("l", [.command, .control])
         case .rotateRight: return CommandKey("r", [.command, .control])
         case .resetRotation: return nil
-        case .singlePage: return CommandKey("1", [.command, .option])
-        case .thumbnails: return CommandKey("2", [.command, .option])
+        case .showThumbnails: return CommandKey("2", [.command, .option])
         case .contactSheet: return CommandKey("6", [.command, .option])
         }
     }
@@ -284,8 +283,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return "Turn the image page a quarter turn left, in this view only — the file is not changed"
         case .rotateRight: return "Turn the image page a quarter turn right, in this view only — the file is not changed"
         case .resetRotation: return "Show the image page as it is in the file"
-        case .singlePage: return "Show the page alone, without thumbnails"
-        case .thumbnails: return "Show a thumbnail of each scan of the open files beside the page"
+        case .showThumbnails: return "Show or hide a thumbnail of each scan of the open files beside the page"
         case .contactSheet: return "Show every PDF page of the open files as a numbered tile"
         case .previewPreviousFile: return "Previous file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewNextFile: return "Next file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"

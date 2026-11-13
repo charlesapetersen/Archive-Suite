@@ -72,18 +72,15 @@ struct ArchiveReaderCommands: Commands {
             .keyboardShortcut(.showInspector)
             .disabled(nav == nil && !(docTags?.canTag ?? false))
             // Preview's page views, on its keys (W40.reader-page-views), in the document window and the preview
-            // sheet alike: one is checked at a time. Choosing the checked one again leaves only the contact
-            // sheet, which returns to the page it was opened from.
+            // sheet alike. Show/Hide Thumbnails is one item named by its state (W40.reader-thumbnails-toggle);
+            // the contact sheet keeps its checked item, and choosing it again returns to the page it was opened
+            // from.
             if let doc, doc.supportsPageOverview {
                 Divider()
-                Toggle(ReaderCommand.singlePage.title, isOn: Binding(
-                    get: { doc.pageView == .single }, set: { _ in doc.setPageView(.single) }
-                ))
-                .keyboardShortcut(.singlePage)
-                Toggle(ReaderCommand.thumbnails.title, isOn: Binding(
-                    get: { doc.pageView == .thumbnails }, set: { _ in doc.setPageView(.thumbnails) }
-                ))
-                .keyboardShortcut(.thumbnails)
+                Button(ReaderCommand.showThumbnails.title(showing: doc.pageView == .thumbnails)) {
+                    doc.toggleThumbnails()
+                }
+                .keyboardShortcut(.showThumbnails)
                 .disabled(!doc.canShowThumbnails)
                 Toggle(ReaderCommand.contactSheet.title, isOn: Binding(
                     get: { doc.showingAllPages }, set: { doc.setShowingAllPages($0) }

@@ -2,8 +2,8 @@ import XCTest
 import SwiftUI
 @testable import ArchiveReader
 
-/// W40.reader-page-views: Preview's page views — Hide Thumbnails ⌥⌘1, Thumbnails ⌥⌘2 and Contact Sheet ⌥⌘6 —
-/// across every file in the viewer.
+/// W40.reader-page-views: Preview's page views — Show/Hide Thumbnails ⌥⌘2 (one item that toggles,
+/// W40.reader-thumbnails-toggle) and Contact Sheet ⌥⌘6 — across every file in the viewer.
 @MainActor
 final class PageViewsTests: XCTestCase {
     /// Three files: a five-page scan (three pairs, the last an odd trailing scan), and two one-page files.
@@ -43,6 +43,27 @@ final class PageViewsTests: XCTestCase {
         reader.setPageView(.contactSheet)
         reader.setShowingAllPages(false)
         XCTAssertEqual(reader.pageView, .single)
+    }
+
+    /// Show/Hide Thumbnails is one item: ⌥⌘2 toggles the sidebar, its name follows it, and from the contact sheet
+    /// it shows the sidebar, as Preview's does (W40.reader-thumbnails-toggle).
+    func testShowHideThumbnailsIsOneToggle() throws {
+        let reader = viewer(try fixtures())
+        let item = ReaderCommand.showThumbnails
+        XCTAssertEqual(item.title(showing: reader.pageView == .thumbnails), "Show Thumbnails")
+        reader.toggleThumbnails()
+        XCTAssertEqual(reader.pageView, .thumbnails)
+        XCTAssertEqual(item.title(showing: reader.pageView == .thumbnails), "Hide Thumbnails")
+        reader.toggleThumbnails()
+        XCTAssertEqual(reader.pageView, .single)
+        XCTAssertFalse(reader.showingThumbnails)
+        reader.setPageView(.contactSheet)
+        XCTAssertEqual(item.title(showing: reader.pageView == .thumbnails), "Show Thumbnails")
+        reader.toggleThumbnails()
+        XCTAssertEqual(reader.pageView, .thumbnails, "from the contact sheet the toggle shows the sidebar")
+        let none = viewer([])
+        none.toggleThumbnails()
+        XCTAssertEqual(none.pageView, .single, "nothing open, nothing to show")
     }
 
     func testAThumbnailGoesToItsFileAndPair() throws {
@@ -133,8 +154,9 @@ final class PageViewsTests: XCTestCase {
 
     /// The menu items' keys, as the table holds them.
     func testThePageViewCommandsAreBoundToPreviewsKeys() {
-        XCTAssertEqual(ReaderCommand.singlePage.glyph, "⌥⌘1")
-        XCTAssertEqual(ReaderCommand.thumbnails.glyph, "⌥⌘2")
+        XCTAssertEqual(ReaderCommand.showThumbnails.glyph, "⌥⌘2")
+        XCTAssertFalse(ReaderCommand.allCases.contains { $0.key == CommandKey("1", [.command, .option]) },
+                       "⌥⌘1 is free: the toggle replaced Hide Thumbnails")
         XCTAssertEqual(ReaderCommand.contactSheet.glyph, "⌥⌘6")
         XCTAssertFalse(ReaderCommand.allCases.contains { $0.reserved }, "no key is held for a later item")
     }

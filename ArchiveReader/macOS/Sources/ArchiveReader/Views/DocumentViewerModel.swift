@@ -74,7 +74,8 @@ final class DocumentViewerModel: ObservableObject {
     /// The page counts of the open files, for the page views.
     let pageCounts = OpenFilePageCounts()
 
-    /// Preview's three page views, ⌥⌘1 / ⌥⌘2 / ⌥⌘6 (`ReaderCommand.singlePage`, `.thumbnails`, `.contactSheet`).
+    /// Preview's three page views: the page alone, the thumbnail sidebar (⌥⌘2, `ReaderCommand.showThumbnails`,
+    /// which toggles) and the contact sheet (⌥⌘6, `.contactSheet`).
     enum PageView: Sendable, Equatable { case single, thumbnails, contactSheet }
 
     var pageView: PageView { showingAllPages ? .contactSheet : (showingThumbnails ? .thumbnails : .single) }
@@ -93,6 +94,10 @@ final class DocumentViewerModel: ObservableObject {
         case .contactSheet: setShowingAllPages(true)
         }
     }
+
+    /// View ▸ Show/Hide Thumbnails (⌥⌘2) and its toolbar button: hides the sidebar when it is showing, otherwise
+    /// shows it, leaving the contact sheet as Preview does (W40.reader-thumbnails-toggle).
+    func toggleThumbnails() { setPageView(pageView == .thumbnails ? .single : .thumbnails) }
 
     func setShowingAllPages(_ show: Bool) {
         showingAllPages = show && canShowAllPages

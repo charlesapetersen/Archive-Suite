@@ -95,7 +95,7 @@ struct PreviewSheet: View {
                 .keyboardShortcut(.previewNextPage)
                 .disabled(!model.canGoNext)
                 .help(ReaderCommand.previewNextPage.help)
-            // View ▸ Thumbnails and Contact Sheet (⌥⌘2 / ⌥⌘6) reach this sheet's published model too.
+            // View ▸ Show/Hide Thumbnails and Contact Sheet (⌥⌘2 / ⌥⌘6) reach this sheet's published model too.
             PageViewButtons(model: model, idPrefix: "ar.preview").labelStyle(.iconOnly)
             // Rotate Left / Right are Document menu items (⌃⌘L / ⌃⌘R), which reach this sheet's published model.
             Button { model.rotateLeft() } label: { Image(systemName: "rotate.left") }

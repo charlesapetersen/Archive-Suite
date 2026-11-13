@@ -44,10 +44,10 @@ Protocol.
 - **Document window**: two-up viewer (image left / OCR text right), independent per-pane zoom, a
   draggable splitter (default ⅔ : ⅓), keyboard-driven page-scroll + document cycling, intelligent copy
   (line-break-aware, de-hyphenating), and in-document Find. Preview's page views, in the document
-  window and the preview sheet: **View ▸ Thumbnails** (⌥⌘2) is a sidebar of the scans of every open
+  window and the preview sheet: **View ▸ Show Thumbnails** (⌥⌘2) is a sidebar of the scans of every open
   file, the file on view marked; **View ▸ Contact Sheet** (⌥⌘6) shows every PDF page of every open file
   as a numbered tile in one grid that fills the window and reflows when it is resized, as Preview does,
-  OCR pages included, each file's heading on its first tile and the file on view tinted; **Hide Thumbnails** (⌥⌘1) returns to the page alone. Click a
+  OCR pages included, each file's heading on its first tile and the file on view tinted; the same item, now **Hide Thumbnails** (⌥⌘2 again), returns to the page alone. Click a
   thumbnail or tile to read it. Both are also toolbar buttons, and draw from the on-disk thumbnail cache. Window tabbing is disabled to keep pages and
   windows distinct.
 - **Options** (⌘,): link format, copy behavior, viewer defaults, and more.

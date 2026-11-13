@@ -51,8 +51,8 @@ The menu shortcut checks and existing document/preview copy interaction tests us
 
 ## ✅ CLOSED (W40.reader-page-views, 2026-11-11) — Thumbnails and Contact Sheet across all open files
 
-Preview's page views are in the document window and the preview sheet: View ▸ Hide Thumbnails ⌥⌘1, Thumbnails
-⌥⌘2, Contact Sheet ⌥⌘6 (All Pages Tiled, below, renamed), plus two toolbar buttons. The sidebar shows the image
+Preview's page views are in the document window and the preview sheet: View ▸ Show/Hide Thumbnails ⌥⌘2 (one
+item since W40.reader-thumbnails-toggle; it was Hide Thumbnails ⌥⌘1 and Thumbnails ⌥⌘2), Contact Sheet ⌥⌘6 (All Pages Tiled, below, renamed), plus two toolbar buttons. The sidebar shows the image
 page of each page pair, never the OCR text page, for every open file under a heading that marks the file on view;
 the contact sheet keeps every PDF page. Both draw lazily from the on-disk `PDFThumbnailer` cache, decoded to their
 size, and turned as the reader turned the page; off-screen cells hold no bitmap. Each window remembers its sidebar.

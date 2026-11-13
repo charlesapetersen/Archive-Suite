@@ -270,8 +270,8 @@ Every command's name, key and tooltip is written once, in `ReaderCommand` (`W40.
 (`ArchiveReaderCommands.swift`), the toolbars, the preview sheet's buttons and the document window read it.
 `ReaderCommandTableTests` fails on two commands sharing a key where both answer it (the menu bar together with
 each window's own keys), on a menu item whose name or key differs from the table, and on any string in the app's
-sources that names a key nothing binds. Keys held for a coming item: `⌥⌘1`/`⌥⌘2`/`⌥⌘6` single page / Thumbnails /
-Contact Sheet (`W40.reader-page-views`, as in Preview).
+sources that names a key nothing binds. The page views keep Preview's keys: `⌥⌘2` Show/Hide Thumbnails, one item that
+toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.reader-page-views`); `⌥⌘1` is free.
 
 *Navigation window*
 - `↑/↓` move selection · `⇧↑/⇧↓` extend · `⌘A` select all · type letters/digits = type-select *(native `Table`)*
