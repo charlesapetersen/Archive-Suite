@@ -9,7 +9,7 @@ import Foundation
 
 /// One thing in effect that narrows the list.
 enum FilterFacet: Hashable, Sendable {
-    case smartFolder, folder, read, quality(Int), tag(String), dates, name, text, needsAttention, ambiguousDates
+    case smartFolder, folder, read, quality(Int), tag(String), dates, name, text, needsAttention, ambiguousDates, poorOCR
 
     /// The folder and the smart folder say *where* the list looks rather than what it looks for, so an empty
     /// list is blamed on them only when no other filter alone explains it.
@@ -37,6 +37,7 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         case .text: return "ar.filter.chip.text"
         case .needsAttention: return "ar.filter.needsAttention"
         case .ambiguousDates: return "ar.filter.ambiguousDates"
+        case .poorOCR: return "ar.filter.poorOCR"
         }
     }
 
@@ -71,6 +72,7 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         }
         if f.needsAttentionOnly { add(.needsAttention, "Needs attention", "the needs-attention filter") }
         if f.ambiguousDatesOnly { add(.ambiguousDates, "Ambiguous dates", "the ambiguous-dates filter") }
+        if f.poorOCROnly { add(.poorOCR, "Poor OCR", "the poor-OCR filter") }
         return chips
     }
 
@@ -110,6 +112,7 @@ extension LibraryFilter {
         case .name: f.searchText = ""
         case .needsAttention: f.needsAttentionOnly = false
         case .ambiguousDates: f.ambiguousDatesOnly = false
+        case .poorOCR: f.poorOCROnly = false
         }
         return f
     }

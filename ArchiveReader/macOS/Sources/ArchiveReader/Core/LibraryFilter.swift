@@ -46,6 +46,13 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         get { ambiguousDates ?? false }
         set { ambiguousDates = newValue ? true : nil }
     }
+    /// W44.reocr-reader: only files flagged `OCR Poor` (`DocumentTags.hasPoorOCR`), to deal with them in a batch.
+    /// Optional for the same reason as `ambiguousDates`. Use `poorOCROnly`.
+    var poorOCR: Bool? = nil
+    var poorOCROnly: Bool {
+        get { poorOCR ?? false }
+        set { poorOCR = newValue ? true : nil }
+    }
 
     var dateRange: DateRangeFilter? {
         dateFromYear == nil && dateToYear == nil ? nil : DateRangeFilter(fromYear: dateFromYear, toYear: dateToYear)
@@ -61,7 +68,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         !subjects.isEmpty || !qualities.isEmpty || read != .all || dateRange != nil
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
-            || needsAttentionOnly || ambiguousDatesOnly
+            || needsAttentionOnly || ambiguousDatesOnly || poorOCROnly
     }
 
     func matches(_ file: ArchiveFile) -> Bool {
@@ -90,6 +97,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
             }
         }
         if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }
+        if poorOCROnly, !file.tags.hasPoorOCR { return false }
         // Date range — either role, the same value meeting both bounds.
         if let dateRange, dateRange.matchingRoles(file.tags.dateKeysByRole).isEmpty { return false }
         // Filename text

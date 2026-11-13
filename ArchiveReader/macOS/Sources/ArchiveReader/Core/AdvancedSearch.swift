@@ -330,6 +330,11 @@ extension AdvancedSearch {
         }
         if f.needsAttentionOnly { rules.append(SearchRule(field: .needsAttention)) }
         if f.ambiguousDatesOnly { rules.append(SearchRule(field: .ambiguousDate)) }
+        // The poor-OCR filter is the `OCR Poor` tag (`DocumentTags.hasPoorOCR` is that tag by identity), so a smart
+        // folder saved from it needs no rule of its own.
+        if f.poorOCROnly {
+            var r = SearchRule(field: .tags, op: .hasAll); r.tags = [DocumentTags.poorOCRTag]; rules.append(r)
+        }
         self.init(combine: .all, rules: rules)
     }
 

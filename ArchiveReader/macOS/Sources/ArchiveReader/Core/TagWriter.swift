@@ -21,7 +21,8 @@ enum TagWriter {
     /// write target's identity re-verified inside coordination (Safety §6); a file moved/replaced
     /// under the same path aborts with `.identityMismatch`. `nil` (default) skips the check.
     static func apply(_ delta: TagDelta, to url: URL, expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try recorded(.apply, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
+        try recorded(.apply, url, poorOCR: PoorOCRFlagGuard.requested(add: delta.add, remove: delta.remove)) {
+            try journalledWrite(url, expectedIdentity: identity) { current, label in
             var removals = delta.remove
             var additions = delta.add
             var targetLabel = label
@@ -90,7 +91,8 @@ enum TagWriter {
                                 expecting identity: FileIdentity? = nil,
                                 undoing change: UndoneChange,
                                 op: AuditLedger.Operation = .undo) throws -> TagWriteResult {
-        try recorded(op, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
+        try recorded(op, url, poorOCR: PoorOCRFlagGuard.requested(add: delta.add, remove: delta.remove)) {
+            try journalledWrite(url, expectedIdentity: identity) { current, label in
             var targetLabel = label
             switch delta.color {
             case .restoreLabel(let lbl): targetLabel = lbl
@@ -189,7 +191,7 @@ enum TagWriter {
     /// and a file already carrying exactly `new` alone is left unwritten (W40.fix-tags-case-insensitive).
     static func renameToken(from old: String, to new: String, on url: URL,
                             expecting identity: FileIdentity? = nil) throws -> TagWriteResult {
-        try recorded(.rename, url) { try journalledWrite(url, expectedIdentity: identity) { current, label in
+        try recorded(.rename, url, poorOCR: PoorOCRFlagGuard.requested(add: [new], remove: [old])) { try journalledWrite(url, expectedIdentity: identity) { current, label in
             guard current.contains(where: { shouldRemoveTag($0, matching: old) }) else { return nil }
             var renamed = current.filter { !shouldRemoveTag($0, matching: old) }
             if !renamed.contains(where: { isSameTag($0, new) }) { renamed.append(new) }
@@ -215,11 +217,15 @@ enum TagWriter {
     /// post-write verification, or a raw Foundation error from the label write, which comes after the
     /// tag write. `unreadable`, `identityMismatch` and `coordinationFailed` are refused before any write
     /// and leave nothing to record.
-    private static func recorded(_ op: AuditLedger.Operation, _ url: URL,
+    ///
+    /// `poorOCR` is the value the write asks for `OCR Poor` when its delta names the tag: the write then runs under
+    /// the shared flag protocol (`PoorOCRFlagGuard`, W44.reocr-reader), whose lock is taken before coordination, and
+    /// the ledger line carries what it recorded.
+    private static func recorded(_ op: AuditLedger.Operation, _ url: URL, poorOCR: Bool? = nil,
                                  _ write: () throws -> TagWriteResult) throws -> TagWriteResult {
         // An unbound write is its own action, journalled like any other: intent before, done after.
         guard AuditLedger.context != nil else {
-            return try AuditLedger.withContext(group: UUID()) { try recorded(op, url, write) }
+            return try AuditLedger.withContext(group: UUID()) { try recorded(op, url, poorOCR: poorOCR, write) }
         }
         // Bind the persisted inode to the object present before the write. Capturing only after
         // coordination could record a replacement's identity against the original file's inverse.
@@ -227,13 +233,16 @@ enum TagWriter {
         let identity = FileIdentity.capture(url)
         let stableBefore = number != nil && AuditLedger.fileNumber(url) == number
         do {
-            let result = try write()
+            var flag: PoorOCRFlagGuard.Record?
+            let result = try PoorOCRFlagGuard.run(requested: poorOCR, url: url, record: &flag, write)
             let sameObject = identity.flatMap { original in
                 FileIdentity.capture(result.url).map { $0.matches(original) }
             } == true
             let recordedFile = stableBefore && sameObject && AuditLedger.fileNumber(result.url) == number ? number : nil
-            AuditLedger.shared.record(op, result, file: recordedFile)
+            AuditLedger.shared.record(op, result, file: recordedFile, flag: flag)
             return result
+        } catch let error as PoorOCRFlagGuard.Refusal {
+            throw error   // refused before any tag write: nothing to record
         } catch let error as TagWriteError {
             if case .verificationFailed(let why) = error { AuditLedger.shared.recordUnverified(op, url, why) }
             throw error

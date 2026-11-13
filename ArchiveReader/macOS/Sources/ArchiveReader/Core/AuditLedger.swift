@@ -145,6 +145,9 @@ final class AuditLedger: @unchecked Sendable {
         var attempt: Int?
         /// Set on a redo's lines and its `redoAttempt` marker: the undo group the redo reverses.
         var redoes: UUID?
+        /// W44.reocr-reader: set when the write named `OCR Poor` and ran under the shared flag protocol: the file's
+        /// root GUID and relative path, the operation, and the flag generation before and after.
+        var flag: PoorOCRFlagGuard.Record? = nil
     }
 
     private let lock = NSLock()
@@ -225,7 +228,7 @@ final class AuditLedger: @unchecked Sendable {
     }
 
     /// Append one line for a verified write. A no-op result records nothing.
-    func record(_ op: Operation, _ r: TagWriteResult, file: FileNumber?) {
+    func record(_ op: Operation, _ r: TagWriteResult, file: FileNumber?, flag: PoorOCRFlagGuard.Record? = nil) {
         guard !r.isNoOp else { return }
         let ctx = Self.context ?? Context(group: UUID(), undoes: nil)
         let entry = Entry(
@@ -237,7 +240,7 @@ final class AuditLedger: @unchecked Sendable {
             delta: Self.forwardDelta(r),
             inverse: Delta(add: r.occurrenceInverse.add, remove: r.occurrenceInverse.remove,
                            label: Self.label(of: r.occurrenceInverse.color)),
-            unverified: nil, redoes: ctx.redoes)
+            unverified: nil, redoes: ctx.redoes, flag: flag)
         append(entry, recordsChange: true)
     }
 

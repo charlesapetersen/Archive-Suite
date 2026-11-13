@@ -8,7 +8,8 @@ import ArchiveCore
 /// planned switch (see `CLAUDE.md` §Stack & Build — access is meant to sit behind this abstraction).
 @MainActor
 final class RootFolderStore: ObservableObject {
-    @Published private(set) var root: URL?
+    /// Mirrored to `ImproveOCRArchive`, which keys the OCR Poor flag records by this root (W44.reocr-reader).
+    @Published private(set) var root: URL? { didSet { ImproveOCRArchive.shared.rootURL = root } }
 
     /// The prefix every path a discovery pass reports under `root` is spelled with — computed once
     /// here, at adoption, and `nil` exactly when there is no root.
