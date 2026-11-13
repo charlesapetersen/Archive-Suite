@@ -38,14 +38,16 @@ Section 3 makes a year explicit when any rule candidate in the own text carries 
 | Gemini 3.7 Flash (gateway) | any own candidate (section 3) | 96.3% (131/136) | 58.2% (53/91) | 184/227 | 55 / 28 | 15.6% (14/90) |
 | Gemini 3.7 Flash (gateway) | a quote from self | 96.3% (131/136) | 58.2% (53/91) | 184/227; 0 / 0, p 1.0 | 52 / 31 | 13.3% (12/90) |
 
-## The model's own flag on an explicit text year (a variant)
+## The model's own flag on an explicit text year (a variant, in-sample)
 
-Section 3 never takes Date Uncertain from the model. Here the trace reply's own `date_uncertain` is allowed one thing only: to add Date Uncertain to a year step 1 made explicit (the year is kept, nothing is removed). A year with Date Uncertain is not a false year.
+Section 3 never takes Date Uncertain from the model. Here the trace reply's own `date_uncertain` is allowed one thing only: to add Date Uncertain to a year step 1 made explicit (the year is kept, nothing is removed). A year with Date Uncertain is not a false year. Like the self-quote variant, it was chosen after reading this run's undated false years and is evaluated on the same replies, so it is an in-sample comparison, not a tested rule; and part of its undated false-year rate is judged by the Gemini image pass, the scored route's own step 2 (split below the table).
 
 | route | owner text years the model flagged: n, exact, owner-uncertain | certain years flagged | uncertain years unflagged | false-year rate, undated |
 |---|---|---|---|---|
 | Gemini 3.7 Flash (gateway), section 3 | – | 14.4% (26/181) | 37.5% (15/40) | 15.6% (14/90) |
 | Gemini 3.7 Flash (gateway), the flag demotes | 11, 5, 7 | 16.6% (30/181) | 20.0% (8/40) | 5.6% (5/90) |
+
+Gemini 3.7 Flash (gateway), the flag demotes: of its 5 undated false years, 2 are on documents the owner ruled (2 of 15 explicit years there) and 3 are judged by the Gemini image pass (3 of 30).
 
 ## What the image step adds (paired, not in text)
 

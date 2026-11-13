@@ -16,7 +16,7 @@ The tie rule. On the 96 a gap is a tie only when it is under the pair's floor, t
 routes (the owner, 2026-11-11, W46.pairs-redecide-owner-ok: "floor only", as 12-settings-design §3.3 reads; the
 paired interval is shown beside the figure but makes no tie). A hosted route (family cloud or plan) is held to Gemini
 3.7 Flash's 0.49; a Mac route is local greedy, 0.00; a cluster route has no rerun and is not one machine's greedy
-decoding, so it is held to the hosted 0.49. On the 895 there is no floor: the interval alone decides (R-3). Each
+decoding, so it is held to the hosted 0.49. On the 895 the floor makes no tie: the interval alone decides (R-3). Each
 entry keeps both tests, `under_floor` and `interval_holds_0`, and `tie` is the one its set uses.
 
 W46.pair-matrix-cover added the groups the solver ranks on. On the 96, beside `all`: each kind of ocr-pages.csv

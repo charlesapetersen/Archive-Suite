@@ -70,11 +70,11 @@ Places written: 66, of which 66 are read by the check. Quoted from the recipient
 
 ## Measurement card
 
-**Truth.** `ent_truth.load_truth()`: W46.fix-ent-truth (two model families drafting, Sonnet ruling 86 documents) with
+**Truth.** `ent_truth.load_truth()`: W46.fix-ent-truth (GPT 5.6 Luna and Claude Sonnet 5 drafting, Sonnet ruling 86 documents) with
 the owner's answers and the sending-place rule; 138 correspondence documents, 72 named places. The owner overturned 3
 of 7 asked rulings (P11-5), so about 2-3% of the fields are wrong in the truth; the 18 rule-emptied places nobody
-checked are the weakest rows. Gemini drafted part of the truth and is the scored family (a relative, as in every entity
-report). The non-correspondence documents have no name truth: their figures are counts, not accuracy.
+checked are the weakest rows. No Gemini drafted or ruled, so no scored route is a drafter or a relative of one (as in
+`ent-score-paid.md` and `ent-place-rule.md`). The non-correspondence documents have no name truth: their figures are counts, not accuracy.
 
 **Selection.** The entity truth set (W46.fix-ent-truth's 300-document sample and its stratified top-up), chosen before
 any route here; never by a tested route or ABBYY text. The 21 non-correspondence documents are that set's own.

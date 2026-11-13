@@ -51,7 +51,8 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   "Locked boxes named"), and two public boxes, `manuscripts-public` (Lincoln, 19th-century handwritten
   correspondence) and `typed-gov-public` (CREST) [M]. Rules: (a) a `magazine` figure ranks only for a route whose
   prompt states the article-within-issue rule: since W46.seg-magazine-rule-app that is Gemini 3.8 Flash on g2, whose
-  figure is Gemini 3.7's g2 answer (93.8% of the Illustrated Review's gaps), labelled as 3.7's. Every other route's
+  figure is Gemini 3.7's g2 answer (93.8% of the Illustrated Review's gaps), labelled as 3.7's and as measured on the
+  set rule 10 was written and adopted on, not a held-out one (pass 14, P14-7). Every other route's
   `magazine` figure (g1, w1, c1, and the students, which trained on the box) is shown with "ranks nothing yet" and the
   solver never picks on it. Until then the reason was not the prompts (only Gemini's g1 carries the full-issue rule; Claude's w1 and GLM's c1 have none, and
   every cloud route merges the newsletter pair with or without it, P8-4, seg-boxes-score.md Reading): it is that the
@@ -109,7 +110,7 @@ segment figures conditional on each route's call at unsure gaps.
   "test-boxes.after_checking":{"value":100.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages right after checking","value":"100.0%"}},
   "test-boxes.unflagged_per_500":{"value":0.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"unflagged errors per 500 pages (count)","value":"0.0 (0)"}},
   "dev-boxes":{"value":91.9,"n":551,"truth":"owner-dev","source":{"file":"seg-magazine-rule-app.md","route":"g2 on 3.7, held out (pooled)","attribute":"pages exact, no checking","value":"91.9%"}},
-  "magazine.gap_acc":{"value":93.8,"n":146,"truth":"owner-locked","source":{"file":"seg-magazine-rule.md","route":"g2","attribute":"Gap accuracy","value":"93.8%"}}},
+  "magazine.gap_acc":{"value":93.8,"n":146,"truth":"owner-locked, the adoption set","source":{"file":"seg-magazine-rule.md","route":"g2","attribute":"Gap accuracy","value":"93.8%"}}},
  "cost":{"usd_1000_list":3.61,"usd_1000_batch":1.81,"price_read":"2026-10-05","source":{"file":"options.md","route":"gemini-3.8-flash/low","attribute":"list $ / batch $","value":"$3.61 / $1.81"}},
  "time":{"per_unit_s":5.33,"per_window_s":16.0,"measured":false,"measured_on":"Gemini 3.7's gateway window call, lent to 3.8 (not timed on 3.8)","derived":"seconds a seven-page window call over 3, a window every 3 pages at stride 3","source":{"file":"seg-boxes-score.md","route":"Gateway line","attribute":"s a call","value":"16.0 s"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},

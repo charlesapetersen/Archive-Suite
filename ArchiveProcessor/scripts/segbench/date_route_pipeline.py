@@ -860,10 +860,13 @@ def write_md(out):
             u = X["undated"]
             L.append(f"| {LABELS[m]} | {lab} | {pc(X['by_stratum']['in text']['exact'])} | {pc(X['not_in_text'])} | "
                      f"{pair} | {u['explicit']} / {u['estimates']} | {pc(u['false_year'])} |")
-    L += ["", "## The model's own flag on an explicit text year (a variant)", "",
+    L += ["", "## The model's own flag on an explicit text year (a variant, in-sample)", "",
           "Section 3 never takes Date Uncertain from the model. Here the trace reply's own `date_uncertain` is allowed one "
           "thing only: to add Date Uncertain to a year step 1 made explicit (the year is kept, nothing is removed). A year "
-          "with Date Uncertain is not a false year.", "",
+          "with Date Uncertain is not a false year. Like the self-quote variant, it was chosen after reading this run's "
+          "undated false years and is evaluated on the same replies, so it is an in-sample comparison, not a tested rule; "
+          "and part of its undated false-year rate is judged by the Gemini image pass, the scored route's own step 2 "
+          "(split below the table).", "",
           "| route | owner text years the model flagged: n, exact, owner-uncertain | certain years flagged | uncertain years unflagged | false-year rate, undated |",
           "|---|---|---|---|---|"]
     for m, S in M.items():
@@ -873,6 +876,12 @@ def write_md(out):
         L.append(f"| {LABELS[m]}, the flag demotes | {F['owner_text_flagged']}, {F['owner_text_flagged_exact']}, "
                  f"{F['owner_text_flagged_owner_du']} | {pc(F['du_vs_owner']['certain_flagged'])} | "
                  f"{pc(F['du_vs_owner']['uncertain_unflagged'])} | {pc(F['undated']['false_year'])} |")
+    for m, S in M.items():
+        U = S["flag_demotes"]["undated"]
+        L += ["", f"{LABELS[m]}, the flag demotes: of its {U['false_year']['k']} undated false years, "
+              f"{U['owner_ruled']['false']} are on documents the owner ruled ({U['owner_ruled']['false']} of "
+              f"{U['owner_ruled']['explicit_ruled']} explicit years there) and {U['model_scored']['false']} are judged "
+              f"by the Gemini image pass ({U['model_scored']['false']} of {U['model_scored']['explicit_unruled']})."]
     L += ["", "## What the image step adds (paired, not in text)", "",
           "The same documents and trace replies, the route with and without step 2.", "",
           "| route | with step 2 | without | only with | only without | sign test p |", "|---|---|---|---|---|---|"]

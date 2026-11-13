@@ -493,9 +493,10 @@ def markdown(o):
         bk = r['by_kind'] or {}
         L.append(f'| {rid} | {r["per_unit_s"]} | {bk.get("typewritten", "")} | '
                  f'{bk.get("printed", "")} | {bk.get("handwritten", "")} | {bk.get("mixed", "")} | {r["p90_s"] or ""} | '
-                 f'{r["load_s"]} | {", ".join(map(str, r["load_avg"])) if r["load_avg"] else "-"} | {r["note"]} |')
+                 f'{r["load_s"]}{" (first call\'s warm-up in a fresh process, not a model load)" if rid == "apple-vision" else ""} | {", ".join(map(str, r["load_avg"])) if r["load_avg"] else "-"} | {r["note"]} |')
     L += ['', '"printed" includes the two clippings. kraken rows are blla segmentation plus the line reader on its '
-          'lines, page by page; the load column is both models\' load.',
+          'lines, page by page; the load column is both models\' load. Apple Vision\'s load is the first call\'s warm-up in '
+          'a fresh process, not a model load, and no row depends on it.',
           '', '### The earlier Mac seconds stand', '',
           'The readers timed again here took, page by page, this much of their earlier readings\' wall on the same '
           'pages (where both generated the same tokens): '

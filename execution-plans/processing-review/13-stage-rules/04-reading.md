@@ -38,9 +38,12 @@ owner, walkthrough 2026-11-11, W46.pairs-redecide-owner-ok: floor only, as `12-s
 route 0.49 points (twice Gemini 3.7 Flash's rerun range of 0.24, lent to every hosted route without its own rerun); a
 local greedy route 0.00, so any paired gap separates two of them (Qwen3-VL 8B 4-bit byte-identical across two runs 15 days
 apart); per kind twice the kind's own range (handwritten hosted 0.60, twice 0.30, `ocr-ppocrv6-hands-paid.md` Noise);
-on the 895 there is no floor, so a pick there takes the stratum's leader and the interval makes no tie either (the
+on the 895 no floor makes a tie, so a pick there takes the stratum's leader and the interval makes no tie either (the
 owner's "the interval makes no tie", applied to the 895 picks by W46.pairs-redecide); the interval (R-3, the matrix's
-895 `tie` flag) decides only whether a stratum route earns a row, as Ling3 Flash VL's N5 pair did.
+895 `tie` flag) decides only whether a stratum route earns a row, as Ling3 Flash VL's N5 pair did. The rerun floor
+is a route's own property, not the 96's, so the hosted 0.49 applies on the 895 too as each route's own floor; it changes
+no pick today (no cluster runner-up within 0.49 in L4, L9 or pooled L1-L3), and L3 and N6 are the groups where a
+cluster runner-up sits within it (`ocr-pair-matrix.md` §The tie per pair; pass 14, P14-5).
 The bench pairs every reading row that has per-page scores with every other (`ocr-pair-matrix.md`, W46.ocr-pair-matrix
 and W46.pair-matrix-cover): on the 96 over all pages, per kind (typewritten, printed, handwritten, each with its kind
 floor: 0.42, 0.24, 0.60 hosted, a Mac pair 0.00) and on hands16; on the 895 per stratum and pooled L1-L3. The

@@ -6,7 +6,7 @@ Apple M3 Pro, 18 GB, macOS 27.2, 2026-11-11. The same 16 of the owner's pages fo
 
 | route | median s a page | typewritten | printed | handwritten | mixed | 90th pct | load s | load average before, after | how |
 |---|---|---|---|---|---|---|---|---|---|
-| apple-vision | 0.19 | 0.17 | 0.17 | 0.21 | 0.17 | 0.22 | 43.4 | 2.69, 4.12 | median of 3 reads a page, one process |
+| apple-vision | 0.19 | 0.17 | 0.17 | 0.21 | 0.17 | 0.22 | 43.4 (first call's warm-up in a fresh process, not a model load) | 2.69, 4.12 | median of 3 reads a page, one process |
 | xiaomi-ocr-0-bf16 | 7.61 | 7.71 | 10.8 | 5.85 | 6.57 | 10.31 | 1.7 | 5.93, 2.87 | one read a page, greedy |
 | paddleocr-vl1.6-bf16 | 3.73 | 3.88 | 5.68 | 2.85 | 3.29 | 5.98 | 1.0 | 2.87, 3.76 | one read a page, greedy |
 | lightonocr-3-4b-mlx8 | 23.5 | 25.5 | 34.53 | 14.68 | 18.8 | 30.35 | 3.5 | 3.76, 3.43 | one read a page, greedy |
@@ -21,7 +21,7 @@ Apple M3 Pro, 18 GB, macOS 27.2, 2026-11-11. The same 16 of the owner's pages fo
 | kraken-biblia | 9.06 | 10.03 | 10.47 | 9.04 | 7.73 | 13.49 | 4.04 | 4.0, 5.97 | blla 4.51 s (in one process, its model loaded once) + line reading 4.55 s (one page a call less a call on a blank page), medians |
 | pp-doclayoutv3 | 0.19 | 0.19 | 0.19 | 0.19 | 0.19 | 0.19 | 1.69 | 5.97, 5.44 | median of 3 detections a page, 1024 px draft |
 
-"printed" includes the two clippings. kraken rows are blla segmentation plus the line reader on its lines, page by page; the load column is both models' load.
+"printed" includes the two clippings. kraken rows are blla segmentation plus the line reader on its lines, page by page; the load column is both models' load. Apple Vision's load is the first call's warm-up in a fresh process, not a model load, and no row depends on it.
 
 ### The earlier Mac seconds stand
 

@@ -35,10 +35,16 @@ is hosted (cloud or plan); 0.00 between two Mac routes (local greedy, byte-ident
 has no rerun and is not one machine's greedy decoding, so it takes the hosted 0.49. Per kind the kind's own range
 applies, twice Gemini 3.7 Flash's per-kind rerun range: typewritten 0.42 (0.21), printed 0.24 (0.12), handwritten and
 hands16 0.60 (0.30); a pair of Mac routes stays 0.00 in every group. The paired interval is shown beside the figure
-and makes no tie; each entry keeps it as `interval_holds_0`, and the floor test as `under_floor`. **On the 895 there
-is no floor and the interval alone decides** (R-3), so there `tie` is `interval_holds_0`. The settings solver reads
+and makes no tie; each entry keeps it as `interval_holds_0`, and the floor test as `under_floor`. **On the 895 the
+floor makes no tie and the interval alone decides** (R-3), so there `tie` is `interval_holds_0`. The settings solver reads
 a tie on the 96 from the pair's entry here; on the 895 a pick takes the stratum's leader and the 895 `tie` decides only
-whether a stratum route earns a row (W46.pairs-redecide, 04-reading §3); the table's `noise.reading` names this file. The first build (W46.ocr-pair-matrix)
+whether a stratum route earns a row (W46.pairs-redecide, 04-reading §3); the table's `noise.reading` names this file.
+The rerun floor is a route's own instability, which does not change with the page set, so the hosted 0.49 holds on
+the 895 too (measurement review pass 14, P14-5). It changes no pick today: the strata the picks take (L4 forms, L9
+newspapers, pooled L1-L3 handwritten) have no cluster runner-up within 0.49 of the leader. Among cluster routes the
+groups where it would bite are L3 (Qwen3.6 27B over Qwen3.5 27B by 0.26 and Infinity-Parser2 Pro by 0.30) and N6
+(Xiaomi OCR over Infinity-Parser2 Pro by 0.41); among all routes also L1-L3 (Infinity over Gemini 3.7 Flash, 0.17),
+L2 (Gemini over Infinity, 0.21) and L3's Gemini (0.11). The first build (W46.ocr-pair-matrix)
 also counted an interval that holds 0 as a tie on the 96; the figures are unchanged, only that flag.
 
 On the 96 the leaders separate. On answered NES the four (Gemini 3.1 Pro 96.85, Gemini 3.7 Flash 96.76, Claude

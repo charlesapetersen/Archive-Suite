@@ -13,8 +13,9 @@ Script: `scripts/segbench/dewarp_curved_select.py` (tests: `test_dewarp_curved_s
 
 - **On the 24 bound or curled pages, the guarded copy selects a little better than the route's copy.** The guard
   passes UVDoc on 12 of the 24. The guarded pipeline (UVDoc where the guard passes, the route's copy elsewhere)
-  passes 74.8% of lines against 71.6%: **+3.2 (+0.4 to +7.7) pooled**, +4.6 (+0.6 to +9.1) as the mean page
-  difference. 7 pages are better and 2 worse. On the 12 pages the guard passes, UVDoc lifts the pass rate from 74.8%
+  passes 74.8% of lines against 71.6%: **+3.2 (+0.4 to +7.7) pooled with the drag-edge rule, +2.2 (−0.5 to +5.8)
+  without it**; the rule (§The arms, "Drag ends at the copy's edge") was added after the first run showed those ends,
+  and without it the interval holds 0. With the rule, +4.6 (+0.6 to +9.1) as the mean page difference. 7 pages are better and 2 worse. On the 12 pages the guard passes, UVDoc lifts the pass rate from 74.8%
   to 85.8%: **+11.0 (+2.9 to +18.2)**.
 - **It costs the flat pairs nothing.** The guard passes 10 of the 24 flat pairs. Guarded, they pass 94.6% against
   93.5%: +1.1 (−0.6 to +3.8); 2 pages better, 1 worse.
@@ -28,7 +29,7 @@ Script: `scripts/segbench/dewarp_curved_select.py` (tests: `test_dewarp_curved_s
   cuts 12 own-sheet words and selects 24 of 33 against 33.
 - **What this means for the call.** Where the guard lets it through, a guarded UVDoc copy is a real gain for
   selection on bent pages (+11.0), and it removes no own-sheet word by construction. Over all the owner's bound or
-  curled pages the gain is small (+3.2), because the guard holds back half of them, the two owner pages included.
+  curled pages the gain is small (+3.2 with the drag-edge rule, +2.2 without), because the guard holds back half of them, the two owner pages included.
   The 2026-11-06 call stands until the owner revisits it.
 
 ## The arms
