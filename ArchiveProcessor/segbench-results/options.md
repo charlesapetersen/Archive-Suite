@@ -17,6 +17,7 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 | Claude and ChatGPT together | 90.9% | 10.2 | 97.3% | 4.1 (3) | $31.44 / $15.72 |
 | GLM-5.3 Flash only (budget) | 80.6% | 33.1 | 97.0% | 4.1 (3) | $1.16 / none |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | 80.3% | 78.8 | 98.8% | 1.4 (1) | $0.000 / none |
+| Gemini only, text alone (budget) | 87.3% | 29.2 | 98.5% | 1.4 (1) | $1.68 / $0.842 |
 
 Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and this row's level and figures are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them (segbench-results/seg-magazine-rule-app.md). Gemini 3.8 on g1 at <= 0.965 scored 87.3% no checking, 24.2 checks per 100 pages, 98.5% after checking and 2 unflagged errors. Its token and price row below is 3.8's, measured on g1. The row is one run at window offset 0; over offsets 0, 1 and 2 (segbench-results/seg-g2-offsets.md) the same route scores 88.8%–89.1% no checking, 25.3–29.2 checks per 100 pages, 100.0%–100.0% after checking, 0.0–0.0 unflagged errors per 500 pages.
 
@@ -30,6 +31,7 @@ Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and thi
 | Claude and ChatGPT together | min, <= 0.850 | 91.1% | 5.8 | 99.0% | 1.8 |
 | GLM-5.3 Flash only (budget) | min, <= 0.925 | 90.2% | 17.1 | 97.3% | 2.7 |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | min, <= 0.995 | 90.5% | 73.3 | 100.0% | 0.0 |
+| Gemini only, text alone (budget) | min, <= 0.950 | 89.4% | 11.8 | 99.0% | 1.8 |
 
 ## By test box
 
@@ -47,6 +49,8 @@ Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and thi
 | GLM-5.3 Flash only (budget) | RG165 | 113 | 83.9% | 27 | 23.9 | 100.0% | 0 |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | Stanton | 250 | 75.3% | 213 | 85.2 | 98.4% | 1 |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | RG165 | 113 | 94.3% | 73 | 64.6 | 100.0% | 0 |
+| Gemini only, text alone (budget) | Stanton | 250 | 84.8% | 85 | 34.0 | 97.9% | 1 |
+| Gemini only, text alone (budget) | RG165 | 113 | 94.3% | 21 | 18.6 | 100.0% | 0 |
 
 ## Tokens and cost per 1,000 pages
 
@@ -70,7 +74,7 @@ ChatGPT through `codex exec` (the ChatGPT subscription; no money): Codex reporte
 
 - Manual asks about every gap between two document pages (87 per 100 pages on these boxes) and costs nothing; it is the floor the others are measured against.
 - On the test boxes the fewest checks were Claude only's (10.2 per 100 pages, 3 unflagged errors), and the fewest unflagged errors Gemini only's (0, at 25.3 checks per 100 pages; ChatGPT only ties it at 79.1). The trade-off is the level: a higher one flags more and leaves less.
-- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 3 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 1 on the test boxes, 0 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
+- Every count here is small (Claude only 3 on the test boxes, 2 held out on the development boxes, Gemini only 0 on the test boxes, 3 held out on the development boxes, ChatGPT only 0 on the test boxes, 0 held out on the development boxes, Claude and ChatGPT together 3 on the test boxes, 2 held out on the development boxes, GLM-5.3 Flash only (budget) 3 on the test boxes, 3 held out on the development boxes, Corpus-trained Qwen3.5 2B on this Mac (no key) 1 on the test boxes, 0 held out on the development boxes, Gemini only, text alone (budget) 1 on the test boxes, 2 held out on the development boxes), so a difference of one or two errors is within noise, and a zero on 363 pages is not a promise of zero. The figures shown to a user should be the rounded test figures, labelled as measured on two locked boxes (363 pages) of one archive.
 - The models make the same mistakes more often than different ones (on Dean, Claude and Gemini took the same decision on every gap), which is why combining them adds little over Claude alone.
 
 ## Measurement card

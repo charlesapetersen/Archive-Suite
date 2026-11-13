@@ -303,6 +303,9 @@ def segmentation(op):
         # price chart, as the FarmShare rows are.
         if "on this Mac" in c[0]:
             row.update(name=c[0] + " (scored at full precision on FarmShare)", std=None, batch=None, mac=True)
+        # W46.seg-text-tier-app: the app's text-only Gemini 3.8 tier, its level and figures Gemini 3.7 Flash's (gateway).
+        if c[0].startswith("Gemini only, text alone"):
+            row.update(name=c[0] + " (3.8 sends it; figures are Gemini 3.7 Flash's, gateway)")
         seg.append(row)
     shipped_mac = next((a for a in seg if a.get("mac")), None)
     cheap = CHEAP_MD.read_text()
@@ -393,7 +396,7 @@ def segmentation(op):
         if any(f(d["arms"]["image"]["figures"])[k] != shipped[k] for k in ("nocheck", "checks", "after", "unflagged")):
             sys.exit(f"seg-text-tier-test.json's image arm no longer matches options.md: {d['arms']['image']['figures']}")
         c = d["per_1000_pages"]["text"]
-        seg.append({"name": "Gemini only, text alone (3.7 Flash, gateway; candidate budget tier, not in the app)",
+        seg.append({"name": "Gemini only, text alone at the image level, <= 0.965 (3.7 Flash, gateway)",
                     **f(d["arms"]["text"]["figures"]), "std": cents(c["list"]), "batch": cents(c["batch"]),
                     "source": tier.name})
     return seg
