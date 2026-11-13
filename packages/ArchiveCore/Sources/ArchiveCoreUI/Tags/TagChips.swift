@@ -42,7 +42,10 @@ public enum TagChips {
 
     /// Flows the chips left to right, wrapping at `width`. A chip wider than the field is clamped to it and its
     /// title truncated when drawn. `lineHeight` is the chips' height; the field passes one line of native tokens.
-    public static func layout(_ titles: [String], font: NSFont, width: CGFloat, lineHeight: CGFloat? = nil) -> Layout {
+    /// `titleWidth` measures a title in `font` (`titleWidth(_:font:)`); a list working out many rows' heights passes
+    /// a cached copy, since a title's width does not depend on the field's.
+    public static func layout(_ titles: [String], font: NSFont, width: CGFloat, lineHeight: CGFloat? = nil,
+                              titleWidth: ((String) -> CGFloat)? = nil) -> Layout {
         let height = lineHeight ?? chipHeight(for: font)
         let padding = horizontalPadding(for: font)
         let gap = chipGap(for: font)
@@ -51,7 +54,7 @@ public enum TagChips {
         var x = leadingInset
         var y = verticalInset
         for title in titles {
-            let textWidth = ceil(attributedTitle(title, font: font, color: .labelColor).size().width)
+            let textWidth = titleWidth?(title) ?? Self.titleWidth(title, font: font)
             let chipWidth = min(textWidth + 2 * padding, maxWidth)
             if x > leadingInset, x + chipWidth > leadingInset + maxWidth {
                 x = leadingInset
@@ -61,6 +64,11 @@ public enum TagChips {
             x += chipWidth + gap
         }
         return Layout(chips: chips, height: y + height + verticalInset)
+    }
+
+    /// A title's drawn width in `font`, rounded up.
+    public static func titleWidth(_ title: String, font: NSFont) -> CGFloat {
+        ceil(attributedTitle(title, font: font, color: .labelColor).size().width)
     }
 
     /// The fill of a chip on an ordinary row: the accent, tinted like the native token.

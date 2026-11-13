@@ -108,6 +108,12 @@ final class NotesTableTruncationTests: XCTestCase {
         column.width = 600
         table.layoutSubtreeIfNeeded()
         XCTAssertEqual(table.rect(ofRow: taggedRow).height, oneLine, "one line of chips fits a wide column")
+        // The cell on screen follows the row's new height without a reload, so its chips never overhang the row.
+        let resized = try XCTUnwrap(table.view(atColumn: index0, row: taggedRow, makeIfNecessary: false)
+                                    as? NotesTagsCellView)
+        XCTAssertEqual(resized.chips.frame.height, TagChips.chipHeight(for: font), accuracy: 0.5,
+                       "one line of chips after the resize")
+        XCTAssertLessThanOrEqual(resized.chips.frame.maxY, resized.bounds.height + 0.5)
 
         column.width = 180
         table.layoutSubtreeIfNeeded()

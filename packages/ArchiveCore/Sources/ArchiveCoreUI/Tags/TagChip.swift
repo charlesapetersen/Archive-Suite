@@ -29,13 +29,13 @@ public struct TagChip: View {
         HStack(spacing: 3) {
             Text(title).font(Font(font)).lineLimit(1).truncationMode(.tail)
             if let onRemove {
-                Button(action: onRemove) {
+                let button = Button(action: onRemove) {
                     Image(systemName: "xmark").font(.system(size: max(8, font.pointSize - 4), weight: .semibold))
                 }
                 .buttonStyle(.borderless)
                 .help("Remove \(title)")
                 .accessibilityLabel("Remove \(title)")
-                .accessibilityIdentifier(removeIdentifier ?? "")
+                if let removeIdentifier { button.accessibilityIdentifier(removeIdentifier) } else { button }
             }
         }
         .padding(.leading, padding)

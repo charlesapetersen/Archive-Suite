@@ -16,8 +16,10 @@ public final class TagChipsView: NSView {
     public override var isFlipped: Bool { true }
 
     /// The height `titles` need at `width`: one line of chips when they fit, more when they wrap.
-    public static func height(for titles: [String], font: NSFont, width: CGFloat) -> CGFloat {
-        TagChips.layout(titles, font: font, width: width).height
+    /// `titleWidth` is `TagChips.layout`'s: a cached measure, for a table asking for many rows.
+    public static func height(for titles: [String], font: NSFont, width: CGFloat,
+                              titleWidth: ((String) -> CGFloat)? = nil) -> CGFloat {
+        TagChips.layout(titles, font: font, width: width, titleWidth: titleWidth).height
     }
 
     public override func draw(_ dirtyRect: NSRect) {

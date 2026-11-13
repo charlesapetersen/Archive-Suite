@@ -73,15 +73,22 @@ struct NoteTagBar: View {
     }
 
     /// The bar's lines: the tags, then the add field, wrapping across the whole width and scrolling past `maxLines`.
+    /// The field is the last thing in the lines, so past `maxLines` the bar opens scrolled to its end and scrolls
+    /// back to it after each tag added or removed: the field the keyboard is in is never out of sight.
     private var lines: some View {
-        ScrollView(.vertical) {
-            FlowLayout(spacing: 4, lineSpacing: 2) {
-                ForEach(item.managedTags, id: \.self) { tag in token(tag) }
-                    .frame(height: Self.lineHeight)
-                field.frame(width: Self.fieldWidth)
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                FlowLayout(spacing: 4, lineSpacing: 2) {
+                    ForEach(item.managedTags, id: \.self) { tag in token(tag) }
+                        .frame(height: Self.lineHeight)
+                    field.frame(minWidth: 120, idealWidth: Self.fieldWidth, maxWidth: Self.fieldWidth)
+                        .id(Self.fieldAnchor)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tokensHeight = $0 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tokensHeight = $0 }
+            .defaultScrollAnchor(.bottom)
+            .onChange(of: item.managedTags) { proxy.scrollTo(Self.fieldAnchor, anchor: .bottom) }
         }
         .scrollIndicators(.automatic)
         .frame(height: max(Self.lineHeight, min(tokensHeight, Self.lineHeight * Self.maxLines + 4)))
@@ -91,6 +98,7 @@ struct NoteTagBar: View {
 
     /// Wide enough for a long tag and its filled-in completion, as the filter bar's (`NoteTagChipsField.fieldWidth`).
     static let fieldWidth: CGFloat = 180
+    private static let fieldAnchor = "an.tagbar.field"
 
     /// The inspector's layout: the tags wrapping, the field under them.
     private var tokens: some View {

@@ -107,10 +107,10 @@ final class StackedLayoutUITests: NotesFixtureUITestCase {
             let list = mainWindow.tables.firstMatch
             let listTop = divider.frame.minY - 160
             let kind = mainWindow.descendants(matching: .any)["an.filter.kind"].firstMatch
-            // The bar's last row is the tag filter since Round-up left it (W40.notes-window-panes).
-            let lastRow = mainWindow.descendants(matching: .any)["an.filter.tags"].firstMatch
+            // The bar's last row is the search, laid out as the Reader's (W40.suite-reader-notes-consistency).
+            let lastRow = mainWindow.descendants(matching: .any)["an.filter.search"].firstMatch
             let firstRow = list.tableRows.firstMatch
-            print("[small-fixes] at the floor: list top \(listTop), kind \(kind.frame), tags \(lastRow.frame), "
+            print("[small-fixes] at the floor: list top \(listTop), kind \(kind.frame), search \(lastRow.frame), "
                   + "table \(list.frame), first row \(firstRow.frame), divider \(divider.frame)")
             XCTAssertGreaterThanOrEqual(kind.frame.minY, listTop - 0.5, "the filter bar's top row should be inside the list")
             XCTAssertTrue(lastRow.exists && lastRow.frame.maxY <= divider.frame.minY + 0.5,

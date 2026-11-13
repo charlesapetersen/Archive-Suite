@@ -402,6 +402,9 @@ struct NotesTableView: NSViewRepresentable {
         /// Heights already worked out, by the Tags column's width and the row's tags.
         private var heightCache: [String: CGFloat] = [:]
         private var heightCacheWidth: CGFloat = -1
+        /// Each tag's drawn width, which does not change with the column's: a live resize then rewraps every row
+        /// with arithmetic alone, without measuring text again.
+        private var titleWidths: [String: CGFloat] = [:]
 
         /// One line, or the height of the row's chips at the Tags column's width when they wrap.
         func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
@@ -414,8 +417,13 @@ struct NotesTableView: NSViewRepresentable {
             if width != heightCacheWidth { heightCache = [:]; heightCacheWidth = width }
             let key = tags.joined(separator: "\u{1F}")
             if let known = heightCache[key] { return max(base, known) }
-            let needed = TagChipsView.height(for: tags, font: NotesTableView.listFont, width: width)
-                + 2 * NotesTagsCellView.verticalInset
+            let font = NotesTableView.listFont
+            let needed = TagChipsView.height(for: tags, font: font, width: width, titleWidth: { [self] title in
+                if let known = titleWidths[title] { return known }
+                let measured = TagChips.titleWidth(title, font: font)
+                titleWidths[title] = measured
+                return measured
+            }) + 2 * NotesTagsCellView.verticalInset
             heightCache[key] = needed
             return max(base, needed)
         }
@@ -739,7 +747,10 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
               let col = tv.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
         col.isHidden.toggle()
         if id == "tags", tv.numberOfRows > 0 {   // a row is as tall as its tags only while they show
-            tv.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tv.numberOfRows))
+            NSAnimationContext.runAnimationGroup { context in   // not animated, as `Coordinator.noteRowHeights`
+                context.duration = 0
+                tv.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tv.numberOfRows))
+            }
         }
         var hidden = NotesAppSettings.windowHiddenColumns(for: windowKind)
         if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
@@ -873,6 +884,16 @@ final class NotesTagsCellView: NSTableCellView {
 
     override func layout() {
         super.layout()
+        placeChips()
+    }
+
+    /// A row whose height changes without a reload (the Tags column resized) resizes its cell; the chips follow.
+    override func resizeSubviews(withOldSize oldSize: NSSize) {
+        super.resizeSubviews(withOldSize: oldSize)
+        placeChips()
+    }
+
+    private func placeChips() {
         let width = bounds.width - 2 * Self.horizontalInset
         let height = min(bounds.height, TagChipsView.height(for: chips.titles, font: chips.font, width: max(1, width)))
         chips.frame = CGRect(x: Self.horizontalInset, y: max(0, ((bounds.height - height) / 2).rounded()),
