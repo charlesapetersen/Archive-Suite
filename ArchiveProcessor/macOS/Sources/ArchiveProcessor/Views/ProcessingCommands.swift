@@ -27,6 +27,8 @@ extension Notification.Name {
     static let addFilesRequested = Notification.Name("AddFilesRequested")
     /// Posted from File ▸ Choose Output Folder… (⇧⌘O); `OCRView` opens its output-folder panel.
     static let chooseOutputFolderRequested = Notification.Name("ChooseOutputFolderRequested")
+    /// Posted from Processing ▸ Improve OCR… (⇧⌘I); `OCRView` opens the Improve OCR dialog for its PDFs (W44).
+    static let improveOCRRequested = Notification.Name("ImproveOCRRequested")
 }
 
 /// Whether a text field / field editor currently holds keyboard focus. Global shortcuts stand down when
@@ -83,6 +85,12 @@ struct ProcessingCommands: Commands {
                 NotificationCenter.default.post(name: .cycleProviderRequested, object: nil)
             }
             .keyboardShortcut("p", modifiers: [.command, .option])
+
+            Divider()
+            Button("Improve OCR\u{2026}") {
+                NotificationCenter.default.post(name: .improveOCRRequested, object: nil)
+            }
+            .keyboardShortcut("i", modifiers: [.command, .shift])
         }
     }
 }

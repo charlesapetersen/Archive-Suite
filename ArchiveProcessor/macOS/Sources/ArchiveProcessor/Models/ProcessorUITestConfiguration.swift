@@ -57,6 +57,7 @@ enum ProcessorUITestConfiguration {
     }
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }
+        if isActive, arguments.contains("-APUITestSyntheticSuitePair") { return syntheticSuitePair() }
         guard arguments.contains("-APUITestSyntheticMultiPagePDF") else { return nil }
         return syntheticMultiPagePDF()
     }
@@ -131,6 +132,33 @@ enum ProcessorUITestConfiguration {
             return nil
         }
         return URL(fileURLWithPath: arguments[index + 1])
+    }
+
+    /// W44 Improve OCR: a scratch archive in this app's temporary directory (a Reader root marker and one Processor
+    /// two-page file, image and text), so the dialog has a suite pair inside a root. Never a corpus file.
+    private static func syntheticSuitePair() -> URL? {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("archive-processor-uitest-archive-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        let folder = root.appendingPathComponent("Box 1", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let marker = RootMarker(guid: UUID(), name: "UI test archive", kind: .reader, createdAt: Date())
+        guard let markerData = try? JSONEncoder().encode(marker),
+              (try? markerData.write(to: root.appendingPathComponent(RootMarker.filename), options: .atomic)) != nil else { return nil }
+        let image = NSImage(size: NSSize(width: 300, height: 400))
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 300, height: 400)).fill()
+        "A typed letter, 1952".draw(at: NSPoint(x: 20, y: 200), withAttributes: [.font: NSFont.systemFont(ofSize: 20)])
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+              let jpeg = rep.representation(using: .jpeg, properties: [:]) else { return nil }
+        let jpg = root.appendingPathComponent("scan.jpg"), pdf = folder.appendingPathComponent("Letter 1952.pdf")
+        guard (try? jpeg.write(to: jpg)) != nil,
+              (try? PDFGenerator().generate(imageURL: jpg, result: OCRResult(text: "A typcd lettcr, l952", classification: nil,
+                                            errorMessage: nil, errorCode: nil), model: LLMModel.appleVisionModels[0],
+                                            outputURL: pdf, originalFileName: "scan.jpg", pageKind: .typewritten)) != nil
+        else { return nil }
+        return pdf
     }
 
     /// The app sandbox cannot read a temporary file owned by the separate XCUITest runner. Build the

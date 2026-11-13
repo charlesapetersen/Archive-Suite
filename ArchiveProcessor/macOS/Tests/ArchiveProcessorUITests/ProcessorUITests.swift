@@ -125,6 +125,29 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(select.waitForNonExistence(timeout: 5), "Escape dismisses it")
     }
 
+    /// W44.reocr-processor: Processing ▸ Improve OCR… (⇧⌘I) opens the dialog for the dropped suite file: the file with
+    /// its page count and current reader, its header's Kind, the ranked readers for that Kind, and, with no shared
+    /// folder connected in this fresh VM, a Run that says why it is not offered. No OCR, no network, no write.
+    func testImproveOCRDialogListsTheFileTheKindAndTheReaders() throws {
+        relaunch(extra: ["-APUITestSyntheticSuitePair"])
+        XCTAssertTrue(element("ap.ocr.dropZone").waitForExistence(timeout: 10), "the Process Files window is up")
+        XCTAssertTrue(app.menuBars.menuItems["Improve OCR…"].exists, "the Processing menu lists Improve OCR…")
+        app.typeKey("i", modifierFlags: [.command, .shift])
+        let dialog = element("ap.reocr.dialog")
+        XCTAssertTrue(dialog.waitForExistence(timeout: 10), "⇧⌘I opens the Improve OCR dialog")
+        XCTAssertTrue(app.staticTexts["Letter 1952.pdf"].exists, "the dropped file is listed")
+        XCTAssertTrue(element("ap.reocr.kind.Letter 1952.pdf").exists, "the file has a Kind picker")
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'ap.reocr.row.typewritten.'"))
+        XCTAssertGreaterThan(rows.count, 0, "the header's Kind (typewritten) has ranked readers")
+        let blocker = element("ap.reocr.blocker")
+        XCTAssertTrue(blocker.exists, "Run says why it is not offered")
+        XCTAssertTrue(renderedText(of: blocker).contains("shared folder"), "without a connected shared folder: \(renderedText(of: blocker))")
+        XCTAssertFalse(element("ap.reocr.run").isEnabled, "Run is not offered until the folder is connected")
+        attachScreenshot("processor-improve-ocr-dialog")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(dialog.waitForNonExistence(timeout: 5), "Escape closes it")
+    }
+
     func testInstitutionalComputingImportOffersNeutralFolderChooser() throws {
         relaunch(extra: ["-APUITestSyntheticMultiPagePDF"])
         let choose = element("ap.ocr.institutionalComputeChoose")
