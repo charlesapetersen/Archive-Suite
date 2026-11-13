@@ -83,7 +83,7 @@ iOS, so each was checked against the iOS code.
 | Tag sheet (Quality 0–3, five recent years, 4-digit year, 12 months, Skip/Apply/Cancel, no swipe-dismiss) | `SegmentTagSheet.kt` | `SegmentTagSheet.swift` | same |
 | Phone backup of unsent photos | MediaStore album `Pictures/Archive Capture` | Photos library, add-only, no album | same in effect |
 | Capture thumbnails | decoded off the UI thread | decoded off the main thread | same |
-| Camera format and orientation | CameraX writes a JPEG | `AVCapturePhotoSettings()` defaults, no codec set | suspect S-022 |
+| Camera format and orientation | CameraX writes a JPEG | JPEG codec set explicitly (W46.capture-companions) | suspect S-022 |
 | Uploads while the app is in the background | keep going while the process lives | no `beginBackgroundTask` | suspect S-023 |
 | Plain HTTP to the Mac | `usesCleartextTraffic=true` | no ATS keys; ATS exempts IP addresses and `.local` names, which are what pairing uses | same in effect |
 

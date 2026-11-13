@@ -449,6 +449,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     correction off). Filed as `W40.fix-ios-landscape-orientation`.
   - 2026-11-01 `W40.fix-ios-landscape-orientation` — fixed in code: each shot sets the device's rotation angle on the
     photo connection, so the JPEG carries its EXIF orientation. Re-check on the phone: task 6 of the iPhone pack.
+  - 2026-11-13 `W46.capture-companions` — the codec is now set explicitly: each shot asks for JPEG when the output
+    offers it, so the format no longer rests on the default.
 
 ### S-023 · iOS uploads may be cut off whenever the phone leaves the app
 

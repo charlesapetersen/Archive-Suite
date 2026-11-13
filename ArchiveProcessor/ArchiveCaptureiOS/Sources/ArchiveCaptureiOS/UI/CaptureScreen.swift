@@ -24,6 +24,13 @@ struct CaptureScreen: View {
                     // Never attach the preview to a session without a camera (CameraController.hasCamera).
                     if camera.hasCamera == true {
                         CameraPreview(session: camera.session)
+                            .overlay(alignment: .bottom) {
+                                Text(CaptureSettings.guidance)
+                                    .font(.caption).foregroundStyle(.white)
+                                    .padding(.horizontal, 8).padding(.vertical, 4)
+                                    .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 6))
+                                    .padding(8)
+                            }
                     } else if camera.hasCamera == false {
                         Text("No camera on this device.").foregroundStyle(.white)
                     }

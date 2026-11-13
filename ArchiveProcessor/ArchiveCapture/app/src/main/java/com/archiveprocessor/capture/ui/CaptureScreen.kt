@@ -107,7 +107,7 @@ fun CaptureScreen(vm: CaptureViewModel) {
         }
     }
 
-    val controller = remember { LifecycleCameraController(context) }
+    val controller = remember { LifecycleCameraController(context).also(CaptureCameraDefaults::apply) }
     LaunchedEffect(hasCam) { if (hasCam) controller.bindToLifecycle(lifecycleOwner) }
 
     // The strip shows only current in-flight work — document pages (queued/transferring) plus any failed
@@ -137,6 +137,16 @@ fun CaptureScreen(vm: CaptureViewModel) {
                         }
                     },
                     modifier = Modifier.fillMaxSize()
+                )
+                Text(
+                    CaptureCameraDefaults.GUIDANCE,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             } else {
                 Text("Camera permission needed to capture.", color = Color.White)

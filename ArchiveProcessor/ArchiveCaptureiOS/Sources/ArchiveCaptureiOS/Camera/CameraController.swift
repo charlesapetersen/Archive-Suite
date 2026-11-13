@@ -78,7 +78,14 @@ final class CameraController: NSObject, ObservableObject {
             hasVideoInput = true
             rotationCoordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: nil)
         }
-        if session.canAddOutput(photoOutput) { session.addOutput(photoOutput) }
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+            // The capture rule (processing review, stage rule 11 §3): the camera's best still, not the default
+            // `.balanced`. A per-shot prioritization above this maximum throws, so the shot reads it back.
+            // Size stays the `.photo` preset's full-sensor default (12 MP); the 48 MP opt-in is not taken,
+            // since the Mac reads a 2,048 px copy.
+            photoOutput.maxPhotoQualityPrioritization = .quality
+        }
         session.commitConfiguration()
         configured = true
         let hasCamera = hasVideoInput
@@ -107,10 +114,27 @@ final class CameraController: NSObject, ObservableObject {
                 let angle = CaptureRotation.snapped(raw)
                 if connection.isVideoRotationAngleSupported(angle) { connection.videoRotationAngle = angle }
             }
-            let settings = AVCapturePhotoSettings()
+            let settings = CaptureSettings.photoSettings(for: self.photoOutput)
             self.completions[settings.uniqueID] = completion
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
+    }
+}
+
+/// The capture rule for each shot (W46.capture-companions): JPEG, flash off, quality first, nothing done to the
+/// frame on the phone. Each is set rather than inherited: the default flash mode was never read on a device,
+/// so it is not relied on.
+enum CaptureSettings {
+    /// Static guidance shown over the preview. No live warning until W46.capture-warning validates a cut.
+    static let guidance = "Hold still · avoid reflections · the whole page, and only that page, in frame"
+
+    static func photoSettings(for output: AVCapturePhotoOutput) -> AVCapturePhotoSettings {
+        let settings = output.availablePhotoCodecTypes.contains(.jpeg)
+            ? AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.jpeg])
+            : AVCapturePhotoSettings()
+        if output.supportedFlashModes.contains(.off) { settings.flashMode = .off }
+        settings.photoQualityPrioritization = output.maxPhotoQualityPrioritization
+        return settings
     }
 }
 
