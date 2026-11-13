@@ -22,6 +22,7 @@ AGENT = os.path.dirname(HERE)
 AUTONOMOUS = os.path.join(os.path.dirname(AGENT), "autonomous")
 DAEMON = os.path.join(AUTONOMOUS, "archive-suite-autonomous.sh")
 EM = "—"
+BOX = "\u2500"   # the step banner health-gate.sh prints: `── name ──`
 
 PLAN = """# plan
 
@@ -100,6 +101,8 @@ class Fixture(unittest.TestCase):
         self.env = dict(os.environ, AGENT_REPO=self.repo, AGENT_STATE=self.state, AGENT_PROJECT="fixture",
                         HOME=self.tmp)
         self.env.pop("AUTONOMOUS_PLAN", None)
+        for k in ("AGENT_GATE_ONLY", "AUTONOMOUS_GATE_ONLY"):   # a retry list in the runner's environment
+            self.env.pop(k, None)
         self.env["AGENT_GATE_PGREP"] = "no-such-gate-" + os.path.basename(self.tmp)   # never a real gate
 
     def write(self, rel, text, mode=None):
@@ -574,6 +577,66 @@ class Gate(Fixture):
                 self.assertEqual(r.returncode, 1)
                 self.assertEqual(r.stdout.splitlines()[-2:],
                                  ["HEALTH GATE: RED %s no verdict (exit %d)" % (EM, rc), "HEALTH GATE CLASS: code"])
+
+    def filtering_gate(self):
+        """A fake health-gate.sh that filters like the real one: it reads AUTONOMOUS_GATE_ONLY space-separated,
+        prints `── name ──` for each step it runs, and logs each call's list to calls.log."""
+        self.write("ops/autonomous/health-gate.sh", "\n".join([
+            "#!/bin/bash",
+            'only="${AUTONOMOUS_GATE_ONLY:-}"',
+            'echo "only=[$only]" >> "%s/calls.log"' % self.tmp,
+            "for name in build-reader tag-vocabulary write-surface-lint; do",
+            '  case " $only " in "  "|*" $name "*) ;; *) continue ;; esac',
+            '  echo "%s%s $name %s%s"' % (BOX, BOX, BOX, BOX),
+            "done",
+            'echo "HEALTH GATE: GREEN"', "exit 0", ""]), 0o755)
+
+    def calls(self):
+        with open(os.path.join(self.tmp, "calls.log")) as f:
+            return f.read().splitlines()
+
+    def test_a_retry_runs_only_the_failing_steps(self):
+        # 2026-11-12: the engine sends AGENT_GATE_ONLY as a comma list and the adapter dropped it, so a retry of
+        # three steps re-ran all 63.
+        self.filtering_gate()
+        r = self.hook("gate", AGENT_GATE_ONLY="write-surface-lint,tag-vocabulary")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.calls(), ["only=[write-surface-lint tag-vocabulary]"])
+        self.assertNotIn("%s%s build-reader" % (BOX, BOX), r.stdout)
+        self.assertEqual(r.stdout.splitlines()[-1], "HEALTH GATE: GREEN")
+
+    def test_a_first_run_ignores_an_inherited_list(self):
+        self.filtering_gate()
+        r = self.hook("gate", AUTONOMOUS_GATE_ONLY="build-reader")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.calls(), ["only=[]"])
+
+    def test_a_retry_naming_no_step_runs_the_whole_gate(self):
+        # A name that matches no step would run nothing and print GREEN; the adapter must not pass that on.
+        self.filtering_gate()
+        r = self.hook("gate", AGENT_GATE_ONLY="tag-vocabulary,no-such-step")
+        self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual(self.calls(), ["only=[tag-vocabulary no-such-step]", "only=[]"])
+        self.assertIn("ran no step named: no-such-step", r.stdout)
+        self.assertIn("%s%s build-reader %s%s" % (BOX, BOX, BOX, BOX), r.stdout)
+        self.assertEqual(r.stdout.count("HEALTH GATE: GREEN"), 2, r.stdout)   # the whole gate's, then the adapter's
+        self.assertNotIn("tag-vocabulary no-such-step", r.stdout)   # nothing from the abandoned retry
+
+    def test_a_retry_list_does_not_reach_the_steps(self):
+        # Review finding: left exported, AGENT_GATE_ONLY reached agent-hooks-proof's own fixture gates.
+        self.write("ops/autonomous/health-gate.sh",
+                   '#!/bin/bash\necho "child=[${AGENT_GATE_ONLY-unset}]"\necho "%s%s s %s%s"\n'
+                   'echo "HEALTH GATE: GREEN"\n' % (BOX, BOX, BOX, BOX), 0o755)
+        r = self.hook("gate", AGENT_GATE_ONLY="s")
+        self.assertIn("child=[unset]", r.stdout)
+
+    def test_a_full_rerun_that_fails_is_red(self):
+        self.write("ops/autonomous/health-gate.sh",
+                   '#!/bin/bash\nif [ -n "$AUTONOMOUS_GATE_ONLY" ]; then echo "HEALTH GATE: GREEN"; exit 0; fi\n'
+                   'echo "HEALTH GATE: RED %s build-reader"\nexit 1\n' % EM, 0o755)
+        r = self.hook("gate", AGENT_GATE_ONLY="no-such-step")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertEqual(r.stdout.splitlines()[-2:], ["HEALTH GATE: RED %s build-reader" % EM, "HEALTH GATE CLASS: code"])
 
     def test_the_sandbox_refusal_is_the_one_skip(self):
         self.fake_gate(["The health gate launches apps; request execution outside the Codex sandbox."], 3)
