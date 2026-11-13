@@ -76,15 +76,16 @@ tie, cheaper wins; handwritten `gemini3.8-flash` labelled "conditional on the tr
 `gemini3.8-flash` (88.8%, $3.61; 25.3 checks per 100 pages; 100.0% after checking; prompt g2, every figure Gemini
 3.7's g2 answers, W46.seg-magazine-rule-app) with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
 on documents with no year in the text ($2.75 per 1,000, 5.3 s), step 4 `gemini3.7-flash-trace-neigh`. Entities
-`gemini-tagging-place`'s successor, the entity feature's own prompt (owner call 10), extracted always, shown when
-ranked. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
+`gemini-entity-feature`, the entity feature's own prompt (owner call 10; sender 0.69, $2.37 per 1,000, 5.1 s,
+`ent-feature.md`), extracted always, shown when ranked; `gemini-tagging-place` and `gemini-entity8k` are not offered. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
 
 **D2. A Gemini key, ceiling $1 for 1,000 pages, hours 24 (batch prices).** Reading `gemini3.8-flash` at the batch price
 ($1.61) is over the ceiling; two Gemini rows fit, `gemini3.5-flash-lite` ($0.79 batch; 95.17 answered) and
 `gemini3.1-flash-lite` ($0.58; 94.59). The best feasible is `gemini3.5-flash-lite`; `gemini3.1-flash-lite` minus it is
 −0.56 [−2.77, +1.09] (n 92, owner96/all/answered; strict −1.57 [−4.67, +0.78], n 95), over the 0.49 floor, so no tie
 and `gemini3.5-flash-lite` is picked. The card's "What a better figure would need" names `gemini3.8-flash` (96.47) and
-the $0.61 shortfall. Segmentation the 2B or `manual`.
+the $0.61 shortfall. Segmentation the 2B or `manual`. Entities: `gemini-entity-feature` ($2.37) does not fit
+what the ceiling leaves, so names fall to `qwen3-vl-8b-mac` on typed correspondence and `none` on handwriting.
 
 **D3. The Claude plan only.** Reading `claude-sonnet5.5` (96.48, no money, the plan's window share by `usage.md`);
 handwritten 92.50 labelled a drafter family. Segmentation `claude-sonnet5.5` (85.5%, 10.2 checks). Dating and entities:
@@ -112,7 +113,8 @@ route won on money).
 - Segmentation: `seg-qwen3.5-2b-bf16-cluster` (80.3%; the fastest of three ties); review rule disagreement with the
   teacher as partner.
 - Dating: steps 1 and 4 `qwen3.6-27b-trace-neigh-vision` (56.5 not in text, 93.3 in text), step 2 `qwen3.6-27b-image`.
-- Entities: `qwen3.6-27b` (sender 0.62) on correspondence; never from Vision text on handwriting.
+- Entities: `qwen3.6-27b` (sender 0.62) on correspondence; never from Vision text on handwriting. With an OpenRouter
+  key as well, `gemini-entity-feature` (0.69); with Gemini excluded, still `qwen3.6-27b`.
 - Placement: the hand line detector setting visible (owner section 2, placement); PP-OCRv6 det offered as the
   cluster-side detector.
 

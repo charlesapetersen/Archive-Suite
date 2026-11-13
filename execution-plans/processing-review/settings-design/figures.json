@@ -2029,8 +2029,32 @@
  ],
  "ent": [
   {
+   "id": "gemini-entity-feature",
+   "name": "Gemini, the entity feature's own request (3,000 characters)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini",
+     "openrouter"
+    ]
+   },
+   "usd_1000": 2.37,
+   "usd_1000_batch": null,
+   "s_doc": 5.1,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "measured with Gemini 3.7 Flash on Vision text; the app's 3.8 not run on this prompt (ent-feature.md Scope); a tie with the tagging call carrying both November rules on every field (tagging-place minus entity3k-place: sender +0.04 [-0.00, +0.08], recipient -0.06 [-0.13, +0.00], place -0.07 [-0.17, +0.02], city +0.00; ent-place-rule.md); rerun floor on 40: sender +0.00, recipient +0.01, place -0.03",
+   "source": "settings-routes.json, stage entities, row gemini-entity-feature",
+   "f1": {
+    "sender": 0.69,
+    "recipient": 0.88,
+    "place": 0.8
+   },
+   "n": 138
+  },
+  {
    "id": "gemini-tagging-place",
-   "name": "Gemini, inside the tagging call (shipped prompt)",
+   "name": "Gemini, inside the tagging call (measured history)",
    "family": "cloud",
    "needs": {
     "key": [

@@ -215,10 +215,11 @@ enum SettingsSolverTestDriver {
         eq("D1 handwritten: Gemini 3.8 Flash", pick(d1, "reading", "handwritten"), "gemini3.8-flash")
         check("D1 no cascade beats Gemini 3.8 Flash", !pick(d1, "reading").hasPrefix("casc-"))
         eq("D1 segmentation: Gemini 3.8 Flash", pick(d1, "segmentation"), "gemini3.8-flash")
-        eq("D1 names: Gemini tagging (the entity prompt not offered yet)", pick(d1, "entities", "correspondence-typed"),
-           "gemini-tagging-place")
+        eq("D1 names: the entity feature's own prompt", pick(d1, "entities", "correspondence-typed"),
+           "gemini-entity-feature")
+        check("D1 names: the tagging call's rows are history, not offered",
+              !d1.blockers("entities", "gemini-tagging-place").isEmpty)
         skip("D1 dating steps 2 and 4", "pending W46.date-route-pipeline (the 3.7 rows are the gateway's)")
-        skip("D1 names on the entity feature's own prompt", "pending W46.ent-feature")
 
         // D2 (and G3). A Gemini key, ceiling $1 for 1,000 pages, 24 hours (batch prices).
         var tight = SettingsAnswers()
@@ -294,8 +295,8 @@ enum SettingsSolverTestDriver {
               e.blockers("segmentation", "qwen3.5-27b-teacher").contains { $0.contains("not as a voter alone") })
         var clKey = cl
         clKey.keys = ["openrouter"]
-        eq("E with a key as well: names from Gemini tagging (note 09 §9 profile 4)",
-           pick(solve("E-key", clKey, ea), "entities", "correspondence-typed"), "gemini-tagging-place")
+        eq("E with a key as well: names from the entity feature's prompt (note 09 §9 profile 4)",
+           pick(solve("E-key", clKey, ea), "entities", "correspondence-typed"), "gemini-entity-feature")
         clKey.excludedModelFamilies = ["gemini"]
         let ek = solve("E-key-nogemini", clKey, ea)
         eq("E with an OpenRouter key, no Gemini: names on the cluster", pick(ek, "entities", "correspondence-typed"),

@@ -58,6 +58,10 @@ pages."
   pre-November name behaviour. The `gemini-tagging-place` figures were measured with both rules in the tagging prompt,
   so they describe the rules, not the reverted call; the reverted prompt's own figures are on the built truth only
   (`tagging` in `ent-prompt-app.md`: sender 0.706, recipient 0.717, place 0.617 ed2 F1) until item 3 restates them.
+  The app's entity feature (W46.ent-feature) sends the entity3k-place prompt byte for byte, so its row,
+  `gemini-entity-feature`, carries that arm's figures on the owner-rule truth (`ent-feature.md`: sender 0.69,
+  recipient 0.88, place 0.80, by city 0.88; a tie with `gemini-tagging-place` on every field; $2.37 per 1,000, one
+  extra call, median 5.1 s); `gemini-tagging-place` stays in §4 as measured history, not offered (W46.ent-feature-table).
 
 ## 4. Table rows
 
@@ -81,8 +85,28 @@ come from `build_figures.py`'s hand-entered rows with no measuring file behind t
 The stage header above is kept apart from the route rows, which follow as a list like the other notes' blocks.
 
 ```json
-[ {"id": "gemini-tagging-place", "name": "Gemini, inside the tagging call (shipped prompt)", "family": "cloud",
+[ {"id": "gemini-entity-feature", "name": "Gemini, the entity feature's own request (3,000 characters)", "family": "cloud",
   "app_route": "gemini|gemini-3.8-flash", "status": "shipped",
+  "needs": {"key": ["gemini", "openrouter"], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},
+  "figures": {
+   "sender": {"value": 0.69, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-feature.md", "route": "entity prompt", "attribute": "sender", "value": "0.69"}},
+   "recipient": {"value": 0.88, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-feature.md", "route": "entity prompt", "attribute": "recipient", "value": "0.88"}},
+   "sending_place": {"value": 0.80, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-feature.md", "route": "entity prompt", "attribute": "place P / R / F1", "value": "0.83 / 0.76 / 0.80"}},
+   "place_city": {"value": 0.88, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-feature.md", "route": "entity prompt", "attribute": "place by city", "value": "0.88"}}},
+  "cost": {"usd_1000_list": 2.37, "usd_1000_batch": null, "price_read": null, "source": {"file": "ent-feature.md", "route": "entity prompt", "attribute": "one more call per correspondence document, Gemini 3.7 Flash list price, the 138 calls' metered tokens", "value": "$2.37 per 1,000"}},
+  "time": {"per_unit_s": 5.1, "measured": true, "measured_on": "the Stanford gateway, median of the 138 calls", "source": {"file": "ent-feature.md", "route": "entity prompt", "attribute": "median through the gateway", "value": "median 5.1 s"}},
+  "memory": null,
+  "caveats": ["measured with Gemini 3.7 Flash on Vision text; the app's 3.8 not run on this prompt (ent-feature.md Scope)",
+   "a tie with the tagging call carrying both November rules on every field (tagging-place minus entity3k-place: sender +0.04 [-0.00, +0.08], recipient -0.06 [-0.13, +0.00], place -0.07 [-0.17, +0.02], city +0.00; ent-place-rule.md); rerun floor on 40: sender +0.00, recipient +0.01, place -0.03",
+   "behind the app's correspondence gate (the tagging reply's format) 134 of 138 pass and the scores move by at most 0.01 (sender 0.69, recipient 0.87, place 0.79); the gate lets 4 of 21 non-correspondence documents through (ent-feature.md)",
+   "every name came with a quote found exactly in the text; a quote proves the words are on the page, not the role: read senders right 85 of 112 (ent-feature.md)",
+   "first 3,000 characters only: 78 of 138 named senders in that span of Vision text, 90 in 8,000 (ent-score-paid.md)",
+   "one extra call after the tagging call, about 58% of its $4.07; owner call 11's 'extracted always on a cloud route' was made when names came with the tagging call at no cost (ent-feature.md)",
+   "the sender convention is the truth's: a person, or the issuing organisation when no person is named (owner call 10)"],
+  "kind_rules": ["non-correspondence: do not show", "handwritten: allowed (ent-robust.md: Gemini text keeps 0.94 of the 27B extractor's names on hands)"],
+  "fallback": "none", "conditions": []},
+ {"id": "gemini-tagging-place", "name": "Gemini, inside the tagging call (measured history)", "family": "cloud",
+  "app_route": null, "status": "measured",
   "needs": {"key": ["gemini", "openrouter"], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},
   "figures": {
    "sender": {"value": 0.73, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-place-rule.md", "route": "tagging-place", "attribute": "sender F1", "value": "0.73"}},
@@ -102,7 +126,7 @@ The stage header above is kept apart from the route rows, which follow as a list
    "tagging call price doubles 1 Jan 2027 (G-entities.md R4)",
    "measured with both provisional rules in the tagging prompt; owner call 10 reverts that prompt, whose own figures are the built-truth tagging arm (sender 0.706, recipient 0.717, place 0.617; ent-prompt-app.md) until item 3 restates them"],
   "kind_rules": ["non-correspondence: do not show", "handwritten: allowed (ent-robust.md: Gemini text keeps 0.94 of the 27B extractor's names on hands)"],
-  "fallback": "none", "conditions": []},
+  "fallback": "none", "conditions": ["not offered by the app: the tagging prompt was reverted to its pre-November name lines (owner call 10) and the app reads names with gemini-entity-feature; kept as measured history"]},
  {"id": "gemini-entity8k", "name": "Gemini, a dedicated entity prompt (8,000 characters)", "family": "cloud",
   "app_route": null, "status": "measured",
   "needs": {"key": ["gemini", "openrouter"], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},
@@ -345,13 +369,14 @@ Kinds: T typed or printed correspondence, H handwritten correspondence, N non-co
   `none` (rule `ent-vision-hands`). N: `none`.
 - **1. 32 GB and 64 GB.** Same as 16 GB until item 4 measures the 27B on the Mac [I].
 - **1. 8 GB** (not a plan tier, a solver edge): `none`, since `qwen3.5-4b-mac` is conditioned off.
-- **2. Cheap API (OpenRouter).** T and H: `gemini-tagging-place` (sender 0.73) if Gemini is reachable on the key, as the
-  row's `needs` allows; else `qwen3.6-27b` (0.62). N: `none`.
-- **3. Premium API.** T and H: `gemini-tagging-place` (0.73 sender, $0 extra); `gemini-entity8k` loses on the tie rule
-  (0.76 against 0.73 unpaired, a few points, so a tie by ENT-1; costlier). **Plan only:** no plan row; fall to the profile-1 pick.
+- **2. Cheap API (OpenRouter).** T and H: `gemini-entity-feature` (sender 0.69) if Gemini is reachable on the key, as
+  the row's `needs` allows; else `qwen3.6-27b` (0.62). N: `none`.
+- **3. Premium API.** T and H: `gemini-entity-feature` (0.69 sender, $2.37 per 1,000 extra); `gemini-entity8k` (0.76)
+  and `gemini-tagging-place` (0.73) are not offered by the app. A ceiling that leaves less than the feature's cost
+  drops names to the profile-1 pick. **Plan only:** no plan row; fall to the profile-1 pick.
 - **4. Cluster.** T and H: `qwen3.6-27b` (0.62 sender, ABBYY-input figures, provisional until item 4), any reading
   route but Vision for H. With a key as well:
-  `gemini-tagging-place`.
+  `gemini-entity-feature`.
 - **5. Plus a coding agent.** As the base profile: no kit route (the fine-tune not run, `ent-robust.md`).
 
 ## Owner's calls (2026-11-06)
