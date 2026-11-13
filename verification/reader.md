@@ -786,7 +786,11 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   ⌥⌘C, one live selection, a render guard; `W40.fix-reader-copy-text-pane`).
   `ArchiveReaderTests/CopyTextCleanerTests.testSingleNewlinesBecomeSpaces`,
   `.testBlankLineIsParagraphBreak` and `.testDeHyphenationJoinsSplitWord` test the cleaner. The VM interaction
-  check is `W40.fix-reader-copy-text-pane-ui`.
+  check is `ArchiveReaderUITests/CopyTextPaneUITests` (`W40.fix-reader-copy-text-pane-ui`).
+- **Runtime evidence:** 2026-11-12 · macOS 27.2 guest, `CopyTextPaneUITests` on a generated one-page PDF: a word
+  double-clicked in the text pane enables Edit ▸ Copy and ⌘C / ⇧⌘C give it; a word double-clicked on the image page
+  clears the text pane's highlight and moves the focus border, and both copies give the image's word; Select All in
+  the text pane copies `alpha wel-\nfare bravo` plain and `alpha welfare bravo` cleaned.
 - **Runtime evidence:** 2026-11-06 · owner session reader-2, task 3 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): Copy Cleaned for Prose from the image page kept the paragraph breaks on real OCR (`W40.fix-reader-prose-paragraphs`, seen on the owner's pages for the first time). Edit ▸ Copy was greyed (row 10), and no copy command took the selection in the text pane (row 11).
 - **Status:** `fixed-pending-recheck` (builder is not verifier)
 - **History:**
