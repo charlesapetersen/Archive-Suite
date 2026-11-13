@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCoreUI
 
 // MARK: - NSViewRepresentable bridge
 
@@ -8,9 +9,9 @@ import AppKit
 /// `NSTableViewDiffableDataSource<Int, UUID>` + `Coordinator` + `ColumnPickerHeaderView` +
 /// `ContextMenuTableView` structure. Differences from Reader: identity is `ItemSummary.id` (UUID,
 /// front-matter) not `ArchiveFile` (path, Finder tags); the columns are the Notes set
-/// (kind/title/instances/date/quality/tags); and the tags column is **read-only** here (edited in the
-/// detail inspector, W9.b3). Quality has an inline borderless menu; titles rename inline via Return,
-/// double-click, or the row context menu.
+/// (kind/title/instances/date/quality/tags); and the tags column draws the Reader's wrapping chips
+/// (`TagChipsView`, W40.suite-reader-notes-consistency), edited in place by a token field laid over the cell.
+/// Quality has an inline borderless menu; titles rename inline via Return, double-click, or the row context menu.
 struct NotesTableView: NSViewRepresentable {
     @ObservedObject var model: NotesNavigationModel
     @Binding var selection: Set<UUID>
@@ -22,6 +23,7 @@ struct NotesTableView: NSViewRepresentable {
     /// Non-hideable primary column (analogous to Reader's always-visible "File name").
     static let titleColumnID = "title"
     private static let fontSize: CGFloat = 13
+    static var listFont: NSFont { .systemFont(ofSize: fontSize) }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -49,8 +51,9 @@ struct NotesTableView: NSViewRepresentable {
         tableView.allowsColumnReordering = true
         tableView.allowsColumnResizing = true
         tableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        // Fixed height, not `usesAutomaticRowHeights`: every cell here is one line, and with automatic
-        // heights the rows collapsed to 16 pt and squeezed each 16 pt text line to 12 (W40.fix-notes-row-clip).
+        // Not `usesAutomaticRowHeights`: with automatic heights the rows collapsed to 16 pt and squeezed each 16 pt
+        // text line to 12 (W40.fix-notes-row-clip). This is one line's height; a row whose tags wrap is as tall as
+        // their chips, worked out from the Tags column's width (`Coordinator.tableView(_:heightOfRow:)`).
         tableView.rowHeight = ceil(max(20, Self.fontSize * 1.8))
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
 
@@ -176,6 +179,8 @@ struct NotesTableView: NSViewRepresentable {
             if newIDs != coordinator.currentSnapshotIDs {
                 coordinator.applySnapshotKeepingSelection(newIDs, wanted: selection)
             }
+            // A tag added or removed can change how many lines a row's chips take.
+            coordinator.noteRowHeights()
             // Values may have changed, and a row the snapshot moved keeps its old cell (a rename that
             // re-sorts the list would still show the old title) — reload the visible rows.
             let visRange = tableView.rows(in: tableView.visibleRect)
@@ -275,6 +280,7 @@ struct NotesTableView: NSViewRepresentable {
 
             if colID == "kind" { return makeKindCell(tableView: tableView, item: item) }
             if colID == "quality" { return makeQualityCell(tableView: tableView, item: item) }
+            if colID == "tags" { return makeTagsCell(tableView: tableView, item: item) }
 
             let cellID = NSUserInterfaceItemIdentifier("cell.\(colID)")
             let cell: NSTableCellView
@@ -370,20 +376,64 @@ struct NotesTableView: NSViewRepresentable {
                 // An empty cell still says what it is (the audit, once the stacked list showed it; W48).
                 tf.setAccessibilityLabel(item.sourcesText.isEmpty ? "No sources" : nil)
 
-            case "tags":
-                tf.stringValue = item.displayTags
-                tf.textColor = .labelColor
-                tf.setAccessibilityIdentifier("an.cell.tags.\(item.id.uuidString)")
-                tf.setAccessibilityLabel(item.displayTags.isEmpty ? "No tags" : nil)
-                // A recycled cell still holding another row's tags field: end that edit, which saves to its own item.
-                if let editing = editingTags, editing.superview === cell, editingTagsItemID != item.id {
-                    tableView.window?.makeFirstResponder(tableView)
-                }
-
             default:
                 tf.stringValue = ""
             }
             return cell
+        }
+
+        /// The Tags cell: the note's tags as the Reader's list draws them, wrapping at the column's width; the row is
+        /// as tall as they need (`tableView(_:heightOfRow:)`).
+        private func makeTagsCell(tableView: NSTableView, item: ItemSummary?) -> NSView {
+            let cellID = NSUserInterfaceItemIdentifier("cell.tags")
+            let cell = tableView.makeView(withIdentifier: cellID, owner: nil) as? NotesTagsCellView
+                ?? NotesTagsCellView(identifier: cellID)
+            cell.show(item?.managedTags ?? [], font: NotesTableView.listFont)
+            cell.chips.setAccessibilityIdentifier(item.map { "an.cell.tags.\($0.id.uuidString)" })
+            // A recycled cell still holding another row's tags field: end that edit, which saves to its own item.
+            if let editing = editingTags, editing.superview === cell, editingTagsItemID != item?.id {
+                tableView.window?.makeFirstResponder(tableView)
+            }
+            return cell
+        }
+
+        // MARK: Row heights
+
+        /// Heights already worked out, by the Tags column's width and the row's tags.
+        private var heightCache: [String: CGFloat] = [:]
+        private var heightCacheWidth: CGFloat = -1
+
+        /// One line, or the height of the row's chips at the Tags column's width when they wrap.
+        func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+            let base = tableView.rowHeight
+            guard currentSnapshotIDs.indices.contains(row),
+                  let tags = displayedByID[currentSnapshotIDs[row]]?.managedTags, !tags.isEmpty,
+                  let column = tableView.tableColumns.first(where: { $0.identifier.rawValue == "tags" }),
+                  !column.isHidden else { return base }
+            let width = NotesTagsCellView.chipsWidth(inColumn: column.width)
+            if width != heightCacheWidth { heightCache = [:]; heightCacheWidth = width }
+            let key = tags.joined(separator: "\u{1F}")
+            if let known = heightCache[key] { return max(base, known) }
+            let needed = TagChipsView.height(for: tags, font: NotesTableView.listFont, width: width)
+                + 2 * NotesTagsCellView.verticalInset
+            heightCache[key] = needed
+            return max(base, needed)
+        }
+
+        func tableViewColumnDidResize(_ notification: Notification) {
+            guard let column = notification.userInfo?["NSTableColumn"] as? NSTableColumn,
+                  column.identifier.rawValue == "tags" else { return }
+            noteRowHeights()
+        }
+
+        /// Asks the table for every row's height again, without animating: the tags, the Tags column's width or
+        /// whether it shows changed.
+        func noteRowHeights() {
+            guard let tableView, tableView.numberOfRows > 0 else { return }
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                tableView.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tableView.numberOfRows))
+            }
         }
 
         private func makeQualityCell(tableView: NSTableView, item: ItemSummary?) -> NSView {
@@ -584,7 +634,7 @@ struct NotesTableView: NSViewRepresentable {
                         self.editingTags?.removeFromSuperview()
                         self.editingTags = nil
                         self.editingTagsItemID = nil
-                        cell?.textField?.isHidden = false
+                        (cell as? NotesTagsCellView)?.chips.isHidden = false
                         self.parent.model.objectWillChange.send()
                     }
                 })
@@ -592,13 +642,13 @@ struct NotesTableView: NSViewRepresentable {
             field.frame = cell.bounds.insetBy(dx: 1, dy: 1)
             field.autoresizingMask = [.width, .height]
             cell.addSubview(field)
-            cell.textField?.isHidden = true
+            (cell as? NotesTagsCellView)?.chips.isHidden = true
             editingTags = field
             editingTagsItemID = id
             // A field that cannot take the keyboard would never end, and the list would stay frozen.
             if cell.window?.makeFirstResponder(field) != true {
                 field.removeFromSuperview()
-                cell.textField?.isHidden = false
+                (cell as? NotesTagsCellView)?.chips.isHidden = false
                 editingTags = nil
                 editingTagsItemID = nil
                 cannotEdit("The tags could not be edited in the list; use the tag bar under the note.")
@@ -688,6 +738,9 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
               let tv = tableView,
               let col = tv.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
         col.isHidden.toggle()
+        if id == "tags", tv.numberOfRows > 0 {   // a row is as tall as its tags only while they show
+            tv.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<tv.numberOfRows))
+        }
         var hidden = NotesAppSettings.windowHiddenColumns(for: windowKind)
         if col.isHidden { hidden.insert(id) } else { hidden.remove(id) }
         NotesAppSettings.setWindowHiddenColumns(hidden, for: windowKind)
@@ -777,6 +830,53 @@ final class NotesTitleCellView: NSTableCellView {
         styled.addAttribute(.foregroundColor, value: Self.glyphColor(for: backgroundStyle),
                             range: NSRange(location: 0, length: (Self.replicatedGlyph as NSString).length))
         field.attributedStringValue = styled
+    }
+}
+
+/// The Tags column's cell: the note's tags as chips (`TagChipsView`), filled on an ordinary row and outlined on a
+/// selected one, as the Reader's File tags column draws them. One line of chips sits in the middle of the row, as the
+/// other columns' text does; chips that wrap start at the top.
+final class NotesTagsCellView: NSTableCellView {
+    static let horizontalInset: CGFloat = 2
+    static let verticalInset: CGFloat = 2
+    let chips = TagChipsView()
+
+    /// The width the chips wrap at in a Tags column `columnWidth` wide.
+    static func chipsWidth(inColumn columnWidth: CGFloat) -> CGFloat { max(1, columnWidth - 2 * horizontalInset) }
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        chips.placeholder = ""
+        chips.setAccessibilityElement(true)
+        chips.setAccessibilityRole(.staticText)
+        addSubview(chips)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    func show(_ tags: [String], font: NSFont) {
+        chips.titles = tags
+        chips.font = font
+        chips.isHidden = false
+        let text = tags.joined(separator: ", ")
+        chips.setAccessibilityLabel(tags.isEmpty ? "No tags" : "Tags")
+        chips.setAccessibilityValue(text)
+        toolTip = tags.isEmpty ? nil : text
+        needsLayout = true
+    }
+
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { chips.emphasized = backgroundStyle == .emphasized }
+    }
+
+    override func layout() {
+        super.layout()
+        let width = bounds.width - 2 * Self.horizontalInset
+        let height = min(bounds.height, TagChipsView.height(for: chips.titles, font: chips.font, width: max(1, width)))
+        chips.frame = CGRect(x: Self.horizontalInset, y: max(0, ((bounds.height - height) / 2).rounded()),
+                             width: max(1, width), height: height)
     }
 }
 

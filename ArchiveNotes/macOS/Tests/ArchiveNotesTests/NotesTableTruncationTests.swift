@@ -1,5 +1,6 @@
 import AppKit
 import ArchiveCore
+import ArchiveCoreUI
 import SwiftUI
 import XCTest
 @testable import ArchiveNotes
@@ -46,6 +47,77 @@ final class NotesTableTruncationTests: XCTestCase {
         await index.close()
     }
 
+    /// W40.suite-reader-notes-consistency (owner, Notes session 2 row 12): the Tags column's chips wrap as the
+    /// Reader's do and the row grows to hold them; a column wide enough for one line gives the row back its one-line
+    /// height, and hiding the column does too. A selected row's chips are outlined, at the same height.
+    func testTagsWrapAndTheRowGrowsToHoldThem() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let index = NotesIndex(url: root.appendingPathComponent("index.sqlite"))
+        try await index.open()
+        let organization = OrganizationStore(index: index)
+        try await organization.load(storeRoot: root)
+        let model = NotesModel(organization: organization)
+        let stamp = Date(timeIntervalSince1970: 0)
+        let tags = ["Department of Finance", "Correspondence", "Governor's Office", "Budget"]
+        let tagged = ItemSummary(id: UUID(), title: "Tagged", kind: .note, date: nil, datePrecision: nil,
+                                 dateUncertain: false, sortDate: nil, quality: nil, created: stamp, modified: stamp,
+                                 mtime: 0, managedTags: tags)
+        let bare = ItemSummary(id: UUID(), title: "Bare", kind: .note, date: nil, datePrecision: nil,
+                               dateUncertain: false, sortDate: nil, quality: nil, created: stamp, modified: stamp,
+                               mtime: 0, managedTags: [])
+        model.replaceItems([tagged, bare])
+        let nav = NotesNavigationModel(model: model, defaultKind: .note)
+        let host = NSHostingView(rootView: NotesTableView(model: nav, selection: .constant([]), onDoubleClick: {},
+                                                          buildContextMenu: { _ in nil }))
+        host.frame = CGRect(x: 0, y: 0, width: 900, height: 300)
+        host.layoutSubtreeIfNeeded()
+        func findTable(in parent: NSView) -> NSTableView? {
+            if let table = parent as? NSTableView { return table }
+            return parent.subviews.lazy.compactMap { findTable(in: $0) }.first
+        }
+        let table = try XCTUnwrap(findTable(in: host))
+        let column = try XCTUnwrap(table.tableColumns.first { $0.identifier.rawValue == "tags" })
+        column.isHidden = false
+        let rowOf = { (id: UUID) in try XCTUnwrap(nav.displayed.firstIndex { $0.id == id }) }
+        let taggedRow = try rowOf(tagged.id), bareRow = try rowOf(bare.id)
+        let font = NSFont.systemFont(ofSize: 13)
+
+        column.width = 180
+        table.layoutSubtreeIfNeeded()
+        let oneLine = table.rowHeight + table.intercellSpacing.height   // rect(ofRow:) includes the spacing
+        let narrow = TagChips.layout(tags, font: font, width: NotesTagsCellView.chipsWidth(inColumn: 180))
+        XCTAssertGreaterThan(Set(narrow.chips.map(\.frame.minY)).count, 1, "four tags wrap in a 180 pt column")
+        XCTAssertGreaterThan(table.rect(ofRow: taggedRow).height, oneLine + 10, "the row grows to hold its chips")
+        XCTAssertEqual(table.rect(ofRow: bareRow).height, oneLine, "a row with no tags keeps one line")
+        let index0 = try XCTUnwrap(table.tableColumns.firstIndex(of: column))
+        let cell = try XCTUnwrap(table.view(atColumn: index0, row: taggedRow, makeIfNecessary: true)
+                                 as? NotesTagsCellView)
+        cell.layoutSubtreeIfNeeded()
+        XCTAssertEqual(cell.chips.titles, tags)
+        XCTAssertEqual(cell.chips.frame.height, narrow.height, accuracy: 0.5, "the cell shows every line of chips")
+        XCTAssertLessThanOrEqual(cell.chips.frame.maxY, cell.bounds.height + 0.5, "the chips stay inside the row")
+        XCTAssertEqual(cell.chips.accessibilityValue() as? String, tags.joined(separator: ", "))
+
+        let before = table.rect(ofRow: taggedRow).height
+        cell.backgroundStyle = .emphasized
+        XCTAssertTrue(cell.chips.emphasized, "a selected row's chips are outlined")
+        XCTAssertEqual(table.rect(ofRow: taggedRow).height, before, "selecting never changes the row's height")
+
+        column.width = 600
+        table.layoutSubtreeIfNeeded()
+        XCTAssertEqual(table.rect(ofRow: taggedRow).height, oneLine, "one line of chips fits a wide column")
+
+        column.width = 180
+        table.layoutSubtreeIfNeeded()
+        XCTAssertGreaterThan(table.rect(ofRow: taggedRow).height, oneLine + 10)
+        column.isHidden = true
+        table.noteHeightOfRows(withIndexesChanged: IndexSet(integersIn: 0..<table.numberOfRows))
+        XCTAssertEqual(table.rect(ofRow: taggedRow).height, oneLine, "with the Tags column hidden every row is one line")
+        await index.close()
+    }
+
     private func assertContained(_ view: NotesTableView, itemID: UUID,
                                  column: String, name: String) throws {
         // Host the real bridge, so production row sizing, cells and constraints all participate.
@@ -74,7 +146,8 @@ final class NotesTableTruncationTests: XCTestCase {
         let testedIndex = table.tableColumns.firstIndex(of: tested)!
         let cell = try XCTUnwrap(table.view(atColumn: testedIndex, row: 0, makeIfNecessary: true) as? NSTableCellView)
         table.layoutSubtreeIfNeeded()
-        let field = try XCTUnwrap(cell.textField)
+        // The Tags column draws chips, not a text field (W40.suite-reader-notes-consistency).
+        let field: NSView = try XCTUnwrap(column == "tags" ? (cell as? NotesTagsCellView)?.chips : cell.textField)
         let columnRect = table.rect(ofColumn: testedIndex)
         XCTAssertLessThanOrEqual(table.convert(field.bounds, from: field).maxX, columnRect.maxX + 0.5,
                                  "\(name): the field must yield to its column width")
