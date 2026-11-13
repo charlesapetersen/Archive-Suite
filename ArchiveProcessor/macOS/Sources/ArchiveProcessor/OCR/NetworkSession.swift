@@ -172,7 +172,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[EntityFeatureTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[DateRouteTestDriver.envKey]))
+                flag: ProcessInfo.processInfo.environment[DateRouteTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[PageReaderTestDriver.envKey]))
         else { return nil }
         return stub
 #else
