@@ -74,6 +74,8 @@ struct SettingsRangeChart: Identifiable {
         /// Where it sits on this chart, when it was measured on the chart's own figure; nil keeps it in the list only.
         let y: Double?
         let caveats: [String]
+        /// The trained model's licence, its base model's (the kit README's "Licences"); nil when the table states none.
+        let licence: String?
     }
 
     let id: String
@@ -437,7 +439,8 @@ extension SettingsSheetModel {
             default: break
             }
             return SettingsRangeChart.KitPoint(id: p.id, name: Self.kitName(p.id, r), measured: measured,
-                                               condition: Self.kitCondition(p.reason), y: y, caveats: r.caveats)
+                                               condition: Self.kitCondition(p.reason), y: y, caveats: r.caveats,
+                                               licence: r.licence)
         }
     }
 

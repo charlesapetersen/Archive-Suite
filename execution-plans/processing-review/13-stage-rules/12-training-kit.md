@@ -83,6 +83,7 @@ hold out whole collections or boxes, never a random page split).
   "family": "kit",
   "app_route": null,
   "status": "after-training",
+  "licence": "Apache-2.0, its base model's (Qwen3.5 2B); the Mac build is converted with mlx-vlm (MIT)",
   "needs": {"key": [], "plan": [], "cluster": true, "mac_gb": 16, "gpus": 1},
   "figures": {
    "owner-heldout-box-sasha": {"value": 89.1, "n": 175, "truth": "owner-ruled Sasha, known gaps", "metric": "gap accuracy",
@@ -120,7 +121,7 @@ hold out whole collections or boxes, never a random page split).
    "archive-seg-manifest.json beside the Mac build, hashed on that build (W46.kit-mac-build)"
   ]
  },
- {"id":"seg-2b-lora-k200","name":"The 2B adapted to your material (LoRA continuation on a cluster after about 200 corrected gaps)","family":"kit","app_route":null,"status":"after-training","needs":{"key":[],"plan":[],"cluster":true,"mac_gb":16,"gpus":1},
+ {"id":"seg-2b-lora-k200","name":"The 2B adapted to your material (LoRA continuation on a cluster after about 200 corrected gaps)","family":"kit","app_route":null,"status":"after-training","licence":"Apache-2.0, its base model's (Qwen3.5 2B); the Mac build is converted with mlx-vlm (MIT)","needs":{"key":[],"plan":[],"cluster":true,"mac_gb":16,"gpus":1},
   "figures":{"manuscripts-public.next_box":{"value":86.8,"n":244,"truth":"Lincoln box 2: catalogue starts plus Gemini 3.7 continuation calls (lincoln2.json)","metric":"pages exact; corpus 2B 52.1%","source":{"file":"seg-adapt-lora.md","route":"LoRA, k = 200, box 2","attribute":"pages exact","value":"86.8%"}},
    "manuscripts-public.next_box_errors_per_100":{"value":4.9,"n":244,"truth":"as above","metric":"errors per 100 gaps; corpus 2B 17.2; change -12.3 (-18.8 to -7.4)","source":{"file":"seg-adapt-lora.md","route":"LoRA, k = 200, box 2","attribute":"errors per 100 gaps","value":"4.9"}},
    "manuscripts-public.next_box_errors_per_100_k50":{"value":15.6,"n":244,"truth":"as above","metric":"errors per 100 gaps; change -1.6 (-4.5 to +1.2), a tie","source":{"file":"seg-adapt-lora.md","route":"LoRA, k = 50, box 2","attribute":"errors per 100 gaps","value":"15.6"}}},
@@ -136,6 +137,7 @@ hold out whole collections or boxes, never a random page split).
   "family": "kit",
   "app_route": null,
   "status": "after-training",
+  "licence": "Apache-2.0, its base model's (Qwen3.5 2B); trained with mlx-vlm (MIT)",
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": null, "gpus": 0},
   "figures": {},
   "cost": null,
@@ -158,6 +160,7 @@ hold out whole collections or boxes, never a random page split).
   "family": "kit",
   "app_route": null,
   "status": "after-training",
+  "licence": "Apache-2.0, its base model's (Benjamin Kiessling's kraken port of PP-OCRv6 medium, Zenodo 10.5281/zenodo.21788410); kraken itself is Apache-2.0",
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 16, "gpus": 0},
   "figures": {
    "handwritten-one-hand-160-lines": {"value": 2.50, "n": 16, "truth": "By the People, Blackwell held-out pages", "metric": "NES gain over the untuned model, base 59.7; +1.70 to +3.24 (CPU)",
@@ -180,8 +183,7 @@ hold out whole collections or boxes, never a random page split).
    "20 and 40 lines are ties; 240 against 160 is a measured tie, both trained to early stop at 5 epochs (P7-5)",
    "on the owner's Shils pages with paragraph truth it made 3 of 4 held-out pages worse",
    "the untuned recogniser is 71.6 on the owner's hand pages against 89.9 for LightOnOCR-3 4B 8-bit on the Mac, so a +2.5 gain does not close that gap",
-   "needs blla or Vision line boxes and a line-correction screen, which the Processor lacks today and builds in this release (H-corpus.md 6.3; 14-owner-calls.md call 7)",
-   "the kraken port's licence is not stated in the files read [?]"
+   "needs blla or Vision line boxes and a line-correction screen, which the Processor lacks today and builds in this release (H-corpus.md 6.3; 14-owner-calls.md call 7)"
   ],
   "kind_rules": ["handwritten only; one fine-tune per hand"],
   "fallback": "ppocrv6-kraken-blla",
@@ -292,7 +294,8 @@ kraken, doc-split-v1) and mlx-vlm MIT (`10-gap-audit.md` stage 10); the kraken P
 the files read [?]; research-licensed readers such as Churro-3B appear on R7 (`10-gap-audit.md`). Options: a README
 section plus a manifest field (`licence`) the app shows on the range point; a README section only. Recommendation:
 both, so the range view can show it; the wording is the owner's. Decided (session, section 2): both, the wording the
-owner's at ship time.
+owner's at ship time. Shipped (W46.kit-licence-statement, 2026-11-13): the kit README's "Licences", a `licence`
+field in each after-training row and in `archive-seg-manifest.json`; the kraken port is Apache-2.0 (its Zenodo record).
 
 **7.4 The handwriting fine-tune's place: how many corrected lines before it is offered.** Measured on one hand: 20 lines
 -0.14, 40 lines -0.32 (ties), 80 lines +1.12 (+0.31 to +1.91), 160 lines +2.50 (+1.70 to +3.24), 240 lines a tie with 160
@@ -338,7 +341,7 @@ section 2): confirmed as read.
   decided) in a form a kit run can read.
 - **Gaps the table needs** (`12-settings-design.md` §3.9): the seg students' training wall time on one GPU (not in the
   files read); Mac memory and seconds for a continuation loaded as an adapter (unmeasured); a gate held-out size measured
-  on non-owner material; the kraken port's licence [?]; a second hand for the fine-tune curve; a 32 GB Mac LoRA step
+  on non-owner material; a second hand for the fine-tune curve; a 32 GB Mac LoRA step
   (hardware-blocked, gap audit owner question 4).
 
 ## 9. Profile test expectations

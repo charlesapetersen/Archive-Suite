@@ -258,6 +258,31 @@ cannot rename their provenance. Never modify an in-use venv. The old FarmShare h
 measured notes are a record of those jobs. Historical `fs-*` bench method keys and
 `segbench-results/farmshare/` results stay named for the actual measurement source.
 
+## Licences
+
+A model you run on your own cluster through this kit may carry a research-only or non-commercial licence. The kit
+does not change a model's licence: read its terms, and your institution's rules, before you use what it produces. A
+model you train carries its base model's licence; the material you train it on may add terms of its own.
+
+| Model or tool | What the kit uses it for | Licence |
+|---|---|---|
+| Qwen3.5 (2B, 4B; the 27B teacher) | the segmentation students `train_seg.py` trains, and their teacher | Apache-2.0 |
+| kraken | the handwriting fine-tune's line detection (blla), training and reading | Apache-2.0 |
+| Benjamin Kiessling's kraken port of PP-OCRv6 medium ([Zenodo 10.5281/zenodo.21788410](https://doi.org/10.5281/zenodo.21788410)) | the base of the handwriting fine-tune on the Mac | Apache-2.0 |
+| doc-split-v1 (`nutrientdocs/doc-split-v1`) | the laptop segmenter the bench measured beside the students | Apache-2.0 |
+| mlx-vlm | converting a trained student for the Mac (`train_seg.py mac`) | MIT |
+| GLM-OCR (`zai-org/GLM-OCR`) | the layout-first newspaper reader (`download.sh glm-ocr`) | MIT |
+| DocLayout-YOLO DocStructBench (`juliozhao/DocLayout-YOLO-DocStructBench-imgsz1280-2501`) | the layout detector of that preset | AGPL-3.0: copyleft, with duties if you share it or serve it to others |
+
+Licences as each model's card or record stated them on 2026-11-13; a model's own card is the authority. Readers the
+bench measured under research or non-commercial terms (CHURRO-3B; PreP-OCR's ResShift, NTU S-Lab licence) are not
+set up by this kit. If you add a model, its licence is yours to state.
+
+`train_seg.py check` writes the trained model's licence into `archive-seg-manifest.json` as `licence`: the base
+model's for a Qwen3.5 base, read from the adapter's `train.json` or `--base-build`, or what you give with
+`--licence`, which wins. A base the kit does not know gets `null` and a note to give `--licence`. Archive
+Processor's settings sheet shows each after-training route's licence on the Range tab.
+
 ## Institution-hosted model endpoints
 
 An institution may already host an **OpenAI-compatible** vision model. The app’s existing **API Gateway**

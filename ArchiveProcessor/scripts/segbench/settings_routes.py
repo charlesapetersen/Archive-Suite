@@ -719,6 +719,10 @@ def check(table):
     shared = [r for st in table["stages"] for r in st["routes"] if r["id"] == "seg-2b-lora-k200"]
     if len(shared) == 2 and shared[0] != shared[1]:
         print("FAIL seg-2b-lora-k200 differs between notes 07 and 12 (one row shared)"); bad += 1
+    for st in table["stages"]:  # W46.kit-licence-statement: the range view states each one's licence
+        for r in st["routes"]:
+            if r["status"] == "after-training" and not r.get("licence"):
+                print(f"FAIL licence {st['id']}/{r['id']}: an after-training row states no licence"); bad += 1
     nfig = loose = 0
     for where, s, holder in srcs:
         nfig += 1

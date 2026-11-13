@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-12",
+ "built": "2026-11-13",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -9482,7 +9482,8 @@
       "labelled 'measured on one material'",
       "review flagging by disagreement with a second model stays on after adaptation",
       "the kit's gate passes on a held-out box of the same material holding at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, its interval resampling that box's documents (note 12, seg-kit-gate.md)"
-     ]
+     ],
+     "licence": "Apache-2.0, its base model's (Qwen3.5 2B); the Mac build is converted with mlx-vlm (MIT)"
     }
    ]
   },
@@ -12047,7 +12048,8 @@
       "the user's corpus has per-document structure (tags or folders) to label from (H-corpus.md 6.3 item 3)",
       "train_seg.py check passes under the gate rule of call 7.2 (gap accuracy, minimum support, two runs, 3.2-point anchor margin), on held-out whole collections and the locked anchor",
       "archive-seg-manifest.json beside the Mac build, hashed on that build (W46.kit-mac-build)"
-     ]
+     ],
+     "licence": "Apache-2.0, its base model's (Qwen3.5 2B); the Mac build is converted with mlx-vlm (MIT)"
     },
     {
      "id": "seg-2b-lora-k200",
@@ -12145,7 +12147,8 @@
       "labelled 'measured on one material'",
       "review flagging by disagreement with a second model stays on after adaptation",
       "the kit's gate passes on a held-out box of the same material holding at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, its interval resampling that box's documents (note 12, seg-kit-gate.md)"
-     ]
+     ],
+     "licence": "Apache-2.0, its base model's (Qwen3.5 2B); the Mac build is converted with mlx-vlm (MIT)"
     },
     {
      "id": "kit-seg-lora-mac",
@@ -12185,7 +12188,8 @@
      "fallback": null,
      "conditions": [
       "not offered in this release (14-owner-calls.md call 7); revisited only if a Mac step is measured to complete"
-     ]
+     ],
+     "licence": "Apache-2.0, its base model's (Qwen3.5 2B); trained with mlx-vlm (MIT)"
     },
     {
      "id": "kit-hands-ppocrv6-ft",
@@ -12289,8 +12293,7 @@
       "20 and 40 lines are ties; 240 against 160 is a measured tie, both trained to early stop at 5 epochs (P7-5)",
       "on the owner's Shils pages with paragraph truth it made 3 of 4 held-out pages worse",
       "the untuned recogniser is 71.6 on the owner's hand pages against 89.9 for LightOnOCR-3 4B 8-bit on the Mac, so a +2.5 gain does not close that gap",
-      "needs blla or Vision line boxes and a line-correction screen, which the Processor lacks today and builds in this release (H-corpus.md 6.3; 14-owner-calls.md call 7)",
-      "the kraken port's licence is not stated in the files read [?]"
+      "needs blla or Vision line boxes and a line-correction screen, which the Processor lacks today and builds in this release (H-corpus.md 6.3; 14-owner-calls.md call 7)"
      ],
      "kind_rules": [
       "handwritten only; one fine-tune per hand"
@@ -12302,7 +12305,8 @@
       "the line-correction screen exists (built in this release, 14-owner-calls.md call 7)",
       "a separate held-out acceptance check for each hand passes (ocr-ppocrv6-hands.md)",
       "kraken PP-OCRv6 on blla lines is the stage 04 route the user has (the low-memory fallback)"
-     ]
+     ],
+     "licence": "Apache-2.0, its base model's (Benjamin Kiessling's kraken port of PP-OCRv6 medium, Zenodo 10.5281/zenodo.21788410); kraken itself is Apache-2.0"
     }
    ]
   }

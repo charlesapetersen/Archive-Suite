@@ -1738,6 +1738,20 @@ class Check(unittest.TestCase):
             self.assertIsNone(m["anchor"])
             self.assertIn("no anchor score", " ".join(m["gate"]["reasons"]))
 
+    def test_manifest_states_the_licence(self):
+        # W46.kit-licence-statement: the base's licence when the kit knows the base, --licence over it, else none.
+        with tempfile.TemporaryDirectory() as t:
+            tmp = Path(t)
+            lic = lambda *extra: (self.run_check(tmp, {2}, {2, 4}, *extra),
+                                  json.loads((tmp / "m.json").read_text())["licence"])
+            r, got = lic("--base-build", "Qwen/Qwen3.5-2B")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(got, "Apache-2.0, its base model's (Qwen/Qwen3.5-2B)")
+            self.assertEqual(lic("--base-build", "Qwen/Qwen3.5-2B", "--licence", "CC BY-NC 4.0")[1], "CC BY-NC 4.0")
+            r, got = lic("--base-build", "some-other-base")
+            self.assertIsNone(got)
+            self.assertIn("states no licence", r.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

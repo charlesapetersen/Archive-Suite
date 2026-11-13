@@ -319,6 +319,10 @@ enum SettingsSheetTestDriver {
                 && clusterSeg.first { $0.id == "seg-2b-lora-k200" }?.condition.contains("200 places") == true
                 && clusterSeg.first { $0.id == "kit-seg-student-tags" }?.condition.contains("tags") == true,
               clusterSeg.map { "\($0.id): \($0.condition)" }.joined(separator: " | "))
+        let kitAll = (agent.ranges + clusterKit.ranges).flatMap(\.kit)
+        check("8 F: every after-training point states its licence (W46.kit-licence-statement)",
+              !kitAll.isEmpty && kitAll.allSatisfy { $0.licence?.isEmpty == false },
+              kitAll.map { "\($0.id): \($0.licence ?? "none")" }.joined(separator: " | "))
         check("8 F: an after-training row is never a mark to choose",
               clusterKit.ranges.allSatisfy { c in c.points.allSatisfy { p in !(table.stage(c.id)?.route(p.id)?.afterTraining ?? false) } })
 
@@ -423,7 +427,7 @@ enum SettingsSheetTestDriver {
                 shown += [r.name, r.familyWord, r.figures, r.publicFigure ?? ""]
                 shown += [r.listPrice, r.batchCost, r.time, r.canUse]
             }
-            for k in c.kit { shown += [k.name, k.measured ?? "", k.condition] }
+            for k in c.kit { shown += [k.name, k.measured ?? "", k.condition, k.licence ?? ""] }
         }
         shown = shown.filter { !$0.isEmpty }
         let hits = shown.filter { jargon.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
@@ -435,7 +439,7 @@ enum SettingsSheetTestDriver {
                 dump.append("  mark \(p.id) x \(p.x) y \(p.y) \(p.state)\(p.onFrontier ? " frontier" : "")\(p.picked ? " PICK" : "")\(p.choosable ? "" : " fixed") :: \(p.tooltip)")
             }
             for r in c.rows { dump.append("  row \(r.name) (\(r.familyWord)): \(r.figures) | \(r.publicFigure ?? "-") | \(r.listPrice); \(r.batchCost); \(r.time); \(r.canUse)") }
-            for k in c.kit { dump.append("  kit \(k.name): \(k.measured ?? "-") | \(k.condition) | y \(k.y.map { "\($0)" } ?? "-")") }
+            for k in c.kit { dump.append("  kit \(k.name): \(k.measured ?? "-") | \(k.condition) | y \(k.y.map { "\($0)" } ?? "-") | licence \(k.licence ?? "-")") }
             if !c.offChart.isEmpty { dump.append("  off chart: \(c.offChart.joined(separator: "; "))") }
         }
     }

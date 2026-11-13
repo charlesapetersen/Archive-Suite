@@ -186,6 +186,10 @@ private struct RangeChartBlock: View {
                             }
                             Text(k.condition).font(.caption).foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
+                            if let l = k.licence {
+                                Text("Licence: \(l).").font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("ap.sheet.range.\(chart.id).kit.\(k.id)")

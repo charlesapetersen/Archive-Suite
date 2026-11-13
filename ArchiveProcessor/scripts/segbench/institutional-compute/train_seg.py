@@ -236,6 +236,19 @@ DRAWS, CHECK_SEED = 2000, 46
 MANIFEST = "archive-seg-manifest.json"   # what the app reads beside the weights (LocalSegmenter.manifestName)
 MAC_FIGURES = "archive-seg-mac.json"     # `mac`'s warm-up figures, which `check` puts in the manifest
 KIT_FILES = (MANIFEST, MAC_FIGURES)
+# A trained model carries its base model's licence (README §Licences, W46.kit-licence-statement). The bases the kit
+# trains, by a lower-cased piece of the base's name; any other base needs --licence, or the manifest states none.
+BASE_LICENCES = (("qwen3.5", "Apache-2.0"),)
+
+
+def licence_of(stated, base):
+    """The manifest's licence: as stated with --licence, else the known base's; None when neither says."""
+    if stated:
+        return stated
+    for piece, lic in BASE_LICENCES:
+        if base and piece in base.lower():
+            return f"{lic}, its base model's ({base})"
+    return None
 
 
 def run_votes(dirs):
@@ -581,12 +594,16 @@ def cmd_check(a):
         row["gate_reasons"] = run_reasons(row, paired, box, bool(shipped))
         reasons += [(f"run {i + 1}: " if len(cand_runs) > 1 else "") + r for r in row["gate_reasons"]]
     cand = cand_runs[0]
+    trained = json.loads((Path(a.adapter).parent / "train.json").read_text()) if a.adapter else {}
+    licence = licence_of(a.licence, trained.get("model") or a.base_build)
+    if not licence:
+        print("note: the manifest states no licence; give --licence with the base model's (README, Licences)",
+              file=sys.stderr)
     manifest = {
         "kit_version": KIT_VERSION, "prompt_id": PROMPT_ID, "bench_request": "method_local.request (o1), 1024 px",
-        "model": a.candidate, "base_build": a.base_build,
+        "model": a.candidate, "base_build": a.base_build, "licence": licence,
         "weights_sha256": sha256_of(a.weights) if a.weights else None,
-        "adapter": ({"sha256": sha256_of(a.adapter), **{k: v for k, v in
-                     json.loads((Path(a.adapter).parent / "train.json").read_text()).items() if k in ("rank", "model")}}
+        "adapter": ({"sha256": sha256_of(a.adapter), **{k: v for k, v in trained.items() if k in ("rank", "model")}}
                     if a.adapter else None),
         "training_data": ({"sha256": sha256_of(Path(a.data) / "train.jsonl"),
                            "rule": json.loads((Path(a.data) / "data.json").read_text()).get("rule")} if a.data else None),
@@ -785,6 +802,8 @@ def main():
     p.add_argument("--mac", help=f"the Mac figures as JSON (seconds a page, peak GB, download GB, measured on); "
                                  f"default {MAC_FIGURES} in the --weights folder")
     p.add_argument("--note", help="what the figures were measured on, if not the weights hashed")
+    p.add_argument("--licence", help="the trained model's licence, its base model's (README, Licences); "
+                                     "default: the known base's, from the adapter's train.json or --base-build")
     p.add_argument("--out", help=f"default {MANIFEST} in the --weights folder")
     p = sub.add_parser("mac")
     g = p.add_mutually_exclusive_group(required=True)

@@ -180,10 +180,12 @@ struct SettingsRouteTable: Decodable, Sendable {
         /// A cascade: its readers in order, and what sends a page on.
         let stages: [String]?
         let trigger: String?
+        /// An after-training row: the trained model's licence, its base model's (W46.kit-licence-statement).
+        let licence: String?
 
         enum CodingKeys: String, CodingKey {
             case id, name, family, status, needs, figures, cost, time, memory, caveats, fallback, conditions, step
-            case stages, trigger
+            case stages, trigger, licence
             case appRoute = "app_route"
             case kindRules = "kind_rules"
         }
@@ -207,6 +209,7 @@ struct SettingsRouteTable: Decodable, Sendable {
             step = try c.decodeIfPresent([Int].self, forKey: .step)
             stages = try c.decodeIfPresent([String].self, forKey: .stages)
             trigger = try c.decodeIfPresent(String.self, forKey: .trigger)
+            licence = try c.decodeIfPresent(String.self, forKey: .licence)
         }
 
         /// A figure's value: `figures[key].value`, or the figure itself when the table gives a bare number.
