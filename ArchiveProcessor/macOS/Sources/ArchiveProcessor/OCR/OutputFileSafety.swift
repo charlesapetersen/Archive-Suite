@@ -181,7 +181,9 @@ enum OutputFileSafety {
     static let systemAttributes: Set<String> = ["com.apple.provenance", "com.apple.quarantine", "com.apple.macl",
                                                 "com.apple.rootless"]
 
-    /// Every extended attribute of `source` but the system's own, set on `destination` and read back equal.
+    /// Every extended attribute of `source` (its Finder tags and label among them) put on `destination` by
+    /// `copyfile`, as Improve OCR's reviewed publication does (ReOCRFileWriter), then each one but the system's own
+    /// read back equal. Not a raw `setxattr` per attribute: the write-surface lint forbids a direct Finder-tag write.
     static func copyExtendedAttributes(from source: URL, to destination: URL) throws {
         func fail() -> Error { POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let size = listxattr(source.path, nil, 0, XATTR_NOFOLLOW)
@@ -190,14 +192,19 @@ enum OutputFileSafety {
         var names = [CChar](repeating: 0, count: size)
         guard listxattr(source.path, &names, size, XATTR_NOFOLLOW) == size else { throw fail() }
         let list = names.split(separator: 0).map { String(decoding: $0.map { UInt8(bitPattern: $0) }, as: UTF8.self) }
+        var want: [(name: String, value: [UInt8])] = []
         for name in list where !systemAttributes.contains(name) {
             let length = getxattr(source.path, name, nil, 0, 0, XATTR_NOFOLLOW)
             guard length >= 0 else { throw fail() }
             var value = [UInt8](repeating: 0, count: length)
-            guard getxattr(source.path, name, &value, length, 0, XATTR_NOFOLLOW) == length,
-                  setxattr(destination.path, name, value, length, 0, XATTR_NOFOLLOW) == 0 else { throw fail() }
-            var back = [UInt8](repeating: 0, count: length)
-            guard getxattr(destination.path, name, &back, length, 0, XATTR_NOFOLLOW) == length, back == value else {
+            guard getxattr(source.path, name, &value, length, 0, XATTR_NOFOLLOW) == length else { throw fail() }
+            want.append((name, value))
+        }
+        guard copyfile(source.path, destination.path, nil,
+                       copyfile_flags_t(COPYFILE_XATTR | COPYFILE_NOFOLLOW)) == 0 else { throw fail() }
+        for (name, value) in want {
+            var back = [UInt8](repeating: 0, count: value.count)
+            guard getxattr(destination.path, name, &back, value.count, 0, XATTR_NOFOLLOW) == value.count, back == value else {
                 throw ReplaceError.notVerified
             }
         }

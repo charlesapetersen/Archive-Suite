@@ -388,14 +388,18 @@ echo "gate-rc=$GATE_RC"
         holds = state / "holds.log"
         holds_before = holds.read_text() if holds.exists() else ""
         waiters_before = {w.name for w in (state / "waiters").glob("*.json")}
+        # Sized from gui-vm-proof's own 300 s cap (prove-gui-vm.sh), not from its run time: W40.vm-gate-unpause
+        # took it to about 150 s, past the old 120 s timeout and 150 s holder, and this check went red with no
+        # queueing at all. The holder outlives the step's cap and is ended as soon as the check is made.
+        light_cap = 300 + 60
         ready = root / "light-harness-holder"
-        holder = spawn("sleep", "150", ready=ready)
+        holder = spawn("sleep", str(light_cap + 60), ready=ready)
         check(until(ready.exists), "light-harness fixture owns the lock")
         owner()
         try:
             light_gate = subprocess.run(["bash", str(HERE / "health-gate.sh")],
                                         env=dict(env, AUTONOMOUS_GATE_ONLY="vm-lane-proof gui-vm-proof"),
-                                        capture_output=True, text=True, timeout=120)
+                                        capture_output=True, text=True, timeout=light_cap)
             light_out = light_gate.stdout
         except subprocess.TimeoutExpired as e:
             partial = e.stdout or b""

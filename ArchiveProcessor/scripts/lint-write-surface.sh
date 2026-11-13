@@ -24,6 +24,9 @@ ALLOW=(
   # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
   # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
   "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"
+  # W46.date-route-header: the dating-route test (DEBUG only) puts a custom attribute on its scratch output, so it
+  # can prove OutputFileSafety.replaceGeneratedOutput keeps it. Its Finder tags go through MacOSTagger.
+  "tagwrite${SEP}macOS/Sources/ArchiveProcessor/Tagging/DateRouteTestDriver.swift${SEP}_ = setxattr(pdf.path, \"com.archivesuite.test\", \"kept\", 4, 0, XATTR_NOFOLLOW)"
 )
 
 PASS=0
