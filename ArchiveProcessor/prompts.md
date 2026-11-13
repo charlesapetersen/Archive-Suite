@@ -297,6 +297,39 @@ Rules:
 
 ---
 
+## 8. Entity Prompt (sender, recipients, sending place)
+
+**Source:** `EntityExtractor.swift` — `prompt(text:)` (W46.ent-feature)
+
+A second, dedicated call after the tagging call, on correspondence only (the tagging reply's `format` is a letter,
+memo or telegram) and only where `EntityRunPolicy` allows it: always on a cloud route, on this Mac's model only when the
+collection ranks names and every page is typed or printed, never on handwriting read by Apple Vision, and never the
+sender from Apple Vision text. Only the document's own text is sent (no nearby documents). Each returned name is
+checked against that text (`EntityExtractor.evidence`) and written to the sidecar's `entities` object as quoted or
+inferred. Measured before it shipped: `segbench-results/ent-feature.md` (the bench copy is `segbench/ent_feature.py`,
+which `test_ent_feature.py` compares with the Swift).
+
+```
+You are extracting correspondence metadata from one document in a historical archive: a letter, memo or telegram. The text below was read from a photograph by machine OCR and may contain recognition errors.
+
+---
+{document text, first 3,000 characters}
+---
+
+Respond with ONLY a JSON object of this shape:
+{"sender": [{"name": "...", "quote": "..."}], "recipient": [{"name": "...", "quote": "..."}], "sending_place": [{"name": "...", "quote": "..."}]}
+
+Rules:
+- "sender": the person who wrote or signed the document (a signature, a typed name under the closing, a "From:" line). If no person is named as its writer, the organisation it comes from. Typist's initials and enclosures are not senders.
+- "recipient": the person or people it is addressed to (the inside address, a "To:" line, the salutation). List each addressee. Copies ("cc") are not recipients.
+- "sending_place": where it was sent from (the letterhead's or the dateline's city), as "City, State" or "City, Country". Only a place the document writes (a dateline, a letterhead or an address): an empty list when it writes none, never a place inferred from an institution's name, the collection or other documents.
+- "name": the normalised name, as "Given Surname" without titles (no Mr., Dr., Professor, President); correct obvious OCR errors in it.
+- "quote": the name exactly as it is written in the OCR text above, recognition errors included, copied character for character; null when the name is not written in the text (for example only a role is written, such as "Dear Mr. President", and you know who held it).
+- Use an empty list for a field the document does not let you fill. Use only this document.
+```
+
+---
+
 ## Notes
 
 - **Mistral OCR** uses Mistral's dedicated OCR endpoint (`/v1/ocr`) and does not receive a custom prompt. It returns markdown-formatted text.

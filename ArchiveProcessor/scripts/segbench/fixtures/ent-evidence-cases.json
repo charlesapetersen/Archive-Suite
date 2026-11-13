@@ -1,0 +1,17 @@
+[
+ {"id": "exact, spacing folded", "quote": "John Smith", "text": "Yours truly,\nJohn   Smith\nDirector", "evidence": "quoted", "distance": 0},
+ {"id": "case ignored", "quote": "JOHN SMITH", "text": "Yours truly, John Smith", "evidence": "quoted", "distance": 0},
+ {"id": "a line break inside the quote", "quote": "John\nSmith", "text": "Yours truly, John Smith", "evidence": "quoted", "distance": 0},
+ {"id": "one letter misread", "quote": "Jahn Smith", "text": "Yours truly, John Smith", "evidence": "quoted", "distance": 1},
+ {"id": "two letters swapped", "quote": "Jonh Smith", "text": "Yours truly, John Smith", "evidence": "quoted", "distance": 2},
+ {"id": "three edits away", "quote": "Jxhx Smxth", "text": "Yours truly, John Smith", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "five letters, one edit", "quote": "Smyth", "text": "Mr. Smith", "evidence": "quoted", "distance": 1},
+ {"id": "four letters, one edit", "quote": "Smyt", "text": "Mr. Smit", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "a short quote found exactly", "quote": "Ann", "text": "Dear Ann,", "evidence": "quoted", "distance": 0},
+ {"id": "a short quote one edit away", "quote": "Ann", "text": "Dear Amn,", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "no quote", "quote": null, "text": "Dear Mr. President,", "evidence": "inferred", "why": "no quote"},
+ {"id": "a blank quote", "quote": "  \n ", "text": "Dear Mr. President,", "evidence": "inferred", "why": "no quote"},
+ {"id": "only past the 3,000 characters sent", "quote": "Mary Jones", "pad": 3000, "text": " Mary Jones", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "a neighbour's name", "quote": "Robert White", "text": "Dear Dr. Brown, thank you. Yours, Alice Green", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "a place", "quote": "Washington, D. C.", "text": "WASHINGTON, D. C.\nMarch 3, 1958", "evidence": "quoted", "distance": 0}
+]

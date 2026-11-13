@@ -93,6 +93,7 @@ struct ContentView: View {
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SettingsSolverTestDriver.runIfRequested()        // $0 W46 settings solver on the profile cases
             SettingsSheetTestDriver.runIfRequested()         // $0 W46 settings sheet: its words and its offscreen pages
+            EntityFeatureTestDriver.runIfRequested()         // $0 W46 entity feature: prompt, evidence, policy, sidecar
             ReOCRRankingTestDriver.runIfRequested()          // $0 W44 Improve OCR ranked readers, no wire
             ImproveOCRRequestStoreTestDriver.runIfRequested() // $0 W44 Improve OCR hand-off store, scratch only
             ReOCRPreservationCheckTestDriver.runIfRequested() // $0 W44 Improve OCR byte-preservation check, in memory

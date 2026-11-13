@@ -1,0 +1,200 @@
+{
+ "docs": 138,
+ "evidence": {
+  "recipient": {
+   "inferred: no quote (truth inferred)": {
+    "right": 1,
+    "wrong": 0
+   },
+   "read, distance 0": {
+    "right": 148,
+    "wrong": 16
+   },
+   "read, distance 0 (truth inferred)": {
+    "right": 2,
+    "wrong": 0
+   }
+  },
+  "sender": {
+   "read, distance 0": {
+    "right": 85,
+    "wrong": 27
+   },
+   "read, distance 0 (truth inferred)": {
+    "right": 1,
+    "wrong": 0
+   }
+  },
+  "sending_place": {
+   "read, distance 0": {
+    "right": 55,
+    "wrong": 11
+   }
+  }
+ },
+ "gate": {
+  "formats": {
+   "brochure": 1,
+   "leaflet": 1,
+   "letter": 88,
+   "memo": 45,
+   "newspaper article": 1,
+   "report": 1,
+   "telegram": 1
+  },
+  "named_senders_lost": 3,
+  "passed": 134
+ },
+ "inside_address": {
+  "inside_address": 5,
+  "inside_right": 5,
+  "inside_wrong": 0,
+  "places_written": 66,
+  "quoted": 66
+ },
+ "noncorr": {
+  "all": {
+   "recipient": {
+    "filled": 2,
+    "names_quoted": 2
+   },
+   "sender": {
+    "filled": 5,
+    "names_quoted": 6
+   },
+   "sending_place": {
+    "filled": 2,
+    "names_quoted": 3
+   }
+  },
+  "answered": 21,
+  "behind_gate": {
+   "recipient": {
+    "filled": 0,
+    "names_quoted": 0
+   },
+   "sender": {
+    "filled": 1,
+    "names_quoted": 1
+   },
+   "sending_place": {
+    "filled": 0,
+    "names_quoted": 0
+   }
+  },
+  "docs": 21,
+  "formats": {
+   "campaign material": 1,
+   "diagram": 1,
+   "magazine": 1,
+   "magazine article": 2,
+   "memo": 4,
+   "minutes": 1,
+   "newsletter": 3,
+   "newspaper article": 2,
+   "pamphlet": 1,
+   "report": 2,
+   "routing slip": 1,
+   "speech": 1,
+   "transcript": 1
+  },
+  "gate_leak": 4,
+  "spent_usd": 0.094,
+  "unparsed": 0
+ },
+ "parsed": 138,
+ "scores": {
+  "entity prompt": {
+   "city": {
+    "f1": 0.8840579710144928,
+    "fn": 11,
+    "fp": 5,
+    "precision": 0.9242424242424242,
+    "tp": 61
+   },
+   "n": 138,
+   "recipient": {
+    "docs": 137,
+    "f1": 0.8802395209580838,
+    "filled_when_empty": 1,
+    "fn": 24,
+    "fp": 16,
+    "precision": 0.901840490797546,
+    "recall": 0.8596491228070176,
+    "tp": 147,
+    "truth_nonempty": 130,
+    "wrong_when_filled_docs": 15
+   },
+   "sender": {
+    "docs": 136,
+    "f1": 0.688259109311741,
+    "filled_when_empty": 1,
+    "fn": 50,
+    "fp": 27,
+    "precision": 0.7589285714285714,
+    "recall": 0.6296296296296297,
+    "tp": 85,
+    "truth_nonempty": 127,
+    "wrong_when_filled_docs": 27
+   },
+   "sending_place": {
+    "docs": 138,
+    "f1": 0.7971014492753623,
+    "filled_when_empty": 1,
+    "fn": 17,
+    "fp": 11,
+    "precision": 0.8333333333333334,
+    "recall": 0.7638888888888888,
+    "tp": 55,
+    "truth_nonempty": 72,
+    "wrong_when_filled_docs": 11
+   }
+  },
+  "entity prompt behind the gate": {
+   "city": {
+    "f1": 0.8759124087591241,
+    "fn": 12,
+    "fp": 5,
+    "precision": 0.9230769230769231,
+    "tp": 60
+   },
+   "n": 138,
+   "recipient": {
+    "docs": 137,
+    "f1": 0.8693009118541033,
+    "filled_when_empty": 1,
+    "fn": 28,
+    "fp": 15,
+    "precision": 0.9050632911392406,
+    "recall": 0.8362573099415205,
+    "tp": 143,
+    "truth_nonempty": 130,
+    "wrong_when_filled_docs": 14
+   },
+   "sender": {
+    "docs": 136,
+    "f1": 0.6857142857142857,
+    "filled_when_empty": 1,
+    "fn": 51,
+    "fp": 26,
+    "precision": 0.7636363636363637,
+    "recall": 0.6222222222222222,
+    "tp": 84,
+    "truth_nonempty": 127,
+    "wrong_when_filled_docs": 26
+   },
+   "sending_place": {
+    "docs": 138,
+    "f1": 0.7883211678832116,
+    "filled_when_empty": 1,
+    "fn": 18,
+    "fp": 11,
+    "precision": 0.8307692307692308,
+    "recall": 0.75,
+    "tp": 54,
+    "truth_nonempty": 72,
+    "wrong_when_filled_docs": 11
+   }
+  }
+ }
+}

@@ -1044,6 +1044,11 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = min(6, total)
+        // W46.ent-feature: what the names policy reads that is known before a tagging reply gives its `format`.
+        let entityBase: [EntityRunPolicy.Inputs] = snapshot.map {
+            entityInputs(for: $0, runConfig: runConfig, provider: provider, model: model, gateway: gateway,
+                         localAgent: localAgent)
+        }
 
         // Precompute neighbor context per segment on the main actor, so the concurrent tasks capture
         // only immutable, Sendable inputs.
@@ -1063,70 +1068,108 @@ extension OCRProcessor {
         // only exists once that cover's result has been applied. Results arrive out of order, so an
         // enclosure's write is deferred until the pool drains, then applied from `finalTagsBySeg`.
         var finalTagsBySeg: [Int: GeneratedTags] = [:]
-        var deferredEnclosures: [(index: Int, raw: GeneratedTags)] = []
+        var deferredEnclosures: [(index: Int, raw: GeneratedTags, entities: EntityResult?)] = []
+
+        // One segment: its tags, then its names when the policy runs the feature on it (the reply's `format` says
+        // whether it is correspondence). Mac-tagged segments skip both calls.
+        let work: @Sendable (Int) async -> (Int, GeneratedTags, EntityResult?) = { i in
+            if !macSubjectsBySeg[i].isEmpty {
+                return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil)   // Mac-tagged → no LLM
+            }
+            let tags = await generator.generateTags(
+                for: snapshot[i], nearbySegments: nearbyBySeg[i],
+                provider: provider, model: model, thinkingLevel: nil,
+                apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
+            )
+            var inputs = entityBase[i]
+            inputs.format = tags.format
+            guard !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs) else { return (i, tags, nil) }
+            let names = await EntityExtractor.extract(text: snapshot[i].combinedText, decision: run,
+                                                      provider: provider, model: model, apiKey: apiKey,
+                                                      gatewayConfig: gateway)
+            return (i, tags, names)
+        }
 
         // Tag segments concurrently (bounded pool) instead of one-at-a-time. Each call is small,
         // text-only, and independent, so overlapping the network round-trips is a big speedup.
         // Tagging is a simple text→JSON task, so we skip thinking (`thinkingLevel: nil`).
         var completed = 0
-        await withTaskGroup(of: (Int, GeneratedTags).self) { group in
+        await withTaskGroup(of: (Int, GeneratedTags, EntityResult?).self) { group in
             var next = 0
             while next < maxConcurrent {
                 let i = next
-                group.addTask {
-                    if !macSubjectsBySeg[i].isEmpty {
-                        return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]))   // Mac-tagged → no LLM
-                    }
-                    let tags = await generator.generateTags(
-                        for: snapshot[i], nearbySegments: nearbyBySeg[i],
-                        provider: provider, model: model, thinkingLevel: nil,
-                        apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
-                    )
-                    return (i, tags)
-                }
+                group.addTask { await work(i) }
                 next += 1
             }
-            for await (i, rawTags) in group {
+            for await (i, rawTags, names) in group {
                 if Task.isCancelled { break }
                 if Self.validCoverIndex(of: i, in: snapshot) != nil {
-                    deferredEnclosures.append((i, rawTags))
+                    deferredEnclosures.append((i, rawTags, names))
                 } else {
                     finalTagsBySeg[i] = applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
                                                            enableSegmentJSON: enableSegmentJSON,
                                                            outputDirectory: outputDirectory,
-                                                           runConfig: runConfig)
+                                                           runConfig: runConfig, entities: names)
                 }
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
                 statusMessage = "Tagging \(completed)/\(total)…"
                 if next < total {
                     let j = next
-                    group.addTask {
-                        if !macSubjectsBySeg[j].isEmpty {
-                            return (j, GeneratedTags(subjectTags: macSubjectsBySeg[j]))   // Mac-tagged → no LLM
-                        }
-                        let tags = await generator.generateTags(
-                            for: snapshot[j], nearbySegments: nearbyBySeg[j],
-                            provider: provider, model: model, thinkingLevel: nil,
-                            apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
-                        )
-                        return (j, tags)
-                    }
+                    group.addTask { await work(j) }
                     next += 1
                 }
             }
         }
         // Same cancellation contract as the pool: a cancelled run writes nothing further.
         guard !Task.isCancelled else { return }
-        for (i, raw) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
+        for (i, raw, names) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
             // A cover that was never applied (absent from `finalTagsBySeg`) yields NO sent-with date —
             // never a neighbour's.
             let cover = Self.validCoverIndex(of: i, in: snapshot).flatMap { finalTagsBySeg[$0] }
             finalTagsBySeg[i] = applyGeneratedTags(raw, toSegmentAt: i, in: snapshot,
                                                    enableSegmentJSON: enableSegmentJSON,
                                                    outputDirectory: outputDirectory,
-                                                   runConfig: runConfig, coverTags: cover ?? GeneratedTags())
+                                                   runConfig: runConfig, coverTags: cover ?? GeneratedTags(),
+                                                   entities: names)
         }
+    }
+    /// W46.ent-feature — the names policy's inputs for one segment, before the tagging reply gives its `format`: the
+    /// route's family, who read each page (Apple Vision or a model), each page's kind, whether the collection ranks
+    /// names and whether the user chose no names for the stage.
+    func entityInputs(for segment: DocumentSegment, runConfig: SessionProcessingConfig?, provider: LLMProvider,
+                      model: LLMModel, gateway: GatewayConfig?, localAgent: LocalAgentConfig?) -> EntityRunPolicy.Inputs {
+        let family: EntityRunPolicy.Family = localAgent != nil ? .plan : (gateway?.isLocalModel == true ? .mac : .cloud)
+        let results = segment.pdfURLs.map { url in jobs.first(where: { $0.sourceURL == url })?.result }
+        let kinds = results.map { EntityRunPolicy.PageKind($0?.pageReader?.kind) }
+        let readers: [String?] = results.map { r in
+            guard let r else { return nil }
+            if let second = r.secondReader { return second.provider }
+            if let page = r.pageReader { return page.provider }
+            if r.imported != nil { return "imported" }
+            return runConfig?.provider.rawValue
+        }
+        let source: EntityRunPolicy.TextSource
+        if readers.contains(LLMProvider.appleVision.rawValue) {
+            source = .vision
+        } else if readers.isEmpty || readers.contains(where: { $0 == nil }) {
+            source = .unknown
+        } else {
+            source = .reader
+        }
+        let values = activeResolvedSettings?.values ?? [:]
+        let ranked = values[SettingsKey.priorities.rawValue]?.value.strings?
+            .contains(SettingsPriority.names.rawValue) ?? false
+        // "No names" on the Names card is stored for the whole stage (`SettingsSheetModel.overrideKey`); a per-part key
+        // is read too. Any other route chosen there is not read: the names call takes the run's text route.
+        let part = kinds.contains(.handwritten) ? "correspondence-handwritten" : "correspondence-typed"
+        let routeNone = [SettingsSheetModel.overrideKey("entities"), SettingsKey.override(stage: "entities", part: part)]
+            .contains { values[$0.rawValue]?.value.string == "none" }
+        // With a gateway set, LLMTextClient calls the gateway's model, whatever the provider and model say.
+        let modelName = gateway?.displayName ?? model.displayName
+        let route = (family == .mac ? "this Mac" : (gateway != nil ? "Gateway" : provider.rawValue)) + " · " + modelName
+        return EntityRunPolicy.Inputs(family: family, namesRanked: ranked, routeNone: routeNone, format: nil,
+                                      textSource: source, pageKinds: kinds, route: route)
     }
     /// W37 — the covering segment's index when `snapshot[i]` carries a usable enclosure relation: the
     /// cover precedes it, is in range, and is a document (never a box/folder label). `nil` otherwise.
@@ -1144,7 +1187,7 @@ extension OCRProcessor {
     private func applyGeneratedTags(_ rawTags: GeneratedTags, toSegmentAt i: Int, in snapshot: [DocumentSegment],
                                     enableSegmentJSON: Bool, outputDirectory: URL,
                                     runConfig: SessionProcessingConfig?,
-                                    coverTags: GeneratedTags? = nil) -> GeneratedTags {
+                                    coverTags: GeneratedTags? = nil, entities: EntityResult? = nil) -> GeneratedTags {
         guard i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
         var tags = rawTags
@@ -1174,7 +1217,7 @@ extension OCRProcessor {
         }
         if enableSegmentJSON && !segment.isBox && !segment.isFolder {
             writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory,
-                             enclosureOf: enclosureOfName)
+                             enclosureOf: enclosureOfName, entities: entities?.sidecarObject)
         }
         return tags
     }
@@ -1285,7 +1328,7 @@ extension OCRProcessor {
         try? out.write(to: url, options: .atomic)
     }
     private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL,
-                                  enclosureOf: String? = nil) {
+                                  enclosureOf: String? = nil, entities: [String: Any]? = nil) {
         guard let firstFile = segment.pdfURLs.first else { return }
         // Write JSON next to the output PDF, using its base name so they match
         let jsonURL: URL
@@ -1301,7 +1344,7 @@ extension OCRProcessor {
         let formatOverride = SegmentJSONBuilder.labelFormatOverride(isBox: segment.isBox, isFolder: segment.isFolder)
         guard let data = SegmentJSONBuilder.buildData(fileURLs: segment.pdfURLs, texts: segment.texts,
                                                       tags: tags, formatOverride: formatOverride,
-                                                      enclosureOf: enclosureOf) else { return }
+                                                      enclosureOf: enclosureOf, entities: entities) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
     /// Merge multi-page document segments into single PDFs.

@@ -30,10 +30,15 @@ enum SegmentJSONBuilder {
     /// `sent_with_uncertain` — only when `tags.sentWith` is set, so a sidecar without a sent-with date is
     /// byte-identical to the pre-W37 output.
     ///
+    ///   - entities: W46.ent-feature — the entity feature's `entities` object (`EntityResult.sidecarObject`), when it
+    ///     ran on this document. It then holds the document's sender, recipients and sending place, each with its
+    ///     evidence, so the tagging call's `author_name`, `recipient_name` and `author_location` are left out: one
+    ///     answer per field. `nil` → the sidecar is byte-identical to the output before the feature.
+    ///
     /// The output is `[.prettyPrinted, .sortedKeys]` JSON, so it is byte-for-byte deterministic.
     static func buildData(fileURLs: [URL], texts: [String],
                           tags: GeneratedTags, formatOverride: String? = nil,
-                          enclosureOf: String? = nil) -> Data? {
+                          enclosureOf: String? = nil, entities: [String: Any]? = nil) -> Data? {
         // Body text with per-image markers (image marker always; text line only when non-empty).
         var bodyParts: [String] = []
         for (i, url) in fileURLs.enumerated() {
@@ -57,6 +62,12 @@ enum SegmentJSONBuilder {
         if let v = tags.authorLocation { dict["author_location"] = v }
         if let v = tags.recipientLocation { dict["recipient_location"] = v }
         if let v = tags.publicationName { dict["publication_name"] = v }
+        if let entities {
+            dict["entities"] = entities
+            dict["author_name"] = nil
+            dict["recipient_name"] = nil
+            dict["author_location"] = nil
+        }
         // Box/folder label override wins over tags.format (Process-Files path); nil-op for documents.
         if let f = formatOverride { dict["format"] = f }
         dict["files"] = fileURLs.map { $0.lastPathComponent }

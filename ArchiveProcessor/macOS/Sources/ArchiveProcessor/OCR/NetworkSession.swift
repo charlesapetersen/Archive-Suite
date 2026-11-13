@@ -135,7 +135,8 @@ enum NetworkSession {
     /// contract (`RetryBackendTestDriver.envKey`) have their own flags for the same reason, as does the W41
     /// OpenRouter request contract (`OpenRouterTestDriver.envKey`) and the W41 cascade contract
     /// (`OCRCascadeTestDriver.envKey`) and the W41 page-kind contract (`OCRPageKindTestDriver.envKey`) and the W41
-    /// local-model contract (`LocalModelsTestDriver.envKey`).
+    /// local-model contract (`LocalModelsTestDriver.envKey`), and the W46 entity feature
+    /// (`EntityFeatureTestDriver.envKey`).
     nonisolated static func visionHybridTestTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
 
     /// The stand-in transport for THIS process, or nil when the wire is what a request takes. Resolved in
@@ -167,7 +168,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[InstitutionalComputeImportTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[RotationRuleTestDriver.envKey]))
+                flag: ProcessInfo.processInfo.environment[RotationRuleTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[EntityFeatureTestDriver.envKey]))
         else { return nil }
         return stub
 #else

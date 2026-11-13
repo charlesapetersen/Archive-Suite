@@ -329,10 +329,15 @@ OCR/                           OCR pipeline + provider clients:
   SegmentJSONBuilder.swift     Pure shared builder for the per-segment `.json` metadata sidecar (body +
                                fields, optional box/folder format override). Both Process-Files and Live
                                writeSegmentJSON delegate to it; callers own the URL + atomic disk write.
+                               An `entities` object (W46.ent-feature) replaces the tagging call's three name keys.
 Tagging/                       Finder-tag writing + segmentation (Tier-2 — writes irreplaceable data):
   MacOSTagger.swift            Fresh-write ADAPTER over `ArchiveCore.CoordinatedTagWriter`; writes Finder tags
                                (subjects/date/Quality/color + trailing Unread) — no direct `setResourceValue` here.
   TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
+  EntityExtractor.swift        W46.ent-feature: the names call (sender, recipients, sending place), its evidence check
+                               (quote in the document's own text, ed2 on 5+ letters, else inferred), the sidecar's
+                               `entities` object and `EntityRunPolicy` (correspondence only; cloud always, Mac when
+                               names rank; no Vision sender, no Vision hands). Wired in `performTaggingPhase`.
   DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification;
                                `enclosureOf` (W37) from the OCR `[enclosure]` marker, never adjacency.
   CollectionSegmenter.swift    Group files into box/folder collections.
