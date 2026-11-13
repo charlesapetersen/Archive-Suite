@@ -64,6 +64,7 @@ enum TextLayerTestDriver {
             check("2 \(name) placed", o.layer.route != .textPage, "\(o.layer)")
             check("2 \(name) the reading aligned", o.layer.route == .visionLinesAligned, "\(o.layer.route)")
             check("2 \(name) every line placed", o.layer.unplaced == 0 && o.layer.lines >= memo.count, "\(o.layer)")
+            check("2 \(name) a level page is not turned", o.straightenedDegrees == nil, "\(String(describing: o.straightenedDegrees))")
             guard let doc = PDFDocument(url: out), doc.pageCount == 2, let image = doc.page(at: 0), let text = doc.page(at: 1)
             else { check("2 \(name) two pages", false); continue }
             check("2 \(name) the text page is page 2",
@@ -88,6 +89,49 @@ enum TextLayerTestDriver {
                 try? FileManager.default.copyItem(at: out, to: URL(fileURLWithPath: keep).appendingPathComponent(out.lastPathComponent))
             }
         }
+
+        // 4. Straightening (`straightenReadingCopy`, 01-reading-copy.md §3).
+        let level = await Task.detached { ReadingCopy.lineAngle(of: decode(jpeg)!) }.value
+        check("4 a level page measures level", level.map { abs($0) < 0.5 } == true, "\(String(describing: level))")
+        if let skewed = drawPage(memo, to: dir.appendingPathComponent("skewed.jpg"), type: "public.jpeg", skew: 3),
+           let slight = drawPage(memo, to: dir.appendingPathComponent("slight.jpg"), type: "public.jpeg", skew: 0.5) {
+            let measured = await Task.detached { ReadingCopy.lineAngle(of: decode(skewed)!) }.value
+            check("4 a page drawn 3 degrees off level measures about 3", measured.map { abs($0 - 3) < 0.5 } == true,
+                  "\(String(describing: measured))")
+            let out = dir.appendingPathComponent("skewed.pdf")
+            let o = await write(skewed, reading: reading, kind: .typewritten, rotation: 0, to: out)
+            check("4 it is turned level", o?.straightenedDegrees.map { abs($0 - 3) < 0.5 } == true,
+                  "\(String(describing: o?.straightenedDegrees))")
+            if let doc = PDFDocument(url: out), let page = doc.page(at: 0), let jpg = jpegStreams(page).first,
+               let cg = CGImageSourceCreateWithData(jpg as CFData, nil).flatMap({ CGImageSourceCreateImageAtIndex($0, 0, nil) }) {
+                check("4 on a canvas that holds all of it (nothing cropped)", cg.width > pageW && cg.height > pageH,
+                      "\(cg.width)x\(cg.height)")
+                let after = await Task.detached { ReadingCopy.lineAngle(of: cg) }.value
+                check("4 the page shown is level", after.map { abs($0) < 0.5 } == true, "\(String(describing: after))")
+                let layer = page.string ?? ""
+                let missing = memo.flatMap { $0.split(separator: " ") }.filter { !layer.contains($0) }
+                check("4 its layer holds every word", missing.isEmpty, "missing \(missing)")
+                check("4 its layer was placed", o?.layer.route == .visionLinesAligned, "\(String(describing: o?.layer))")
+            } else { check("4 the straightened page is readable", false) }
+            let off = dir.appendingPathComponent("skewed-off.pdf")
+            let o2 = await write(skewed, reading: reading, kind: .typewritten, rotation: 0, to: off,
+                                 options: PDFGenerator.TextLayerOptions(straighten: false))
+            let source = (try? Data(contentsOf: skewed)) ?? Data()
+            check("4 switched off, the page is left as photographed", o2?.straightenedDegrees == nil
+                  && PDFDocument(url: off)?.page(at: 0).map(jpegStreams)?.contains(source) == true)
+            let o3 = await write(slight, reading: reading, kind: .typewritten, rotation: 0,
+                                 to: dir.appendingPathComponent("slight.pdf"))
+            check("4 a page under 1 degree is left as it is", o3 != nil && o3?.straightenedDegrees == nil,
+                  "\(String(describing: o3?.straightenedDegrees))")
+            let o4 = await write(skewed, reading: reading, kind: .handwritten, rotation: 0,
+                                 to: dir.appendingPathComponent("skewed-hand.pdf"))
+            check("4 a page with no layer is straightened too", o4?.straightenedDegrees != nil && o4?.layer.route == .textPage)
+        } else { check("4 skewed pages drawn", false) }
+        check("4 no settings: both switches on", PDFGenerator.TextLayerOptions.from([:]) == .standard)
+        let offValues = [SettingsKey.straightenReadingCopy.rawValue: ResolvedSetting(value: .bool(false), layer: .collection)]
+        check("4 a collection's straighten off is read", PDFGenerator.TextLayerOptions.from(offValues).straighten == false
+              && PDFGenerator.TextLayerOptions.from(offValues).placeHandOnImage)
+        check("4 straightening is no longer pending on the sheet", !SettingsSheetModel.switchPending.contains(.straightenReadingCopy))
 
         // 3. No layer: the rule says so, or none was asked for.
         let cases: [(String, OCRPageKind?, String, PDFGenerator.TextLayerOptions?)] = [
@@ -189,13 +233,17 @@ enum TextLayerTestDriver {
     static let pageW = 1200, pageH = 1550
     static func baselineY(_ i: Int) -> Int { pageH - 140 - i * 70 }
 
-    private static func drawPage(_ text: [String], to url: URL, type: String) -> URL? {
+    private static func drawPage(_ text: [String], to url: URL, type: String, skew: Double = 0) -> URL? {
         guard let ctx = CGContext(data: nil, width: pageW, height: pageH, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: pageW, height: pageH))
         ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
         let font = CTFontCreateWithName("Courier" as CFString, 34, nil)
+        // A positive skew makes the lines fall to the right, as ReadingCopy measures it (y down): clockwise on paper.
+        ctx.translateBy(x: CGFloat(pageW) / 2, y: CGFloat(pageH) / 2)
+        ctx.rotate(by: CGFloat(-skew * .pi / 180))
+        ctx.translateBy(x: -CGFloat(pageW) / 2, y: -CGFloat(pageH) / 2)
         for (i, line) in text.enumerated() {
             let s = CFAttributedStringCreate(nil, line as CFString, [kCTFontAttributeName: font] as CFDictionary)!
             ctx.textPosition = CGPoint(x: 90, y: CGFloat(baselineY(i))); CTLineDraw(CTLineCreateWithAttributedString(s), ctx)
@@ -204,6 +252,10 @@ enum TextLayerTestDriver {
               let dest = CGImageDestinationCreateWithURL(url as CFURL, type as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary)
         return CGImageDestinationFinalize(dest) ? url : nil
+    }
+
+    nonisolated private static func decode(_ url: URL) -> CGImage? {
+        CGImageSourceCreateWithURL(url as CFURL, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
     }
 
     private static func size(_ url: URL) -> Int {

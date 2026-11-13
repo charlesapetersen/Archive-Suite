@@ -219,11 +219,22 @@ extension OCRProcessor {
         let gone = Set(sources.map { $0.lastPathComponent })
         untaggedOutputs.removeAll { gone.contains($0) }
         placeholderOutputs.removeAll { gone.contains($0) }
+        textPageOnlyOutputs.removeAll { gone.contains($0.name) }
     }
     /// Reset both records at the start of a run.
     func clearOutputWarnings() {
         untaggedOutputs = []
         placeholderOutputs = []
+        textPageOnlyOutputs = []
+    }
+
+    /// W42.int-s5 — a page whose image page got no searchable layer, and why, for the run log (05-placement.md §3:
+    /// "named in the run report"). Not a warning: its text is on the text page. A later write of the same output
+    /// replaces the entry; a placed layer removes it.
+    func recordTextLayer(_ outcome: TextLayerOutcome, forSource source: URL) {
+        let name = source.lastPathComponent
+        textPageOnlyOutputs.removeAll { $0.name == name }
+        if outcome.route == .textPage, let reason = outcome.reason { textPageOnlyOutputs.append((name, reason)) }
     }
 
     /// The end-of-run warning text for both records, or "" when everything landed cleanly.
@@ -799,12 +810,12 @@ extension OCRProcessor {
         let outputSettings = lateRunOutputSettings(for: runConfig)
         if !preOCRed, let model = currentModel {
             // Each regeneration awaits (its layer reads the page with Vision, W42.int-s5), so the review's images
-            // and the jobs may change meanwhile: walk a copy, and apply an image only while its job is the same file.
-            let (images, removed, reviewed) = (manualSegImages, manualSegRemoved, jobs.map(\.sourceURL))
+            // and the jobs may change meanwhile: walk a copy, and apply an image only while its job is the same job.
+            let (images, removed, reviewed) = (manualSegImages, manualSegRemoved, jobs.map(\.id))
             for idx in images.indices where !removed.contains(idx) {
                 let img = images[idx]
                 let fileIndex = img.fileIndex
-                guard fileIndex < jobs.count, jobs.count == reviewed.count, jobs[fileIndex].sourceURL == reviewed[fileIndex],
+                guard fileIndex < jobs.count, jobs.count == reviewed.count, jobs[fileIndex].id == reviewed[fileIndex],
                       let existing = jobs[fileIndex].result,
                       img.rotationDegrees != existing.rotationDegrees else { continue }
                 let updated = OCRResult(text: existing.text, classification: existing.classification,
@@ -824,18 +835,21 @@ extension OCRProcessor {
                         let (fileName, gatewayName) = (source.lastPathComponent, currentGateway?.displayName)
                         let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
                         let (imageMB, columns) = (outputSettings.pdfImageMB, outputSettings.textColumns)
-                        let imagePage = try await Task.detached(priority: .userInitiated) {
-                            try PDFGenerator().generate(
+                        let layerOptions = textLayerOptions
+                        let output = try await Task.detached(priority: .userInitiated) {
+                            try PDFGenerator().generateOutput(
                                 imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                                 originalFileName: fileName,
                                 gatewayDisplayName: gatewayName,
                                 localAgentDisplayName: agentName,
                                 localAgentModelName: agentModel,
                                 pdfImageMB: imageMB,
-                                textColumns: columns
+                                textColumns: columns,
+                                textLayer: layerOptions
                             )
                         }.value
-                        recordImagePage(imagePage, forSource: source)
+                        recordImagePage(output.imagePage, forSource: source)
+                        recordTextLayer(output.layer, forSource: source)
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
                                source.lastPathComponent, error.localizedDescription)

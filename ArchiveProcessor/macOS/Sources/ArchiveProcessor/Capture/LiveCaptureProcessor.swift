@@ -1224,6 +1224,7 @@ final class LiveCaptureProcessor: ObservableObject {
             tags, withholdingSender: writeJSON && tags.authorName != nil
                 && EntityRunPolicy.withholdsTaggingSender(liveEntityInputs(results: results, config: config)))
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
+        let textLayer = PDFGenerator.TextLayerOptions.from(liveSettings(config))
         let taggingMode = config.taggingMode
         let stampUnread = config.taggingMode.stampsUnread
 
@@ -1251,7 +1252,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
                                    taggingMode: taggingMode,
-                                   stampUnread: stampUnread)
+                                   stampUnread: stampUnread, textLayer: textLayer)
         }.value
 
         // B8: the off-main write itself can straddle a Clear. If the session was cleared while it ran, do NOT
@@ -1283,7 +1284,7 @@ final class LiveCaptureProcessor: ObservableObject {
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
             exportedImageMB: exportedImageMB, textColumns: textColumns,
             taggingMode: taggingMode,
-            stampUnread: stampUnread)
+            stampUnread: stampUnread, textLayer: textLayer)
         persistManifest()
         for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
         labelStagedRecord(groupId, type: gType, outcome: outcome, results: results)
@@ -1490,6 +1491,9 @@ final class LiveCaptureProcessor: ObservableObject {
         /// the operator selects in Settings after the segment was staged.
         let taggingMode: TaggingMode
         let stampUnread: Bool
+        /// W42.int-s5 — the image page's switches (straighten, hand placement) as they were at staging, so a rotation
+        /// regeneration writes the same kind of page. nil in a manifest written before them: the built-in defaults.
+        let textLayer: PDFGenerator.TextLayerOptions?
 
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, order: Int,
@@ -1500,7 +1504,7 @@ final class LiveCaptureProcessor: ObservableObject {
              boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
-             stampUnread: Bool) {
+             stampUnread: Bool, textLayer: PDFGenerator.TextLayerOptions? = nil) {
             self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName
@@ -1510,6 +1514,7 @@ final class LiveCaptureProcessor: ObservableObject {
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
             self.taggingMode = taggingMode
             self.stampUnread = stampUnread
+            self.textLayer = textLayer
         }
     }
 
@@ -1522,7 +1527,8 @@ final class LiveCaptureProcessor: ObservableObject {
         boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
-        stampUnread: Bool
+        stampUnread: Bool,
+        textLayer: PDFGenerator.TextLayerOptions = .standard
     ) -> StagedSegment {
         let fm = FileManager.default
         let pdfGen = PDFGenerator()
@@ -1561,7 +1567,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                                  localAgentDisplayName: localAgentDisplayName,
                                                  localAgentModelName: localAgentModelName,
                                                  pdfImageMB: pdfImageMB, textColumns: textColumns,
-                                                 sourceDates: sourceDates)
+                                                 sourceDates: sourceDates, textLayer: textLayer)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
@@ -2085,7 +2091,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
                                            taggingMode: seg.taggingMode,
-                                           stampUnread: seg.stampUnread)
+                                           stampUnread: seg.stampUnread, textLayer: seg.textLayer ?? .standard)
                 }
             }.value
             guard let self else { return }

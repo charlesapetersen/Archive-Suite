@@ -846,8 +846,9 @@ struct SettingsSheetModel {
                          source: stage.note)
     }
 
-    /// Switches the run does not read yet: the new page output (W42.int-s5) applies them.
-    static let switchPending: Set<SettingsKey> = [.straightenReadingCopy, .placeHandOnImage]
+    /// Switches the run does not read yet. Straightening is followed (W42.int-s5, `PDFGenerator.TextLayerOptions`); the
+    /// hand placement switch waits for the hand placer, which W42.int-s5 still has to bring into the app.
+    static let switchPending: Set<SettingsKey> = [.placeHandOnImage]
     static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
 
     static func switchLabel(_ key: SettingsKey) -> String? {

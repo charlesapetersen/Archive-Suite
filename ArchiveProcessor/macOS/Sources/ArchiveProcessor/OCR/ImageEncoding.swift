@@ -98,7 +98,9 @@ enum ImageEncoding {
 
     /// Write the image at `url` to `dest` as a JPEG of ~`targetMB`, applying `rotationDegrees` (the app's
     /// clockwise rotation correction, in {0,90,180,270}) so the exported image matches the rotated PDF
-    /// page-1 image. A normal-orientation JPEG that is already at/under the target AND needs no rotation is
+    /// page-1 image before straightening: a page-1 image turned level (W42.int-s5, `ReadingCopy`) is the reading
+    /// copy, and the exported image stays as photographed, the one copy that keeps the original geometry.
+    /// A normal-orientation JPEG that is already at/under the target AND needs no rotation is
     /// copied byte-for-byte (pristine, no re-encode); everything else is decoded (EXIF orientation baked
     /// in), rotated if needed, and re-encoded toward the target. `dest` should be a `.jpg`.
     @discardableResult

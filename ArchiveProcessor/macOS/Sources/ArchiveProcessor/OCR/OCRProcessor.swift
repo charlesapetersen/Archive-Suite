@@ -281,6 +281,8 @@ class OCRProcessor: ObservableObject {
     /// The source name is the RIGHT key here twice over: after a merge the placeholder page lives inside
     /// a combined PDF, and the page to re-run is identified by the photo it came from.
     var placeholderOutputs: [String] = []
+    /// W42.int-s5 — outputs whose image page carries no searchable layer, with the reason (`recordTextLayer`).
+    var textPageOnlyOutputs: [(name: String, reason: String)] = []
     /// The model used for the current processing run (for PDF regeneration headers)
     var currentModel: LLMModel?
     /// Gateway configuration for the current run (nil = direct API mode)

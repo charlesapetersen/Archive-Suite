@@ -49,6 +49,8 @@ struct PDFGenerator {
     struct Output: Sendable, Equatable {
         var imagePage: ImagePageOutcome
         var layer: TextLayerOutcome
+        /// The median line slope the image page was turned level by (`ReadingCopy`); nil when it was left as it was.
+        var straightenedDegrees: Double? = nil
     }
 
     @discardableResult
@@ -76,8 +78,11 @@ struct PDFGenerator {
         let outcome: ImagePageOutcome
         var layer = TextLayerOutcome.textPage("no layer asked for")
 
-        if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB),
+        var straightened: Double?
+        if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB,
+                                         straighten: textLayer?.straighten == true),
            let plain = PDFDocument(data: image.pdf)?.page(at: 0) {
+            straightened = image.straightenedDegrees
             var page = plain
             if let textLayer {
                 let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer)
@@ -105,15 +110,24 @@ struct PDFGenerator {
         guard pdfDocument.write(to: outputURL) else {
             throw PDFError.writeFailed
         }
-        return Output(imagePage: outcome, layer: layer)
+        return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened)
     }
 
     // MARK: - Searchable layer (W42.int-s5)
 
-    /// What the run tells the layer: the placement switch (`placeHandOnImage`, `05-placement.md` §2).
-    struct TextLayerOptions: Sendable, Equatable {
+    /// What the run tells the image page: the placement switch (`placeHandOnImage`, `05-placement.md` §2) and the
+    /// straightening switch (`straightenReadingCopy`, `01-reading-copy.md` §3). Both on by default.
+    struct TextLayerOptions: Codable, Sendable, Equatable {
         var placeHandOnImage = true
+        var straighten = true
         static let standard = TextLayerOptions()
+
+        /// The two switches as a run's frozen settings hold them (`ResolvedSettingsSnapshot.values`); a key absent
+        /// (no settings snapshot) is its built-in default.
+        static func from(_ values: [String: ResolvedSetting]) -> TextLayerOptions {
+            func flag(_ key: SettingsKey) -> Bool { values[key.rawValue]?.value.bool ?? key.defaultValue.bool ?? true }
+            return TextLayerOptions(placeHandOnImage: flag(.placeHandOnImage), straighten: flag(.straightenReadingCopy))
+        }
     }
 
     /// The image page with its searchable layer, or nil (and why) when it gets none. Never worse than the plain page:
@@ -164,9 +178,16 @@ struct PDFGenerator {
         var decoded: () -> CGImage?
         /// Where the image sits on the page, normalised, top-left origin.
         var frame: CGRect
+        /// The median line slope the image was turned level by (`ReadingCopy`); nil when it was left as it was.
+        var straightenedDegrees: Double? = nil
     }
 
-    private func makeImagePageData(imageURL: URL, rotationDegrees: Int = 0, targetMB: Double = 0) -> ImagePageData? {
+    /// `straighten` (W42.int-s5, `straightenReadingCopy`): when the oriented, turned image's lines slope by a median of
+    /// 1 degree or more, the page shows it turned level on a canvas that holds all of it, encoded once toward the
+    /// target like any re-encoded page. A level page, an unreadable angle, or a call on the main thread (Vision reads
+    /// the angle) leaves the page as it would be without the switch.
+    private func makeImagePageData(imageURL: URL, rotationDegrees: Int = 0, targetMB: Double = 0,
+                                   straighten: Bool = false) -> ImagePageData? {
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil) else { return nil }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
@@ -194,6 +215,42 @@ struct PDFGenerator {
         let fastPathColorSafe = headerColorModel == (kCGImagePropertyColorModelRGB as String)
             || headerColorModel == (kCGImagePropertyColorModelGray as String)
 
+        // The image as the page shows it: decoded, EXIF orientation resolved, the app's rotation applied.
+        func orientedImage() -> CGImage? {
+            guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
+            let baseImage: CGImage
+            if sourceType == "public.jpeg" && orientation == 1 {
+                baseImage = cgImage
+            } else {
+                let thumbOptions: [CFString: Any] = [
+                    kCGImageSourceThumbnailMaxPixelSize: max(cgImage.width, cgImage.height),
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true
+                ]
+                guard let oriented = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, thumbOptions as CFDictionary) else { return nil }
+                baseImage = oriented
+            }
+            return noRotation ? baseImage : ImageEncoding.rotate(baseImage, byDegreesClockwise: rotationDegrees)
+        }
+        func components(_ image: CGImage) -> String {
+            switch image.colorSpace?.numberOfComponents ?? 3 {
+            case 1: return "/DeviceGray"
+            case 4: return "/DeviceCMYK"
+            default: return "/DeviceRGB"
+            }
+        }
+
+        var decoded: CGImage?
+        if straighten, !Thread.isMainThread, let image = orientedImage() {
+            decoded = image
+            if let turn = ReadingCopy.straighteningTurn(for: image), let level = ReadingCopy.straightened(image, by: turn),
+               let enc = ImageEncoding.encodeToTargetMB(level, targetMB: targetMB, quality: 0.90),
+               var page = imagePageData(jpeg: enc.data, width: enc.width, height: enc.height, colorSpace: components(level)) {
+                page.straightenedDegrees = turn
+                return page
+            }
+        }
+
         if noRotation && sourceType == "public.jpeg" && orientation == 1 && underTarget && fastPathColorSafe {
             // Verbatim fast path: unrotated, normal-orientation JPEG already within target → embed the
             // original bytes as-is (no decode, no re-encode). Dims/color-model come from the file header.
@@ -207,30 +264,7 @@ struct PDFGenerator {
         } else {
             // Decode, resolve EXIF orientation, apply any LLM rotation, then encode toward the PDF image
             // size target (targetMB <= 0 → full-resolution encode at quality 0.90, i.e. prior behavior).
-            guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else { return nil }
-            let imageWidth = cgImage.width
-            let imageHeight = cgImage.height
-
-            let baseImage: CGImage
-            if sourceType == "public.jpeg" && orientation == 1 {
-                baseImage = cgImage
-            } else {
-                let thumbOptions: [CFString: Any] = [
-                    kCGImageSourceThumbnailMaxPixelSize: max(imageWidth, imageHeight),
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true
-                ]
-                guard let oriented = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, thumbOptions as CFDictionary) else { return nil }
-                baseImage = oriented
-            }
-
-            let finalImage: CGImage
-            if noRotation {
-                finalImage = baseImage
-            } else {
-                guard let rotated = ImageEncoding.rotate(baseImage, byDegreesClockwise: rotationDegrees) else { return nil }
-                finalImage = rotated
-            }
+            guard let finalImage = decoded ?? orientedImage() else { return nil }
 
             // Size toward the target on the FINAL oriented/rotated image (so the long edge is correct).
             guard let enc = ImageEncoding.encodeToTargetMB(finalImage, targetMB: targetMB, quality: 0.90) else { return nil }
@@ -240,15 +274,16 @@ struct PDFGenerator {
 
             // Detect color space from the final (possibly rotated) image; dimensions may be downscaled
             // but the component count is preserved, so the embedded /ColorSpace stays correct.
-            let numComponents = finalImage.colorSpace?.numberOfComponents ?? 3
-            switch numComponents {
-            case 1: colorSpace = "/DeviceGray"
-            case 4: colorSpace = "/DeviceCMYK"
-            default: colorSpace = "/DeviceRGB"
-            }
+            colorSpace = components(finalImage)
         }
 
-        guard !jpegData.isEmpty else { return nil }
+        return imagePageData(jpeg: jpegData, width: embedWidth, height: embedHeight, colorSpace: colorSpace)
+    }
+
+    /// The one-page PDF that shows `jpeg` (`width` x `height` pixels) centred on a letter page.
+    private func imagePageData(jpeg jpegData: Data, width embedWidth: Int, height embedHeight: Int,
+                               colorSpace: String) -> ImagePageData? {
+        guard !jpegData.isEmpty, embedWidth > 0, embedHeight > 0 else { return nil }
 
         // Calculate positioning centered on letter-size page
         let pageWidth = 612.0

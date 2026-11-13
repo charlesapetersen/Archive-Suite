@@ -2,20 +2,25 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## ⚠️ LIMITATION (W42.int-s5, checkpoint 1, 2026-11-13): what the image page's searchable layer does not yet do
+## ⚠️ LIMITATION (W42.int-s5, checkpoints 1-2, 2026-11-13): what the image page's searchable layer does not yet do
 
 New output puts an invisible text layer on the image page of print pages (`OCR/TextLayerRule.swift`,
-VisionOCRKit `TextLayer`); the text page stays. Still open inside W42.int-s5 (`execution-plans/items/W42.int-s5.md`):
+VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or more level (`OCR/ReadingCopy.swift`,
+switch `straightenReadingCopy`); the text page stays. Still open inside W42.int-s5 (`execution-plans/items/W42.int-s5.md`):
 - **Improve OCR keeps the old layer.** It replaces the text page only, so after a re-read the image page still holds
   the earlier reader's words (or Vision's) beside the new text page; find, copy and the Reader's index see both.
-- **No run report of it.** A page that got the text page alone (handwriting, a right-to-left or CJK script, an unknown
-  kind whose reading did not align, Vision failing) is not named anywhere yet; `PDFGenerator.generateOutput` returns
-  the outcome and the callers drop it.
+- **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
+  Live Capture and the multi-page PDF path drop the outcome.
 - **Handwriting gets no layer**: the hand placer (kraken blla lines with CTC alignment) is not in the app, so the
-  `placeHandOnImage` switch is not followed yet; nor is `straightenReadingCopy`.
+  `placeHandOnImage` switch is not followed yet (the settings sheet still says so).
+- **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
+  "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
+  the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the
+  switch once a session (`liveSettings`), so a change mid-session waits for the next.
 - **The Reader indexes the text twice** (the layer and the text page, `ExtractedContent.fullBody`); on a page where the
   reading did not align, the layer is Vision's own words, so Vision's misreads are searchable there.
-- **Time:** the engine's Vision pass runs once more per print page at output (seconds a page), Live Capture included.
+- **Time:** at output the engine's Vision pass runs once more per print page (seconds a page), and straightening reads
+  the line angle with one more Vision pass at 1,600 px on every page, Live Capture included.
 
 ## ⚠️ LIMITATION (W46.seg-text-tier-default, 2026-11-13): the default Gemini segmenter reads no picture, so a page with no OCR text gives it nothing
 

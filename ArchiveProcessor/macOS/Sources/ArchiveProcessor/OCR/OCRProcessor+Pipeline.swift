@@ -1554,6 +1554,9 @@ extension OCRProcessor {
         _takenOutputPaths = []
         exportedImageMap = [:]
         currentModel = pending.model
+        // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
+        // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
+        activeResolvedSettings = pending.resolvedSettings
         let runConfig = makePendingBatchResumeConfig(pending, apiKey: apiKey)
         applyResumeConfig(runConfig)
         activeRunConfig = runConfig
@@ -1821,6 +1824,9 @@ extension OCRProcessor {
         exportedImageMap = [:]
         pdfToImageMap = [:]
         currentModel = pending.model
+        // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
+        // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
+        activeResolvedSettings = pending.resolvedSettings
         currentGateway = pending.gatewayConfig
         currentLocalAgent = pending.localAgent
         activeRunConfig = runConfig
@@ -1921,6 +1927,7 @@ extension OCRProcessor {
                 statusMessage = "Rebuilding \(toGenerate.count) missing PDF\(toGenerate.count == 1 ? "" : "s")…"
                 // W23.h5-fu — carry each regenerated PDF's image-page verdict back too, so a rebuilt
                 // output that could not embed its scan is reported instead of counting as a clean redo.
+                let layerOptions = textLayerOptions
                 let regen: (failed: Set<URL>, placeholders: Set<URL>) = await Task.detached(priority: .utility) {
                     let gen = PDFGenerator()
                     var failed = Set<URL>()
@@ -1932,7 +1939,7 @@ extension OCRProcessor {
                                               gatewayDisplayName: gatewayName,
                                               localAgentDisplayName: localAgentDisplayName,
                                               localAgentModelName: localAgentModelName,
-                                              pdfImageMB: pdfMB, textColumns: txtCols)
+                                              pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions)
                             if outcome.isPlaceholder { placeholders.insert(g.outputURL) }
                         } catch {
                             failed.insert(g.outputURL)
@@ -3585,6 +3592,11 @@ extension OCRProcessor {
             lines.append("Input files whose output PDF holds a PLACEHOLDER image page, not the scan"
                        + " (the source image was not touched):")
             for name in placeholderOutputs { lines.append("  \u{2022} \(name)") }
+        }
+        if !textPageOnlyOutputs.isEmpty {
+            lines.append("")
+            lines.append("Pages with no searchable text on the image (their text is on the text page):")
+            for entry in textPageOnlyOutputs { lines.append("  \u{2022} \(entry.name): \(entry.reason)") }
         }
 
         let content = lines.joined(separator: "\n")

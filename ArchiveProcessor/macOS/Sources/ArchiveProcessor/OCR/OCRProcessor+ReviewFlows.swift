@@ -380,10 +380,11 @@ extension OCRProcessor {
         // Apply rotation changes back to jobs and regenerate the affected output PDFs.
         // Each regeneration awaits (its layer reads the page with Vision, W42.int-s5), so the jobs may be cleared or
         // replaced meanwhile: an item is applied only while its job is still the one it was reviewed for.
-        let reviewed = jobs.map(\.sourceURL)
+        // By job id, as the OCR write's own guard (W16.bat10): a list cleared and re-dropped with the same files differs.
+        let reviewed = jobs.map(\.id)
         for item in documentReviewItems {
             guard item.fileIndex < jobs.count, jobs.count == reviewed.count,
-                  jobs[item.fileIndex].sourceURL == reviewed[item.fileIndex] else { continue }
+                  jobs[item.fileIndex].id == reviewed[item.fileIndex] else { continue }
             let newRot = item.rotationDegrees
             let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
             guard newRot != oldRot, let existingResult = jobs[item.fileIndex].result else { continue }
@@ -408,8 +409,9 @@ extension OCRProcessor {
                     // Off the main actor: the image page's searchable layer reads it with Vision (W42.int-s5).
                     let (fileName, gatewayName) = (source.lastPathComponent, currentGateway?.displayName)
                     let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
-                    let imagePage = try await Task.detached(priority: .userInitiated) {
-                        try pdfGen.generate(
+                    let layerOptions = textLayerOptions
+                    let output = try await Task.detached(priority: .userInitiated) {
+                        try pdfGen.generateOutput(
                             imageURL: imageURL,
                             result: result,
                             model: model,
@@ -419,10 +421,12 @@ extension OCRProcessor {
                             localAgentDisplayName: agentName,
                             localAgentModelName: agentModel,
                             pdfImageMB: pdfSettings.pdfImageMB,
-                            textColumns: pdfSettings.textColumns
+                            textColumns: pdfSettings.textColumns,
+                            textLayer: layerOptions
                         )
                     }.value
-                    recordImagePage(imagePage, forSource: source)
+                    recordImagePage(output.imagePage, forSource: source)
+                    recordTextLayer(output.layer, forSource: source)
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
                            source.lastPathComponent, error.localizedDescription)
