@@ -94,6 +94,7 @@ struct ContentView: View {
             SettingsSheetTestDriver.runIfRequested()         // $0 W46 settings sheet: its words and its offscreen pages
             ReOCRRankingTestDriver.runIfRequested()          // $0 W44 Improve OCR ranked readers, no wire
             ImproveOCRRequestStoreTestDriver.runIfRequested() // $0 W44 Improve OCR hand-off store, scratch only
+            ReOCRPreservationCheckTestDriver.runIfRequested() // $0 W44 Improve OCR byte-preservation check, in memory
             SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
             SettingsInterviewsTestDriver.runIfRequested()    // $0 W46 the general and the collection interviews, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
