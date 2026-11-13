@@ -42,7 +42,7 @@ struct VisionOCRSettings: Codable, Equatable, Sendable {
 /// Local, no-network OCR via macOS Vision. It is intentionally transcription-only: Vision returns no
 /// document class, date, segment, or Finder tags. Those optional judgement paths remain disabled until
 /// the separate Vision+LLM hybrid backend exists.
-struct VisionClient {
+struct VisionClient: Sendable {
     let settings: VisionOCRSettings
 
     /// Vision work is CPU-bound rather than HTTP/rate limited. Apple Silicon exposes performance cores as

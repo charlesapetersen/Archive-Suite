@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-struct AnthropicClient {
+struct AnthropicClient: Sendable {
     let apiKey: String
     let model: LLMModel
     let thinkingLevel: ThinkingLevel?

@@ -26,6 +26,9 @@ settings:
 packages:
   ArchiveCore:
     path: ../../packages/ArchiveCore
+  # Vision OCR's engine (W42.int-s1); the Processor reads every page through its PageReader protocol (W42.int-s2).
+  VisionOCRKit:
+    path: ../../packages/VisionOCRKit
 
 targets:
   ArchiveProcessor:
@@ -52,6 +55,8 @@ targets:
         buildPhase: resources
     dependencies:
       - package: ArchiveCore
+      - package: VisionOCRKit
+        product: VisionOCRKit
     # The pinned static PDFium the Improve OCR writer links (W44.reocr-processor; owner, 2026-11-12). The script checks
     # the installed copy's SHA-256 and installs it from the machine's cached zip when missing; it never downloads.
     # Static because a separate dylib cannot pass library validation under the suite's self-signed certificate.

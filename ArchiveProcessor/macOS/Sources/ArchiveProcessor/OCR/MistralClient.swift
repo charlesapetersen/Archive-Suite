@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-struct MistralClient {
+struct MistralClient: Sendable {
     let apiKey: String
     let model: LLMModel
 

@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-struct OpenAICompatibleClient {
+struct OpenAICompatibleClient: Sendable {
     let baseURL: String
     let apiKey: String
     let modelID: String
@@ -338,10 +338,12 @@ extension OpenAICompatibleClient {
         }
     }
 
+    /// The ceiling is the price the estimate used: OpenRouter's listed one once read (W42.int-s2), else the bench's.
     static func openRouterProviderField(_ route: OpenRouterRoute) -> [String: Any] {
-        ["order": [route.providerTag],
-         "allow_fallbacks": false,
-         "quantizations": [route.precision],
-         "max_price": ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]]
+        let priced = OpenRouterPrices.priced(route)
+        return ["order": [route.providerTag],
+                "allow_fallbacks": false,
+                "quantizations": [route.precision],
+                "max_price": ["prompt": priced.inputCostPer1M, "completion": priced.outputCostPer1M]]
     }
 }

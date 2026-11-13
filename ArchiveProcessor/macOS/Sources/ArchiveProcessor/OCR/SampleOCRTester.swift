@@ -1,4 +1,5 @@
 import Foundation
+import VisionOCRKit
 import ImageIO
 #if canImport(AppKit)
 import AppKit
@@ -21,10 +22,12 @@ enum SampleOCRTester {
             switch account {
             case LLMProvider.gemini.rawValue:
                 let model = LLMModel.geminiModels.first { $0.id == "gemini-2.5-flash-lite" } ?? LLMModel.geminiModels[0]
-                result = try await GeminiClient(apiKey: trimmed, model: model, thinkingLevel: nil).ocr(imageURL: url)
+                result = try await PageReaders.reader(provider: .gemini, model: model, apiKey: trimmed, thinkingLevel: nil)
+                    .read(PageReaderInput(imageURL: url)).detail
             case LLMProvider.mistral.rawValue:
                 guard let model = LLMModel.mistralModels.first else { return .unknown("model") }
-                result = try await MistralClient(apiKey: trimmed, model: model).ocr(imageURL: url)
+                result = try await PageReaders.reader(provider: .mistral, model: model, apiKey: trimmed, thinkingLevel: nil)
+                    .read(PageReaderInput(imageURL: url)).detail
             default:
                 return .unknown("provider")
             }

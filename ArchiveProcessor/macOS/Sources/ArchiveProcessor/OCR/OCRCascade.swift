@@ -1,4 +1,5 @@
 import Foundation
+import VisionOCRKit
 
 /// W41.app-ocr-cascade — read each page with the run's own (cheap) model first, and send a page it fails on to a
 /// stronger route the user picks.
@@ -268,8 +269,9 @@ struct OCRCascade: Codable, Equatable, Sendable {
 
     private static func visionWordCount(imageURL: URL, settings: VisionOCRSettings) async -> Int? {
         if let visionWordsOverride { return visionWordsOverride(imageURL) }
-        guard let result = try? await VisionClient(settings: settings).ocr(imageURL: imageURL),
-              let text = result.text else { return nil }
+        guard let reader = try? PageReaders.reader(provider: .appleVision, model: LLMModel.appleVisionModels[0],
+                                                   apiKey: "", thinkingLevel: nil, visionSettings: settings),
+              let text = try? await reader.read(PageReaderInput(imageURL: imageURL)).text else { return nil }
         return wordCount(text)
     }
 }

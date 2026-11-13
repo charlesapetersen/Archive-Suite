@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import VisionOCRKit
 import os
 
 extension OCRProcessor {
@@ -1314,6 +1315,10 @@ extension OCRProcessor {
         segmentationContext: SegmentationContext,
         runConfig: SessionProcessingConfig? = nil
     ) async {
+        // W42.int-s2: the request's price ceiling follows OpenRouter's listing; read it if a day old.
+        if provider == .openrouter, runConfig?.gateway == nil, runConfig?.localAgent == nil {
+            await OpenRouterPrices.refreshIfStale()
+        }
         if segmentationContext.previousTextCharCount == 0 {
             // No dependency on prior OCR text — can run in parallel
             await performOCRParallel(
@@ -1762,36 +1767,14 @@ extension OCRProcessor {
 
         let networkResult: OCRResult
         do {
-            // Backend precedence: the Local Agent CLI wins, then the gateway, then the direct provider
-            // path (Settings makes useLocalAgent/useGateway mutually exclusive; the order is defensive).
-            if let localAgent {
-                networkResult = try await LocalAgentClient(config: localAgent).ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-            } else if let gateway = gatewayConfig {
-                let client = OpenAICompatibleClient.gateway(gateway)
-                networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-            } else {
-                switch provider {
-                case .anthropic:
-                    let client = AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                case .gemini:
-                    let client = GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                case .mistral:
-                    let client = MistralClient(apiKey: apiKey, model: model)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, imageScale: scale)
-                case .openai:
-                    let client = OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                case .openrouter:
-                    let client = try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey)
-                    networkResult = try await client.ocr(imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                case .appleVision:
-                    networkResult = try await VisionClient(settings: visionSettings).ocr(
-                        imageURL: imageURL, previousText: previousText,
-                        previousImageURL: previousImageURL, customPrompt: customPrompt, imageScale: scale)
-                }
-            }
+            // W42.int-s2: the one way to read a page. `PageReaders.reader` keeps the backend precedence (the Local
+            // Agent CLI, then the gateway, then the direct provider).
+            let reader = try PageReaders.reader(
+                provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
+                gateway: gatewayConfig, localAgent: localAgent, visionSettings: visionSettings)
+            networkResult = try await reader.read(PageReaderInput(
+                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                customPrompt: customPrompt, imageScale: scale)).detail
         } catch {
             _ = await rotationCorrection  // let the concurrent task finish
             return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil,

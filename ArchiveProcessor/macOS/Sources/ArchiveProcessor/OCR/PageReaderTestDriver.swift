@@ -2,6 +2,7 @@
 import AppKit
 import CoreText
 import Foundation
+import VisionOCRKit
 
 /// Headless, $0 self-test of the one way to read a page (W42.int-s2), gated by `PAGEREADER_TEST=1` (does nothing in
 /// normal use). Run by `scripts/test-page-reader.sh`, which compares the journey lines with the committed
@@ -61,15 +62,23 @@ enum PageReaderTestDriver {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         await journeys(dir: dir, current: current)
-        PageReaderSeamChecks.run(check: check)
-        OpenRouterPriceChecks.run(check: check)
+        await seamChecks(dir: dir, current: current)
+        await priceChecks(current: current)
     }
 
     /// The reply each provider's wire gives, for the page being read: the page's own text in that provider's shape.
     private final class Current: @unchecked Sendable {
         var text = ""
+        /// The endpoints listing each model's GET gets, by model id.
+        var listings: [String: String] = [:]
         func reply(for request: URLRequest) -> String {
             let host = request.url?.host ?? ""
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/endpoints") {
+                let id = path.replacingOccurrences(of: "/api/v1/models/", with: "")
+                    .replacingOccurrences(of: "/endpoints", with: "")
+                return listings[id] ?? #"{"data":{"id":"\#(id)","endpoints":[]}}"#
+            }
             let tagged = "[document_start]\n" + text
             func json(_ object: Any) -> String {
                 String(data: try! JSONSerialization.data(withJSONObject: object), encoding: .utf8)!
@@ -115,6 +124,102 @@ enum PageReaderTestDriver {
         }
     }
 
+    /// 2. Every provider has a reader that names its route, and the reader measures: seconds always, dollars at the
+    ///    route's page price for a paid reading, none for Vision or a failed page.
+    private static func seamChecks(dir: URL, current: Current) async {
+        let memo = PageReaderInput(imageURL: dir.appendingPathComponent("memo.png"))
+        current.text = smokePages[0].text
+        for provider in LLMProvider.allCases {
+            guard let model = provider.models.first,
+                  let reader = try? PageReaders.reader(provider: provider, model: model, apiKey: "test-key",
+                                                       thinkingLevel: nil) else {
+                check("2 \(provider.rawValue) has a page reader", false); continue
+            }
+            check("2 \(provider.rawValue) reader names its route", reader.route.hasPrefix(provider.rawValue + "|"),
+                  reader.route)
+            guard let reading = try? await reader.read(memo) else { check("2 \(provider.rawValue) reads", false); continue }
+            check("2 \(provider.rawValue) reading is timed", reading.seconds > 0, "\(reading.seconds)")
+            check("2 \(provider.rawValue) reading text is the detail's", reading.text == reading.detail.text)
+            if provider == .appleVision {
+                check("2 Vision costs nothing", reading.dollars == nil, "\(String(describing: reading.dollars))")
+            } else {
+                let want = PageReaders.pagePrice(model)
+                check("2 \(provider.rawValue) reading costs its page price", reading.dollars == want && want > 0,
+                      "got \(String(describing: reading.dollars)) want \(want)")
+            }
+        }
+        let gateway = GatewayConfig(baseURL: "https://remote-gateway.invalid/v1", modelID: "gw", displayName: "GW",
+                                    inputCostPer1M: 1, outputCostPer1M: 1)
+        let viaGateway = try? PageReaders.reader(provider: .gemini, model: LLMProvider.gemini.models[0], apiKey: "k",
+                                                 thinkingLevel: nil, gateway: gateway)
+        check("2 the gateway wins over the provider", viaGateway?.route == "Gateway|gw", viaGateway?.route ?? "nil")
+        let agent = LocalAgentConfig(tool: .claude, binaryPath: "/nonexistent")
+        let viaAgent = try? PageReaders.reader(provider: .gemini, model: LLMProvider.gemini.models[0], apiKey: "k",
+                                               thinkingLevel: nil, gateway: gateway, localAgent: agent)
+        check("2 the Local Agent wins over the gateway", viaAgent?.route.hasPrefix("LocalAgent|") == true,
+              viaAgent?.route ?? "nil")
+        let stray = LLMModel(id: "someone/unpinned", displayName: "x", provider: .openrouter, supportsThinking: false,
+                             returnsMd: false, inputCostPer1M: 1, outputCostPer1M: 1, batchDiscount: 1)
+        check("2 an unpinned OpenRouter model gets no reader",
+              (try? PageReaders.reader(provider: .openrouter, model: stray, apiKey: "k", thinkingLevel: nil)) == nil)
+        current.text = "failed"
+    }
+
+    /// 3. OpenRouter's listed price for the pinned upstream, through the no-wire seam into a scratch defaults suite.
+    private static func priceChecks(current: Current) async {
+        guard let route = OpenRouterRoute.forModel("qwen/qwen3-vl-235b-a22b-instruct"),
+              let glm = OpenRouterRoute.forModel("z-ai/glm-5.3-flash") else { check("3 catalog routes", false); return }
+        // The shape of the bench's cached listing (ocr-panel-cloud/catalog/qwen3-vl-235b.json), cheaper rival first.
+        let listing = #"{"data":{"id":"qwen/qwen3-vl-235b-a22b-instruct","endpoints":["#
+            + #"{"tag":"novita/fp8","quantization":"fp8","pricing":{"prompt":"0.0000001","completion":"0.0000005"}},"#
+            + #"{"tag":"deepinfra/bf16","quantization":"bf16","pricing":{"prompt":"0.00000015","completion":"0.0000006"}},"#
+            + #"{"tag":"deepinfra/fp8","quantization":"fp8","pricing":{"prompt":"0.00000022","completion":"0.0000009","input_cache_read":"0.00000011"}}]}}"#
+        let price = OpenRouterPrices.parse(Data(listing.utf8), route: route)
+        check("3 the pinned upstream's row, not a cheaper provider's", price?.tag == "deepinfra/fp8",
+              price?.tag ?? "nil")
+        check("3 per token read as per million", price?.inputPer1M == 0.22 && price?.outputPer1M == 0.9,
+              "\(String(describing: price))")
+        let glmListing = #"{"data":{"id":"z-ai/glm-5.3-flash","endpoints":[{"tag":"z-ai/bf16","quantization":"bf16","#
+            + #""pricing":{"prompt":"0.0000003","completion":"0.000001"}},{"tag":"z-ai/fp8","quantization":"fp8","#
+            + #""pricing":{"prompt":"0.00000016","completion":"0.00000052"}}]}}"#
+        check("3 a provider tag finds its row at the pinned precision",
+              OpenRouterPrices.parse(Data(glmListing.utf8), route: glm)?.tag == "z-ai/fp8")
+        let lacking = #"{"data":{"id":"qwen/qwen3-vl-235b-a22b-instruct","endpoints":[{"tag":"novita/fp8","#
+            + #""quantization":"fp8","pricing":{"prompt":"0.0000001","completion":"0.0000005"}}]}}"#
+        check("3 a listing without the pinned upstream gives no price",
+              OpenRouterPrices.parse(Data(lacking.utf8), route: route) == nil)
+        check("3 another model's listing gives no price", OpenRouterPrices.parse(Data(glmListing.utf8), route: route) == nil)
+        let free = listing.replacingOccurrences(of: "0.00000022", with: "0")
+        check("3 a zero price is not a price", OpenRouterPrices.parse(Data(free.utf8), route: route) == nil)
+
+        check("3 no listing read: the bench's price", OpenRouterPrices.priced(route, [:]) == route.model)
+        if let price {
+            let priced = OpenRouterPrices.priced(route, [route.model.id: price])
+            check("3 the listing's price reaches the model", priced.inputCostPer1M == 0.22
+                  && priced.outputCostPer1M == 0.9 && priced.id == route.model.id)
+            let bench = CostEstimator.secondReaderPageCost(model: route.model, imageScale: 1)
+            let listed = CostEstimator.secondReaderPageCost(model: priced, imageScale: 1)
+            check("3 the estimate follows the listing", listed > bench, "listed \(listed) bench \(bench)")
+        }
+
+        // End to end through the seam, in a scratch suite so the app's own stored prices are untouched.
+        let suite = "PageReaderTestDriver-\(UUID().uuidString)"
+        guard let scratch = UserDefaults(suiteName: suite) else { check("3 scratch defaults", false); return }
+        defer { scratch.removePersistentDomain(forName: suite) }
+        current.listings = [route.model.id: listing, glm.model.id: glmListing]
+        let report = await OpenRouterPrices.refreshIfStale(force: true, defaults: scratch)
+        let stored = OpenRouterPrices.stored(scratch)
+        check("3 refresh stores the listed rows", stored[route.model.id]?.tag == "deepinfra/fp8"
+              && stored[glm.model.id]?.tag == "z-ai/fp8", report.joined(separator: "; "))
+        check("3 a route the listing lacks keeps the bench's price",
+              stored.count == 2 && report.filter { $0.contains("the bench's price stays") }.count
+                == OpenRouterRoute.catalog.count - 2, report.joined(separator: "; "))
+        let again = await OpenRouterPrices.refreshIfStale(defaults: scratch)
+        check("3 a fresh price is not read again", !again.contains { $0.hasPrefix(route.model.id) },
+              again.joined(separator: "; "))
+        current.listings = [:]
+    }
+
     private static func makeSmokePages() -> URL? {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("page-reader-test-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -149,8 +254,5 @@ enum PageReaderTestDriver {
     }
 }
 
-/// Filled in with the protocol (W42.int-s2); empty on the baseline run.
-enum PageReaderSeamChecks { @MainActor static func run(check: (String, Bool, @autoclosure () -> String) -> Void) {} }
-enum OpenRouterPriceChecks { @MainActor static func run(check: (String, Bool, @autoclosure () -> String) -> Void) {} }
 
 #endif

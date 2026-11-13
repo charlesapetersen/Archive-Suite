@@ -105,6 +105,7 @@ struct SettingsView: View {
     @State private var mistralKey = ""
     @State private var openaiKey = ""
     @State private var openrouterKey = ""
+    @State private var openRouterPricesRead = 0
     @State private var gatewayKey = ""
     @State private var localAgentStatus = ""       // Detect & Verify result message (empty = not yet run)
     @State private var localAgentChecking = false
@@ -465,10 +466,15 @@ struct SettingsView: View {
                     }
                 }
                 if let route = OpenRouterRoute.forModel(selectedModel.id), selectedProvider == .openrouter {
-                    Text(route.settingsNote)
+                    // `openRouterPricesRead` re-renders the note once OpenRouter's listing has been read (W42.int-s2).
+                    Text(openRouterPricesRead >= 0 ? route.settingsNote : "")
                         .font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ap.settings.openRouterRoute")
+                        .task {
+                            await OpenRouterPrices.refreshIfStale()
+                            openRouterPricesRead += 1
+                        }
                 }
                 // What reads which pages best is the settings sheet's reading card (W46.settings-sheet), in place of
                 // the guide that sat here (W41.app-ocr-hierarchy).

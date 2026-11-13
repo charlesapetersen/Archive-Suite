@@ -1,4 +1,5 @@
 import Foundation
+import VisionOCRKit
 
 /// W41.app-ocr-default — the second reader for a page Gemini refuses.
 ///
@@ -171,36 +172,17 @@ enum OCRRefusalFallback {
         _ route: Route, imageURL: URL, previousText: String?, previousImageURL: URL?,
         customPrompt: String?, imageScale: Double
     ) async throws -> OCRResult {
-        if let localAgent = route.localAgent {
-            return try await LocalAgentClient(config: localAgent).ocr(
-                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale)
-        }
-        switch route.provider {
-        case .anthropic:
-            return try await AnthropicClient(apiKey: route.apiKey, model: route.model, thinkingLevel: nil).ocr(
-                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale)
-        case .openai:
-            return try await OpenAICompatibleClient.openAI(model: route.model, apiKey: route.apiKey, thinkingLevel: nil).ocr(
-                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale)
-        case .openrouter:
-            return try await OpenAICompatibleClient.pinnedOpenRouter(model: route.model, apiKey: route.apiKey).ocr(
-                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale)
-        case .mistral:
-            return try await MistralClient(apiKey: route.apiKey, model: route.model).ocr(
-                imageURL: imageURL, previousText: previousText, imageScale: imageScale)
-        case .gemini:
-            // Never a refusal route (`availableRoutes` builds none: Gemini is the refuser), but a cascade may
-            // escalate a cheaper reader's failure to it.
-            return try await GeminiClient(apiKey: route.apiKey, model: route.model, thinkingLevel: nil).ocr(
-                imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: imageScale)
-        case .appleVision:
-            // Never a second reader: Vision's text is not a transcription the panel scored as one.
+        // Never a second reader: Vision's text is not a transcription the panel scored as one.
+        if route.localAgent == nil, route.provider == .appleVision {
             return OCRResult(text: nil, classification: nil, errorMessage: "not a second reader", errorCode: nil)
         }
+        // W42.int-s2: through the one page reader, with no thinking level as before. Gemini is never a refusal route
+        // (`availableRoutes` builds none: Gemini is the refuser), but a cascade may escalate a cheaper reader's
+        // failure to it.
+        let reader = try PageReaders.reader(provider: route.provider, model: route.model, apiKey: route.apiKey,
+                                            thinkingLevel: nil, localAgent: route.localAgent)
+        return try await reader.read(PageReaderInput(
+            imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+            customPrompt: customPrompt, imageScale: imageScale)).detail
     }
 }

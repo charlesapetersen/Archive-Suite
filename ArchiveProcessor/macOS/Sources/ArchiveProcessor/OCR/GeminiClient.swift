@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 import ImageIO
 
-struct GeminiClient {
+struct GeminiClient: Sendable {
     let apiKey: String
     let model: LLMModel
     let thinkingLevel: ThinkingLevel?

@@ -422,7 +422,8 @@ struct LLMModel: Identifiable, Hashable, Codable {
     // bench's. Prices are the pinned endpoint's, from the panel's frozen OpenRouter catalogs (2026-10-11/13).
     // The first entry is the provider's default: the rule table's pick for an OpenRouter key with no fallback for a
     // failed page (strict NES, 94.01, every page answered), and not one of the truth's drafters.
-    static let openrouterModels: [LLMModel] = OpenRouterRoute.catalog.map(\.model)
+    /// At OpenRouter's listed price for each pinned upstream once read (W42.int-s2, `OpenRouterPrices`), else the bench's.
+    static var openrouterModels: [LLMModel] { OpenRouterRoute.catalog.map { OpenRouterPrices.priced($0) } }
 }
 
 // MARK: - OpenRouter routes
@@ -515,9 +516,11 @@ struct OpenRouterRoute: Sendable, Equatable {
     var settingsNote: String {
         let provider = providerTag.split(separator: "/").first.map(String.init) ?? providerTag
         let at = precision == "unknown" ? "at the precision it serves (it lists none)" : "at \(precision)"
+        let priced = OpenRouterPrices.priced(self)
         return measured + " Runs on \(provider) only, \(at), with OpenRouter's fallbacks off: the provider the bench "
-            + "measured, at its price ($\(Self.price(model.inputCostPer1M)) in, $\(Self.price(model.outputCostPer1M)) out "
-            + "per million tokens). If that provider is down the page fails rather than going elsewhere."
+            + "measured, at $\(Self.price(priced.inputCostPer1M)) in, $\(Self.price(priced.outputCostPer1M)) out "
+            + "per million tokens (\(OpenRouterPrices.source(self))). If that provider is down the page fails rather "
+            + "than going elsewhere."
     }
 
     private static func price(_ v: Double) -> String { String(format: "%.2f", v) }
