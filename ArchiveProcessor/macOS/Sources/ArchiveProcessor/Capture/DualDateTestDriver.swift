@@ -132,18 +132,18 @@ enum DualDateTestDriver {
         func own(_ y: String?, _ m: String? = nil, _ d: String? = nil) -> ArchiveDate? {
             EnclosureDates.ownDate(of: GeneratedTags(year: y, month: m, day: d))
         }
-        check("year/month/day cover", own("1958", "03 March", "Day 12")?.wireValue == "1958-03-12")
-        check("year/month cover", own("1958", "03 March")?.wireValue == "1958-03")
+        check("year/month/day cover", own("1958", "3 March", "Day 12")?.wireValue == "1958-03-12")
+        check("year/month cover", own("1958", "3 March")?.wireValue == "1958-03")
         check("year-only cover", own("1958")?.wireValue == "1958")
         check("decade cover", own("1950s")?.wireValue == "1950s")
         check("undated cover → nil", own(nil) == nil)
-        check("an impossible cover date is not truncated into a fake one", own("1958", "02 February", "Day 30") == nil)
+        check("an impossible cover date is not truncated into a fake one", own("1958", "2 February", "Day 30") == nil)
         check("an unparseable cover month gives nil, not a year guess", own("1958", "Spring") == nil)
         check("a day without a month is ignored (as machineDate does)", own("1958", nil, "Day 4")?.wireValue == "1958")
         check("an OCR-failed cover has no date",
               EnclosureDates.ownDate(of: GeneratedTags(year: "1958", ocrFailed: true)) == nil)
         var enc = GeneratedTags(year: "1957", subjectTags: ["Harbours"])
-        EnclosureDates.applySentWith(fromCover: GeneratedTags(year: "1958", month: "03 March", day: "Day 12",
+        EnclosureDates.applySentWith(fromCover: GeneratedTags(year: "1958", month: "3 March", day: "Day 12",
                                                               dateUncertain: true), to: &enc)
         check("enclosure gets the cover's date and the cover's uncertainty",
               enc.sentWith?.wireValue == "1958-03-12" && enc.sentWithUncertain)
@@ -245,9 +245,9 @@ enum DualDateTestDriver {
                 with: ["Sent With 1958-03"])
               == ["1957", "Sent With 1958-03", "Harbours", "Sent with love", "Sent With Love"])
         check("token insertion lands after the own-date run",
-              OCRProcessor.replacingSentWithTokens(in: ["1957", "05 May", "Day 3", "Date Uncertain", "Harbours"],
+              OCRProcessor.replacingSentWithTokens(in: ["1957", "5 May", "Day 3", "Date Uncertain", "Harbours"],
                                                    with: ["Sent With 1958"])
-              == ["1957", "05 May", "Day 3", "Date Uncertain", "Sent With 1958", "Harbours"])
+              == ["1957", "5 May", "Day 3", "Date Uncertain", "Sent With 1958", "Harbours"])
         check("stripping with no replacement removes both tokens",
               OCRProcessor.replacingSentWithTokens(in: ["1957", "Sent With 1958", "Sent With Date Uncertain", "X"], with: [])
               == ["1957", "X"])
@@ -386,10 +386,10 @@ enum DualDateTestDriver {
         }
         check("typed 1968 → the Year tag", tagsTyped("1968") == ["1968"])
         check("typed 1960s → the decade tag", tagsTyped("1960s") == ["1960s"])
-        check("typed March 1968 → Year + Month", tagsTyped("March 1968") == ["1968", "03 March"])
-        check("typed 1968-03-12 → Year + Month + Day", tagsTyped("1968-03-12") == ["1968", "03 March", "Day 12"])
-        check("typed 12 Mar 1968 → the same", tagsTyped("12 Mar 1968") == ["1968", "03 March", "Day 12"])
-        check("an impossible typed day is dropped to its month", tagsTyped("31 February 1968") == ["1968", "02 February"])
+        check("typed March 1968 → Year + Month", tagsTyped("March 1968") == ["1968", "3 March"])
+        check("typed 1968-03-12 → Year + Month + Day", tagsTyped("1968-03-12") == ["1968", "3 March", "Day 12"])
+        check("typed 12 Mar 1968 → the same", tagsTyped("12 Mar 1968") == ["1968", "3 March", "Day 12"])
+        check("an impossible typed day is dropped to its month", tagsTyped("31 February 1968") == ["1968", "2 February"])
         check("typed Sent with → its token after the own date",
               tagsTyped("1957", sentWith: "March 1958") == ["1957", "Sent With 1958-03"])
         check("typed Sent with a decade", tagsTyped("", sentWith: "1950s") == ["Sent With 1950s"])
@@ -405,10 +405,10 @@ enum DualDateTestDriver {
             check("\(wire): seed text → components → date round-trips",
                   typed(wire) == d && TypedDateTags.date(year: c.year, month: c.month, day: c.day) == d)
         }
-        var cleared = SegmentTagData(year: "1968", month: "03 March", day: "Day 12")
+        var cleared = SegmentTagData(year: "1968", month: "3 March", day: "Day 12")
         cleared.ownDate = nil
         check("an emptied field clears Year, Month and Day", cleared.dateComponents == TypedDateTags.Components())
-        var decadeOver = SegmentTagData(year: "1968", month: "03 March", day: "Day 12")
+        var decadeOver = SegmentTagData(year: "1968", month: "3 March", day: "Day 12")
         decadeOver.ownDate = typed("1960s")
         check("a coarser typed date drops the old month and day", decadeOver.dateComponents == .init(year: "1960s"))
         check("stored strings that name no date are shown, not hidden",
@@ -419,7 +419,7 @@ enum DualDateTestDriver {
         check("an auto-date reply is taken as the date it names (no unseen Day beside a year)",
               reply.dateComponents == .init(year: "1968"))
         reply.setDate(fromReply: GeneratedTags(year: "1968", month: "March", day: "12"))
-        check("...and in the canonical tag strings", reply.dateComponents == .init(year: "1968", month: "03 March", day: "Day 12"))
+        check("...and in the canonical tag strings", reply.dateComponents == .init(year: "1968", month: "3 March", day: "Day 12"))
         reply.setDate(fromReply: GeneratedTags(year: "circa 1968"))
         check("a reply that names no date is kept verbatim for the field to show",
               reply.dateComponents == .init(year: "circa 1968") && reply.ownDate == nil)

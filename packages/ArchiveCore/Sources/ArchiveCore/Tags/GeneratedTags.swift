@@ -9,7 +9,7 @@ import Foundation
 /// source for `SPEC/tag-format.md §Finder tags (page 1)`.
 public struct GeneratedTags: Codable, Sendable {
     public var year: String?             // e.g. "1987"
-    public var month: String?            // e.g. "03 March"
+    public var month: String?            // e.g. "3 March"
     public var day: String?              // e.g. "Day 15"
     public var dateUncertain: Bool
     /// W37.dual-date: the covering letter's date when this document is an enclosure with its own date;
@@ -112,10 +112,11 @@ public struct GeneratedTags: Codable, Sendable {
         return date
     }
 
-    /// Parse a month from the "MM Month" tag form ("03 March"), a bare number, or a bare name — so
-    /// the JSON `date` doesn't silently drop a month the user typed as "March" instead of "03 March".
+    /// Parse a month from the Month tag form ("3 March" or "03 March"), a bare number, or a bare name — so
+    /// the JSON `date` doesn't silently drop a month the user typed as "March" instead of "3 March".
     public static func monthNumber(from s: String) -> Int? {
         let trimmed = s.trimmingCharacters(in: .whitespaces)
+        if let m = DocumentTags.parseMonth(trimmed) { return m.number }
         if let n = Int(trimmed.prefix(2)), (1...12).contains(n) { return n }
         if let n = Int(trimmed), (1...12).contains(n) { return n }
         let lower = trimmed.lowercased()
@@ -129,10 +130,11 @@ public struct GeneratedTags: Codable, Sendable {
     public static let englishMonthNames = ["January", "February", "March", "April", "May", "June",
                                            "July", "August", "September", "October", "November", "December"]
 
-    /// Build a "MM MonthName" month tag (e.g. "03 March") for a 1...12 month; nil for an out-of-range month.
+    /// Build a month tag for a 1...12 month, with no leading zero ("3 March"; owner, 2026-11-13); nil for an
+    /// out-of-range month. `TagEditing.monthToken` writes the same string.
     public static func monthTag(_ month: Int) -> String? {
         guard (1...12).contains(month) else { return nil }
-        return String(format: "%02d %@", month, englishMonthNames[month - 1])
+        return "\(month) \(englishMonthNames[month - 1])"
     }
 
     /// Parse a day-of-month from "Day 15", "day 15", or "15".

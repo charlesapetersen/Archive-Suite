@@ -67,7 +67,7 @@ struct CompletedManualSegment: Identifiable {
 /// tag is added automatically by `MacOSTagger.applyTags` in stamping modes, so it is not seeded here.)
 struct SegmentTagData {
     var year: String = ""
-    var month: String = ""      // "MM Month"
+    var month: String = ""      // "M Month", e.g. "3 March"
     var day: String = ""        // "Day D"
     var dateUncertain: Bool = false
     var subjectTags: [String] = []
@@ -120,7 +120,7 @@ struct ManualTagSegment: Identifiable {
     let images: [ManualTagImage]
     // Editable date fields
     var year: String = ""
-    var month: String = ""      // "MM Month", e.g. "03 March"
+    var month: String = ""      // "M Month", e.g. "3 March"
     var day: String = ""        // "Day D", e.g. "Day 15"
     var dateUncertain: Bool = false
     var subjectTags: [String] = []

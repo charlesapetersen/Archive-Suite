@@ -14,8 +14,9 @@ final class SetDateEditTests: XCTestCase {
     }
 
     func testEachPrecisionWritesTheFacetTokens() {
-        XCTAssertEqual(TagEditing.dateTokens(for: date("1958-03-12")), ["1958", "03 March", "Day 12"])
-        XCTAssertEqual(TagEditing.dateTokens(for: date("1958-03")), ["1958", "03 March"])
+        XCTAssertEqual(TagEditing.dateTokens(for: date("1958-03-12")), ["1958", "3 March", "Day 12"])
+        XCTAssertEqual(TagEditing.dateTokens(for: date("1958-03")), ["1958", "3 March"])
+        XCTAssertEqual(TagEditing.dateTokens(for: date("1958-10")), ["1958", "10 October"])
         XCTAssertEqual(TagEditing.dateTokens(for: date("1958")), ["1958"])
         XCTAssertEqual(TagEditing.dateTokens(for: date("1950s")), ["1950s"])
         // The same tokens the separate ops write.
@@ -43,7 +44,12 @@ final class SetDateEditTests: XCTestCase {
     }
 
     func testTheSameDateWritesNothing() {
+        XCTAssertTrue(TagEditing.delta(for: .setDate(date("1958-03-12")), given: tags(["Day 12", "1958", "3 March", "X"])).isEmpty)
+        // W40.suite-month-tag-zero: the older `03 March` is the same date, so an unchanged field does not rewrite it.
         XCTAssertTrue(TagEditing.delta(for: .setDate(date("1958-03-12")), given: tags(["Day 12", "1958", "03 March", "X"])).isEmpty)
+        let moved = TagEditing.delta(for: .setDate(date("1958-04-12")), given: tags(["Day 12", "1958", "03 March"]))
+        XCTAssertEqual(moved.remove.sorted(), ["03 March", "1958", "Day 12"])
+        XCTAssertEqual(moved.add, ["1958", "4 April", "Day 12"])
         XCTAssertTrue(TagEditing.delta(for: .setDate(nil), given: tags(["X"])).isEmpty)
         XCTAssertFalse(TagEditing.delta(for: .setDate(date("1958")), given: tags(["1958", "1950s"])).isEmpty,
                        "a hidden decade beside the year is dropped")

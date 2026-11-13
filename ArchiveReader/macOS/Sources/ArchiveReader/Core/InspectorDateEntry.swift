@@ -4,7 +4,7 @@ import ArchiveCore
 /// The Inspector's two date fields, the own date and the Sent-with date (W40.fix-reader-date-fields): each is one
 /// typed field read by the suite's `DateFieldEntry` (Notes' field rules, W40.suite-date-design), so `1958`, `1950s`,
 /// `March 1958`, `1958-3`, `12 March 1958` and `1958-03-12` all work. A field shows its date in words with no
-/// leading zero (`12 March 1958`); the tags are unchanged (`SPEC/tag-format.md`), so what is written is padded.
+/// leading zero (`12 March 1958`), as the Month tag it writes does (`3 March`, `SPEC/tag-format.md`).
 enum InspectorDateEntry {
 
     /// What a field's text says.

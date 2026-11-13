@@ -22,13 +22,13 @@ final class TagEditingTests: XCTestCase {
     }
 
     func testMonthTokenFormat() {
-        XCTAssertEqual(TagEditing.monthToken(3), "03 March")
+        XCTAssertEqual(TagEditing.monthToken(3), "3 March")  // no leading zero (W40.suite-month-tag-zero)
         XCTAssertEqual(TagEditing.monthToken(11), "11 November")
     }
 
     func testSetMonthReplaces() {
         let d = TagEditing.delta(for: .setMonth(5), given: tags(["03 March", "1980"]))
-        XCTAssertEqual(d.add, ["05 May"])
+        XCTAssertEqual(d.add, ["5 May"])
         XCTAssertEqual(d.remove, ["03 March"])
     }
 
@@ -122,7 +122,7 @@ final class TagEditingTests: XCTestCase {
         XCTAssertEqual(t.monthToken, "05 May")
         XCTAssertTrue(t.subjects.contains("03 March"))
         let d = TagEditing.delta(for: .setMonth(7), given: t)
-        XCTAssertEqual(d.add, ["07 July"])
+        XCTAssertEqual(d.add, ["7 July"])
         XCTAssertEqual(d.remove, ["05 May"])
     }
 

@@ -56,11 +56,11 @@ struct DateTagProjectionTests {
         #expect(Set(try await finderTags(env, id)) == ["1984", "1968", "Do Not Sync"])
 
         await env.model.setDate("1968-03", precision: .month, for: id)
-        #expect(Set(try await finderTags(env, id)) == ["1984", "1968", "03 March", "Do Not Sync"])
+        #expect(Set(try await finderTags(env, id)) == ["1984", "1968", "3 March", "Do Not Sync"])
 
         await env.model.setDate("1968-03-05", precision: .day, for: id)
         let datedTags = try await finderTags(env, id)
-        #expect(Set(datedTags) == ["1984", "1968", "03 March", "Day 5", "Do Not Sync"])
+        #expect(Set(datedTags) == ["1984", "1968", "3 March", "Day 5", "Do Not Sync"])
         let parsed = DocumentTags.parse(raw: datedTags, labelNumber: nil)
         #expect(parsed.year == 1968 && parsed.month?.number == 3 && parsed.day == 5,
                 "the appended authoritative facets must win over the subject token 1984")
@@ -81,7 +81,7 @@ struct DateTagProjectionTests {
         await env.model.setDate("1971-04", precision: .month, for: id)
         await env.model.setQuality(3, for: id)
         let tags = try await finderTags(env, id)
-        #expect(Set(tags) == ["1984", "1971", "04 April", "Q3", "Do Not Sync"])
+        #expect(Set(tags) == ["1984", "1971", "4 April", "Q3", "Do Not Sync"])
         let parsed = DocumentTags.parse(raw: tags, labelNumber: nil)
         #expect(parsed.year == 1971 && parsed.month?.number == 4 && parsed.quality == 3)
         #expect(try url.resourceValues(forKeys: [.labelNumberKey]).labelNumber == 6,
@@ -163,6 +163,6 @@ struct DateTagProjectionTests {
         _ = try await env.store.createTemplate(template)
 
         let id = try #require(await env.model.newItem(kind: .note, in: nil, from: template.id))
-        #expect(Set(try await finderTags(env, id)) == ["1971", "04 April", "Day 5"])
+        #expect(Set(try await finderTags(env, id)) == ["1971", "4 April", "Day 5"])
     }
 }

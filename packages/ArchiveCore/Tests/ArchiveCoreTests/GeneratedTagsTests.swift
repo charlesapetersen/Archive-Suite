@@ -95,9 +95,9 @@ struct GeneratedTagsTests {
 
     @Test func monthTag_allTwelve() {
         let expected = [
-            "01 January", "02 February", "03 March", "04 April",
-            "05 May", "06 June", "07 July", "08 August",
-            "09 September", "10 October", "11 November", "12 December"
+            "1 January", "2 February", "3 March", "4 April",
+            "5 May", "6 June", "7 July", "8 August",
+            "9 September", "10 October", "11 November", "12 December"
         ]
         for m in 1...12 {
             #expect(GeneratedTags.monthTag(m) == expected[m - 1])
@@ -113,7 +113,10 @@ struct GeneratedTagsTests {
     // MARK: - monthNumber
 
     @Test func monthNumber_specFormat() {
-        #expect(GeneratedTags.monthNumber(from: "03 March") == 3)
+        #expect(GeneratedTags.monthNumber(from: "3 March") == 3)
+        #expect(GeneratedTags.monthNumber(from: "03 March") == 3)  // the older written form still reads
+        #expect(GeneratedTags.monthNumber(from: "1 January") == 1)
+        #expect(GeneratedTags.monthNumber(from: "10 October") == 10)
         #expect(GeneratedTags.monthNumber(from: "12 December") == 12)
     }
 

@@ -3,7 +3,7 @@ import ArchiveCore
 
 /// The Processor's typed date field and the tags it writes (W40.processor-date-field). A date is typed in one field
 /// by ArchiveCore `DateFieldEntry`'s rules — the suite's one design, as in Notes — and kept as the same Year / Month /
-/// Day strings `GeneratedTags` already writes ("1968" or "1960s", "03 March", "Day 12"), so the tag format is unchanged.
+/// Day strings `GeneratedTags` already writes ("1968" or "1960s", "3 March", "Day 12"), so the tag format is unchanged.
 /// A covering letter's date (`sentWith`) is the `ArchiveDate` wire value, as before.
 enum TypedDateTags {
 
@@ -28,7 +28,7 @@ enum TypedDateTags {
         }
     }
 
-    /// The own date the strings name: Year "1958" or a decade "1950s"; Month "03 March" (or anything
+    /// The own date the strings name: Year "1958" or a decade "1950s"; Month "3 March" (or anything
     /// `GeneratedTags.monthNumber` accepts); Day "Day 12". A day without a month is ignored, as
     /// `GeneratedTags.machineDate` ignores it. `nil` when there is no year, or a present component does not
     /// parse or form a real date (Feb 30): a disputed date is left alone, not silently truncated. A decade

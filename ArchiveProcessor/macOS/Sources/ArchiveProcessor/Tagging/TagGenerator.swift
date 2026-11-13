@@ -119,11 +119,11 @@ class TagGenerator: ObservableObject {
 
         var tags = GeneratedTags()
         // Coerce year/month/day: models frequently return these as JSON numbers, not strings.
-        // Normalize bare-number months/days to SPEC format ("MM Month" / "Day N").
+        // Normalize bare-number months/days to SPEC format ("M Month" / "Day N").
         tags.year = GeneratedTags.stringField(json["year"])
         if let rawMonth = GeneratedTags.stringField(json["month"]) {
             if let n = GeneratedTags.monthNumber(from: rawMonth), GeneratedTags.monthTag(n) != nil {
-                // Already SPEC-conforming ("03 March") or a bare number/name → normalize
+                // "03 March" (the prompt's example form), "3 March" or a bare number/name → the written "3 March"
                 tags.month = GeneratedTags.monthTag(n)
             } else {
                 tags.month = rawMonth

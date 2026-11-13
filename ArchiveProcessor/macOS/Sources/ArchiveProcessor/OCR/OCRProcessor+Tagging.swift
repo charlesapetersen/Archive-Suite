@@ -294,7 +294,7 @@ extension OCRProcessor {
         guard index >= 0, index < preGroupedYears.count, let y = preGroupedYears[index] else { return nil }
         return String(y)
     }
-    /// Phone-supplied month for the file at `index`, as an "MM Month" tag (e.g. "03 March"); nil if none.
+    /// Phone-supplied month for the file at `index`, as an Month tag (e.g. "3 March"); nil if none.
     private func phoneMonthTag(at index: Int) -> String? {
         guard index >= 0, index < preGroupedMonths.count, let m = preGroupedMonths[index] else { return nil }
         return GeneratedTags.monthTag(m)
@@ -1383,15 +1383,14 @@ extension OCRProcessor {
         kept.insert(contentsOf: replacement, at: insertAt)
         return kept
     }
-    /// The own-date tokens `allTags` emits first: Year (or decade), "MM Month", "Day N", "Date Uncertain".
+    /// The own-date tokens `allTags` emits first: Year (or decade), Month ("3 March", or the older "03 March"),
+    /// "Day N", "Date Uncertain".
     private nonisolated static func isLeadingOwnDateToken(_ t: String) -> Bool {
         if t == "Date Uncertain" { return true }
         if DocumentTags.parseDay(t) != nil { return true }
         let digits = t.hasSuffix("s") ? String(t.dropLast()) : t
         if (3...4).contains(digits.count), digits.allSatisfy({ ("0"..."9").contains($0) }) { return true }
-        let parts = t.split(separator: " ")
-        return parts.count == 2 && parts[0].count == 2 && Int(parts[0]) != nil
-            && GeneratedTags.englishMonthNames.contains(String(parts[1]))
+        return DocumentTags.parseMonth(t) != nil
     }
     /// Rewrite ONLY the W37 keys of an existing sidecar (absent file → nothing). Same serialization
     /// options as `SegmentJSONBuilder`, atomic write; an unreadable sidecar is left alone.
@@ -1571,7 +1570,7 @@ extension OCRProcessor {
             }
         }
     }
-    /// Normalize a free-text month to SPEC "MM Month" format (e.g. "3" → "03 March").
+    /// Normalize a free-text month to the SPEC Month tag (e.g. "3" or "03" → "3 March").
     /// Returns nil for empty/blank input; passes through unrecognized values unchanged.
     private static func normalizeMonth(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)

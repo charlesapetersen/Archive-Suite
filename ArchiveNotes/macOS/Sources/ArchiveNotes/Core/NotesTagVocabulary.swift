@@ -67,13 +67,13 @@ enum NotesTagVocabulary {
             guard parts.count == 2, let year = DocumentTags.parseYear(String(parts[0])), let month = Int(parts[1]),
                   (1...12).contains(month),
                   DocumentTags.sortDateKey(year: year, month: month, day: nil, decade: nil) != nil else { return [] }
-            return ["\(year)", String(format: "%02d %@", month, DocumentTags.monthNames[month - 1])]
+            return ["\(year)", TagEditing.monthToken(month)]
         case .day:
             let parts = date.split(separator: "-")
             guard parts.count == 3, let year = DocumentTags.parseYear(String(parts[0])), let month = Int(parts[1]), let day = Int(parts[2]),
                   (1...12).contains(month), GregorianDay.isValidDay(year: year, month: month, day: day),
                   DocumentTags.sortDateKey(year: year, month: month, day: day, decade: nil) != nil else { return [] }
-            return ["\(year)", String(format: "%02d %@", month, DocumentTags.monthNames[month - 1]), "Day \(day)"]
+            return ["\(year)", TagEditing.monthToken(month), "Day \(day)"]
         }
     }
 

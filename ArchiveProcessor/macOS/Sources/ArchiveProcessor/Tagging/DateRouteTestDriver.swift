@@ -150,14 +150,14 @@ enum DateRouteTestDriver {
         let letter = "Washington\nMarch 3, 1947\nDear Sir"
         let explicit = DateRoute.decide(text: letter, near: near, traceRaw: #"{"year": 1947, "lo": 1947, "hi": 1947, "date_uncertain": false, "evidence": {"neighbour": "self", "quote": "March 3, 1947"}}"#,
                                         image: nil, imageNote: DateRoute.imageNotNeeded)
-        var t = GeneratedTags(year: "1947", month: "03 March", day: "Day 3", dateUncertain: true)
+        var t = GeneratedTags(year: "1947", month: "3 March", day: "Day 3", dateUncertain: true)
         explicit.apply(to: &t)
         check("2 explicit text year: the tagging call's month and day kept when it read the same year, no flag",
-              t.year == "1947" && t.month == "03 March" && t.day == "Day 3" && !t.dateUncertain)
-        var t2 = GeneratedTags(year: "1950", month: "05 May", day: "Day 9")
+              t.year == "1947" && t.month == "3 March" && t.day == "Day 3" && !t.dateUncertain)
+        var t2 = GeneratedTags(year: "1950", month: "5 May", day: "Day 9")
         explicit.apply(to: &t2)
         check("2 explicit text year: another year's month and day replaced by the dated form's month",
-              t2.year == "1947" && t2.month == "03 March" && t2.day == nil, "\(t2.allTags)")
+              t2.year == "1947" && t2.month == "3 March" && t2.day == nil, "\(t2.allTags)")
         let o = explicit.with(measured: true).sidecarObject()
         check("2 sidecar, explicit: class, step, the quote and its line", o["class"] as? String == "text"
               && o["step"] as? Int == 1 && o["quote"] as? String == "March 3, 1947" && o["line"] as? Int == 2
@@ -166,7 +166,7 @@ enum DateRouteTestDriver {
         let memo = "MEMO\nTo: Files"
         let est = DateRoute.decide(text: memo, near: near, traceRaw: #"{"year": 1957, "lo": 1956, "hi": 1958, "date_uncertain": true, "evidence": {"neighbour": "P1", "quote": "June 2, 1957"}}"#,
                                    image: nil, imageNote: DateRoute.imageNoRoute)
-        var t3 = GeneratedTags(year: "1957", month: "06 June", day: "Day 2")
+        var t3 = GeneratedTags(year: "1957", month: "6 June", day: "Day 2")
         est.apply(to: &t3)
         check("2 estimate: the year with Date Uncertain, never a month or day", t3.year == "1957" && t3.dateUncertain
               && t3.month == nil && t3.day == nil)
@@ -189,7 +189,7 @@ enum DateRouteTestDriver {
               && fo["interval_90"] == nil && fo["reason"] as? String == "no year with checked evidence")
 
         var inherited = failed
-        inherited.inherit(fromCover: GeneratedTags(year: "1958", month: "03 March"), coverFile: "L.pdf")
+        inherited.inherit(fromCover: GeneratedTags(year: "1958", month: "3 March"), coverFile: "L.pdf")
         var t5 = GeneratedTags()
         inherited.apply(to: &t5)
         check("2 step 3a: an enclosure with no own date takes the cover's year, Date Uncertain, no month",
@@ -212,7 +212,7 @@ enum DateRouteTestDriver {
         let io = byImage.with(measured: true).sidecarObject()
         let roles = io["second_role_dates"] as? [[String: Any]] ?? []
         check("2 image: the document's own quoted date, its month, no flag; the stamp kept as a second-role date",
-              t6.year == "1961" && t6.month == "03 March" && !t6.dateUncertain && io["class"] as? String == "image"
+              t6.year == "1961" && t6.month == "3 March" && !t6.dateUncertain && io["class"] as? String == "image"
               && io["quote"] as? String == "March 30, 1961" && io["where"] as? String == "dateline"
               && roles.count == 1 && roles[0]["quote"] as? String == "RECEIVED APR 4 1961" && roles[0]["role"] as? String == "stamp")
 
@@ -497,19 +497,19 @@ enum DateRouteTestDriver {
         check("3 gateway: the dating calls ask for the measured model", wire.models.contains(DateRoute.gatewayModel))
         let a = applied(g, gFiles[0]), aj = json(gOut["DOCA"])
         check("3 A: 1947 from its text with the tagging call's month and day, no Date Uncertain",
-              a.contains("1947") && a.contains("03 March") && a.contains("Day 3") && !a.contains("Date Uncertain"), "\(a)")
+              a.contains("1947") && a.contains("3 March") && a.contains("Day 3") && !a.contains("Date Uncertain"), "\(a)")
         check("3 A: the sidecar's dating object names the class, the quote and its line",
               (aj["dating"] as? [String: Any])?["class"] as? String == "text"
               && (aj["dating"] as? [String: Any])?["line"] as? Int == 2 && aj["date_uncertain"] as? Bool == false)
         let b = applied(g, gFiles[2]), bd = json(gOut["DOCB"])["dating"] as? [String: Any] ?? [:]
         check("3 B: 1961 from the page image, its month, no flag (not the tagging call's 1950, not the estimate)",
-              b.contains("1961") && b.contains("03 March") && !b.contains("1950") && !b.contains("Date Uncertain"), "\(b)")
+              b.contains("1961") && b.contains("3 March") && !b.contains("1950") && !b.contains("Date Uncertain"), "\(b)")
         check("3 B: the stamp is a second-role date in the sidecar, not a second year tag",
               (bd["second_role_dates"] as? [[String: Any]])?.first?["quote"] as? String == "RECEIVED APR 4 1961"
               && !b.contains("Sent With 1961") && bd["image_pass"] as? String == DateRoute.imageSent)
         let c = applied(g, gFiles[3]), cd = json(gOut["DOCC"])["dating"] as? [String: Any] ?? [:]
         check("3 C: the neighbour's 1947, always Date Uncertain, never a month",
-              c.contains("1947") && c.contains("Date Uncertain") && !c.contains("05 May") && !c.contains("1950"), "\(c)")
+              c.contains("1947") && c.contains("Date Uncertain") && !c.contains("5 May") && !c.contains("1950"), "\(c)")
         check("3 C: the estimate cites A's output file, the check and the measured interval",
               cd["class"] as? String == "estimate" && cd["source"] as? String == "gateway-DOCA.jpg"
               && (cd["interval_90"] as? [String: Any])?["hi"] as? Int == 1949)
@@ -621,7 +621,7 @@ enum DateRouteTestDriver {
         let cards = sheet.manualTagSegments
         if cards.count == 5 {
             check("5 sheet A: its text year and its dated form's month, no day, no flag",
-                  cards[0].year == "1947" && cards[0].month == "03 March" && cards[0].day.isEmpty && !cards[0].dateUncertain,
+                  cards[0].year == "1947" && cards[0].month == "3 March" && cards[0].day.isEmpty && !cards[0].dateUncertain,
                   "\(cards[0].year) \(cards[0].month) \(cards[0].day)")
             check("5 sheet B: the page image's 1961, no flag", cards[2].year == "1961" && !cards[2].dateUncertain)
             check("5 sheet C: the neighbour's 1947, Date Uncertain, no month",
@@ -758,7 +758,7 @@ enum DateRouteTestDriver {
               "\(a)")
         let b = tags("B")
         check("6 Live B: the page image's 1961 and month, not the tagging call's 1950; its stamp a second-role date",
-              b.contains("1961") && b.contains("03 March") && !b.contains("1950") && !b.contains("Date Uncertain")
+              b.contains("1961") && b.contains("3 March") && !b.contains("1950") && !b.contains("Date Uncertain")
               && (dating("B")?["second_role_dates"] as? [[String: Any]])?.first?["quote"] as? String == "RECEIVED APR 4 1961",
               "\(b)")
         check("6 Live B: the staged PDF's header names the image evidence",

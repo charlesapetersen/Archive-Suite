@@ -13,7 +13,7 @@ public enum TagEditOp: Sendable, Equatable {
     case setDay(Int?)           // 1...31, or nil to clear
     /// The item's own date as one typed value (W40.fix-reader-date-fields): replaces the Year, Month, Day and Decade
     /// tokens together, so one entry is one write and one undo step; nil clears all four. The tokens are the ones
-    /// `setYear`/`setMonth`/`setDay` write (`1958`, `03 March`, `Day 12`) and a decade's `1950s`.
+    /// `setYear`/`setMonth`/`setDay` write (`1958`, `3 March`, `Day 12`) and a decade's `1950s`.
     case setDate(ArchiveDate?)
     case setDateUncertain(Bool)
     case setQuality(Int?)       // 1...3, or nil to clear (unrated writes NO token — never `Q0`)
@@ -44,10 +44,15 @@ public enum TagEditing {
             return TagDelta(add: d.map { ["Day \($0)"] } ?? [], remove: tags.dayToken.map { [$0] } ?? [])
         case .setDate(let d):
             // Names ONLY the tokens this file consumed for the four facets, as `setYear` does. The same tokens
-            // already there (in any order): no write.
+            // already there (in any order), or the same date in an older spelling (`03 March`): no write, so an
+            // unchanged field never rewrites a file's Month tag to drop its zero.
             let remove = [tags.yearToken, tags.monthToken, tags.dayToken, tags.decadeToken].compactMap { $0 }
             let add = d.map(dateTokens(for:)) ?? []
-            if Set(remove.map { $0.trimmingCharacters(in: .whitespaces) }) == Set(add) { return TagDelta() }
+            let present = remove.map { token -> String in
+                let t = token.trimmingCharacters(in: .whitespaces)
+                return DocumentTags.parseMonth(t).map { monthToken($0.number) } ?? t
+            }
+            if Set(present) == Set(add) { return TagDelta() }
             return TagDelta(add: add, remove: remove)
         case .setDateUncertain(let on):
             if on {
@@ -115,14 +120,16 @@ public enum TagEditing {
         tags.raw.filter { predicate($0.trimmingCharacters(in: .whitespaces)) }
     }
 
-    /// The facet tokens an own date is written as: `1950s`; `1958`; `1958`, `03 March`; `1958`, `03 March`, `Day 12`.
+    /// The facet tokens an own date is written as: `1950s`; `1958`; `1958`, `3 March`; `1958`, `3 March`, `Day 12`.
     public static func dateTokens(for d: ArchiveDate) -> [String] {
         if d.precision == .decade { return ["\(d.year)s"] }
         return [String(d.year)] + (d.month.map { [monthToken($0)] } ?? []) + (d.day.map { ["Day \($0)"] } ?? [])
     }
 
+    /// The Month tag for a 1...12 month, written with no leading zero (`3 March`; owner, 2026-11-13). Readers
+    /// accept `03 March` as well (`SPEC/tag-format.md`); sort a Month by its number, never by this text.
     public static func monthToken(_ m: Int) -> String {
-        String(format: "%02d ", m) + DocumentTags.monthNames[m - 1]
+        "\(m) " + DocumentTags.monthNames[m - 1]
     }
 }
 

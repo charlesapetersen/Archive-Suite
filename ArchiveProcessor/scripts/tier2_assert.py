@@ -25,7 +25,7 @@ except Exception:
     PdfReader = None
 
 YEAR = re.compile(r'^\d{4}$')
-MONTH = re.compile(r'^\d{2} [A-Z][a-z]+$')          # "03 March"
+MONTH = re.compile(r'^(?:[1-9]|1[0-2]) [A-Z][a-z]+$')  # "3 March" (no leading zero since 2026-11-13)
 DAY = re.compile(r'^Day \d+$')
 GT_MAP = {'box': 'box_label', 'folder': 'folder_label',
           'new': 'document_start', 'cont': 'document_continuation'}

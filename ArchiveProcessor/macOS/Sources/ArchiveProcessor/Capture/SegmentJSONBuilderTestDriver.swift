@@ -106,7 +106,7 @@ enum SegmentJSONBuilderTestDriver {
         let cases: [Case] = [
             Case(name: "document · all fields · multi-page",
                  files: ["a.pdf", "b.pdf"], texts: ["Hello world", "Second page"],
-                 tags: GeneratedTags(year: "1968", month: "03 March", day: "Day 15",
+                 tags: GeneratedTags(year: "1968", month: "3 March", day: "Day 15",
                                      dateUncertain: false, subjectTags: ["democratic party", "elections"],
                                      format: "letter", authorName: "Jane Doe", recipientName: "John Roe",
                                      authorLocation: "Washington", recipientLocation: "New York",

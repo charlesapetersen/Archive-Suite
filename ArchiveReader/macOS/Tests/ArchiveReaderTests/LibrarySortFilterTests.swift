@@ -135,6 +135,17 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertEqual(sorted, ["jan", "jan25", "mar"])  // Jan(0) < Jan-25 < March
     }
 
+    // W40.suite-month-tag-zero: Month tags are written without the zero, so as text `3 March` would sort after
+    // `10 October`; the list orders them by the month's number, and the older `03 March` sorts the same.
+    func testUnpaddedMonthsSortByNumber() {
+        let files = [
+            file("oct", ["1980", "10 October"]),
+            file("mar", ["1980", "3 March"]),
+            file("feb", ["1980", "02 February"]),
+        ]
+        XCTAssertEqual(LibrarySort.sorted(files, by: LibrarySort.default).map(\.name), ["feb", "mar", "oct"])
+    }
+
     func testQualitySortNilLast() {
         let files = [
             file("q2", ["Q2", "1980"]),
