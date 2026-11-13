@@ -132,6 +132,7 @@ final class ProcessorUITests: XCTestCase {
         relaunch(extra: ["-APUITestSyntheticSuitePair"])
         XCTAssertTrue(element("ap.ocr.start").waitForExistence(timeout: 10), "the Process Files window is up with the file")
         XCTAssertTrue(app.menuBars.menuItems["Improve OCR…"].exists, "the Processing menu lists Improve OCR…")
+        XCTAssertTrue(app.menuBars.menuItems["Improve OCR on Flagged Files…"].exists, "and the flagged-files entry")
         app.typeKey("i", modifierFlags: [.command, .shift])
         let dialog = element("ap.reocr.dialog")
         XCTAssertTrue(dialog.waitForExistence(timeout: 10), "⇧⌘I opens the Improve OCR dialog")

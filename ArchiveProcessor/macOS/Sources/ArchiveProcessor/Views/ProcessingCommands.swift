@@ -34,6 +34,9 @@ extension Notification.Name {
     static let improveOCRHandoff = Notification.Name("ImproveOCRHandoff")
     /// Posted from Processing ▸ Improve OCR History…; `OCRView` shows what Improve OCR has kept (W44).
     static let improveOCRHistoryRequested = Notification.Name("ImproveOCRHistoryRequested")
+    /// Posted from Processing ▸ Improve OCR on Flagged Files…; `OCRView` asks for a folder and opens the dialog for the
+    /// PDFs in it tagged OCR Poor (W44).
+    static let improveOCRFlaggedRequested = Notification.Name("ImproveOCRFlaggedRequested")
 }
 
 /// Whether a text field / field editor currently holds keyboard focus. Global shortcuts stand down when
@@ -96,6 +99,9 @@ struct ProcessingCommands: Commands {
                 NotificationCenter.default.post(name: .improveOCRRequested, object: nil)
             }
             .keyboardShortcut("i", modifiers: [.command, .shift])
+            Button("Improve OCR on Flagged Files\u{2026}") {
+                NotificationCenter.default.post(name: .improveOCRFlaggedRequested, object: nil)
+            }
             Button("Improve OCR History\u{2026}") {
                 NotificationCenter.default.post(name: .improveOCRHistoryRequested, object: nil)
             }

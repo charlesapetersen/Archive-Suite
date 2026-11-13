@@ -234,6 +234,29 @@ struct ImproveOCRHooks: ViewModifier {
                 showsHistory = true
             }
             .sheet(isPresented: $showsHistory) { ImproveOCRHistoryView() }
+            .onReceive(NotificationCenter.default.publisher(for: .improveOCRFlaggedRequested)) { _ in
+                guard canOpen, selection == nil, !SheetGuard.sheetIsUp else { return }
+                let panel = NSOpenPanel()
+                panel.canChooseDirectories = true
+                panel.canChooseFiles = false
+                panel.prompt = "Find Flagged Files"
+                panel.message = "Choose a folder: Improve OCR opens for the PDFs in it flagged OCR Poor."
+                guard panel.runModal() == .OK, let folder = panel.url else { return }
+                Task.detached {
+                    let found = ReOCRFlaggedFinder.find(in: folder)
+                    await MainActor.run {
+                        if found.files.isEmpty {
+                            message = "No PDF in \(folder.lastPathComponent) is flagged OCR Poor (\(found.scanned) checked)."
+                        } else {
+                            selection = ImproveOCRSelection(files: found.files)
+                            if found.truncated || found.unreadableFolders > 0 {
+                                message = (found.truncated ? "Showing the first \(found.files.count) flagged files. " : "")
+                                    + (found.unreadableFolders > 0 ? "\(found.unreadableFolders) folder(s) could not be read." : "")
+                            }
+                        }
+                    }
+                }
+            }
             .alert("Improve OCR", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("OK") { message = nil }
             } message: {

@@ -25,6 +25,7 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   16. The flagged-files finder returns the PDFs tagged OCR Poor in any spelling, under subfolders, up to a limit.
 ///   15. The history lists each change with its state and size; Remove takes only that change's copy, an undecided one
 ///       too, never one stopped during publication; only an accepted change offers Restore.
 ///   14. A Reader hand-off resolves only files inside the named archive (saved grant, else the person's choice,
@@ -693,6 +694,23 @@ enum ReOCRJobTestDriver {
                 let fresh = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
                 _ = try j.accept(fresh)
                 check("15 a new acceptance offers Restore", h.entries().first { $0.id == fresh.operation.journal.operationID }?.canRestore == true)
+            }
+
+            // 16. The flagged files under a folder, in any spelling, and nothing else.
+            do {
+                let d = try folder("flagged")
+                let sub = d.appendingPathComponent("Box 2", isDirectory: true)
+                try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+                let a = try file(try folder("flagged-a"), pairs: 1), b = try file(try folder("flagged-b"), pairs: 1), c = try file(try folder("flagged-c"), pairs: 1)
+                let fa = d.appendingPathComponent("A.pdf"), fb = sub.appendingPathComponent("B.pdf"), fc = d.appendingPathComponent("C.pdf")
+                try FileManager.default.copyItem(at: a, to: fa); try FileManager.default.copyItem(at: b, to: fb); try FileManager.default.copyItem(at: c, to: fc)
+                try tag(fa, ["OCR Poor", "Q1"]); try tag(fb, ["ocr poor"]); try tag(fc, ["Q2"])
+                let found = ReOCRFlaggedFinder.find(in: d)
+                check("16 the flagged PDFs are found, in any spelling and in subfolders",
+                      found.files.map(\.lastPathComponent) == ["A.pdf", "B.pdf"] && found.scanned == 3 && !found.truncated, "\(found)")
+                let one = ReOCRFlaggedFinder.find(in: d, limit: 1)
+                check("16 a limit is kept and reported", one.files.count == 1 && one.truncated)
+                check("16 finding changes nothing", tags(fc) == ["Q2"] && tags(fa).contains("OCR Poor"))
             }
 
             // 7. A rotated image page.
