@@ -241,12 +241,13 @@ private struct RuleValueView: View {
                 .accessibilityIdentifier("ar.advanced.rule.tags")
         case .quality:
             HStack(spacing: 6) {
-                ForEach([1, 2, 3, 4, 5, 0], id: \.self) { q in
+                ForEach(QualityLevels.all + [0], id: \.self) { q in
                     Toggle(q == 0 ? "none" : "\(q)", isOn: Binding(
                         get: { rule.qualities.contains(q) },
                         set: { if $0 { rule.qualities.insert(q) } else { rule.qualities.remove(q) } }))
                     .toggleStyle(.checkbox)
                     .help(q == 0 ? "No quality tag" : "Quality \(q)")
+                    .accessibilityIdentifier("ar.advanced.rule.quality.\(q == 0 ? "none" : "Q\(q)")")
                 }
             }
         case .readState:

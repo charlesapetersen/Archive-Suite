@@ -11,6 +11,13 @@ enum ReadFilter: String, Sendable, CaseIterable, Codable {
     case all, read, unread, noReadState
 }
 
+/// The quality levels a document can carry: `SPEC/tag-format.md` writes only `Q1`–`Q3`, and unrated is no tag.
+/// The filter bar, the Inspector, the list's Quality pop-up and the Advanced Search form all offer this list, so
+/// they cannot drift apart again (W40.reader-quality-levels: the form offered 1–5).
+enum QualityLevels {
+    static let all = [1, 2, 3]
+}
+
 /// The active filter state of the navigation window.
 struct LibraryFilter: Sendable, Equatable, Codable {
     /// The tag filter: a file must carry every one of them. Matching any of several tags is an Advanced Search

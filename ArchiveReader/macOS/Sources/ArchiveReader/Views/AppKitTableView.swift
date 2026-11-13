@@ -739,7 +739,8 @@ struct AppKitTableView: NSViewRepresentable {
             }
 
             menu.removeAllItems()
-            for value in [nil, 1, 2, 3] as [Int?] {
+            // Item index n is quality n (0 = None), which `qualityMenuChanged` relies on.
+            for value in [nil] + QualityLevels.all.map(Optional.some) {
                 menu.addItem(withTitle: value.map { "Q\($0)" } ?? "None")
             }
             guard let file else {

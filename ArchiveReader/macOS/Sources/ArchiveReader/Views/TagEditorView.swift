@@ -328,7 +328,7 @@ struct TagEditorView: View {
             title("Quality" + (s.commonQuality == nil ? "  (mixed)" : ""))
             HStack {
                 facetButton("None", current: s.commonQuality == .some(nil)) { apply(.setQuality(nil)) }
-                ForEach([1, 2, 3], id: \.self) { q in
+                ForEach(QualityLevels.all, id: \.self) { q in
                     facetButton("Q\(q)", current: s.commonQuality == .some(q)) { apply(.setQuality(q)) }
                 }
             }

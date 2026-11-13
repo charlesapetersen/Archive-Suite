@@ -135,8 +135,36 @@ final class SavedSearchFixtureTests: XCTestCase {
         XCTAssertNil(d.data(forKey: SavedSearchStore.unreadableKey), file: file, line: line)
     }
 
+    /// What loading does on purpose to a frozen builder's searches: quality levels the suite never writes (the
+    /// form offered 4 and 5 until W40.reader-quality-levels) match nothing and are dropped. Nothing else changes.
+    private func asLoadedToday(_ searches: [SavedSearch]) -> [SavedSearch] {
+        func fix(_ r: SearchRule) -> SearchRule {
+            var r = r
+            r.qualities = r.qualities.filter { $0 == 0 || QualityLevels.all.contains($0) }
+            r.children = r.children.map(fix)
+            return r
+        }
+        return searches.map { s in var s = s; s.search.rules = s.search.rules.map(fix); return s }
+    }
+
     func testTheNovember2026FixtureLoadsUnchanged() throws {
-        try assertLoads("saved-searches-2026-11", as: SavedSearchFixtures.november2026)
+        try assertLoads("saved-searches-2026-11", as: asLoadedToday(SavedSearchFixtures.november2026))
+    }
+
+    /// W40.reader-quality-levels: the November fixture saved Quality rows with 0, 2 and 5; they load, keeping
+    /// none and 2. A row of only 4 and 5 loads too, empty, so it is inactive rather than undecodable.
+    func testQualityLevelsTheSuiteNeverWritesAreDroppedOnLoad() throws {
+        let (d, name) = makeDefaults(); defer { d.removePersistentDomain(forName: name) }
+        d.set(try fixture("saved-searches-2026-11"), forKey: "savedSearches")
+        let rules = SavedSearchStore(defaults: d).searches.first { $0.name == "Every operator" }?.search.rules ?? []
+        let quality = rules.filter { $0.field == .quality }
+        XCTAssertEqual(quality.count, RuleField.quality.operators.count)
+        XCTAssertTrue(quality.allSatisfy { $0.qualities == [0, 2] }, "\(quality.map(\.qualities))")
+
+        let json = #"{"field":"quality","op":"is","qualities":[4,5]}"#
+        let rule = try JSONDecoder().decode(SearchRule.self, from: Data(json.utf8))
+        XCTAssertEqual(rule.qualities, [])
+        XCTAssertFalse(rule.isActive)
     }
 
     /// The newest fixture covers every field, operator, read state, date role and combine the form offers. A new

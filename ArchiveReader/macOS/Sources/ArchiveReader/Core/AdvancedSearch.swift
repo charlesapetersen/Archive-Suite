@@ -72,7 +72,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// The "to" date of `between`.
     var text2: String = ""
     var tags: [String] = []
-    /// Quality levels 1–5; 0 stands for "no quality tag".
+    /// Quality levels (`QualityLevels.all`); 0 stands for "no quality tag".
     var qualities: Set<Int> = []
     var read: ReadFilter = .unread
     /// Which date a date row tests. A new row tests the document's own date (W40.suite-date-design: Date means the
@@ -98,7 +98,10 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         text = try c.decodeIfPresent(String.self, forKey: .text) ?? ""
         text2 = try c.decodeIfPresent(String.self, forKey: .text2) ?? ""
         tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
-        qualities = try c.decodeIfPresent(Set<Int>.self, forKey: .qualities) ?? []
+        // A row saved when the form offered 4 and 5 still loads; those levels match nothing, so they are dropped
+        // (W40.reader-quality-levels).
+        qualities = (try c.decodeIfPresent(Set<Int>.self, forKey: .qualities) ?? [])
+            .filter { $0 == 0 || QualityLevels.all.contains($0) }
         read = try c.decodeIfPresent(ReadFilter.self, forKey: .read) ?? .unread
         dateRole = try c.decodeIfPresent(DateRoleChoice.self, forKey: .dateRole) ?? .either
         combine = try c.decodeIfPresent(RuleCombine.self, forKey: .combine) ?? .all

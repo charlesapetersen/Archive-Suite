@@ -84,6 +84,24 @@ final class AdvancedSearchUITests: FixtureUITestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// W40.reader-quality-levels (owner, 2026-11-13: "we only have 1-3, no?"): a Quality row offers Q1, Q2, Q3
+    /// and none, the levels the suite writes, and no 4 or 5.
+    func testQualityRowOffersTheSuitesLevels() throws {
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        app.buttons["ar.filter.advanced"].click()
+        XCTAssertTrue(app.staticTexts["ar.advanced.count"].waitForExistence(timeout: 5), "the form opens")
+        let field = app.popUpButtons.matching(identifier: "ar.advanced.rule.field").element(boundBy: 0)
+        field.click()
+        app.menuItems["Quality"].click()
+        let boxes = app.checkBoxes.matching(NSPredicate(format: "identifier BEGINSWITH %@", "ar.advanced.rule.quality."))
+        XCTAssertTrue(boxes.firstMatch.waitForExistence(timeout: 3))
+        _ = captureScreenshot("w40-advanced-quality-row")
+        XCTAssertEqual(boxes.allElementsBoundByIndex.map(\.identifier),
+                       ["ar.advanced.rule.quality.Q1", "ar.advanced.rule.quality.Q2", "ar.advanced.rule.quality.Q3",
+                        "ar.advanced.rule.quality.none"], "four boxes: 1, 2, 3 and none")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     /// W40.fix-reader-advanced-many-rules (owner, 2026-11-10: rules past about seven "get added for a little bit
     /// and then dropped"): twelve rules added one by one, each from the last row's +, all stay in the form while
     /// it counts, and all come back when the form reopens on the search in effect.

@@ -15816,3 +15816,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   and B to its top; fitted or unkeyed panes remember nothing), the Reader unit bundle (857, 0 failures), and in
   the Tart VM `ViewerUITests` (20, 0 failures). No new warnings. Bench cache: nothing written.
   <!-- /W40.reader-page-position-memory -->
+- [x] **W40.reader-quality-levels — Advanced Search offers Quality 1–5; the suite has 1–3** · §Archive Reader — the owner's notes of 2026-11-13 · SHIPPED 2026-11-13
+  Owner, 2026-11-13: "Advanced search provides quality levels 1-5. But we only have 1-3, no?" One list,
+  `QualityLevels.all` (`Core/LibraryFilter.swift`, [1, 2, 3], per `SPEC/tag-format.md`), now feeds the Advanced
+  Search Quality row (1, 2, 3 and none), the filter bar's Q buttons, the Inspector's quality buttons and the list's
+  Quality pop-up. `SearchRule` drops any level outside that list (0 = none is kept) when it decodes, so a smart
+  folder saved with 4 or 5 still loads; a row of only 4 and 5 loads empty and is inactive (skipped) rather than
+  matching nothing. No migration beyond that decode filter: nothing real to migrate. The frozen 2026-11 fixture
+  is untouched; its test compares against the builder with that one load transform applied.
+  Verified: `SavedSearchFixtureTests` (new: the fixture's 0/2/5 rows load as 0/2; a 4/5 row decodes empty and
+  inactive), the Reader unit bundle (858, 0 failures), and in the Tart VM `AdvancedSearchUITests` (new
+  `testQualityRowOffersTheSuitesLevels`: four boxes, Q1 Q2 Q3 none). No new warnings. Bench cache: nothing written.
+  <!-- /W40.reader-quality-levels -->

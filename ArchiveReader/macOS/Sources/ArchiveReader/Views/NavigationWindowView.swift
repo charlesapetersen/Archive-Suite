@@ -546,7 +546,7 @@ struct NavigationWindowView: View {
 
         HStack(spacing: 4) {
             // Q1 → Q3, the order of the row Quality pop-up and the tag editor (W40.fix-reader-visual-polish).
-            ForEach([1, 2, 3], id: \.self) { q in
+            ForEach(QualityLevels.all, id: \.self) { q in
                 Toggle("Q\(q)", isOn: Binding(
                     get: { model.filter.qualities.contains(q) },
                     set: { on in
