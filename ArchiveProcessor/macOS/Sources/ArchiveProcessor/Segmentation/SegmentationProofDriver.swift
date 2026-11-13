@@ -252,7 +252,7 @@ enum SegmentationProofDriver {
                 for k in p.flaggedGapItems.indices {
                     let item = p.flaggedGapItems[k]
                     let want: GapDecision = truthNew(labels, gap: item.id) ? .new : .continue
-                    p.flaggedGapItems[k].answer = item.proposal == want ? .keep : (want == .new ? .split : .join)
+                    p.flaggedGapItems[k].answer = FlaggedGapAnswer(want)
                 }
                 flagged = p.flaggedGapItems
                 p.confirmFlaggedReview()
@@ -277,7 +277,7 @@ enum SegmentationProofDriver {
         let flaggedIDs = Set(flagged.map(\.id))
         let unflaggedWrong = (0..<gaps).filter { !flaggedIDs.contains($0) && before[$0] != truth[$0] }.count
         let noAnswer = flagged.filter { $0.confidence <= 0 }.count
-        let changed = flagged.filter { $0.answer != .keep }.count
+        let changed = flagged.filter { $0.decision != $0.proposal }.count
         let windows = WindowLayout.windows(pageCount: labels.count, pages: spec.windowPages, stride: spec.windowStride)
         let expected = Set(spec.voters.flatMap { voter in
             windows.map { WindowKey(voter: voter.name, pages: 0, start: $0.lowerBound, end: $0.upperBound) }

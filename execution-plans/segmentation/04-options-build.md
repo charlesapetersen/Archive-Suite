@@ -358,12 +358,14 @@ switch for the existing skim sheet, which is forced on for these approaches (bel
 **The flagged pass** is a new sheet beside `DocumentSegmentReviewSheet`, and it shows one flagged gap at a time:
 
 - page n on the left and page n+1 on the right, each at reading size;
-- above them, the proposal ("New document starts here", or "Same document continues"), its confidence in words
-  (low / very low) and the model's cue, truncated;
-- three actions:
-  - **Keep** accepts the proposal (Return).
+- one question, does page n+1 start a new document or continue page n, with two actions:
   - **Split** makes n+1 start a document (S).
   - **Join** makes n+1 continue n (J).
+- no proposal, confidence or cue (owner, 2026-11-12; W46.seg-check-blind). A Keep that accepted the proposal asked
+  the user to judge the model and the pages at once, and a cue usually shows which way the model leaned. On the 92
+  timing-pack gaps the proposal is right 80 times, the same as answering "continue" every time, so showing it gives
+  the user nothing to go on. The app keeps the proposal internally for the count line, and a run saved with a
+  `keep` answer resumes with it read as the proposal;
 - ← / → move between gaps, and an action is never final until the pass is done;
 - a counter, "12 of 37";
 - "Done" is enabled only when every flagged gap has been answered, because the figures assume each one is checked;

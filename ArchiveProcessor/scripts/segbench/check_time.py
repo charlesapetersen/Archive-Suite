@@ -174,7 +174,11 @@ def cmd_score(a):
     m, lo, hi = mean_ci(xs)
     mk, lok, hik = mean_ci(kept) if kept else (None, None, None)
     ans = {it["key"]: it["answer"] for it in run["items"]}
-    decision = {k: {"keep": truth[k]["proposal"], "split": "new", "join": "continue"}[ans[k]] for k in keys}
+    # The sheet asks only Split or Join (W46.seg-check-blind); a log with any other answer is not from that sheet.
+    odd = sorted({ans[k] for k in keys} - {"split", "join"})
+    if odd:
+        raise SystemExit(f"the log holds answers the sheet no longer offers: {odd}; rerun on the current app")
+    decision = {k: {"split": "new", "join": "continue"}[ans[k]] for k in keys}
     scored = [k for k in keys if not truth[k]["unsure"]]
     wrong = [k for k in scored if decision[k] != truth[k]["truth"]]
     prop_wrong = [k for k in scored if truth[k]["proposal"] != truth[k]["truth"]]

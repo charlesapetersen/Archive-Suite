@@ -271,7 +271,7 @@ final class VisualReviewUITests: XCTestCase {
                 element("flaggedReview.split").click()
                 pause(0.5)
                 shoot("flagged-review-second")
-                element("flaggedReview.keep").click()
+                element("flaggedReview.join").click()
                 pause(0.5)
                 shoot("flagged-review-answered")
             } else { missing.append("flagged review") }

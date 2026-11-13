@@ -126,9 +126,15 @@ enum SegmentationReviewTestDriver {
         eq("1 a resumed batch segments as Manual", batch.segmentationApproach, .manual)
 
         // 2. The pure half.
-        eq("2 keep follows the proposal", FlaggedGapAnswer.keep.decision(proposed: .continue), .continue)
-        eq("2 split starts a document", FlaggedGapAnswer.split.decision(proposed: .continue), .new)
-        eq("2 join continues", FlaggedGapAnswer.join.decision(proposed: .new), .continue)
+        eq("2 only two answers", FlaggedGapAnswer.allCases, [.split, .join])
+        eq("2 split starts a document", FlaggedGapAnswer.split.decision, .new)
+        eq("2 join continues", FlaggedGapAnswer.join.decision, .continue)
+        eq("2 a saved keep resolves to the proposal",
+           [SavedGapAnswer.keep.answer(proposed: .new), SavedGapAnswer.keep.answer(proposed: .continue)],
+           [.split, .join])
+        eq("2 a saved split or join ignores the proposal",
+           [SavedGapAnswer.split.answer(proposed: .continue), SavedGapAnswer.join.answer(proposed: .new)],
+           [.split, .join])
 
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("APSegReviewTest-\(UUID().uuidString)", isDirectory: true)
@@ -149,18 +155,25 @@ enum SegmentationReviewTestDriver {
         eq("2 the flagged gaps, in order", items.map(\.id), [2, 3])
         eq("2 page n beside page n+1", items.first.map { [$0.leftURL, $0.rightURL] } ?? [], [urls[2], urls[3]])
         eq("2 rotation carried", items.first?.leftRotation, 90)
-        eq("2 confidence in words", items.map(\.confidenceText), ["very low confidence", "low confidence"])
+        eq("2 the proposal is kept internally", items.map(\.proposal), [.continue, .continue])
         check("2 not done with an unanswered gap", !FlaggedReview.isComplete(items))
         items[0].answer = .split
-        items[1].answer = .keep
+        items[1].answer = .join
         check("2 done once every gap is answered", FlaggedReview.isComplete(items))
         eq("2 classifications", FlaggedReview.classifications(proposals: proposals, photoKinds: kinds, answers: items),
            [.folderLabel, .documentStart, .documentStart, .documentStart, .documentContinuation, .documentContinuation])
         eq("2 answers keyed by the page after the gap", FlaggedReview.answersByPage(items),
-           [urls[3].path: .split, urls[4].path: .keep])
+           [urls[3].path: .split, urls[4].path: .join])
         let again = FlaggedReview.items(proposals: proposals, pages: pages, rotations: [],
                                         prior: FlaggedReview.answersByPage(items))
-        eq("2 a recorded answer is offered again", again.map(\.answer), [.split, .keep])
+        eq("2 a recorded answer is offered again", again.map(\.answer), [.split, .join])
+        // A run saved before W46.seg-check-blind holds `keep`; it must decode and not be asked again.
+        let oldJSON = Data(#"{"\#(urls[3].path)":"keep","\#(urls[4].path)":"split"}"#.utf8)
+        let oldSaved = try? JSONDecoder().decode([String: SavedGapAnswer].self, from: oldJSON)
+        eq("2 a saved keep decodes", oldSaved?[urls[3].path], .keep)
+        eq("2 a saved keep is answered as the proposal",
+           FlaggedReview.items(proposals: proposals, pages: pages, rotations: [], prior: oldSaved ?? [:])
+               .map(\.answer), [.join, .split])
         eq("2 count line", FlaggedReview.summary(items), "2 boundaries checked, 1 changed")
         eq("2 no count line without flagged gaps", FlaggedReview.summary([]), nil)
 
@@ -249,7 +262,7 @@ enum SegmentationReviewTestDriver {
         check("5 the flagged pass opens", await waitFor { p.awaitingFlaggedReview })
         eq("5 three windows asked", Set(fake.calls), [[1, 2, 3, 4], [1, 2, 3, 4, 5, 6], [4, 5, 6]])
         eq("5 one flagged gap, pages 3 and 4", p.flaggedGapItems.map { [$0.id, $0.answer == nil ? 0 : 1] }, [[2, 0]])
-        eq("5 its proposal", p.flaggedGapItems.first?.proposalText, "Same document continues")
+        eq("5 its proposal, kept internally", p.flaggedGapItems.first?.proposal, .continue)
         eq("5 the window answers were saved", saved.last?.segmentationWindows?.count, 3)
         p.confirmFlaggedReview()
         check("5 Done refused while a gap is unanswered", p.awaitingFlaggedReview)

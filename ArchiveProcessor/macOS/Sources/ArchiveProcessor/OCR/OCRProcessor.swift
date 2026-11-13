@@ -678,7 +678,7 @@ class OCRProcessor: ObservableObject {
         /// fingerprint: they are the run's own progress after OCR, rewritten as it goes, and only ever a
         /// proposal the user reviews before anything is written.
         var segmentationWindows: [WindowKey: WindowAnswer]? = nil
-        var segmentationAnswers: [String: FlaggedGapAnswer]? = nil
+        var segmentationAnswers: [String: SavedGapAnswer]? = nil
         /// The settings layers as they resolved when the run started (W46.settings-layers): a record of what
         /// produced it, read by nothing that decides how the run goes, so outside the fingerprint. A resume keeps it.
         var resolvedSettings: ResolvedSettingsSnapshot? = nil

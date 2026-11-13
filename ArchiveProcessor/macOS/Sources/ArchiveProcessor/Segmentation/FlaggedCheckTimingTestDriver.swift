@@ -172,16 +172,16 @@ enum FlaggedCheckTimingTestDriver {
         // 1. The recorder on a fixed sequence: shown, answered (focus moves on), moved back, changed, done.
         var r = Recorder(count: 3)
         r.observe(t: 0, focus: 0, answers: [nil, nil, nil])
-        r.observe(t: 4, focus: 0, answers: [.keep, nil, nil])
-        r.observe(t: 4, focus: 1, answers: [.keep, nil, nil])
-        r.observe(t: 9, focus: 1, answers: [.keep, nil, nil])          // nothing changed: no event
-        r.observe(t: 11, focus: 0, answers: [.keep, nil, nil])
+        r.observe(t: 4, focus: 0, answers: [.join, nil, nil])
+        r.observe(t: 4, focus: 1, answers: [.join, nil, nil])
+        r.observe(t: 9, focus: 1, answers: [.join, nil, nil])          // nothing changed: no event
+        r.observe(t: 11, focus: 0, answers: [.join, nil, nil])
         r.observe(t: 15, focus: 0, answers: [.split, nil, nil])
         r.observe(t: 15, focus: 7, answers: [.split, nil, nil])        // clamped to the last gap
         r.end(t: 20, done: true)
         r.end(t: 30, done: false)                                       // only the first end counts
         r.observe(t: 31, focus: 0, answers: [nil, nil, nil])           // nothing after the end
-        let want: [Event] = [Event(t: 0, kind: "focus", index: 0), Event(t: 4, kind: "answer", index: 0, answer: "keep"),
+        let want: [Event] = [Event(t: 0, kind: "focus", index: 0), Event(t: 4, kind: "answer", index: 0, answer: "join"),
                              Event(t: 4, kind: "focus", index: 1), Event(t: 11, kind: "focus", index: 0),
                              Event(t: 15, kind: "answer", index: 0, answer: "split"), Event(t: 15, kind: "focus", index: 2),
                              Event(t: 20, kind: "done")]
@@ -224,7 +224,7 @@ enum FlaggedCheckTimingTestDriver {
               && processor.flaggedGapItems[1].leftRotation == 90 && processor.flaggedReviewApproachName == "Gemini")
         check("2 Done is not offered yet", !FlaggedReview.isComplete(processor.flaggedGapItems))
         clock.t = 6
-        processor.flaggedGapItems[0].answer = .keep
+        processor.flaggedGapItems[0].answer = .join
         processor.flaggedGapFocus = 1
         let partial = (try? Data(contentsOf: out)).flatMap { try? JSONDecoder().decode(Run.self, from: $0) }
         check("2 the log is on disk before Done", partial?.done == nil && partial?.events.count == 3,
@@ -236,10 +236,10 @@ enum FlaggedCheckTimingTestDriver {
         let run = await task.value
         let saved = (try? Data(contentsOf: out)).flatMap { try? JSONDecoder().decode(Run.self, from: $0) }
         check("2 Done ends the log", saved?.done == true && saved?.events.last == Event(t: 15, kind: "done"))
-        check("2 the answers by key", saved?.items == [RunItem(key: "T 1|2", answer: "keep"),
+        check("2 the answers by key", saved?.items == [RunItem(key: "T 1|2", answer: "join"),
                                                       RunItem(key: "T 2|3", answer: "split")])
         check("2 the events", saved?.events == [Event(t: 0, kind: "focus", index: 0),
-                                                Event(t: 6, kind: "answer", index: 0, answer: "keep"),
+                                                Event(t: 6, kind: "answer", index: 0, answer: "join"),
                                                 Event(t: 6, kind: "focus", index: 1),
                                                 Event(t: 13.5, kind: "answer", index: 1, answer: "split"),
                                                 Event(t: 15, kind: "done")], "got \(String(describing: saved?.events))")

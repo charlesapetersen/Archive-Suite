@@ -201,15 +201,20 @@ final class ProcessorUITests: XCTestCase {
     }
 
     /// W36.seg-opt-review: one flagged pass, page n beside page n+1. Done waits for every gap's answer, an
-    /// answer moves to the next gap, and the answers come back in order. Synthetic pages, no run behind it.
+    /// answer moves to the next gap, and the answers come back in order. W46.seg-check-blind: only Split and Join
+    /// are offered, and the model's proposal is not shown. Synthetic pages, no run behind it.
     func testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone() throws {
         relaunch(extra: ["-APUITestFlaggedReview"])
 
         let counter = element("flaggedReview.counter")
         XCTAssertTrue(counter.waitForExistence(timeout: 10), "the flagged pass must open")
         XCTAssertTrue(renderedText(of: counter).contains("1 of 2"), "the counter starts at the first gap")
-        XCTAssertTrue(renderedText(of: element("flaggedReview.proposal")).contains("Same document continues"),
-                      "the first gap shows its proposal")
+        XCTAssertFalse(element("flaggedReview.proposal").exists, "the sheet does not show the model's proposal")
+        XCTAssertFalse(element("flaggedReview.keep").exists, "the sheet asks only Split or Join")
+        let cue = NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", "letter seems", "letter seems")
+        XCTAssertFalse(app.staticTexts.matching(cue).firstMatch.exists, "the model's cue is not shown")
+        XCTAssertTrue(element("flaggedReview.split").exists && element("flaggedReview.join").exists,
+                      "the sheet offers Split and Join")
         let done = element("flaggedReview.done")
         XCTAssertFalse(done.isEnabled, "Done must wait until every flagged gap is answered")
         attachScreenshot("processor-flagged-review-first-gap")
@@ -218,13 +223,13 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(waitUntil { self.renderedText(of: counter).contains("2 of 2") },
                       "an answer moves on to the next unanswered gap")
         XCTAssertFalse(done.isEnabled, "one gap is still unanswered")
-        element("flaggedReview.keep").click()
+        element("flaggedReview.join").click()
         XCTAssertTrue(waitUntil { done.isEnabled }, "Done is enabled once every gap is answered")
         done.click()
 
         let result = element("ap.uitest.flaggedResult")
         XCTAssertTrue(result.waitForExistence(timeout: 10), "Done must close the pass and return the answers")
-        XCTAssertTrue(renderedText(of: result).contains("done=true split,keep"),
+        XCTAssertTrue(renderedText(of: result).contains("done=true split,join"),
                       "the answers come back in gap order: \(renderedText(of: result))")
     }
 

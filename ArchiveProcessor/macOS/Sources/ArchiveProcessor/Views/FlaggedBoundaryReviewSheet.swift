@@ -3,9 +3,10 @@ import SwiftUI
 // MARK: - The review of flagged boundaries (W36.seg-opt-review)
 
 /// One flagged gap at a time, page n on the left and page n+1 on the right
-/// (execution-plans/segmentation/04-options-build.md Part 3 §5). Keep accepts the proposal, Split makes the right
-/// page start a document, Join makes it continue the left one. An answer is never final until Done, which is
-/// enabled only once every flagged gap has one; Escape cancels the run, and nothing is written.
+/// (execution-plans/segmentation/04-options-build.md Part 3 §5). It asks one question: Split makes the right page
+/// start a document, Join makes it continue the left one. The model's proposal, its confidence and its cue are not
+/// shown, since a cue usually gives away which way the model leaned (W46.seg-check-blind). An answer is never final
+/// until Done, which is enabled only once every flagged gap has one; Escape cancels the run, and nothing is written.
 struct FlaggedBoundaryReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
 
@@ -26,7 +27,6 @@ struct FlaggedBoundaryReviewSheet: View {
             footer
         }
         .frame(minWidth: 900, minHeight: 600)
-        .onKeyPress(.return) { answer(.keep); return .handled }
         .onKeyPress(characters: ["s", "S"]) { _ in answer(.split); return .handled }
         .onKeyPress(characters: ["j", "J"]) { _ in answer(.join); return .handled }
         .onKeyPress(.leftArrow) { move(-1); return .handled }
@@ -46,7 +46,7 @@ struct FlaggedBoundaryReviewSheet: View {
                 Text((processor.flaggedReviewPartnerName.map {
                         "\(processor.flaggedReviewApproachName) and \($0) disagree about these boundaries, or one of them gave no answer. "
                     } ?? "\(processor.flaggedReviewApproachName) was unsure about these boundaries. ")
-                     + "Keys: Return=Keep  S=Split  J=Join  \u{2190}\u{2192}=Move")
+                     + "Does the right page start a new document, or continue the left one? Keys: S=Split  J=Join  \u{2190}\u{2192}=Move")
                     .font(.caption)
                     .foregroundStyle(.primary)
             }
@@ -61,24 +61,13 @@ struct FlaggedBoundaryReviewSheet: View {
 
     private func gap(_ item: FlaggedGapItem) -> some View {
         VStack(spacing: 12) {
-            VStack(spacing: 4) {
-                Text(item.proposalText)
-                    .font(.headline)
-                    .accessibilityIdentifier("flaggedReview.proposal")
-                Text(item.confidenceText + (item.shortCue.isEmpty ? "" : " · \(item.shortCue)"))
-                    .font(.caption)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, 8)
             HStack(spacing: 16) {
                 page(item.leftURL, rotation: item.leftRotation, caption: "Page before")
                 page(item.rightURL, rotation: item.rightRotation, caption: "Page after")
             }
             .padding(.horizontal)
+            .padding(.top, 8)
             HStack(spacing: 12) {
-                choice("Keep", .keep, item, help: "Accept the proposal (Return)")
                 choice("Split", .split, item, help: "The right page starts a new document (S)")
                 choice("Join", .join, item, help: "The right page continues the left one (J)")
             }
@@ -99,7 +88,7 @@ struct FlaggedBoundaryReviewSheet: View {
     }
 
     /// The chosen answer is drawn accent-filled, the others plain, so the pick reads at a glance and is not
-    /// confused with Keep's focus ring (W40.fix-processor-flagged-page-edges).
+    /// confused with a focus ring (W40.fix-processor-flagged-page-edges).
     private func choice(_ title: String, _ a: FlaggedGapAnswer, _ item: FlaggedGapItem, help: String) -> some View {
         let chosen = item.answer == a
         return Button { answer(a) } label: {
@@ -146,7 +135,7 @@ struct FlaggedBoundaryReviewSheet: View {
     }
 }
 
-/// Keep / Split / Join. `.borderedProminent` would mark the pick, but macOS greys it out whenever the
+/// Split / Join. `.borderedProminent` would mark the pick, but macOS greys it out whenever the
 /// window is not key, which leaves picked and unpicked alike again; this fill holds in either state.
 private struct FlaggedChoiceButtonStyle: ButtonStyle {
     let chosen: Bool

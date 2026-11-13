@@ -67,7 +67,7 @@ enum ReviewCorrectionsTestDriver {
                          proposal(2, .continue, flagged: true), proposal(3, .continue), proposal(4, .continue),
                          proposal(5, .new)]
         let pages = (0..<7).map { ReviewedPage(name: "IMG_\($0).jpg", sha256: nil, output: "IMG_\($0).pdf") }
-        let items = [item(1, .continue, .keep), item(2, .continue, .split)]
+        let items = [item(1, .continue, .join), item(2, .continue, .split)]
         let afterFlagged: [DocumentClassification] = [.boxLabel, .documentStart, .documentContinuation, .documentStart,
                                                       .documentContinuation, .documentContinuation, .documentStart]
         var final: [DocumentClassification?] = afterFlagged

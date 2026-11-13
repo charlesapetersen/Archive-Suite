@@ -926,7 +926,7 @@ extension OCRProcessor {
     /// resume asks neither the model nor the user again. A no-op outside a non-batch run (a batch's journal is
     /// retired before segmentation, and a pre-OCRed run has none).
     func persistWindowSegmentationProgress(windows: [WindowKey: WindowAnswer]? = nil,
-                                           answers: [String: FlaggedGapAnswer]? = nil) {
+                                           answers: [String: SavedGapAnswer]? = nil) {
         guard var run = activePendingRun else { return }
         if let windows { run.segmentationWindows = windows }
         if let answers { run.segmentationAnswers = (run.segmentationAnswers ?? [:]).merging(answers) { $1 } }

@@ -60,16 +60,28 @@ enum SegmentationPlan: Equatable, Sendable {
 
 // MARK: - The flagged pass
 
-/// The user's answer to one flagged gap (§5): Keep accepts the proposal, Split makes page n+1 start a document,
-/// Join makes it continue page n.
+/// The user's answer to one flagged gap (§5): Split makes page n+1 start a document, Join makes it continue
+/// page n. The sheet asks only that, without the model's proposal (W46.seg-check-blind).
 enum FlaggedGapAnswer: String, Sendable, Codable, CaseIterable {
-    case keep, split, join
+    case split, join
 
-    func decision(proposed: GapDecision) -> GapDecision {
+    var decision: GapDecision { self == .split ? .new : .continue }
+
+    init(_ decision: GapDecision) { self = decision == .new ? .split : .join }
+}
+
+/// An answer as a saved run holds it. A run saved before W46.seg-check-blind can hold `keep`, which accepted the
+/// proposal; it resolves to the answer that proposal gives, so a resumed run does not ask again.
+enum SavedGapAnswer: String, Sendable, Codable, Equatable {
+    case split, join, keep
+
+    init(_ answer: FlaggedGapAnswer) { self = answer == .split ? .split : .join }
+
+    func answer(proposed: GapDecision) -> FlaggedGapAnswer {
         switch self {
-        case .keep: return proposed
-        case .split: return .new
-        case .join: return .continue
+        case .split: return .split
+        case .join: return .join
+        case .keep: return FlaggedGapAnswer(proposed)
         }
     }
 }
@@ -87,25 +99,7 @@ struct FlaggedGapItem: Identifiable, Equatable, Sendable {
     let cue: String
     var answer: FlaggedGapAnswer?
 
-    var decision: GapDecision? { answer?.decision(proposed: proposal) }
-
-    /// The proposal as the user reads it.
-    var proposalText: String {
-        proposal == .new ? "New document starts here" : "Same document continues"
-    }
-
-    /// The confidence in words. Every flagged gap is at or below its approach's level, so it is low or worse;
-    /// 0 means a voter gave no answer.
-    var confidenceText: String {
-        if confidence <= 0 { return "no answer from the model" }
-        return confidence < 0.7 ? "very low confidence" : "low confidence"
-    }
-
-    /// The model's cue, shortened for the line above the pages.
-    var shortCue: String {
-        let c = cue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return c.count > 160 ? String(c.prefix(160)) + "…" : c
-    }
+    var decision: GapDecision? { answer?.decision }
 }
 
 /// The pages a run's windows cover: every file not removed, in run order, with its job index.
@@ -119,13 +113,13 @@ enum FlaggedReview {
     /// The gaps to ask about, in run order, with any answer already recorded for this run (`prior`, keyed by
     /// the path of the page after the gap, so a resume that sees the same pages does not ask again).
     static func items(proposals: [GapProposal], pages: WindowStagePages, rotations: [Int],
-                      prior: [String: FlaggedGapAnswer] = [:]) -> [FlaggedGapItem] {
+                      prior: [String: SavedGapAnswer] = [:]) -> [FlaggedGapItem] {
         proposals.filter { $0.flagged && !$0.fixed && $0.gap + 1 < pages.urls.count }.map { p in
             FlaggedGapItem(id: p.gap, leftURL: pages.urls[p.gap], rightURL: pages.urls[p.gap + 1],
                            leftRotation: p.gap < rotations.count ? rotations[p.gap] : 0,
                            rightRotation: p.gap + 1 < rotations.count ? rotations[p.gap + 1] : 0,
                            proposal: p.decision, confidence: p.confidence, cue: p.cue,
-                           answer: prior[pages.urls[p.gap + 1].path])
+                           answer: prior[pages.urls[p.gap + 1].path]?.answer(proposed: p.decision))
         }
     }
 
@@ -133,8 +127,9 @@ enum FlaggedReview {
     static func isComplete(_ items: [FlaggedGapItem]) -> Bool { items.allSatisfy { $0.answer != nil } }
 
     /// The answers to record in the run's manifest, keyed as `items(prior:)` reads them.
-    static func answersByPage(_ items: [FlaggedGapItem]) -> [String: FlaggedGapAnswer] {
-        Dictionary(items.compactMap { i in i.answer.map { (i.rightURL.path, $0) } }, uniquingKeysWith: { $1 })
+    static func answersByPage(_ items: [FlaggedGapItem]) -> [String: SavedGapAnswer] {
+        Dictionary(items.compactMap { i in i.answer.map { (i.rightURL.path, SavedGapAnswer($0)) } },
+                   uniquingKeysWith: { $1 })
     }
 
     /// Each page's classification, from the proposals and the user's answers: a label photo stays a label, the

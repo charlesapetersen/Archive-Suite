@@ -4,10 +4,10 @@
 # takes. Interactive, on the owner's screen; about half an hour at the 20 s the settings sheet assumes. $0: no model
 # call, no key, no network; nothing is written but the log below (no run, manifest, tag or output).
 #
-#   ArchiveProcessor/scripts/time-flagged-checks.sh           # build if needed, open the sheet, score when done
+#   ArchiveProcessor/scripts/time-flagged-checks.sh           # build if stale, open the sheet, score when done
 #
-# Answer each gap as you would in a real run (Return = Keep, S = Split, J = Join), at your normal pace; Done when all
-# are answered. Take a break by leaving the sheet as it is: a stay over 120 s on one gap is reported as a pause.
+# Answer each gap as you would in a real run: does the right page start a new document (S = Split) or continue the
+# left one (J = Join)? The sheet does not show the model's proposal. At your normal pace; Done when all are answered. Take a break by leaving the sheet as it is: a stay over 120 s on one gap is reported as a pause.
 # Notes for the scoring session go in the notes file the script names. Cancel Run (Escape) stops with the log kept.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -24,7 +24,11 @@ cache="$HOME/Library/Caches/ArchiveSuiteRehearsal/seg-check-time"
 [ -f "$cache/pack.json" ] || "$py" scripts/segbench/check_time.py pack
 
 bin="$here/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
-if [ ! -x "$bin" ]; then
+# Build when the app is missing or older than any of its sources: on 2026-11-12 the primary checkout's app dated from
+# 31 October, had no timing driver, and would have opened with no log (W46.seg-check-blind).
+if [ ! -x "$bin" ] || [ -n "$(find macOS/Sources macOS/project.yml ../packages/ArchiveCore/Sources ../packages/ArchiveCore/Package.swift \
+        -newer "$bin" -type f -print -quit 2>/dev/null)" ]; then
+    echo "Building the Debug app (missing or older than its sources)..."
     (cd macOS && xcodegen generate >/dev/null && \
      xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build -quiet)
 fi
