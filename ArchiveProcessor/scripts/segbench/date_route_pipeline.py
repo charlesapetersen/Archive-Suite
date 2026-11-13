@@ -28,6 +28,8 @@ date_image already read or rendered the same way are reused from their caches, n
     python3 date_route_pipeline.py sample            # the two sets and their neighbours -> CACHE/targets.jsonl ($0)
     python3 ops/autonomous/heavy-run.py run -- python3 date_route_pipeline.py vision    # orient + Vision, resumable
     python3 date_route_pipeline.py run [--limit N]   # Gemini 3.7 Flash through the gateway (paid, CAP)
+    python3 date_route_pipeline.py rerender / check  # rebuild img/ from orient.json; requests against the 3.7 hashes
+    python3 date_route_pipeline.py run38 [--limit N] # step 2 on Gemini 3.8, direct key (paid, CAP38; -pipeline-38)
     python3 date_route_pipeline.py export --out DIR [--remote R]   # the same requests for the 27B on Sherlock
     python3 date_route_pipeline.py pack --src DIR    # the export as a frozen Sherlock pack (sherlock/date-route-27b/)
     python3 date_route_pipeline.py collect           # the pack's returned answers -> CACHE/answers-27b.jsonl
@@ -80,6 +82,12 @@ QWEN_ANSWERS = CACHE / "answers-27b.jsonl"
 CACHED_OWNER_IMAGE = DI.PACK / "gateway" / "gemini3.7-flash-gw-2400"
 CACHED_OWNER_IMAGE_LEDGER = DI.PACK / "gateway" / "calls.jsonl"
 CACHED_QWEN_IMAGE = DI.CLUSTER / "out"
+# W46.date-route-pipeline-38: the image pass on a direct Gemini key (3.8; real money on the owner's key).
+GEMINI38 = "gemini3.8-flash-direct-image"
+DIRECT_MODEL = DT.MODEL                     # gemini-3.8-flash, the app's default
+LEDGER38 = CACHE / "calls-38.jsonl"
+CAP38 = 1.50          # the item's total; estimate about $0.55 (about 180 image replies at $0.003)
+WORST_IMAGE_38 = (6000 * DT.PRICE_IN + DU.DI_MAX * DT.PRICE_OUT) / 1e6
 _lock = threading.Lock()
 
 
@@ -348,6 +356,156 @@ def cmd_run(a):
         res = list(ex.map(lambda j: call(*j), jobs))
     print(f"{sum(bool(r.get('text')) for r in res)}/{len(res)} answered, ${spent():.4f} spent in all "
           f"({G.billed_note(ledger())})", flush=True)
+
+
+# --- the image pass on Gemini 3.8, direct key (W46.date-route-pipeline-38) --------------------------------------
+# The gateway serves only 3.7, so step 2 on a direct Gemini key (the app's default, 3.8) had no row (P7-4). The same
+# images and prompt as date_undated.image_body, on the Gemini API's own request (what the app's direct-key client
+# sends): temperature 0, thinkingLevel low, 4,096 output tokens. Steps 1 and 4 keep the gateway's 3.7 trace replies,
+# so the row differs from Gemini 3.7's in the image pass alone.
+
+def image_body_38(images):
+    import base64
+    parts = [{"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(b).decode()}} for b in images]
+    return {"contents": [{"role": "user", "parts": parts + [{"text": DI.PROMPT}]}],
+            "generationConfig": {"temperature": 0, "maxOutputTokens": DU.DI_MAX,
+                                 "thinkingConfig": {"thinkingLevel": "low"}}}
+
+
+def image38_dest(d):
+    return CACHE / "image-38" / (d["id"].replace(":", "_") + ".json")
+
+
+def spent38():
+    return sum(r.get("cost") or 0 for r in ledger(LEDGER38))
+
+
+def cost38(u):
+    """Thinking is billed as output (date_tagging.PRICE_IN/OUT, 3.8 Flash's list price)."""
+    return ((u.get("promptTokenCount") or 0) * DT.PRICE_IN +
+            ((u.get("candidatesTokenCount") or 0) + (u.get("thoughtsTokenCount") or 0)) * DT.PRICE_OUT) / 1e6
+
+
+_key = []
+
+
+def direct_key():
+    """The Processor's Gemini key, read once from the Keychain into memory (method_gemini.api_key's lookup, without its
+    imports). Never printed or written."""
+    with _lock:
+        if not _key:
+            r = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", "com.archiveprocessor.app", "-a",
+                                "Gemini", "-w"], capture_output=True, text=True, timeout=30)
+            if r.returncode != 0 or not r.stdout.strip():
+                raise SystemExit("no Gemini key in the Keychain (com.archiveprocessor.app / Gemini)")
+            _key.append(r.stdout.strip())
+        return _key[0]
+
+
+def call38(key, b, dest: Path):
+    """One direct-key reply, cached by destination; the ledger line is written before the reply is used."""
+    if dest.exists():
+        return json.loads(dest.read_text())
+    import requests
+    with _lock:
+        if spent38() + WORST_IMAGE_38 > CAP38:
+            raise SystemExit(f"cap: ${spent38():.4f} spent of ${CAP38}")
+    t = time.time()
+    r = None
+    for attempt in range(4):
+        try:
+            r = requests.post(DT.API.format(model=DIRECT_MODEL), json=b, timeout=180,
+                              headers={"x-goog-api-key": direct_key(), "Content-Type": "application/json"})
+        except requests.RequestException as e:
+            print(key, "network", type(e).__name__, flush=True)
+            r = None
+        if r is not None and r.status_code not in (429, 500, 502, 503, 504):
+            break
+        time.sleep(10 * (attempt + 1))
+    status = r.status_code if r is not None else 0
+    got = r.json() if r is not None and r.headers.get("content-type", "").startswith("application/json") else {}
+    usage = got.get("usageMetadata") or {}
+    rec = {"id": key, "http": status, "t": t, "wall_s": round(time.time() - t, 3), "model": got.get("modelVersion"),
+           "usage": usage, "cost": round(cost38(usage), 6),
+           "request_sha256": hashlib.sha256(json.dumps(b, sort_keys=True).encode()).hexdigest()}
+    with _lock:
+        CACHE.mkdir(parents=True, exist_ok=True)
+        with LEDGER38.open("a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    cand = (got.get("candidates") or [{}])[0]
+    text = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts") or []
+                   if not p.get("thought")) or None
+    out = {"id": key, "text": text if status == 200 else None, "finish": cand.get("finishReason"),
+           "seconds": rec["wall_s"], "tokens": [usage.get("promptTokenCount"), usage.get("candidatesTokenCount"),
+                                                usage.get("thoughtsTokenCount")], "model": DIRECT_MODEL}
+    if status == 200 and text:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    else:
+        print(key, status, out["finish"], json.dumps(got)[:300], flush=True)
+    return out
+
+
+def wants_image_38(d, doc):
+    """Where step 2 runs (no year candidate in the own text, either set), and the owner's 122 that W46.date-image-paid
+    sent to Gemini 3.7, so the two image readers are also compared image for image."""
+    return not T.candidates(doc["text"]) or (d["set"] == "owner" and
+                                             (CACHED_OWNER_IMAGE / ("image|" + d["id"] + ".json")).exists())
+
+
+def cmd_rerender(a):
+    """Rebuild the upright 2,400 px images run38 sends whose files are gone (the cache's img/ is rebuildable), from the
+    orientation verdicts cmd_vision kept, the same way it wrote them. `check` then compares the rebuilt requests with
+    the 3.7 ledger's hashes."""
+    from PIL import Image
+    import corpus_pairs as CP
+    orient = json.loads((CACHE / "orient.json").read_text())
+    pairs = DU.jpeg_pairs()
+    (CACHE / "img").mkdir(parents=True, exist_ok=True)
+    n = skipped = 0
+    for d in targets():
+        if not (readable(d) and wants_image_38(d, doc_of(d))):
+            continue
+        for p in d["pages"][:DI.PAGES]:
+            if img_path(p) is not None:
+                continue
+            o = orient.get(p) or {}
+            if "deg" not in o or not pairs.get(p):
+                skipped += 1; continue
+            with Image.open(os.path.join(CP.JPEGS, pairs[p])) as im:
+                im = im.convert("RGB").rotate(o["deg"], expand=True)
+                im.thumbnail((DU.LONG_SIDE, DU.LONG_SIDE), Image.Resampling.LANCZOS)
+                im.save(CACHE / "img" / (_name(p) + ".jpg"), "JPEG", quality=90)
+            n += 1
+    print(f"{n} pages rendered, {skipped} without a verdict")
+
+
+def cmd_check(a):
+    """The rebuilt image requests against the hashes of the 3.7 requests already sent: same images, same bytes."""
+    sent = {r["id"]: r["request_sha256"] for r in ledger() + ledger(CACHED_OWNER_IMAGE_LEDGER) +
+            ledger(DU.CACHE / "calls.jsonl") if r["id"].startswith("image|") and r.get("http") == 200
+            and r.get("request_sha256")}
+    same = diff = 0
+    for d in targets():
+        k = "image|" + d["id"]
+        if k in sent and readable(d) and wants_image_38(d, doc_of(d)):
+            got = hashlib.sha256(json.dumps(DU.image_body(images_of(d)), sort_keys=True).encode()).hexdigest()
+            same += got == sent[k]; diff += got != sent[k]
+    print(f"{same} requests byte-identical to the ones sent to 3.7, {diff} different")
+
+
+def cmd_run38(a):
+    jobs = []
+    for d in targets():
+        if readable(d) and wants_image_38(d, doc_of(d)) and not image38_dest(d).exists():
+            imgs = images_of(d)
+            if imgs:
+                jobs.append(("image|" + d["id"], image_body_38(imgs), image38_dest(d)))
+    jobs = jobs[: a.limit or None]
+    print(f"{len(jobs)} requests to send; ${spent38():.4f} spent so far (cap ${CAP38})", flush=True)
+    with ThreadPoolExecutor(4) as ex:
+        res = list(ex.map(lambda j: call38(*j), jobs))
+    print(f"{sum(bool(r.get('text')) for r in res)}/{len(res)} answered, ${spent38():.4f} spent in all", flush=True)
 
 
 # --- the 27B pack (Sherlock) ------------------------------------------------------------------------------------
@@ -1014,13 +1172,16 @@ def main():
     sub.add_parser("sample")
     v = sub.add_parser("vision"); v.add_argument("--limit", type=int, default=0)
     r = sub.add_parser("run"); r.add_argument("--limit", type=int, default=0)
+    r = sub.add_parser("run38"); r.add_argument("--limit", type=int, default=0)
+    sub.add_parser("rerender")
+    sub.add_parser("check")
     e = sub.add_parser("export"); e.add_argument("--out", required=True)
     e.add_argument("--remote", default="$GROUP_HOME/$USER/archive-suite/date-route-pipeline")
     k = sub.add_parser("pack"); k.add_argument("--src", default=str(CACHE / "sherlock-pack"))
     sub.add_parser("collect")
     sub.add_parser("score")
     a = ap.parse_args()
-    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "export": cmd_export, "pack": cmd_pack,
+    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "run38": cmd_run38, "rerender": cmd_rerender, "check": cmd_check, "export": cmd_export, "pack": cmd_pack,
      "collect": cmd_collect, "score": cmd_score}[a.cmd](a)
 
 

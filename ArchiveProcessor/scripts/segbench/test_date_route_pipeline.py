@@ -118,5 +118,30 @@ class Cap(unittest.TestCase):
         self.assertEqual((b["temperature"], b["reasoning_effort"]), (0, "low"))
 
 
+class Direct38(unittest.TestCase):
+    def test_the_direct_image_request_carries_the_gateway_requests_images_prompt_and_settings(self):
+        imgs = [b"\xff\xd8one", b"\xff\xd8two"]
+        g, d = P.DU.image_body(imgs), P.image_body_38(imgs)
+        gparts, dparts = g["messages"][0]["content"], d["contents"][0]["parts"]
+        self.assertEqual([p["image_url"]["url"].split(",", 1)[1] for p in gparts[:-1]],
+                         [p["inline_data"]["data"] for p in dparts[:-1]])
+        self.assertEqual(gparts[-1]["text"], dparts[-1]["text"])
+        c = d["generationConfig"]
+        self.assertEqual((c["temperature"], c["maxOutputTokens"], c["thinkingConfig"]["thinkingLevel"]),
+                         (g["temperature"], g["max_tokens"], g["reasoning_effort"]))
+
+    def test_thinking_is_billed_as_output(self):
+        u = {"promptTokenCount": 1_000_000, "candidatesTokenCount": 500_000, "thoughtsTokenCount": 500_000}
+        self.assertAlmostEqual(P.cost38(u), P.DT.PRICE_IN + P.DT.PRICE_OUT)
+
+    def test_refuses_before_a_request_when_the_worst_case_would_pass_the_cap(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(P, "CACHE", Path(tmp)), \
+                mock.patch.object(P, "LEDGER38", Path(tmp) / "calls-38.jsonl"), mock.patch("requests.post") as post:
+            (Path(tmp) / "calls-38.jsonl").write_text(json.dumps({"id": "x", "cost": P.CAP38 - P.WORST_IMAGE_38 / 2}))
+            with self.assertRaises(SystemExit):
+                P.call38("k", P.image_body_38([b"x"]), Path(tmp) / "out.json")
+            post.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
