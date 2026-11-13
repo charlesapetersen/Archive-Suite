@@ -182,7 +182,7 @@ asking the owner for anything:
 
 **Iterate on single tests in the VM; run a full lane once, at the end (owner, 2026-11-12).** A full app lane on the
 macOS 27.2 guest takes hours (one guest also slows as it runs: run a full lane as `VM_SPLIT=4`, fresh guest per
-chunk; W40.vm-macos27-runtime), so a session that debugs against full lanes spends most of its wall time waiting. While fixing or checking a test, run only it, or its class, with
+chunk, balanced by measured test time; W40.vm-macos27-runtime; the health gate runs one such chunk per invocation), so a session that debugs against full lanes spends most of its wall time waiting. While fixing or checking a test, run only it, or its class, with
 `VM_KEEP=1 ONLY_TESTING=<App>UITests/<Class>[/<test>] ops/gui/vm-gui-runner.sh <app> xcuitest` (`VM_KEEP=1` keeps the
 guest booted between calls; `ops/gui/README.md` §3). A test that fails in a lane but passes
 alone is a lane effect: rerun the lane split before chasing it in the test. The full lane is the

@@ -3,9 +3,16 @@
 # headless Tart VM so it NEVER touches the owner's screen and never hangs the host with the "Enable UI
 # Automation" prompt.
 #
-# Covers EVERY app that ships a UITest bundle — Reader, Notes, and Processor. One app runs per health-gate
-# invocation, selected round-robin from the configured pool, so three 20-minute caps cannot exceed the
-# daemon's 50-minute whole-gate deadline. Set AUTONOMOUS_GUI_VM_APPS to a subset when diagnosing a lane.
+# Covers EVERY app that ships a UITest bundle — Reader, Notes, and Processor. ONE CHUNK of one app runs per
+# health-gate invocation, rotating over app × chunk (W40.vm-gate-unpause, 2026-11-13). On the macOS 27.2 guest a
+# whole lane is far over the gate's budget (Notes ~6,250 s of tests in fresh guests, Reader ~3,000 s) while the
+# rest of the gate takes ~1,400 s of the engine's 3,000 s, so each invocation builds the app once
+# (`build-for-testing`), enumerates its selection (tart_enumerate_tests, shared with the runner's VM_SPLIT) and
+# runs one chunk with `test-without-building`. Chunks are planned by ops/gui/vm-chunks.py from measured per-test
+# times (the committed seed ops/gui/vm-test-times.tsv, overridden by what this gate learns from its own passed
+# tests) to at most AUTONOMOUS_GUI_VM_CHUNK seconds each. A plan is made at each app's chunk 0 and kept for the
+# rest of that app's cycle, so a cycle runs every test once; a test added mid-cycle joins the next chunk to run.
+# A full cycle is about twenty invocations. Set AUTONOMOUS_GUI_VM_APPS to a subset when diagnosing a lane.
 #
 # SAFETY POSTURE (Tier-2 autonomous infra — biased hard toward fail-open):
 #   • ON by default. Set AUTONOMOUS_GUI_VM=0 to disable.
@@ -30,9 +37,12 @@
 # the gate's stdout, was captured into health-gate's $LOG, which is shown only on RED and deleted on exit.
 # A failing suite must never be reported as a checkmark. Found by an adversarial audit, 2026-07-30.
 #
-# Knobs: AUTONOMOUS_GUI_VM_NAME (default archive-gui-runner), AUTONOMOUS_GUI_VM_MAXRUN (per-app, 1200s),
-#        AUTONOMOUS_GUI_VM_APPS (default "reader notes processor"), AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s),
-#        AUTONOMOUS_GUI_VM_STATE (round-robin state; default $ROOT/.maintenance/gui-vm-next-app).
+# Knobs: AUTONOMOUS_GUI_VM_NAME (default archive-gui-runner), AUTONOMOUS_GUI_VM_MAXRUN (cap on one guest
+#        xcodebuild, 1000 s), AUTONOMOUS_GUI_VM_BUDGET (the whole step, 1400 s: every guest xcodebuild is capped
+#        to what is left of it, so the step cannot push the gate past the engine's 3,000 s), AUTONOMOUS_GUI_VM_CHUNK
+#        (estimated test seconds per chunk, 600), AUTONOMOUS_GUI_VM_APPS (default "reader notes processor"),
+#        AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s), AUTONOMOUS_GUI_VM_STATE (rotation state, `app chunk chunks`;
+#        default $ROOT/.maintenance/gui-vm-next-app; the chunk plans and learned times sit beside it).
 set -uo pipefail
 . "$(dirname "$0")/heavy-enter.sh"
 # The normal Homebrew prefix is retained as belt-and-braces above tart-lib's shared resolver. The
@@ -41,10 +51,15 @@ set -uo pipefail
 export PATH="${AUTONOMOUS_GUI_VM_BIN_DIR:-/opt/homebrew/bin}:$PATH"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 VM="${AUTONOMOUS_GUI_VM_NAME:-archive-gui-runner}"
-MAXRUN="${AUTONOMOUS_GUI_VM_MAXRUN:-1200}"
+MAXRUN="${AUTONOMOUS_GUI_VM_MAXRUN:-1000}"
+BUDGET="${AUTONOMOUS_GUI_VM_BUDGET:-1400}"
+CHUNK_S="${AUTONOMOUS_GUI_VM_CHUNK:-600}"
 AGENTWAIT="${AUTONOMOUS_GUI_VM_AGENTWAIT:-240}"
 APP_POOL="${AUTONOMOUS_GUI_VM_APPS:-reader notes processor}"
 STATE="${AUTONOMOUS_GUI_VM_STATE:-$ROOT/.maintenance/gui-vm-next-app}"
+STATE_DIR="$(dirname "$STATE")"
+LEARNED="$STATE_DIR/gui-vm-test-times.tsv"
+SEED="$ROOT/ops/gui/vm-test-times.tsv"
 # Apps whose UITest failures WARN instead of REDding the gate. The point of the warn tier is that a suite
 # with known failures still RUNS and reports every gate — visibility without parking a multi-day run on a
 # regression that is already tracked. An app graduates out of this list the moment its suite is green.
@@ -66,13 +81,10 @@ skip() { echo "GUI-VM gate SKIPPED: $*"; exit 3; }
 
 # ---- guards (each SKIPs; a missing prereq must never RED) --------------------------------------
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] || skip "disabled (AUTONOMOUS_GUI_VM=0)"
-# PAUSED until W40.vm-gate-unpause (interactive session, 2026-11-06). On the macOS 27.2 guest the suites failed
-# for harness reasons, fixed by W40.vm-macos27-harness (2026-11-11), and a run is slow: Notes took 5,875 s with
-# 61 of 146 failing, then 11,836 s for 138 with 4 failing (W40.vm-macos27-runtime), so it cannot fit the gate's
-# 3,000 s cap and timed the gate out twice, parking the engine. W40.vm-gate-unpause, once the per-app items and
-# the runtime item are done, sets this default back to empty in the same commit. Sessions still run
-# the lane themselves through ops/gui/vm-gui-runner.sh. An empty AUTONOMOUS_GUI_VM_PAUSED runs the lane anyway.
-PAUSED="${AUTONOMOUS_GUI_VM_PAUSED-W40.vm-gate-unpause is open: the UITest suites do not pass on the macOS 27.2 guest yet, and a run does not fit the gate}"
+# A pause is a SKIP that names its reason (AUTONOMOUS_GUI_VM_PAUSED="<why>"); none by default. The step was paused
+# 2026-11-06 to 2026-11-13 while the suites failed on the macOS 27.2 guest and a whole lane could not fit the gate
+# (W40.vm-macos27-*); W40.vm-gate-unpause lifted it with the chunk rotation above.
+PAUSED="${AUTONOMOUS_GUI_VM_PAUSED:-}"
 [ -z "$PAUSED" ] || skip "paused: $PAUSED"
 # tart-vs-VM stays two distinct skips (W21.vmgui-path). The PATH fix now lives in tart-lib.sh so BOTH
 # entry points get it; the prefix above is kept as belt-and-braces for the lines above the source.
@@ -99,35 +111,49 @@ trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 tart_lock_acquire "${AUTONOMOUS_GUI_VM_LOCKWAIT:-300}" \
   || skip "the GUI VM is in use by another run (pid ${TART_LOCK_OWNER:-?}) — not competing for it"
 
-# ---- round-robin selection ----------------------------------------------------------------------
-# Advancing the state before boot is intentional: a missing VM or a full guest disk is an inconclusive
-# attempt for THIS lane, not a reason to starve the other two on every later health gate. The lock above
-# serializes the read/advance/write with the interactive runner's VM ownership.
-select_app() {
-  local candidate first="" last="" selected="" take_next=0 tmp
+# ---- rotation over app × chunk -----------------------------------------------------------------
+# The state is one line, `<app> <chunk> <chunks>`: the slice the last invocation ran and how many chunks its plan
+# had. The next slice is that app's next chunk, or the next app's chunk 0 once the plan is done. Advancing the
+# state before boot is intentional: a missing VM or a full guest disk is an inconclusive attempt for THIS slice,
+# not a reason to starve the others on every later health gate. The lock above serializes the read/advance/write
+# with the interactive runner's VM ownership. (An older one-word state, just the app, reads as its cycle done.)
+write_state() { # app chunk chunks
+  local tmp
+  if mkdir -p "$STATE_DIR" 2>/dev/null && tmp="$(mktemp "${STATE}.tmp.XXXXXX" 2>/dev/null)"; then
+    printf '%s %s %s\n' "$1" "$2" "$3" > "$tmp" && mv -f "$tmp" "$STATE" || rm -f "$tmp"
+  else
+    echo "WARN: GUI-VM rotation state could not be updated at $STATE; this run is $1 chunk $2, but later gates may repeat it." >&2
+  fi
+}
+select_slice() {
+  local candidate first="" last="" last_k="" last_n="" selected="" take_next=0
   for candidate in $APP_POOL; do
     archive_app_known "$candidate" || skip "unknown app '$candidate' in AUTONOMOUS_GUI_VM_APPS (known: reader notes processor)"
     [ -n "$first" ] || first="$candidate"
-    if [ "$take_next" = 1 ]; then selected="$candidate"; break; fi
-    [ "$candidate" = "$last" ] && take_next=1
   done
   [ -n "$first" ] || skip "AUTONOMOUS_GUI_VM_APPS is empty (need at least one of: reader notes processor)"
-  [ -f "$STATE" ] && IFS= read -r last < "$STATE" || true
-  # Re-run after loading state: the first walk validates the pool without coupling the state file to it.
-  selected=""; take_next=0
-  for candidate in $APP_POOL; do
-    if [ "$take_next" = 1 ]; then selected="$candidate"; break; fi
-    [ "$candidate" = "$last" ] && take_next=1
-  done
-  [ -n "$selected" ] || selected="$first"
-  if mkdir -p "$(dirname "$STATE")" 2>/dev/null && tmp="$(mktemp "${STATE}.tmp.XXXXXX" 2>/dev/null)"; then
-    printf '%s\n' "$selected" > "$tmp" && mv -f "$tmp" "$STATE" || rm -f "$tmp"
+  [ -f "$STATE" ] && read -r last last_k last_n < "$STATE" || true
+  case "$last_k" in ''|*[!0-9]*) last_k="" ;; esac
+  case "$last_n" in ''|*[!0-9]*) last_n="" ;; esac
+  CHUNK_K=0
+  # The same app's next chunk, while its plan has one and the app is still in the pool.
+  if [ -n "$last_k" ] && [ -n "$last_n" ] && [ $(( last_k + 1 )) -lt "$last_n" ] \
+     && case " $APP_POOL " in *" $last "*) true ;; *) false ;; esac; then
+    selected="$last"; CHUNK_K=$(( last_k + 1 ))
   else
-    echo "WARN: GUI-VM round-robin state could not be updated at $STATE; this run is $selected, but later gates may repeat it." >&2
+    for candidate in $APP_POOL; do
+      if [ "$take_next" = 1 ]; then selected="$candidate"; break; fi
+      [ "$candidate" = "$last" ] && take_next=1
+    done
+    [ -n "$selected" ] || selected="$first"
   fi
   APPS="$selected"
+  PLAN="$STATE_DIR/gui-vm-plan-$APPS"
+  # The chunk count is the stored plan's until this run replans (then write_state again with the new count).
+  CHUNK_N="$(grep -c . "$PLAN" 2>/dev/null || true)"; [ -n "$CHUNK_N" ] && [ "$CHUNK_N" -gt 0 ] || CHUNK_N=1
+  write_state "$APPS" "$CHUNK_K" "$CHUNK_N"
 }
-select_app
+select_slice
 
 # ---- boot ---------------------------------------------------------------------------------------
 # WHY the guest-agent wait exists (the 2026-07-29 failure, root-caused 2026-07-30): `tart ip --wait`
@@ -183,24 +209,46 @@ applog()     { echo "$(app_art "$1")/xcuitest-attempt$2.log"; }
 # The test verdict is tart_test_verdict's: xcodebuild's marker, or, when tart_run_test's summary guard had to
 # end a build tool that would not exit (W40.vm-macos27-runtime), XCTest's own top-level summary line.
 is_fail()    { grep -qE '^CRASH_REPORT\[' "$(applog "$1" "$2")" 2>/dev/null || tests_failed "$1" "$2"; }
-# One top-level summary per test bundle the app's selector runs (Reader runs two).
-app_bundles() { tart_selector_bundles "$(archive_app_field "$1" tests)"; }
-is_success() { [ "$(tart_test_verdict "$(applog "$1" "$2")" "$(app_bundles "$1")")" = succeeded ]; }
-tests_failed() { [ "$(tart_test_verdict "$(applog "$1" "$2")" "$(app_bundles "$1")")" = failed ]; }
+# What an attempt ran: its comma-separated selectors, kept beside its log (the chunk, or the retry's classes).
+attempt_sel() { echo "$(app_art "$1")/xcuitest-attempt$2.selectors"; }
+# One top-level summary per test bundle the attempt's selectors run (a Reader chunk can run two).
+app_bundles() { tart_selector_bundles "$(cat "$(attempt_sel "$1" "$2")" 2>/dev/null || archive_app_field "$1" tests)"; }
+is_success() { [ "$(tart_test_verdict "$(applog "$1" "$2")" "$(app_bundles "$1" "$2")")" = succeeded ]; }
+tests_failed() { [ "$(tart_test_verdict "$(applog "$1" "$2")" "$(app_bundles "$1" "$2")")" = failed ]; }
 # A missing Processor window can mean a guest keychain/unlock/modal failure, not an app regression. The
 # test itself saves a rendered screenshot before emitting this marker; classify it as infrastructure.
 is_processor_no_window() { [ "$1" = processor ] && grep -q '^PROCESSOR_UI_NO_WINDOW$' "$(applog "$1" "$2")" 2>/dev/null; }
 
-run_app_once() {   # $1 = app, $2 = attempt number
-  local app="$1" attempt="$2" log fixture mk prerun proj scheme tests test_args dd bundle frc ddrc result_art
+# A guest xcodebuild's cap: MAXRUN, or what is left of the step's BUDGET less 150 s to collect the artifacts and
+# stop the guest (a crash harvest, a result-bundle copy, tart_stop_clean's 60 s).
+run_cap() {
+  local left=$(( BUDGET - SECONDS - 150 ))
+  [ "$left" -gt "$MAXRUN" ] && left="$MAXRUN"
+  echo "$left"
+}
+# An attempt starts only with this much cap left: its kill, prerun and fixture rebuild (up to 200 s) run before
+# the test, and are not themselves capped (Tier-2 review, 2026-11-13: without the floor a retry could start, spend
+# its time on the fixture, and push the step past its budget).
+ATTEMPT_FLOOR="${AUTONOMOUS_GUI_VM_ATTEMPT_FLOOR:-320}"
+# An attempt that did not finish for want of time: the floor refused it, or the maxrun guard ended it.
+out_of_time() { grep -qE '^SKIP\[[a-z]+\]: no time left|^\[guard\] maxrun:' "$(applog "$1" "$2")" 2>/dev/null; }
+
+run_app_once() {   # $1 = app, $2 = attempt number, $3 = comma-separated selectors (the chunk, or the retry's)
+  local app="$1" attempt="$2" tests="$3" log fixture mk prerun proj scheme test_args dd bundle frc result_art cap
   mkdir -p "$(app_art "$app")"
   log="$(applog "$app" "$attempt")"; : > "$log"
+  printf '%s\n' "$tests" > "$(attempt_sel "$app" "$attempt")"
   proj="$(archive_app_field "$app" proj)";   scheme="$(archive_app_field "$app" scheme)"
-  tests="$(archive_app_field "$app" tests)"; dd="$(archive_app_field "$app" dd)"
+  dd="$(archive_app_field "$app" dd)"
   test_args="$(archive_xcode_test_args "$tests")" || {
     echo "SKIP[$app]: invalid VM test selector list '$tests'" >>"$log"
     return 0
   }
+  cap="$(run_cap)"
+  if [ "$cap" -lt "$ATTEMPT_FLOOR" ]; then
+    echo "SKIP[$app]: no time left in the step's ${BUDGET} s budget for attempt $attempt (${cap} s of cap, ${ATTEMPT_FLOOR} s needed)" | tee -a "$log"
+    return 0
+  fi
   fixture="$(archive_app_field "$app" fixture)"; mk="$(archive_app_field "$app" mkfixture)"
   prerun="$(archive_app_field "$app" prerun)"
   # CHECKED, not fire-and-forget (W21.vmgui-g14-leak). This used to be a bare
@@ -224,17 +272,6 @@ run_app_once() {   # $1 = app, $2 = attempt number
       echo "WARN[$app]: prerun FAILED (exit $?) — the app may start from an INHERITED container, which is a different test than a fresh one. See $log." | tee -a "$log"
     fi
   fi
-
-  # Reuse the app's incremental build products but prune old result bundles and decline a near-full guest
-  # before starting a build. Storage/agent trouble is infrastructure, so leaving no TEST marker makes the
-  # main classifier report SKIPPED rather than inventing a product regression.
-  ddrc=0
-  tart_prepare_gui_dd "$VM" "$app" || ddrc=$?
-  case "$ddrc" in
-    0) printf '%s\n' "${TART_GUI_DD_NOTE:-storage: reused DerivedData}" >>"$log" ;;
-    1) echo "SKIP[$app]: guest disk is too full for a safe Xcode build — ${TART_GUI_DD_NOTE:-no free-space report}" | tee -a "$log"; return 0 ;;
-    *) echo "SKIP[$app]: could not prepare the guest DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed}" | tee -a "$log"; return 0 ;;
-  esac
 
   # Fixtured UITests XCTSkip themselves when their scratch fixture is missing — which would let the
   # gate go GREEN on the few unfixtured tests and hide the real coverage. Build it if absent
@@ -278,14 +315,20 @@ run_app_once() {   # $1 = app, $2 = attempt number
   # into the VM: that couples a throwaway image to host secrets and breaks again on every VM rebuild.
   tart_crash_mark "$VM"
   # tart_run_test, not a bare exec under gtimeout: it also ends a build tool that stays up after its summary
-  # or goes silent, each with a [guard] line in the log (MAXRUN stays the per-app cap).
-  TART_TEST_SUMMARIES="$(app_bundles "$app")" tart_run_test "$VM" "$log" "
+  # or goes silent, each with a [guard] line in the log. Its cap is MAXRUN or what is left of BUDGET.
+  cap="$(run_cap)"
+  if [ "$cap" -le 60 ]; then
+    echo "SKIP[$app]: no time left in the step's ${BUDGET} s budget for attempt $attempt after its fixture" | tee -a "$log"
+    return 0
+  fi
+  echo "run[$app]: attempt $attempt, test-without-building $tests (cap ${cap} s)" >>"$log"
+  TART_TEST_SUMMARIES="$(app_bundles "$app" "$attempt")" tart_run_test "$VM" "$log" "
     rm -rf '$bundle'
-    xcodebuild test -project '$GUEST_REPO/$proj' -scheme '$scheme' \
+    xcodebuild test-without-building -project '$GUEST_REPO/$proj' -scheme '$scheme' \
       $test_args -destination 'platform=macOS' \
       -derivedDataPath '$dd' -resultBundlePath '$bundle' \
       CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
-  " "$MAXRUN" || true
+  " "$cap" || true
   collect_shots "$app" "$attempt" "$log"
   collect_crashes "$app" "$attempt" "$log"
   # Preserve the finalized result bundle beside this attempt's log. A failed/interrupted Xcode run may
@@ -357,20 +400,137 @@ esac
 
 is_warn_only() { case " $WARN_APPS " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 
-red=""; skipped=""; green=""; warned=""
+# ---- build once, enumerate, pick the chunk -------------------------------------------------------
+app="$APPS"; ADIR="$(app_art "$app")"; mkdir -p "$ADIR"
+PROJ="$(archive_app_field "$app" proj)"; SCHEME="$(archive_app_field "$app" scheme)"; DD="$(archive_app_field "$app" dd)"
+rm -f "$ADIR"/xcuitest-attempt*.selectors "$ADIR"/build-attempt*.log
+
+# Reuse the app's incremental build products but prune old result bundles and decline a near-full guest
+# before starting a build. Storage/agent trouble is infrastructure, so it is a SKIP, never a product RED.
+ddrc=0
+tart_prepare_gui_dd "$VM" "$app" || ddrc=$?
+case "$ddrc" in
+  0) printf '%s\n' "${TART_GUI_DD_NOTE:-storage: reused DerivedData}" >>"$GLOG" ;;
+  1) skip "inconclusive for: $app (guest disk is too full for a safe Xcode build — ${TART_GUI_DD_NOTE:-no free-space report})" ;;
+  *) skip "inconclusive for: $app (could not prepare the guest DerivedData — ${TART_GUI_DD_NOTE:-guest transport failed})" ;;
+esac
+
+# One build per invocation; the attempts run `test-without-building` against it. A compile failure is
+# reproducible by nature, but it gets the same one retry as a test failure: twice FAILED is RED, a build with
+# no verdict (transport, the cap) is inconclusive.
+build_once() { # $1 = attempt → 0 built, 1 build failed, 2 no verdict
+  local log="$ADIR/build-attempt$1.log" cap
+  : > "$log"
+  cap="$(run_cap)"
+  [ "$cap" -gt 0 ] || { echo "no time left in the step's ${BUDGET} s budget for the build" >>"$log"; return 2; }
+  tart_run_test "$VM" "$log" "xcodebuild build-for-testing -project '$GUEST_REPO/$PROJ' -scheme '$SCHEME' \
+      -destination 'platform=macOS' -derivedDataPath '$DD' CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" "$cap" || true
+  grep -q '\*\* TEST BUILD SUCCEEDED \*\*' "$log" && return 0
+  grep -q '\*\* TEST BUILD FAILED \*\*' "$log" && return 1
+  return 2
+}
+brc=0; build_once 1 || brc=$?
+if [ "$brc" = 1 ]; then
+  echo "GUI-VM gate: $app guest build failed — retrying once (flake guard)…"
+  brc=0; build_once 2 || brc=$?
+  if [ "$brc" = 1 ]; then
+    keep="$ART/gui-vm-$app-LAST-FAILURE.log"
+    { echo "=== $app — guest build failed twice $(date '+%F %T') ==="
+      grep -E "error:" "$ADIR/build-attempt2.log" | sed -E 's#/Volumes/My Shared Files/repo/##' | sort -u | head -12
+      echo "  --- evidence: $ADIR/build-attempt1.log · $ADIR/build-attempt2.log ---"; } > "$keep" 2>/dev/null || true
+    if is_warn_only "$app"; then
+      echo "GUI-VM gate: WARN — the $app guest build failed twice (warn tier; detail in $keep)"; cat "$keep"; exit 4
+    fi
+    echo "GUI-VM gate: RED — reproducible UITest failure in: $app (the guest build failed twice)"; cat "$keep"; exit 1
+  fi
+fi
+[ "$brc" = 0 ] || skip "inconclusive for: $app (the guest build ended with no verdict; see $ADIR/build-attempt*.log)"
+
+LIST="$ADIR/enumerated-tests.txt"
+cap="$(run_cap)"; [ "$cap" -gt 0 ] || skip "inconclusive for: $app (no time left in the step's ${BUDGET} s budget to enumerate)"
+tart_enumerate_tests "$VM" "$PROJ" "$SCHEME" "$DD" "$(archive_app_field "$app" tests)" "$LIST" "$cap" \
+  || skip "inconclusive for: $app ($TART_ENUM_NOTE)"
+
+plan_chunks() {
+  python3 "$TART_VM_CHUNKS" plan --tests "$LIST" --budget "$CHUNK_S" --times "$SEED" --times "$LEARNED" > "$PLAN.tmp" \
+    && mv -f "$PLAN.tmp" "$PLAN"
+}
+# A cycle's plan is made at its chunk 0 and kept to its end (the header says why).
+if [ "$CHUNK_K" = 0 ] || [ ! -s "$PLAN" ]; then
+  plan_chunks || skip "inconclusive for: $app (could not plan the chunks from $LIST)"
+fi
+src=0; sel="$(python3 "$TART_VM_CHUNKS" select --tests "$LIST" --plan "$PLAN" --index "$CHUNK_K" 2>"$ADIR/select.err")" || src=$?
+if [ "$src" = 3 ]; then   # the stored plan has fewer chunks than the state says: start the app's cycle again
+  plan_chunks || skip "inconclusive for: $app (could not plan the chunks from $LIST)"
+  CHUNK_K=0; src=0
+  sel="$(python3 "$TART_VM_CHUNKS" select --tests "$LIST" --plan "$PLAN" --index 0 2>"$ADIR/select.err")" || src=$?
+fi
+[ "$src" = 0 ] || skip "inconclusive for: $app (could not select chunk $CHUNK_K: $(cat "$ADIR/select.err" 2>/dev/null))"
+CHUNK_N="$(tail -n 1 "$ADIR/select.err")"
+write_state "$app" "$CHUNK_K" "$CHUNK_N"
+CHUNK_SEL="$(tart_chunk_selectors "$sel")"
+SLICE="chunk $(( CHUNK_K + 1 ))/$CHUNK_N"
+[ -n "$CHUNK_SEL" ] || skip "inconclusive for: $app ($SLICE has no tests left)"
+CHUNK_TESTS="$(python3 "$TART_VM_CHUNKS" count --tests "$LIST" --selectors "$CHUNK_SEL" 2>/dev/null || true)"
+echo "GUI-VM gate: $app $SLICE — $(printf '%s' "$sel" | wc -w | tr -d ' ') selector(s) from $LIST (plan: $PLAN)"
+
+# The retry asks one question per failed test: does it fail again? So it reruns the classes the failed tests
+# are in (or the single tests, where this chunk ran a split class test by test), with a fresh fixture, and not
+# the whole chunk — that keeps a retry inside the budget. It narrows ONLY when the named failures are all that
+# attempt 1 got wrong: every one of the chunk's tests reported, no crash report, no runner restart. Otherwise
+# (a crash outside any test, a bundle that never loaded) the retry is the whole chunk, so a green retry can never
+# clear a failure it did not run again (Tier-2 review, 2026-11-13). CHUNK_TESTS is the chunk's count, set above.
+retry_selectors() { # $1 = app
+  local failed t c one out="" log reported
+  log="$(applog "$1" 1)"
+  failed="$(sed -nE "s/^Test Case '-\[([A-Za-z0-9_]+)\.([A-Za-z0-9_]+) ([A-Za-z0-9_]+)\]' failed \(.*/\1\/\2\/\3/p" "$log" 2>/dev/null | sort -u)"
+  reported="$(grep -cE "^Test Case '-\[[^]]+\]' (passed|failed|skipped) \(" "$log" 2>/dev/null || true)"
+  if [ -z "$failed" ] || [ "$reported" != "$CHUNK_TESTS" ] \
+     || grep -qE '^CRASH_REPORT\[|Restarting after unexpected exit' "$log" 2>/dev/null; then
+    echo "$CHUNK_SEL"; return 0
+  fi
+  for t in $failed; do
+    c="${t%/*}"
+    case ",$CHUNK_SEL," in *",$c,"*) one="$c" ;; *) one="$t" ;; esac
+    case ",$out," in *",$one,"*) ;; *) out="${out:+$out,}$one" ;; esac
+  done
+  echo "$out"
+}
+
+# What the chunk's passed tests took, merged into the learned times (later wins) that plan the next cycle.
+learn_times() { # $1 = log
+  local new tmp
+  new="$(python3 "$TART_VM_CHUNKS" times "$1" 2>/dev/null)" || return 0
+  [ -n "$new" ] || return 0
+  mkdir -p "$STATE_DIR" 2>/dev/null && tmp="$(mktemp "$LEARNED.tmp.XXXXXX" 2>/dev/null)" || return 0
+  { cat "$LEARNED" 2>/dev/null; printf '%s\n' "$new"; } \
+    | awk -F'\t' 'NF == 2 { if (!($1 in t)) o[++n] = $1; t[$1] = $2 } END { for (i = 1; i <= n; i++) print o[i] "\t" t[o[i]] }' > "$tmp" \
+    && mv -f "$tmp" "$LEARNED" || rm -f "$tmp"
+  return 0
+}
+
+red=""; skipped=""; green=""; warned=""; untimed=""
 for app in $APPS; do
-  run_app_once "$app" 1 || true
+  run_app_once "$app" 1 "$CHUNK_SEL" || true
+  learn_times "$(applog "$app" 1)"
   if is_processor_no_window "$app" 1; then
     echo "GUI-VM gate: Processor did not expose a window; screenshot kept in $(app_art "$app")/shots-attempt1. Treating guest launch state as SKIPPED, not a product RED."
     skipped="$skipped $app"; continue
   fi
   if is_success "$app" 1 && ! is_fail "$app" 1; then green="$green $app"; continue; fi
   if is_fail "$app" 1; then
-    echo "GUI-VM gate: $app UITest failure — retrying once (flake guard)…"
-    run_app_once "$app" 2 || true
+    echo "GUI-VM gate: $app UITest failure — retrying once (flake guard): $(retry_selectors "$app")…"
+    run_app_once "$app" 2 "$(retry_selectors "$app")" || true
     if is_success "$app" 2 && ! is_fail "$app" 2; then
       echo "GUI-VM gate: $app GREEN on retry — attempt 1 was a flake (evidence: $(applog "$app" 1))."
       green="$green $app"; continue
+    fi
+    # A retry the step's own budget cut short proves nothing either way. That is this gate's sizing, not the
+    # guest's transport, so it is inconclusive rather than the RED the rule below gives a dead retry; attempt
+    # 1's failures are still kept in the LAST-FAILURE log for a session to rerun.
+    if ! is_fail "$app" 2 && ! is_success "$app" 2 && out_of_time "$app" 2; then
+      echo "GUI-VM gate: $app failed attempt 1 and the retry ran out of the step's ${BUDGET} s budget — SKIPPED, not RED (evidence: $(applog "$app" 1))."
+      skipped="$skipped $app"; untimed="$untimed $app"; continue
     fi
     # A retry that produced NEITHER marker cannot clear a failure that DID reproduce as a marker on
     # attempt 1 — that would let an infra hiccup on the retry launder a real RED into a skip.
@@ -455,20 +615,21 @@ show_failures() {   # $1 = app
     grep -E "error:" "$(applog "$1" "$n")" | sed -E 's#/Volumes/My Shared Files/repo/##' | sort -u | head -12
   done
   echo "  --- evidence: $(applog "$1" 1) · $(applog "$1" 2) ---"
+  echo "  --- to rerun in the VM: ONLY_TESTING='$(cat "$(attempt_sel "$1" 1)" 2>/dev/null)' ops/gui/vm-gui-runner.sh $1 xcuitest ---"
 }
 
-echo "GUI-VM gate: passed[${green:- none} ] warned[${warned:- none} ] skipped[${skipped:- none} ] failed[${red:- none} ]"
+echo "GUI-VM gate ($SLICE): passed[${green:- none} ] warned[${warned:- none} ] skipped[${skipped:- none} ] failed[${red:- none} ]"
 
 # Preserve the evidence. Each attempt log is truncated at the start of the next run, so without this the
 # only record of WHY a suite failed is gone by the following gate — and the owner is left with a summary
 # line and nothing to act on.
-for app in $red $warned; do
+for app in $red $warned $untimed; do
   keep="$ART/gui-vm-$app-LAST-FAILURE.log"
   { echo "=== $app — failing run captured $(date '+%F %T') ==="; show_failures "$app"; } > "$keep" 2>/dev/null || true
 done
 
 if [ -n "$red" ]; then
-  echo "GUI-VM gate: RED — reproducible UITest failure in:$red"
+  echo "GUI-VM gate: RED — reproducible UITest failure in:$red ($SLICE)"
   for app in $red; do show_failures "$app"; done
   exit 1
 fi
@@ -479,6 +640,6 @@ if [ -n "$warned" ]; then
   echo "GUI-VM gate: passed:${green:- none}  |  detail kept in $ART/gui-vm-<app>-LAST-FAILURE.log"
   exit 4
 fi
-[ -n "$skipped" ] && skip "inconclusive for:$skipped (boot, timeout, or infra — not a regression)"
-echo "GUI-VM gate: GREEN —$green"
+[ -n "$skipped" ] && skip "inconclusive for:$skipped $SLICE (boot, timeout, or infra — not a regression)"
+echo "GUI-VM gate: GREEN —$green $SLICE"
 exit 0
