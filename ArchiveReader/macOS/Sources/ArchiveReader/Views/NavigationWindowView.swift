@@ -21,6 +21,8 @@ struct NavigationWindowView: View {
     @AppStorage("ar.listFontSize") private var listFontSize = 13.0   // C3 row density / readability
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false   // W24.cal1-reader
     @State private var renameText = ""
+    /// The filter bar's Save to "<name>" is asking before it replaces the smart folder's rules.
+    @State private var confirmingSaveFiltersToScope = false
     @FocusState private var searchFocused: Bool     // C5: ⌥⌘F focuses OCR search
     @State private var tagFilterFocusToken = 0       // C5: ⌘L focuses the tag filter
     /// The preview sheet's viewer model while that sheet is up — see `publishedPreviewViewer`.
@@ -112,6 +114,13 @@ struct NavigationWindowView: View {
             Button("Cancel", role: .cancel) { model.renamingSearch = nil }
         }
         .onChange(of: model.renamingSearch) { _, s in if let s { renameText = s.name } }
+        .alert(model.savedScope.map { SmartFolderReplace.title($0.name) } ?? "",
+               isPresented: $confirmingSaveFiltersToScope) {
+            Button("Replace") { model.saveFiltersToScope() }.accessibilityIdentifier("ar.filter.saveTo.replace")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(SmartFolderReplace.message)
+        }
         .onChange(of: model.focusSearchRequest) { searchFocused = true }              // C5 ⌥⌘F
         .onChange(of: model.focusTagFilterRequest) { tagFilterFocusToken &+= 1 }       // C5 ⌘L
         .sheet(isPresented: $model.showingPreview) {
@@ -625,6 +634,13 @@ struct NavigationWindowView: View {
                 .help("Save these filters as a smart folder in the sidebar")
                 .accessibilityIdentifier("ar.filter.saveSmartFolder")
                 .filterBarTrailing()
+            if model.canSaveFiltersToScope, let folder = model.savedScope {
+                Button("Save to \u{201c}\(folder.name)\u{201d}") { confirmingSaveFiltersToScope = true }
+                    .fixedSize()
+                    .help("Make these filters part of the smart folder's own rules")
+                    .accessibilityIdentifier("ar.filter.saveTo")
+                    .filterBarTrailing()
+            }
             Button("Clear All") { model.clearUserFilters() }
                 .fixedSize()
                 .help(model.clearAllHelp)

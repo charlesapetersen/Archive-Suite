@@ -24,10 +24,14 @@ struct FolderNode: Identifiable, Hashable, Sendable {
 struct AdvancedSearchRequest: Identifiable {
     let id = UUID()
     var editing: SavedSearch?
+    /// The smart folder the list was showing when a new search opened (`editing` nil), which the form offers
+    /// to save back to (W40.reader-smart-folder-update).
+    var origin: SavedSearch?
     let draft: AdvancedSearchDraft
 
-    init(editing: SavedSearch?, search: AdvancedSearch) {
+    init(editing: SavedSearch?, origin: SavedSearch? = nil, search: AdvancedSearch) {
         self.editing = editing
+        self.origin = editing == nil ? origin : nil
         draft = AdvancedSearchDraft(search)
     }
 
@@ -525,9 +529,49 @@ final class NavigationModel: ObservableObject {
 
     /// Open the Advanced Search form on what the list shows now (the scope, the filter bar and Find, as rules),
     /// or on the starter rows when nothing is in effect.
+    /// Inside a saved smart folder the form starts from its rules as saved, so saving back keeps a folder rule
+    /// that is outside the current root, and it remembers the folder to offer Save to it.
     func openAdvancedSearch() {
-        let current = effectiveSearch
-        advancedSearchRequest = AdvancedSearchRequest(editing: nil, search: current.isActive ? current : .starter)
+        let origin = savedScope
+        let current = origin.map { scopeNarrowedByFilters($0) } ?? effectiveSearch
+        advancedSearchRequest = AdvancedSearchRequest(editing: nil, origin: origin,
+                                                      search: current.isActive ? current : .starter)
+    }
+
+    /// The saved smart folder in scope, as the store holds it now; nil for no scope or an unsaved search.
+    var savedScope: SavedSearch? {
+        guard scopeIsSaved, let id = scope?.id else { return nil }
+        return savedSearches.searches.first { $0.id == id }
+    }
+
+    /// `folder`'s saved rules AND the filter bar AND the Find box.
+    private func scopeNarrowedByFilters(_ folder: SavedSearch) -> AdvancedSearch {
+        folder.search.narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery))
+    }
+
+    /// Whether the filter bar offers Save to the smart folder in scope: one is, and filters narrow it.
+    var canSaveFiltersToScope: Bool {
+        guard let folder = savedScope else { return false }
+        return scopeNarrowedByFilters(folder) != folder.search
+    }
+
+    /// The filter bar's Save to "<name>": the smart folder in scope takes its rules AND the filters as its rules,
+    /// and the filters clear, since they are now the folder's own (W40.reader-smart-folder-update).
+    func saveFiltersToScope() {
+        guard let folder = savedScope else { return }
+        saveToSmartFolder(folder.id, search: scopeNarrowedByFilters(folder))
+    }
+
+    /// Replace a smart folder's rules with `search` and show it, user filters cleared (the form's Save to
+    /// "<name>", and the filter bar's). Nothing happens when the folder is gone.
+    func saveToSmartFolder(_ id: UUID, search: AdvancedSearch) {
+        guard savedSearches.searches.contains(where: { $0.id == id }) else {
+            statusMessage = "That smart folder no longer exists — use Save as New Smart Folder."
+            return
+        }
+        savedSearches.update(id, search: search)
+        guard let saved = savedSearches.searches.first(where: { $0.id == id }) else { return }
+        applyScope(saved)
     }
 
     /// A folder rule's value as the form shows it: its path under the archive root, or the folder's own name.

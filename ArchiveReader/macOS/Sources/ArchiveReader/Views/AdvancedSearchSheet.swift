@@ -16,6 +16,7 @@ struct AdvancedSearchSheet: View {
     @State private var revealRule: UUID?
     @State private var matchCount: Int?
     @State private var naming = false
+    @State private var confirmingSaveTo = false
     @State private var name = ""
     @FocusState private var nameFocused: Bool
     @Environment(\.dismiss) private var dismiss
@@ -27,6 +28,7 @@ struct AdvancedSearchSheet: View {
     }
 
     private var editing: SavedSearch? { request.editing }
+    private var origin: SavedSearch? { request.origin }
     private var search: AdvancedSearch { draft.search }
 
     /// Tall enough for every row up to the cap, so the list grows as rules are added before it scrolls.
@@ -83,13 +85,19 @@ struct AdvancedSearchSheet: View {
                     .accessibilityIdentifier("ar.advanced.clear")
                 Spacer()
                 if editing == nil, !naming {
-                    Button("Save as Smart Folder…") {
+                    Button(origin == nil ? "Save as Smart Folder…" : "Save as New Smart Folder…") {
                         name = ""
                         naming = true
                         DispatchQueue.main.async { nameFocused = true }
                     }
                     .disabled(!search.isActive)
                     .accessibilityIdentifier("ar.advanced.saveAs")
+                }
+                if let origin, !naming {
+                    Button("Save to \u{201c}\(origin.name)\u{201d}") { confirmingSaveTo = true }
+                        .disabled(!search.isActive || search == origin.search)
+                        .help("Replace this smart folder's rules with these")
+                        .accessibilityIdentifier("ar.advanced.saveTo")
                 }
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
                 Button(editing == nil ? "Search" : "Save") { commit() }
@@ -99,6 +107,12 @@ struct AdvancedSearchSheet: View {
         }
         .padding(18)
         .frame(minWidth: 880, idealWidth: 900)
+        .alert(origin.map { SmartFolderReplace.title($0.name) } ?? "", isPresented: $confirmingSaveTo) {
+            Button("Replace") { saveToOrigin() }.accessibilityIdentifier("ar.advanced.saveTo.replace")
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(SmartFolderReplace.message)
+        }
         .task(id: search) {
             // A short pause, so typing a word runs one count, not one per key. The next edit cancels this count.
             let search = search
@@ -126,6 +140,20 @@ struct AdvancedSearchSheet: View {
         model.saveAdvancedSearch(search, name: trimmedName)
         dismiss()
     }
+
+    private func saveToOrigin() {
+        guard let origin else { return }
+        model.saveToSmartFolder(origin.id, search: search)
+        dismiss()
+    }
+}
+
+/// The question Save to "<name>" asks before it replaces a smart folder's rules (W40.reader-smart-folder-update).
+/// It asks rather than offering undo: the store keeps no history and the window's undo stack is the text fields'
+/// (`TextUndoGuard`), so an undo entry there would sit among typing steps.
+enum SmartFolderReplace {
+    static func title(_ name: String) -> String { "Replace the rules of \u{201c}\(name)\u{201d}?" }
+    static let message = "The smart folder will match these rules from now on. Its old rules are not kept."
 }
 
 /// A list of rule rows; a group row holds another, indented.
