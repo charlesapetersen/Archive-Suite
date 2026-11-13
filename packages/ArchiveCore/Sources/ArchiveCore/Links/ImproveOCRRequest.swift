@@ -152,8 +152,12 @@ public enum ImproveOCRPathError: Error, Equatable, Sendable {
 public enum ImproveOCRPath {
     public static func problem(_ path: String) -> ImproveOCRPathError? {
         if path.isEmpty { return .empty }
-        if path.hasPrefix("/") || path.hasPrefix("~") { return .absolute }
-        if path.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) {
+        if path.hasPrefix("/") { return .absolute }
+        // Controls, and invisible format and separator characters (bidi overrides, U+2028/2029) that would let a
+        // name read as another in the dialog.
+        if path.unicodeScalars.contains(where: {
+            [.control, .format, .lineSeparator, .paragraphSeparator].contains($0.properties.generalCategory)
+        }) {
             return .controlCharacter
         }
         let components = path.split(separator: "/", omittingEmptySubsequences: false)
@@ -166,9 +170,11 @@ public enum ImproveOCRPath {
     }
 
     /// Two spellings of one file on a case-insensitive, normalization-insensitive volume (APFS default)
-    /// share this key, so a request cannot name the same file twice.
+    /// share this key, so a request cannot name the same file twice. Full case folding (ς and σ, ß and ss),
+    /// not `lowercased()`. On a case-sensitive volume this refuses two names that are two files; the person
+    /// then sends them in two requests.
     public static func targetKey(_ path: String) -> String {
-        path.precomposedStringWithCanonicalMapping.lowercased()
+        path.precomposedStringWithCanonicalMapping.folding(options: [.caseInsensitive], locale: nil)
     }
 }
 
@@ -224,9 +230,11 @@ public struct ImproveOCRManifest: Codable, Equatable, Sendable {
         case fromTheFuture
     }
 
+    /// `createdAt` is kept to the whole second, as the ISO 8601 form stores it, so a manifest equals itself
+    /// after a round trip.
     public init(requestID: UUID, createdAt: Date, rootGUID: UUID, rootPathHint: String?, entries: [Entry]) {
         self.requestID = requestID
-        self.createdAt = createdAt
+        self.createdAt = Date(timeIntervalSince1970: createdAt.timeIntervalSince1970.rounded(.down))
         self.rootGUID = rootGUID
         self.rootPathHint = rootPathHint
         self.entries = entries

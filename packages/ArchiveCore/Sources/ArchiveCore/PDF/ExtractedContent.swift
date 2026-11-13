@@ -20,6 +20,12 @@ public struct PDFReaderProvenance: Sendable, Equatable {
     public let provider: String
     public let model: String
     public let processingDate: String
+
+    public init(provider: String, model: String, processingDate: String) {
+        self.provider = provider
+        self.model = model
+        self.processingDate = processingDate
+    }
 }
 
 public enum PDFHeaderDiagnostic: String, Sendable, Equatable {

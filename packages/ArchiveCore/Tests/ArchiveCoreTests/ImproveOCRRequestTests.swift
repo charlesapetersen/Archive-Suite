@@ -97,6 +97,8 @@ struct ImproveOCRRequestTests {
         // "é" precomposed and decomposed name one file on APFS.
         let decomposed = "e\u{301}.pdf".addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
         #expect(parseError("\(base)&rel=%C3%A9.pdf&rel=\(decomposed)") == .duplicateTarget("e\u{301}.pdf"))
+        // APFS folds final sigma with sigma; lowercased() does not.
+        #expect(ImproveOCRPath.targetKey("ΑΣ.pdf") == ImproveOCRPath.targetKey("ασ.pdf"))
     }
 
     // MARK: - Paths
@@ -105,7 +107,9 @@ struct ImproveOCRRequestTests {
         #expect(ImproveOCRPath.problem("Box 1/letter.pdf") == nil)
         #expect(ImproveOCRPath.problem("") == .empty)
         #expect(ImproveOCRPath.problem("/Users/x/a.pdf") == .absolute)
-        #expect(ImproveOCRPath.problem("~/a.pdf") == .absolute)
+        #expect(ImproveOCRPath.problem("~Drafts/a.pdf") == nil)   // relative to the root: no tilde expansion
+        #expect(ImproveOCRPath.problem("a\u{202E}fdp.pdf") == .controlCharacter)
+        #expect(ImproveOCRPath.problem("a\u{2028}b.pdf") == .controlCharacter)
         #expect(ImproveOCRPath.problem("../a.pdf") == .dotComponent)
         #expect(ImproveOCRPath.problem("a/../../b.pdf") == .dotComponent)
         #expect(ImproveOCRPath.problem("./a.pdf") == .dotComponent)
@@ -138,6 +142,12 @@ struct ImproveOCRRequestTests {
 
     @Test func manifestRoundTripsThroughJSON() throws {
         let original = manifest([entry("a.pdf"), entry("b/c.pdf", pairs: [0, 2])])
+        let decoded = try ImproveOCRManifest.decode(original.encoded(), expecting: request, now: now)
+        #expect(decoded == original)
+    }
+
+    @Test func manifestWithAFractionalCreationTimeRoundTrips() throws {
+        let original = manifest([entry("a.pdf")], created: Date(timeIntervalSince1970: 1_800_000_000.75))
         let decoded = try ImproveOCRManifest.decode(original.encoded(), expecting: request, now: now)
         #expect(decoded == original)
     }
