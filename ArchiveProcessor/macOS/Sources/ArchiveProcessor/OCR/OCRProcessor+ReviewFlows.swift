@@ -378,8 +378,12 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
 
         // Apply rotation changes back to jobs and regenerate the affected output PDFs.
+        // Each regeneration awaits (its layer reads the page with Vision, W42.int-s5), so the jobs may be cleared or
+        // replaced meanwhile: an item is applied only while its job is still the one it was reviewed for.
+        let reviewed = jobs.map(\.sourceURL)
         for item in documentReviewItems {
-            guard item.fileIndex < jobs.count else { continue }
+            guard item.fileIndex < jobs.count, jobs.count == reviewed.count,
+                  jobs[item.fileIndex].sourceURL == reviewed[item.fileIndex] else { continue }
             let newRot = item.rotationDegrees
             let oldRot = jobs[item.fileIndex].result?.rotationDegrees ?? 0
             guard newRot != oldRot, let existingResult = jobs[item.fileIndex].result else { continue }
@@ -395,34 +399,41 @@ extension OCRProcessor {
                 let pdfSettings = lateRunOutputSettings(for: runConfig)
                 // Use the temp JPEG if this was a PDF input, otherwise the original file.
                 let imageURL = pdfToImageMap[item.fileURL] ?? item.fileURL
+                let source = jobs[item.fileIndex].sourceURL
+                let appliedTags = jobs[item.fileIndex].appliedTags
                 do {
                     // W23.h5-fu — the regenerated PDF re-decides whether the scan is embedded, so its
                     // outcome REPLACES any earlier verdict for this output (a rotation that fixes a
                     // previously undecodable image clears the warning, and vice versa).
-                    let imagePage = try pdfGen.generate(
-                        imageURL: imageURL,
-                        result: result,
-                        model: model,
-                        outputURL: outputURL,
-                        originalFileName: jobs[item.fileIndex].sourceURL.lastPathComponent,
-                        gatewayDisplayName: currentGateway?.displayName,
-                        localAgentDisplayName: currentLocalAgent?.provenanceDisplayName,
-                        localAgentModelName: currentLocalAgent?.provenanceModelName,
-                        pdfImageMB: pdfSettings.pdfImageMB,
-                        textColumns: pdfSettings.textColumns
-                    )
-                    recordImagePage(imagePage, forSource: jobs[item.fileIndex].sourceURL)
+                    // Off the main actor: the image page's searchable layer reads it with Vision (W42.int-s5).
+                    let (fileName, gatewayName) = (source.lastPathComponent, currentGateway?.displayName)
+                    let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
+                    let imagePage = try await Task.detached(priority: .userInitiated) {
+                        try pdfGen.generate(
+                            imageURL: imageURL,
+                            result: result,
+                            model: model,
+                            outputURL: outputURL,
+                            originalFileName: fileName,
+                            gatewayDisplayName: gatewayName,
+                            localAgentDisplayName: agentName,
+                            localAgentModelName: agentModel,
+                            pdfImageMB: pdfSettings.pdfImageMB,
+                            textColumns: pdfSettings.textColumns
+                        )
+                    }.value
+                    recordImagePage(imagePage, forSource: source)
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
-                           jobs[item.fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
+                           source.lastPathComponent, error.localizedDescription)
                 }
                 // Regenerating rewrites the file, dropping its Finder tags. In copy-source mode the
                 // tags were applied during OCR and nothing re-applies them later, so restore them now.
                 // (Other modes apply tags in the later tagging phase, so appliedTags is empty here.)
+                // From the values taken before the await, so the file gets its tags back whatever the jobs became.
                 if passSourceTags {
                     // Copy-source restore after rotation regen: verbatim, label untouched.
-                    tagOutput(jobs[item.fileIndex].appliedTags, at: outputURL,
-                              source: jobs[item.fileIndex].sourceURL, stampUnread: false)
+                    tagOutput(appliedTags, at: outputURL, source: source, stampUnread: false)
                 }
             }
         }

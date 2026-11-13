@@ -306,7 +306,25 @@ enum ReOCRJobTestDriver {
                 check("6c a flipped image is rendered",
                       ReOCRJob.embeddedJPEG(page("q -200 0 0 250 200 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
                 check("6c a page that also draws text is rendered",
-                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT ET"), pageIndex: 0) == nil)
+                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0) == nil)
+                // W42.int-s5: the searchable layer is text in render mode 3, which paints nothing.
+                check("6c a page whose only text is invisible (the searchable layer) is extracted",
+                      ReOCRJob.embeddedJPEG(page("q Q q 0 0 200 250 re W n q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT (x) Tj [(y) -2 (z)] TJ ET Q"),
+                                            pageIndex: 0) == jpg)
+                check("6c invisible text in a Type 3 font is rendered (its glyphs are procedures that may paint)",
+                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT /F1 1 Tf (x) Tj ET",
+                                                 resources: "/Font << /F1 << /Type /Font /Subtype /Type3 >> >>"),
+                                            pageIndex: 0) == nil)
+                check("6c invisible text in a TrueType font is extracted",
+                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 3 Tr BT /F1 1 Tf (x) Tj ET",
+                                                 resources: "/Font << /F1 << /Type /Font /Subtype /TrueType >> >>"),
+                                            pageIndex: 0) == jpg)
+                check("6c text in another render mode is rendered",
+                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q 2 Tr BT (x) Tj ET"), pageIndex: 0) == nil)
+                check("6c a render mode Q restores is rendered",
+                      ReOCRJob.embeddedJPEG(page("q 3 Tr Q q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0) == nil)
+                check("6c an unbalanced Q is rendered",
+                      ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q Q"), pageIndex: 0) == nil)
                 check("6c an image clipped smaller is rendered",
                       ReOCRJob.embeddedJPEG(page("q 0 0 100 100 re W n 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
                 check("6c a clip to the whole page (as PDFKit writes) is extracted",
@@ -319,7 +337,7 @@ enum ReOCRJobTestDriver {
                       ReOCRJob.embeddedJPEG(page("q 200 0 0 250 0 0 cm /Im0 Do Q q 200 0 0 250 0 0 cm /Im0 Do Q"), pageIndex: 0) == nil)
                 let rendered = d.appendingPathComponent("r.jpg")
                 check("6c a rendered page still reaches the reader as a JPEG",
-                      ReOCRJob.writeImageInput(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT ET"), pageIndex: 0, to: rendered)
+                      ReOCRJob.writeImageInput(page("q 200 0 0 250 0 0 cm /Im0 Do Q BT (x) Tj ET"), pageIndex: 0, to: rendered)
                       && CGImageSourceCreateWithURL(rendered as CFURL, nil).flatMap { CGImageSourceGetType($0) as String? } == "public.jpeg")
             }
 

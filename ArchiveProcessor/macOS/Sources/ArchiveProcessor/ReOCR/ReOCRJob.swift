@@ -532,7 +532,8 @@ struct ReOCRJob {
     /// The page's JPEG, byte for byte, only when that is exactly what the page shows: an unrotated page whose content
     /// is `q`/`Q`, rectangular clips that hold the whole image, one `cm` that scales without turning, flipping or
     /// skewing and keeps the whole image inside the crop box, and one `Do` of its only XObject; the XObject a JPEG image with no mask or decode array and an upright
-    /// orientation. Anything else (text, paths, clipping, shading, inline images, a second image) is rendered instead.
+    /// orientation. Text that paints nothing (render mode 3: the searchable layer, W42.int-s5) is allowed; anything else
+    /// (visible text, paths, clipping, shading, inline images, a second image) is rendered instead.
     static func embeddedJPEG(_ pdf: Data, pageIndex: Int) -> Data? {
         guard let doc = ReOCRPreservationCheck.document(pdf) else { return nil }
         return withExtendedLifetime(doc) { () -> Data? in
@@ -558,6 +559,21 @@ struct ReOCRJob {
             }
             var any: CGPDFObjectRef?
             for key in ["SMask", "Mask", "Decode", "ImageMask"] where CGPDFDictionaryGetObject(image, key, &any) { return nil }
+            // A Type 3 font's glyphs are content procedures that may paint even in render mode 3; the layer never uses one.
+            var fonts: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(resources, "Font", &fonts), let fonts {
+                final class Seen { var type3 = false }
+                let seen = Seen()
+                CGPDFDictionaryApplyBlock(fonts, { _, object, info in
+                    let seen = Unmanaged<Seen>.fromOpaque(info!).takeUnretainedValue()
+                    var font: CGPDFDictionaryRef?, subtype: UnsafePointer<CChar>?
+                    if !CGPDFObjectGetValue(object, .dictionary, &font) { seen.type3 = true; return false }
+                    if let font, CGPDFDictionaryGetName(font, "Subtype", &subtype), let subtype,
+                       String(cString: subtype) == "Type3" { seen.type3 = true; return false }
+                    return true
+                }, Unmanaged.passUnretained(seen).toOpaque())
+                if seen.type3 { return nil }
+            }
             guard let drawn = drawsOnlyImage(page, name: name) else { return nil }
             let crop = page.getBoxRect(.cropBox).insetBy(dx: -0.5, dy: -0.5)
             guard crop.contains(drawn) else { return nil }
@@ -583,6 +599,9 @@ struct ReOCRJob {
             var other = false
             var rects: [CGRect] = []
             var clips = 0
+            /// The text render mode, saved and restored with the graphics state (`q`/`Q`); 3 paints nothing.
+            var renderMode = 0
+            var savedModes: [Int] = []
         }
         let state = State()
         guard let table = CGPDFOperatorTableCreate() else { return nil }
@@ -614,7 +633,31 @@ struct ReOCRJob {
             Unmanaged<State>.fromOpaque(info!).takeUnretainedValue().clips += 1
         }
         CGPDFOperatorTableSetCallback(table, "n") { _, _ in }
-        for op in ["BT", "ET", "Tj", "TJ", "'", "\"", "m", "l", "c", "v", "y", "h", "S", "s", "f", "F", "f*", "B", "B*",
+        // W42.int-s5: the image page's searchable layer is text that paints nothing (render mode 3, invisible), so the
+        // page still shows exactly the image. Text is allowed only in that mode; any text shown in another mode is
+        // something drawn, and the page is rendered instead.
+        CGPDFOperatorTableSetCallback(table, "q") { _, info in
+            let state = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            state.savedModes.append(state.renderMode)
+        }
+        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+            let state = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            if let mode = state.savedModes.popLast() { state.renderMode = mode } else { state.other = true }
+        }
+        CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
+            let state = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            var mode: CGPDFInteger = 0
+            if CGPDFScannerPopInteger(scanner, &mode) { state.renderMode = mode } else { state.other = true }
+        }
+        for op in ["Tj", "TJ", "'", "\""] {
+            CGPDFOperatorTableSetCallback(table, op) { _, info in
+                let state = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+                if state.renderMode != 3 { state.other = true }
+            }
+        }
+        CGPDFOperatorTableSetCallback(table, "BT") { _, _ in }
+        CGPDFOperatorTableSetCallback(table, "ET") { _, _ in }
+        for op in ["m", "l", "c", "v", "y", "h", "S", "s", "f", "F", "f*", "B", "B*",
                    "b", "b*", "W*", "sh", "BI", "ID", "EI", "d0", "d1", "BDC", "BMC", "DP", "MP", "gs"] {
             CGPDFOperatorTableSetCallback(table, op) { _, info in
                 Unmanaged<State>.fromOpaque(info!).takeUnretainedValue().other = true

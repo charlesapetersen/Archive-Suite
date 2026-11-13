@@ -798,10 +798,14 @@ extension OCRProcessor {
         // (regen overwrites the PDF, which would clobber freshly-applied Finder tags).
         let outputSettings = lateRunOutputSettings(for: runConfig)
         if !preOCRed, let model = currentModel {
-            for idx in manualSegImages.indices where !manualSegRemoved.contains(idx) {
-                let img = manualSegImages[idx]
+            // Each regeneration awaits (its layer reads the page with Vision, W42.int-s5), so the review's images
+            // and the jobs may change meanwhile: walk a copy, and apply an image only while its job is the same file.
+            let (images, removed, reviewed) = (manualSegImages, manualSegRemoved, jobs.map(\.sourceURL))
+            for idx in images.indices where !removed.contains(idx) {
+                let img = images[idx]
                 let fileIndex = img.fileIndex
-                guard fileIndex < jobs.count, let existing = jobs[fileIndex].result,
+                guard fileIndex < jobs.count, jobs.count == reviewed.count, jobs[fileIndex].sourceURL == reviewed[fileIndex],
+                      let existing = jobs[fileIndex].result,
                       img.rotationDegrees != existing.rotationDegrees else { continue }
                 let updated = OCRResult(text: existing.text, classification: existing.classification,
                                         rotationDegrees: img.rotationDegrees,
@@ -812,22 +816,29 @@ extension OCRProcessor {
                 jobs[fileIndex].result = updated
                 if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
                     let imageURL = pdfToImageMap[img.url] ?? img.url
+                    let source = jobs[fileIndex].sourceURL
                     do {
                         // W23.h5-fu — the regen re-decides whether the scan embedded; record the fresh
                         // verdict so a rotation fix clears (or raises) the placeholder warning.
-                        let imagePage = try PDFGenerator().generate(
-                            imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
-                            originalFileName: jobs[fileIndex].sourceURL.lastPathComponent,
-                            gatewayDisplayName: currentGateway?.displayName,
-                            localAgentDisplayName: currentLocalAgent?.provenanceDisplayName,
-                            localAgentModelName: currentLocalAgent?.provenanceModelName,
-                            pdfImageMB: outputSettings.pdfImageMB,
-                            textColumns: outputSettings.textColumns
-                        )
-                        recordImagePage(imagePage, forSource: jobs[fileIndex].sourceURL)
+                        // Off the main actor: the image page's searchable layer reads it with Vision (W42.int-s5).
+                        let (fileName, gatewayName) = (source.lastPathComponent, currentGateway?.displayName)
+                        let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
+                        let (imageMB, columns) = (outputSettings.pdfImageMB, outputSettings.textColumns)
+                        let imagePage = try await Task.detached(priority: .userInitiated) {
+                            try PDFGenerator().generate(
+                                imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
+                                originalFileName: fileName,
+                                gatewayDisplayName: gatewayName,
+                                localAgentDisplayName: agentName,
+                                localAgentModelName: agentModel,
+                                pdfImageMB: imageMB,
+                                textColumns: columns
+                            )
+                        }.value
+                        recordImagePage(imagePage, forSource: source)
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
-                               jobs[fileIndex].sourceURL.lastPathComponent, error.localizedDescription)
+                               source.lastPathComponent, error.localizedDescription)
                     }
                 }
             }

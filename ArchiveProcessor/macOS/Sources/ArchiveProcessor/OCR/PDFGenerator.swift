@@ -4,6 +4,7 @@ import PDFKit
 import CoreText
 import ImageIO
 import ArchiveCore
+import VisionOCRKit
 
 /// W37.dual-date — the optional source-document date lines of a newly generated PDF's OCR-text header
 /// (`Document date: …` / `Sent with: …`). Display strings (`ArchiveDate.display`). These are the
@@ -44,17 +45,46 @@ struct PDFGenerator {
         var isPlaceholder: Bool { self == .placeholder }
     }
 
+    /// What `generateOutput` wrote: the image page's verdict and its searchable layer's (W42.int-s5).
+    struct Output: Sendable, Equatable {
+        var imagePage: ImagePageOutcome
+        var layer: TextLayerOutcome
+    }
+
     @discardableResult
     func generate(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL,
                   originalFileName: String? = nil, gatewayDisplayName: String? = nil,
                   localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                   pdfImageMB: Double = 0, textColumns: Int = 1,
-                  sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) throws -> ImagePageOutcome {
+                  sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
+                  textLayer: TextLayerOptions? = .standard) throws -> ImagePageOutcome {
+        try generateOutput(imageURL: imageURL, result: result, model: model, outputURL: outputURL,
+                           originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName,
+                           localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
+                           pdfImageMB: pdfImageMB, textColumns: textColumns, sourceDates: sourceDates,
+                           pageKind: pageKind, textLayer: textLayer).imagePage
+    }
+
+    /// `generate`, saying also what the image page's searchable layer came to. `textLayer` nil writes no layer.
+    func generateOutput(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL,
+                        originalFileName: String? = nil, gatewayDisplayName: String? = nil,
+                        localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
+                        pdfImageMB: Double = 0, textColumns: Int = 1,
+                        sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
+                        textLayer: TextLayerOptions? = .standard) throws -> Output {
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
+        var layer = TextLayerOutcome.textPage("no layer asked for")
 
-        if let imagePage = makeImagePage(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB) {
-            pdfDocument.insert(imagePage, at: 0)
+        if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB),
+           let plain = PDFDocument(data: image.pdf)?.page(at: 0) {
+            var page = plain
+            if let textLayer {
+                let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer)
+                layer = layered.outcome
+                if let p = layered.page { page = p }
+            }
+            pdfDocument.insert(page, at: 0)
             outcome = .embedded
         } else {
             // The source image couldn't be decoded/embedded. Insert a visible placeholder rather than
@@ -62,6 +92,7 @@ struct PDFGenerator {
             // keeps PDFTextExtractor's pageCount>=2 heuristic valid, and surfaces the failure.
             pdfDocument.insert(makePlaceholderImagePage(note: "Original image could not be embedded (\(imageURL.lastPathComponent))."), at: 0)
             outcome = .placeholder
+            layer = .textPage("the image could not be embedded")
         }
 
         let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName,
@@ -74,12 +105,68 @@ struct PDFGenerator {
         guard pdfDocument.write(to: outputURL) else {
             throw PDFError.writeFailed
         }
-        return outcome
+        return Output(imagePage: outcome, layer: layer)
+    }
+
+    // MARK: - Searchable layer (W42.int-s5)
+
+    /// What the run tells the layer: the placement switch (`placeHandOnImage`, `05-placement.md` §2).
+    struct TextLayerOptions: Sendable, Equatable {
+        var placeHandOnImage = true
+        static let standard = TextLayerOptions()
+    }
+
+    /// The image page with its searchable layer, or nil (and why) when it gets none. Never worse than the plain page:
+    /// any failure keeps the image page without a layer, and the text page carries the text either way.
+    private func layeredImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
+                                  options: TextLayerOptions) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+        let kind = TextLayerRule.kind(explicit: pageKind, result: result)
+        let reading = result.text.flatMap { $0.isEmpty ? nil : $0 }
+        let requireAligned: Bool
+        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage) {
+        case .textPage(let why): return (nil, .textPage(why))
+        case .place(let r): requireAligned = r
+        }
+        // The engine's Vision reading stalls on the main thread (W42.int-s3); a caller there gets no layer.
+        guard !Thread.isMainThread else { return (nil, .textPage("written on the main thread")) }
+        guard let cg = image.decoded(), cg.width > 0,
+              let vision = TextLayer.visionLines(of: cg) else { return (nil, .textPage("Vision could not read the image")) }
+        guard !vision.isEmpty else { return (nil, .textPage("Vision found no lines")) }
+        let lines = TextLayer.aligned(vision, reading: reading, aspect: Double(cg.height) / Double(cg.width))
+        if requireAligned, lines.placement != .aligned {
+            return (nil, .textPage("the page's kind is unknown and the reading did not align with Vision's lines"))
+        }
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("ap-layer-" + UUID().uuidString, isDirectory: true)
+        defer { try? fm.removeItem(at: dir) }
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            let plainURL = dir.appendingPathComponent("image.pdf"), layeredURL = dir.appendingPathComponent("layered.pdf")
+            try image.pdf.write(to: plainURL)
+            let unplaced = try TextLayer.write(imagePage: plainURL, lines: lines, imageFrame: image.frame, to: layeredURL)
+            // Read into memory: a PDFDocument opened on a URL reads it lazily, and the directory goes at return.
+            guard let page = PDFDocument(data: try Data(contentsOf: layeredURL))?.page(at: 0) else {
+                return (nil, .textPage("the layered page could not be read back"))
+            }
+            let route: TextLayerRoute = lines.placement == .aligned ? .visionLinesAligned : .visionOwn
+            return (page, TextLayerOutcome(route: route, reason: nil, lines: lines.lines.count, unplaced: unplaced))
+        } catch {
+            return (nil, .textPage("the layer could not be written: \(error.localizedDescription)"))
+        }
     }
 
     // MARK: - Image Page
 
-    private func makeImagePage(imageURL: URL, rotationDegrees: Int = 0, targetMB: Double = 0) -> PDFPage? {
+    /// The image page as a one-page PDF, the pixels it shows and where they sit on the page.
+    struct ImagePageData {
+        var pdf: Data
+        /// Decodes the embedded image, as drawn (oriented and turned): what the layer's lines are read from.
+        var decoded: () -> CGImage?
+        /// Where the image sits on the page, normalised, top-left origin.
+        var frame: CGRect
+    }
+
+    private func makeImagePageData(imageURL: URL, rotationDegrees: Int = 0, targetMB: Double = 0) -> ImagePageData? {
         guard let imageSource = CGImageSourceCreateWithURL(imageURL as CFURL, nil) else { return nil }
 
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
@@ -173,7 +260,7 @@ struct PDFGenerator {
         let drawY = (pageHeight - drawHeight) / 2
 
         // Build a minimal PDF with JPEG bytes embedded via DCTDecode
-        let pdfBytes = buildPDFWithJPEG(
+        let pdfBytes: Data = buildPDFWithJPEG(
             jpegData: jpegData, colorSpace: colorSpace,
             imageWidth: embedWidth, imageHeight: embedHeight,
             pageWidth: pageWidth, pageHeight: pageHeight,
@@ -181,8 +268,13 @@ struct PDFGenerator {
             drawWidth: drawWidth, drawHeight: drawHeight
         )
 
-        guard let doc = PDFDocument(data: pdfBytes) else { return nil }
-        return doc.page(at: 0)
+        let embedded = jpegData
+        let frame = CGRect(x: drawX / pageWidth, y: (pageHeight - drawY - drawHeight) / pageHeight,
+                           width: drawWidth / pageWidth, height: drawHeight / pageHeight)
+        return ImagePageData(pdf: pdfBytes, decoded: {
+            guard let src = CGImageSourceCreateWithData(embedded as CFData, nil) else { return nil }
+            return CGImageSourceCreateImageAtIndex(src, 0, nil)
+        }, frame: frame)
     }
 
     /// Maps a CGImageSource color model (kCGImagePropertyColorModel*) to the PDF /ColorSpace name.
