@@ -295,6 +295,25 @@ enum WindowCombiner {
         }
     }
 
+    /// An approach that sends no images reads each page by its OCR text alone, so a page whose OCR failed or holds
+    /// no text (a photograph, a blank back) gives it nothing to judge: both gaps beside such a page are flagged for
+    /// the user (W46.seg-text-tier-blank). An approach with any voter that sees the pictures is left as it is, and a
+    /// gap beside a label photo stays fixed.
+    static func flaggingTextless(_ proposals: [GapProposal], texts: [String], approach: ApproachSpec) -> [GapProposal] {
+        guard !approach.voters.isEmpty, approach.voters.allSatisfy({ !$0.sendsImages }) else { return proposals }
+        func blank(_ i: Int) -> Bool {
+            i < texts.count && texts[i].allSatisfy(\.isWhitespace)
+        }
+        return proposals.map { p in
+            let empty = [p.gap, p.gap + 1].filter(blank)
+            guard !p.fixed, !empty.isEmpty else { return p }
+            let note = empty.map { "page \($0 + 1) has no OCR text" }.joined(separator: ", ")
+                + "; the model saw no picture"
+            return GapProposal(gap: p.gap, decision: p.decision, confidence: p.confidence, agreed: p.agreed,
+                               flagged: true, cue: p.cue.isEmpty ? note : note + " || " + p.cue, fixed: false)
+        }
+    }
+
     struct Judgement: Equatable {
         let decision: GapDecision
         let flagged: Bool
@@ -495,8 +514,10 @@ struct WindowSegmenter: Sendable {
                     answered[key(v, w, n)].map { (w, $0) }
                 }))
         }
-        let proposals = WindowCombiner.proposals(photoKinds: photoKinds, voters: verdicts,
-                                                 rule: approach.rule, level: approach.level)
+        let proposals = WindowCombiner.flaggingTextless(
+            WindowCombiner.proposals(photoKinds: photoKinds, voters: verdicts, rule: approach.rule,
+                                     level: approach.level),
+            texts: pages.map(\.text), approach: approach)
         return WindowSegmentation(proposals: proposals, answered: answered,
                                   failed: failed.sorted { ($0.voter, $0.start) < ($1.voter, $1.start) })
     }

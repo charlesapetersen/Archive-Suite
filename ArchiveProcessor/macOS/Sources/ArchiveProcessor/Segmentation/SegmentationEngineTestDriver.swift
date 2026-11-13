@@ -530,6 +530,53 @@ enum SegmentationEngineTestDriver {
                   g.url?.absoluteString.hasSuffix("/models/gemini-3.8-flash:generateContent") == true
                   && parts.count == 1 && parts[0]["text"] as? String == r.prompt && !(String(data: g.httpBody ?? Data(), encoding: .utf8) ?? "inlineData").contains("inlineData"))
         } else { check("gemini-text request builds", false) }
+
+        // A page with no OCR text (W46.seg-text-tier-blank): on the recorded box, with the Gemini voter's replies
+        // under the text voter's name, a blanked page and a whitespace page flag both gaps beside them; a blank
+        // page beside a label photo leaves that gap fixed; nothing else changes, and the image window is unmoved.
+        var textReplies: [String: String] = [:]
+        for w in fx.windows["G"] ?? [] { textReplies[FakeTransport.key("window-gemini-3.8-flash-low-text", w.start, w.end)] = w.reply }
+        let photo = fx.photo_kinds.map { $0.flatMap { PhotoKind(rawValue: $0.lowercased()) } }
+        let texts = (0..<fx.pages).map { "page \($0 + 1)" }
+        var blanked = texts
+        blanked[10] = ""
+        blanked[30] = " \n\t"
+        blanked[22] = ""
+        func run(_ s: ApproachSpec, _ t: [String], _ r: [String: String]) async -> WindowSegmentation? {
+            try? await WindowSegmenter.instant(FakeTransport(replies: r)).segment(
+                pages: t.map { PageInput(jpeg: Data(), text: $0) }, photoKinds: photo, approach: s)
+        }
+        let clean = await run(spec, texts, textReplies), blank = await run(spec, blanked, textReplies)
+        if let clean, let blank, clean.proposals.count == fx.pages - 1, blank.proposals.count == fx.pages - 1 {
+            let beside: Set<Int> = [9, 10, 29, 30, 22]
+            check("gemini-text: photo 22 is a label, so gap 21 is fixed and gaps 9-10, 29-30 and 22 are document gaps",
+                  photo[21] != nil && [9, 10, 22, 29, 30].allSatisfy { photo[$0] == nil && photo[$0 + 1] == nil })
+            check("gemini-text: the gaps beside a page with no text are flagged, saying which page",
+                  beside.allSatisfy { blank.proposals[$0].flagged }
+                  && blank.proposals[9].cue.hasPrefix("page 11 has no OCR text; the model saw no picture || ")
+                  && blank.proposals[30].cue.hasPrefix("page 31 has no OCR text"))
+            check("gemini-text: they keep the model's decision and confidence",
+                  beside.allSatisfy { blank.proposals[$0].decision == clean.proposals[$0].decision
+                      && blank.proposals[$0].confidence == clean.proposals[$0].confidence })
+            check("gemini-text: a blank page beside a label photo leaves that gap a fixed boundary",
+                  blank.proposals[21] == clean.proposals[21] && blank.proposals[21].fixed && !blank.proposals[21].flagged)
+            check("gemini-text: every other gap is as before (\(clean.proposals.filter(\.flagged).count) flagged clean, "
+                  + "\(blank.proposals.filter(\.flagged).count) blanked)",
+                  clean.proposals.indices.filter { !beside.contains($0) }.allSatisfy { blank.proposals[$0] == clean.proposals[$0] }
+                  && clean.proposals.filter(\.flagged).count < blank.proposals.filter(\.flagged).count)
+            let stage = WindowStagePages(fileIndices: Array(0..<fx.pages),
+                                         urls: (0..<fx.pages).map { URL(fileURLWithPath: "/tmp/p\($0).jpg") },
+                                         photoKinds: photo)
+            check("gemini-text: a run stopped and checked by the user flags the same gaps",
+                  OCRProcessor.partialProposals(pages: stage, spec: spec, answered: blank.answered, texts: blanked)
+                  == blank.proposals)
+        } else { check("gemini-text: segments the recorded box", false) }
+        var imageReplies: [String: String] = [:]
+        for w in fx.windows["G"] ?? [] { imageReplies[FakeTransport.key("window-gemini-3.8-flash-low", w.start, w.end)] = w.reply }
+        if let image = try? options.spec(for: .gemini), let a = await run(image, texts, imageReplies),
+           let b = await run(image, blanked, imageReplies) {
+            check("gemini (with images): a page with no text changes nothing", a.proposals == b.proposals)
+        } else { check("gemini (with images): segments the recorded box", false) }
         return out
     }
 

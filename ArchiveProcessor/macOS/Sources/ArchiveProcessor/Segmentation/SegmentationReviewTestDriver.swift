@@ -199,12 +199,13 @@ enum SegmentationReviewTestDriver {
             .segment(pages: urls.map { _ in PageInput(jpeg: Data([0]), text: "") }, photoKinds: kinds,
                      approach: spec)
         let firstOnly = (full?.answered ?? [:]).filter { $0.key.start == 0 && $0.key.end == 4 }
-        let partial = OCRProcessor.partialProposals(pages: pages, spec: spec, answered: firstOnly)
+        let partial = OCRProcessor.partialProposals(pages: pages, spec: spec, answered: firstOnly,
+                                                    texts: urls.map { _ in "" })
         eq("3 gaps the answered window covered are not flagged", partial.prefix(3).map(\.flagged), [false, false, false])
         eq("3 gaps no window answered are flagged at confidence 0",
            partial.suffix(2).map { "\($0.flagged) \($0.confidence)" }, ["true 0.0", "true 0.0"])
         eq("3 no figures: every document gap flagged",
-           OCRProcessor.partialProposals(pages: pages, spec: nil, answered: [:]).map(\.flagged),
+           OCRProcessor.partialProposals(pages: pages, spec: nil, answered: [:], texts: []).map(\.flagged),
            [false, true, true, true, true])
 
         // 4. The manifest.

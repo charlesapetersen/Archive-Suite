@@ -15759,3 +15759,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   reading stalled inside Vision when called on the main thread, so it asserts off-main. ArchiveOCRBench has the panel;
   its published copy is behind. Bench cache: `page-kinds/` (lists and calls, about 60 KB) kept, as the pin reads it.
   <!-- /W42.int-s3 -->
+- [x] **W46.seg-text-tier-blank — the text-only Gemini window flags the gaps beside a page with no OCR text [S · Tier-2]** · §Document processing review — W46 (lane: processor) — SHIPPED 2026-11-13. Filed by W46.seg-text-tier-default's review.
+  `WindowCombiner.flaggingTextless` (WindowSegmenter.swift): when none of an approach's voters sends images (today only
+  `gemini-text`), both gaps beside a page whose OCR text is empty or whitespace are flagged, keeping the model's decision
+  and confidence, the cue starting "page N has no OCR text; the model saw no picture". A gap beside a label photo stays
+  fixed. Applied at the end of `WindowSegmenter.segment` (so a resume is covered) and in `OCRProcessor.partialProposals`
+  (a stopped run the user checks), whose `texts` is now required. Any voter that sees pictures (the image window, the
+  2B beside a partner) is unchanged. Test: `scripts/test-segmentation-engine.sh` on the Deaver fixture with pages 11, 23
+  and 31 blanked (31 whitespace): gaps 9-10, 22, 29-30 flagged (27 flagged clean, 31 blanked), gap 21 fixed, every other
+  gap equal, the stopped-run path matches, and the image window unmoved; ALL PASS, as does test-segmentation-review.sh.
+  Tier-2 review (Opus, adversarial): no defect; took its one suggestion (make `texts` required). KNOWN_ISSUES
+  LIMITATION W46.seg-text-tier-default marked mitigated. Bench cache: nothing used. $0, no model call.
+  <!-- /W46.seg-text-tier-blank -->

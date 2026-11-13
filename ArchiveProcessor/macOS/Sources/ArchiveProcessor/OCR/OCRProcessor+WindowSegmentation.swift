@@ -275,16 +275,19 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return nil }
         switch choice {
         case .checkMyself:
-            return Self.partialProposals(pages: pages, spec: spec, answered: answered)
+            return Self.partialProposals(pages: pages, spec: spec, answered: answered,
+                                         texts: pages.fileIndices.map { jobs[$0].result?.text ?? "" })
         case .stop:
             stopRunAfterWindowStage(message: message, resumable: canResume)
             return nil
         }
     }
 
-    /// The proposals the answered windows make; every gap no window answered is flagged with confidence 0.
+    /// The proposals the answered windows make; every gap no window answered is flagged with confidence 0, and an
+    /// approach that sends no images flags the gaps beside a page with no text in `texts`, as a whole run does.
     nonisolated static func partialProposals(pages: WindowStagePages, spec: ApproachSpec?,
-                                             answered: [WindowKey: WindowAnswer]) -> [GapProposal] {
+                                             answered: [WindowKey: WindowAnswer],
+                                             texts: [String]) -> [GapProposal] {
         let n = pages.urls.count
         guard let spec else {
             return WindowCombiner.proposals(photoKinds: pages.photoKinds, voters: [Array(repeating: nil, count: max(0, n - 1))],
@@ -297,8 +300,10 @@ extension OCRProcessor {
                     answered[WindowKey(voter: v.name, pages: n, start: w.lowerBound, end: w.upperBound)].map { (w, $0) }
                 }))
         }
-        return WindowCombiner.proposals(photoKinds: pages.photoKinds, voters: verdicts, rule: spec.rule,
-                                        level: spec.level)
+        return WindowCombiner.flaggingTextless(
+            WindowCombiner.proposals(photoKinds: pages.photoKinds, voters: verdicts, rule: spec.rule,
+                                     level: spec.level),
+            texts: texts, approach: spec)
     }
 
     /// Called by the stop prompt.

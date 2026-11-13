@@ -10,7 +10,10 @@ each page's OCR result (`OCRProcessor+WindowSegmentation.swift`, `jobs[i].result
 failed, or that holds no text (a photograph, a blank back), reaches it as an empty page. The image window had the
 picture to go on; this one does not, and nothing flags the gaps beside such a page. The measured figures (87.3% exact,
 29.2 checks per 100 pages) are on test boxes whose pages were all read. Choosing Gemini with the images in the chooser
-or on the settings sheet avoids it. Follow-up: `W46.seg-text-tier-blank` (flag the gaps beside a page with no text).
+or on the settings sheet avoids it. **Mitigated (W46.seg-text-tier-blank, 2026-11-13):** an approach none of whose
+voters sends images now flags both gaps beside a page whose text is empty or whitespace (`WindowCombiner.flaggingTextless`,
+in a whole run and in a stopped run the user checks), the cue naming the page; a gap beside a label photo stays fixed.
+What remains: a box with many such pages has more gaps to check than the figures say, since the user decides each one.
 
 ## ⚠️ LIMITATION (W46.date-route, 2026-11-13): what the dating route does not yet cover
 
