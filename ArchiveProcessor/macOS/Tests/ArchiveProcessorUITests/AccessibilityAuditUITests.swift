@@ -67,7 +67,9 @@ final class AccessibilityAuditUITests: XCTestCase {
         let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
         LayoutGuard.waitUntilSettled(settings)
-        sweep.audit(settings, screen: "settings")
+        // Settings is a `.grouped` Form full of TextFields: on macOS 27 each sweep reports SwiftUI's unnamed
+        // parent/child orphan there (W40.vm-macos27-processor; the probe is on the exemption).
+        sweep.audit(settings, screen: "settings", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
         sweep.finish()
     }
 

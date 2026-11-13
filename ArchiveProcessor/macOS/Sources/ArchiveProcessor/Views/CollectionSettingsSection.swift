@@ -43,7 +43,9 @@ struct CollectionSettingsSection: View {
     var body: some View {
         Section {
             if let folder = outputFolder {
-                LabeledContent("Collection", value: folder.lastPathComponent)
+                // The value in primary: a grouped Form draws it secondary, 3.90:1 on macOS 27's light
+                // window (W40.vm-macos27-processor), and the collection's name is what this row is for.
+                LabeledContent("Collection") { Text(folder.lastPathComponent).foregroundStyle(.primary) }
                 HStack {
                     Picker("Project", selection: projectBinding(folder)) {
                         Text("None").tag(UUID?.none)

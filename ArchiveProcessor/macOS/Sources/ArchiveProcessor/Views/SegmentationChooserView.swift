@@ -83,8 +83,14 @@ struct SegmentationChooserView: View {
 
             if let row = rows.first(where: { $0.approach == approach }) {
                 if let reason = row.unavailableReason {
-                    Label(reason, systemImage: "exclamationmark.circle")
-                        .font(.caption).foregroundStyle(.orange)
+                    // The words in primary, the warning colour on the icon only: orange caption text
+                    // measured 2.16:1 on the light window (W40.vm-macos27-processor).
+                    Label {
+                        Text(reason)
+                    } icon: {
+                        Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                    }
+                        .font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ap.segmentation.unavailable")
                     // ChatGPT's alternative to a key, "Continue with ChatGPT", sits above.
