@@ -5281,11 +5281,14 @@ extension Recogniser {
     }
 
     static func pageShape(of observations: [SearchableWriter.Observation]) -> PageShape {
-        let widths = observations
+        pageShape(widths: observations
             .filter { $0.text.filter { !$0.isWhitespace }.count >= 4 && ($0.quarterTurns ?? 0) == 0 }
-            .map(\.boundingBox.width)
-            .filter { $0 > 0 }
-            .sorted()
+            .map { Double($0.boundingBox.width) })
+    }
+
+    /// The shape from the counted lines' widths alone (`EnginePageKind`, for a host app's own Vision pass).
+    static func pageShape(widths all: [Double]) -> PageShape {
+        let widths = all.filter { $0 > 0 }.sorted()
         guard !widths.isEmpty else { return PageShape() }
         return PageShape(lines: widths.count, wideWidth: widths[widths.count * 9 / 10])
     }

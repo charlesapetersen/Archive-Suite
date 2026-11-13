@@ -234,9 +234,9 @@ enum SettingsInterviewsTestDriver {
 
     private static func measurement(_ root: URL) {
         let kinds: [PageKind?] = [
-            PageKind(kind: "typewritten", confidence: 0.95), PageKind(kind: "typewritten", confidence: 0.6),
-            PageKind(kind: "handwritten", confidence: 0.9), nil,
-            PageKind(kind: "printed", confidence: 0.85),
+            PageKind(kind: .typewritten, confidence: 0.95), PageKind(kind: .typewritten, confidence: 0.6),
+            PageKind(kind: .handwritten, confidence: 0.9), nil,
+            PageKind(kind: .printed, confidence: 0.85),
         ]
         let m = KindMeasurement.tally(kinds, date: day)
         eq("the sample counts every photograph given", m.sample, 5)
@@ -461,7 +461,7 @@ enum SettingsInterviewsTestDriver {
         pg.apply(to: &project, now: day)
         var own = CollectionInterviewAnswers(resolver: SettingsResolver(general: g, project: project), own: nil)
         check("a project's mix shows as inherited", own.mixInheritedFrom == "the project “Letters”" && !own.correctedMix)
-        own.take(KindMeasurement.tally([PageKind(kind: "typewritten", confidence: 0.9)], date: day))
+        own.take(KindMeasurement.tally([PageKind(kind: .typewritten, confidence: 0.9)], date: day))
         own.languages = []; own.scriptShares = [:]; own.periodFrom = nil; own.periodTo = nil
         var cl2 = SettingsLayer(kind: .collection, name: "c")
         own.apply(to: &cl2, now: day)

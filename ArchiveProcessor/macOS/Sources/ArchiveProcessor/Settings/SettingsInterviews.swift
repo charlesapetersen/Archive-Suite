@@ -247,7 +247,7 @@ struct KindMeasurement: Equatable, Sendable {
         var unknown = 0
         for k in kinds {
             guard let k else { unknown += 1; continue }
-            counts[k.kind, default: 0] += 1
+            counts[k.kind.mixKind.rawValue, default: 0] += 1
             if k.confidence < PageKindRouting.minimumConfidence { unsure += 1 }
         }
         return KindMeasurement(sample: kinds.count, counts: counts, unsure: unsure, unknown: unknown, date: date)
@@ -330,10 +330,10 @@ enum PublicStratum {
 /// only what this interview answered (the user changed it, a starting point filled it, or the layer already held it):
 /// everything else stays inherited live from the project and the general settings (owner, 2026-11-04, "Layers").
 struct CollectionInterviewAnswers: Equatable, Sendable {
-    static let measuredKinds = ["typewritten", "printed", "handwritten", "forms"]
+    static let measuredKinds = PageKindName.classifierKinds.map(\.rawValue)
     /// Kinds the classifier does not measure, asked and labelled "not measured" (owner, 2026-11-06). `registers` is
     /// kept under its own name and read as forms (`SettingsResolver.answers`).
-    static let unmeasuredKinds = ["clippings", "newspapers", "registers", "mixed"]
+    static let unmeasuredKinds = PageKindName.askedKinds.map(\.rawValue)
     static let languageChoices: [(code: String, label: String)] = [
         ("en", "English"), ("fr", "French"), ("de", "German"), ("nl", "Dutch"), ("es", "Spanish"),
         ("pt", "Portuguese"), ("it", "Italian"), ("la", "Latin"), ("other", "Another language"),
@@ -485,13 +485,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     func isAnswered(_ key: SettingsKey) -> Bool { answered.contains(key.rawValue) }
 
     static func unmeasuredLabel(_ kind: String) -> String {
-        switch kind {
-        case "clippings": return "Newspaper clippings"
-        case "newspapers": return "Whole newspaper pages"
-        case "registers": return "Registers and ledgers"
-        case "mixed": return "Typed pages with handwriting on them"
-        default: return kind
-        }
+        PageKindName(rawValue: kind)?.shareLabel ?? kind
     }
 
     static func priorityLabel(_ p: SettingsPriority) -> String {

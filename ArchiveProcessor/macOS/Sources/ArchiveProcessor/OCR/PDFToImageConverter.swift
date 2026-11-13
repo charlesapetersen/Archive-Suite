@@ -64,6 +64,27 @@ struct PDFToImageConverter {
     /// Render one PDF page to a temporary JPEG in the temp directory.
     /// Returns the URL of the temporary JPEG, or nil on failure.
     private static func renderPageToJPEG(_ page: PDFPage) -> URL? {
+        guard let cgImage = renderPageImage(page) else { return nil }
+
+        // Write as JPEG
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".jpg")
+
+        guard let dest = CGImageDestinationCreateWithURL(
+            tempURL as CFURL, "public.jpeg" as CFString, 1, nil
+        ) else { return nil }
+
+        CGImageDestinationAddImage(dest, cgImage, [
+            kCGImageDestinationLossyCompressionQuality: 0.85
+        ] as CFDictionary)
+
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return tempURL
+    }
+
+    /// One PDF page as the run's OCR sees it, before JPEG encoding: upright, at about 2x, the long edge clamped.
+    /// The page-kind measure (W42.int-s3) classifies PDF pages from this.
+    static func renderPageImage(_ page: PDFPage) -> CGImage? {
         // Size to the VISIBLE page — the media box is unrotated, so swap W/H when the page's /Rotate
         // is 90/270; otherwise a rotated scan renders with the wrong aspect and gets clipped.
         let pageRect = page.bounds(for: .mediaBox)
@@ -98,21 +119,6 @@ struct PDFToImageConverter {
         guard let cgThumb = thumb.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         context.draw(cgThumb, in: CGRect(origin: .zero, size: pixelSize))
 
-        guard let cgImage = context.makeImage() else { return nil }
-
-        // Write as JPEG
-        let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + ".jpg")
-
-        guard let dest = CGImageDestinationCreateWithURL(
-            tempURL as CFURL, "public.jpeg" as CFString, 1, nil
-        ) else { return nil }
-
-        CGImageDestinationAddImage(dest, cgImage, [
-            kCGImageDestinationLossyCompressionQuality: 0.85
-        ] as CFDictionary)
-
-        guard CGImageDestinationFinalize(dest) else { return nil }
-        return tempURL
+        return context.makeImage()
     }
 }

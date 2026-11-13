@@ -268,9 +268,9 @@ enum EntityRunPolicy {
         case typedOrPrinted, handwritten, unknown
 
         init(_ kind: String?) {
-            switch kind {
-            case "typewritten", "printed", "forms": self = .typedOrPrinted
-            case "handwritten": self = .handwritten
+            switch kind.flatMap(PageKindName.init(rawValue:))?.routingKind {
+            case .typewritten, .printed, .forms: self = .typedOrPrinted
+            case .handwritten: self = .handwritten
             default: self = .unknown
             }
         }

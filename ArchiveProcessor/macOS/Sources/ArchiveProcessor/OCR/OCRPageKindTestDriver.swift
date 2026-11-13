@@ -4,6 +4,7 @@ import ArchiveCore
 import Foundation
 import PDFKit
 import SwiftUI
+import VisionOCRKit
 
 /// Key-free, no-network contract for W41.app-page-kind, gated by `OCRPAGEKIND_TEST=1`. Checks the bundled classifier
 /// weights, the routing from a page's kind to the guide's first runnable pick, the file list's plan (per-page and
@@ -68,10 +69,10 @@ enum OCRPageKindTestDriver {
         let hc = model.hand.classes
         check("2 the hand's top class decides when no form is called",
               PageKind.decide(hand: [0.1, 0.85, 0.05], form: [0.9, 0.1], handClasses: hc)
-              == PageKind(kind: "typewritten", confidence: 0.85))
+              == PageKind(kind: .typewritten, confidence: 0.85))
         check("2 a form call wins, with the form regression's probability",
               PageKind.decide(hand: [0.1, 0.85, 0.05], form: [0.3, 0.7], handClasses: hc)
-              == PageKind(kind: "forms", confidence: 0.7))
+              == PageKind(kind: .forms, confidence: 0.7))
 
         // 3. Routing from the kind to the guide's pick.
         guard let guide = OCRPageGuidance.loadBundled() else {
@@ -88,48 +89,48 @@ enum OCRPageKindTestDriver {
         func cand(_ m: LLMModel) -> PageKindRouting.Candidate { .init(provider: m.provider, modelID: m.id) }
         let runDefault = cand(claude)
         let all: Set = [cand(claude), cand(flash), cand(qwen)]
-        func choose(_ kind: String?, _ conf: Double = 0.95, available: Set<PageKindRouting.Candidate> = all,
+        func choose(_ kind: PageKindName?, _ conf: Double = 0.95, available: Set<PageKindRouting.Candidate> = all,
                     run: PageKindRouting.Candidate = runDefault, override: PageKindRouting.Candidate? = nil,
                     hand: Bool = false) -> PageKindRouting.Choice {
             PageKindRouting.choose(kind: kind.map { PageKind(kind: $0, confidence: conf) }, guidance: guide,
                                    available: available, runDefault: run, override: override, handwritingOnTyped: hand)
         }
         check("3 a sure typewritten page goes to the guide's first pick, Gemini 3.8 Flash",
-              choose("typewritten") == .init(provider: .gemini, modelID: flash.id, reason: .kind))
-        check("3 a sure handwritten page too", choose("handwritten").modelID == flash.id)
-        check("3 a form goes to Qwen3.6 27B", choose("forms") == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
+              choose(.typewritten) == .init(provider: .gemini, modelID: flash.id, reason: .kind))
+        check("3 a sure handwritten page too", choose(.handwritten).modelID == flash.id)
+        check("3 a form goes to Qwen3.6 27B", choose(.forms) == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
         check("3 printed: Claude Sonnet 5.5 is not in the app, so the next pick, Qwen3.6 27B",
-              choose("printed").modelID == qwen.id)
+              choose(.printed).modelID == qwen.id)
         check("3 a pick with no key is passed over; none runnable keeps the run's model (no_pick)",
-              choose("printed", available: [cand(claude)]) == .init(provider: .anthropic, modelID: claude.id, reason: .noPick))
+              choose(.printed, available: [cand(claude)]) == .init(provider: .anthropic, modelID: claude.id, reason: .noPick))
         check("3 the guide's pick being the run's model reads as same",
-              choose("typewritten", run: cand(flash)).reason == .same)
+              choose(.typewritten, run: cand(flash)).reason == .same)
         check("3 a page under \(PageKindRouting.minimumConfidence) keeps the run's model (uncertain)",
-              choose("typewritten", 0.79) == .init(provider: .anthropic, modelID: claude.id, reason: .uncertain)
-              && choose("typewritten", PageKindRouting.minimumConfidence).reason == .kind)
+              choose(.typewritten, 0.79) == .init(provider: .anthropic, modelID: claude.id, reason: .uncertain)
+              && choose(.typewritten, PageKindRouting.minimumConfidence).reason == .kind)
         check("3 a page with no kind keeps the run's model (unknown)", choose(nil).reason == .unknown)
         check("3 the user's choice wins over the kind, and over uncertainty",
-              choose("typewritten", 0.3, override: cand(qwen)) == .init(provider: .openrouter, modelID: qwen.id, reason: .override))
+              choose(.typewritten, 0.3, override: cand(qwen)) == .init(provider: .openrouter, modelID: qwen.id, reason: .override))
         // W46.mixed-route-setting: "Read handwriting on typed pages" sends typed and printed pages to the handwritten pick.
         check("3 handwriting on typed pages: a printed page goes to the handwritten pick, Gemini 3.8 Flash, not Qwen",
-              choose("printed", hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
+              choose(.printed, hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
         check("3 handwriting on typed pages: a typewritten page too, recorded as the switch's",
-              choose("typewritten", hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
+              choose(.typewritten, hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
         check("3 handwriting on typed pages leaves handwritten pages and forms on their own kind's pick",
-              choose("handwritten", hand: true).reason == .kind
-              && choose("forms", hand: true) == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
+              choose(.handwritten, hand: true).reason == .kind
+              && choose(.forms, hand: true) == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
         check("3 handwriting on typed pages: no runnable handwritten pick routes the page by its own kind",
-              choose("printed", available: [cand(claude), cand(qwen)], hand: true)
+              choose(.printed, available: [cand(claude), cand(qwen)], hand: true)
               == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
         check("3 handwriting on typed pages: the handwritten pick being the run's model reads as same",
-              choose("printed", run: cand(flash), hand: true).reason == .same)
+              choose(.printed, run: cand(flash), hand: true).reason == .same)
         check("3 handwriting on typed pages leaves an unsure page and the user's choice alone",
-              choose("printed", 0.79, hand: true).reason == .uncertain
-              && choose("printed", override: cand(claude), hand: true).reason == .override)
+              choose(.printed, 0.79, hand: true).reason == .uncertain
+              && choose(.printed, override: cand(claude), hand: true).reason == .override)
         check("3 the switch's reason reroutes and reads in the file list",
               PageKindRouting.Reason.handwriting.routes && !PageKindRouting.Reason.same.routes
-              && PageKindRouting.summary(kind: PageKind(kind: "printed", confidence: 0.9),
-                                         choice: choose("printed", hand: true), modelName: flash.displayName)
+              && PageKindRouting.summary(kind: PageKind(kind: .printed, confidence: 0.9),
+                                         choice: choose(.printed, hand: true), modelName: flash.displayName)
               == "Printed (90%) → \(flash.displayName), for its handwriting")
         check("3 keyed candidates: every built-in model of a keyed provider, none of an unkeyed one",
               PageKindRouting.keyedCandidates(key: { $0 == .gemini ? "k" : ($0 == .openai ? "" : nil) })
@@ -138,9 +139,9 @@ enum OCRPageKindTestDriver {
         // 4. The file list's plan: per-page and per-batch choices; a PDF and a page not yet told are left out.
         let a = root.appendingPathComponent("a.jpg"), b = root.appendingPathComponent("b.jpg")
         let c = root.appendingPathComponent("c.jpg"), pdf = root.appendingPathComponent("d.pdf")
-        let told: [String: PageKind] = [PageReaderPlan.key(a): PageKind(kind: "typewritten", confidence: 0.97),
-                                        PageReaderPlan.key(b): PageKind(kind: "forms", confidence: 0.9),
-                                        PageReaderPlan.key(c): PageKind(kind: "printed", confidence: 0.5)]
+        let told: [String: PageKind] = [PageReaderPlan.key(a): PageKind(kind: .typewritten, confidence: 0.97),
+                                        PageReaderPlan.key(b): PageKind(kind: .forms, confidence: 0.9),
+                                        PageReaderPlan.key(c): PageKind(kind: .printed, confidence: 0.5)]
         PageKindStore.classifyOverride = { told[PageReaderPlan.key($0)] }
         PageKindStore.availableOverride = all
         defer { PageKindStore.classifyOverride = nil; PageKindStore.availableOverride = nil }
@@ -219,7 +220,7 @@ enum OCRPageKindTestDriver {
         let qwenCut = #"{"choices":[{"finish_reason":"length","message":{"content":"[document_start]\nloop loop"}}]}"#
         await script.set(["anthropic": (200, claudeText), "generativelanguage": (200, geminiText),
                           "openrouter": (200, qwenCut)])
-        let kindA = PageKind(kind: "typewritten", confidence: 0.97)
+        let kindA = PageKind(kind: .typewritten, confidence: 0.97)
         var live = PageReaderPlan()
         live.pages[PageReaderPlan.key(image)] = .init(kind: kindA, choice: .init(provider: .gemini, modelID: flash.id, reason: .kind))
         func ocr(_ url: URL, _ readers: PageReaderPlan, cascade: OCRCascade = .off, gateway: GatewayConfig? = nil)
@@ -266,7 +267,7 @@ enum OCRPageKindTestDriver {
               && r.pageReader == nil)
 
         var kept = PageReaderPlan()
-        kept.pages[PageReaderPlan.key(image)] = .init(kind: PageKind(kind: "printed", confidence: 0.5),
+        kept.pages[PageReaderPlan.key(image)] = .init(kind: PageKind(kind: .printed, confidence: 0.5),
                                                       choice: .init(provider: .anthropic, modelID: claude.id, reason: .uncertain))
         var own = PageReaderPlan()
         own.pages[PageReaderPlan.key(image)] = .init(kind: kindA, choice: .init(provider: .anthropic, modelID: claude.id, reason: .override))
@@ -302,7 +303,7 @@ enum OCRPageKindTestDriver {
               !calls.contains { $0.contains("generativelanguage") })
 
         var toQwen = PageReaderPlan()
-        toQwen.pages[PageReaderPlan.key(image)] = .init(kind: PageKind(kind: "forms", confidence: 0.9),
+        toQwen.pages[PageReaderPlan.key(image)] = .init(kind: PageKind(kind: .forms, confidence: 0.9),
                                                         choice: .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
         await script.reset()
         r = await ocr(image, toQwen, cascade: OCRCascade(routeID: OCRCascade.routeID(for: claude)))
@@ -364,11 +365,106 @@ enum OCRPageKindTestDriver {
                       let k = PageKind.decide(hand: h, form: fm, handClasses: model.hand.classes) else {
                     lines.append("\(f[0])\tunread"); continue
                 }
-                lines.append(([f[0], k.kind, String(format: "%.6f", k.confidence)]
+                lines.append(([f[0], k.kind.rawValue, String(format: "%.6f", k.confidence)]
                               + (h + [fm[1]]).map { String(format: "%.6f", $0) }).joined(separator: "\t"))
             }
             try? (lines.joined(separator: "\n") + "\n").write(toFile: out, atomically: true, encoding: .utf8)
             check("9 parity pages classified (\(lines.count))", !lines.isEmpty)
+        }
+
+        // 10. The one list (W42.int-s3): Finder tags, the newspaper rule, the precedence, routing and the header.
+        check("10 the corpus's tags: Handwritten, Clippings, Statistics; case and colour suffix ignored",
+              PageKindName.fromFinderTags(["handwritten\n6"]) == .handwritten
+              && PageKindName.fromFinderTags(["Clippings"]) == .clippings
+              && PageKindName.fromFinderTags(["STATISTICS", "Q2"]) == .forms
+              && PageKindName.fromFinderTags(["Regis McKenna", "Q1"]) == nil)
+        check("10 a file with several kind tags: Handwritten, then Clippings, then Statistics",
+              PageKindName.fromFinderTags(["Statistics", "Clippings", "Handwritten"]) == .handwritten
+              && PageKindName.fromFinderTags(["Statistics", "Clippings"]) == .clippings)
+        func pageLines(_ n: Int, width: Double, text: String = "word word") -> [PageLine] {
+            (0..<n).map { i in PageLine(text: text, box: CGRect(x: 0.1, y: Double(i) / Double(n + 1), width: width,
+                                                                 height: 0.002), confidence: 0.9) }
+        }
+        check("10 a newspaper: 600 lines, or 200 set five columns across (under a fifth of the page)",
+              EnginePageKind.isNewspaper(lines: pageLines(600, width: 0.45))
+              && EnginePageKind.isNewspaper(lines: pageLines(200, width: 0.18))
+              && !EnginePageKind.isNewspaper(lines: pageLines(599, width: 0.45))
+              && !EnginePageKind.isNewspaper(lines: pageLines(340, width: 0.209))
+              && !EnginePageKind.isNewspaper(lines: pageLines(199, width: 0.1)))
+        check("10 a line of under four characters is not counted",
+              !EnginePageKind.isNewspaper(lines: pageLines(700, width: 0.1, text: "a b"))
+              && EnginePageKind.shape(of: pageLines(10, width: 0.3, text: "abcd")).lines == 10)
+        let typed = PageKind(kind: .typewritten, confidence: 0.6)
+        check("10 a Finder tag corrects the classifier and the newspaper rule",
+              PageKind.detect(classified: typed, uprightLines: pageLines(700, width: 0.1), tags: ["Clippings"],
+                              photographed: true)
+              == PageKind(kind: .clippings, confidence: 1, source: .finderTag, photographed: true))
+        check("10 a newspaper's line shape wins over the classifier's print call",
+              PageKind.detect(classified: typed, uprightLines: pageLines(700, width: 0.1), tags: [], photographed: false)
+              == PageKind(kind: .newspapers, confidence: 1, source: .layout))
+        check("10 otherwise the classifier's call stands, photographed carried as a second axis",
+              PageKind.detect(classified: typed, uprightLines: pageLines(40, width: 0.7), tags: ["Q2"], photographed: true)
+              == PageKind(kind: .typewritten, confidence: 0.6, source: .classifier, photographed: true))
+        check("10 no classifier call (weights failed, older macOS): no kind, whatever the tags say",
+              PageKind.detect(classified: nil, uprightLines: [], tags: ["Handwritten"], photographed: false) == nil)
+        check("10 routing: newspapers and clippings take print's pick, a register the form's, mixed the hand's",
+              choose(.newspapers) == choose(.printed) && choose(.clippings) == choose(.printed)
+              && choose(.registers) == choose(.forms) && choose(.mixed) == choose(.handwritten))
+        check("10 'Read handwriting on typed pages' acts on a newspaper and a clipping too (they are print)",
+              choose(.newspapers, hand: true).reason == .handwriting && choose(.clippings, hand: true).reason == .handwriting
+              && choose(.registers, hand: true).reason == .kind)
+        check("10 the header's Kind keeps the four ranked kinds",
+              PageKindName.allCases.map(\.headerKind) == [.handwritten, .typewritten, .printed, .forms,
+                                                          .printed, .printed, .forms, .handwritten])
+        check("10 the interview's measured and asked kinds are the list's, and cover it once each",
+              CollectionInterviewAnswers.measuredKinds == ["typewritten", "printed", "handwritten", "forms"]
+              && CollectionInterviewAnswers.unmeasuredKinds == ["clippings", "newspapers", "registers", "mixed"]
+              && Set(PageKindName.classifierKinds + PageKindName.askedKinds) == Set(PageKindName.allCases)
+              && PageKindName.allCases.allSatisfy { PageKindName.classifierKinds.contains($0.mixKind) })
+        check("10 a sample's newspaper page counts as print in the measured mix",
+              KindMeasurement.tally([PageKind(kind: .newspapers, confidence: 1, source: .layout)]).counts == ["printed": 1])
+        check("10 the file list says where a kind came from",
+              PageKind(kind: .newspapers, confidence: 1, source: .layout, photographed: true).summary
+              == "Whole newspaper page (by its columns), photographed"
+              && PageKind(kind: .handwritten, confidence: 1, source: .finderTag).summary == "Handwritten (Finder tag)")
+
+        // 11. The measure (W42.int-s3): with OCRPAGEKIND_KINDS_LIST (rows `id <TAB> file <TAB> page`), classify each
+        // page as the app does (an image file with its camera and Finder tags; a PDF page as the run renders it) and
+        // write `id call source confidence classifier lines wideW photographed` rows to OCRPAGEKIND_KINDS_OUT, which
+        // `scripts/segbench/page_kinds.py` scores against the truth.
+        if let list = env["OCRPAGEKIND_KINDS_LIST"], let out = env["OCRPAGEKIND_KINDS_OUT"],
+           let rows = try? String(contentsOfFile: list, encoding: .utf8) {
+            var outRows: [String] = []
+            for row in rows.split(whereSeparator: \.isNewline) where !row.hasPrefix("#") {
+                let f = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+                guard f.count >= 3, let pageNumber = Int(f[2]) else { continue }
+                let url = URL(fileURLWithPath: f[1])
+                var image: CGImage?, properties: [CFString: Any]?, tags: [String] = []
+                if PageKindStore.isPDF(url) {
+                    image = PDFDocument(url: url)?.page(at: pageNumber - 1).flatMap(PDFToImageConverter.renderPageImage)
+                } else {
+                    image = PageKindClassifier.loadImage(url)
+                    properties = CGImageSourceCreateWithURL(url as CFURL, nil)
+                        .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+                    tags = (try? MacOSTagger.readTags(from: url)) ?? []
+                }
+                guard let image, let s = await PageKindClassifier.measure(image) else {
+                    outRows.append("\(f[0])\tunread"); continue
+                }
+                var call: PageKind?
+                if let h = model.hand.probabilities(s.handFeatures()), let fm = model.form.probabilities(s.formFeatures()) {
+                    call = PageKind.decide(hand: h, form: fm, handClasses: model.hand.classes)
+                }
+                let photo = EnginePageKind.isPhotograph(image, properties: properties)
+                let shape = EnginePageKind.shape(of: s.uprightLines)
+                let k = PageKind.detect(classified: call, uprightLines: s.uprightLines, tags: tags, photographed: photo)
+                outRows.append([f[0], k?.kind.rawValue ?? "unknown", k?.source.rawValue ?? "-",
+                                String(format: "%.4f", k?.confidence ?? 0), call?.kind.rawValue ?? "unknown",
+                                "\(shape.lines)", String(format: "%.3f", shape.wideWidth), photo ? "1" : "0"]
+                    .joined(separator: "\t"))
+            }
+            try? (outRows.joined(separator: "\n") + "\n").write(toFile: out, atomically: true, encoding: .utf8)
+            check("11 kind pages measured (\(outRows.count))", !outRows.isEmpty)
         }
 
         finish(results)

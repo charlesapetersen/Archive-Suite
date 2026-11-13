@@ -651,7 +651,7 @@ struct SettingsSheetModel {
                         let rest = a.mix.filter { !["typewritten", "printed", "handwritten"].contains($0.key) && $0.value > 0 }
                             .sorted { $0.value > $1.value }
                             .map { k in String(format: "%.0f%% ", k.value / whole * 100) + (CollectionInterviewAnswers.measuredKinds.contains(k.key)
-                                ? PageKind.label(k.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(k.key).lowercased()) }
+                                ? PageKindName.label(k.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(k.key).lowercased()) }
                         return rest.isEmpty ? "" : ", " + rest.joined(separator: ", ")
                     }()
                 rows.append(PartRow(id: "all", label: "On your mix of pages", routeName: nil,

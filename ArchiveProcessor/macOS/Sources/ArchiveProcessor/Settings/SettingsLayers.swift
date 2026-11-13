@@ -389,7 +389,7 @@ extension SettingsKey {
             case .mix:
                 return sorted.map { kind in
                     let name = CollectionInterviewAnswers.measuredKinds.contains(kind.key)
-                        ? PageKind.label(kind.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(kind.key).lowercased()
+                        ? PageKindName.label(kind.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(kind.key).lowercased()
                     return "\(name) \(number(kind.value))%"
                 }.joined(separator: ", ")
             default:

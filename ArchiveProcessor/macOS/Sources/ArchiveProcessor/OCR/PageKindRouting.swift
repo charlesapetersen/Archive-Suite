@@ -46,7 +46,7 @@ enum PageKindRouting {
 
     /// The kinds "Read handwriting on typed pages" acts on: every typed or printed page, since no pre-flag tells a
     /// mixed page before it is read (Phase 4, `13-stage-rules/10-kinds-and-routing.md` §7 call 1).
-    static let typedKinds: Set<String> = ["typewritten", "printed"]
+    static let typedKinds: Set<PageKindName> = [.typewritten, .printed]
 
     /// The page's reader. `available` is every built-in model the user can run now (a keyed provider, or a local
     /// route), in no order; the guide's order decides. A user override wins over everything. With
@@ -65,10 +65,10 @@ enum PageKindRouting {
             }
             return nil
         }
-        if handwritingOnTyped, typedKinds.contains(kind.kind), let c = firstPick("handwritten") {
+        if handwritingOnTyped, typedKinds.contains(kind.kind.routingKind), let c = firstPick("handwritten") {
             return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .handwriting)
         }
-        guard let c = firstPick(kind.kind) else { return keep(.noPick) }
+        guard let c = firstPick(kind.kind.routingKind.rawValue) else { return keep(.noPick) }
         return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .kind)
     }
 
@@ -106,7 +106,7 @@ enum PageKindRouting {
             pagePrice(m, imageScale: imageScale, sendPreviousImage: sendPreviousImage, contextCharCount: contextCharCount)
         }
         func record(_ reason: Reason, _ p: LLMProvider, _ m: LLMModel, cost: Double? = nil) -> PageReaderRecord {
-            PageReaderRecord(kind: entry.kind?.kind, confidence: entry.kind?.confidence, reason: reason,
+            PageReaderRecord(kind: entry.kind?.kind.rawValue, confidence: entry.kind?.confidence, reason: reason,
                              provider: p.rawValue, model: m.displayName, estimatedCost: cost,
                              replacedCost: cost == nil ? nil : price(model))
         }
@@ -147,8 +147,9 @@ enum PageKindRouting {
     }
 
     /// How the page's reader reads in the run history and the file list: "Typewritten (93%) → Gemini 3.8 Flash".
+    /// A kind the guide has no row for (newspapers, clippings, registers, mixed) takes its `routingKind`'s pick.
     static func summary(kind: PageKind?, choice: Choice, modelName: String) -> String {
-        let k = kind.map { "\(PageKind.label($0.kind)) (\(Int(($0.confidence * 100).rounded()))%)" } ?? "Kind not told"
+        let k = kind?.summary ?? "Kind not told"
         switch choice.reason {
         case .kind: return "\(k) → \(modelName)"
         case .same: return "\(k) → \(modelName), the run's model"

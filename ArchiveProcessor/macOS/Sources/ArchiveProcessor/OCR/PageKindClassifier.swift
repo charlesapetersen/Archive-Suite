@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Vision
+import VisionOCRKit
 
 /// Tells a page's kind before OCR (W41.app-page-kind), with the classifier W41.bench-kind-classifier recommended:
 /// Apple Vision's signals and its image feature print, a logistic regression for the hand (handwritten, typewritten,
@@ -85,6 +86,9 @@ struct PageKindSignals: Sendable, Equatable {
     var tableShare = 0.0
     var tableCells = 0
     var print: [Float] = []
+    /// Vision's upright lines (wider than tall), for the newspaper rule. Boxes as Vision gives them (origin bottom-left);
+    /// the rule reads widths only.
+    var uprightLines: [PageLine] = []
 
     func handFeatures() -> [Double] {
         [harmonic, periodic, conf, textPx, Double(lines)].map { $0.isNaN ? 0 : $0 } + print.map(Double.init)
@@ -93,40 +97,41 @@ struct PageKindSignals: Sendable, Equatable {
     func formFeatures() -> [Double] { [tableShare, Double(tableCells)] + handFeatures() }
 }
 
-/// One page's kind: the guide's kind id (`OCRPageGuidance.Kind.id`) and how sure the classifier was of it.
-struct PageKind: Codable, Sendable, Equatable {
-    /// "handwritten", "typewritten", "printed" or "forms".
-    let kind: String
-    /// The probability of the call that decided it: the form regression's when it calls a form, else the hand's.
-    let confidence: Double
-
-    /// The bench's routing rule: a form goes to the form pick, else the page goes to its hand's.
+extension PageKind {
+    /// The bench's routing rule: a form goes to the form pick, else the page goes to its hand's. nil when the
+    /// probabilities do not match the classes or name a kind outside the list.
     static func decide(hand: [Double], form: [Double], handClasses: [String]) -> PageKind? {
         guard form.count == 2, hand.count == handClasses.count,
               let top = hand.indices.max(by: { hand[$0] < hand[$1] }) else { return nil }
-        if form[1] > form[0] { return PageKind(kind: "forms", confidence: form[1]) }
-        return PageKind(kind: handClasses[top], confidence: hand[top])
-    }
-
-    static func label(_ kind: String) -> String {
-        switch kind {
-        case "handwritten": return "Handwritten"
-        case "typewritten": return "Typewritten"
-        case "printed": return "Printed"
-        case "forms": return "Form or table"
-        default: return kind
-        }
+        if form[1] > form[0] { return PageKind(kind: .forms, confidence: form[1]) }
+        return PageKindName(rawValue: handClasses[top]).map { PageKind(kind: $0, confidence: hand[top]) }
     }
 }
 
 enum PageKindClassifier {
     /// The page's kind, or nil when it cannot be told here (no weights, Vision older than macOS 26, a feature print
-    /// of another length, an unreadable image). nil means "unknown": the page keeps the run's model.
-    static func classify(_ image: CGImage, model: PageKindModel? = PageKindModel.bundled) async -> PageKind? {
-        guard let model, let s = await measure(image), s.print.count == model.printLength,
-              let hand = model.hand.probabilities(s.handFeatures()),
-              let form = model.form.probabilities(s.formFeatures()) else { return nil }
-        return PageKind.decide(hand: hand, form: form, handClasses: model.hand.classes)
+    /// of another length, an unreadable image). nil means "unknown": the page keeps the run's model. `properties` are
+    /// the image file's (its camera tags tell a photograph) and `tags` its Finder tags (`PageKind.detect`).
+    static func classify(_ image: CGImage, properties: [CFString: Any]? = nil, tags: [String] = [],
+                         model: PageKindModel? = PageKindModel.bundled) async -> PageKind? {
+        guard let model, let s = await measure(image) else { return nil }
+        var call: PageKind?
+        if s.print.count == model.printLength, let hand = model.hand.probabilities(s.handFeatures()),
+           let form = model.form.probabilities(s.formFeatures()) {
+            call = PageKind.decide(hand: hand, form: form, handClasses: model.hand.classes)
+        }
+        return PageKind.detect(classified: call, uprightLines: s.uprightLines, tags: tags,
+                               photographed: EnginePageKind.isPhotograph(image, properties: properties))
+    }
+
+    /// An image file's kind: the image upright, its camera tags and its Finder tags. A PDF's page is classified from
+    /// its rendered image with `classify` (no camera or Finder tags of its own).
+    static func classify(url: URL, model: PageKindModel? = PageKindModel.bundled) async -> PageKind? {
+        guard let image = loadImage(url) else { return nil }
+        let properties = CGImageSourceCreateWithURL(url as CFURL, nil)
+            .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
+        return await classify(image, properties: properties, tags: (try? MacOSTagger.readTags(from: url)) ?? [],
+                              model: model)
     }
 
     /// The image at the given path at its own size, upright by its EXIF orientation (as the bench loads it).
@@ -160,6 +165,7 @@ enum PageKindClassifier {
             let short = min(bw, bh)
             guard short > 0 else { continue }
             heights.append(short)
+            if bw >= bh { s.uprightLines.append(PageLine(text: top.string, box: o.boundingBox, confidence: top.confidence)) }
             confs.append(Double(top.confidence))
             if top.string.count >= 15, bw > bh, periodic.count < 60, let g = gray,
                let r = periodicity(g, x0: Double(o.boundingBox.minX) * W, x1: Double(o.boundingBox.maxX) * W,

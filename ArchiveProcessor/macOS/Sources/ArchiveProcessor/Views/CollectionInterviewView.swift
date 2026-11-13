@@ -135,7 +135,7 @@ struct CollectionInterviewView: View {
                 }
             }
             ForEach(CollectionInterviewAnswers.measuredKinds, id: \.self) { kind in
-                percentRow(PageKind.label(kind), value: Binding(
+                percentRow(PageKindName.label(kind), value: Binding(
                     get: { answers.measuredShares[kind] ?? 0 },
                     set: { answers.measuredShares[kind] = $0; answers.correctedMix = true; answers.touch(.mix) }))
             }
@@ -374,8 +374,7 @@ struct CollectionInterviewView: View {
             for url in sample {
                 if Task.isCancelled { break }
                 let kind = await Task.detached(priority: .utility) { () -> PageKind? in
-                    guard let image = PageKindClassifier.loadImage(url) else { return nil }
-                    return await PageKindClassifier.classify(image)
+                    await PageKindClassifier.classify(url: url)
                 }.value
                 kinds.append(kind)
                 measuredCount = kinds.count

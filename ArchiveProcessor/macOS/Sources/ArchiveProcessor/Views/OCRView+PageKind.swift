@@ -62,10 +62,7 @@ final class PageKindStore: ObservableObject {
 
     nonisolated private static func classify(_ url: URL) async -> PageKind? {
         if let o = classifyOverride { return await o(url) }
-        return await Task.detached(priority: .utility) {
-            guard let image = PageKindClassifier.loadImage(url) else { return nil }
-            return await PageKindClassifier.classify(image)
-        }.value
+        return await Task.detached(priority: .utility) { await PageKindClassifier.classify(url: url) }.value
     }
 
     static func isPDF(_ url: URL) -> Bool { url.pathExtension.lowercased() == "pdf" }
