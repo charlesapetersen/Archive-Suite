@@ -296,13 +296,15 @@ private struct NotesRuleValueView: View {
                         dateField($rule.text2, "to")
                     }
                 }
+                // The own date first and by default; the sent-with date is a separate, rarer search (W40.suite-date-design).
                 Picker("Which date", selection: $rule.dateRole) {
-                    Text("either date").tag(DateRoleChoice.either)
                     Text("own date").tag(DateRoleChoice.own)
                     Text("sent-with date").tag(DateRoleChoice.sentWith)
+                    Divider()
+                    Text("either date").tag(DateRoleChoice.either)
                 }
                 .labelsHidden().fixedSize()
-                .help("The item's own date, the date of the letter it was sent with, or either")
+                .help("The item's own date; or the date of the letter it was sent with, or either")
             }
         case .folder:
             Picker("Folder", selection: $rule.folderId) {

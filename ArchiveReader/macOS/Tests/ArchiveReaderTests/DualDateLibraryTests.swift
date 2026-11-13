@@ -29,20 +29,56 @@ final class DualDateLibraryTests: XCTestCase {
         XCTAssertEqual(LibrarySort.sorted([a, b, c], by: LibrarySort.default).map(\.name), ["c.pdf", "a.pdf", "b.pdf"])
     }
 
-    func testYearFilterMatchesEitherRoleOnce() {
+    private func either(_ from: Int?, _ to: Int?) -> LibraryFilter {
+        var f = LibraryFilter(dateFromYear: from, dateToYear: to)
+        f.dateRangeRoles = .either
+        return f
+    }
+
+    func testYearFilterMatchesEitherRoleOnceWhenAsked() {
         let enc = file("enc.pdf", enclosure)
-        XCTAssertTrue(LibraryFilter(dateFromYear: 1957, dateToYear: 1957).matches(enc))
-        XCTAssertTrue(LibraryFilter(dateFromYear: 1958, dateToYear: 1958).matches(enc))
-        XCTAssertFalse(LibraryFilter(dateFromYear: 1959, dateToYear: nil).matches(enc))
-        XCTAssertTrue(LibraryFilter(dateFromYear: nil, dateToYear: 1957).matches(enc))
+        XCTAssertTrue(either(1957, 1957).matches(enc))
+        XCTAssertTrue(either(1958, 1958).matches(enc))
+        XCTAssertFalse(either(1959, nil).matches(enc))
+        XCTAssertTrue(either(nil, 1957).matches(enc))
         let files = [enc, file("other.pdf", ["1958"])]
-        XCTAssertEqual(files.filter(LibraryFilter(dateFromYear: 1950, dateToYear: 1960).matches).count, 2,
+        XCTAssertEqual(files.filter(either(1950, 1960).matches).count, 2,
                        "a file matching on both roles is still one row")
+    }
+
+    /// W40.suite-date-design: the year range tests the own date unless asked; the sent-with date alone works too.
+    func testYearFilterTestsTheOwnDateByDefault() {
+        let enc = file("enc.pdf", enclosure)                     // own 1957, sent 1958
+        let sentOnly = file("sent.pdf", ["Sent With 1958-03"])
+        XCTAssertEqual(LibraryFilter().dateRangeRoles, .own)
+        XCTAssertTrue(LibraryFilter(dateFromYear: 1957, dateToYear: 1957).matches(enc))
+        XCTAssertFalse(LibraryFilter(dateFromYear: 1958, dateToYear: 1958).matches(enc))
+        XCTAssertFalse(LibraryFilter(dateFromYear: 1958, dateToYear: 1958).matches(sentOnly),
+                       "a sent-with date alone is not the item's date")
+        var sent = LibraryFilter(dateFromYear: 1958, dateToYear: 1958)
+        sent.dateRangeRoles = .sentWith
+        XCTAssertTrue(sent.matches(enc))
+        XCTAssertTrue(sent.matches(sentOnly))
+        XCTAssertFalse(LibraryFilter(dateFromYear: 1957, dateToYear: 1957, dateRangeRole: .sentWith).matches(enc))
+        XCTAssertEqual(AdvancedSearch(filter: sent, fullTextQuery: "").rules.first { $0.field == .date }?.dateRole, .sentWith)
+        XCTAssertEqual(AdvancedSearch(filter: LibraryFilter(dateFromYear: 1958), fullTextQuery: "").rules.first { $0.field == .date }?.dateRole, .own)
+        XCTAssertEqual(SearchRule(field: .date).dateRole, .own, "a new Advanced Search date row tests the own date")
+    }
+
+    /// A filter saved before the role existed tested either date; it decodes to that, so a smart folder keeps
+    /// what it meant.
+    func testAFilterSavedWithoutTheRoleKeepsEither() throws {
+        let old = #"{"subjects":[],"subjectCombine":"all","qualities":[],"read":"all","searchText":"","needsAttentionOnly":false,"dateFromYear":1958,"dateToYear":1958}"#
+        let f = try JSONDecoder().decode(LibraryFilter.self, from: Data(old.utf8))
+        XCTAssertEqual(f.dateRangeRoles, .either)
+        XCTAssertTrue(f.matches(file("enc.pdf", enclosure)))
+        let rule = try JSONDecoder().decode(SearchRule.self, from: Data(#"{"field":"date","op":"between","text":"1958"}"#.utf8))
+        XCTAssertEqual(rule.dateRole, .either, "a date row saved without its role keeps either")
     }
 
     func testRangeCannotPairOneDatePerBound() {
         let split = file("split.pdf", ["1950", "Sent With 1970"])
-        XCTAssertFalse(LibraryFilter(dateFromYear: 1960, dateToYear: 1965).matches(split))
+        XCTAssertFalse(either(1960, 1965).matches(split))
     }
 
     func testUndatedNeverMatchesAnActiveRangeAndInactiveMatchesAll() {

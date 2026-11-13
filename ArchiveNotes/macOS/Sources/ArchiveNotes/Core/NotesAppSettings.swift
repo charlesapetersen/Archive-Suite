@@ -219,22 +219,32 @@ enum NotesAppSettings {
     /// apply; once the user toggles any column in the header picker, that window's explicit set is
     /// persisted and used verbatim (an explicitly-empty set ⟹ "show all", distinct from "never set").
     /// `from:`/`into:` injectable so the round-trip is testable against a scratch domain.
+    ///
+    /// An **opt-in** column (`optInColumns`) is hidden until the user shows it, in a saved set too: the saved array
+    /// records a shown opt-in column as `shown:<id>`, so a set saved before the column existed keeps it hidden.
     static func windowHiddenColumns(for windowKind: Item.Kind, from store: UserDefaults = .standard) -> Set<String> {
         if let saved = store.stringArray(forKey: hiddenColumnsKey(windowKind)) {
-            return Set(saved)   // explicit per-window choice (an empty array = user showed everything)
+            // explicit per-window choice (an empty array = user showed everything but the opt-in columns)
+            let shown = Set(saved.filter { $0.hasPrefix(shownPrefix) }.map { String($0.dropFirst(shownPrefix.count)) })
+            return Set(saved.filter { !$0.hasPrefix(shownPrefix) }).union(optInColumns.subtracting(shown))
         }
         let legacy = Set(store.stringArray(forKey: NotesLayoutSettingsKey.hiddenColumns) ?? [])
         return defaultHiddenColumns(for: windowKind, legacy: legacy)
     }
     static func setWindowHiddenColumns(_ hidden: Set<String>, for windowKind: Item.Kind, into store: UserDefaults = .standard) {
-        store.set(Array(hidden).sorted(), forKey: hiddenColumnsKey(windowKind))
+        let shown = optInColumns.subtracting(hidden).map { shownPrefix + $0 }
+        store.set((Array(hidden.subtracting(optInColumns)) + shown).sorted(), forKey: hiddenColumnsKey(windowKind))
     }
+    /// Columns hidden until the user shows them. **Sent with** (W40.suite-date-design): few items have a sent-with
+    /// date and many users never set one, so the list does not give it a column unless asked.
+    static let optInColumns: Set<String> = ["sentWith"]
+    private static let shownPrefix = "shown:"
     /// The hidden-column set for a freshly-opened window (no explicit per-window choice yet): the Note
     /// window hides the always-blank "sources" column; the Extract window hides nothing. Any `legacy`
     /// global hides (the pre-W14.4 shared key) are folded in so an upgrading user keeps prior choices.
     static func defaultHiddenColumns(for windowKind: Item.Kind, legacy: Set<String> = []) -> Set<String> {
         let base: Set<String> = windowKind == .extract ? [] : ["sources"]
-        return base.union(legacy)
+        return base.union(legacy).union(optInColumns)
     }
     private static func hiddenColumnsKey(_ windowKind: Item.Kind) -> String {
         windowKind == .extract ? NotesLayoutSettingsKey.extractWindowHiddenColumns : NotesLayoutSettingsKey.noteWindowHiddenColumns

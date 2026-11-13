@@ -56,7 +56,10 @@ struct NotesActiveFilterChip: Identifiable, Equatable, Sendable {
         for t in f.tags.sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending }) {
             add(.tag(t), anyOf ? "Tag (any): \(t)" : "Tag: \(t)", "the tag \u{201c}\(t)\u{201d}")
         }
-        if let years = f.dateYearsSummary { add(.dates, "Years: \(years)", "the year range \(years)") }
+        if let years = f.dateYearsSummary {
+            let sent = f.dateRangeRoles == .own ? "" : f.dateRangeRoles == .sentWith ? ", sent-with date" : ", own or sent-with"
+            add(.dates, "Years\(sent): \(years)", "the year range \(years)")
+        }
         switch f.roundup {
         case nil: break
         case true?: add(.roundup, "Round-up notes", "the round-up notes filter")
@@ -91,7 +94,7 @@ extension NotesFilter {
         case .advancedSearch, .smartFolder: break
         case let .quality(q): f.qualities.remove(q)
         case let .tag(t): f.tags.removeAll { $0 == t }
-        case .dates: f.dateFrom = nil; f.dateTo = nil
+        case .dates: f.dateFrom = nil; f.dateTo = nil; f.dateRangeRole = .own
         case .roundup: f.roundup = nil
         case .keyword: f.searchText = ""
         }

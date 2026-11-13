@@ -105,11 +105,13 @@ final class AdvancedSearchTests: XCTestCase {
         let files = [june81, y83, sent82, undated]
         func hits(_ r: SearchRule) -> [Bool] { files.map { search(.all, r).matches($0, RuleContext()) } }
 
-        XCTAssertEqual(hits(rule(.date, .between) { $0.text = "1981"; $0.text2 = "1982" }), [true, false, true, false])
-        XCTAssertEqual(hits(rule(.date, .between) { $0.text = "1981-07"; $0.text2 = "1983" }),
+        XCTAssertEqual(hits(rule(.date, .between) { $0.text = "1981"; $0.text2 = "1982"; $0.dateRole = .either }), [true, false, true, false])
+        XCTAssertEqual(hits(rule(.date, .between) { $0.text = "1981-07"; $0.text2 = "1983"; $0.dateRole = .either }),
                        [false, true, true, false])
         XCTAssertEqual(hits(rule(.date, .before) { $0.text = "1981-6-30" }), [true, false, true, false])
-        XCTAssertEqual(hits(rule(.date, .after) { $0.text = "1982" }), [false, true, true, false])
+        XCTAssertEqual(hits(rule(.date, .after) { $0.text = "1982"; $0.dateRole = .either }), [false, true, true, false])
+        // A new row tests the own date (W40.suite-date-design).
+        XCTAssertEqual(hits(rule(.date, .after) { $0.text = "1982" }), [false, true, false, false])
         XCTAssertEqual(hits(rule(.date, .after) { $0.text = "1982"; $0.dateRole = .own }), [false, true, false, false])
         XCTAssertEqual(hits(rule(.date, .between) { $0.text = "1980s"; $0.dateRole = .sentWith }),
                        [false, false, true, false])

@@ -64,8 +64,10 @@ extension ItemSummary {
         return displaySentWith
     }
 
-    /// `dateColumnText` with both dates shown through `displayDate(calendarsEnabled:)`.
-    func dateColumnText(calendarsEnabled: Bool) -> String? {
+    /// `dateColumnText` with both dates shown through `displayDate(calendarsEnabled:)`. While the list shows its own
+    /// Sent-with column (`sentWithColumnShown`, W40.suite-date-design), the Date column is the item's own date alone.
+    func dateColumnText(calendarsEnabled: Bool, sentWithColumnShown: Bool = false) -> String? {
+        if sentWithColumnShown { return displayDate(calendarsEnabled: calendarsEnabled) }
         switch (displayDate(calendarsEnabled: calendarsEnabled), displaySentWith(calendarsEnabled: calendarsEnabled)) {
         case let (own?, sent?): return "\(own) · sent with \(sent)"
         case let (nil, sent?):  return "Sent with \(sent)"

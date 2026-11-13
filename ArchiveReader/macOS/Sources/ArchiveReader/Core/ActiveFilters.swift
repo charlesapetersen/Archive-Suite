@@ -64,7 +64,10 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         for t in f.subjects.sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending }) {
             add(.tag(t), anyOf ? "Tag (any): \(t)" : "Tag: \(t)", "the tag \u{201c}\(t)\u{201d}")
         }
-        if let years = f.dateYearsSummary { add(.dates, "Years: \(years)", "the year range \(years)") }
+        if let years = f.dateYearsSummary {
+            let sent = f.dateRangeRoles == .own ? "" : f.dateRangeRoles == .sentWith ? ", sent-with date" : ", own or sent-with"
+            add(.dates, "Years\(sent): \(years)", "the year range \(years)")
+        }
         let name = f.searchText.trimmingCharacters(in: .whitespaces)
         if !name.isEmpty { add(.name, "Name: \(name)", "the file-name filter \u{201c}\(name)\u{201d}") }
         if let q = fullTextQuery?.trimmingCharacters(in: .whitespaces), !q.isEmpty {
@@ -108,7 +111,7 @@ extension LibraryFilter {
         case .read: f.read = .all
         case let .quality(q): f.qualities.remove(q)
         case let .tag(t): f.removeSubject(t)
-        case .dates: f.dateFromYear = nil; f.dateToYear = nil
+        case .dates: f.dateFromYear = nil; f.dateToYear = nil; f.dateRangeRole = .own
         case .name: f.searchText = ""
         case .needsAttention: f.needsAttentionOnly = false
         case .ambiguousDates: f.ambiguousDatesOnly = false

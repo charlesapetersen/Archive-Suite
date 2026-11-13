@@ -70,7 +70,8 @@ struct NotesSearchRule: Codable, Equatable, Identifiable, Sendable {
     var kind: Item.Kind = .note
     /// Quality levels 1–3; 0 stands for "no quality".
     var qualities: Set<Int> = []
-    var dateRole: DateRoleChoice = .either
+    /// A new row tests the item's own date (W40.suite-date-design); a row saved without the key keeps `either`.
+    var dateRole: DateRoleChoice = .own
     /// A folder rule's folder: membership in it or any folder below it (graph, not path).
     var folderId: UUID?
     /// A group row's own all/any and rules.
@@ -296,6 +297,7 @@ extension NotesAdvancedSearch {
             var r = NotesSearchRule(field: .date, op: .between)
             r.text = f.dateFrom.map { Self.keyText($0, upper: false) } ?? ""
             r.text2 = f.dateTo.map { Self.keyText($0, upper: true) } ?? ""
+            r.dateRole = f.dateRangeRoles
             rules.append(r)
         }
         if let roundup = f.roundup { rules.append(NotesSearchRule(field: .roundup, op: roundup ? .is : .isNot)) }

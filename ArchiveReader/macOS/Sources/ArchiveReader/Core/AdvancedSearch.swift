@@ -75,7 +75,10 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// Quality levels 1–5; 0 stands for "no quality tag".
     var qualities: Set<Int> = []
     var read: ReadFilter = .unread
-    var dateRole: DateRoleChoice = .either
+    /// Which date a date row tests. A new row tests the document's own date (W40.suite-date-design: Date means the
+    /// own date; the sent-with date is searched on its own). A row saved without the key keeps `either`, what it
+    /// meant when saved; every row written since W37 carries the key.
+    var dateRole: DateRoleChoice = .own
     /// A group row's own all/any and rules.
     var combine: RuleCombine = .all
     var children: [SearchRule] = []
@@ -322,6 +325,7 @@ extension AdvancedSearch {
             var r = SearchRule(field: .date, op: .between)
             r.text = f.dateFromYear.map(String.init) ?? ""
             r.text2 = f.dateToYear.map(String.init) ?? ""
+            r.dateRole = f.dateRangeRoles
             rules.append(r)
         }
         let name = f.searchText.trimmingCharacters(in: .whitespaces)

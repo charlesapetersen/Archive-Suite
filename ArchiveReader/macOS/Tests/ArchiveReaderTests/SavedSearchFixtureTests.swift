@@ -18,6 +18,7 @@ enum SavedSearchFixtures {
                              _ fill: (inout SearchRule) -> Void = { _ in }) -> SearchRule {
         var r = SearchRule(field: field, op: op)
         r.id = id(n)
+        r.dateRole = .either   // the 2026-11 default, frozen here; new rows default to .own since W40.suite-date-design
         fill(&r)
         return r
     }

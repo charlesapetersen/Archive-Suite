@@ -364,6 +364,7 @@ final class NotesNavigationModel: ObservableObject {
     func clearDateFilter() {
         filter.dateFrom = nil
         filter.dateTo = nil
+        filter.dateRangeRole = .own
     }
 
     /// Reset the per-window user filter + keyword to neutral, keeping only the window's kind (the

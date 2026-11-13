@@ -31,11 +31,19 @@ struct LibraryFilter: Sendable, Equatable, Codable {
     /// no-text-layer). The status lives in the async content index, so this dimension is applied by
     /// the model (like full-text search), not inside `matches`.
     var needsAttentionOnly: Bool = false
-    /// W37: whole-year date range. A file matches when its own date OR its sent-with (covering letter)
-    /// date lies inside, each tested on its own (`ArchiveCore.DateRangeFilter`); undated files never
-    /// match an active range. Optional so a smart folder saved before this field still decodes.
+    /// W37: whole-year date range. A file matches when one of the dates `dateRangeRoles` names lies inside, each
+    /// tested on its own (`ArchiveCore.DateRangeFilter`); undated files never match an active range. Optional so a
+    /// smart folder saved before this field still decodes.
     var dateFromYear: Int? = nil
     var dateToYear: Int? = nil
+    /// Which date the year range tests (W40.suite-date-design): the document's own date unless the user also asks
+    /// for the sent-with date. `nil` is a filter saved before this field, when the range tested either date, so a
+    /// smart folder keeps what it meant. Use `dateRangeRoles`.
+    var dateRangeRole: DateRoleChoice? = .own
+    var dateRangeRoles: DateRoleChoice {
+        get { dateRangeRole ?? .either }
+        set { dateRangeRole = newValue }
+    }
     /// W40.fix-reader-date-ambiguity: only files with two tags for one date facet, to review them. Stored
     /// optional so a smart folder or saved view state written before this field still decodes; a non-optional
     /// field makes the synthesized decoder throw, and `SavedSearchStore` would then load nothing and overwrite
@@ -98,8 +106,10 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         }
         if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }
         if poorOCROnly, !file.tags.hasPoorOCR { return false }
-        // Date range — either role, the same value meeting both bounds.
-        if let dateRange, dateRange.matchingRoles(file.tags.dateKeysByRole).isEmpty { return false }
+        // Date range — the chosen roles, the same value meeting both bounds.
+        if let dateRange, !dateRange.matchingRoles(file.tags.dateKeysByRole).contains(where: dateRangeRoles.roles.contains) {
+            return false
+        }
         // Filename text
         let q = searchText.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty, file.name.range(of: q, options: .caseInsensitive) == nil { return false }

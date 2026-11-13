@@ -222,13 +222,31 @@ struct DualDateTests {
 
     // MARK: Filter
 
-    @Test("a date range matches either role, but both bounds must hold for the SAME value")
+    @Test("the date range tests the own date unless asked, and a filter saved before the role keeps either")
+    func filterTestsTheOwnDateByDefault() throws {
+        let enclosure = summary(item(date: "1950", precision: .year, sentWith: ArchiveDate(year: 1970)!))
+        var f = NotesFilter()
+        f.dateFrom = 1969 * 10_000
+        f.dateTo = 1971 * 10_000 + 1231
+        #expect(f.dateRangeRoles == .own)
+        #expect(!f.matches(enclosure, folderItemIDs: nil), "the sent-with date is not the item's date")
+        #expect(NotesAdvancedSearch(filter: f, keyword: "").rules.first { $0.field == .date }?.dateRole == .own)
+        f.dateRangeRoles = .sentWith
+        #expect(f.matches(enclosure, folderItemIDs: nil))
+        #expect(NotesAdvancedSearch(filter: f, keyword: "").rules.first { $0.field == .date }?.dateRole == .sentWith)
+        #expect(NotesSearchRule(field: .date).dateRole == .own)
+        let old = try JSONDecoder().decode(NotesFilter.self, from: Data(#"{"dateFrom":19690000}"#.utf8))
+        #expect(old.dateRangeRoles == .either)
+    }
+
+    @Test("asked for either date, a range matches either role, but both bounds must hold for the SAME value")
     func filterMatchesEitherRole() {
         let enclosure = summary(item(date: "1950", precision: .year, sentWith: ArchiveDate(year: 1970)!))
         func range(_ from: Int, _ to: Int) -> NotesFilter {
             var f = NotesFilter()
             f.dateFrom = from * 10_000
             f.dateTo = to * 10_000 + 1231
+            f.dateRangeRoles = .either
             return f
         }
         #expect(!range(1960, 1965).matches(enclosure, folderItemIDs: nil),
@@ -239,7 +257,7 @@ struct DualDateTests {
         #expect(range(1969, 1971).matchingDateRoles(enclosure) == [.sentWith])
         #expect(range(1940, 1980).matchingDateRoles(enclosure) == [.own, .sentWith])
 
-        var lowerOnly = NotesFilter(); lowerOnly.dateFrom = 1960 * 10_000
+        var lowerOnly = NotesFilter(); lowerOnly.dateFrom = 1960 * 10_000; lowerOnly.dateRangeRoles = .either
         #expect(lowerOnly.matches(enclosure, folderItemIDs: nil), "the sent-with 1970 alone satisfies ≥ 1960")
         let undated = summary(item())
         #expect(!range(1900, 2000).matches(undated, folderItemIDs: nil))

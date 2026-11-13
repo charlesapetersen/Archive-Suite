@@ -651,10 +651,15 @@ struct NavigationWindowView: View {
             }
             .textFieldStyle(.roundedBorder)
             .frame(width: 160)
-            Text("Matches a document's own date or the date of the letter it was sent with.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            // The own date by default; the covering letter's date only when asked (W40.suite-date-design).
+            Toggle("Also match sent-with dates", isOn: Binding(
+                get: { model.filter.dateRangeRoles == .either },
+                set: { model.filter.dateRangeRoles = $0 ? .either : .own }))
+                .controlSize(.small)
+                .help("Also match the date of the letter a document was sent with. Advanced Search can search that date alone.")
+                .accessibilityIdentifier("ar.filter.dateSentWith")
             HStack {
-                Button("Clear") { model.filter.dateFromYear = nil; model.filter.dateToYear = nil }
+                Button("Clear") { model.filter.dateFromYear = nil; model.filter.dateToYear = nil; model.filter.dateRangeRole = .own }
                     .disabled(model.filter.dateRange == nil)
                 Spacer()
                 Button("Done") { showingDateFilter = false }.keyboardShortcut(.defaultAction)

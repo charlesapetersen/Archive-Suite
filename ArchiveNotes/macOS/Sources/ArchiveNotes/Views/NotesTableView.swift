@@ -105,6 +105,7 @@ struct NotesTableView: NSViewRepresentable {
             ("title",      "Title",   300, 180,  800, .title),
             ("instances",  "In",      46,  40,   70,  nil),
             ("date",       "Date",    140, 100,  220, .date),
+            ("sentWith",   "Sent with", 110, 80, 200, nil),   // opt-in (W40.suite-date-design)
             ("quality",    "Quality", 90,  70,   120, .quality),
             ("sources",    "Sources", 70,  50,   120, nil),
             ("tags",       "Tags",    280, 140,  600, nil),
@@ -359,13 +360,26 @@ struct NotesTableView: NSViewRepresentable {
                 tf.setAccessibilityIdentifier("an.cell.instances.\(item.id.uuidString)")
 
             case "date":
-                tf.stringValue = item.dateColumnText(calendarsEnabled: parent.calendarsEnabled) ?? "—"
+                let sentWithShown = tableView.tableColumn(withIdentifier: .init("sentWith")).map { !$0.isHidden } ?? false
+                tf.stringValue = item.dateColumnText(calendarsEnabled: parent.calendarsEnabled,
+                                                     sentWithColumnShown: sentWithShown) ?? "—"
                 tf.textColor = .labelColor
-                if item.sortDateUncertain {
+                if sentWithShown ? item.dateUncertain : item.sortDateUncertain {
                     tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
                 }
                 tf.setAccessibilityIdentifier("an.cell.date.\(item.id.uuidString)")
                 if let dateField = tf as? NoteTitleTextField { configureDateField(dateField, for: item) }
+
+            case "sentWith":
+                // The covering letter's date (W37.dual-date), its own column once the user shows it.
+                let sent = item.displaySentWith(calendarsEnabled: parent.calendarsEnabled)
+                tf.stringValue = sent ?? ""
+                tf.textColor = .labelColor
+                if item.sentWithUncertain {
+                    tf.font = NSFontManager.shared.convert(regularFont, toHaveTrait: .italicFontMask)
+                }
+                tf.setAccessibilityLabel(sent == nil ? "No sent-with date" : nil)
+                tf.setAccessibilityIdentifier("an.cell.sentWith.\(item.id.uuidString)")
 
             case "sources":
                 // Distinct source notes for a segmented extract; blank for notes / source-less
@@ -746,6 +760,11 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
               let tv = tableView,
               let col = tv.tableColumns.first(where: { $0.identifier.rawValue == id }) else { return }
         col.isHidden.toggle()
+        if id == "sentWith", tv.numberOfRows > 0, let date = tv.tableColumn(withIdentifier: .init("date")) {
+            // The Date column drops or regains the sent-with date it shows while this column is hidden.
+            tv.reloadData(forRowIndexes: IndexSet(integersIn: 0..<tv.numberOfRows),
+                          columnIndexes: IndexSet(integer: tv.column(withIdentifier: date.identifier)))
+        }
         if id == "tags", tv.numberOfRows > 0 {   // a row is as tall as its tags only while they show
             NSAnimationContext.runAnimationGroup { context in   // not animated, as `Coordinator.noteRowHeights`
                 context.duration = 0

@@ -168,8 +168,13 @@ struct NotesFilterBar: View {
             }
             .textFieldStyle(.roundedBorder)
             .frame(width: 160)
-            Text("Matches a note's own date or the date of the letter it was sent with.")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            // The own date by default; the covering letter's date only when asked (W40.suite-date-design).
+            Toggle("Also match sent-with dates", isOn: Binding(
+                get: { nav.filter.dateRangeRoles == .either },
+                set: { nav.filter.dateRangeRoles = $0 ? .either : .own }))
+                .controlSize(.small)
+                .help("Also match the date of the letter an item was sent with. Advanced Search can search that date alone.")
+                .accessibilityIdentifier("an.filter.dateSentWith")
             HStack {
                 Button("Clear") { nav.clearDateFilter() }
                     .disabled(!nav.hasDateFilter)

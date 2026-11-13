@@ -34,14 +34,22 @@ struct NotesFilter: Codable, Equatable, Sendable {
     var folderId: UUID? = nil
     /// nil = any; true = round-up notes; false = other items.
     var roundup: Bool? = nil
+    /// Which date the date bounds test (W40.suite-date-design): the item's own date unless the user also asks for
+    /// the sent-with date. `nil` is a filter saved before this field, when the bounds tested either date. Use
+    /// `dateRangeRoles`.
+    var dateRangeRole: DateRoleChoice? = .own
+    var dateRangeRoles: DateRoleChoice {
+        get { dateRangeRole ?? .either }
+        set { dateRangeRole = newValue }
+    }
 
-    /// The bounds as Core's either-role range predicate (`DateRangeFilter`).
+    /// The bounds as Core's range predicate (`DateRangeFilter`).
     var dateRange: DateRangeFilter { DateRangeFilter(lower: dateFrom, upper: dateTo) }
 
-    /// Which date roles of `item` lie inside the date bounds — empty when unbounded or none does.
+    /// Which of the chosen date roles of `item` lie inside the date bounds — empty when unbounded or none does.
     /// Lets a caller say which date matched (the item is still listed once).
     func matchingDateRoles(_ item: ItemSummary) -> [DateRole] {
-        dateRange.isUnbounded ? [] : dateRange.matchingRoles(item.dateKeysByRole)
+        dateRange.isUnbounded ? [] : dateRange.matchingRoles(item.dateKeysByRole).filter(dateRangeRoles.roles.contains)
     }
 
     /// Whether this filter is effectively empty (matches everything).
@@ -82,11 +90,11 @@ struct NotesFilter: Codable, Equatable, Sendable {
         if !qualities.isEmpty {
             guard let q = item.quality, qualities.contains(q) else { return false }
         }
-        // Date range over the SPEC sort key (year*10000 + month*100 + day), matching EITHER the item's
-        // own date or its sent-with date (W37.dual-date, owner 2026-10-05). Each value is tested on its
-        // own — both bounds must hold for the SAME value, so own 1950 + sent 1970 never matches
+        // Date range over the SPEC sort key (year*10000 + month*100 + day), matching the item's own date, or
+        // its sent-with date as well when asked (W37.dual-date; W40.suite-date-design). Each value is tested on
+        // its own — both bounds must hold for the SAME value, so own 1950 + sent 1970 never matches
         // 1960–1965. Undated items are excluded whenever any bound is set.
-        if !dateRange.isUnbounded, dateRange.matchingRoles(item.dateKeysByRole).isEmpty { return false }
+        if !dateRange.isUnbounded, matchingDateRoles(item).isEmpty { return false }
         // Tags (managed tokens) — ALL (subset) or ANY (intersection). Exact-token match, mirroring
         // Reader's subject set logic; the filter bar supplies canonical tokens.
         if !tags.isEmpty {
@@ -120,7 +128,9 @@ extension NotesFilter {
             dateFrom:    try c.decodeIfPresent(Int.self,         forKey: .dateFrom),
             dateTo:      try c.decodeIfPresent(Int.self,         forKey: .dateTo),
             folderId:    try c.decodeIfPresent(UUID.self,        forKey: .folderId),
-            roundup:     try c.decodeIfPresent(Bool.self,        forKey: .roundup)
+            roundup:     try c.decodeIfPresent(Bool.self,        forKey: .roundup),
+            // Absent in a filter saved before the role existed: nil, which tests either date as it did then.
+            dateRangeRole: try c.decodeIfPresent(DateRoleChoice.self, forKey: .dateRangeRole)
         )
     }
 }

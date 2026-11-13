@@ -157,8 +157,21 @@ struct NotesAppSettingsTests {
 
     @Test func windowHiddenColumnsDefaultHidesSourcesInNoteWindowOnly() {
         let d = scratchDefaults()   // never toggled → per-window defaults apply
-        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["sources"])
-        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d).isEmpty)
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["sources", "sentWith"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["sentWith"])
+    }
+
+    /// W40.suite-date-design: the Sent-with column is opt-in. A set saved before it existed keeps it hidden; once
+    /// shown, it stays shown across a save and a load, in that window only.
+    @Test func sentWithColumnIsHiddenUntilShown() {
+        let d = scratchDefaults()
+        d.set(["tags"], forKey: NotesLayoutSettingsKey.noteWindowHiddenColumns)   // saved before the column
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags", "sentWith"])
+        NotesAppSettings.setWindowHiddenColumns(["tags"], for: .note, into: d)    // the user shows it
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["sentWith"])
+        NotesAppSettings.setWindowHiddenColumns(["tags", "sentWith"], for: .note, into: d)   // and hides it again
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags", "sentWith"])
     }
 
     @Test func windowHiddenColumnsRoundTripsPerWindowIndependently() {
@@ -183,8 +196,8 @@ struct NotesAppSettingsTests {
         // Pre-W14.4 upgrade path: a legacy global hidden set seeds the first-open per-window default,
         // unioned with the window default (Note window also hides the blank "sources" column).
         NotesAppSettings.setHiddenColumns(["tags"], into: d)
-        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags", "sources"])
-        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["tags"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .note, from: d) == ["tags", "sources", "sentWith"])
+        #expect(NotesAppSettings.windowHiddenColumns(for: .extract, from: d) == ["tags", "sentWith"])
     }
 
     /// W40.notes-detail-layout: the inspector panel is shown by default, and its width clamps like the others.

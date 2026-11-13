@@ -44,6 +44,9 @@ struct NoteMetadataInspector: View {
     @State private var collectionRecords: [CollectionSettingsRecord] = []
     @State private var collectionRecordsFor: UUID?
     @State private var showsRoundupExplanation = false
+    /// Whether the Sent-with fields are unfolded: open for an item that has a sent-with date, folded otherwise
+    /// (W40.suite-date-design), re-decided when the selection changes.
+    @State private var showsSentWith = false
 
     private enum DateRole: Hashable { case own, sentWith }
 
@@ -352,11 +355,25 @@ struct NoteMetadataInspector: View {
     /// The covering letter's date (W37.dual-date): an item enclosed with a dated letter keeps its own
     /// date above and records the letter's here. Sorting uses the own date and falls back to this one
     /// only when there is no own date — said explicitly below so the fallback is never mistaken for
-    /// the item's own date.
+    /// the item's own date. A level below Date and folded away unless the item has one (W40.suite-date-design,
+    /// owner, notes-2 row 25: few items have one and many users never set one).
     @ViewBuilder private var sentWithSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Sent with").font(.subheadline.bold())
+        DisclosureGroup(isExpanded: $showsSentWith) {
+            sentWithFields.padding(.top, 4)
+        } label: {
+            Text(item.sentWith == nil ? "Sent with a letter" : "Sent with a letter: \(item.displaySentWith(calendarsEnabled: calendarsEnabled) ?? "")")
+                .font(.caption)
+                .help("The date of the letter this item was sent with, for an item that came enclosed with one")
                 .accessibilityIdentifier("an.detail.sentWith.heading")
+        }
+        .accessibilityIdentifier("an.detail.sentWith.disclosure")
+    }
+
+    @ViewBuilder private var sentWithFields: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("The date of the letter this item was sent with. The Date above stays the item's own date.")
+                .font(.caption).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
             TextField("e.g. 1958, March 1958, 12 March 1958", text: $swDateText)
                 .textFieldStyle(.roundedBorder).frame(maxWidth: 260)
                 .focused($focusedDate, equals: .sentWith)
@@ -396,6 +413,7 @@ struct NoteMetadataInspector: View {
     /// Seed local fields from the selected item's stored dates (no write — see the type doc).
     private func seed(from item: ItemSummary) {
         seedDates(from: item)
+        showsSentWith = item.sentWith != nil || item.sentWithUncertain
     }
 
     /// Seed both date fields, each in the calendar it is typed in (`DateFieldEntry.seedText`).
