@@ -86,9 +86,6 @@ struct PageKindSignals: Sendable, Equatable {
     var tableShare = 0.0
     var tableCells = 0
     var print: [Float] = []
-    /// Vision's upright lines (wider than tall), for the newspaper rule. Boxes as Vision gives them (origin bottom-left);
-    /// the rule reads widths only.
-    var uprightLines: [PageLine] = []
 
     func handFeatures() -> [Double] {
         [harmonic, periodic, conf, textPx, Double(lines)].map { $0.isNaN ? 0 : $0 } + print.map(Double.init)
@@ -120,7 +117,8 @@ enum PageKindClassifier {
            let form = model.form.probabilities(s.formFeatures()) {
             call = PageKind.decide(hand: hand, form: form, handClasses: model.hand.classes)
         }
-        return PageKind.detect(classified: call, uprightLines: s.uprightLines, tags: tags,
+        let newspaper = PageKind.readsForNewspaper(call) && EnginePageKind.readNewspaper(image)?.isNewspaper == true
+        return PageKind.detect(classified: call, newspaper: newspaper, tags: tags,
                                photographed: EnginePageKind.isPhotograph(image, properties: properties))
     }
 
@@ -165,7 +163,6 @@ enum PageKindClassifier {
             let short = min(bw, bh)
             guard short > 0 else { continue }
             heights.append(short)
-            if bw >= bh { s.uprightLines.append(PageLine(text: top.string, box: o.boundingBox, confidence: top.confidence)) }
             confs.append(Double(top.confidence))
             if top.string.count >= 15, bw > bh, periodic.count < 60, let g = gray,
                let r = periodicity(g, x0: Double(o.boundingBox.minX) * W, x1: Double(o.boundingBox.maxX) * W,

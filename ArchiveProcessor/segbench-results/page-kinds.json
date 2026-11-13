@@ -1,0 +1,132 @@
+{
+ "measured": "W42.int-s3, 2026-11-13, M3 Pro 18 GB, macOS 27.2",
+ "newspaper": {
+  "by_set": {
+   "outside": {
+    "n": 81,
+    "right": 79
+   },
+   "sample": {
+    "n": 66,
+    "right": 66
+   }
+  },
+  "n": 147,
+  "not_found": [
+   "s55",
+   "nb13",
+   "nb15",
+   "nb16",
+   "nb19"
+  ],
+  "per_kind": {
+   "clippings": {
+    "calls": {
+     "printed": 11
+    },
+    "n": 11,
+    "right": 11
+   },
+   "newspapers": {
+    "calls": {
+     "newspapers": 30,
+     "printed": 2
+    },
+    "n": 32,
+    "right": 30
+   },
+   "other": {
+    "calls": {
+     "printed": 101,
+     "typewritten": 3
+    },
+    "n": 104,
+    "right": 104
+   }
+  },
+  "photographed": 1,
+  "read_seconds_max": 13.75,
+  "read_seconds_median": 1.26,
+  "wrong": [
+   "nb14",
+   "xn01"
+  ]
+ },
+ "owner": {
+  "engine_newspaper": 1,
+  "n": 144,
+  "newspaper_calls": 0,
+  "per_kind": {
+   "forms": {
+    "calls": {
+     "clippings": 1,
+     "forms": 13
+    },
+    "n": 14,
+    "right": 13,
+    "right_untagged": 14,
+    "routed": 13,
+    "routed_untagged": 14
+   },
+   "handwritten": {
+    "calls": {
+     "handwritten": 34
+    },
+    "n": 34,
+    "right": 34,
+    "right_untagged": 34,
+    "routed": 34,
+    "routed_untagged": 34
+   },
+   "mixed": {
+    "calls": {
+     "handwritten": 2
+    },
+    "n": 2,
+    "right": 2,
+    "right_untagged": 2,
+    "routed": 2,
+    "routed_untagged": 2
+   },
+   "printed": {
+    "calls": {
+     "clippings": 10,
+     "forms": 3,
+     "printed": 18
+    },
+    "n": 31,
+    "right": 18,
+    "right_untagged": 31,
+    "routed": 28,
+    "routed_untagged": 31
+   },
+   "typewritten": {
+    "calls": {
+     "clippings": 2,
+     "forms": 1,
+     "typewritten": 60
+    },
+    "n": 63,
+    "right": 60,
+    "right_untagged": 63,
+    "routed": 60,
+    "routed_untagged": 63
+   }
+  },
+  "photographed": 117,
+  "read_seconds_median": 1.65,
+  "sources": {
+   "classifier": 99,
+   "finder_tag": 45
+  },
+  "tag_changed": {
+   "forms -> clippings": 1,
+   "printed -> clippings": 10,
+   "printed -> forms": 3,
+   "typewritten -> clippings": 2,
+   "typewritten -> forms": 1
+  },
+  "tagged_pages": 30,
+  "unread": 0
+ }
+}

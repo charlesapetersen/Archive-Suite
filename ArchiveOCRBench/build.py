@@ -52,6 +52,7 @@ HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 R6_SPOT = HERE / "data" / "r6-spot.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 KIND_ATRIUM = RESULTS / "kind-atrium.json"  # W46.kind-mixed-support: covered estimates and full-call bounds
+PAGE_KINDS = RESULTS / "page-kinds.json"  # W42.int-s3: the app's one list of kinds, per kind (page_kinds.py report)
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
 DATING_PUBLIC = RESULTS / "date-tagging-public.json"
 DATING_TRACEABLE = RESULTS / "date-traceable.json"  # W46.date-traceable: date_traceable.py score
@@ -1523,6 +1524,7 @@ def main():
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "kind_atrium": json.loads(KIND_ATRIUM.read_text()) if KIND_ATRIUM.exists() else None,
+             "page_kinds": json.loads(PAGE_KINDS.read_text()) if PAGE_KINDS.exists() else None,
              "dating": dating,
              "dating_public": json.loads(DATING_PUBLIC.read_text()) if DATING_PUBLIC.exists() else None,
              "dating_traceable": dating_traceable(),

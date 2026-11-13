@@ -396,26 +396,36 @@ enum OCRPageKindTestDriver {
               && EnginePageKind.shape(of: pageLines(10, width: 0.3, text: "abcd")).lines == 10)
         let typed = PageKind(kind: .typewritten, confidence: 0.6)
         check("10 a Finder tag corrects the classifier and the newspaper rule",
-              PageKind.detect(classified: typed, uprightLines: pageLines(700, width: 0.1), tags: ["Clippings"],
-                              photographed: true)
+              PageKind.detect(classified: typed, newspaper: true, tags: ["Clippings"], photographed: true)
               == PageKind(kind: .clippings, confidence: 1, source: .finderTag, photographed: true))
-        check("10 a newspaper's line shape wins over the classifier's print call",
-              PageKind.detect(classified: typed, uprightLines: pageLines(700, width: 0.1), tags: [], photographed: false)
+        check("10 the newspaper call wins over the classifier's print call",
+              PageKind.detect(classified: typed, newspaper: true, tags: [], photographed: false)
               == PageKind(kind: .newspapers, confidence: 1, source: .layout))
         check("10 otherwise the classifier's call stands, photographed carried as a second axis",
-              PageKind.detect(classified: typed, uprightLines: pageLines(40, width: 0.7), tags: ["Q2"], photographed: true)
+              PageKind.detect(classified: typed, newspaper: false, tags: ["Q2"], photographed: true)
               == PageKind(kind: .typewritten, confidence: 0.6, source: .classifier, photographed: true))
         check("10 no classifier call (weights failed, older macOS): no kind, whatever the tags say",
-              PageKind.detect(classified: nil, uprightLines: [], tags: ["Handwritten"], photographed: false) == nil)
+              PageKind.detect(classified: nil, newspaper: true, tags: ["Handwritten"], photographed: false) == nil)
+        check("10 only a page called printed is read for the newspaper call",
+              PageKind.readsForNewspaper(PageKind(kind: .printed, confidence: 0.5))
+              && !PageKind.readsForNewspaper(typed) && !PageKind.readsForNewspaper(PageKind(kind: .forms, confidence: 0.9))
+              && !PageKind.readsForNewspaper(nil))
         check("10 routing: newspapers and clippings take print's pick, a register the form's, mixed the hand's",
               choose(.newspapers) == choose(.printed) && choose(.clippings) == choose(.printed)
               && choose(.registers) == choose(.forms) && choose(.mixed) == choose(.handwritten))
         check("10 'Read handwriting on typed pages' acts on a newspaper and a clipping too (they are print)",
               choose(.newspapers, hand: true).reason == .handwriting && choose(.clippings, hand: true).reason == .handwriting
               && choose(.registers, hand: true).reason == .kind)
-        check("10 the header's Kind keeps the four ranked kinds",
+        check("10 the header's Kind keeps the four ranked kinds; mixed and registers leave it absent",
               PageKindName.allCases.map(\.headerKind) == [.handwritten, .typewritten, .printed, .forms,
-                                                          .printed, .printed, .forms, .handwritten])
+                                                          .printed, .printed, nil, nil])
+        check("10 a Finder tag passes the confidence gate: an unsure printed page tagged Statistics takes the form pick",
+              PageKind.detect(classified: PageKind(kind: .printed, confidence: 0.5), newspaper: false,
+                              tags: ["Statistics"], photographed: false).map { choose($0.kind, $0.confidence) }
+              == choose(.forms))
+        check("10 a run record from before the source and photographed fields still decodes",
+              (try? JSONDecoder().decode(PageKind.self, from: Data(#"{"kind":"printed","confidence":0.9}"#.utf8)))
+              == PageKind(kind: .printed, confidence: 0.9))
         check("10 the interview's measured and asked kinds are the list's, and cover it once each",
               CollectionInterviewAnswers.measuredKinds == ["typewritten", "printed", "handwritten", "forms"]
               && CollectionInterviewAnswers.unmeasuredKinds == ["clippings", "newspapers", "registers", "mixed"]
@@ -428,10 +438,13 @@ enum OCRPageKindTestDriver {
               == "Whole newspaper page (by its columns), photographed"
               && PageKind(kind: .handwritten, confidence: 1, source: .finderTag).summary == "Handwritten (Finder tag)")
 
-        // 11. The measure (W42.int-s3): with OCRPAGEKIND_KINDS_LIST (rows `id <TAB> file <TAB> page`), classify each
-        // page as the app does (an image file with its camera and Finder tags; a PDF page as the run renders it) and
-        // write `id call source confidence classifier lines wideW photographed` rows to OCRPAGEKIND_KINDS_OUT, which
-        // `scripts/segbench/page_kinds.py` scores against the truth.
+        // 11. The measure (W42.int-s3): with OCRPAGEKIND_KINDS_LIST (rows `id <TAB> file <TAB> page [<TAB> tags]`),
+        // classify each page as the app does (an image file with its camera and Finder tags; a PDF page as the run
+        // renders it) and write `id call source confidence classifier lines wideW photographed untagged seconds` rows to
+        // OCRPAGEKIND_KINDS_OUT, which `scripts/segbench/page_kinds.py` scores against the truth. A tags column
+        // ("; "-separated, the truth set's record of the original's tags) stands in for the xattr a cached copy lacks;
+        // `untagged` is the call with no tags at all. Every page gets the engine's newspaper reading here, for its
+        // shape and its seconds; the call reads it only where the app would (`readsForNewspaper`).
         if let list = env["OCRPAGEKIND_KINDS_LIST"], let out = env["OCRPAGEKIND_KINDS_OUT"],
            let rows = try? String(contentsOfFile: list, encoding: .utf8) {
             var outRows: [String] = []
@@ -448,19 +461,29 @@ enum OCRPageKindTestDriver {
                         .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
                     tags = (try? MacOSTagger.readTags(from: url)) ?? []
                 }
+                if f.count >= 4, !f[3].isEmpty { tags = f[3].components(separatedBy: "; ") }
                 guard let image, let s = await PageKindClassifier.measure(image) else {
                     outRows.append("\(f[0])\tunread"); continue
                 }
                 var call: PageKind?
-                if let h = model.hand.probabilities(s.handFeatures()), let fm = model.form.probabilities(s.formFeatures()) {
+                if s.print.count == model.printLength, let h = model.hand.probabilities(s.handFeatures()),
+                   let fm = model.form.probabilities(s.formFeatures()) {
                     call = PageKind.decide(hand: h, form: fm, handClasses: model.hand.classes)
                 }
                 let photo = EnginePageKind.isPhotograph(image, properties: properties)
-                let shape = EnginePageKind.shape(of: s.uprightLines)
-                let k = PageKind.detect(classified: call, uprightLines: s.uprightLines, tags: tags, photographed: photo)
+                let started = Date()
+                // Off the main actor, as the app calls it (`PageKindClassifier.classify` is nonisolated): run on the
+                // main thread, the engine's banded Vision reading stalled inside Vision here.
+                let read = await Task.detached(priority: .utility) { EnginePageKind.readNewspaper(image) }.value
+                let seconds = Date().timeIntervalSince(started)
+                let news = PageKind.readsForNewspaper(call) && read?.isNewspaper == true
+                let k = PageKind.detect(classified: call, newspaper: news, tags: tags, photographed: photo)
+                let bare = PageKind.detect(classified: call, newspaper: news, tags: [], photographed: photo)
                 outRows.append([f[0], k?.kind.rawValue ?? "unknown", k?.source.rawValue ?? "-",
                                 String(format: "%.4f", k?.confidence ?? 0), call?.kind.rawValue ?? "unknown",
-                                "\(shape.lines)", String(format: "%.3f", shape.wideWidth), photo ? "1" : "0"]
+                                "\(read?.lines ?? -1)", String(format: "%.3f", read?.wideWidth ?? -1), photo ? "1" : "0",
+                                bare?.kind.rawValue ?? "unknown", String(format: "%.2f", seconds),
+                                read?.isNewspaper == true ? "1" : "0"]
                     .joined(separator: "\t"))
             }
             try? (outRows.joined(separator: "\n") + "\n").write(toFile: out, atomically: true, encoding: .utf8)

@@ -374,7 +374,12 @@ existing scratch, key-free, no-network execution remains unchanged.
   header; unplanned, uncertain, keyless and gateway pages keep the run's model; the cascade still escalates a routed
   page), the run history, and a render guard. With the bench's private cache on this Mac it also classifies the
   bench's 184 labelled pages and checks the app calls the bench model's kind on its measured signals (ids and figures
-  only; `PAGE_KIND_PARITY=0` skips). No API key, network, corpus, or spend; not in the health gate.
+  only; `PAGE_KIND_PARITY=0` skips). Section 10 checks the one list of kinds (W42.int-s3: the Finder tags, the
+  newspaper rule's edges, the precedence, routing per kind, the header's Kind, the interview's lists). With the
+  measure's lists on this Mac (`scripts/segbench/page_kinds.py list`) it also re-runs the per-kind measure on the
+  owner's labelled pages and the newspaper truth pages and fails when any kind gets fewer pages right than
+  `segbench-results/page-kinds.json` (several minutes; `PAGE_KIND_PIN=0` skips; reads the Zotero library and the
+  caches, writes nothing). No API key, network, corpus write, or spend; not in the health gate.
 - **`test-batch-resume.sh`** — batch/non-batch crash-resume manifests, **and** (W16.bat1) the three paid
   batch clients' provider **response-shape contract** — every status/result body shape Anthropic, Gemini and
   Mistral are accepted in, from literal fixtures through the pure parse seams in `BatchOCR.swift`

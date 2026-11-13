@@ -8,7 +8,7 @@
 # Parity with the bench: when the bench's private cache is on this Mac (~/Library/Caches/ArchiveSuiteRehearsal/
 # kind-classifier, W41.bench-kind-classifier), the app also classifies the bench's own labelled pages and this script
 # checks it calls the same kind as the bench's model on the bench's measured signals. Only ids and figures are printed.
-# Skip it with PAGE_KIND_PARITY=0.
+# Skip it with PAGE_KIND_PARITY=0. The per-kind pin is below (PAGE_KIND_PIN=0 skips it).
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -35,6 +35,18 @@ trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
 wait_for_test_report "$report" "$log" "$pid" "OCR-page-kind" "OCRPAGEKIND" 600
 cat "$report"
 grep -q '^ALL PASS$' "$report"
+
+# The per-kind pin (W42.int-s3): with the measure's lists on this Mac (scripts/segbench/page_kinds.py list), the app
+# classifies the owner's labelled pages and the newspaper truth pages again, and no kind may get fewer pages right
+# than segbench-results/page-kinds.json records. Several minutes (the engine reads each page for the newspaper call);
+# skip it with PAGE_KIND_PIN=0.
+kinds="${PAGE_KINDS_CACHE:-$HOME/Library/Caches/ArchiveSuiteRehearsal/page-kinds}"
+if [ "${PAGE_KIND_PIN:-1}" = 1 ] && [ -f "$kinds/owner.tsv" ] && [ -f "$kinds/newspaper.tsv" ]; then
+    /usr/bin/python3 scripts/segbench/page_kinds.py run "$work" >/dev/null
+    /usr/bin/python3 scripts/segbench/page_kinds.py pin "$work/calls-owner.tsv" "$work/calls-newspaper.tsv"
+else
+    echo "PIN SKIPPED: no page-kind lists at $kinds"
+fi
 
 if [ ${#parity[@]} -eq 0 ]; then
     echo "PARITY SKIPPED: no bench cache at $cache"

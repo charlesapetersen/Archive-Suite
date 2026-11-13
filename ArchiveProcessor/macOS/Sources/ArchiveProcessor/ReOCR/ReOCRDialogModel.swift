@@ -74,8 +74,7 @@ final class ReOCRDialogModel {
                   let cg = PageKindClassifier.loadImage(image) else { continue }
             let call = await PageKindClassifier.classify(cg)
             try? FileManager.default.removeItem(at: image)
-            guard let call, pages[i].origin == nil else { continue }
-            let kind = call.kind.headerKind
+            guard let call, let kind = call.kind.headerKind, pages[i].origin == nil else { continue }
             pages[i].kind = kind
             pages[i].origin = .classifier
             pages[i].confidence = call.confidence

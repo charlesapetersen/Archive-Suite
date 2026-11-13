@@ -15731,3 +15731,31 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   3300×2550 after ⌃⌘R; its screenshot shows the menu. Its text-pane check is skipped on that single-page fixture
   (no OCR text page), so the unit test carries it. No bench-cache scratch made.
   <!-- /W40.reader-image-context-menu -->
+- [x] **W42.int-s3 — kinds of page: one list [M]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) · SHIPPED 2026-11-13 (lane: processor) (uses: build) (blocked-on: W42.int-s2) — Stage 3, as Phase 4 decided (`13-stage-rules/10-kinds-and-routing.md`): the kinds the shipped classifier measures (typewritten, printed, handwritten, forms and registers; 137 of 141 owner pages right, 723 of 895 public), the kinds asked in the interview (clippings, newspapers, registers), mixed pages through the mixed switch, photographed page as a second axis; Finder tags correct it when present. Done when its accuracy is measured per kind on the owner's labelled pages and the newspaper truth pages, with a check pinning it.
+  **Shipped 2026-11-13** (checkpoint 1, then this commit). The list is `PageKindName` (`ArchiveProcessor/macOS/Sources/
+  ArchiveProcessor/OCR/PageKinds.swift`): handwritten, typewritten, printed, forms (the classifier's), newspapers (whole
+  pages, detected), and clippings, registers, mixed (asked in the interview, or a Finder tag; never detected).
+  Photographed is a second axis on `PageKind` (VisionOCRKit's page-kinds-three rule, `EnginePageKind.isPhotograph`;
+  nothing reads it yet). `PageKind.detect`: a Finder tag first (Handwritten, Clippings, Statistics -> forms; it passes
+  the 0.8 floor), then the newspaper call, then the classifier; no classifier call (no weights) is still no kind.
+  The newspaper call is the engine's own banded, gutter-split Vision reading (`EnginePageKind.readNewspaper`, the
+  ocr-newspaper-detect rule unchanged), only on a page the classifier calls printed: the app's single Vision pass,
+  tried first, called 13 of 32 whole pages (128 lines found where the engine finds 615). Routing reads `routingKind`
+  (newspapers and clippings take print's pick until W46.layout-newspapers, registers the form's, mixed the hand's);
+  the PDF header's `Kind:` keeps its four values (`headerKind`; mixed and registers leave it absent), so no SPEC change;
+  the interview's measured and asked kinds and labels come from the list; old run records decode.
+  Measured (`ArchiveProcessor/segbench-results/page-kinds.md`, `scripts/segbench/page_kinds.py`, through the app):
+  owner's 144 labelled pages, in-sample (KND-1; held-out stays 137/141), 144/144 untagged; with the originals' Finder
+  tags 127 exact and 137 reaching their kind's pick (tags changed 17 calls: Statistics on 4 pages labelled not a form,
+  Clippings on 2 typewritten pages and a form, the other 10 Clippings on printed pages, which route the same); no page
+  called a newspaper. Vision OCR's newspaper truth (147 of 152 found; s55, nb13, nb15, nb16, nb19 not on this Mac):
+  whole pages 30/32 (misses nb14, xn01), clippings 11/11 and other pages 104/104 not called newspapers. The engine's
+  reading costs a median 1.3-1.7 s a printed page (most 13.8 s), beside the classifier's 0.6 s.
+  Pin: `scripts/test-ocr-page-kind.sh` (77 checks; section 10 the list, section 11 the measure; parity 184/184) re-runs
+  the measure when its lists are on the Mac and fails when any kind gets fewer pages right than `page-kinds.json`.
+  Review (opus, adversarial): 1 HIGH fixed (the header dropped `Kind:` for newspaper and clipping pages), MEDIUM fixed
+  (old resume records failed to decode; the pin counted unread pages right), the tag-passes-the-floor behaviour kept
+  and pinned; LOW fixed (settings comment, measure's print-length check, pin KeyError). Also found: the engine's
+  reading stalled inside Vision when called on the main thread, so it asserts off-main. ArchiveOCRBench has the panel;
+  its published copy is behind. Bench cache: `page-kinds/` (lists and calls, about 60 KB) kept, as the pin reads it.
+  <!-- /W42.int-s3 -->

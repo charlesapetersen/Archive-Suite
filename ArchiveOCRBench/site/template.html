@@ -308,6 +308,13 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
   </section>
 
+  <section class="panel" id="page-kinds" hidden>
+    <div class="head"><h2>The app's page kinds, one list, as the app calls them</h2><span class="meta">free, on the Mac (W42.int-s3)</span></div>
+    <p class="note" id="page-kinds-note"></p>
+    <div class="tbl"><table><thead><tr><th>Owner page, labelled</th><th>Pages</th><th>Right</th><th>Right, no Finder tags</th><th>Reaches its kind's pick</th><th>Its pick, no tags</th></tr></thead><tbody id="page-kinds-owner"></tbody></table></div>
+    <div class="tbl"><table><thead><tr><th>Newspaper truth page</th><th>Pages</th><th>Right</th><th>Called</th></tr></thead><tbody id="page-kinds-news"></tbody></table></div>
+  </section>
+
   <section class="panel" id="kind-mixed" hidden>
     <div class="head"><h2>Mixed-page signals: what the checked frame supports</h2><span class="meta">W46.kind-atrium · W46.kind-mixed-support · offline</span></div>
     <p class="note" id="kind-mixed-note"></p>
@@ -1035,6 +1042,14 @@ if (KC) {
   document.getElementById('kind-clf-route').innerHTML = '<tr><td>True kinds</td><td>—</td><td>' + f2(KC.oracle_nes) + '</td><td>—</td></tr>' + KC.routing.map(r => '<tr><td>' + r.classifier + '</td><td>' + r.as_labelled + ' of ' + r.n + '</td><td>' + f2(r.mean_nes) + '</td><td>' + (r.lost >= 0 ? '−' : '+') + Math.abs(r.lost).toFixed(2) + '</td></tr>').join('');
   document.getElementById('kind-clf-speed').innerHTML = KC.speed.map(s => '<tr><td>' + s.step + '</td><td>' + s.s_page.toFixed(2) + '</td><td>' + (s.peak_gb ? s.peak_gb.toFixed(1) + ' GB' : 'OS model') + '</td></tr>').join('');
 } else document.getElementById('kind-clf').hidden = true;
+const PK = DATA.page_kinds;
+if (PK) {
+  document.getElementById('page-kinds').hidden = false;
+  const O = PK.owner, N = PK.newspaper;
+  document.getElementById('page-kinds-note').textContent = 'The Processor\'s own call (a Finder tag first, then a whole newspaper page by the engine\'s line shape, then the classifier), run through the app on ' + O.n + ' of the owner\'s labelled pages (in-sample: the classifier\'s weights were fitted on them; its held-out figure is above) and ' + N.n + ' of Vision OCR\'s newspaper truth pages. A whole newspaper page should be called one; a clipping and every other page should not. Clippings, registers and mixed pages are asked, not detected. Detail: segbench-results/page-kinds.md.';
+  document.getElementById('page-kinds-owner').innerHTML = Object.entries(O.per_kind).map(([k, v]) => '<tr><td>' + k + '</td><td>' + v.n + '</td><td>' + v.right + '</td><td>' + v.right_untagged + '</td><td>' + v.routed + '</td><td>' + v.routed_untagged + '</td></tr>').join('');
+  document.getElementById('page-kinds-news').innerHTML = Object.entries(N.per_kind).map(([k, v]) => '<tr><td>' + k + '</td><td>' + v.n + '</td><td>' + v.right + '</td><td>' + Object.entries(v.calls).map(([c, m]) => c + ' ' + m).join(', ') + '</td></tr>').join('');
+}
 const KA = DATA.kind_atrium;
 if (KA && KA.bulk_mixed_design) {
   document.getElementById('kind-mixed').hidden = false;

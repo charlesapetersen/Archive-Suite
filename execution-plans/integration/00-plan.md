@@ -171,6 +171,8 @@ before calling).
 
 ### Stage 3 — kinds of page
 
+**Shipped 2026-11-13 (`W42.int-s3`).** The list, the detector and their per-kind figures: `ArchiveProcessor/segbench-results/page-kinds.md`; the code is `OCR/PageKinds.swift`.
+
 One list for the whole app, decided here and stated in the session's notes. It is likely to be: newspaper, printed
 (book, journal, report), typewritten (typewriter and computer printer, as the owner ruled on 14 October),
 handwritten, mixed, form or table, and photographed page as a second axis (it changes the image, not the writing).

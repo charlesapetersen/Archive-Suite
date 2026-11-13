@@ -405,6 +405,16 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 (`segbench-results/kind-classifier.md` §6). The classifier's inputs are measured exactly as the bench's
 `kind-signals.swift` measures them — change the two together.
 
+**The one list of kinds** (W42.int-s3, `OCR/PageKinds.swift`; `segbench-results/page-kinds.md`). A whole newspaper page
+is told by the engine's own banded Vision reading, only on a page the classifier calls printed (30 of 32 whole pages,
+no false call on 147 other pages and the owner's 144; about 1.3-1.7 s a page more, up to 14 s), and routed to print's
+pick until the layout stage (`W46.layout-newspapers`) gives it a route of its own. **Clippings, registers and mixed pages
+are not detected**: they come from a Finder tag (Clippings) or the collection interview. **A Finder tag overrides the
+classifier and passes the 0.8 floor**, as Phase 4 decided; on the owner's 144 labelled pages the tags changed 17 calls and
+sent 7 pages to another pick than their label's (Statistics on 4 pages labelled not a form; Clippings on 2 typewritten
+pages and 1 form), against none untagged (in-sample). The PDF header's `Kind:` keeps its four values: a newspaper or a
+clipping is written `printed`. The photographed axis is carried on each page's kind but nothing reads it yet.
+
 **Read handwriting on typed pages** (W46.mixed-route-setting, beneath it) shares every limit above, since it acts only on
 the kinds told there: a PDF's pages, an unsure page and every run it does not apply to keep their reader. Its typed-text
 figure is measured on typed and printed pages only; on **mixed pages it is not measured** (2 pages scored), and its

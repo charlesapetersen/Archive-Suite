@@ -1,7 +1,6 @@
 import ArchiveCore
 import CoreGraphics
 import Foundation
-import VisionOCRKit
 
 /// The app's one list of page kinds (W42.int-s3, Stage 3 of `execution-plans/integration/00-plan.md`; the rules are
 /// Phase 4's, `execution-plans/processing-review/13-stage-rules/10-kinds-and-routing.md`). The classifier, the
@@ -11,7 +10,7 @@ import VisionOCRKit
 /// `scripts/test-ocr-page-kind.sh`. Raw values are the settings layer's mix keys and the model guide's kind ids.
 enum PageKindName: String, CaseIterable, Codable, Sendable {
     case handwritten, typewritten, printed, forms
-    /// A whole newspaper page, told by the shape of Vision's lines (`EnginePageKind.isNewspaper`).
+    /// A whole newspaper page, told by the shape of the engine's reading of it (`EnginePageKind.readNewspaper`).
     case newspapers
     /// One article cut to a page; told only by the Finder tag Clippings, else asked.
     case clippings
@@ -67,13 +66,16 @@ enum PageKindName: String, CaseIterable, Codable, Sendable {
     /// The kind a sample's measured mix counts the page under: one of `classifierKinds`.
     var mixKind: PageKindName { routingKind }
 
-    /// The PDF header's `Kind:` (`SPEC/tag-format.md`), which keeps the four kinds the readers are ranked by.
-    var headerKind: OCRPageKind {
-        switch routingKind {
+    /// The PDF header's `Kind:` (`SPEC/tag-format.md`), which keeps the four kinds the readers are ranked by: a
+    /// newspaper or a clipping is print. nil for mixed pages and registers, which say nothing of the writing, so the
+    /// line stays absent rather than guessed (as `PDFGenerator` leaves an unknown kind out).
+    var headerKind: OCRPageKind? {
+        switch self {
         case .handwritten: return .handwritten
         case .typewritten: return .typewritten
         case .forms: return .forms
-        default: return .printed
+        case .printed, .newspapers, .clippings: return .printed
+        case .registers, .mixed: return nil
         }
     }
 
@@ -100,34 +102,57 @@ struct PageKind: Codable, Sendable, Equatable {
     enum Source: String, Codable, Sendable {
         /// The on-device classifier (`PageKindClassifier`).
         case classifier
-        /// The shape of Vision's lines (`EnginePageKind.isNewspaper`).
+        /// The shape of the engine's reading of the page (`EnginePageKind.readNewspaper`).
         case layout
         /// The source file's Finder tags (`PageKindName.fromFinderTags`).
         case finderTag = "finder_tag"
     }
 
     let kind: PageKindName
-    /// The classifier's probability for its call; 1 for a Finder tag or the newspaper rule.
+    /// The classifier's probability for its call; 1 for a Finder tag (the owner's label: it passes the 0.8 gate
+    /// whatever the classifier thought) or the newspaper call.
     let confidence: Double
     var source: Source = .classifier
     var photographed = false
 
-    /// The one rule that puts the signals together. A Finder tag corrects everything (the owner's label); then a
-    /// newspaper's line shape (the classifier has no newspaper class and calls one printed); then the classifier.
-    /// `classified` nil (no weights, an older macOS, an unreadable image) gives nil whatever else is known, so a page
-    /// keeps the run's model when the weights fail to load, as the rule note requires.
-    static func detect(classified: PageKind?, uprightLines: [PageLine], tags: [String],
-                       photographed: Bool) -> PageKind? {
+    init(kind: PageKindName, confidence: Double, source: Source = .classifier, photographed: Bool = false) {
+        self.kind = kind
+        self.confidence = confidence
+        self.source = source
+        self.photographed = photographed
+    }
+
+    private enum CodingKeys: String, CodingKey { case kind, confidence, source, photographed }
+
+    /// A run record written before the source and the photographed axis decodes as the classifier's, not scanned.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(PageKindName.self, forKey: .kind)
+        confidence = try c.decode(Double.self, forKey: .confidence)
+        source = try c.decodeIfPresent(Source.self, forKey: .source) ?? .classifier
+        photographed = try c.decodeIfPresent(Bool.self, forKey: .photographed) ?? false
+    }
+
+    /// The one rule that puts the signals together. A Finder tag corrects everything (the owner's label); then the
+    /// newspaper call (`EnginePageKind.readNewspaper`; the classifier has no newspaper class and calls one printed);
+    /// then the classifier. `classified` nil (no weights, an older macOS, an unreadable image) gives nil whatever else
+    /// is known, so a page keeps the run's model when the weights fail to load, as the rule note requires.
+    static func detect(classified: PageKind?, newspaper: Bool, tags: [String], photographed: Bool) -> PageKind? {
         guard let classified else { return nil }
         if let tagged = PageKindName.fromFinderTags(tags) {
             return PageKind(kind: tagged, confidence: 1, source: .finderTag, photographed: photographed)
         }
-        if EnginePageKind.isNewspaper(lines: uprightLines) {
+        if newspaper {
             return PageKind(kind: .newspapers, confidence: 1, source: .layout, photographed: photographed)
         }
         return PageKind(kind: classified.kind, confidence: classified.confidence, source: .classifier,
                         photographed: photographed)
     }
+
+    /// Whether the page is read for the newspaper call: only a page the classifier calls printed. It called all 32
+    /// whole newspaper pages of the truth set printed, and the one owner page the rule called a newspaper was a
+    /// form (`segbench-results/page-kinds.md`); the engine's banded reading costs seconds a page, spent only here.
+    static func readsForNewspaper(_ classified: PageKind?) -> Bool { classified?.kind == .printed }
 
     /// "Typewritten (93%)", "Whole newspaper page (by its columns)", "Handwritten (Finder tag)", each with
     /// ", photographed" when it was.
