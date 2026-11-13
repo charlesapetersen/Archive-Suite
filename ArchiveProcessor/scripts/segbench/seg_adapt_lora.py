@@ -301,13 +301,13 @@ BOOT, SEED = 2000, 43
 RESULTS = Path(__file__).resolve().parents[2] / "segbench-results"
 
 
-def arm_judges(pack: Path, runs: Path):
+def arm_judges(pack: Path, runs: Path, arms=ARMS):
     """One judge per arm from runs/<arm>/answers.jsonl, through the pack's own windows (method_window's judge form)."""
     import method_local as L
     import method_window as W
     ws = {w["cache_key"]: w for w in map(json.loads, (pack / "windows" / "windows.jsonl").read_text().splitlines())}
     out, failed = {}, {}
-    for arm in ARMS:
+    for arm in arms:
         got = {}
         for line in (runs / arm / "answers.jsonl").read_text().splitlines():
             try:
