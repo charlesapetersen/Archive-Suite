@@ -698,7 +698,6 @@ the two apps, outlined the features, and left the design to us.
 All four items shipped (W44.reocr-plan, -spec, -processor, -reader; `SUITE_TODO_DONE.md`); the contract and its design
 record are `SPEC/improve-ocr.md`. One follow-up remains:
 
-- [ ] **`W44.reocr-reader-freshness` — the Reader's index notices a replaced file even when its date is kept [S · ~1 session · Tier-1]** (lane: reader) (uses: build). The content index skips a file whose modification date is unchanged (`ContentIndexer.launch`), and an Improve OCR publication keeps the date, so today only the Processor's receipt makes the Reader read the new text (`ArchiveReader/KNOWN_ISSUES.md`, W44). A replacement outside the suite that restores the date, or a receipt the Reader never sees, leaves the old text searchable. Add the file's inode and size to the stored freshness key (the index is a disposable cache: change the schema, no migration), without making a tag-only change re-extract. Tests: a same-date replacement is re-indexed; a tag edit is not.
 
 ## Archive Processor — a broader benchmark corpus and the pre-release model sweep (owner, 2026-10-16)
 

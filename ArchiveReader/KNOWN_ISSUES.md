@@ -8,10 +8,10 @@ Shipped: Tags ▸ Flag as Poor OCR / Remove Poor OCR Flag (⌃⌘P, also in the 
 Sort & Filter ▸ Show Poor OCR Only, Tags ▸ Improve OCR…, File ▸ Connect Improve OCR Folder…, the text page's reader
 and Kind in the document window's status bar, and receipt-driven re-indexing. Contract: `SPEC/improve-ocr.md`.
 What it does not do, deliberately or not yet:
-- **The index notices a suite replacement only through its receipt.** The content index skips a file whose
-  modification date is unchanged, and the Processor keeps the date. A replacement made outside the suite that
-  restores the date, or a receipt the Reader never reads (its folder disconnected), leaves the old text searchable
-  until the index is rebuilt. Strengthening the skip with the file's inode and size is `W44.reocr-reader-freshness`.
+- **The index's freshness key is the date, inode and size** (W44.reocr-reader-freshness), so a replacement that
+  keeps the date is read again without its receipt, and a tag edit (an extended attribute written in place) is not.
+  What still passes as unchanged: a rewrite in place, same inode, that keeps both the size and the date. No suite
+  writer does that (a Processor publication changes the inode, `SPEC/improve-ocr.md`); a receipt or a rebuild fixes it.
 - **Generic edits that name `OCR Poor` run on the main thread**, as every Reader tag write does, and wait at most 1 s
   for the file's flag lock (`SPEC/improve-ocr.md` §3 states the exception). The Flag command runs off it.
 - **Never connected, a generic edit of the tag is not recorded**, like an edit in Finder; the Flag command asks for
@@ -21,8 +21,8 @@ What it does not do, deliberately or not yet:
   made in another app until the watcher sees it; the write itself re-reads the file.
 - **Receipts are read on library changes, on activation and every 20 s**; the Processor sends no wake-up. Seen IDs are
   kept in the Reader's own defaults, all of them; receipts stay in the shared folder. An index pass already running
-  when a receipt is handled can write the file's old text back after the row was dropped; the date-only skip then
-  keeps it until `W44.reocr-reader-freshness` (the next receipt or a rebuild also fixes it).
+  when a receipt is handled can write the file's old text back after the row was dropped; it carries the old file's
+  inode, so the next pass after the watcher sees the replacement reads the file again.
 - **A reload after a receipt rebuilds the document's panes** on the same page pair; zoom and find highlights in that
   window start again.
 - **Not exercised by automation:** the real Launch Services launch of Archive Processor (no Processor is installed in

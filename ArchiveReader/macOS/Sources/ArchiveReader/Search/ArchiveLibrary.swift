@@ -1580,7 +1580,8 @@ final class ArchiveLibrary: ObservableObject {
         commit(files.map { f in
             (f.path, ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
                                  tags: Self.parse(f.tags.raw, f.tags.labelNumber),
-                                 contentModified: f.contentModified, isDataless: f.isDataless,
+                                 contentModified: f.contentModified,
+                                 contentIdentity: f.contentIdentity, isDataless: f.isDataless,
                                  provenance: f.provenance))
         })
     }
@@ -1598,6 +1599,7 @@ final class ArchiveLibrary: ObservableObject {
                     // not mtime, so this is the right key for the content-index freshness check and
                     // the wrong one for detecting a tag change (plan §5.12).
                     contentModified: entry.contentModified,
+                    contentIdentity: entry.fingerprint.map(ContentIdentity.init),
                     isDataless: entry.isDataless,
                     provenance: .disk(readAt: Date()))
     }
@@ -1610,6 +1612,7 @@ final class ArchiveLibrary: ObservableObject {
                            fileType: shortType(uti: nil, url: url),
                            tags: parse(entry.tagNames, entry.labelNumber),
                            contentModified: Date(timeIntervalSince1970: entry.fingerprint.mtime),
+                           contentIdentity: ContentIdentity(entry.fingerprint),
                            isDataless: entry.fingerprint.isDataless,
                            provenance: provenance)
     }
@@ -1618,6 +1621,7 @@ final class ArchiveLibrary: ObservableObject {
         ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
                     tags: parse(after, afterLabel),
                     contentModified: f.contentModified,
+                    contentIdentity: f.contentIdentity,
                     isDataless: f.isDataless,
                     provenance: .disk(readAt: Date()))
     }

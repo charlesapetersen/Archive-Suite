@@ -15,6 +15,17 @@ enum ArchiveFileProvenance: Hashable, Sendable {
     }
 }
 
+/// A file's inode and byte size. A replacement that keeps the modification date (an Improve OCR
+/// publication, a copy that restores the date) still changes one of them; a Finder-tag write, which only
+/// sets an extended attribute in place, changes neither.
+struct ContentIdentity: Hashable, Sendable {
+    let inode: UInt64
+    let size: Int64
+
+    init(inode: UInt64, size: Int64) { self.inode = inode; self.size = size }
+    init(_ fingerprint: CorpusFileFingerprint) { self.init(inode: fingerprint.inode, size: fingerprint.size) }
+}
+
 /// One row in the navigation window: a tagged file discovered by the library.
 ///
 /// `tags` are parsed for display/sort/filter from ArchiveCore's on-disk read. `url` is the identity used
@@ -33,13 +44,15 @@ struct ArchiveFile: Identifiable, Sendable {
         let fileType: String
         let tags: DocumentTags
         let contentModified: Date?
+        let contentIdentity: ContentIdentity?
         let isDataless: Bool
         let provenance: ArchiveFileProvenance
         let dateAmbiguities: [DateAmbiguity]
         let subjectKeys: Set<String>
 
         init(url: URL, path: String, name: String, fileType: String, tags: DocumentTags,
-             contentModified: Date?, isDataless: Bool, provenance: ArchiveFileProvenance) {
+             contentModified: Date?, contentIdentity: ContentIdentity?, isDataless: Bool,
+             provenance: ArchiveFileProvenance) {
             self.url = url
             self.path = path
             self.pathHash = UTF8Key(path).hashValue
@@ -47,6 +60,7 @@ struct ArchiveFile: Identifiable, Sendable {
             self.fileType = fileType
             self.tags = tags
             self.contentModified = contentModified
+            self.contentIdentity = contentIdentity
             self.isDataless = isDataless
             self.provenance = provenance
             self.dateAmbiguities = tags.dateAmbiguities
@@ -67,6 +81,9 @@ struct ArchiveFile: Identifiable, Sendable {
     var fileType: String { fields.fileType }        // short label, e.g. "PDF"
     var tags: DocumentTags { fields.tags }
     var contentModified: Date? { fields.contentModified }
+    /// The inode and size discovery saw, beside the date in the content index's freshness key
+    /// (W44.reocr-reader-freshness). Nil for a row built without a `stat(2)` (synthetic test rows).
+    var contentIdentity: ContentIdentity? { fields.contentIdentity }
     var isDataless: Bool { fields.isDataless }
     var provenance: ArchiveFileProvenance { fields.provenance }
     /// W40.fix-reader-date-ambiguity: date facets that carried two tags, worked out once per row so the
@@ -80,7 +97,7 @@ struct ArchiveFile: Identifiable, Sendable {
     func isSameStoredRow(as other: ArchiveFile) -> Bool { fields === other.fields }
 
     init(url: URL, name: String, fileType: String, tags: DocumentTags,
-         contentModified: Date?, isDataless: Bool = false,
+         contentModified: Date?, contentIdentity: ContentIdentity? = nil, isDataless: Bool = false,
          provenance: ArchiveFileProvenance = .disk(readAt: Date())) {
         // Native UTF-8, made once here: a bridged string (what the walk and URL hand over) is copied
         // to UTF-8 on every byte-hash, which made each sort's 116k key lookups slower, not faster.
@@ -88,7 +105,8 @@ struct ArchiveFile: Identifiable, Sendable {
         path.makeContiguousUTF8()
         name.makeContiguousUTF8()
         fields = Fields(url: url, path: path, name: name, fileType: fileType, tags: tags,
-                        contentModified: contentModified, isDataless: isDataless, provenance: provenance)
+                        contentModified: contentModified, contentIdentity: contentIdentity,
+                        isDataless: isDataless, provenance: provenance)
     }
 
     /// Discovery and index reconstruction build URLs from filesystem representations; URL equality
@@ -132,6 +150,7 @@ extension ArchiveFile: Hashable {
         lhs.isSameStoredRow(as: rhs)
             || (lhs.url == rhs.url && lhs.name == rhs.name && lhs.fileType == rhs.fileType
                 && lhs.tags == rhs.tags && lhs.contentModified == rhs.contentModified
+                && lhs.contentIdentity == rhs.contentIdentity
                 && lhs.isDataless == rhs.isDataless && lhs.provenance == rhs.provenance)
     }
     // url-only hash stays valid: value-equal files share a url, so they share a hash (collisions OK).

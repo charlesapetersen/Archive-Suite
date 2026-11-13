@@ -64,7 +64,8 @@ struct LibraryChangeSet: Sendable {
         guard let old = row.old, let new = row.new else { return .membership }
         var fields: Fields = []
         if old.tags != new.tags { fields.insert(.tags) }
-        if old.contentModified != new.contentModified || old.isDataless != new.isDataless
+        if old.contentModified != new.contentModified || old.contentIdentity != new.contentIdentity
+            || old.isDataless != new.isDataless
             || old.fileType != new.fileType || old.name != new.name || old.url != new.url {
             fields.insert(.content)
         }

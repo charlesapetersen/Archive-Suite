@@ -7,12 +7,21 @@ import ArchiveCore
 struct IndexRow: Sendable {
     let path: String
     let mtime: Double
+    var identity: ContentIdentity? = nil
     let name: String
     let classification: String?
     let body: String
     let pageCount: Int
     let hasText: Bool
     let readable: Bool
+}
+
+/// What the index compares to decide a file's text is current (W44.reocr-reader-freshness): the content
+/// modification date and the file's inode and size. A replacement that keeps the date still changes the
+/// inode or the size, and a tag edit changes none of the three, so it does not re-extract.
+struct ContentStamp: Equatable, Sendable {
+    let mtime: Double
+    let identity: ContentIdentity?
 }
 
 /// A disposable, rebuildable full-text index over the OCR body text of the corpus, backed by the
@@ -56,7 +65,15 @@ actor ContentIndex {
             // Bookkeeping table (path-indexed for fast incremental checks) + FTS5 search table.
             // `page_count`/`has_text`/`readable` carry the non-standard-PDF detection (display + triage);
             // a fresh v2 DB filename (see ContentIndexer) means every row is written with these columns.
-            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, page_count INTEGER, has_text INTEGER, readable INTEGER);")
+            // W44.reocr-reader-freshness: the freshness key gained `inode`/`size`. A table written before
+            // that is dropped with its text and rebuilt by the next pass — no migration, the index is a
+            // cache, and dropping inside the same file leaves no orphan behind.
+            let columns = try columnNames("files")
+            if !columns.isEmpty, !columns.contains("inode") {
+                try exec("DROP TABLE IF EXISTS fts;")
+                try exec("DROP TABLE files;")
+            }
+            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER);")
             try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, path UNINDEXED);")
         } catch {
             // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
@@ -76,38 +93,72 @@ actor ContentIndex {
         if db != nil { sqlite3_close_v2(db); db = nil }
     }
 
-    /// True if `path` is absent or its stored mtime differs (needs (re)indexing).
-    func needsIndex(path: String, mtime: Double) -> Bool {
-        guard let stmt = prepare("SELECT mtime FROM files WHERE path = ?;") else { return true }
+    /// True if `path` is absent or its stored stamp differs (needs (re)indexing).
+    func needsIndex(path: String, mtime: Double, identity: ContentIdentity? = nil) -> Bool {
+        guard let stmt = prepare("SELECT mtime, inode, size FROM files WHERE path = ?;") else { return true }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, path)
         if sqlite3_step(stmt) == SQLITE_ROW {
-            return sqlite3_column_double(stmt, 0) != mtime
+            return stamp(stmt, from: 0) != ContentStamp(mtime: mtime, identity: identity)
         }
         return true
     }
 
-    /// All stored (path, mtime) pairs in one query — the indexer pulls this once to partition
-    /// files into work (mtime differs) vs skipped, instead of a serialized `needsIndex` per file.
-    func existingMTimes() -> [String: Double] {
-        guard let stmt = prepare("SELECT path, mtime FROM files;") else { return [:] }
+    /// All stored (path, stamp) pairs in one query — the indexer pulls this once to partition
+    /// files into work (stamp differs) vs skipped, instead of a serialized `needsIndex` per file.
+    func existingStamps() -> [String: ContentStamp] {
+        guard let stmt = prepare("SELECT path, mtime, inode, size FROM files;") else { return [:] }
         defer { sqlite3_finalize(stmt) }
-        var map: [String: Double] = [:]
+        var map: [String: ContentStamp] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
             if let c = sqlite3_column_text(stmt, 0) {
-                map[String(cString: c)] = sqlite3_column_double(stmt, 1)
+                map[String(cString: c)] = stamp(stmt, from: 1)
             }
         }
         return map
     }
 
+    /// The stamp in columns `first` (mtime), `first + 1` (inode), `first + 2` (size). A row written
+    /// without an identity has NULL in both.
+    private func stamp(_ stmt: OpaquePointer, from first: Int32) -> ContentStamp {
+        let mtime = sqlite3_column_double(stmt, first)
+        guard sqlite3_column_type(stmt, first + 1) != SQLITE_NULL else {
+            return ContentStamp(mtime: mtime, identity: nil)
+        }
+        return ContentStamp(mtime: mtime, identity: ContentIdentity(
+            inode: UInt64(bitPattern: sqlite3_column_int64(stmt, first + 1)),
+            size: sqlite3_column_int64(stmt, first + 2)))
+    }
+
+    /// The column names of `table`; empty when it does not exist.
+    private func columnNames(_ table: String) throws -> Set<String> {
+        guard let stmt = prepare("PRAGMA table_info(\(table));") else { throw IndexError.sql(lastMessage) }
+        defer { sqlite3_finalize(stmt) }
+        var names: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let c = sqlite3_column_text(stmt, 1) { names.insert(String(cString: c)) }
+        }
+        return names
+    }
+
+    private func bindIdentity(_ stmt: OpaquePointer, _ index: Int32, _ identity: ContentIdentity?) {
+        if let identity {
+            sqlite3_bind_int64(stmt, index, Int64(bitPattern: identity.inode))
+            sqlite3_bind_int64(stmt, index + 1, identity.size)
+        } else {
+            sqlite3_bind_null(stmt, index)
+            sqlite3_bind_null(stmt, index + 1)
+        }
+    }
+
     /// Insert or replace the indexed text + format-detection flags for one file. `readable=false`
     /// records an unreadable/non-PDF file (empty body) so it can still be surfaced as needing attention.
-    func upsert(path: String, mtime: Double, name: String, classification: String?, body: String,
+    func upsert(path: String, mtime: Double, identity: ContentIdentity? = nil, name: String,
+                classification: String?, body: String,
                 pageCount: Int = 0, hasText: Bool = true, readable: Bool = true) throws {
         try exec("BEGIN IMMEDIATE;")
         do {
-            try upsertRow(path: path, mtime: mtime, name: name, classification: classification,
+            try upsertRow(path: path, mtime: mtime, identity: identity, name: name, classification: classification,
                           body: body, pageCount: pageCount, hasText: hasText, readable: readable)
             try exec("COMMIT;")
         } catch {
@@ -124,7 +175,7 @@ actor ContentIndex {
         try exec("BEGIN IMMEDIATE;")
         do {
             for row in rows {
-                try upsertRow(path: row.path, mtime: row.mtime, name: row.name,
+                try upsertRow(path: row.path, mtime: row.mtime, identity: row.identity, name: row.name,
                               classification: row.classification, body: row.body,
                               pageCount: row.pageCount, hasText: row.hasText, readable: row.readable)
             }
@@ -137,7 +188,8 @@ actor ContentIndex {
 
     /// The body of a single-file upsert. Called inside an already-open transaction — no
     /// BEGIN/COMMIT here. Fully synchronous (no await) to preserve the actor-reentrancy invariant.
-    private func upsertRow(path: String, mtime: Double, name: String, classification: String?,
+    private func upsertRow(path: String, mtime: Double, identity: ContentIdentity?, name: String,
+                           classification: String?,
                            body: String, pageCount: Int, hasText: Bool, readable: Bool) throws {
         var rowid: Int64? = nil
         if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
@@ -147,20 +199,22 @@ actor ContentIndex {
         }
         if let rowid {
             try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-            try run("UPDATE files SET mtime = ?, page_count = ?, has_text = ?, readable = ? WHERE rowid = ?;") {
+            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ? WHERE rowid = ?;") {
                 sqlite3_bind_double($0, 1, mtime)
-                sqlite3_bind_int($0, 2, Int32(pageCount))
-                sqlite3_bind_int($0, 3, hasText ? 1 : 0)
-                sqlite3_bind_int($0, 4, readable ? 1 : 0)
-                sqlite3_bind_int64($0, 5, rowid)
+                self.bindIdentity($0, 2, identity)
+                sqlite3_bind_int($0, 4, Int32(pageCount))
+                sqlite3_bind_int($0, 5, hasText ? 1 : 0)
+                sqlite3_bind_int($0, 6, readable ? 1 : 0)
+                sqlite3_bind_int64($0, 7, rowid)
             }
             try insertFTS(rowid: rowid, body: body, classification: classification, name: name, path: path)
         } else {
-            try run("INSERT INTO files(path, mtime, page_count, has_text, readable) VALUES(?, ?, ?, ?, ?);") {
+            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable) VALUES(?, ?, ?, ?, ?, ?, ?);") {
                 self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
-                sqlite3_bind_int($0, 3, Int32(pageCount))
-                sqlite3_bind_int($0, 4, hasText ? 1 : 0)
-                sqlite3_bind_int($0, 5, readable ? 1 : 0)
+                self.bindIdentity($0, 3, identity)
+                sqlite3_bind_int($0, 5, Int32(pageCount))
+                sqlite3_bind_int($0, 6, hasText ? 1 : 0)
+                sqlite3_bind_int($0, 7, readable ? 1 : 0)
             }
             let newRow = sqlite3_last_insert_rowid(db)
             try insertFTS(rowid: newRow, body: body, classification: classification, name: name, path: path)

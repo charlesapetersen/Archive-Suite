@@ -191,17 +191,17 @@ final class ContentIndexTests: XCTestCase {
         await idx.close()
     }
 
-    func testExistingMTimes() async throws {
+    func testExistingStamps() async throws {
         let (idx, url) = makeIndex(); defer { try? FileManager.default.removeItem(at: url) }
         try await idx.open()
-        let empty = await idx.existingMTimes()
+        let empty = await idx.existingStamps()
         XCTAssertTrue(empty.isEmpty)
         try await idx.upsert(path: "/a.pdf", mtime: 100, name: "a", classification: nil, body: "hello")
         try await idx.upsert(path: "/b.pdf", mtime: 200, name: "b", classification: nil, body: "world")
-        let mtimes = await idx.existingMTimes()
-        XCTAssertEqual(mtimes.count, 2)
-        XCTAssertEqual(mtimes["/a.pdf"], 100)
-        XCTAssertEqual(mtimes["/b.pdf"], 200)
+        let stamps = await idx.existingStamps()
+        XCTAssertEqual(stamps.count, 2)
+        XCTAssertEqual(stamps["/a.pdf"], ContentStamp(mtime: 100, identity: nil))
+        XCTAssertEqual(stamps["/b.pdf"], ContentStamp(mtime: 200, identity: nil))
         await idx.close()
     }
 

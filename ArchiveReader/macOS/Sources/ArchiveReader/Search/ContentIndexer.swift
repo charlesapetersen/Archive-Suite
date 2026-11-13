@@ -133,17 +133,18 @@ final class ContentIndexer: ObservableObject {
     }
 #endif
 
-    /// Incrementally index the given files (skips unchanged content via `existingMTimes`).
+    /// Incrementally index the given files (skips unchanged content via `existingStamps`).
     ///
     /// - An **empty** set means the library was cleared (a scope change, or no tagged files): cancel any
     ///   in-flight pass and drop queued work so a stale-scope pass can't starve the new scope. The next
     ///   non-empty call (the new scope's `DidFinishGathering`) starts a fresh pass promptly.
     /// - If a pass is **already running**, the request is *coalesced* into `pending` (newest wins) and
-    ///   launched on completion — not dropped. Because `needsIndex` is mtime-based and idempotent, the
+    ///   launched on completion — not dropped. Because `needsIndex` is stamp-based and idempotent, the
     ///   follow-up pass cheaply skips everything unchanged, so a tag-only update (mark Read, edit tags)
     ///   does NOT restart the expensive initial extraction from zero.
     /// W44.reocr-reader: drop the rows of files whose contents an Improve OCR receipt says were replaced, keeping
-    /// their dates, so the next pass extracts them again (its skip compares only the date). The rows are a
+    /// their dates, so the next pass extracts them again (a replacement that kept the inode and size too would
+    /// otherwise pass the stamp check, W44.reocr-reader-freshness). The rows are a
     /// disposable cache; the files are untouched. False when the index could not be changed.
     func forget(_ paths: [String]) async -> Bool {
         guard !paths.isEmpty else { return true }
@@ -184,8 +185,8 @@ final class ContentIndexer: ObservableObject {
                 await self?.finish(gen, .couldNotOpen(Self.detail(error)))
                 return
             }
-            // Pull all stored mtimes in one query to partition work without per-file actor round-trips.
-            let existing = await idx.existingMTimes()
+            // Pull all stored stamps in one query to partition work without per-file actor round-trips.
+            let existing = await idx.existingStamps()
             let datalessPaths = files.filter(\.isDataless).map(\.path)
             var cacheRowsDropped = 0
             if !datalessPaths.isEmpty {
@@ -200,9 +201,8 @@ final class ContentIndexer: ObservableObject {
             }
             let work = files.filter { f in
                 guard !f.isDataless else { return false }
-                let mtime = f.contentModified?.timeIntervalSince1970 ?? 0
                 guard let stored = existing[f.path] else { return true }
-                return stored != mtime
+                return stored != Self.stamp(f)
             }
             let total = files.count
             let skipped = total - work.count
@@ -293,17 +293,22 @@ final class ContentIndexer: ObservableObject {
     ) -> IndexRow {
         CorpusWalker.withDatalessMaterializationDisabled {
             let path = file.path
-            let mtime = file.contentModified?.timeIntervalSince1970 ?? 0
+            let stamp = Self.stamp(file)
             if let content = extractPDF(file.url) {
-                return IndexRow(path: path, mtime: mtime, name: file.name,
+                return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                                 classification: content.classification, body: content.fullBody,
                                 pageCount: content.pageCount,
                                 hasText: !content.fullBody.isEmpty, readable: true)
             }
-            return IndexRow(path: path, mtime: mtime, name: file.name,
+            return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                             classification: nil, body: "",
                             pageCount: 0, hasText: false, readable: false)
         }
+    }
+
+    /// The freshness stamp discovery recorded for `file`, as the index stores it.
+    private nonisolated static func stamp(_ file: ArchiveFile) -> ContentStamp {
+        ContentStamp(mtime: file.contentModified?.timeIntervalSince1970 ?? 0, identity: file.contentIdentity)
     }
 
     /// The SQLite message out of a `ContentIndex.IndexError`, for a `Failure`'s detail line.
