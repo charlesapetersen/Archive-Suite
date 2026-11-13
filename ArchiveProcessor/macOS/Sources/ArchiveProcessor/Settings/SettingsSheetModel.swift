@@ -289,10 +289,10 @@ struct SettingsSheetModel {
         return out
     }
 
-    /// The user's own time checking boundaries for this batch, at the 20 s a place the design assumes.
+    /// The user's own time checking boundaries for this batch, at the measured `SettingsSolver.checkSeconds` a place.
     static func checkingHours(_ s: SettingsSolution, answers a: SettingsAnswers) -> Double? {
         guard let per100 = s.pick("segmentation", "all")?.route?.figure("test-boxes.checks_per_100"), per100 > 0 else { return nil }
-        return per100 * Double(a.pages) / 100 * 20 / 3600
+        return per100 * Double(a.pages) / 100 * SettingsSolver.checkSeconds / 3600
     }
 
     private static func relax(_ s: SettingsSolution, answers a: SettingsAnswers, words: Words) -> [String] {
@@ -697,8 +697,8 @@ struct SettingsSheetModel {
                                     sample: nil, label2: nil, warning: false))
                 rows.append(PartRow(id: "checking", label: "Your own checking time", routeName: nil,
                                     figure: "about \(SettingsSheetModel.count(Int(places.rounded()), "place")), roughly "
-                                        + words.hours(places * 20 / 3600),
-                                    sample: "at about 20 seconds a place, a guess nobody has timed yet; not in the times above",
+                                        + words.hours(places * SettingsSolver.checkSeconds / 3600),
+                                    sample: "at about 3 seconds a place, timed on one person checking 92 places; not in the times above",
                                     label2: nil, warning: false))
             }
             if let after = r.figure("test-boxes.after_checking") {

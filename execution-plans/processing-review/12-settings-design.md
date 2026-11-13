@@ -122,7 +122,7 @@ weighted accuracy, or, under "cheapest within a point" and "fastest within a poi
 money or time; a difference under the bench's tie threshold (half a point of NES; the segmentation rerun floor of
 1.4 to 3.2 points of pages exact) is a tie and the cheaper route wins it. The segmentation figure a user sees is the
 no-checking figure moved toward the after-checking figure by the share of the needed checks their minutes cover
-(20 s a boundary, an assumption to measure).
+(3.2 s a boundary, the owner's mean over 92 flagged gaps, `segbench-results/seg-check-time.md`).
 
 ### 3.4 The range view
 
@@ -200,7 +200,9 @@ files an item where the sheet needs the figure.
   bench's Gemini prompt is on the article-within-issue rule (g2, `segbench-results/seg-magazine-rule.md`), and so is
   the app's Gemini voter since `W46.seg-magazine-rule-app` (its figures Gemini 3.7's, labelled so); the ChatGPT
   voter's c1 waits on `W46.gateway-models-ok`.
-- The checking-time figure assumes 20 s a boundary; nobody has timed a user checking.
+- The checking-time figure is one person's, timed once: 3.2 s a boundary (n 92, interval 2.6 to 3.9 s) by the owner on
+  pages he had seen, on the two-page sheet. Other readers, unseen material and W46.seg-check-context's wider sheet are
+  not timed.
 - The Claude plan's cost is a share of its windows, measured on the user's account by the method in `usage.md`; the
   ChatGPT plan has no meter an app can read.
 - Every Vision figure is the macOS 27.2 reading; the public Vision row answers 305 of 320 pages.

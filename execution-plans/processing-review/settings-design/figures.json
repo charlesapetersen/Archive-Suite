@@ -1610,7 +1610,7 @@
    "s_page": null,
    "s_est": true,
    "peak_gb": 0,
-   "note": "checking time unmeasured",
+   "note": "checking time is one person's, timed once",
    "source": "settings-routes.json, stage segmentation, row manual",
    "nocheck": null,
    "checks_per_100": 86.8,

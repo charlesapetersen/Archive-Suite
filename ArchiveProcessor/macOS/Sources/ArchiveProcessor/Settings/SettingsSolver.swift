@@ -695,14 +695,19 @@ struct SettingsSolver {
         r.figure("test-boxes") ?? (r.family == .manual ? 0 : nil)   // by hand nothing is found until a gap is checked
     }
 
+    /// Seconds a person takes to check one flagged boundary: the owner's mean over 92 gaps the Gemini route flags on
+    /// the test boxes (`W46.seg-check-time`, `segbench-results/seg-check-time.md`; 95% interval 2.6 to 3.9 s). He had
+    /// seen the pages before and the sheet showed two pages, so a user on unseen material may take longer.
+    static let checkSeconds = 3.2
+
     /// The figure a user sees: the no-checking figure moved toward the after-checking one by the share of the needed
-    /// checks their minutes cover, at 20 s a boundary (an assumption to measure, `W46.seg-check-time`).
+    /// checks their minutes cover, at `checkSeconds` a boundary.
     func segmentationShown(_ r: SettingsRouteTable.Route) -> Double? {
         guard let base = segmentationFigure(r) else { return nil }
         guard let after = r.figure("test-boxes.after_checking"), let per100 = r.figure("test-boxes.checks_per_100"),
               per100 > 0 else { return base }
         let needed = per100 * Double(answers.pages) / 100
-        let can = answers.checkingMinutes * 60 / 20
+        let can = answers.checkingMinutes * 60 / Self.checkSeconds
         return base + (after - base) * min(1, can / needed)
     }
 

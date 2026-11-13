@@ -15635,3 +15635,29 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 
 - [x] **W42.int-s1 — the engine as a package [L]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) · SHIPPED 2026-11-13 (lane: suite) (uses: build) — Owner, walkthrough 2026-11-13: ship without the ux-regression run; the package's 2123/2137 checks, identical to Vision OCR's own build, are enough, and testdocs/ stays on OneDrive. Stage 1 of `execution-plans/integration/00-plan.md`: Vision OCR's engine into `packages/VisionOCRKit` with its history, the helper as an executable product, resources as package resources, macOS 14 minimum. Done when the package builds for both architectures, its tests pass as a test target with the same count of checks, `ux-regression.sh` through a package product is no worse than Vision OCR 1.16.0's, and Vision OCR's app rebuilt against the package passes its suite. Vision OCR's queue is done and its release cut (2026-10-16), so nothing holds this. — **Shipped:** Vision OCR 1.16.0's engine is `packages/VisionOCRKit`, moved by a filtered subtree merge (a clone at 1.16.0 plus two doc commits through `git filter-repo` keeping `Sources/ Helper/ Tests/ Tools/ Resources/ testdocs/ run_tests.sh build.sh`, under `packages/VisionOCRKit/`; 300 of 633 commits; gitleaks clean). Library `Sources/VisionOCRKit/` (`DownloadRunner` moved out of `SettingsView.swift`; `read-model.py` and `mac-ocr-LICENSE` are package resources via `Bundle.module`); `visionocr-recognise` executable product (`Helper/`); `visionocr-checks` executable + `VisionOCRKitTests` test target (`PackageTests/`); `visionocr-gate` product from `Tools/score-gate.swift`; `App/` (the SwiftUI screens) in no target, still built by `build.sh`. macOS 14 minimum everywhere. Measured: universal release build (arm64 + x86_64; the whole package needs `-Xswiftc -enable-testing` for the two `@testable` targets, the library and helper do not, re-checked at ship); `swift test -c release -Xswiftc -enable-testing` 2123/2137, the same 14 outline-fixture failures as Vision OCR's own `run_tests.sh` on this Mac (environmental, pre-date the move), 457 s. Vision OCR's app rebuilt against the package: `build.sh` compiles `App/` with the package's sources, both suite lanes give the same count; making `App/` `import VisionOCRKit` needs Stage 2's public API, for an app Stage 7 retires. `Tools/ux-regression.sh` builds the gate and helper as package products and carries `ops/ux-regression/{set,baseline}.tsv` from Vision OCR (baseline at its 4b6567b); not run, by the owner's call (corpus stays on OneDrive; to run it later: `VISIONOCR_TESTDOCS=~/Claude/vision-ocr/testdocs VISIONOCR_MODEL_HOME="$HOME/Library/Application Support/Vision OCR" Tools/ux-regression.sh` from the package, ~16 min under the heavy lock). Commits: 784989d7, 85bb6240, b4e89165 and this one. No bench cache used.
   <!-- /W42.int-s1 -->
+- [x] **W46.seg-check-time — how long a person takes to check a flagged gap [S]** · §Document processing review — W46 · SHIPPED 2026-11-13. Filed by Phase 4 of the processing review, 2026-11-06.
+  **Result: 3.2 s a flagged boundary, n = 92** (mean time in view; bootstrap 95% interval 2.6 to 3.9 s; median 1.9 s,
+  quartiles 1.3 to 3.9 s; longest 20.9 s; first 10 gaps 3.7 s median, the rest 1.9 s), against the 20 s the settings
+  sheet assumed. One owner session on the app's own Check Flagged Boundaries sheet (Split or Join only, after
+  W46.seg-check-blind), 2026-11-13 09:37, 92 of 92 answered, no pauses, empty notes file. The 92 are every gap the app's
+  Gemini route flags on Stanton (81) and RG165 (11) at the shipped level (prompt g2, Gemini 3.7's cached gateway answers,
+  rule min, level <= 0.965). Report with its measurement card: `ArchiveProcessor/segbench-results/seg-check-time.{md,json}`.
+  12 answers differ from the truth (Stanton 26|27, 32|33, 33|34, 46|47, 49|50, 53|54, 56|57, 101|102, 124|125; RG165
+  79|80, 85|86, 99|100); the owner is judging them in an interactive session (`review-20261113/` in the bench cache), so
+  whether they are slips or truth errors is not settled here.
+  **Scope:** one reader who had seen the pages, on the two-page sheet. The owner then judged two pages too little
+  context (W46.seg-check-context, filed 2026-11-13), so the figure is a floor for a wider sheet; other readers and unseen
+  material are not timed.
+  **What changed:** `SettingsSolver.checkSeconds = 3.2` replaces the 20 s in `segmentationShown` and
+  `SettingsSheetModel.checkingHours` and the sheet's checking row ("at about 3 seconds a place, timed on one person
+  checking 92 places"); SettingsSheetTestDriver check 2 follows. Stage note 07-segmentation.md (the manual row's time and
+  caveat, change trigger, call 6), 12-settings-design.md §3.9 and its open-questions line, settings-routes.json, and the
+  settings-design prototype regenerated. test-settings-sheet/solver/routes ALL PASS, build clean.
+  **Instrument (checkpoint 987695fe):** `check_time.py pack|score`, the Debug-only `FlaggedCheckTimingTestDriver` (its
+  $0 self-test `test-flagged-check-timing.sh`), and `time-flagged-checks.sh`, which rebuilds the Debug app when its
+  sources are newer. The bench page (ArchiveOCRBench) has no place for a person's checking time, which is neither a
+  route nor a segmentation approach, so it gets no entry. Cost $0.
+  **Bench cache:** `seg-check-time/pages/` (218 MB, rebuilt by `check_time.py pack`) moved to the Trash; kept `pack.json`,
+  `truth.json`, the orientation check, the run logs (2026-11-13 is the scored one; the two 2026-11-12 ones are earlier
+  attempts) and the owner's `review-20261113/` folder, which an interactive session owns.
+  <!-- /W46.seg-check-time -->

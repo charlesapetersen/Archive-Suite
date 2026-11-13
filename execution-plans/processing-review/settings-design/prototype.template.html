@@ -286,7 +286,7 @@ function accuracy(stage, r) {
   }
   if (stage === "seg") {
     const base = r.nocheck == null ? 0 : r.nocheck; // by hand: nothing is segmented until a gap is checked
-    const needChecks = r.checks_per_100 * state.pages / 100, canChecks = state.checkMin * 60 / 20; // 20 s a check
+    const needChecks = r.checks_per_100 * state.pages / 100, canChecks = state.checkMin * 60 / 3.2; // 3.2 s a check, measured (W46.seg-check-time)
     const f = needChecks ? Math.min(1, canChecks / needChecks) : 1;
     return base + (r.after - base) * f;
   }
@@ -484,7 +484,7 @@ function renderRules() {
   $("basis").innerHTML = [
     "Reading accuracy is NES on the owner's 96 truth pages (50 typewritten, 28 printed, 16 handwritten, 2 mixed), the same images and prompt for every route; " + F.noise.truth_note,
     "Your document mix weights the three per-kind figures. The public hard pages (895 pages in 15 strata: hands before 1850, Kurrent, charters, early print, ledgers, non-Latin scripts) are shown where a route was run on them; every route is far lower there and Gemini leads the open routes by 16 to 22 points.",
-    "Segmentation is pages in exactly the right document on the two locked test boxes (Stanton and RG 165, 363 pages), scored once; the rerun floor is " + F.noise.seg_rerun_pages_exact_points + ". The checking column assumes 20 seconds a boundary.",
+    "Segmentation is pages in exactly the right document on the two locked test boxes (Stanton and RG 165, 363 pages), scored once; the rerun floor is " + F.noise.seg_rerun_pages_exact_points + ". The checking column uses 3.2 seconds a boundary, timed on one person (W46.seg-check-time).",
     "Dating is the exact year on 250 owner-tagged documents; 'not in the text' is the 131 whose year the text layer did not carry. The Date Uncertain and false-year figures are owner-ruled on blind sheets.",
     "Entities are F1 at edit distance 2 on 138 correspondence documents against an owner-checked truth.",
     "Cloud times are typical call times, not a bench table (marked est.); Mac times are medians on an M3 Pro with 18 GB; cluster times are pages an hour on one L40S. Cluster money is shown at cloud GPU rates for comparison only.",

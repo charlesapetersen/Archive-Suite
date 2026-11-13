@@ -100,8 +100,8 @@ segment figures conditional on each route's call at unsure gaps.
  "figures":{"test-boxes.checks_per_100":{"value":86.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Full manual","attribute":"boundaries to check per 100 pages","value":"86.8"}},
   "test-boxes.after_checking":{"value":100.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Full manual","attribute":"pages right after checking","value":"100.0%"}}},
  "cost":{"usd_1000_list":0,"usd_1000_batch":0,"price_read":null,"source":{"file":"options.md","route":"Full manual","attribute":"API cost","value":"none"}},
- "time":{"per_unit_s":null,"measured":false,"measured_on":"20 s a boundary assumed, 12-settings-design.md §3.9","source":null},
- "memory":{"peak_gb":0,"measured_on":null,"source":null},"caveats":["checking time unmeasured"],"kind_rules":[],"fallback":null,"conditions":[]},
+ "time":{"per_unit_s":null,"measured":false,"measured_on":"the user's own checking, 3.2 s a boundary (segbench-results/seg-check-time.md), not machine time","source":null},
+ "memory":{"peak_gb":0,"measured_on":null,"source":null},"caveats":["checking time is one person's, timed once"],"kind_rules":[],"fallback":null,"conditions":[]},
 
 {"id":"gemini3.8-flash","name":"Gemini 3.8 Flash","family":"cloud","app_route":"gemini|gemini-3.8-flash","status":"shipped","needs":{"key":["gemini"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
  "figures":{"test-boxes":{"value":88.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages in an exact document, no checking","value":"88.8%"}},
@@ -318,7 +318,7 @@ adaptation row).
   Lincoln, and may change kind rule (c).
 - A second material for the LoRA test with start recall held: the "measured on one material" label goes; a loss of
   starts larger than one a box withdraws the offer.
-- A measured checking time other than 20 s a boundary changes every after-checking figure the solver shows.
+- A checking time measured on other readers or unseen material, far from 3.2 s a boundary, changes every after-checking figure the solver shows.
 - A Gemini price above $3.61 list per 1,000 pages after 31 Dec 2026 ($7.22, options.md) keeps the ranking (the
   accuracy lead is over the floor) but changes "cheapest within a point" picks [I].
 
@@ -357,7 +357,8 @@ Every call below was decided on 2026-11-06 (14-owner-calls.md); each ends with i
 5. **The magazine rule redo (shown settled in its order).** W46.seg-magazine-rule-redo waits on
    W46.seg-boxes-sir-article and W46.review-done (.maintenance/AUTONOMOUS_PLAN.md). Open was whether the sheet shows
    the magazine kind before then. Decided (session, section 2): shown with "ranks nothing yet", per kind rule (a).
-6. **The checking-time assumption.** 20 s a boundary, unmeasured (12-settings-design.md §3.9). Options: (a) keep the
+6. **The checking-time assumption.** 20 s a boundary, unmeasured (12-settings-design.md §3.9); since
+   W46.seg-check-time (2026-11-13) 3.2 s, measured (seg-check-time.md). Options: (a) keep the
    assumption, labelled, and file a timing measure from the app's review screen in an owner session after the magazine
    redo; (b) show checks per 100 pages only. Decided (session, section 2): (a).
 7. **The laptop route and when it is offered.** Evidence: 80.3% unchecked, 78.8 checks, 98.8% after (options.md);
@@ -441,7 +442,7 @@ From 14-owner-calls.md. The owner's own calls bearing on this stage:
 Picks the session took on this note's recommendations (section 2, owner may veto): the text-only cloud window is a
 filed test-box run on the gateway (about $1.30) before any tier is offered; the review rule is disagreement with a
 second model for the 2B when a partner is feasible, own confidence otherwise and for the cloud routes; the magazine kind
-is shown with "ranks nothing yet" until W46.seg-magazine-rule-redo; the 20 s checking-time assumption is kept, labelled,
+is shown with "ranks nothing yet" until W46.seg-magazine-rule-redo; the 20 s checking-time assumption is kept, labelled (measured at 3.2 s by W46.seg-check-time),
 with a timing measure filed for an owner session after the redo; the 2B is offered to every 16 GB Mac with no key with a
 zero-shot card and the manuscript warning, and as an optional disagreement partner beside a cloud voter; the tie
 threshold is 3.2 points, the top of the rerun floor, until a measured range exists (replaced 2026-11-13 by twice the

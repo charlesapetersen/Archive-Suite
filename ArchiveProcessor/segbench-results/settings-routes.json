@@ -8117,7 +8117,7 @@
      "time": {
       "per_unit_s": null,
       "measured": false,
-      "measured_on": "20 s a boundary assumed, 12-settings-design.md §3.9",
+      "measured_on": "the user's own checking, 3.2 s a boundary (segbench-results/seg-check-time.md), not machine time",
       "source": null
      },
      "memory": {
@@ -8126,7 +8126,7 @@
       "source": null
      },
      "caveats": [
-      "checking time unmeasured"
+      "checking time is one person's, timed once"
      ],
      "kind_rules": [],
      "fallback": null,

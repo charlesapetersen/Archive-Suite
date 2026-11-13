@@ -103,8 +103,8 @@ enum SettingsSheetTestDriver {
             check("2 a magazine figure off the article rule ranks nothing yet",
                   s.routeID != "gemini3.8-flash" && s.parts.contains { $0.id == "magazine" && $0.label2?.hasPrefix("ranks nothing yet") == true },
                   s.routeID ?? "nil")
-            check("2 the user's own checking time shown, with its 20 s assumption",
-                  s.parts.contains { $0.id == "checking" && $0.sample?.contains("20 seconds") == true })
+            check("2 the user's own checking time shown, at the measured 3 s a place",
+                  s.parts.contains { $0.id == "checking" && $0.sample?.contains("3 seconds a place, timed") == true })
             check("2 a segmentation pick Process Files can run is offered to it",
                   s.routeID == "seg-qwen3.5-2b-8bit" ? s.apply == .segmentation(.local) : true, "\(s.apply as Any)")
             // W46.seg-review-rule: the 2B's card says it is zero-shot, carries the manuscript warning, and offers a partner.
