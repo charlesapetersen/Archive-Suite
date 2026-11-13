@@ -25,6 +25,7 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   12. A real reader on this Mac (Apple Vision, $0) through the row factory reads the page and is named in the header.
 ///   11. The saved support connection resolves, follows a moved folder, refuses a different store, forgets on disconnect.
 ///   10. Restore puts the original back with later tag edits kept and the flag re-added; refused on a changed file or
 ///       a second time; no re-flag after a later flag action or when the original was not flagged.
@@ -148,6 +149,24 @@ enum ReOCRJobTestDriver {
         t += "trailer\n<< /Size \(offsets.count + 1) /Root 1 0 R >>\nstartxref\n\(xref)\n%%EOF\n"
         out.append(Data(t.utf8))
         return out
+    }
+
+    /// A JPEG of large black typed words on white, for Apple Vision to read.
+    private static func typedPage(_ url: URL, _ text: String) throws {
+        let w = 1700, h = 2200
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw CocoaError(.fileWriteUnknown) }
+        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        let s = NSAttributedString(string: text, attributes: [.font: NSFont(name: "Courier", size: 64) ?? NSFont.systemFont(ofSize: 64),
+                                                             .foregroundColor: NSColor.black])
+        let frame = CTFramesetterCreateFrame(CTFramesetterCreateWithAttributedString(s), CFRange(location: 0, length: s.length),
+                                             CGPath(rect: CGRect(x: 120, y: 600, width: w - 240, height: 1400), transform: nil), nil)
+        CTFrameDraw(frame, ctx)
+        guard let image = ctx.makeImage(), let rep = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [:])
+        else { throw CocoaError(.fileWriteUnknown) }
+        try rep.write(to: url)
     }
 
     private static func tag(_ url: URL, _ tags: [String]) throws {
@@ -488,6 +507,34 @@ enum ReOCRJobTestDriver {
                 c.disconnect()
                 check("11 disconnecting forgets it", { do { _ = try c.resolve(); return false }
                     catch { return (error as? ReOCRSupportConnection.Problem) == .notConnected } }())
+            }
+
+            // 12. A real reader on this Mac ($0, no network): Apple Vision through the row factory, end to end.
+            do {
+                let d = try folder("vision"), j = job(d)
+                let img = d.appendingPathComponent("typed.jpg"), pdf = d.appendingPathComponent("Letter.pdf")
+                try typedPage(img, "IMPROVED READING OF THE LETTER 1952")
+                try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "garbled old text", classification: nil,
+                                            errorMessage: nil, errorCode: nil), model: model, outputURL: pdf,
+                                            originalFileName: "typed.jpg", pageKind: .typewritten)
+                let vision = LLMModel.appleVisionModels[0]
+                let row = ReOCRRanking.Row(id: "vision", name: vision.displayName, appRoute: nil, provider: .appleVision,
+                                           modelID: vision.id, figure: nil, sample: nil, caveats: [], usdPer1000: 0,
+                                           estimateUSD: 0, readiness: .ready, tie: .notMeasured, isCurrent: false)
+                guard let read = ReOCRJob.reader(for: row, apiKey: "") else { check("12 the Vision row has a reader", false); return }
+                let review = try await j.start(file: pdf, root: archive(d), model: vision, read: read)
+                let newText = (try? review.results.first?.outcome.get()) ?? ""
+                check("12 Vision reads the image page", newText.uppercased().contains("IMPROVED READING"), newText)
+                check("12 a candidate is made", review.candidate != nil, review.candidateProblem ?? "")
+                _ = try j.accept(review)
+                let header = PDFDocument(url: pdf)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
+                check("12 the header names Vision as the reader", header?.provenance?.model == vision.displayName,
+                      "\(String(describing: header?.provenance))")
+                var notReady = row
+                notReady = ReOCRRanking.Row(id: row.id, name: row.name, appRoute: "gemini|x", provider: .gemini, modelID: "x",
+                                            figure: nil, sample: nil, caveats: [], usdPer1000: nil, estimateUSD: nil,
+                                            readiness: .needsSetup("needs a Gemini key"), tie: .notMeasured, isCurrent: false)
+                check("12 a row that needs setup has no reader", ReOCRJob.reader(for: notReady, apiKey: "k") == nil)
             }
 
             // 7. A rotated image page.

@@ -355,6 +355,28 @@ struct ReOCRJob {
         }
     }
 
+    // MARK: The reader
+
+    /// The reader for a ranked row (plan §4): exactly the route the person chose. No cascade and no refusal fallback, so
+    /// no model the person did not choose reads a page or is paid for it; rotation off, since a suite file's image
+    /// pages were turned upright when it was made. Nil when the row cannot run now or names no model this app has.
+    /// The caller passes the row's key (empty for a route on this Mac) and the prompt its settings use.
+    static func reader(for row: ReOCRRanking.Row, apiKey: String, customPrompt: String? = nil, standardImageMB: Double = 4,
+                       visionSettings: VisionOCRSettings = .default, models: [LLMModel]? = nil) -> Reader? {
+        guard row.readiness == .ready,
+              let model = (models ?? row.provider.models).first(where: { $0.id == row.modelID && $0.provider == row.provider })
+        else { return nil }
+        if row.provider != .appleVision && apiKey.isEmpty { return nil }
+        let provider = row.provider
+        return { image, _, _ in
+            await OCRProcessor.performOCRCall(
+                imageURL: image, provider: provider, model: model, thinkingLevel: model.supportsThinking ? .low : nil,
+                apiKey: apiKey, previousText: nil, previousImageURL: nil, customPrompt: customPrompt, imageScale: 1,
+                gatewayConfig: nil, localAgent: nil, rotationMode: .off, standardImageMB: standardImageMB,
+                visionSettings: visionSettings, cascade: .off, refusalFallback: false)
+        }
+    }
+
     // MARK: Restore
 
     enum ReflagOutcome: Codable, Equatable, Sendable {
