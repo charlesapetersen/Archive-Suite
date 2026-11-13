@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import PDFKit
 import os
@@ -17,6 +18,10 @@ final class DocumentViewerModel: ObservableObject {
     @Published var index = 0 { didSet { if index != oldValue { loadCurrent() } } }
     /// Which page pair of the current document the two panes show. Reset to 0 by every document load.
     @Published private(set) var pair = 0
+    /// W44.reocr-reader: counts the times the open file's contents were replaced under it (an Improve OCR
+    /// receipt); part of the panes' identity, so a reload builds fresh views on the new pages.
+    @Published private(set) var contentRevision = 0
+    private var replacedObserver: AnyCancellable?
     @Published private(set) var current: PDFDocument?
     @Published private(set) var loadError: String?
     @Published private(set) var jpegPartnerPage: PDFPage?
@@ -171,6 +176,11 @@ final class DocumentViewerModel: ObservableObject {
         // Edit ▸ Copy (⌘C) reaching any pane copies the viewer's selection (`ReaderPDFView.copy(_:)`,
         // `ExtractedTextView.copy(_:)`), and a selection the user makes in one pane clears the other's.
         textController.copySelection = { [weak self] in self?.copyPlainSelection() }
+        replacedObserver = NotificationCenter.default.publisher(for: .readerFileContentsReplaced)
+            .sink { [weak self] note in
+                guard let paths = note.userInfo?[ReaderFileContentsReplaced.pathsKey] as? [String] else { return }
+                MainActor.assumeIsolated { self?.reloadReplaced(paths: Set(paths)) }
+            }
         textController.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
         textController.userSelected = { [weak self] in self?.userSelected(in: .right) }
         textController.tookFocus = { [weak self] in self?.paneTookFocus(.right) }
@@ -337,6 +347,33 @@ final class DocumentViewerModel: ObservableObject {
     var textPage: PDFPage? { page(at: DocumentPagePairs.textPageIndex(pair: pair)) }
     var hasTextPage: Bool { textPage != nil }
 
+    /// W44.reocr-reader: who read this pair's text page and its Kind, from the page's own header
+    /// ("Gemini · gemini-3.7-flash · Typewritten"); nil when the header names neither. Display only.
+    var textPageReading: String? {
+        let key = pageIdentity
+        if let cached = readingCache, cached.key == key { return cached.value }
+        let header = textPage.map { PDFHeaderParser.parse($0).header } ?? nil
+        var parts: [String] = []
+        if let p = header?.provenance { parts += [p.provider, p.model] }
+        if let k = header?.kind { parts.append(k.displayName) }
+        let value = parts.isEmpty ? nil : parts.joined(separator: " · ")
+        readingCache = (key, value)
+        return value
+    }
+    private var readingCache: (key: String, value: String?)?
+
+    /// The file's contents were replaced (an Improve OCR receipt): load it again from the disk, on the same
+    /// pair where it still exists. Any other window's file is left alone.
+    func reloadReplaced(paths: Set<String>) {
+        guard let path = currentFilePath, paths.contains(path) else { return }
+        let keep = pair
+        neighbours = NeighbourCache()
+        contentRevision += 1
+        loadCurrent()
+        setPair(keep)
+        tagStatus = "The text of this file was improved in Archive Processor; it is shown now."
+    }
+
     func updateArchiveContext(target: ArchiveLinkTarget?, index: JPEGPartnerIndex?) {
         archiveLinkTarget = target
         jpegPartnerIndex = index
@@ -375,7 +412,7 @@ final class DocumentViewerModel: ObservableObject {
     /// `PDFPaneView.updateNSView`'s reuse fallback compares `page.string`, which is `nil` for both an old
     /// and a new *image* page — so without the pair in the identity the left pane would keep showing the
     /// previous scan.
-    var pageIdentity: String { "\(index)#\(pair)" }
+    var pageIdentity: String { "\(index)#\(pair)#r\(contentRevision)" }
     /// The image pane's identity also covers the PDF / JPEG switch, so the swap always builds a fresh view
     /// that takes the carried zoom and region, rather than leaning on `updateNSView`'s text comparison
     /// (an image page and a JPEG both have no text, so it cannot tell them apart).

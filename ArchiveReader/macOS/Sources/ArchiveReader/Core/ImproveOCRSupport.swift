@@ -31,7 +31,8 @@ final class ImproveOCRSupport: @unchecked Sendable {
         }
     }
 
-    private let defaults: UserDefaults
+    /// Also holds the receipts the Reader has seen (`ImproveOCRReceiptInbox`).
+    let defaults: UserDefaults
     private let lock = NSLock()
     /// The folder whose security scope this process holds, released when another replaces it.
     private var scoped: URL?

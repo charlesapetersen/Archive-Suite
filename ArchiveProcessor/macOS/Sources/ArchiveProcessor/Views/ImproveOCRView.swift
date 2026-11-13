@@ -127,11 +127,15 @@ final class ImproveOCRController: ObservableObject {
         }
     }
 
-    /// The archive root all `files` are inside: the nearest folder above the first with a root marker.
+    /// The archive root all `files` are inside: the nearest folder above the first with a root marker, the rule the
+    /// Reader keys its flag records by (`SPEC/improve-ocr.md` §3). A marker that cannot be read stops the search
+    /// (nil) rather than being looked past, as in the Reader.
     static func findRoot(for files: [URL]) -> ReOCRJob.Root? {
         guard var dir = files.first?.deletingLastPathComponent().standardizedFileURL else { return nil }
         while dir.pathComponents.count > 1 {
-            if let marker = try? RootMarker.read(at: dir) {
+            let read: RootMarker?
+            do { read = try RootMarker.read(at: dir) } catch { return nil }
+            if let marker = read {
                 let prefix = dir.path.hasSuffix("/") ? dir.path : dir.path + "/"
                 guard files.allSatisfy({ $0.standardizedFileURL.path.hasPrefix(prefix) }) else { return nil }
                 return ReOCRJob.Root(guid: marker.guid, url: dir)

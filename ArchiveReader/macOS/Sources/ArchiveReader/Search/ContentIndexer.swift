@@ -142,6 +142,18 @@ final class ContentIndexer: ObservableObject {
     ///   launched on completion — not dropped. Because `needsIndex` is mtime-based and idempotent, the
     ///   follow-up pass cheaply skips everything unchanged, so a tag-only update (mark Read, edit tags)
     ///   does NOT restart the expensive initial extraction from zero.
+    /// W44.reocr-reader: drop the rows of files whose contents an Improve OCR receipt says were replaced, keeping
+    /// their dates, so the next pass extracts them again (its skip compares only the date). The rows are a
+    /// disposable cache; the files are untouched. False when the index could not be changed.
+    func forget(_ paths: [String]) async -> Bool {
+        guard !paths.isEmpty else { return true }
+        do {
+            try await index.open()
+            try await index.deletePaths(paths)
+            return true
+        } catch { return false }
+    }
+
     func startIndexing(_ files: [ArchiveFile]) {
         ReaderStages.measure("indexer.startIndexing") { startIndexingStage(files) }
     }

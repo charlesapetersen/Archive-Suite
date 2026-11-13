@@ -62,7 +62,13 @@ extension NavigationModel {
             } }
             return (verified, failed, refusal, unfinished.names)
         }.value
-        library.applyVerifiedWrites(outcome.verified)
+        // The batch ran off the main thread, so a tag edit made meanwhile may have reached the row first. A result
+        // is shown only while the file still reads as it left it; otherwise the later write's row stands.
+        let current = outcome.verified.filter { r in
+            guard case let .success(names, _) = TagReading.read(r.url) else { return false }
+            return multisetEqual(names, r.after)
+        }
+        library.applyVerifiedWrites(current)
         refreshUndoHistory()
         let done = outcome.verified.count, failed = outcome.failed + reverified.rejected
         var message = flag ? "Flagged \(done) file\(done == 1 ? "" : "s") as poor OCR."
@@ -70,7 +76,7 @@ extension NavigationModel {
         if failed > 0 { message += " \(failed) could not be changed" + (outcome.refusal.map { ": \($0)" } ?? ".") }
         if !outcome.unfinished.isEmpty {
             message += " The flag record of \(outcome.unfinished.prefix(3).joined(separator: ", ")) could not be finished;"
-                + " Archive Processor will not clear those flags until they are flagged or unflagged here again."
+                + " Archive Processor will treat a review of those files as out of date."
         }
         statusMessage = message
         announce(statusMessage)
@@ -160,6 +166,66 @@ extension NavigationModel {
                     self.announce(self.statusMessage)
                 }
             }
+        }
+    }
+}
+
+extension NavigationModel {
+    // MARK: Receipts: the Processor replaced a file's text
+
+    /// Reads the Processor's unseen receipts and, for each file in this archive, drops its index row (the
+    /// replacement kept the file's dates, so an ordinary pass would skip it), starts the incremental pass that
+    /// extracts it again, and reloads a document window showing it. Called on each library change and when the app
+    /// comes forward; also every 20 seconds while a folder is connected. Cheap when there is nothing new: one
+    /// folder listing.
+    func checkImproveOCRReceipts() {
+        let support = ImproveOCRSupport.shared
+        guard support.isConnected, !ImproveOCRReceiptCheck.running else { return }
+        ImproveOCRReceiptCheck.startTimer { [weak self] in self?.checkImproveOCRReceipts() }
+        guard let folder = try? support.resolve() else { return }
+        let inbox = ImproveOCRReceiptInbox(defaults: support.defaults)
+        let unseen = inbox.unseen(in: folder)
+        guard !unseen.isEmpty else { return }
+        var refresh: [String] = [], seen: [UUID] = []
+        var paths: [String]?
+        let candidates: () -> [String] = { [library] in
+            if let paths { return paths }
+            let all = library.files.map(\.path)
+            paths = all
+            return all
+        }
+        for item in unseen {
+            switch ImproveOCRReceiptInbox.disposition(of: item.receipt, archive: .shared, candidates: candidates) {
+            case .refresh(let path): refresh.append(path); seen.append(item.id)
+            case .drop: seen.append(item.id)
+            case .notHere: break
+            }
+        }
+        let unique = Array(Set(refresh))
+        ImproveOCRReceiptCheck.running = true
+        Task {
+            defer { ImproveOCRReceiptCheck.running = false }
+            guard await indexer.forget(unique) else { return }   // left unseen: the next check tries again
+            if !unique.isEmpty {
+                indexer.startIndexing(indexableFiles(library.files))
+                NotificationCenter.default.post(name: .readerFileContentsReplaced, object: nil,
+                                                userInfo: [ReaderFileContentsReplaced.pathsKey: unique])
+            }
+            inbox.markSeen(seen)
+        }
+    }
+}
+
+/// One receipt check at a time, and the timer that repeats it.
+@MainActor
+enum ImproveOCRReceiptCheck {
+    static var running = false
+    private static var timer: Timer?
+
+    static func startTimer(_ check: @escaping @MainActor () -> Void) {
+        guard timer == nil, !ArchiveTestHost.isUnitTestHost else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { _ in
+            MainActor.assumeIsolated { check() }
         }
     }
 }

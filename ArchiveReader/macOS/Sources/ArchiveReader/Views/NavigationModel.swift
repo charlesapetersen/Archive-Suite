@@ -451,6 +451,7 @@ final class NavigationModel: ObservableObject {
             return
         }
         library.revalidateOnActivation(now: now)
+        checkImproveOCRReceipts()
     }
 
     /// Adopt the app-level link context and seed it with the current root (the store resolved its saved
@@ -1729,15 +1730,19 @@ final class NavigationModel: ObservableObject {
         ReaderStages.measure("model.finishLibraryChange") { finishLibraryChangeStages(files, pathsChanged: pathsChanged) }
     }
 
+    /// The files the content index covers: excluded folders are never added to it.
+    func indexableFiles(_ files: [ArchiveFile]) -> [ArchiveFile] {
+        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
+            return files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
+        }
+        return files
+    }
+
     private func finishLibraryChangeStages(_ files: [ArchiveFile], pathsChanged: Bool) {
         // Filter excluded folders before indexing so excluded files are never added to the content index.
-        let filesToIndex: [ArchiveFile]
-        if let rootPath = rootStore.discoveredPathPrefix, !excludedFolders.excludedRelativePaths.isEmpty {
-            filesToIndex = files.filter { !excludedFolders.isExcludedAbsolute($0.path, rootPath: rootPath) }
-        } else {
-            filesToIndex = files
-        }
+        let filesToIndex = indexableFiles(files)
         indexer.startIndexing(filesToIndex)             // incremental; no-op if running
+        checkImproveOCRReceipts()                       // W44.reocr-reader: replaced files keep their dates
         if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
         restoreSelectionIfNeeded()                      // reading-session resume
         applyPendingRevealIfPossible()                  // deep-link reveal deferral

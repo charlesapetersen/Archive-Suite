@@ -407,6 +407,12 @@ struct DocumentWindowView: View {
                     .accessibilityIdentifier("ar.doc.tagStatus")
             }
             Spacer()
+            // W44.reocr-reader: the text page's reader and Kind, from its header.
+            if let reading = model.textPageReading {
+                Text(reading).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    .help("Read by \(reading) (from the text page's header)")
+                    .accessibilityIdentifier("ar.doc.ocrReading")
+            }
             Text(model.positionLabel).foregroundStyle(.primary)
         }
         .font(.callout)
