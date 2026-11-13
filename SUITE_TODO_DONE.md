@@ -15570,3 +15570,23 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Not yet seen on a phone: whether quality mode slows the shutter noticeably on a real device. It rides the next owner phone session; nothing filed.
   Verified: Android `./gradlew --offline assembleDebug testDebugUnitTest` clean, all 16 suites pass, new `CaptureCameraDefaultsTest` (the fresh controller is not in quality mode; the applied one is quality mode, flash off, no target size) and `CaptureScreenTest` (builds the controller with the defaults) included. iOS `xcodebuild build` for generic iOS succeeds with no new warnings (the two present are the existing AppIntents and portrait-only notes). Not Tier-2: camera settings and a label, no file-writing, Capture/ or Net/ path. Bench cache: nothing written.
   <!-- /W46.capture-companions -->
+
+- [x] **W46.kit-corrections-store — where corrected gaps and lines live for the kit [S]** · §Document processing review — W46 · SHIPPED 2026-11-13 (this commit) (lane: processor) (uses: build) (blocked-on: W46.settings-layers) — Corrected segmentation gaps and corrected handwriting lines kept in the collection's review records, per material, so a kit run can read them and count toward the 200-gap and 80-line thresholds.
+  - **Where:** `<output>/.archivesuite/corrections/`, one file per run and kind: `gaps-<run id>.json`, `lines-<run id>.json`. Format: new `SPEC/collection-settings.md` §"The review records"; writer `Settings/ReviewCorrections.swift`; the kit's reader `scripts/segbench/institutional-compute/kit_corrections.py` (`count`, `export`, `--pool`).
+  - **Gaps:** when a window-segmented run's skim closes, `recordReviewedGaps` (`OCRProcessor+WindowSegmentation.swift`) records every gap between reviewed pages: the proposal, confidence, flagged, the final call, and a ruling: `checked` (flagged pass), `changed` (skim) or `accepted`. Each page is recorded by source name, SHA-256 (the institutional import's identity) and output PDF name. Hashing and writing happen off the main actor, and a failure never stops the run. Gaps beside label photos, removed pages or unclassified pages are left out. The run id comes from the run's frozen settings: `pending.resolvedSettings` on every resume path, including the pre-OCRed one, so a resumed review replaces its first.
+  - **What counts:** the 200 counts gaps a person ruled on (`checked`+`changed`). This follows `seg-adapt-lora.md`, where the k gaps were person-corrected. `accepted` gaps are kept as known gaps for building training windows, but they do not count. Lines count per hand, with a floor of 80 and a target of 160. The material is the collection. Pooling several collections is the user's call (`--pool`).
+  - **Lines:** `LineReviewRecord` fixes the format the line-correction screen (W46.kit-hands) will write: page, line index, boundary and baseline, recognised text and route, corrected text, hand. No screen writes it yet.
+  - **Tier-2:** an Opus adversarial review found no HIGH, 1 MEDIUM and 7 LOW, all fixed:
+    - MEDIUM: the pre-OCRed resume read a stale or missing `activeResolvedSettings`; it now takes the pending run's snapshot.
+    - The writer refuses a newer-format record and never replaces a later review with an older one, for example two detached writes racing.
+    - The Python reader skips malformed records and entries instead of aborting. It matches a pair by hash only when both pages have one, otherwise by name within the folder. It folds an id-less record into its folder's collection, and it resolves paths.
+    - The SPEC now states the owner fallback and the unclassified-page rule.
+  - **Verified:**
+    - Processor Debug build clean, with no new warnings (only the existing AppIntents metadata notice).
+    - New `scripts/test-review-corrections.sh`: 50 checks, covering building, writing, replacing, late and newer records, a missing folder, and links or files at each level. It then has `kit_corrections.py` count what the app wrote.
+    - `test-segmentation-review.sh` now checks that the stage records its review end to end (pages 3 and 4 split as checked).
+    - `test-settings-layers.sh` passes with the shared `ensureFolders(in:subfolder:)`.
+    - `test_kit_corrections.py`: 11 tests.
+    - Release-driver lint and write-surface lint clean.
+  - No bench cache created, nothing kept. $0; no corpus access, uploads or paid calls.
+  <!-- /W46.kit-corrections-store -->

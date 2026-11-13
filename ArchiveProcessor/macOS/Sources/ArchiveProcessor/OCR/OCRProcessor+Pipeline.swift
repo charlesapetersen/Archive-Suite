@@ -1660,7 +1660,8 @@ extension OCRProcessor {
             let preGrouped = preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
             if case .windows(let approach) = plan, !preGrouped {
                 guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
-                                                       runConfig: runConfig) == .done else {
+                                                       runConfig: runConfig, outputDirectory: pending.outputDirectory,
+                                                       settings: pending.resolvedSettings) == .done else {
                     cleanupTempFiles(); return
                 }
             } else {
@@ -1990,7 +1991,8 @@ extension OCRProcessor {
                     confirmCollectionIDs: pending.confirmCollectionIDs,
                     reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
                     customPrompt: pending.customPrompt,
-                    runConfig: runConfig
+                    runConfig: runConfig,
+                    settings: pending.resolvedSettings
                 )
                 // Pre-OCRed path handles its own post-processing; skip to finalization
                 activePendingRun = nil
@@ -2059,7 +2061,8 @@ extension OCRProcessor {
             let preGrouped = preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
             if case .windows(let approach) = plan, !preGrouped {
                 guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
-                                                       runConfig: runConfig) == .done else {
+                                                       runConfig: runConfig, outputDirectory: pending.outputDirectory,
+                                                       settings: pending.resolvedSettings) == .done else {
                     cleanupTempFiles(); return
                 }
             } else {
@@ -3081,7 +3084,8 @@ extension OCRProcessor {
                 confirmCollectionIDs: confirmCollectionIDs,
                 reviewDocumentSegmentation: reviewDocumentSegmentation,
                 customPrompt: segmentationContext.customPrompt,
-                runConfig: runConfig
+                runConfig: runConfig,
+                settings: activeResolvedSettings
             )
         } else if !autoReOCR || mixedReOCR {
             // --- Standard path: all inputs except the multi-page PDFs already rebuilt above. ---
@@ -3238,7 +3242,8 @@ extension OCRProcessor {
                 rebuildSegments(files: files)
             } else if case .windows(let approach) = plan {
                 guard await runWindowSegmentationStage(files: files, approach: approach,
-                                                       runConfig: runConfig) == .done else {
+                                                       runConfig: runConfig, outputDirectory: outputDirectory,
+                                                       settings: activeResolvedSettings) == .done else {
                     cleanupTempFiles(); return
                 }
             } else if case .manualWindow = plan {

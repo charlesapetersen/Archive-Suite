@@ -54,9 +54,12 @@ extension OCRProcessor {
         return WindowStagePages(fileIndices: idx, urls: urls, photoKinds: kinds)
     }
 
-    /// The whole stage. `.stopped` means the caller ends the run where it is.
+    /// The whole stage. `.stopped` means the caller ends the run where it is. `outputDirectory` and `settings` name
+    /// the collection and run the reviewed gaps are recorded for (W46.kit-corrections-store); with no run id nothing
+    /// is recorded.
     func runWindowSegmentationStage(files: [URL], approach: SegmentationApproach,
-                                    runConfig: SessionProcessingConfig?) async -> WindowStageOutcome {
+                                    runConfig: SessionProcessingConfig?, outputDirectory: URL,
+                                    settings: ResolvedSettingsSnapshot?) async -> WindowStageOutcome {
         segmentationCheckSummary = nil
         // The photos are known before the windows run, as the figures were scored (Part 3 §1).
         await showBoxFolderConfirmation(files: files, runConfig: runConfig)
@@ -108,9 +111,29 @@ extension OCRProcessor {
         reviewCheckedFileIndices = []
         reviewSkimNote = nil
         guard !Task.isCancelled else { return .stopped }
+        recordReviewedGaps(pages: pages, proposals: proposals, items: items, afterFlagged: classes, approach: approach,
+                           partner: partner, outputDirectory: outputDirectory, settings: settings)
         rebuildSegments(files: files)
         segmentationCheckSummary = FlaggedReview.summary(items)
         return .done
+    }
+
+    /// Record every gap the review settled in the collection's review records, for the training kit. The pages are
+    /// hashed and the file written off the main actor; a failure is logged and never stops the run.
+    private func recordReviewedGaps(pages: WindowStagePages, proposals: [GapProposal], items: [FlaggedGapItem],
+                                    afterFlagged: [DocumentClassification], approach: SegmentationApproach,
+                                    partner: SegmentationApproach?, outputDirectory: URL,
+                                    settings: ResolvedSettingsSnapshot?) {
+        guard let runID = settings?.runID else { return }
+        let final = zip(pages.fileIndices, pages.urls).map { i, url -> DocumentClassification? in
+            removedSourceURLs.contains(url) || jobs[i].status == .removed ? nil : jobs[i].classification
+        }
+        let request = ReviewCorrections.GapRequest(
+            runID: runID, recordedAt: Date(), settings: settings, outputDirectory: outputDirectory,
+            approach: approach.rawValue, partner: partner?.rawValue, urls: pages.urls,
+            outputs: pages.urls.map { outputURLMap[$0] }, proposals: proposals, flagged: items,
+            afterFlagged: afterFlagged, final: final)
+        Task.detached(priority: .utility) { ReviewCorrections.recordGaps(request) }
     }
 
     /// The approach's proposal for every gap, or nil when the run stops here. A usage limit or an error that no

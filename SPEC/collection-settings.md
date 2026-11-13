@@ -16,7 +16,8 @@ that an older build leaves a newer document alone. It is not there to carry a mi
 `<output folder>/.archivesuite/collection-settings.json`, and one file per run in
 `<output folder>/.archivesuite/runs/<yyyyMMdd-HHmmss UTC>-<run id>.json`. The output folder is the collection. Live
 Capture files each collection into its own subfolder, so each of those is a collection and gets its own record. The
-`.archivesuite` folder is hidden and holds only the Suite's own files about the collection. The W47 container file is to live beside
+`.archivesuite` folder is hidden and holds only the Suite's own files about the collection. Its `corrections` folder
+holds the review records for the training kit (§"The review records"). The W47 container file is to live beside
 this one (`execution-plans/containers/00-plan.md`; not written yet).
 
 ## What it holds
@@ -94,6 +95,60 @@ answer it follows, `_1`: the date; the general layer's `staysOnMac` follows "Spe
 The same snapshot is kept in the run's pending record (`pending_run.json` / `pending_batch.json`,
 `resolvedSettings`), outside its fingerprint. It is a record. Nothing reads it to decide how a run goes. The pending
 record encodes its dates as that file's other dates are (seconds since 2001), not as ISO 8601.
+
+## The review records
+
+What a person settled in a run's review, kept with the collection for the training kit (`W46.kit-corrections-store`;
+`execution-plans/processing-review/13-stage-rules/12-training-kit.md` §7.4, §7.5). They are in
+`<output folder>/.archivesuite/corrections/`, one file per run and kind: `gaps-<run id>.json` and `lines-<run id>.json`.
+The run id is the run record's. The writer is the Processor's `Settings/ReviewCorrections.swift`. The kit's reader is
+`ArchiveProcessor/scripts/segbench/institutional-compute/kit_corrections.py`, which counts the records per material
+(`count`) and exports the gaps (`export`). The Reader and Notes do not read them. The same JSON conventions as above
+apply, a record may be up to 8 MB, and a reader leaves alone a record with a larger `schemaVersion`.
+
+A **gaps record** is written when a window-segmented run's skim closes. A run that segments some other way writes none, and
+neither does one with no run id. Its keys are `schemaVersion` (`1`), `kind` (`"gaps"`), `runID`, `recordedAt`, `owner`, `approach`, `partner`,
+`pages` and `gaps`. `owner` holds `collectionID` and `collectionName`, plus `projectID` and `projectName`. These come
+from the collection's settings document. Without one, they come from the run's frozen settings and the folder's name,
+so `collectionID` may be null. `approach` is the segmentation approach that proposed the boundaries, and `partner`
+is the approach that checked it, if there was one. `pages` is the number of pages reviewed. Each gap has these keys:
+
+| key | meaning |
+|---|---|
+| `gap` | The gap's index: it lies between reviewed pages `gap` and `gap + 1`. |
+| `left`, `right` | The two pages, each with `name` (the source file's name), `sha256` (of the source file, the identity the kit's institutional import matches on) and `output` (the output PDF's name at review time, if one was written). |
+| `proposed`, `confidence`, `flagged` | The approach's call (`new` or `continue`), its confidence, and whether the person was asked about the gap. |
+| `final` | The call after the review. |
+| `ruling` | `checked`: the person answered the gap in the flagged pass. `changed`: the person changed it in the skim. `accepted`: the call was left as proposed through the skim. |
+
+A gap next to a box or folder photo is left out, because such a gap is a boundary by construction. So is a gap next to
+a page the skim removed, or next to a page left with no classification. The kit's 200 counts `checked` and `changed` gaps, the ones a person ruled on. `accepted`
+gaps are known, but they are not counted.
+
+A **lines record** has `schemaVersion` (`1`), `kind` (`"lines"`), `runID`, `recordedAt`, `owner` and `lines`. Each line
+has these keys:
+
+- `page`, as above.
+- `line`: its index in reading order.
+- `boundary`, plus `baseline` if there is one: point lists in the page image's pixels.
+- `recognised`: the recogniser's text. `recognisedBy`: the recogniser's route id.
+- `corrected`: the person's text.
+- `hand`: the hand, as the person names it.
+
+The line-correction screen (`W46.kit-hands`) writes these. No screen writes them yet. The kit's 80 counts lines per hand.
+
+The material is the collection. A record whose `collectionID` is null joins the collection id that the folder's other records
+carry. A user who knows that several collections are one material pools them with `kit_corrections.py --pool`; nothing
+in the records says so. A page pair or a line that appears in more than one record is counted once, from the newest
+record. A page is matched by its `sha256` when both pages of the pair have one. Otherwise it is matched by its name
+within its own folder.
+
+Writing follows the same rules as the settings document. A record is written only into an existing output folder, and
+`.archivesuite` and `corrections` are created one level at a time, never through a link. The write is atomic. A
+run's earlier record of the same kind is replaced, because a resumed run's review supersedes its first. Some things at
+that name are left alone instead: a record with a later `recordedAt`, a record with a larger `schemaVersion`, and a
+name that is a link or a folder. A failure is logged and never stops the run. Pages are hashed and the file
+is written off the main thread.
 
 ## How the Reader and Notes read it
 

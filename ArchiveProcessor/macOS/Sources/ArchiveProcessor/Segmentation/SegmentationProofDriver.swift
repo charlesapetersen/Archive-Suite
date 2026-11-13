@@ -230,7 +230,9 @@ enum SegmentationProofDriver {
 
         let started = Date()
         let outcome = SegmentationReviewTestDriver.Box<WindowStageOutcome>()
-        Task { outcome.value = await p.runWindowSegmentationStage(files: urls, approach: approach, runConfig: nil) }
+        Task { outcome.value = await p.runWindowSegmentationStage(files: urls, approach: approach, runConfig: nil,
+                                                                       outputDirectory: FileManager.default.temporaryDirectory,
+                                                                       settings: nil) }
 
         var flagged: [FlaggedGapItem] = []
         var stopMessage: String?

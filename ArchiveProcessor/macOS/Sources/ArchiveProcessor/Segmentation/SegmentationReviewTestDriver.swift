@@ -234,7 +234,14 @@ enum SegmentationReviewTestDriver {
         var saved: [OCRProcessor.PendingRun] { savedBox.value ?? [] }
         p.activePendingRun = pending.withoutProgress()
         let outcome = Box<WindowStageOutcome>()
-        Task { outcome.value = await p.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        let reviewRun = UUID()
+        let reviewSettings = ResolvedSettingsSnapshot(runID: reviewRun, resolvedAt: Date(), collectionID: nil,
+                                                      projectID: nil, projectName: nil, macMemoryGB: 16, values: [:],
+                                                      processing: [:])
+        Task {
+            outcome.value = await p.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
+                                                               outputDirectory: dir, settings: reviewSettings)
+        }
 
         check("5 box/folder confirmation first", await waitFor { p.awaitingBoxFolderConfirmation })
         eq("5 the folder photo is confirmed", p.boxFolderConfirmItems.map(\.fileIndex), [0])
@@ -263,6 +270,16 @@ enum SegmentationReviewTestDriver {
         eq("5 four documents and the folder", p.segments.count, 5)
         eq("5 the count line", p.segmentationCheckSummary, "1 boundary checked, 1 changed")
         check("5 the note is cleared after the skim", p.reviewSkimNote == nil && p.reviewCheckedFileIndices.isEmpty)
+        // W46.kit-corrections-store: the review is recorded in the collection's review records, off the main actor.
+        check("5 the reviewed gaps are recorded",
+              await waitFor { !ReviewCorrections.gapRecords(in: dir).isEmpty })
+        let recorded = ReviewCorrections.gapRecords(in: dir).first
+        eq("5 the record is the run's", recorded?.runID, reviewRun)
+        eq("5 every gap but the one beside the folder photo", recorded?.gaps.map(\.gap), [1, 2, 3, 4])
+        eq("5 the checked gap is pages 3 and 4, split",
+           recorded?.gaps.filter(\.personRuled).map { [$0.left.name, $0.right.name, $0.final.rawValue] },
+           [["page-3.jpg", "page-4.jpg", "new"]])
+        eq("5 the approach", recorded?.approach, "claude")
 
         // 6. Resume.
         let silent = FakeTransport(verdicts: [:], failWith: .fatal("must not be called"))
@@ -271,7 +288,8 @@ enum SegmentationReviewTestDriver {
         r.pendingRunSaveOverride = { _ in }
         r.activePendingRun = saved.last
         let resumed = Box<WindowStageOutcome>()
-        Task { resumed.value = await r.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        Task { resumed.value = await r.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
+                                                    outputDirectory: dir, settings: nil) }
         if await waitFor({ r.awaitingBoxFolderConfirmation }) { r.confirmBoxFolderReview() }
         check("6 the flagged pass opens on resume", await waitFor { r.awaitingFlaggedReview })
         eq("6 the model was not asked again", silent.calls.count, 0)
@@ -286,7 +304,8 @@ enum SegmentationReviewTestDriver {
         u.windowTransportOverride = limited
         u.pendingRunSaveOverride = { _ in }
         let limitedOutcome = Box<WindowStageOutcome>()
-        Task { limitedOutcome.value = await u.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        Task { limitedOutcome.value = await u.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
+                                                    outputDirectory: dir, settings: nil) }
         if await waitFor({ u.awaitingBoxFolderConfirmation }) { u.confirmBoxFolderReview() }
         check("7 the limit asks", await waitFor { u.windowStopPrompt != nil })
         check("7 the message says why", u.windowStopPrompt?.message.contains("usage limit") == true)
@@ -307,7 +326,8 @@ enum SegmentationReviewTestDriver {
         s2.activePendingRun = pending.withoutProgress()
         s2.isProcessing = true
         let stopped = Box<WindowStageOutcome>()
-        Task { stopped.value = await s2.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        Task { stopped.value = await s2.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
+                                                    outputDirectory: dir, settings: nil) }
         if await waitFor({ s2.awaitingBoxFolderConfirmation }) { s2.confirmBoxFolderReview() }
         check("7b the limit asks, resumable", await waitFor { s2.windowStopPrompt?.canResumeLater == true })
         s2.answerWindowStop(.stop)
@@ -328,7 +348,8 @@ enum SegmentationReviewTestDriver {
         k.activePendingRun = pending.withoutProgress()
         let killed = Box<WindowStageOutcome>()
         let stage = Task {
-            killed.value = await k.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil)
+            killed.value = await k.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
+                                                    outputDirectory: dir, settings: nil)
         }
         if await waitFor({ k.awaitingBoxFolderConfirmation }) { k.confirmBoxFolderReview() }
         check("8 all three windows sent", await waitFor { hanging.calls.count == 3 })
@@ -346,7 +367,8 @@ enum SegmentationReviewTestDriver {
         kr.pendingRunSaveOverride = { _ in }
         kr.activePendingRun = crashBox.value
         let afterCrash = Box<WindowStageOutcome>()
-        Task { afterCrash.value = await kr.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil) }
+        Task { afterCrash.value = await kr.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
+                                                    outputDirectory: dir, settings: nil) }
         if await waitFor({ kr.awaitingBoxFolderConfirmation }) { kr.confirmBoxFolderReview() }
         check("8 the flagged pass opens after the crash", await waitFor { kr.awaitingFlaggedReview })
         eq("8 only the two missing windows asked", Set(rest.calls), [[1, 2, 3, 4, 5, 6], [4, 5, 6]])

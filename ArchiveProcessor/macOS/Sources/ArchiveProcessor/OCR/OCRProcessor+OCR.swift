@@ -91,7 +91,8 @@ extension OCRProcessor {
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
         customPrompt: String? = nil,
-        runConfig: SessionProcessingConfig? = nil
+        runConfig: SessionProcessingConfig? = nil,
+        settings: ResolvedSettingsSnapshot?
     ) async {
         let total = files.count
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
@@ -170,7 +171,8 @@ extension OCRProcessor {
         if case .windows(let approach) = plan {
             // W36.seg-opt-review: the window segmenter proposes, the user checks the flagged gaps, then skims.
             guard await runWindowSegmentationStage(files: files, approach: approach,
-                                                   runConfig: runConfig) == .done else { return }
+                                                   runConfig: runConfig, outputDirectory: outputDirectory,
+                                                   settings: settings) == .done else { return }
         } else if case .manualWindow = plan {
             // no-op: handled in the combined manual window
         } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {

@@ -169,14 +169,15 @@ enum CollectionSettingsFile {
         return .document(doc)
     }
 
-    /// Make sure `<output>/.archivesuite` (and, with `runs`, its `runs` folder) is a real folder, creating one level at
-    /// a time; never through a link.
-    private static func ensureFolders(in outputDirectory: URL, runs: Bool) throws {
+    /// Make sure `<output>/.archivesuite` (and, with `subfolder`, that folder inside it: `runs`, `corrections`) is a
+    /// real folder, creating one level at a time; never through a link.
+    static func ensureFolders(in outputDirectory: URL, subfolder: String?) throws {
         guard probe(outputDirectory) == .directory || isDirectoryFollowingLinks(outputDirectory) else {
             throw CollectionSettingsError.noOutputFolder(outputDirectory.path)
         }
-        var folders = [CollectionSettingsDocument.folder(in: outputDirectory)]
-        if runs { folders.append(CollectionSettingsDocument.runsFolder(in: outputDirectory)) }
+        let top = CollectionSettingsDocument.folder(in: outputDirectory)
+        var folders = [top]
+        if let subfolder { folders.append(top.appendingPathComponent(subfolder, isDirectory: true)) }
         for dir in folders {
             switch probe(dir) {
             case .directory: continue
@@ -200,7 +201,7 @@ enum CollectionSettingsFile {
     /// that became unreadable or newer since it was read is not overwritten: an unreadable one is renamed aside, one
     /// that is refused is left alone.
     static func write(_ doc: CollectionSettingsDocument, in outputDirectory: URL, now: Date = Date()) throws {
-        try ensureFolders(in: outputDirectory, runs: false)
+        try ensureFolders(in: outputDirectory, subfolder: nil)
         switch read(in: outputDirectory) {
         case .refused(let e): throw e
         case .unreadable: try setAside(in: outputDirectory, now: now)
@@ -216,7 +217,7 @@ enum CollectionSettingsFile {
 
     /// Write one run's record as a new file in `.archivesuite/runs/`, named by its start and id; never over a file.
     static func writeRun(_ record: CollectionRunRecord, in outputDirectory: URL) throws {
-        try ensureFolders(in: outputDirectory, runs: true)
+        try ensureFolders(in: outputDirectory, subfolder: CollectionSettingsDocument.runsFolderName)
         let data: Data
         do { data = try encoder().encode(record) }
         catch { throw CollectionSettingsError.writeFailed(error.localizedDescription) }

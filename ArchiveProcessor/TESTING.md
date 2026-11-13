@@ -473,6 +473,11 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-settings-solver.sh`** — the W46 settings solver on every case of `13-stage-rules/13-profile-tests.md` (a
   pending case SKIPs by name), the router cases, and that every pick names its evidence row. No Keychain read, no
   window; the table's figures are checked against their sources by `scripts/segbench/settings_routes.py --check`.
+- **`test-review-corrections.sh`** — the W46 review records for the kit: how a run's reviewed gaps are built
+  (checked, changed, accepted; label photos and removed pages left out), written beside the output on scratch folders
+  (atomic, a resumed run's record replaced, never through a link, nothing created in a missing folder) and read back,
+  the lines format, then `kit_corrections.py` counting what the app wrote. `test-segmentation-review.sh` checks the
+  stage records its review. No Keychain read, no window.
 - **`test-settings-layers.sh`** — the W46 settings layers: live resolution through general, project and collection
   with sources and resets, the money habit's ceiling, the solver's inputs, the general store, and the collection's
   settings document writer on scratch folders (atomic, never through a link, an unreadable file set aside with its

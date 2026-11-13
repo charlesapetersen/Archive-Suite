@@ -106,6 +106,7 @@ struct ContentView: View {
             ReOCRPairsTestDriver.runIfRequested()            // $0 W44 Improve OCR pair validation + replacement pages, scratch only
             ReOCRJobTestDriver.runIfRequested()              // $0 W44 Improve OCR one file's run with a fake reader, scratch only
             SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
+            ReviewCorrectionsTestDriver.runIfRequested()     // $0 W46 the collection's review records for the kit, scratch only
             SettingsInterviewsTestDriver.runIfRequested()    // $0 W46 the general and the collection interviews, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
             FlaggedCheckTimingTestDriver.runIfRequested(processor: processor) // $0 W46 timing the flagged checks (owner session)

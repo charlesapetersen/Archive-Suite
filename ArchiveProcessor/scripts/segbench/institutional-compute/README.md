@@ -258,6 +258,28 @@ cannot rename their provenance. Never modify an in-use venv. The old FarmShare h
 measured notes are a record of those jobs. Historical `fs-*` bench method keys and
 `segbench-results/farmshare/` results stay named for the actual measurement source.
 
+## Your corrections: how many you have
+
+Archive Processor keeps what you settle in a review with the collection. That includes every boundary you checked or
+changed in a window-segmented run, and, once the line-correction screen exists, every handwriting line you correct.
+They are kept in the output folder's hidden `.archivesuite/corrections/`, in the format given in
+`SPEC/collection-settings.md` §"The review records". The two after-training routes wait on these counts:
+
+- The segmentation continuation needs 200 gaps of one material ruled on by a person. Gaps you left as proposed do
+  not count.
+- The handwriting fine-tune needs 80 corrected lines of one hand, and 160 is the target.
+
+```bash
+python3 kit_corrections.py count "/path/to/Box 1" "/path/to/Box 2"           # each collection its own material
+python3 kit_corrections.py count "/path/to/Box 1" "/path/to/Box 2" --pool Lincoln   # you say they are one material
+python3 kit_corrections.py export "/path/to/Box 1" --out gaps.jsonl          # every recorded gap, for the pack
+```
+
+Each folder is read recursively, so a Live Capture folder with a collection in each subfolder can be given whole.
+Links are never followed. A page pair or line that was reviewed more than once counts once, from the newest review.
+The count does not check the gate's held-out box: that needs a further box of the same material with at least 267
+known gaps in 10 documents, which `train_seg.py check` enforces.
+
 ## Licences
 
 A model you run on your own cluster through this kit may carry a research-only or non-commercial licence. The kit
@@ -303,6 +325,7 @@ rotation are not supported. This route reads pages directly; it does not require
 
 ```bash
 python3 -m unittest test_institutional_compute
+python3 -m unittest test_kit_corrections
 ```
 
 Tests use synthetic scratch images and a fake localhost vLLM server, validate every profile and 24/48/80 GB
