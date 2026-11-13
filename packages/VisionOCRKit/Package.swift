@@ -38,6 +38,13 @@ let package = Package(
             path: "Tests",
             sources: ["main.swift"]
         ),
+        // Tools/score-gate.swift (Tools/gate/main.swift links to it): the production pipeline from the
+        // command line, which Tools/ux-regression.sh publishes its set through. Built as the checks are.
+        .executableTarget(
+            name: "visionocr-gate",
+            dependencies: ["VisionOCRKit"],
+            path: "Tools/gate"
+        ),
         // Runs visionocr-checks as `swift test` would see it: from the package root, with the
         // package's helper, and fails unless every check passed.
         .testTarget(

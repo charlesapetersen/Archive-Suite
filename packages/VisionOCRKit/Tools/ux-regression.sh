@@ -220,19 +220,21 @@ fi
 W="${OUT:-$(mktemp -d /tmp/ux-regression.XXXXXX)}"
 # a directory holding an earlier run would have its outputs scored as this checkout's
 [ -z "$(ls -A "$W" 2>/dev/null)" ] || { echo "ux-regression: $W is not empty"; exit 2; }
-mkdir -p "$W/in" "$W/pub" "$W/score" "$W/g" "$W/h"
-cp "$ROOT/Tools/score-gate.swift" "$W/g/main.swift"
+mkdir -p "$W/in" "$W/pub" "$W/score" "$W/h"
 cp "$ROOT/Tools/ux-harness.swift" "$W/h/main.swift"
-( cd "$ROOT" && T="$(uname -m)-apple-macos14.0" &&
-  swiftc -O -o "$W/gate" -target "$T" $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) "$W/g/main.swift" &&
-  swiftc -O -o "$W/visionocr-recognise" -target "$T" \
-      Sources/VisionOCRKit/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift Helper/main.swift &&
+# The gate and the helper are VisionOCRKit's products (W42.int-s1): the set is published through the package,
+# not through a swiftc build of its sources. The resource bundle goes beside them, where Bundle.module looks.
+SPM=(swift build -c release -Xswiftc -enable-testing --package-path "$ROOT" --scratch-path "$ROOT/build/spm-test")
+( "${SPM[@]}" --product visionocr-gate && "${SPM[@]}" --product visionocr-recognise &&
+  BIN="$("${SPM[@]}" --show-bin-path)" &&
+  cp "$BIN/visionocr-gate" "$W/gate" && cp "$BIN/visionocr-recognise" "$W/visionocr-recognise" &&
+  cp -R "$BIN/VisionOCRKit_VisionOCRKit.bundle" "$W/" &&
   swiftc -O -o "$W/ux" "$W/h/main.swift" ) > "$W/build.log" 2>&1 ||
     { echo "ux-regression: the tools do not build, see $W/build.log"; exit 2; }
 
 # the accurate mode's models; checked before anything is published
 export VISIONOCR_MODEL_HOME="${VISIONOCR_MODEL_HOME:-$STATE/model-home}"
-export VISIONOCR_READER_SCRIPT="$ROOT/Resources/read-model.py"
+export VISIONOCR_READER_SCRIPT="$ROOT/Sources/VisionOCRKit/Resources/read-model.py"
 NOACC="${VISIONOCR_UX_NO_ACCURATE:-0}"
 # (`ModelDownloads.Item.installed`: the runtime, the layout model, both readers' pinned snapshots)
 if [ "$NOACC" != 1 ] && /usr/bin/grep -q $'\t[a-z]*+accurate:' "$SET"; then

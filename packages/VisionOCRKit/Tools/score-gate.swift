@@ -86,6 +86,9 @@
 //
 // The baseline it establishes is recorded in HANDOFF.md.
 
+#if SWIFT_PACKAGE
+@testable import VisionOCRKit
+#endif
 import AppKit
 import Combine
 import PDFKit

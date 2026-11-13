@@ -224,7 +224,7 @@ fault_mrc_refuses() {
   # Build the tool inside the sandbox, so nothing here touches build/.
   mkdir -p "$SB/h" && cp "$SB/Tools/score-mrc.swift" "$SB/h/main.swift"
   local sources=()
-  for f in "$SB"/Sources/*.swift; do
+  for f in "$SB"/Sources/VisionOCRKit/*.swift "$SB"/App/*.swift; do
     [ "$(basename "$f")" = "App.swift" ] && continue
     sources+=("$f")
   done
@@ -539,7 +539,7 @@ fault_argv_writers() {
   # than an empty array, so this is belt and braces — and that file says the guards
   # are not decoration.
   local sources=()
-  for f in "$SB"/Sources/*.swift; do
+  for f in "$SB"/Sources/VisionOCRKit/*.swift "$SB"/App/*.swift; do
     [ "$(basename "$f")" = "App.swift" ] && continue
     sources+=("$f")
   done
@@ -646,7 +646,7 @@ fault_text_voids() {
   # `Recogniser`, so it cannot be compiled alone.
   mkdir -p "$SB/h" && cp "$SB/Tools/score-text-voids.swift" "$SB/h/main.swift"
   local sources=()
-  for f in "$SB"/Sources/*.swift; do
+  for f in "$SB"/Sources/VisionOCRKit/*.swift "$SB"/App/*.swift; do
     [ "$(basename "$f")" = "App.swift" ] && continue
     sources+=("$f")
   done
@@ -921,7 +921,7 @@ PY
   # `set -u` on bash 3.2 an empty array expansion is a fatal unbound variable, which aborts
   # the run mid-case instead of reporting a red row.
   local sources=()
-  for f in "$SB"/Sources/*.swift; do
+  for f in "$SB"/Sources/VisionOCRKit/*.swift "$SB"/App/*.swift; do
     [ "$(basename "$f")" = "App.swift" ] && continue
     sources+=("$f")
   done
@@ -998,7 +998,7 @@ PY
   # self-test still passed when `largestImage`'s reach moved, the whole table would be the
   # census agreeing with itself. It does not: exactly one row moves, page 5's, whose `r = 4`
   # dictionary becomes reachable at `depth < 5`.
-  mkdir -p "$SB/psrc" && cp "$SB"/Sources/*.swift "$SB/psrc/" && rm -f "$SB/psrc/App.swift"
+  mkdir -p "$SB/psrc" && cp "$SB"/Sources/VisionOCRKit/*.swift "$SB"/App/*.swift "$SB/psrc/" && rm -f "$SB/psrc/App.swift"
   sed -i '' 's|            guard depth < 4 else { return }|            guard depth < 5 else { return }|' \
       "$SB/psrc/Flattener.swift"
   if cmp -s "$SB/psrc/Flattener.swift" "$SB/Sources/VisionOCRKit/Flattener.swift"; then
@@ -1083,7 +1083,7 @@ fault_shape_dump() {
   # subject: this tool drives `Flattener` and `Recogniser`, so it cannot be compiled alone.
   mkdir -p "$SB/h" && cp "$SB/Tools/score-shape-term.swift" "$SB/h/main.swift"
   local sources=()
-  for f in "$SB"/Sources/*.swift; do
+  for f in "$SB"/Sources/VisionOCRKit/*.swift "$SB"/App/*.swift; do
     [ "$(basename "$f")" = "App.swift" ] && continue
     sources+=("$f")
   done
