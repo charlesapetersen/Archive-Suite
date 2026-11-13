@@ -19,10 +19,12 @@ Build and test (both take the heavy lock; the suite runs Vision and the flattene
 
 ```bash
 python3 ops/autonomous/heavy-run.py run -- swift build -c release --arch arm64 --arch x86_64 \
-  --package-path packages/VisionOCRKit
+  -Xswiftc -enable-testing --package-path packages/VisionOCRKit
 python3 ops/autonomous/heavy-run.py run -- swift test -c release -Xswiftc -enable-testing \
   --package-path packages/VisionOCRKit
 ```
+
+A whole-package release build needs `-Xswiftc -enable-testing`, because `visionocr-checks` and `visionocr-gate` use `@testable import`; without it those two targets fail with "unable to resolve Swift module dependency". The library and the helper build without it (`--product visionocr-recognise`), and so does a debug build. The `ux-regression.sh` run was not repeated after the move (owner, 2026-11-13: the suite's matching count is enough; Vision OCR's `testdocs/` corpus stays on the OneDrive backup), so `Tools/ux-regression.sh` through the package products is wired but has not been run.
 
 `-c release` matters: the suite's own notes (`run_tests.sh`) explain why `-O` is load-bearing. `run_tests.sh` and
 `build.sh` still build the suite and Vision OCR's app with `swiftc` from these sources, as a reference lane.

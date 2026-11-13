@@ -151,6 +151,7 @@ Ownership lanes, per-app build commands, and shared hotspots: [`AGENTS.md`](AGEN
 
 - `SPEC/tag-format.md`: shared tag/PDF contract; `OWNER_AUTHORIZATIONS.md`: owner grants and binding constraints.
 - `packages/ArchiveCore/`: shared Swift package (tags, PDF, durable links, suite marker).
+- `packages/VisionOCRKit/`: Vision OCR's reading engine as a package (moved with its history, W42.int-s1); its README.
 - `ArchiveProcessor/`, `ArchiveReader/`, `ArchiveNotes/`: each app's XcodeGen project is in `macOS/`;
   `project.yml` is authoritative and `.xcodeproj` is generated/gitignored. Processor's companions are
   `ArchiveCapture/` (Android) and `ArchiveCaptureiOS/` (iOS). Launch/bootstrap scripts resolve their own paths.

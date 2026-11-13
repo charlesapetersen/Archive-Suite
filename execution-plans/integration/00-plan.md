@@ -125,6 +125,8 @@ can run in parallel once 2 is done, and so can 5 and 6.
 
 ### Stage 1 — the engine as a package
 
+**Shipped 2026-11-13 (`W42.int-s1`).** The UX regression run was waived by the owner (walkthrough 2026-11-13); the suite's 2123/2137 checks match Vision OCR's own build. Layout and build commands: `packages/VisionOCRKit/README.md`.
+
 Move Vision OCR's engine into `packages/VisionOCRKit` in this repository, keeping its history (a subtree merge from
 `~/Claude/vision-ocr` after its release; the session states the method it used). The package holds recognition,
 the page-kind detector, the flattener and its compression, JBIG2, the searchable-PDF writer, the model runtime, the
@@ -226,7 +228,7 @@ cover (the feature ledger b3 in particular). Then W40's h2, h3 and h4 for all th
 ### Risks
 
 - **The move breaks something subtle in the engine.** Vision OCR's suite and its UX regression set are the guard;
-  Stage 1 is not done until both pass against the package.
+  Stage 1 is not done until both pass against the package (the owner waived the UX regression set for Stage 1 on 2026-11-13; the suite passed).
 - **The table's evidence is thin for some kinds.** W41 is about 100 pages and Vision OCR's comparison 67; some kinds
   will have a handful. Each row carries its sample size, and the screen says when a figure rests on few pages.
 - **Two daemons on two repositories during the move.** Stage 1 starts only after Vision OCR's release, and Vision
