@@ -34,7 +34,9 @@ final class NoteTagChipsFieldLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(field.frame.width, 160, "big enough for a tag and its completion")
         XCTAssertNotNil(field.delegate, "the field autocompletes through its delegate")
         let fitting = host.fittingSize
-        XCTAssertGreaterThan(fitting.height, 40, "three chips and the field do not fit one 300-point line, so they "
+        // One line is the field's height (22 pt at most); the Reader's chips (W40.suite-reader-notes-consistency) are
+        // shorter than the old capsules, so two lines measure 40 pt where they measured 45.
+        XCTAssertGreaterThan(fitting.height, 30, "three chips and the field do not fit one 300-point line, so they "
                              + "wrap to more than one, saw \(fitting.height)")
     }
 

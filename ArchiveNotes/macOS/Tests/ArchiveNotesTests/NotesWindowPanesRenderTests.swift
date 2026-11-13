@@ -44,11 +44,12 @@ final class NotesWindowPanesRenderTests: XCTestCase {
         return inked
     }
 
-    private func host(inInspector: Bool, width: CGFloat) -> NSHostingView<some View> {
+    private func host(inInspector: Bool, width: CGFloat,
+                      tags: [String] = ["Labor", "Strikes"]) -> NSHostingView<some View> {
         let t = Date(timeIntervalSince1970: 0)
         let item = ItemSummary(id: UUID(), title: "Memo", kind: .note, date: nil, datePrecision: nil,
                                dateUncertain: false, sortDate: nil, quality: nil,
-                               created: t, modified: t, mtime: 0, managedTags: ["Labor", "Strikes"])
+                               created: t, modified: t, mtime: 0, managedTags: tags)
         let host = NSHostingView(rootView: NoteTagBar(model: model, item: item, inInspector: inInspector)
             .frame(width: width, alignment: .topLeading)
             .background(Color.white))
@@ -67,5 +68,24 @@ final class NotesWindowPanesRenderTests: XCTestCase {
         // The bar is one line; the inspector stacks its title, the tokens and the field.
         XCTAssertGreaterThan(inspector.fittingSize.height, bar.fittingSize.height + 20,
                              "the inspector's tags stack: \(inspector.fittingSize.height) vs \(bar.fittingSize.height)")
+    }
+
+    /// W40.suite-reader-notes-consistency (owner, notes-2 row 13): the bar runs the full width of the note's area, its
+    /// tags the Reader's list chips and the add field after the last of them, not in a column of its own at the right.
+    func testTheBarRunsTheFullWidthWithTheFieldAfterTheTags() throws {
+        let bar = host(inInspector: false, width: 700)
+        let field = try XCTUnwrap(views(NSTokenField.self, in: bar).first, "the bar offers the add-tag field")
+        let x = field.convert(field.bounds, to: bar).minX
+        XCTAssertLessThan(x, 300, "two short tags leave the field near the bar's start, saw x \(x)")
+        XCTAssertEqual(field.frame.width, NoteTagBar.fieldWidth, accuracy: 1)
+
+        let many = ["Department of Finance", "Correspondence", "Governor's Office", "Budget", "County Services",
+                    "School Districts", "Local Government"]
+        let full = host(inInspector: false, width: 700, tags: many)
+        let wrapped = try XCTUnwrap(views(NSTokenField.self, in: full).first)
+        XCTAssertGreaterThan(full.fittingSize.height, bar.fittingSize.height + 10,
+                             "seven tags and the field wrap to a second line")
+        XCTAssertGreaterThan(try inkedPixels(full), 600, "the chips draw")
+        XCTAssertGreaterThan(wrapped.convert(wrapped.bounds, to: full).minY, 0)
     }
 }

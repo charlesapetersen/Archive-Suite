@@ -6,7 +6,7 @@ import ArchiveCoreUI
 /// neither it nor Advanced Search autocompleted, and Advanced Search kept its tags as plain words). The field is the
 /// tag bar's `SubjectEntryField`: it suggests the tags already on notes, and Return or a comma adds what is typed and
 /// keeps the keyboard for the next tag. The chips wrap (`FlowLayout`), so the field keeps its width however many tags
-/// are chosen.
+/// are chosen. They are the Reader's list chips (`TagChip`), as in the tag bar under the note.
 struct NoteTagChipsField: View {
     @Binding var tags: [String]
     @Binding var draft: String
@@ -30,21 +30,11 @@ struct NoteTagChipsField: View {
     /// Wide enough for a long tag ("Corporate Culture") and its filled-in completion.
     static let fieldWidth: CGFloat = 170
 
+    /// The Reader's list chip with a ✕ (`TagChip`, W40.suite-reader-notes-consistency).
     private func chip(_ tag: String) -> some View {
-        HStack(spacing: 3) {
-            Text(tag).font(.caption).lineLimit(1)
-            Button { tags.removeAll { $0 == tag } } label: {
-                Image(systemName: "xmark").font(.caption2.weight(.semibold))
-            }
-            .buttonStyle(.borderless)
-            .help("Remove \(tag)")
-            .accessibilityLabel("Remove \(tag)")
-        }
-        .padding(.horizontal, 7)
-        .frame(height: 20)
-        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("\(chipIdentifier).\(tag)")
+        TagChip(tag) { tags.removeAll { $0 == tag } }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("\(chipIdentifier).\(tag)")
     }
 
     private func add(_ raw: String) {

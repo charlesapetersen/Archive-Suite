@@ -3,9 +3,11 @@ import ArchiveCore
 import ArchiveCoreUI
 
 /// The tag bar under the note's editor (W40.notes-detail-layout; owner session notes-1 row 23: "'Tags' should
-/// appear in a separate editing pane below the note, not in the Inspector or in Details"). The tags show as tokens
-/// with a remove button, wrapping to at most `maxLines` lines and then scrolling inside the bar, so the editor keeps
-/// its height; the add field sits at the bar's end.
+/// appear in a separate editing pane below the note, not in the Inspector or in Details"). It runs the full width of
+/// the note's area, the tags shown as the Reader's list shows them (`TagChip`, each with a remove button) and the add
+/// field following the last tag on the same lines, as typing follows the tokens in the Reader's tag field (owner,
+/// notes-2 row 13; W40.suite-reader-notes-consistency). The lines wrap to at most `maxLines` and then scroll inside the
+/// bar, so the editor keeps its height.
 ///
 /// One subject per entry, so commas inside a subject need no ad-hoc escaping. Add/remove are deltas
 /// against the actor's latest item, not replacements assembled from this view's potentially stale list.
@@ -54,13 +56,15 @@ struct NoteTagBar: View {
     }
 
     private var bar: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("Tags").font(.caption.weight(.semibold))
-                .frame(height: Self.lineHeight)
-            tokens
-            entry
-                .frame(width: 180)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .top, spacing: 8) {
+                Text("Tags").font(.caption.weight(.semibold))
+                    .frame(height: Self.lineHeight)
+                lines
+            }
+            failure
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         // A container, so the controls inside keep their own identifiers (an outer one replaced them).
@@ -68,10 +72,13 @@ struct NoteTagBar: View {
         .accessibilityIdentifier("an.tagbar")
     }
 
-    private var tokens: some View {
+    /// The bar's lines: the tags, then the add field, wrapping across the whole width and scrolling past `maxLines`.
+    private var lines: some View {
         ScrollView(.vertical) {
             FlowLayout(spacing: 4, lineSpacing: 2) {
                 ForEach(item.managedTags, id: \.self) { tag in token(tag) }
+                    .frame(height: Self.lineHeight)
+                field.frame(width: Self.fieldWidth)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { tokensHeight = $0 }
@@ -82,36 +89,45 @@ struct NoteTagBar: View {
         .accessibilityIdentifier("an.tagbar.tokens")
     }
 
+    /// Wide enough for a long tag and its filled-in completion, as the filter bar's (`NoteTagChipsField.fieldWidth`).
+    static let fieldWidth: CGFloat = 180
+
+    /// The inspector's layout: the tags wrapping, the field under them.
+    private var tokens: some View {
+        FlowLayout(spacing: 4, lineSpacing: 2) {
+            ForEach(item.managedTags, id: \.self) { tag in token(tag) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("an.tagbar.tokens")
+    }
+
     private var entry: some View {
         VStack(alignment: .leading, spacing: 2) {
-            SubjectEntryField(draft: $draft, placeholder: "Add tag…", identifier: "an.detail.tags.input",
-                              fillsInAnyCase: true,
-                              suggestions: { Self.suggestions(for: item, in: model.allItems) },
-                              onAdd: { enqueue(.add($0)) })
-            if !failedEdits.isEmpty {
-                HStack {
-                    Text("Couldn't finish saving tags.").font(.caption).foregroundStyle(.red)
-                    Button("Retry") { failedEdits.forEach(enqueue) }
-                        .accessibilityIdentifier("an.detail.tags.retry")
-                }
+            field
+            failure
+        }
+    }
+
+    private var field: some View {
+        SubjectEntryField(draft: $draft, placeholder: "Add tag…", identifier: "an.detail.tags.input",
+                          fillsInAnyCase: true,
+                          suggestions: { Self.suggestions(for: item, in: model.allItems) },
+                          onAdd: { enqueue(.add($0)) })
+    }
+
+    @ViewBuilder private var failure: some View {
+        if !failedEdits.isEmpty {
+            HStack {
+                Text("Couldn't finish saving tags.").font(.caption).foregroundStyle(.red)
+                Button("Retry") { failedEdits.forEach(enqueue) }
+                    .accessibilityIdentifier("an.detail.tags.retry")
             }
         }
     }
 
+    /// The Reader's list chip with a ✕ (`TagChip`).
     private func token(_ tag: String) -> some View {
-        HStack(spacing: 3) {
-            Text(tag).font(.caption).lineLimit(1)
-            Button { enqueue(.remove(tag)) } label: {
-                Image(systemName: "xmark").font(.caption2.weight(.semibold))
-            }
-            .buttonStyle(.borderless)
-            .help("Remove \(tag)")
-            .accessibilityLabel("Remove \(tag)")
-            .accessibilityIdentifier("an.detail.tags.remove.\(tag)")
-        }
-        .padding(.horizontal, 7)
-        .frame(height: Self.lineHeight - 2)
-        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+        TagChip(tag, removeIdentifier: "an.detail.tags.remove.\(tag)") { enqueue(.remove(tag)) }
     }
 
     /// The tags on other notes, in the form a save would write them (`NotesTagVocabulary.titleCased`: a note's
