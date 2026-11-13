@@ -15790,3 +15790,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   the composited window (image pane brightness 0.91 plain, 0.19 inverted; preview 1.00 to 0.10; remembered on
   reopening; the toolbar button turns it off), with `PageViewsUITests` green beside it. Bench cache: nothing written.
   <!-- /W40.reader-image-invert -->
+- [x] **W40.reader-zoom-levels — more zoom levels in the Reader [S]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Owner, 2026-11-13: "More zoom levels for reader." SHIPPED 2026-11-13.
+  Before: every Zoom In / Out (menu, ⌘+ / ⌘−, the toolbar's image and text buttons) multiplied or divided the zoom by
+  1.25, so from 100% the stops were 80, 64, 51% and 125, 156, 195%. Now `Core/ZoomLevels.swift` holds 34 round levels
+  from 10% to 2000% (… 67, 75, 80, 90, 100, 110, 125, 150, 175, 200, 250 …), no step coarser than the old 1.25; a zoom
+  between levels (fitted, pinched) moves to the next level each way, past the ends a step is 1.25 again. It serves
+  the image page, the OCR text page and the extracted text's size; the image pane steps in its zoom unit, so a JPEG
+  shown for its PDF page goes through the same on-screen sizes. There is no zoom menu with listed sizes to extend.
+  Persistence unchanged: the step sets `scaleFactor` and `PDFViewScaleChanged` still records it.
+  Verified: `ZoomLevelsTests` (6), the Reader unit bundle (855, 0 failures); in the Tart VM DocumentPaneKeysUITests,
+  TextZoomUITests, RotationUITests and ViewerUITests/testToolbarImageSourceSwitch green (5 tests). Bench cache:
+  nothing written.
+  <!-- /W40.reader-zoom-levels -->
