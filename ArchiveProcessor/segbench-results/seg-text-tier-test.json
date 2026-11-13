@@ -1,6 +1,6 @@
 {
  "tag": "W46.seg-text-tier-test",
- "date": "2026-11-12",
+ "date": "2026-11-13",
  "level": 0.965,
  "rule": "min",
  "boxes": [
@@ -14,7 +14,7 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 92,
-    "pages_exact_no_review": 0.8878787878787879,
+    "pages_exact_no_review": 0.8757575757575757,
     "flagged_per_100_pages": 25.34435261707989,
     "pages_exact_after_review": 1.0,
     "unflagged_errors": 0,
@@ -25,7 +25,7 @@
      "pages": 250,
      "gaps": 238,
      "flagged": 81,
-     "pages_exact_no_review": 0.8806584362139918,
+     "pages_exact_no_review": 0.8683127572016461,
      "flagged_per_100_pages": 32.4,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -35,7 +35,7 @@
      "pages": 113,
      "gaps": 77,
      "flagged": 11,
-     "pages_exact_no_review": 0.9080459770114943,
+     "pages_exact_no_review": 0.896551724137931,
      "flagged_per_100_pages": 9.734513274336283,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -48,7 +48,7 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 139,
-    "pages_exact_no_review": 0.8727272727272727,
+    "pages_exact_no_review": 0.8787878787878788,
     "flagged_per_100_pages": 38.29201101928375,
     "pages_exact_after_review": 0.9848484848484849,
     "unflagged_errors": 1,
@@ -59,7 +59,7 @@
      "pages": 250,
      "gaps": 238,
      "flagged": 110,
-     "pages_exact_no_review": 0.8477366255144033,
+     "pages_exact_no_review": 0.8600823045267489,
      "flagged_per_100_pages": 44.0,
      "pages_exact_after_review": 0.9794238683127572,
      "unflagged_errors": 1,
@@ -69,7 +69,7 @@
      "pages": 113,
      "gaps": 77,
      "flagged": 29,
-     "pages_exact_no_review": 0.9425287356321839,
+     "pages_exact_no_review": 0.9310344827586207,
      "flagged_per_100_pages": 25.663716814159294,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -80,18 +80,18 @@
  },
  "paired": {
   "no_review": {
-   "delta": -0.015151515151515152,
-   "lo": -0.05787781350482315,
-   "hi": 0.02735562310030395,
+   "delta": 0.0030303030303030303,
+   "lo": -0.033950617283950615,
+   "hi": 0.041666666666666664,
    "pages": 330,
-   "runs": 147
+   "runs": 145
   },
   "after_review": {
    "delta": -0.015151515151515152,
-   "lo": -0.04075235109717868,
+   "lo": -0.03954802259887006,
    "hi": 0.0,
    "pages": 330,
-   "runs": 147
+   "runs": 145
   }
  },
  "gaps_changed": [
@@ -278,7 +278,7 @@
   {
    "box": "Stanton",
    "gap": "32|33",
-   "truth": "new",
+   "truth": "continue",
    "image": [
     "new",
     0.925,
@@ -353,7 +353,7 @@
   {
    "box": "Stanton",
    "gap": "49|50",
-   "truth": "new",
+   "truth": "continue",
    "image": [
     "new",
     0.95,
@@ -563,7 +563,7 @@
   {
    "box": "Stanton",
    "gap": "124|125",
-   "truth": "new",
+   "truth": "continue",
    "image": [
     "new",
     0.515,

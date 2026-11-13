@@ -159,10 +159,48 @@ def cmd_moved(a) -> None:
             print(f"  {p}: {x} -> {y}")
 
 
+def unflagged(box, S, level, rule="min") -> list[str]:
+    """The gaps a route accepts unflagged and gets wrong, as 'a|b' file numbers (unsure gaps never count)."""
+    import ensemble as E
+    import options as O
+    with O.rule(rule):
+        j = E.judge(box, S, 2.0 if level is None else level)
+    unsure = getattr(box, "unsure", set())
+    n = [p.n for p in box.col.pages] if hasattr(box, "col") else None
+    return [f"{n[i] if n else i + 1}|{n[i + 1] if n else i + 2}" for i, (a, flag, _, _) in sorted(j.items())
+            if not flag and i not in unsure and a != box.truth[i]]
+
+
+def cmd_errors(_a) -> None:
+    """Each options.json route's unflagged errors on the test boxes, from the cached answers (no calls)."""
+    import rescore
+    rescore.no_network()
+    import options as O
+    import method_openrouter as MO
+    import seg_magazine_rule_app as A
+    import ensemble as E
+    out = json.loads(O.OUT_JSON.read_text())
+    aps = {a["id"]: a for a in out["approaches"]}
+    fz, fo = O.frozen(), O.frozen_openai()
+    test = {n: E.Box(data.load(n), "CGO") for n in data.TEST}
+    rows = {}
+    for a, f in [*fz["approaches"].items(), ("openai", fo["approaches"]["openai"]), ("mix", fo["approaches"]["mix"])]:
+        name = "gemini g1 (replaced)" if a == "gemini" else a
+        rows[name] = {n: unflagged(test[n], tuple(f["voters"]), f["level"], f["rule"]) for n in data.TEST}
+    g2 = {n: A.g2_box(n) for n in data.TEST}
+    rows["gemini g2"] = {n: unflagged(g2[n], ("G",), aps["gemini"]["level"]) for n in data.TEST}
+    _, boxes = MO.five_box(["G", f"X:{MO.GLM_KEY}", f"X:{MO.LOCAL_SEG_KEY}"])
+    rows["glm"] = {n: unflagged(boxes[n], (f"X:{MO.GLM_KEY}",), aps["glm"]["level"]) for n in data.TEST}
+    rows["local"] = {n: unflagged(boxes[n], (f"X:{MO.LOCAL_SEG_KEY}",), aps["local"]["level"]) for n in data.TEST}
+    for k, v in rows.items():
+        print(f"{k}: " + "; ".join(f"{n} {', '.join(g) or '-'}" for n, g in v.items()))
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("fold").set_defaults(fn=cmd_fold)
+    sub.add_parser("errors").set_defaults(fn=cmd_errors)
     m = sub.add_parser("moved")
     m.add_argument("files", nargs="+")
     m.add_argument("--before", default="origin/main")

@@ -17,19 +17,19 @@ Paired on the same 146 gaps: only g2 right 40, only g1 right 7, +22.6 points, ex
 
 | Prompt | Pages exact, no checking | Checks per 100 pages | Pages exact after checking | Unflagged errors | per 500 pages |
 |---|---|---|---|---|---|
-| g1 | 85.2% | 25.9 | 98.5% | 2 | 2.8 |
-| g2 | 88.8% | 25.3 | 100.0% | 0 | 0.0 |
+| g1 | 89.1% | 25.9 | 97.0% | 3 | 4.1 |
+| g2 | 87.6% | 25.3 | 100.0% | 0 | 0.0 |
 
 By box:
 
-- g1 Stanton: pages exact 84.4% no checking, 34.0 checks per 100 pages, 97.9% after, unflagged 2
-- g1 RG165: pages exact 87.4% no checking, 8.0 checks per 100 pages, 100.0% after, unflagged 0
-- g2 Stanton: pages exact 88.1% no checking, 32.4 checks per 100 pages, 100.0% after, unflagged 0
-- g2 RG165: pages exact 90.8% no checking, 9.7 checks per 100 pages, 100.0% after, unflagged 0
+- g1 Stanton: pages exact 85.2% no checking, 34.0 checks per 100 pages, 95.9% after, unflagged 3
+- g1 RG165: pages exact 100.0% no checking, 8.0 checks per 100 pages, 100.0% after, unflagged 0
+- g2 Stanton: pages exact 86.8% no checking, 32.4 checks per 100 pages, 100.0% after, unflagged 0
+- g2 RG165: pages exact 89.7% no checking, 9.7 checks per 100 pages, 100.0% after, unflagged 0
 
 Unflagged errors:
 
-- g1: Stanton 101|102 (said continue, 0.980), Stanton 102|103 (said continue, 0.980)
+- g1: Stanton 26|27 (said new, 0.985), Stanton 101|102 (said continue, 0.980), Stanton 102|103 (said continue, 0.980)
 - g2: none
 
 The Stanton newsletter issue (photos 101-105, re-ruled on the article rule):
@@ -41,7 +41,7 @@ The Stanton newsletter issue (photos 101-105, re-ruled on the article rule):
 | 103|104 | continue | continue 0.990 | continue 0.990 |
 | 104|105 | continue | continue 0.985 | continue 0.985 |
 
-Paired raw decisions on the same 315 known gaps: only g2 right 6, only g1 right 3, sign test p 0.508. Gaps whose decision changed: 9: Stanton 47|48 continue→new (truth continue), Stanton 48|49 continue→new (truth continue), Stanton 49|50 continue→new (truth new), Stanton 101|102 continue→new (truth new), Stanton 102|103 continue→new (truth new), Stanton 108|109 new→continue (truth continue), Stanton 241|242 new→continue (truth continue), RG165 67|68 continue→new (truth continue), RG165 85|86 continue→new (truth new).
+Paired raw decisions on the same 313 known gaps: only g2 right 4, only g1 right 5, sign test p 1. Gaps whose decision changed: 9: Stanton 47|48 continue→new (truth continue), Stanton 48|49 continue→new (truth continue), Stanton 49|50 continue→new (truth continue), Stanton 101|102 continue→new (truth new), Stanton 102|103 continue→new (truth new), Stanton 108|109 new→continue (truth continue), Stanton 241|242 new→continue (truth continue), RG165 67|68 continue→new (truth continue), RG165 85|86 continue→new (truth continue).
 
 ## The call
 

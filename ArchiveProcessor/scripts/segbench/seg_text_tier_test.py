@@ -151,12 +151,15 @@ def page_flags(box, S, level, r):
     """Per page (None for a label photo): whether its document is exact with no checking and after checking, built
     from the same decisions ensemble.evaluate scores, and checked against its counts."""
     import ensemble as E
+    from score import doc_unsure, forgive
     j = E.judge(box, S, level)
     auto = {i: a for i, (a, _, _, _) in j.items()}
     rev = {i: (box.truth[i] if f else a) for i, (a, f, _, _) in j.items()}
     out = []
     for dec, s in ((auto, r["auto"]), (rev, r["rev"])):
-        ex = SWG.exact_pages(list(box.labels), box.labels_from(dec))
+        pred = box.labels_from(dec)
+        # An unsure gap takes the route's own call, as the scorer counts it (score.py, UNSURE GAPS).
+        ex = SWG.exact_pages(forgive(list(box.labels), pred, doc_unsure(box.labels)), pred)
         if sum(bool(x) for x in ex) != s.pages_exact:
             raise SystemExit(f"{box.name}: per-page exact {sum(bool(x) for x in ex)} != scorer's {s.pages_exact}")
         out.append(ex)

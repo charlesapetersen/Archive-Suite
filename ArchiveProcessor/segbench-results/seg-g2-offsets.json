@@ -9,7 +9,7 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 92,
-    "pages_exact_no_review": 0.8878787878787879,
+    "pages_exact_no_review": 0.8757575757575757,
     "flagged_per_100_pages": 25.34435261707989,
     "pages_exact_after_review": 1.0,
     "unflagged_errors": 0,
@@ -22,7 +22,7 @@
      "pages": 250,
      "gaps": 238,
      "flagged": 81,
-     "pages_exact_no_review": 0.8806584362139918,
+     "pages_exact_no_review": 0.8683127572016461,
      "flagged_per_100_pages": 32.4,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -32,7 +32,7 @@
      "pages": 113,
      "gaps": 77,
      "flagged": 11,
-     "pages_exact_no_review": 0.9080459770114943,
+     "pages_exact_no_review": 0.896551724137931,
      "flagged_per_100_pages": 9.734513274336283,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -66,11 +66,11 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 106,
-    "pages_exact_no_review": 0.8878787878787879,
+    "pages_exact_no_review": 0.9,
     "flagged_per_100_pages": 29.201101928374655,
-    "pages_exact_after_review": 1.0,
-    "unflagged_errors": 0,
-    "unflagged_errors_per_500_pages": 0.0,
+    "pages_exact_after_review": 0.9848484848484849,
+    "unflagged_errors": 1,
+    "unflagged_errors_per_500_pages": 1.3774104683195592,
     "usd_per_1000_pages": 3.6005247933884292,
     "usd_settled_per_1000_pages": 3.6005247933884292
    },
@@ -79,17 +79,17 @@
      "pages": 250,
      "gaps": 238,
      "flagged": 94,
-     "pages_exact_no_review": 0.8683127572016461,
+     "pages_exact_no_review": 0.8888888888888888,
      "flagged_per_100_pages": 37.6,
-     "pages_exact_after_review": 1.0,
-     "unflagged_errors": 0,
-     "unflagged_errors_per_500_pages": 0.0
+     "pages_exact_after_review": 0.9794238683127572,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 2.0
     },
     "RG165": {
      "pages": 113,
      "gaps": 77,
      "flagged": 12,
-     "pages_exact_no_review": 0.9425287356321839,
+     "pages_exact_no_review": 0.9310344827586207,
      "flagged_per_100_pages": 10.619469026548673,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -114,7 +114,14 @@
    },
    "failed_windows": 0,
    "unflagged_gaps": {
-    "Stanton": [],
+    "Stanton": [
+     {
+      "gap": "26|27",
+      "said": "new",
+      "truth": "continue",
+      "confidence": 0.985
+     }
+    ],
     "RG165": []
    }
   },
@@ -123,11 +130,11 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 102,
-    "pages_exact_no_review": 0.8909090909090909,
+    "pages_exact_no_review": 0.8484848484848485,
     "flagged_per_100_pages": 28.09917355371901,
-    "pages_exact_after_review": 1.0,
-    "unflagged_errors": 0,
-    "unflagged_errors_per_500_pages": 0.0,
+    "pages_exact_after_review": 0.9848484848484849,
+    "unflagged_errors": 1,
+    "unflagged_errors_per_500_pages": 1.3774104683195592,
     "usd_per_1000_pages": 3.5960950413223145,
     "usd_settled_per_1000_pages": 3.5960950413223145
    },
@@ -136,17 +143,17 @@
      "pages": 250,
      "gaps": 238,
      "flagged": 92,
-     "pages_exact_no_review": 0.897119341563786,
+     "pages_exact_no_review": 0.8436213991769548,
      "flagged_per_100_pages": 36.8,
-     "pages_exact_after_review": 1.0,
-     "unflagged_errors": 0,
-     "unflagged_errors_per_500_pages": 0.0
+     "pages_exact_after_review": 0.9794238683127572,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 2.0
     },
     "RG165": {
      "pages": 113,
      "gaps": 77,
      "flagged": 10,
-     "pages_exact_no_review": 0.8735632183908046,
+     "pages_exact_no_review": 0.8620689655172413,
      "flagged_per_100_pages": 8.849557522123893,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -171,27 +178,34 @@
    },
    "failed_windows": 0,
    "unflagged_gaps": {
-    "Stanton": [],
+    "Stanton": [
+     {
+      "gap": "26|27",
+      "said": "new",
+      "truth": "continue",
+      "confidence": 0.98
+     }
+    ],
     "RG165": []
    }
   }
  },
  "range": {
   "pages_exact_no_review": [
-   0.8878787878787879,
-   0.8909090909090909
+   0.8484848484848485,
+   0.9
   ],
   "flagged_per_100_pages": [
    25.34435261707989,
    29.201101928374655
   ],
   "pages_exact_after_review": [
-   1.0,
+   0.9848484848484849,
    1.0
   ],
   "unflagged_errors_per_500_pages": [
    0.0,
-   0.0
+   1.3774104683195592
   ],
   "usd_per_1000_pages": [
    3.5960950413223145,
@@ -199,10 +213,10 @@
   ]
  },
  "spread_points": {
-  "g2": 0.3030303030302939,
-  "g1": 2.1212121212121238
+  "g2": 5.151515151515151,
+  "g1": 2.4242424242424176
  },
- "claude_o0": 0.8545454545454545,
+ "claude_o0": 0.8909090909090909,
  "gateway": {
   "calls": 244,
   "spent_usd": 2.612373,

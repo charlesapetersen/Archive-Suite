@@ -8,30 +8,30 @@ Gemini 3.7 Flash through the Stanford gateway on prompt g2 (the article-within-i
 
 | figure | offset 0 (shown) | offset 1 | offset 2 | range |
 |---|---:|---:|---:|---:|
-| pages in an exact document, no checking | 88.8% | 88.8% | 89.1% | 88.8%–89.1% |
+| pages in an exact document, no checking | 87.6% | 90.0% | 84.8% | 84.8%–90.0% |
 | boundaries to check per 100 pages | 25.3 | 29.2 | 28.1 | 25.3–29.2 |
-| pages right after checking | 100.0% | 100.0% | 100.0% | 100.0%–100.0% |
-| unflagged errors per 500 pages | 0.0 | 0.0 | 0.0 | 0.0–0.0 |
+| pages right after checking | 100.0% | 98.5% | 98.5% | 98.5%–100.0% |
+| unflagged errors per 500 pages | 0.0 | 1.4 | 1.4 | 0.0–1.4 |
 | charged $ per 1,000 pages, all attempts | $3.61 | $3.60 | $3.60 | $3.60–$3.61 |
 
 By box:
 
 | offset | box | no checking | to check per 100 pages | after checking | unflagged errors |
 |---|---|---:|---:|---:|---:|
-| o0 | Stanton | 88.1% | 32.4 | 100.0% | 0 |
-| o0 | RG165 | 90.8% | 9.7 | 100.0% | 0 |
-| o1 | Stanton | 86.8% | 37.6 | 100.0% | 0 |
-| o1 | RG165 | 94.3% | 10.6 | 100.0% | 0 |
-| o2 | Stanton | 89.7% | 36.8 | 100.0% | 0 |
-| o2 | RG165 | 87.4% | 8.8 | 100.0% | 0 |
+| o0 | Stanton | 86.8% | 32.4 | 100.0% | 0 |
+| o0 | RG165 | 89.7% | 9.7 | 100.0% | 0 |
+| o1 | Stanton | 88.9% | 37.6 | 97.9% | 1 |
+| o1 | RG165 | 93.1% | 10.6 | 100.0% | 0 |
+| o2 | Stanton | 84.4% | 36.8 | 97.9% | 1 |
+| o2 | RG165 | 86.2% | 8.8 | 100.0% | 0 |
 
-Unflagged errors: none at any offset. Failed windows: 0.
+Unflagged errors: o1 Stanton 26|27 (said new, 0.985), o2 Stanton 26|27 (said new, 0.980). Failed windows: 0.
 
 ## Reading
 
-Over three offsets g2 on Gemini 3.7 scores 88.8%–89.1% of pages in an exact document with no checking, a spread of 0.3 points (g1 on the same model and level spread 2.1, seg-boxes-score.md), 25.3–29.2 checks per 100 pages and 100.0%–100.0% after checking. Against Claude only's 85.5% (prompt w1, one offset-0 run, options.md) the low end is +3.3 points and offset 0 +3.3. The pooled spread is narrow because the boxes move apart: Stanton 86.8%–89.7%, RG165 87.4%–94.3%, so a per-box figure is far less settled than the pooled one.
+Over three offsets g2 on Gemini 3.7 scores 84.8%–90.0% of pages in an exact document with no checking, a spread of 5.2 points (g1 on the same model and level spread 2.4, seg-boxes-score.md), 25.3–29.2 checks per 100 pages and 98.5%–100.0% after checking. Against Claude only's 89.1% (prompt w1, one offset-0 run, options.md) the low end is -4.2 points and offset 0 -1.5. The pooled spread is narrow because the boxes move apart: Stanton 84.4%–88.9%, RG165 86.2%–93.1%, so a per-box figure is far less settled than the pooled one.
 
-The settings layer's tie rule (07-segmentation.md §3) is now reading's construction: twice the larger offset range of the two routes compared, a route with none held to the largest measured (g1's 2.1), so 4.2 points for every pair the table holds. Gemini's 3.3-3.6 points over Claude is under it, a tie, so profile D5 (a Claude plan and a Gemini key) goes back to the plan route on money; on the 3.2 floor of one range it had passed by 0.1. Claude's w1 carries no article rule, so the gap is not like for like either way.
+The settings layer's tie rule (07-segmentation.md §3) is now reading's construction: twice the larger offset range of the two routes compared, a route with none held to the largest measured (g1's 2.4), so 10.4 points for every pair the table holds. Gemini's -4.2-0.9 points over Claude is under it, a tie, so profile D5 (a Claude plan and a Gemini key) goes back to the plan route on money; on the 3.2 floor of one range it had passed by 0.1. Claude's w1 carries no article rule, so the gap is not like for like either way.
 
 ## Gateway
 
@@ -42,6 +42,6 @@ The settings layer's tie rule (07-segmentation.md §3) is now reading's construc
 - **Truth.** The test boxes as options.md scores them: Stanton with the owner's 2026-10-31 newsletter rulings on the article rule, RG165; truth photo labels; no route drafted any of it.
 - **Selection.** options.py's test boxes, fixed since 2026-10-11, whole; the offsets are W46.seg-boxes-score's. Nothing chosen by a route's answers or ABBYY text.
 - **Comparison.** One model, prompt, gateway, image size, Vision text, rule, level and scorer at every offset; only where the windows start changes. Claude's figure beside it is prompt w1, which carries no article rule, at offset 0 only (a like-for-like Claude arm waits on W46.gateway-models-ok).
-- **Noise.** Three runs of one route, at temperature 0, that differ only in window placement: the offset spread is 0.3 points of pooled pages exact (g1: 2.1). Not a rerun at fixed windows, and no other route's offset spread is measured on g2's terms; error counts of a few gaps move by one or two within noise.
+- **Noise.** Three runs of one route, at temperature 0, that differ only in window placement: the offset spread is 5.2 points of pooled pages exact (g1: 2.4). Not a rerun at fixed windows, and no other route's offset spread is measured on g2's terms; error counts of a few gaps move by one or two within noise.
 - **Scope.** Gemini 3.7, not the 3.8 the app sends; the two test boxes only (363 pages). It does not measure Claude's or any other route's offset range, nor a level refit on these boxes.
 

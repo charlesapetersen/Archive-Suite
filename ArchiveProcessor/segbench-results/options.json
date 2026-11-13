@@ -1,6 +1,6 @@
 {
  "version": 1,
- "measured": "2026-10-11",
+ "measured": "2026-11-13",
  "item": "W36.seg-opt-measure",
  "method": "ArchiveProcessor/scripts/segbench/options.py",
  "bar_after_review": 0.98,
@@ -61,32 +61,32 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 37,
-     "pages_exact_no_review": 0.8545454545454545,
+     "pages_exact_no_review": 0.8909090909090909,
      "flagged_per_100_pages": 10.192837465564738,
-     "pages_exact_after_review": 0.9727272727272728,
-     "unflagged_errors": 3,
-     "unflagged_errors_per_500_pages": 4.132231404958677
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 1.3774104683195592
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
       "flagged": 32,
-      "pages_exact_no_review": 0.8477366255144033,
+      "pages_exact_no_review": 0.8518518518518519,
       "flagged_per_100_pages": 12.8,
-      "pages_exact_after_review": 0.9711934156378601,
-      "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 4.0
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 2.0
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 5,
-      "pages_exact_no_review": 0.8735632183908046,
+      "pages_exact_no_review": 1.0,
       "flagged_per_100_pages": 4.424778761061947,
-      "pages_exact_after_review": 0.9770114942528736,
-      "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 4.424778761061947
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
      }
     },
     "dev_held_out": {
@@ -154,7 +154,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 92,
-     "pages_exact_no_review": 0.8878787878787879,
+     "pages_exact_no_review": 0.8757575757575757,
      "flagged_per_100_pages": 25.34435261707989,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -165,7 +165,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 81,
-      "pages_exact_no_review": 0.8806584362139918,
+      "pages_exact_no_review": 0.8683127572016461,
       "flagged_per_100_pages": 32.4,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -175,7 +175,7 @@
       "pages": 113,
       "gaps": 77,
       "flagged": 11,
-      "pages_exact_no_review": 0.9080459770114943,
+      "pages_exact_no_review": 0.896551724137931,
       "flagged_per_100_pages": 9.734513274336283,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -237,8 +237,8 @@
     }
    },
    "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",
-   "note": "The app's voter is Gemini 3.8 Flash sending g2; its level and every figure here are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them on the development boxes (W46.seg-magazine-rule-app). Tokens and price are 3.8's, measured on g1.",
    "figures_note": "These figures were measured on Gemini 3.7 Flash with the same prompt; Gemini 3.8 Flash, which this approach calls, has not been measured on it.",
+   "note": "The app's voter is Gemini 3.8 Flash sending g2; its level and every figure here are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them on the development boxes (W46.seg-magazine-rule-app). Tokens and price are 3.8's, measured on g1.",
    "replaces": {
     "voters": [
      "window-gemini-3.8-flash-low (Gemini 3.8 Flash, thinking low, prompt g1)"
@@ -249,28 +249,28 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 88,
-     "pages_exact_no_review": 0.8727272727272727,
+     "pages_exact_no_review": 0.9,
      "flagged_per_100_pages": 24.242424242424242,
-     "pages_exact_after_review": 0.9848484848484849,
-     "unflagged_errors": 2,
-     "unflagged_errors_per_500_pages": 2.7548209366391183
+     "pages_exact_after_review": 0.9696969696969697,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 4.132231404958677
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
       "flagged": 77,
-      "pages_exact_no_review": 0.8724279835390947,
+      "pages_exact_no_review": 0.8641975308641975,
       "flagged_per_100_pages": 30.8,
-      "pages_exact_after_review": 0.9794238683127572,
-      "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 4.0
+      "pages_exact_after_review": 0.9588477366255144,
+      "unflagged_errors": 3,
+      "unflagged_errors_per_500_pages": 6.0
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 11,
-      "pages_exact_no_review": 0.8735632183908046,
+      "pages_exact_no_review": 1.0,
       "flagged_per_100_pages": 9.734513274336283,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -298,20 +298,20 @@
     ],
     "range": {
      "pages_exact_no_review": [
-      0.8878787878787879,
-      0.8909090909090909
+      0.8484848484848485,
+      0.9
      ],
      "flagged_per_100_pages": [
       25.34435261707989,
       29.201101928374655
      ],
      "pages_exact_after_review": [
-      1.0,
+      0.9848484848484849,
       1.0
      ],
      "unflagged_errors_per_500_pages": [
       0.0,
-      0.0
+      1.3774104683195592
      ]
     }
    }
@@ -331,7 +331,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 287,
-     "pages_exact_no_review": 0.9090909090909091,
+     "pages_exact_no_review": 0.9030303030303031,
      "flagged_per_100_pages": 79.0633608815427,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -342,7 +342,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 221,
-      "pages_exact_no_review": 0.897119341563786,
+      "pages_exact_no_review": 0.8930041152263375,
       "flagged_per_100_pages": 88.4,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -352,7 +352,7 @@
       "pages": 113,
       "gaps": 77,
       "flagged": 66,
-      "pages_exact_no_review": 0.9425287356321839,
+      "pages_exact_no_review": 0.9310344827586207,
       "flagged_per_100_pages": 58.4070796460177,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -429,32 +429,32 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 37,
-     "pages_exact_no_review": 0.9090909090909091,
+     "pages_exact_no_review": 0.9030303030303031,
      "flagged_per_100_pages": 10.192837465564738,
-     "pages_exact_after_review": 0.9727272727272728,
-     "unflagged_errors": 3,
-     "unflagged_errors_per_500_pages": 4.132231404958677
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 1.3774104683195592
     },
     "test_by_box": {
      "Stanton": {
       "pages": 250,
       "gaps": 238,
       "flagged": 32,
-      "pages_exact_no_review": 0.897119341563786,
+      "pages_exact_no_review": 0.8930041152263375,
       "flagged_per_100_pages": 12.8,
-      "pages_exact_after_review": 0.9711934156378601,
-      "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 4.0
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 2.0
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 5,
-      "pages_exact_no_review": 0.9425287356321839,
+      "pages_exact_no_review": 0.9310344827586207,
       "flagged_per_100_pages": 4.424778761061947,
-      "pages_exact_after_review": 0.9770114942528736,
-      "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 4.424778761061947
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
      }
     },
     "dev_held_out": {
@@ -549,11 +549,11 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 39,
-     "pages_exact_no_review": 0.8787878787878788,
+     "pages_exact_no_review": 0.9181818181818182,
      "flagged_per_100_pages": 10.743801652892563,
-     "pages_exact_after_review": 0.9787878787878788,
-     "unflagged_errors": 2,
-     "unflagged_errors_per_500_pages": 2.7548209366391183
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 1.3774104683195592
     },
     "why": "re-ranked with ChatGPT on the development set (options-openai-dev.md)"
    }
@@ -573,7 +573,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 120,
-     "pages_exact_no_review": 0.806060606060606,
+     "pages_exact_no_review": 0.8303030303030303,
      "flagged_per_100_pages": 33.05785123966942,
      "pages_exact_after_review": 0.9696969696969697,
      "unflagged_errors": 3,
@@ -584,7 +584,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 93,
-      "pages_exact_no_review": 0.7942386831275721,
+      "pages_exact_no_review": 0.7818930041152263,
       "flagged_per_100_pages": 37.2,
       "pages_exact_after_review": 0.9588477366255144,
       "unflagged_errors": 3,
@@ -594,7 +594,7 @@
       "pages": 113,
       "gaps": 77,
       "flagged": 27,
-      "pages_exact_no_review": 0.8390804597701149,
+      "pages_exact_no_review": 0.9655172413793104,
       "flagged_per_100_pages": 23.893805309734514,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -668,7 +668,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 286,
-     "pages_exact_no_review": 0.803030303030303,
+     "pages_exact_no_review": 0.796969696969697,
      "flagged_per_100_pages": 78.78787878787878,
      "pages_exact_after_review": 0.9878787878787879,
      "unflagged_errors": 1,
@@ -679,7 +679,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 213,
-      "pages_exact_no_review": 0.7530864197530864,
+      "pages_exact_no_review": 0.7489711934156379,
       "flagged_per_100_pages": 85.2,
       "pages_exact_after_review": 0.9835390946502057,
       "unflagged_errors": 1,
@@ -689,7 +689,7 @@
       "pages": 113,
       "gaps": 77,
       "flagged": 73,
-      "pages_exact_no_review": 0.9425287356321839,
+      "pages_exact_no_review": 0.9310344827586207,
       "flagged_per_100_pages": 64.60176991150442,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -770,7 +770,7 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 106,
-     "pages_exact_no_review": 0.8727272727272727,
+     "pages_exact_no_review": 0.8787878787878788,
      "flagged_per_100_pages": 29.201101928374655,
      "pages_exact_after_review": 0.9848484848484849,
      "unflagged_errors": 1,
@@ -781,7 +781,7 @@
       "pages": 250,
       "gaps": 238,
       "flagged": 85,
-      "pages_exact_no_review": 0.8477366255144033,
+      "pages_exact_no_review": 0.8600823045267489,
       "flagged_per_100_pages": 34.0,
       "pages_exact_after_review": 0.9794238683127572,
       "unflagged_errors": 1,
@@ -791,7 +791,7 @@
       "pages": 113,
       "gaps": 77,
       "flagged": 21,
-      "pages_exact_no_review": 0.9425287356321839,
+      "pages_exact_no_review": 0.9310344827586207,
       "flagged_per_100_pages": 18.58407079646018,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
@@ -858,7 +858,7 @@
   }
  ],
  "openai_measured": {
-  "date": "2026-10-12",
+  "date": "2026-11-13",
   "item": "W36.seg-opt-openai",
   "freeze": "options-frozen-openai.json"
  },
@@ -872,13 +872,8 @@
   "item": "W41.seg-finetune",
   "added": "W41.app-local-seg"
  },
- "rescored": {
-  "date": "2026-10-31",
-  "item": "W46.seg-truth-rescore",
-  "why": "the owner split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule (W46.seg-truth-sheet)"
- },
  "gemini_g2": {
-  "date": "2026-11-11",
+  "date": "2026-11-13",
   "item": "W46.seg-magazine-rule-app",
   "level": 0.965,
   "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",

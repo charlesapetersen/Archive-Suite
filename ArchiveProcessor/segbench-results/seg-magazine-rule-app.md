@@ -20,11 +20,11 @@ Fitted on all three development boxes (Dean, Deaver, Herrnstein; 551 pages): **<
 
 | | pages exact, no checking | checks per 100 pages | pages exact after checking | unflagged errors | per 500 pages |
 |---|---:|---:|---:|---:|---:|
-| g2 on 3.7 at <= 0.965 (the app's figures now) | 88.8% | 25.3 | 100.0% | 0 | 0.0 |
-|   Stanton | 88.1% | 32.4 | 100.0% | 0 | 0.0 |
-|   RG165 | 90.8% | 9.7 | 100.0% | 0 | 0.0 |
-| g2 on 3.7 at <= 0.965 (seg-magazine-rule.md) | 88.8% | 25.3 | 100.0% | 0 | 0.0 |
-| g1 on 3.8 at <= 0.965 (the figures it replaces) | 87.3% | 24.2 | 98.5% | 2 | 2.8 |
+| g2 on 3.7 at <= 0.965 (the app's figures now) | 87.6% | 25.3 | 100.0% | 0 | 0.0 |
+|   Stanton | 86.8% | 32.4 | 100.0% | 0 | 0.0 |
+|   RG165 | 89.7% | 9.7 | 100.0% | 0 | 0.0 |
+| g2 on 3.7 at <= 0.965 (seg-magazine-rule.md) | 87.6% | 25.3 | 100.0% | 0 | 0.0 |
+| g1 on 3.8 at <= 0.965 (the figures it replaces) | 90.0% | 24.2 | 97.0% | 3 | 4.1 |
 
 Unflagged errors at the refit level: none.
 

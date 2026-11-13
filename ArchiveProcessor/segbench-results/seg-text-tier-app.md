@@ -19,11 +19,11 @@ Fitted on all three development boxes (551 pages): **<= 0.950**, against <= 0.96
 
 | | pages exact, no checking | checks per 100 pages | pages exact after checking | unflagged errors | API cost per 1,000 pages, list / batch |
 |---|---:|---:|---:|---:|---:|
-| text alone at <= 0.950 (the tier's figures) | 87.3% | 29.2 | 98.5% | 1 | $1.68 / $0.84 |
-|   Stanton | 84.8% | 34.0 | 97.9% | 1 | — |
-|   RG165 | 94.3% | 18.6 | 100.0% | 0 | — |
-| text alone at the image level <= 0.965 (seg-text-tier-test.md) | 87.3% | 38.3 | 98.5% | 1 | — |
-| images and text, the Gemini only approach (options.json) | 88.8% | 25.3 | 100.0% | 0 | $3.61 / $1.81 |
+| text alone at <= 0.950 (the tier's figures) | 87.9% | 29.2 | 98.5% | 1 | $1.68 / $0.84 |
+|   Stanton | 86.0% | 34.0 | 97.9% | 1 | — |
+|   RG165 | 93.1% | 18.6 | 100.0% | 0 | — |
+| text alone at the image level <= 0.965 (seg-text-tier-test.md) | 87.9% | 38.3 | 98.5% | 1 | — |
+| images and text, the Gemini only approach (options.json) | 87.6% | 25.3 | 100.0% | 0 | $3.61 / $1.81 |
 
 Unflagged errors at its level: Stanton 144|145 (said continue, 0.985).
 

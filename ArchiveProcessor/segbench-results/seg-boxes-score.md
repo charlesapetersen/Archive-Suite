@@ -77,10 +77,10 @@ options.py's frozen Gemini approach (rule min, flag at or below 0.965), applied 
 
 | figure | 3.7, offset 0 | 3.7, offset 1 | 3.7, offset 2 | 3.7 range | 3.8, offset 0 (options.md) |
 |---|---:|---:|---:|---:|---:|
-| pages in an exact document, no checking | 85.2% | 83.0% | 84.2% | 83.0%–85.2% | 87.3% |
+| pages in an exact document, no checking | 89.1% | 89.4% | 87.0% | 87.0%–89.4% | 90.0% |
 | boundaries to check per 100 pages | 25.9 | 26.4 | 27.3 | 25.9–27.3 | 24.2 |
-| pages right after checking | 98.5% | 98.5% | 98.5% | 98.5%–98.5% | 98.5% |
-| unflagged errors per 500 pages | 2.8 | 2.8 | 2.8 | 2.8–2.8 | 2.8 |
+| pages right after checking | 97.0% | 98.5% | 97.0% | 97.0%–98.5% | 97.0% |
+| unflagged errors per 500 pages | 4.1 | 2.8 | 4.1 | 2.8–4.1 | 4.1 |
 | charged $ per 1,000 pages, all attempts (3.8: reference list estimate) | $3.59 | $3.82 | $3.56 | $3.56–$3.82 | $3.61 |
 | settled $ per 1,000 pages, retained allowances out | $3.59 | $3.57 | $3.56 | $3.56–$3.59 | — |
 
@@ -88,16 +88,16 @@ By box:
 
 | offset | box | no checking | to check per 100 pages | after checking | unflagged errors |
 |---|---|---:|---:|---:|---:|
-| 3.7 o0 | Stanton | 84.4% | 34.0 | 97.9% | 2 |
-| 3.7 o0 | RG165 | 87.4% | 8.0 | 100.0% | 0 |
-| 3.7 o1 | Stanton | 81.5% | 34.4 | 97.9% | 2 |
-| 3.7 o1 | RG165 | 87.4% | 8.8 | 100.0% | 0 |
-| 3.7 o2 | Stanton | 83.1% | 36.4 | 97.9% | 2 |
-| 3.7 o2 | RG165 | 87.4% | 7.1 | 100.0% | 0 |
-| 3.8 o0 | Stanton | 87.2% | 30.8 | 97.9% | 2 |
-| 3.8 o0 | RG165 | 87.4% | 9.7 | 100.0% | 0 |
+| 3.7 o0 | Stanton | 85.2% | 34.0 | 95.9% | 3 |
+| 3.7 o0 | RG165 | 100.0% | 8.0 | 100.0% | 0 |
+| 3.7 o1 | Stanton | 85.6% | 34.4 | 97.9% | 2 |
+| 3.7 o1 | RG165 | 100.0% | 8.8 | 100.0% | 0 |
+| 3.7 o2 | Stanton | 82.3% | 36.4 | 95.9% | 3 |
+| 3.7 o2 | RG165 | 100.0% | 7.1 | 100.0% | 0 |
+| 3.8 o0 | Stanton | 86.4% | 30.8 | 95.9% | 3 |
+| 3.8 o0 | RG165 | 100.0% | 9.7 | 100.0% | 0 |
 
-Unflagged errors, by gap: 3.7 o0: Stanton 101|102, Stanton 102|103; 3.7 o1: Stanton 101|102, Stanton 102|103; 3.7 o2: Stanton 101|102, Stanton 102|103; 3.8 o0: Stanton 101|102, Stanton 102|103. Every run's are the same pair, both a confident continue (0.98-0.99): the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B trained on the owner's corpus splits; prompt g2, which states the article-within-issue rule, splits both on Gemini 3.7 (seg-magazine-rule.md). So the route's 2.8 unflagged errors per 500 pages, here and in options.md, is the cloud models' own reading of those pages, which g1's rule 10 agrees with rather than causes, and "after checking 98.5%" is the same at every offset because the same confident pair is wrong every time. The other approaches' unflagged errors in options.md, from its cached test-box answers at their frozen levels (W46.seg-offsets-label): GLM-5.3 Flash's 3 are the same pair and Stanton 144|145; Claude's 3 (Stanton 124|125 and 144|145, RG165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) do not include it.
+Unflagged errors, by gap: 3.7 o0: Stanton 101|102, Stanton 102|103, Stanton 26|27; 3.7 o1: Stanton 101|102, Stanton 102|103; 3.7 o2: Stanton 101|102, Stanton 102|103, Stanton 26|27; 3.8 o0: Stanton 101|102, Stanton 102|103, Stanton 26|27. The other approaches' unflagged errors in options.md, from its cached test-box answers at their frozen levels (W46.seg-offsets-label): GLM-5.3 Flash's 3 are the same pair and Stanton 144|145; Claude's 3 (Stanton 124|125 and 144|145, RG165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) do not include it.
 
 At the two newsletter gaps (truth: new at both), every options.md approach from its cached test-box answers at its frozen rule and level (no call):
 
@@ -112,13 +112,13 @@ At the two newsletter gaps (truth: new at both), every options.md approach from 
 
 ## Reading
 
-On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%–85.2% and checks per 100 pages 25.9–27.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B trained on the owner's corpus splits; prompt g2, which states the article-within-issue rule, splits both on Gemini 3.7 (seg-magazine-rule.md).
+On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 87.0%–89.4% and checks per 100 pages 25.9–27.3; the shipped 3.8 route's own offset range is unmeasured.
 
 ## Measurement card
 
 - **Truth.** The three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated Review owner-ruled on the article-within-issue rule; SC0122 tags and teacher where they agreed, the owner's rulings where they did not, locked 2026-10-29/30) with every unsure gap out; Stanton and RG165 as options.md scores them (Stanton with the owner's 2026-10-31 sheet rulings). No scored route drafted a truth, except that SC0122's agreed stratum is where the teacher agreed with the tag: the owner's 60 blind controls on it found no error, and the SC0122 section reports it apart.
 - **Selection.** The boxes whole, named by the owner before any of these routes ran on them; the offset boxes are options.md's test set. Nothing chosen by a tested route or by ABBYY text.
 - **Comparison.** Every route on the same windows and Vision text, scored on the same known gaps and resolved documents. The Mac 2B and the Sherlock models see 1,024 px images and prompt l1; Gemini sees 1,600 px and g1, as each is run in the bench and the app. Both OCR sets do not apply: this is segmentation.
-- **Noise.** Single runs at temperature 0. Gemini 3.7's window offsets, at the 3.8-fitted level, move no-check exact pages by 2.1 points; the shipped 3.8 route's own offset range is unmeasured. A difference between routes smaller than the offset spread, or than the 1.4-3.2-point rerun floor a box (measured in pages exact; applied to gap accuracy it is a guide, not a measured floor), is a tie. The unflagged-error figures do not move across offsets because the same two confident Stanton gaps are wrong every time. Sign tests are sampling only.
+- **Noise.** Single runs at temperature 0. Gemini 3.7's window offsets, at the 3.8-fitted level, move no-check exact pages by 2.4 points; the shipped 3.8 route's own offset range is unmeasured. A difference between routes smaller than the offset spread, or than the 1.4-3.2-point rerun floor a box (measured in pages exact; applied to gap accuracy it is a guide, not a measured floor), is a tie. Sign tests are sampling only.
 - **Scope.** Three owner boxes and two test boxes. Its Gemini rows are prompt g1, which still says full magazine; g2, on the article-within-issue rule, is measured against them in seg-magazine-rule.md (W46.seg-magazine-rule-redo). It does not settle 3.8 against 3.7 on these boxes, the shipped 3.8 route's own offset range (the gateway serves only 3.7), or a level fitted for 3.7.
 
