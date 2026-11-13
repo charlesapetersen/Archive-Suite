@@ -3,34 +3,44 @@ import AppKit
 import ArchiveCoreUI
 
 /// The item-list filter bar (06-viewers §4, W6-S4). Binds a per-window `NotesNavigationModel` and
-/// surfaces the kind segmented control, a keyword search field (drives FTS — bm25 relevance,
-/// as-you-type), quality (★1–★3) toggles, a tag filter with chips (every tag must match), a year date
-/// range with its own clear button, Save-as-Smart-Folder / Clear All, and the In effect row of chips. Matching any tag rather than
-/// all of them belongs to Advanced Search (`NotesAdvancedSearchSheet`, the bar's Advanced Search button), not this bar (owner, notes-1
-/// row 37, as ruled for the Reader on 2026-11-04). The shared folder/smart-folder SCOPE comes from the tree
+/// surfaces the kind segmented control, quality (Q1–Q3) toggles, a tag filter with chips (every tag must match), a
+/// Dates button whose popover holds the year range, Save as Smart Folder / Clear All, a keyword search field (drives
+/// FTS — bm25 relevance, as-you-type) with Advanced…, and the In effect row of chips. Matching any tag rather than
+/// all of them belongs to Advanced Search (`NotesAdvancedSearchSheet`), not this bar (owner, notes-1 row 37, as
+/// ruled for the Reader on 2026-11-04). The shared folder/smart-folder SCOPE comes from the tree
 /// (`NotesModel.scope`) and is merged with this window's filter at `recompute()`.
 ///
-/// Adapted from Reader's `NavigationWindowView.filterBar`; layout is compact rows so all facets
-/// stay visible at the browser's minimum width.
+/// It is laid out as the Reader's bar is, from the same pieces (W40.suite-reader-notes-consistency; owner, Notes
+/// session 2 row 21: "the filtering UI should match the Reader's"): what the notes are on the first row, in a
+/// `FilterBarLayout` that moves a control to the next row when it does not fit without rebuilding the field being
+/// typed in, Save as Smart Folder and Clear All at its right; the search on the second; In effect under them.
+/// The kind control stands where the Reader's read state does. Save stays shown with nothing else in effect, since a
+/// window's kind alone is worth saving (a Notes-only smart folder, W9.d9).
 struct NotesFilterBar: View {
     @ObservedObject var nav: NotesNavigationModel
 
     @State private var pendingTag = ""
     @State private var showingSaveSheet = false
+    @State private var showingDateFilter = false
     @State private var smartFolderName = ""
 
     var body: some View {
-        VStack(spacing: 6) {
-            topRow
-            facetRow
+        VStack(alignment: .leading, spacing: 8) {
+            FilterBarLayout(spacing: 12) {
+                kindPicker
+                qualityToggles
+                tagFilter
+                datesButton
+                saveButton.filterBarTrailing()
+                clearAllButton.filterBarTrailing()
+            }
+            searchRow
             // Round-up is not a filter here (owner, notes-2 row 19): it is set in the inspector and searched
             // in Advanced Search, whose chip still shows in the row below.
-            tagFilter
             let chips = nav.activeFilterChips
             if !chips.isEmpty { activeFilterChipRow(chips) }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(8)
         .sheet(isPresented: $showingSaveSheet) {
             NameEntrySheet(title: "Save as Smart Folder",
                            message: "Saves the current filters and keyword as a reusable smart folder.",
@@ -43,28 +53,7 @@ struct NotesFilterBar: View {
         }
     }
 
-    // MARK: Row 1 — kind · keyword · count · actions
-
-    /// One row when it fits. At the list's narrowest it does not on macOS 27, whose segmented control is
-    /// wider (each segment as wide as "Extracts": 224 pt in all, 24 pt over the 540 pt list), so the
-    /// keyword field takes a line of its own below the rest rather than the row spilling past the pane.
-    private var topRow: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                kindPicker
-                keywordField
-                topRowActions
-            }
-            VStack(spacing: 6) {
-                HStack(spacing: 8) {
-                    kindPicker
-                    Spacer(minLength: 0)
-                    topRowActions
-                }
-                keywordField
-            }
-        }
-    }
+    // MARK: Row 1 — kind · quality · tags · dates; Save / Clear All at the right
 
     private var kindPicker: some View {
         Picker("Kind", selection: $nav.kindFilter) {
@@ -75,62 +64,147 @@ struct NotesFilterBar: View {
         .pickerStyle(.segmented)
         .labelsHidden()
         .fixedSize()
+        .help("Filter the list by kind")
         .accessibilityIdentifier("an.filter.kind")
     }
 
-    @ViewBuilder private var topRowActions: some View {
-        Button { nav.openAdvancedSearch() } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+    /// Q1 → Q3 toggle buttons binding `filter.qualities`, as the Reader's (the quality is the same 1–3 in both apps).
+    private var qualityToggles: some View {
+        HStack(spacing: 4) {
+            ForEach([1, 2, 3], id: \.self) { q in
+                Toggle("Q\(q)", isOn: Binding(
+                    get: { nav.filter.qualities.contains(q) },
+                    set: { on in
+                        if on { nav.filter.qualities.insert(q) } else { nav.filter.qualities.remove(q) }
+                    }))
+                .toggleStyle(.button)
+                .controlSize(.small)
+                .help("Show only items at quality Q\(q)")
+                .accessibilityIdentifier("an.filter.quality.\(q)")
+            }
         }
-        .help("Advanced Search: rules for text, title, tags, kind, quality, dates and folders (⇧⌥⌘F)")
-        .accessibilityLabel("Advanced Search")
-        .accessibilityIdentifier("an.filter.advanced")
+        .fixedSize()   // squeezed, the toggles collapse to "…" pills
+    }
 
-        Text("\(nav.displayed.count)")
-            .font(.callout.monospacedDigit())
-            .foregroundStyle(.primary)
-            .help("Items shown")
-            .accessibilityIdentifier("an.filter.count")
+    /// The chosen tags as the Reader's chips, wrapping inside the field's width, and the suite's tag field after
+    /// them (W40.fix-notes-tag-fields; owner session notes-2 row 20). Bounded like the Reader's tag filter, so it
+    /// gives way first in a narrow list and moves to a row of its own rather than squeezing the field.
+    private var tagFilter: some View {
+        HStack(alignment: .top, spacing: 4) {
+            Image(systemName: "tag").foregroundStyle(.secondary).frame(height: 22)
+                .accessibilityHidden(true)
+            NoteTagChipsField(tags: $nav.filter.tags, draft: $pendingTag, placeholder: "Filter by tag…",
+                              identifier: "an.filter.tagInput", chipIdentifier: "an.filter.tagChip",
+                              suggestions: { NoteTagChipsField.suggestions(in: nav.model.allItems) })
+        }
+        .frame(minWidth: NoteTagChipsField.fieldWidth + 24, idealWidth: 260, maxWidth: 360, alignment: .leading)
+        .help("Filter by tag — type to autocomplete the tags on notes; Return adds it; ✕ removes it")
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("an.filter.tags")
+    }
 
-        Button {
+    /// The Reader's compact Dates button; the year range is in its popover, and the button shows it once set.
+    private var datesButton: some View {
+        Button { showingDateFilter = true } label: {
+            if let years = nav.filter.dateYearsSummary {
+                Label(years, systemImage: "calendar")
+            } else {
+                Label("Dates", systemImage: "calendar").labelStyle(.iconOnly)
+            }
+        }
+        .controlSize(.small)
+        .fixedSize()
+        .help("Filter by year")
+        .accessibilityIdentifier("an.filter.dates")
+        .popover(isPresented: $showingDateFilter) { dateFilterPopover }
+    }
+
+    private var saveButton: some View {
+        Button("Save as Smart Folder") {
             smartFolderName = ""
             showingSaveSheet = true
-        } label: {
-            Image(systemName: "folder.badge.plus")
         }
-        .help("Save as Smart Folder")
+        .fixedSize()
+        .help("Save these filters as a smart folder in the sidebar")
         .accessibilityIdentifier("an.filter.save")
+    }
 
+    private var clearAllButton: some View {
         Button("Clear All") {
             nav.clearAll()
             pendingTag = ""
         }
+        .fixedSize()
         .disabled(!nav.canClearAll && pendingTag.isEmpty)
         .help(nav.clearAllHelp)
         .accessibilityIdentifier("an.filter.clear")
     }
 
-    private var keywordField: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+    private var dateFilterPopover: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Year range").font(.headline)
+            HStack(spacing: 4) {
+                TextField("From", text: fromYearText)
+                    .accessibilityLabel("From year")
+                    .accessibilityIdentifier("an.filter.dateFrom")
+                Text("\u{2013}").foregroundStyle(.secondary)
+                    .accessibilityHidden(true)   // decorative: the fields are named From year and To year
+                TextField("To", text: toYearText)
+                    .accessibilityLabel("To year")
+                    .accessibilityIdentifier("an.filter.dateTo")
+            }
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 160)
+            Text("Matches a note's own date or the date of the letter it was sent with.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Clear") { nav.clearDateFilter() }
+                    .disabled(!nav.hasDateFilter)
+                    .help("Clear the date filter")
+                    .accessibilityIdentifier("an.filter.dateClear")
+                Spacer()
+                Button("Done") { showingDateFilter = false }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(12).frame(width: 220)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: Row 2 — the search, Advanced…, the count
+
+    /// The keyword search on its own row, a size larger, as the Reader's OCR search (W40.fix-reader-filter-bar).
+    private var searchRow: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(nav.searchText.isEmpty ? Color.secondary : Color.accentColor)
+                .accessibilityHidden(true)
             TextField("Search notes…", text: $nav.searchText)
-                .textFieldStyle(.plain)
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.large)
+                .frame(minWidth: 160, idealWidth: 320, maxWidth: 380)
+                .help("Search the notes' titles and text")
                 .accessibilityLabel("Search notes")
                 .accessibilityIdentifier("an.filter.search")
             if !nav.searchText.isEmpty {
                 Button { nav.searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .buttonStyle(.borderless)
+                .help("Clear the search")
                 .accessibilityIdentifier("an.filter.searchClear")
             }
+            Button("Advanced\u{2026}") { nav.openAdvancedSearch() }
+                .fixedSize()
+                .help("Advanced Search: rules for text, title, tags, kind, quality, dates and folders (⇧⌥⌘F)")
+                .accessibilityIdentifier("an.filter.advanced")
+            Spacer(minLength: 8)
+            Text("\(nav.displayed.count)")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.primary)
+                .fixedSize()
+                .help("Items shown")
+                .accessibilityIdentifier("an.filter.count")
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .textBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)))
-        .frame(minWidth: 120)   // so the row fits beside the Advanced Search button at the list's narrowest
     }
 
     /// Every filter and search in effect, each a chip whose ✕ removes it: the Reader's In effect row
@@ -159,81 +233,6 @@ struct NotesFilterBar: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Filters in effect")
         .accessibilityIdentifier("an.filter.chips")
-    }
-
-    // MARK: Row 2 — quality · date range; row 3 — tags
-
-    private var facetRow: some View {
-        HStack(spacing: 12) {
-            qualityToggles
-            Divider().frame(height: 16)
-            dateRange
-            Spacer(minLength: 0)
-        }
-    }
-
-    /// ★3…★1 toggle row (highest first), binding `filter.qualities`. Structurally copied from Reader's
-    /// priority toggles (`NavigationWindowView.swift:256-267`, there `[10,9,8,7]`).
-    private var qualityToggles: some View {
-        HStack(spacing: 2) {
-            ForEach([3, 2, 1], id: \.self) { q in
-                let on = nav.filter.qualities.contains(q)
-                Button {
-                    if on { nav.filter.qualities.remove(q) } else { nav.filter.qualities.insert(q) }
-                } label: {
-                    Image(systemName: on ? "star.fill" : "star")
-                        .foregroundStyle(on ? Color.yellow : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Quality \(q)")
-                .accessibilityIdentifier("an.filter.quality.\(q)")
-            }
-        }
-    }
-
-    /// Its own row, the width of the bar, so the field is big enough and the chips wrap
-    /// (W40.fix-notes-tag-fields; owner session notes-2 row 20).
-    private var tagFilter: some View {
-        HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "tag").foregroundStyle(.secondary).frame(height: 22)
-                .accessibilityHidden(true)
-            NoteTagChipsField(tags: $nav.filter.tags, draft: $pendingTag, placeholder: "Tag…",
-                              identifier: "an.filter.tagInput", chipIdentifier: "an.filter.tagChip",
-                              suggestions: { NoteTagChipsField.suggestions(in: nav.model.allItems) })
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("an.filter.tags")
-    }
-
-    private var dateRange: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "calendar").foregroundStyle(.secondary)
-            TextField("From", text: fromYearText)
-                .frame(width: 54)
-                .textFieldStyle(.roundedBorder)
-                .help("From year")
-                .accessibilityLabel("From year")
-                .accessibilityIdentifier("an.filter.dateFrom")
-            Text("–").foregroundStyle(.primary)
-                .accessibilityHidden(true)   // decorative: the fields are named From year and To year
-            TextField("To", text: toYearText)
-                .frame(width: 54)
-                .textFieldStyle(.roundedBorder)
-                .help("To year")
-                .accessibilityLabel("To year")
-                .accessibilityIdentifier("an.filter.dateTo")
-            if nav.hasDateFilter {
-                Button { nav.clearDateFilter() } label: {
-                    Image(systemName: "xmark.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Clear the date filter")
-                .accessibilityLabel("Clear the date filter")
-                .accessibilityIdentifier("an.filter.dateClear")
-            }
-        }
     }
 
     // MARK: Actions + derived bindings

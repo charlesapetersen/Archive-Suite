@@ -29,10 +29,12 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
             mainWindow.buttons["an.filter.searchClear"].click()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == self.allNotes })
 
-            mainWindow.buttons["an.filter.quality.3"].click()
+            // Q1–Q3 toggle buttons, as the Reader's (W40.suite-reader-notes-consistency).
+            let q3 = mainWindow.descendants(matching: .any)["an.filter.quality.3"].firstMatch
+            q3.click()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] },
                           "Quality 3 should leave only the quality-3 note, saw \(visibleNotes())")
-            mainWindow.buttons["an.filter.quality.3"].click()
+            q3.click()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == self.allNotes },
                           "toggling Quality 3 off should restore the list")
 
@@ -43,25 +45,35 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == self.allNotes },
                           "Clear should drop the tag facet")
 
-            let from = mainWindow.textFields["an.filter.dateFrom"]
+            // The year range is in the Dates button's popover, as the Reader's (W40.suite-reader-notes-consistency).
+            let dates = mainWindow.descendants(matching: .any)["an.filter.dates"].firstMatch
+            XCTAssertTrue(dates.waitForExistence(timeout: 5), "the bar has a Dates button")
+            dates.click()
+            let from = app.textFields["an.filter.dateFrom"].firstMatch
+            XCTAssertTrue(from.waitForExistence(timeout: 5), "the Dates popover holds the From year")
             from.click()
             from.typeText("1960")
-            let to = mainWindow.textFields["an.filter.dateTo"]
+            let to = app.textFields["an.filter.dateTo"].firstMatch
             to.click()
             to.typeText("1970\r")
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] },
                           "1960–1970 should leave only the 1968 note, saw \(visibleNotes())")
+            if from.exists { app.typeKey(.escape, modifierFlags: []) }   // Return may have been the field's alone
+            XCTAssertTrue(pollUntil(timeout: 5) { !from.exists }, "the popover closes")
+            XCTAssertTrue(dates.label.contains("1960"), "the Dates button shows the range, saw \(dates.label)")
             // W40.fix-notes-filter-bar: the date range has its own clear, which keeps other facets.
             addTagFacet("intel")
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idReader] })
-            let dateClear = mainWindow.descendants(matching: .any)["an.filter.dateClear"].firstMatch
-            XCTAssertTrue(dateClear.waitForExistence(timeout: 5), "a set date range should offer its clear")
+            dates.click()
+            let dateClear = app.buttons["an.filter.dateClear"].firstMatch
+            XCTAssertTrue(dateClear.waitForExistence(timeout: 5), "the Dates popover offers its Clear")
+            XCTAssertTrue(dateClear.isEnabled, "a set date range can be cleared")
             dateClear.click()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idPlain, Self.idReader] },
                           "clearing the date should keep the intel tag, saw \(visibleNotes())")
             XCTAssertEqual(from.value as? String ?? "", "", "the From field should be empty")
-            XCTAssertFalse(mainWindow.descendants(matching: .any)["an.filter.dateClear"].exists,
-                           "with no date set there is nothing to clear")
+            XCTAssertFalse(dateClear.isEnabled, "with no date set there is nothing to clear")
+            app.typeKey(.escape, modifierFlags: [])
             clearFilters()
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == self.allNotes },
                           "Clear All should drop the tag")
