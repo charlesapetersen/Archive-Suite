@@ -192,7 +192,7 @@ Covered by `FilenameFilterFieldTests`, `NavigationUITests.testFilenameFilterUndo
 
 Plain arrows pan the focused PDF page, bounded at its edges; modified arrows retain menu and text-selection behavior. Clicking a PDF or extracted-text pane updates the focus border and focused zoom even without a selection. Rebuilt panes recover keyboard focus only when the window itself holds it, preserving the Find field’s caret.
 
-`DocumentPaneInputTests` exercises real PDFKit scroll geometry and never-ordered AppKit windows, including PDF/extracted-text replacements and a live field editor. Whole-window pointer/key verification remains in W40.fix-reader-doc-keys-focus-ui (blocked on W40.vm-macos27-reader); add/run `ViewerUITests.testDocumentPaneKeyboardFocusAndPan` there and inspect its screenshots.
+`DocumentPaneInputTests` exercises real PDFKit scroll geometry and never-ordered AppKit windows, including PDF/extracted-text replacements and a live field editor. Whole-window pointer/key verification: `ArchiveReaderUITests/DocumentPaneKeysUITests.testDocumentPaneKeyboardFocusAndPan` passes in the macOS 27.2 guest (W40.fix-reader-doc-keys-focus-ui, 2026-11-12, 3 of 3; screenshots read).
 
 ## PDF header metadata and format ambiguities (W44.reocr-spec, 2026-11-07)
 
