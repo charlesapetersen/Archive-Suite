@@ -51,6 +51,12 @@ final class PageViewsUITests: FixtureUITestCase {
         XCTAssertTrue(firstTile.waitForExistence(timeout: 5), "⌥⌘6 shows the contact sheet")
         XCTAssertTrue(app.buttons["ar.doc.pageTile.2.1"].exists, "with the pages of both files")
         XCTAssertFalse(sidebar.exists, "the sheet takes the sidebar's place")
+        // One grid across the files, as in Preview (W40.reader-contact-sheet-grid): the second file's pages follow
+        // the first file's on the same row rather than starting a row of their own.
+        let secondFile = app.buttons["ar.doc.pageTile.2.1"], firstSecond = app.buttons["ar.doc.pageTile.1.2"]
+        print("[page-views] sheet tiles 1.1 \(firstTile.frame) 1.2 \(firstSecond.frame) 2.1 \(secondFile.frame)")
+        XCTAssertEqual(secondFile.frame.midY, firstTile.frame.midY, accuracy: 2, "the files share a row")
+        XCTAssertGreaterThan(secondFile.frame.minX, firstSecond.frame.maxX, "in page order")
         settle(2)
         captureScreenshot("w40-page-views-contact-sheet")
         firstTile.click()

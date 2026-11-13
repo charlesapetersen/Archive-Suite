@@ -117,6 +117,20 @@ final class PageViewsTests: XCTestCase {
         XCTAssertEqual(single.pageView, .thumbnails)
     }
 
+    /// The contact sheet is one run of tiles across the files (W40.reader-contact-sheet-grid): every page in order,
+    /// a file not yet counted stands in with its first page, and one that cannot be opened keeps that page's id.
+    func testTheContactSheetRunsEveryFilesPagesInOneGrid() {
+        let counts: [String: Int] = ["/a.pdf": 3, "/b.pdf": 0]
+        let cells = ContactSheetCell.cells(files: ["/a.pdf", "/b.pdf", "/c.pdf"]) { counts[$0] }
+        XCTAssertEqual(cells.map(\.slot), [PageSlot(file: 0, index: 0), PageSlot(file: 0, index: 1),
+                                           PageSlot(file: 0, index: 2), PageSlot(file: 1, index: 0),
+                                           PageSlot(file: 2, index: 0)])
+        XCTAssertEqual(cells.map(\.unreadable), [false, false, false, true, false])
+        XCTAssertEqual(cells.map(\.path), ["/a.pdf", "/a.pdf", "/a.pdf", "/b.pdf", "/c.pdf"])
+        XCTAssertEqual(Set(cells.map(\.id)).count, cells.count, "ids are unique across files")
+        XCTAssertTrue(ContactSheetCell.cells(files: []) { _ in nil }.isEmpty)
+    }
+
     /// The menu items' keys, as the table holds them.
     func testThePageViewCommandsAreBoundToPreviewsKeys() {
         XCTAssertEqual(ReaderCommand.singlePage.glyph, "⌥⌘1")
