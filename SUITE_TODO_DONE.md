@@ -15718,3 +15718,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   green; `PageViewsUITests` green in the VM, now asserting the View menu reads Show then Hide Thumbnails in both windows.
   No bench-cache scratch made.
   <!-- /W40.reader-thumbnails-toggle -->
+- [x] **W40.reader-image-context-menu — Copy Image and Reveal in Finder on right-click in the viewer [S]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Owner, 2026-11-13: when right-clicking an image in the viewer, offer Copy Image and Reveal in Finder. SHIPPED 2026-11-13.
+  The image pane's `ReaderPDFView.menu(for:)` puts Copy Image and Reveal in Finder above PDFKit's own items, in the
+  document window and the preview sheet alike; the text page keeps PDFKit's menu (only the left controller gets the
+  actions). Copy Image (`DocumentViewerModel.copyImage`) renders the shown image with `PDFPaneController.render` from
+  a private copy turned as `PageTurnStore` says: the PDF's image page at 300 dpi, a JPEG original one to one, the
+  longer side held to 8000 px. Reveal in Finder selects the shown image's file: the JPEG while it is shown, else the
+  PDF. Both only read. Copy Image is a new `ReaderCommand` without a key; Reveal in Finder takes the table's name.
+  Tests: `PageRotationTests` +4 (copied size and top band at four turns, the pasteboard's image, the file's hash
+  unchanged, the JPEG one to one, the menu's items, validation and actions, the text pane left alone); Reader unit
+  bundle 844 green. `ImageContextMenuUITests` green in the VM: the fixture's page copies 2550×3300 upright and
+  3300×2550 after ⌃⌘R; its screenshot shows the menu. Its text-pane check is skipped on that single-page fixture
+  (no OCR text page), so the unit test carries it. No bench-cache scratch made.
+  <!-- /W40.reader-image-context-menu -->
