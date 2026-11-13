@@ -1,0 +1,127 @@
+{
+ "item": "W46.seg-truth-owner-fixes",
+ "date": "2026-11-13",
+ "source": "W46.seg-check-time review-20261113/answers.json",
+ "rulings": [
+  {
+   "box": "Stanton",
+   "left": 26,
+   "right": 27,
+   "timed": "join",
+   "call": "mine-right",
+   "truth_before": "New",
+   "truth_after": "Cont",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 32,
+   "right": 33,
+   "timed": "join",
+   "call": "mine-right",
+   "truth_before": "New",
+   "truth_after": "Cont",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 33,
+   "right": 34,
+   "timed": "split",
+   "call": "mine-right",
+   "truth_before": "Cont",
+   "truth_after": "New",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 46,
+   "right": 47,
+   "timed": "split",
+   "call": "mine-right",
+   "truth_before": "Cont",
+   "truth_after": "New",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 49,
+   "right": 50,
+   "timed": "join",
+   "call": "mine-right",
+   "truth_before": "New",
+   "truth_after": "Cont",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 53,
+   "right": 54,
+   "timed": "split",
+   "call": "mine-right",
+   "truth_before": "Cont",
+   "truth_after": "New",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 56,
+   "right": 57,
+   "timed": "split",
+   "call": "truth-right",
+   "truth_before": "Cont",
+   "truth_after": "Cont",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 101,
+   "right": 102,
+   "timed": "join",
+   "call": "depends",
+   "truth_before": "New",
+   "truth_after": "New",
+   "unsure": false
+  },
+  {
+   "box": "Stanton",
+   "left": 124,
+   "right": 125,
+   "timed": "join",
+   "call": "mine-right",
+   "truth_before": "New",
+   "truth_after": "Cont",
+   "unsure": false
+  },
+  {
+   "box": "RG165",
+   "left": 79,
+   "right": 80,
+   "timed": "split",
+   "call": "unsure",
+   "truth_before": "Cont",
+   "truth_after": "Cont",
+   "unsure": true
+  },
+  {
+   "box": "RG165",
+   "left": 85,
+   "right": 86,
+   "timed": "join",
+   "call": "mine-right",
+   "truth_before": "New",
+   "truth_after": "Cont",
+   "unsure": false
+  },
+  {
+   "box": "RG165",
+   "left": 99,
+   "right": 100,
+   "timed": "join",
+   "call": "unsure",
+   "truth_before": "New",
+   "truth_after": "New",
+   "unsure": true
+  }
+ ]
+}
