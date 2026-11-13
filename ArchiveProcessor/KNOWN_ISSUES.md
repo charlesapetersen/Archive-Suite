@@ -2,6 +2,27 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W46.date-route, 2026-11-13): what the dating route does not yet cover
+
+- **Process Files only.** Live Capture and the manual sheet's auto-date still take the tagging call's date, which
+  always writes a year (`W46.date-route-other-paths`).
+- **The image pass runs only through a remote gateway** (Gemini 3.7 Flash, the measured route). On a direct key,
+  OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
+  estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`
+  (`W46.date-route-image-routes`).
+- **The evidence is in the sidecar's `dating` object, not yet in the PDF header** (`W46.date-route-header`).
+- **A reclassification after tagging** refreshes `Sent With` (W37) but not an enclosure's inherited own year: an
+  enclosure that stops being one keeps its cover's year, still marked `Date Uncertain`, and a page newly marked an
+  enclosure does not inherit, until the run is tagged again.
+- **A year the reply quotes from the document itself counts as explicit** even when no rule candidate carries it (a
+  two-digit `'47`, an OCR-damaged `196L`), as the measured bench route does (`date_route_pipeline.route`); 08-dating.md
+  §3 words step 1 by the rule candidate alone. The model's own flag can still add `Date Uncertain` there.
+- **No propagation fallback.** 08-dating.md §3 step 4 names propagation (the nearest earlier dated document, t=3) for a
+  route with no model for the step; the app has no such route yet (every tagging run has a text model), so a failed
+  dating call writes no year, the rule's explicit year standing where there is one (the stage's Fallback rule).
+- **The folder's date (step 3b)** is `W47.ct-folder-date`'s; a document in a dated folder is estimated from its
+  neighbours meanwhile.
+
 ## ⚠️ LIMITATION (W44.reocr-processor, 2026-11-12): what Improve OCR does not do yet
 
 - **Refused for in-place improvement:** encrypted or signed files, files ending in a cross-reference stream (the

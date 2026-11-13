@@ -808,6 +808,9 @@ struct SettingsSheetModel {
         switch key {
         case .straightenReadingCopy: return "Straighten sloping pages"
         case .placeHandOnImage: return "Put handwritten text on the page image (a page where the fit is unsure gets a separate text page)"
+        case .dateImageEveryDocument:
+            return "Search the page image on every document, not only those whose text has no year: finds stamp dates "
+                + "(kept beside the document's own date); about $1.93 more per 1,000 documents"
         default: return nil
         }
     }
@@ -817,6 +820,7 @@ struct SettingsSheetModel {
         switch id {
         case "reading_copy.straighten": return .straightenReadingCopy
         case "place.hand_on_image": return .placeHandOnImage
+        case "dating.image_every_document": return .dateImageEveryDocument
         default: return nil
         }
     }

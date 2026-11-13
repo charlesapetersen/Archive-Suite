@@ -451,6 +451,7 @@ public enum CollectionSettingsVocabulary {
         "checkingMinutes": "Minutes you will spend checking where documents begin",
         "straightenReadingCopy": "Straighten the copy you read",
         "placeHandOnImage": "Place handwritten text on the page image",
+        "dateImageEveryDocument": "Search the page image for dates on every document",
     ]
 
     /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.

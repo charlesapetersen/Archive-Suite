@@ -372,7 +372,8 @@ HEADERS = {
    "kinds": ["in_text", "not_in_text", "enclosure", "undated", "decade"],
    "rules": [
     {"id": "steps", "text": "Steps in order: explicit from the text; explicit from the image on documents with no year candidate in the text; inherited from a cover or a dated folder; estimated from neighbours with checked evidence, always Date Uncertain.", "source": "date-image.md", "switch": None},
-    {"id": "uncertain-by-evidence", "text": "Date Uncertain is set by the evidence class, never by the model's flag.", "source": "date-truth.md", "switch": None},
+    {"id": "image-every-document", "text": "The image pass on documents whose text already has a year is the user's option, off by default; on, it adds stamp dates as second-role dates, about $1.93 more per 1,000 documents (owner, 2026-11-12).", "source": "date-route-pipeline.md", "switch": {"id": "dating.image_every_document", "label": "Search the page image for dates on every document", "default": False}},
+    {"id": "uncertain-by-evidence", "text": "Date Uncertain is set by the evidence class; the model's own flag may only add it to an explicit text year, never remove it (owner, 2026-11-12).", "source": "date-truth.md", "switch": None},
     {"id": "no-untraceable-guess", "text": "A reply whose evidence fails is not written as a date and not shown as a suggestion.", "source": "date-traceable.md", "switch": None},
     {"id": "no-typeface-dating", "text": "Typeface or paper dating and look-alike retrieval are not steps.", "source": "date-image-typeface.md", "switch": None},
     {"id": "not-on-labels", "text": "Box and folder label segments are not dated as documents; they are inputs to folder inheritance.", "source": "B-dating.md", "switch": None}],

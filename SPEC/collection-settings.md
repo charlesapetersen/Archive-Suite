@@ -69,7 +69,7 @@ above), so a collection's mix is never read beside a project's `strata`.
 | `weights` | `numbers` | Each ranked priority's weight by the same names. Absent means 45, 30, 15, 10 by position. |
 | `batchCeilingUSD`, `hours`, `checkingMinutes` | `double` | This collection's batch limits. A ceiling has effect only when the general spending habit allows money. |
 | `preference` | `string` | `bestMeasured`, `cheapestWithinPoint` or `fastestWithinPoint`. |
-| `staysOnMac`, `straightenReadingCopy`, `placeHandOnImage` | `bool` | The switches: pages stay on this Mac, straighten the copy you read (note 01), place handwritten text on the page image (note 05; the settings sheet's rules tab). |
+| `staysOnMac`, `straightenReadingCopy`, `placeHandOnImage`, `dateImageEveryDocument` | `bool` | The switches: pages stay on this Mac, straighten the copy you read (note 01), place handwritten text on the page image (note 05; the settings sheet's rules tab), search the page image for dates on every document, not only those whose text has no year (note 08; off by default, owner 2026-11-12). |
 
 `V` is `{ "type": T, "value": … }`, with `T` one of `bool`, `int`, `double`, `string`, `strings` (a list) or `numbers`
 (a name → number map, such as the document mix in percent).

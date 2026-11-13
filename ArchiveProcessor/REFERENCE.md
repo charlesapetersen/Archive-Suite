@@ -330,6 +330,8 @@ OCR/                           OCR pipeline + provider clients:
                                fields, optional box/folder format override). Both Process-Files and Live
                                writeSegmentJSON delegate to it; callers own the URL + atomic disk write.
                                An `entities` object (W46.ent-feature) replaces the tagging call's three name keys.
+                               A `dating` object (W46.date-route): evidence class, quote and its place, the
+                               interval where measured, second-role (stamp) dates.
 Tagging/                       Finder-tag writing + segmentation (Tier-2 — writes irreplaceable data):
   MacOSTagger.swift            Fresh-write ADAPTER over `ArchiveCore.CoordinatedTagWriter`; writes Finder tags
                                (subjects/date/Quality/color + trailing Unread) — no direct `setResourceValue` here.
@@ -339,6 +341,11 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
                                `entities` object and `EntityRunPolicy` (correspondence only; cloud always, Mac when
                                names rank; no Vision sender, no Vision hands). Wired in `performTaggingPhase`
                                and `LiveCaptureProcessor.liveEntities` (kept in the staging manifest).
+  DateRoute.swift              W46.date-route: the dating route (08-dating.md §3), the bench's own code ported: rule
+                               candidates, the trace prompt and reply, the evidence check, the image reading, the
+                               step decision. `DateRoute+Run.swift`: the trace call (the measured gateway request,
+                               else the run's route), the gateway image pass, `apply(to:)`, step 3a `inherit`, the
+                               sidecar's `dating` object. Wired in `performTaggingPhase` / `applyGeneratedTags`.
   DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification;
                                `enclosureOf` (W37) from the OCR `[enclosure]` marker, never adjacency.
   CollectionSegmenter.swift    Group files into box/folder collections.

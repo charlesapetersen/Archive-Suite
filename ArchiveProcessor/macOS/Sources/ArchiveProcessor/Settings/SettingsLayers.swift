@@ -217,6 +217,9 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let straightenReadingCopy = SettingsKey(rawValue: "straightenReadingCopy")
     /// Placement's one switch (note 05, the settings sheet's rules tab): handwritten text on the page image.
     static let placeHandOnImage = SettingsKey(rawValue: "placeHandOnImage")
+    /// Dating's one switch (owner, 2026-11-12, W46.date-route-owner-ok (b)): the image pass on documents whose text
+    /// already has a year, for their stamp dates. Off: step 2 runs only where the text has no year (call 7.3).
+    static let dateImageEveryDocument = SettingsKey(rawValue: "dateImageEveryDocument")
 
     static let overridePrefix = "override."
     /// A stage card's chosen route, set when the user overrides the solver's pick.
@@ -230,7 +233,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
         .preference, .priorities, .weights, .staysOnMac, .readingFallback, .checkingMinutes, .straightenReadingCopy,
-        .placeHandOnImage,
+        .placeHandOnImage, .dateImageEveryDocument,
     ]
     static let catalog: [SettingsKey] = generalOnly + anyLayer
 
@@ -268,6 +271,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         // Owner call 6: straightening on by default, switchable off.
         case .straightenReadingCopy: return .bool(true)
         case .placeHandOnImage: return .bool(true)   // the table's default (05-placement.md)
+        case .dateImageEveryDocument: return .bool(false)   // owner, 2026-11-12: off unless the user turns it on
         default: return .string("")   // an override: empty is the solver's pick
         }
     }
@@ -307,6 +311,7 @@ extension SettingsKey {
         case .checkingMinutes: return "Minutes you will spend checking where documents begin"
         case .straightenReadingCopy: return "Straighten the copy you read"
         case .placeHandOnImage: return "Place handwritten text on the page image"
+        case .dateImageEveryDocument: return "Search the page image for dates on every document"
         default: return rawValue
         }
     }

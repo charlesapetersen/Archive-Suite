@@ -1050,6 +1050,17 @@ extension OCRProcessor {
                          localAgent: localAgent)
         }
 
+        // W46.date-route: each document's own text, neighbours and first page images, gathered here; nil for a label,
+        // a document with no text, and one whose phone date (Live Capture) wins anyway, so no dating call is made.
+        let datingBackend = DateRoute.Backend(provider: provider, model: model, apiKey: apiKey, gateway: gateway,
+                                              localAgent: localAgent)
+        let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
+            .value.bool ?? false
+        let jobBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
+        let datingInputs: [DateRoute.Input?] = (0..<total).map {
+            datingInput(for: $0, in: snapshot, jobBySource: jobBySource)
+        }
+
         // Precompute neighbor context per segment on the main actor, so the concurrent tasks capture
         // only immutable, Sendable inputs.
         let nearbyBySeg: [[DocumentSegment]] = (0..<total).map { i in
@@ -1068,51 +1079,57 @@ extension OCRProcessor {
         // only exists once that cover's result has been applied. Results arrive out of order, so an
         // enclosure's write is deferred until the pool drains, then applied from `finalTagsBySeg`.
         var finalTagsBySeg: [Int: GeneratedTags] = [:]
-        var deferredEnclosures: [(index: Int, raw: GeneratedTags, entities: EntityResult?)] = []
+        var deferredEnclosures: [(index: Int, raw: GeneratedTags, entities: EntityResult?,
+                                  dating: DateRoute.Decision?)] = []
 
-        // One segment: its tags, then its names when the policy runs the feature on it (the reply's `format` says
-        // whether it is correspondence). Mac-tagged segments skip both calls.
-        let work: @Sendable (Int) async -> (Int, GeneratedTags, EntityResult?) = { i in
+        // One segment: its tags, then its date (W46.date-route), then its names when the policy runs the feature on it
+        // (the reply's `format` says whether it is correspondence). Mac-tagged segments skip every call.
+        let work: @Sendable (Int) async -> (Int, GeneratedTags, EntityResult?, DateRoute.Decision?) = { i in
             if !macSubjectsBySeg[i].isEmpty {
-                return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil)   // Mac-tagged → no LLM
+                return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil, nil)   // Mac-tagged → no LLM
             }
             let tags = await generator.generateTags(
                 for: snapshot[i], nearbySegments: nearbyBySeg[i],
                 provider: provider, model: model, thinkingLevel: nil,
                 apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
             )
+            var dating: DateRoute.Decision? = nil
+            if let input = datingInputs[i], !tags.ocrFailed, !Task.isCancelled {
+                dating = await DateRoute.run(input, backend: datingBackend, imageEveryDocument: imageEveryDocument)
+            }
             var inputs = entityBase[i]
             inputs.format = tags.format
             // The sidecar is the names' only output, so with sidecars off the call would be spent for nothing.
             guard enableSegmentJSON, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs) else {
-                return (i, tags, nil)
+                return (i, tags, nil, dating)
             }
             let names = await EntityExtractor.extract(text: snapshot[i].combinedText, decision: run,
                                                       provider: provider, model: model, apiKey: apiKey,
                                                       gatewayConfig: gateway)
-            return (i, tags, names)
+            return (i, tags, names, dating)
         }
 
         // Tag segments concurrently (bounded pool) instead of one-at-a-time. Each call is small,
         // text-only, and independent, so overlapping the network round-trips is a big speedup.
         // Tagging is a simple text→JSON task, so we skip thinking (`thinkingLevel: nil`).
         var completed = 0
-        await withTaskGroup(of: (Int, GeneratedTags, EntityResult?).self) { group in
+        await withTaskGroup(of: (Int, GeneratedTags, EntityResult?, DateRoute.Decision?).self) { group in
             var next = 0
             while next < maxConcurrent {
                 let i = next
                 group.addTask { await work(i) }
                 next += 1
             }
-            for await (i, rawTags, names) in group {
+            for await (i, rawTags, names, dating) in group {
                 if Task.isCancelled { break }
                 if Self.validCoverIndex(of: i, in: snapshot) != nil {
-                    deferredEnclosures.append((i, rawTags, names))
+                    deferredEnclosures.append((i, rawTags, names, dating))
                 } else {
                     finalTagsBySeg[i] = applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
                                                            enableSegmentJSON: enableSegmentJSON,
                                                            outputDirectory: outputDirectory,
-                                                           runConfig: runConfig, entities: names)
+                                                           runConfig: runConfig, entities: names,
+                                                           dating: dating)
                 }
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
@@ -1126,7 +1143,7 @@ extension OCRProcessor {
         }
         // Same cancellation contract as the pool: a cancelled run writes nothing further.
         guard !Task.isCancelled else { return }
-        for (i, raw, names) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
+        for (i, raw, names, dating) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
             // A cover that was never applied (absent from `finalTagsBySeg`) yields NO sent-with date —
             // never a neighbour's.
             let cover = Self.validCoverIndex(of: i, in: snapshot).flatMap { finalTagsBySeg[$0] }
@@ -1134,8 +1151,22 @@ extension OCRProcessor {
                                                    enableSegmentJSON: enableSegmentJSON,
                                                    outputDirectory: outputDirectory,
                                                    runConfig: runConfig, coverTags: cover ?? GeneratedTags(),
-                                                   entities: names)
+                                                   entities: names, dating: dating)
         }
+    }
+    /// W46.date-route — what segment `i`'s dating route reads, or nil when no dating call is made: a box or folder
+    /// label (an input to folder inheritance, never dated as a document), a document with no text, or one whose phone
+    /// date wins anyway. Neighbours are named by their first page's source file, as the sidecar's `files` and
+    /// `enclosure_of` name pages (an output PDF may be merged away later).
+    func datingInput(for i: Int, in snapshot: [DocumentSegment], jobBySource: [URL: Int]) -> DateRoute.Input? {
+        let seg = snapshot[i]
+        guard !seg.isBox, !seg.isFolder, !seg.combinedText.isEmpty, let first = seg.pdfURLs.first else { return nil }
+        if let fileIdx = jobBySource[first], phoneYearTag(at: fileIdx) != nil { return nil }
+        let near = DateRoute.neighbours(of: i, in: snapshot) { $0.pdfURLs.first?.lastPathComponent }
+        let pages = seg.pdfURLs.prefix(DateRoute.imagePages).map { url in
+            (url: url, rotation: jobBySource[url].flatMap { jobs[$0].result?.rotationDegrees } ?? 0)
+        }
+        return DateRoute.Input(text: DateRoute.ownText(seg), near: near, pages: Array(pages))
     }
     /// W46.ent-feature — the names policy's inputs for one segment, before the tagging reply gives its `format`
     /// (`EntityRunPolicy.inputs`, which Live Capture reads too).
@@ -1162,10 +1193,17 @@ extension OCRProcessor {
     private func applyGeneratedTags(_ rawTags: GeneratedTags, toSegmentAt i: Int, in snapshot: [DocumentSegment],
                                     enableSegmentJSON: Bool, outputDirectory: URL,
                                     runConfig: SessionProcessingConfig?,
-                                    coverTags: GeneratedTags? = nil, entities: EntityResult? = nil) -> GeneratedTags {
+                                    coverTags: GeneratedTags? = nil, entities: EntityResult? = nil,
+                                    dating: DateRoute.Decision? = nil) -> GeneratedTags {
         guard i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
         var tags = rawTags
+        // W46.date-route: the route's date replaces the tagging call's, then a cover's year where step 3a applies.
+        var dating = dating
+        if dating != nil, let coverTags, let c = Self.validCoverIndex(of: i, in: snapshot) {
+            dating?.inherit(fromCover: coverTags, coverFile: snapshot[c].pdfURLs.first?.lastPathComponent)
+        }
+        dating?.apply(to: &tags)
         // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
         if let firstURL = segment.pdfURLs.first,
            let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
@@ -1192,7 +1230,8 @@ extension OCRProcessor {
         }
         if enableSegmentJSON && !segment.isBox && !segment.isFolder {
             writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory,
-                             enclosureOf: enclosureOfName, entities: entities?.sidecarObject)
+                             enclosureOf: enclosureOfName, entities: entities?.sidecarObject,
+                             dating: dating?.sidecarObject())
         }
         return tags
     }
@@ -1303,7 +1342,8 @@ extension OCRProcessor {
         try? out.write(to: url, options: .atomic)
     }
     private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL,
-                                  enclosureOf: String? = nil, entities: [String: Any]? = nil) {
+                                  enclosureOf: String? = nil, entities: [String: Any]? = nil,
+                                  dating: [String: Any]? = nil) {
         guard let firstFile = segment.pdfURLs.first else { return }
         // Write JSON next to the output PDF, using its base name so they match
         let jsonURL: URL
@@ -1319,7 +1359,8 @@ extension OCRProcessor {
         let formatOverride = SegmentJSONBuilder.labelFormatOverride(isBox: segment.isBox, isFolder: segment.isFolder)
         guard let data = SegmentJSONBuilder.buildData(fileURLs: segment.pdfURLs, texts: segment.texts,
                                                       tags: tags, formatOverride: formatOverride,
-                                                      enclosureOf: enclosureOf, entities: entities) else { return }
+                                                      enclosureOf: enclosureOf, entities: entities,
+                                                      dating: dating) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
     /// Merge multi-page document segments into single PDFs.

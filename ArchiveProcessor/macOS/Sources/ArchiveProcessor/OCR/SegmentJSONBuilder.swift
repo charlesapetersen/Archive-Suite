@@ -35,10 +35,14 @@ enum SegmentJSONBuilder {
     ///     evidence, so the tagging call's `author_name`, `recipient_name` and `author_location` are left out: one
     ///     answer per field. `nil` → the sidecar is byte-identical to the output before the feature.
     ///
+    ///   - dating: W46.date-route — the dating route's `dating` object (`DateRoute.Decision.sidecarObject`): the
+    ///     evidence class, the quote and its place, the interval where measured, second-role dates. `nil` → no key.
+    ///
     /// The output is `[.prettyPrinted, .sortedKeys]` JSON, so it is byte-for-byte deterministic.
     static func buildData(fileURLs: [URL], texts: [String],
                           tags: GeneratedTags, formatOverride: String? = nil,
-                          enclosureOf: String? = nil, entities: [String: Any]? = nil) -> Data? {
+                          enclosureOf: String? = nil, entities: [String: Any]? = nil,
+                          dating: [String: Any]? = nil) -> Data? {
         // Body text with per-image markers (image marker always; text line only when non-empty).
         var bodyParts: [String] = []
         for (i, url) in fileURLs.enumerated() {
@@ -55,6 +59,7 @@ enum SegmentJSONBuilder {
             dict["sent_with_uncertain"] = tags.sentWithUncertain
         }
         if let enclosureOf { dict["enclosure_of"] = enclosureOf }
+        if let dating { dict["dating"] = dating }
         dict["subjects"] = tags.subjectTags.map { GeneratedTags.capitalizeFirstLetters($0) }
         if let v = tags.format { dict["format"] = v }
         if let v = tags.authorName { dict["author_name"] = v }

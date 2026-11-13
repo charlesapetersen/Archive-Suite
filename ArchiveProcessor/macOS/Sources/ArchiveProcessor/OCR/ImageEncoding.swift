@@ -202,6 +202,15 @@ enum ImageEncoding {
         return out as Data
     }
 
+    /// W46.date-route — the page as the dating image pass sends it: EXIF-oriented, turned upright by the run's
+    /// correction, long edge `longEdge` px (never upscaled), JPEG at quality 0.9. nil when the file is not an image.
+    static func uprightJPEG(url: URL, rotationDegrees: Int, longEdge: Int) -> Data? {
+        guard let oriented = orientedCGImage(url: url),
+              let upright = rotate(oriented, byDegreesClockwise: rotationDegrees),
+              let small = scaled(upright, longEdge: longEdge) else { return nil }
+        return encodeJPEGData(small, quality: 0.9)
+    }
+
     /// Downscale a CGImage so its long edge is `longEdge` px (never upscales).
     private static func scaled(_ image: CGImage, longEdge: Int) -> CGImage? {
         let w = image.width, h = image.height

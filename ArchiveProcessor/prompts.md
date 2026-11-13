@@ -328,6 +328,59 @@ Rules:
 - Use an empty list for a field the document does not let you fill. Use only this document.
 ```
 
+## 9. Dating Prompts (the trace call and the image pass)
+
+**Source:** `DateRoute.swift` — `traceTemplate`, `tracePrompt(text:near:)`, `imagePrompt` (W46.date-route)
+
+A dedicated dating call after the tagging call, on every document with text (never a box or folder label, nor a
+document whose Live Capture phone date wins). Its reply replaces the tagging call's date by the route of
+`execution-plans/processing-review/13-stage-rules/08-dating.md` §3: a year a rule candidate in the document's own text
+carries is explicit (no `Date Uncertain`, though the reply's own `date_uncertain` may add it, owner 2026-11-12); a year
+taken from a neighbour is written only when its quote passes `DateRoute.evidenceCheck`, always with `Date Uncertain`;
+otherwise no year. The image pass is sent only where the own text has no year candidate (or on every document with the
+"Search the page image for dates on every document" switch on), and only through a remote gateway, as
+`gemini-3.7-flash` (temperature 0, reasoning low, 4,096 tokens, the pages first at 2,400 px); its document date counts
+when that year is written in a date it quoted, and stamp dates go to the sidecar as second-role dates. Both prompts are
+the bench's own, byte for byte (`segbench/date_traceable.TRACE` "neigh", `segbench/date_image.PROMPT`), checked by
+`scripts/test-date-route.sh` on the cases `segbench/date_route_cases.py` writes. Measured:
+`segbench-results/date-route-pipeline.md`.
+
+Trace prompt:
+
+```
+You are dating a document from a historical archive for a scholar who will check your evidence.
+
+The document's OCR text (id "self"):
+---
+{document text: its first four pages, first 3,000 characters}
+---
+
+Nearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:
+{each neighbour, P3 P2 P1 N1 N2 N3: "[P1]", its first two pages' first 600 characters, "---"}
+
+Dates a rule found printed in the nearby documents (id, year, the line):
+{"[P1] 1947 (\"the line\")", one line a neighbour, or "(none found)"}
+
+Give the year this document was written.
+- If the document prints its own date, use that year and quote the date from "self".
+- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.
+- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).
+- date_uncertain is true when this document does not print its own year.
+- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give "year": null.
+
+Respond with ONLY a JSON object, for example:
+{"year": 1947, "lo": 1946, "hi": 1948, "date_uncertain": true, "evidence": {"neighbour": "P1", "quote": "March 3, 1947"}}
+```
+
+Image pass (sent after the page images):
+
+```
+These are the first pages of one archival document, in order (page 1, then page 2 if given). Find every date written on them: full dates, a month and year, or a year alone, wherever it is (letterhead, dateline, body, signature, stamp, handwriting in a margin). Copy each exactly as it appears, and say where it is. Then give the date the document itself was written or sent, if the pages show it; a date merely mentioned in the text is not it.
+Respond with ONLY a JSON object:
+{"dates": [{"quote": "<exactly as on the page>", "page": 1, "where": "letterhead|dateline|body|signature|stamp|margin|other", "kind": "printed|typed|handwritten|stamped", "year": 1968, "month": 3}], "document_date": {"year": 1968, "month": 3, "quote": "<the quote it comes from>"}}
+Use null for an unknown month or year, and "document_date": null if the pages do not show the document's own date.
+```
+
 ---
 
 ## Notes

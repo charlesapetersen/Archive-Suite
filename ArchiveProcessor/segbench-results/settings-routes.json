@@ -9514,8 +9514,18 @@
      "switch": null
     },
     {
+     "id": "image-every-document",
+     "text": "The image pass on documents whose text already has a year is the user's option, off by default; on, it adds stamp dates as second-role dates, about $1.93 more per 1,000 documents (owner, 2026-11-12).",
+     "source": "date-route-pipeline.md",
+     "switch": {
+      "id": "dating.image_every_document",
+      "label": "Search the page image for dates on every document",
+      "default": false
+     }
+    },
+    {
      "id": "uncertain-by-evidence",
-     "text": "Date Uncertain is set by the evidence class, never by the model's flag.",
+     "text": "Date Uncertain is set by the evidence class; the model's own flag may only add it to an explicit text year, never remove it (owner, 2026-11-12).",
      "source": "date-truth.md",
      "switch": null
     },
