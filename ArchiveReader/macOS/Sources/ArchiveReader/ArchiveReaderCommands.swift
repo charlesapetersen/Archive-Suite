@@ -139,6 +139,9 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(nav == nil)
             Button(ReaderCommand.saveSearch.title) { nav?.showingSaveDialog = true }
                 .disabled(nav == nil)
+            Divider()
+            Button(ReaderCommand.connectImproveOCR.title) { tagSheetNav?.chooseImproveOCRFolder() }
+                .disabled(tagSheetNav == nil)
         }
 
         // Selection (nav window)
@@ -195,6 +198,15 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.toggleFlag.title) { if let nav { nav.toggleFlagSelection() } else { docTags?.toggleFlag() } }
                 .keyboardShortcut(.toggleFlag).disabled(noTagTarget)
             Divider()
+            // W44.reocr-reader: the OCR Poor tag, written to the file through TagWriter, and the hand-off to the
+            // Processor. The title says which way the toggle goes for what is selected.
+            Button(nav?.poorOCRCommandTitle() ?? docTags?.poorOCRTitle ?? ReaderCommand.togglePoorOCR.title) {
+                if let nav { nav.togglePoorOCR() } else { docTags?.togglePoorOCR() }
+            }
+            .keyboardShortcut(.togglePoorOCR).disabled(noTagTarget)
+            Button(ReaderCommand.improveOCR.title) { if let nav { nav.improveOCR() } else { docTags?.improveOCR() } }
+                .disabled(noTagTarget)
+            Divider()
             Button(ReaderCommand.undoTagChange.title) { if let nav { nav.undoLast() } else { docTags?.undo() } }
                 .keyboardShortcut(.undoTagChange)
                 .disabled(nav != nil ? (nav?.undoDepth ?? 0) == 0 : !(docTags?.canUndo ?? false))
@@ -222,6 +234,11 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut(.searchOCRText).disabled(nav == nil)
             Button(ReaderCommand.advancedSearch.title) { nav?.openAdvancedSearch() }
                 .keyboardShortcut(.advancedSearch).disabled(nav == nil)
+            Divider()
+            Toggle(ReaderCommand.showPoorOCROnly.title, isOn: Binding(
+                get: { nav?.filter.poorOCROnly ?? false },
+                set: { nav?.filter.poorOCROnly = $0 }))
+                .disabled(nav == nil)
         }
 
         // Document (document window). ↑/↓ ALONE scroll the focused page (handled by the PDF view, not

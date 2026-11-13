@@ -313,7 +313,13 @@ struct ReOCRJob {
                     try l.reconcile(observedFlagged: Self.isFlagged(file) ?? true)
                     now = try l.state()
                 }
-                if now.isPending { return .changedSinceReview("another action on this file has not finished") }
+                if now.isPending {
+                    // Every suite action holds this lock from `begin` to `commit`, so an intent found under it is one
+                    // that died (in either app). Record the tag as it is, which lifts the barrier for the next action;
+                    // the new generation means this review is out of date.
+                    try l.reconcile(observedFlagged: Self.isFlagged(file) ?? true)
+                    return .changedSinceReview("an earlier action on this file did not finish")
+                }
                 // This operation's own earlier attempt that did not finish the clear (reconciled after a failure, or
                 // read back still flagged). A finished clear of ours followed by a flag now means someone put it back.
                 let ownEarlierAttempt = now.lastOperationID == op && (now.lastOrigin == .reconciled || now.flagged == true)
@@ -460,7 +466,11 @@ struct ReOCRJob {
         do {
             return try flags.withLock(record.key, app: Self.app) { l -> ReflagOutcome in
                 let now = try l.state()
-                if now.isPending { return .changedSinceClear("another action on this file has not finished") }
+                if now.isPending {
+                    // A dead action's barrier (see `clearFlag`): record the tag as it is, then leave the flag alone.
+                    try l.reconcile(observedFlagged: Self.isFlagged(file) ?? true)
+                    return .changedSinceClear("an earlier action on this file did not finish")
+                }
                 guard now.lastOperationID == accepted.operationID, now.lastOrigin == .acceptedClear else {
                     return .changedSinceClear("the file was flagged or unflagged after the new text was accepted")
                 }

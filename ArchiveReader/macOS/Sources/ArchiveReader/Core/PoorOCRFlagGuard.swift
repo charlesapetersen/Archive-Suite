@@ -21,9 +21,14 @@ enum PoorOCRFlagGuard {
         var relativePath: String
         var operationID: UUID
         var generationBefore: UUID?
-        var generationAfter: UUID
+        /// Nil when the record could not be finished after the tag write (`finished` false).
+        var generationAfter: UUID?
         var requested: Bool
-        var observed: Bool
+        /// The tag as read back after the write; nil when it could not be read.
+        var observed: Bool?
+        /// False when the tag write happened but its flag record could not be committed: the record then holds the
+        /// tag as it was found, or a barrier the next suite action on the file reconciles.
+        var finished: Bool
         /// The text pages' Kind and reader when the action knew them; absent means unknown.
         var kind: String?
         var reader: String?
@@ -50,6 +55,15 @@ enum PoorOCRFlagGuard {
     /// Kind and reader per file path, bound by the Flag command so the ledger can say what was flagged.
     @TaskLocal static var annotations: [String: (kind: String?, reader: String?)] = [:]
 
+    /// Collects the files whose tag changed but whose flag record could not be finished, so the action can say so.
+    final class Unfinished: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _names: [String] = []
+        var names: [String] { lock.withLock { _names } }
+        func note(_ url: URL) { lock.withLock { _names.append(url.lastPathComponent) } }
+    }
+    @TaskLocal static var unfinished: Unfinished?
+
     /// The value a delta asks for: true when it adds the tag, false when it only removes it, nil when it does not
     /// name it (the write then needs no guard). Additions win, as in `TagWriter.apply`, which removes first.
     static func requested(add: [String], remove: [String]) -> Bool? {
@@ -70,10 +84,14 @@ enum PoorOCRFlagGuard {
         guard support.isConnected else { return nil }
         let folder: URL
         do { folder = try support.resolve() } catch { throw Refusal.support("\(error)") }
-        guard let root = archive.current() else { throw Refusal.outsideArchive }
-        guard let guid = root.guid else { throw Refusal.noArchiveIdentity }
+        let root: ImproveOCRArchive.Root
+        switch archive.root(for: url) {
+        case .root(let r): root = r
+        case .outside: throw Refusal.outsideArchive
+        case .noIdentity: throw Refusal.noArchiveIdentity
+        }
         let key: ImproveOCRFlagStore.FileKey
-        do { key = try ImproveOCRFlagStore.FileKey(rootGUID: guid, root: root.url, file: url) } catch { throw Refusal.outsideArchive }
+        do { key = try ImproveOCRFlagStore.FileKey(rootGUID: root.guid, root: root.url, file: url) } catch { throw Refusal.outsideArchive }
         // A short wait on the main thread, where every Reader write runs today; the Processor holds the lock only
         // for its own tag write.
         return (ImproveOCRFlagStore(support: folder, lockTimeout: Thread.isMainThread ? 1 : 10), key)
@@ -99,25 +117,30 @@ enum PoorOCRFlagGuard {
                 let intent = try locked.begin(flagged: requested, origin: requested ? .flag : .unflag)
                 let value: T
                 do { value = try write() } catch {
-                    // The barrier must not outlive this call: record what the tag is now.
-                    _ = try? locked.reconcile(observedFlagged: isFlagged(url) ?? requested)
+                    // The barrier must not outlive this call: record what the tag is now (flagged when it cannot be
+                    // read, so an acceptance never clears on a guess).
+                    _ = try? locked.reconcile(observedFlagged: isFlagged(url) ?? true)
                     throw error
                 }
-                guard let observed = isFlagged(url) else {
-                    _ = try? locked.reconcile(observedFlagged: requested)
-                    throw Refusal.tagsUnreadable
+                // The tags are on disk now. Nothing from here may make the write look refused: a record that cannot
+                // be finished is reconciled if it can be, marked unfinished, and the write's result still returned.
+                let observed = isFlagged(url)
+                let event = observed.flatMap { try? locked.commit(intent, observedFlagged: $0) }
+                if event == nil {
+                    _ = try? locked.reconcile(observedFlagged: observed ?? true)
+                    unfinished?.note(url)
                 }
-                let event = try locked.commit(intent, observedFlagged: observed)
                 let note = annotations[url.path]
                 made = Record(rootGUID: target.key.rootGUID, relativePath: target.key.relativePath,
                               operationID: intent.operationID, generationBefore: state.generation,
-                              generationAfter: event.generation, requested: requested, observed: observed,
-                              kind: note?.kind, reader: note?.reader)
+                              generationAfter: event?.generation, requested: requested, observed: observed,
+                              finished: event != nil, kind: note?.kind, reader: note?.reader)
                 return value
             }
         } catch ImproveOCRFlagStore.StoreError.busy {
             throw Refusal.busy
         } catch let e as ImproveOCRFlagStore.StoreError {
+            // Only the steps before the tag write throw these (the lock, the state, a reconcile, `begin`).
             throw Refusal.support(ImproveOCRSupport.Problem.unavailable(ImproveOCRSupport.describe(e)).description)
         }
         record = made

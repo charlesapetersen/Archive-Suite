@@ -67,13 +67,14 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     // Edit
     case copyExact, copyCleaned, copyPageLink, options
     // File
-    case chooseFolder, rescan, saveSearch
+    case chooseFolder, rescan, saveSearch, connectImproveOCR
     // Selection
     case open, preview, revealInFinder, copyLinks, copyArchiveLinks, selectRun, nextUnread, previousUnread
     // Tags
-    case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, toggleFlag, undoTagChange, redoTagChange
+    case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, toggleFlag, undoTagChange, redoTagChange,
+         togglePoorOCR, improveOCR
     // Sort & Filter
-    case clearAll, focusTagFilter, searchOCRText, advancedSearch
+    case clearAll, focusTagFilter, searchOCRText, advancedSearch, showPoorOCROnly
     // Document
     case previousPage, nextPage, focusImagePane, focusTextPane, zoomIn, zoomOut, fitPage, find, findNext, findPrevious
     // Preview turns a page with ⌘L / ⌘R, which are Focus Tag Filter and Mark Read here, so the turn adds ⌃
@@ -117,6 +118,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .chooseFolder: return "Choose Archive Folder…"
         case .rescan: return "Rescan Archive Folder"
         case .saveSearch: return "Save Current Search…"
+        case .connectImproveOCR: return "Connect Improve OCR Folder…"
         case .open: return "Open in Document Window"
         case .preview: return "Preview"
         case .revealInFinder: return "Reveal in Finder"
@@ -133,10 +135,13 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .toggleFlag: return "Toggle Flag"
         case .undoTagChange: return "Undo Tag Change"
         case .redoTagChange: return "Redo Tag Change"
+        case .togglePoorOCR: return "Flag as Poor OCR"
+        case .improveOCR: return "Improve OCR…"
         case .clearAll: return "Clear All"
         case .focusTagFilter: return "Focus Tag Filter"
         case .searchOCRText: return "Search OCR Text"
         case .advancedSearch: return "Advanced Search…"
+        case .showPoorOCROnly: return "Show Poor OCR Only"
         case .previousPage: return "Previous Page in Segment"
         case .nextPage: return "Next Page in Segment"
         case .focusImagePane: return "Focus Image Page"
@@ -196,7 +201,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .chooseFolder: return CommandKey("o", [.command, .shift])
         // ⌘R is Mark Read.
         case .rescan: return CommandKey("r", [.command, .option])
-        case .saveSearch: return nil
+        case .saveSearch, .connectImproveOCR, .improveOCR, .showPoorOCROnly: return nil
         case .open: return CommandKey("o")
         case .preview: return CommandKey("y")
         case .revealInFinder: return CommandKey("r", [.command, .shift])
@@ -210,6 +215,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .markReadAndNext: return CommandKey("m", [.command, .shift])
         case .renameTag, .findSimilarTags: return nil
         case .toggleFlag: return CommandKey("f", [.command, .shift])
+        // P for Poor; ⌘P stays the Mac's Print.
+        case .togglePoorOCR: return CommandKey("p", [.command, .control])
         case .undoTagChange: return CommandKey("z")
         case .redoTagChange: return CommandKey("z", [.command, .shift])
         case .clearAll: return CommandKey("k", [.command, .shift])
@@ -262,6 +269,9 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .markRead: return "Mark the selected documents as read"
         case .markUnread: return "Mark the selected documents as unread"
         case .toggleFlag: return "Flag or unflag the selection — app-only, never written to the file"
+        case .togglePoorOCR: return "Mark the selection's OCR as not good enough (the OCR Poor tag), or remove the mark"
+        case .improveOCR: return "Open Archive Processor's Improve OCR dialog on the selection, to read it again with a better reader"
+        case .connectImproveOCR: return "Choose the folder the Reader and Archive Processor share for Improve OCR"
         case .undoTagChange: return "Undo the last tag change"
         case .advancedSearch: return "Advanced Search: combine rules on text, tags, dates, folders and more"
         case .previousPage: return "Previous page in this segment"

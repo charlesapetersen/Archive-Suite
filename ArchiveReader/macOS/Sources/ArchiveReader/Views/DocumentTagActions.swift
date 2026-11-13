@@ -66,6 +66,27 @@ struct DocumentTagActions {
         viewer.tagStatus = paths.allSatisfy(navigation.flags.isFlagged) ? "Flagged." : "Flag removed."
     }
 
+    /// W44.reocr-reader: the Tags menu's poor-OCR toggle and Improve OCR… for the open file.
+    var poorOCRTitle: String { navigation?.poorOCRCommandTitle(paths: paths) ?? ReaderCommand.togglePoorOCR.title }
+
+    func togglePoorOCR() {
+        guard let navigation, let paths else { return }
+        let flag = !navigation.poorOCRWouldClear(paths: paths)
+        let targets = navigation.libraryFiles(atPaths: paths)
+        guard !targets.isEmpty else { navigation.togglePoorOCR(paths: paths); viewer.tagStatus = navigation.statusMessage; return }
+        guard navigation.connectImproveOCRFolderIfNeeded() else { viewer.tagStatus = navigation.statusMessage; return }
+        Task {
+            await navigation.setPoorOCR(flag, on: targets)
+            viewer.tagStatus = navigation.statusMessage
+        }
+    }
+
+    func improveOCR() {
+        guard let navigation, let paths else { return }
+        navigation.improveOCR(paths: paths)
+        viewer.tagStatus = navigation.statusMessage
+    }
+
     func undo() {
         guard let navigation, canUndo else { return }
         navigation.undoLast()

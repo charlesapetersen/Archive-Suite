@@ -2024,7 +2024,7 @@ final class NavigationModel: ObservableObject {
     /// cache-provenance subset before a bulk operation derives its selection/deltas; disk rows from
     /// this process can proceed directly. A now-untracked/unreadable/missing path is omitted, never
     /// coerced into an empty tag array and never written merely because an old cache row named it.
-    private func reverifyCacheRows(_ files: [ArchiveFile]) -> (files: [ArchiveFile], rejected: Int) {
+    func reverifyCacheRows(_ files: [ArchiveFile]) -> (files: [ArchiveFile], rejected: Int) {
         var verified: [ArchiveFile] = []
         var rejected = 0
         for file in files {
@@ -2067,7 +2067,7 @@ final class NavigationModel: ObservableObject {
         return verified
     }
 
-    private func isInsideMainArchive(_ url: URL) -> Bool {
+    func isInsideMainArchive(_ url: URL) -> Bool {
         guard let root = rootStore.root else { return false }
         let layout = ReaderArchiveLayout(grantedRoot: root)
         guard !layout.needsCommonParentGrant else { return false }
@@ -2087,7 +2087,7 @@ final class NavigationModel: ObservableObject {
     }
 
     /// The tag actions' targets: the named paths when the document window asks, else the list's selection.
-    private func tagTargets(_ paths: [String]?) -> [ArchiveFile] {
+    func tagTargets(_ paths: [String]?) -> [ArchiveFile] {
         guard let paths else { return selectedFiles }
         return libraryFiles(atPaths: paths)
     }
@@ -2135,7 +2135,7 @@ final class NavigationModel: ObservableObject {
         announce(statusMessage)
     }
 
-    private func refreshUndoHistory() { ReaderStages.measure("model.refreshUndoHistory") { refreshUndoHistoryStage() } }
+    func refreshUndoHistory() { ReaderStages.measure("model.refreshUndoHistory") { refreshUndoHistoryStage() } }
 
     private func refreshUndoHistoryStage() {
         if let root = rootStore.root {
@@ -2524,7 +2524,7 @@ final class NavigationModel: ObservableObject {
     }
 
     /// VoiceOver announcement (accessibility). Silent no-op if there is no key window.
-    private func announce(_ messageToAnnounce: String) {
+    func announce(_ messageToAnnounce: String) {
         let message: String
         if AuditLedger.shared.hasRecordingGap {
             if !statusMessage.contains("Audit history could not be saved") {

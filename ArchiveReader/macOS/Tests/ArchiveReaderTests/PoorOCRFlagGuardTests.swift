@@ -1,6 +1,11 @@
+import CryptoKit
 import XCTest
 @testable import ArchiveReader
 import ArchiveCore
+
+private enum SHA256Hex {
+    static func of(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+}
 
 /// W44.reocr-reader: every Reader tag write that names `OCR Poor` runs under the shared flag protocol
 /// (`SPEC/improve-ocr.md` §3). Scratch roots and a scratch support folder only — never the corpus, never the
@@ -75,7 +80,8 @@ final class PoorOCRFlagGuardTests: XCTestCase {
         XCTAssertEqual(record.relativePath, "Box 1/a.pdf")
         XCTAssertEqual(record.generationAfter, first.generation)
         XCTAssertNil(record.generationBefore)
-        XCTAssertTrue(record.observed)
+        XCTAssertEqual(record.observed, true)
+        XCTAssertTrue(record.finished)
 
         // Flagging a flagged file still advances the generation: an acceptance must see the person's new verdict.
         let again = try TagWriter.apply(TagDelta(add: [DocumentTags.poorOCRTag]), to: url)
@@ -168,6 +174,74 @@ final class PoorOCRFlagGuardTests: XCTestCase {
         XCTAssertEqual(now.flagged, false)
         XCTAssertEqual(now.lastOrigin, .reconciled)
         XCTAssertEqual(try tags(url), [])
+    }
+
+    // MARK: Which archive a file belongs to
+
+    func testTheNearestMarkerKeysTheFileAsTheProcessorDoes() throws {
+        try ImproveOCRSupport.shared.connect(support)
+        // A granted folder whose subfolder was granted, and marked, before (the common-parent upgrade).
+        let inner = root.appendingPathComponent("Box 1")
+        let innerMarker = try RootMarker.ensure(at: inner, kind: .reader, name: "Box 1")
+        let url = try makeFile("n.pdf", tags: [])
+        XCTAssertEqual(ImproveOCRArchive.shared.root(for: url), .root(.init(url: inner.standardizedFileURL.resolvingSymlinksInPath(), guid: innerMarker.guid)))
+        _ = try TagWriter.apply(TagDelta(add: [DocumentTags.poorOCRTag]), to: url)
+        let key = try ImproveOCRFlagStore.FileKey(rootGUID: innerMarker.guid, root: inner, file: url)
+        XCTAssertEqual(key.relativePath, "n.pdf")
+        XCTAssertEqual(try ImproveOCRFlagStore(support: support).peek(key)?.flagged, true)
+    }
+
+    func testAFileOutsideTheGrantedRootHasNoArchive() throws {
+        let outside = dir.appendingPathComponent("elsewhere.pdf")
+        try Data("x".utf8).write(to: outside)
+        XCTAssertEqual(ImproveOCRArchive.shared.root(for: outside), .outside)
+        ImproveOCRArchive.shared.rootURL = nil
+        XCTAssertEqual(ImproveOCRArchive.shared.root(for: outside), .outside)
+    }
+
+    // MARK: The hand-off
+
+    func testASmallSelectionTravelsInTheLink() throws {
+        let a = try makeFile("a & b.pdf", tags: []), b = try makeFile("c.pdf", tags: [])
+        let id = UUID()
+        let link = try ImproveOCRHandoff.link(for: [a, b], archive: .shared, support: support, requestID: id)
+        guard case let .inline(rid, guid, paths) = try ImproveOCRRequest(url: link) else { return XCTFail("\(link)") }
+        XCTAssertEqual(rid, id)
+        XCTAssertEqual(guid, try XCTUnwrap(try RootMarker.read(at: root)).guid)
+        XCTAssertEqual(paths, ["Box 1/a & b.pdf", "Box 1/c.pdf"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: support.appendingPathComponent(ImproveOCRManifest.folder).path))
+    }
+
+    func testALargeSelectionIsStagedAsAPrivateManifest() throws {
+        var files: [URL] = []
+        for i in 0..<(ImproveOCRRequest.maxInlineFiles + 1) { files.append(try makeFile("p\(i).pdf", tags: [])) }
+        let id = UUID()
+        let link = try ImproveOCRHandoff.link(for: files, archive: .shared, support: support, requestID: id)
+        XCTAssertEqual(try ImproveOCRRequest(url: link), .manifest(requestID: id))
+        let staged = ImproveOCRManifest.url(for: id, in: support)
+        XCTAssertEqual(staged.lastPathComponent, id.uuidString.lowercased() + ".json")
+        let manifest = try ImproveOCRManifest.decode(try Data(contentsOf: staged), expecting: id, now: Date())
+        XCTAssertEqual(manifest.entries.count, files.count)
+        let first = try XCTUnwrap(manifest.entries.first)
+        XCTAssertEqual(first.relativePath, "Box 1/p0.pdf")
+        let bytes = try Data(contentsOf: files[0])
+        XCTAssertEqual(first.byteCount, Int64(bytes.count))
+        XCTAssertEqual(first.sha256, SHA256Hex.of(bytes))
+        let attrs = try FileManager.default.attributesOfItem(atPath: staged.path)
+        XCTAssertEqual((attrs[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+        let folder = try FileManager.default.attributesOfItem(atPath: staged.deletingLastPathComponent().path)
+        XCTAssertEqual((folder[.posixPermissions] as? NSNumber)?.intValue, 0o700)
+    }
+
+    func testTwoArchivesInOneSelectionAreRefused() throws {
+        let inner = root.appendingPathComponent("Box 1")
+        _ = try RootMarker.ensure(at: inner, kind: .reader, name: "Box 1")
+        let a = try makeFile("a.pdf", tags: [])
+        let top = root.appendingPathComponent("top.pdf")
+        try Data("t".utf8).write(to: top)
+        XCTAssertThrowsError(try ImproveOCRHandoff.link(for: [a, top], archive: .shared, support: support)) {
+            XCTAssertEqual($0 as? ImproveOCRHandoff.Problem, .twoArchives)
+        }
     }
 
     // MARK: The filter

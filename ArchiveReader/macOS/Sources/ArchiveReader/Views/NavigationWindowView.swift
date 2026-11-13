@@ -262,6 +262,9 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
         menu.addItem(withTitle: "Toggle Flag", action: #selector(ContextMenuActions.toggleFlag), keyEquivalent: "")
+        // W44.reocr-reader: the menu is built for each right-click, so the title follows what is selected.
+        menu.addItem(withTitle: model.poorOCRCommandTitle(), action: #selector(ContextMenuActions.togglePoorOCR), keyEquivalent: "")
+        menu.addItem(withTitle: ReaderCommand.improveOCR.title, action: #selector(ContextMenuActions.improveOCR), keyEquivalent: "")
         menu.addItem(withTitle: "Show Inspector", action: #selector(ContextMenuActions.editTags), keyEquivalent: "")
         // W24.cal1-reader: only with Options ▸ Dates ▸ "Show dates in other calendars" on, and a root
         // marker to key the choice by (without one a pick could not be stored).
@@ -1058,6 +1061,8 @@ final class ContextMenuActions: NSObject {
     @objc func markRead()         { model.mark(.read) }
     @objc func markUnread()       { model.mark(.unread) }
     @objc func toggleFlag()       { model.toggleFlagSelection() }
+    @objc func togglePoorOCR()    { model.togglePoorOCR() }
+    @objc func improveOCR()       { model.improveOCR() }
     @objc func editTags()         { model.showingEditor = true }
     @objc func selectDocRun()     { model.extendSelectionToDocumentRun() }
     @objc func setDisplayCalendar(_ sender: NSMenuItem) {

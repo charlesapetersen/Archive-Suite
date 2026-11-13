@@ -24,7 +24,7 @@ final class ImproveOCRSupport: @unchecked Sendable {
 
         var description: String {
             switch self {
-            case .notConnected: "Connect the Improve OCR folder first (Tags ▸ Connect Improve OCR Folder…)"
+            case .notConnected: "Connect the Improve OCR folder first (File ▸ Connect Improve OCR Folder…)"
             case .unavailable(let why): "The Improve OCR folder cannot be used (\(why)); reconnect it"
             case .differentStore: "The Improve OCR folder is not the one connected before; reconnect it"
             }
@@ -36,7 +36,19 @@ final class ImproveOCRSupport: @unchecked Sendable {
     /// The folder whose security scope this process holds, released when another replaces it.
     private var scoped: URL?
 
-    init(defaults: UserDefaults) { self.defaults = defaults }
+    /// DEBUG UITest launches only: a folder the test made, used by path (`-ARUITestImproveOCRSupport <path>`), since
+    /// an off-screen run cannot answer a folder panel. Never a bookmark, never the person's defaults.
+    private var testFolder: URL?
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+#if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-ARUITestRootPath"), let i = args.firstIndex(of: "-ARUITestImproveOCRSupport"), i + 1 < args.count {
+            testFolder = URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        }
+#endif
+    }
 
     /// The unit-test host and a UITest launch keep their connection apart from the person's: both run as
     /// `com.archivereader.app` and would otherwise share its defaults.
@@ -47,8 +59,19 @@ final class ImproveOCRSupport: @unchecked Sendable {
         return .standard
     }
 
+    /// Where the folder panel opens: the suite's suggested folder in the person's own Library. Not
+    /// `ImproveOCRSupportIdentity.suggestedLocation`, which in the sandboxed Reader names the app's container; the
+    /// Processor is not sandboxed, and its suggestion is the real Library's.
+    static func suggestedPanelLocation() -> URL {
+        let home = getpwuid(getuid()).flatMap { $0.pointee.pw_dir.map { String(cString: $0) } } ?? NSHomeDirectory()
+        let support = URL(fileURLWithPath: home, isDirectory: true)
+            .appendingPathComponent("Library/Application Support", isDirectory: true)
+        let suggested = support.appendingPathComponent("ArchiveSuite/ImproveOCR", isDirectory: true)
+        return FileManager.default.fileExists(atPath: suggested.path) ? suggested : support
+    }
+
     /// Whether a folder was ever connected (it may still fail to resolve).
-    var isConnected: Bool { defaults.data(forKey: Self.bookmarkKey) != nil }
+    var isConnected: Bool { lock.withLock { testFolder != nil || defaults.data(forKey: Self.bookmarkKey) != nil } }
 
     /// Connects `folder` (chosen in the Reader's panel, so the sandbox has granted it): makes its identity when it
     /// has none, and saves a security-scoped bookmark and the identity.
@@ -75,6 +98,14 @@ final class ImproveOCRSupport: @unchecked Sendable {
     /// is still suitable, and it is the same store as when connected.
     func resolve() throws -> URL {
         try lock.withLock {
+            if let testFolder {
+                do {
+                    guard try ImproveOCRSupportIdentity.identity(of: testFolder, create: true) != nil else {
+                        throw Problem.unavailable("it has no store record")
+                    }
+                } catch let p as Problem { throw p } catch { throw Problem.unavailable(Self.describe(error)) }
+                return testFolder
+            }
             guard let bookmark = defaults.data(forKey: Self.bookmarkKey),
                   let saved = defaults.string(forKey: Self.storeIDKey).flatMap(UUID.init(uuidString:)) else {
                 throw Problem.notConnected
@@ -125,29 +156,49 @@ final class ImproveOCRSupport: @unchecked Sendable {
     }
 }
 
-/// The archive the tag writer's poor-OCR guard keys files by: the main root and its marker's GUID. Set by the
-/// navigation model when a root is granted; read on any thread.
+/// The archive the poor-OCR flag records and the hand-off key files by: for each file, the nearest folder above it
+/// that holds a root marker, searched no higher than the granted root (`SPEC/improve-ocr.md` §3). The Processor
+/// finds a file's archive the same way, so a granted folder holding an older marked subfolder keys its files under
+/// that subfolder in both apps. Set by the root store when a root is granted; read on any thread.
 final class ImproveOCRArchive: @unchecked Sendable {
     static let shared = ImproveOCRArchive()
 
     struct Root: Equatable, Sendable {
         let url: URL
-        /// Nil while the folder has no readable root marker (a read-only folder, or a damaged marker).
-        let guid: UUID?
+        let guid: UUID
+    }
+
+    enum Lookup: Equatable, Sendable {
+        case root(Root)
+        /// The file is not inside the granted root, or no root is granted.
+        case outside
+        /// No readable marker between the file and the granted root (a read-only folder, or a damaged marker).
+        case noIdentity
     }
 
     private let lock = NSLock()
     private var _root: URL?
 
-    /// The main archive root, or nil when none is granted.
+    /// The granted root, or nil when none is granted.
     var rootURL: URL? {
         get { lock.withLock { _root } }
         set { lock.withLock { _root = newValue } }
     }
 
-    /// The root with its marker read now: the marker can appear after the folder was chosen (a link copy creates one).
-    func current() -> Root? {
-        guard let url = rootURL else { return nil }
-        return Root(url: url, guid: (try? RootMarker.read(at: url))??.guid)
+    /// The archive `file` belongs to, read now: a marker can appear after the folder was chosen.
+    func root(for file: URL) -> Lookup {
+        guard let granted = rootURL?.standardizedFileURL.resolvingSymlinksInPath() else { return .outside }
+        let top = granted.pathComponents
+        var dir = file.standardizedFileURL.resolvingSymlinksInPath().deletingLastPathComponent()
+        guard dir.pathComponents.count >= top.count, Array(dir.pathComponents.prefix(top.count)) == top else { return .outside }
+        while dir.pathComponents.count >= top.count {
+            switch Result(catching: { try RootMarker.read(at: dir) }) {
+            case .success(let marker?): return .root(Root(url: dir, guid: marker.guid))
+            case .success(nil): break
+            case .failure: return .noIdentity   // a damaged marker is left alone, never looked past
+            }
+            dir.deleteLastPathComponent()
+        }
+        return .noIdentity
     }
 }

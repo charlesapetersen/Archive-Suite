@@ -253,6 +253,27 @@ public struct ImproveOCRManifest: Codable, Equatable, Sendable {
         return manifest
     }
 
+    public static let folder = "Requests"
+
+    /// Where the manifest for `requestID` lives in the shared support folder: the lowercase UUID, as the URL spells
+    /// it. Both apps name the file through this.
+    public static func url(for requestID: UUID, in support: URL) -> URL {
+        support.appendingPathComponent(folder, isDirectory: true).appendingPathComponent(requestID.uuidString.lowercased() + ".json")
+    }
+
+    /// The sender's half (`SPEC/improve-ocr.md` §2): publishes the manifest whole at `Requests/<UUID>.json`, mode 0600
+    /// in a private 0700 folder, never over an existing file. Validated first, so nothing the receiver would refuse is
+    /// staged. The caller holds the support folder's security scope.
+    public func stage(in support: URL, now: Date = Date()) throws {
+        try validate(now: now)
+        let data = try encoded()
+        guard data.count <= Self.maxBytes else { throw ValidationError.tooLarge(data.count) }
+        let store = ImproveOCRFlagStore(support: support)
+        try store.checkSuitable()
+        try ImproveOCRFlagStore.makePrivateFolder(support.appendingPathComponent(Self.folder, isDirectory: true))
+        try ImproveOCRFlagStore.createExclusive(Self.url(for: requestID, in: support), data)
+    }
+
     public func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601

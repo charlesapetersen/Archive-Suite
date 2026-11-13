@@ -44,7 +44,7 @@ struct ImproveOCRRequestStore {
         case refused(String)
     }
 
-    static let requestsFolder = "Requests"
+    static let requestsFolder = ImproveOCRManifest.folder
     static let consumedFolder = "Consumed"
 
     /// `consumes: false` checks without recording the ID, so a request that cannot be shown yet (no archive, a
@@ -134,7 +134,7 @@ struct ImproveOCRRequestStore {
     }
 
     private func manifestURL(_ id: UUID) -> URL {
-        requestsDirectory().appendingPathComponent(id.uuidString.lowercased() + ".json")
+        ImproveOCRManifest.url(for: id, in: sharedSupport)
     }
 
     private func manifestExists(_ id: UUID) -> Bool {
