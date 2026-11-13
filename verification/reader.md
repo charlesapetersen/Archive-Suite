@@ -9,7 +9,7 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b1`, 2026-10-12.
   `W23.m9`, `W24.jpeg1`, `W24.cal1-reader`, `W26.walk2`, `W14.2-fu`). `SPEC/tag-format.md` is the contract
   behind R-05 and R-45.
 - **Sources and code read at:** `caefe33a`.
-- **Count:** `unproven 27 · works 13 · broken 2 · fixed-pending-recheck 5 · dropped 1` (works: R-17, R-21, R-23, R-25, R-28, R-29, R-30, R-37, R-44, R-45, R-46, R-47, R-48; broken: R-16, R-43; fixed-pending-recheck: R-11, R-13, R-20, R-35, R-36; dropped: R-26). Updated by `W40.g1-reader-2-ledger`, 2026-11-06, from the owner's Reader session 2 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)) and what it left on disk ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
+- **Count:** `unproven 27 · works 13 · broken 1 · fixed-pending-recheck 6 · dropped 1` (works: R-17, R-21, R-23, R-25, R-28, R-29, R-30, R-37, R-44, R-45, R-46, R-47, R-48; broken: R-16; fixed-pending-recheck: R-11, R-13, R-20, R-35, R-36, R-43; dropped: R-26). Updated by `W40.g1-reader-2-ledger`, 2026-11-06, from the owner's Reader session 2 ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)) and what it left on disk ([`evidence/reader/W40.g1-reader-2-ledger-on-disk.md`](evidence/reader/W40.g1-reader-2-ledger-on-disk.md)).
 
 **Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
 ([`evidence/reader/W40.a3-full-ui.md`](evidence/reader/W40.a3-full-ui.md), `a5ab9e3c`) passed every UITest
@@ -943,10 +943,16 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)): the toolbar's PDF / JPEG switch offered JPEG on
   *Cambridge/YUNG 2 8 Scans LLMed/00114 Young papers.pdf*, which has no JPEG (row 8). Checked in the session copy
   by this item: `Archival Photos JPEGS/` has no Cambridge `00114` file; four other folders hold a `00114 …` JPEG.
-- **Status:** `broken` — `W40.fix-reader-jpeg-switch-missing` (S3)
+  2026-11-12 · macOS 27.2 guest, `ViewerUITests.testToolbarImageSourceSwitch` (`W40.fix-reader-jpeg-switch-missing-ui`,
+  `ONLY_TESTING=ArchiveReaderUITests/ViewerUITests/testToolbarImageSourceSwitch ops/gui/vm-gui-runner.sh reader xcuitest`):
+  passed. Screenshots read: on the paired fixture the toolbar shows a live PDF / JPEG capsule with JPEG selected and the
+  JPEG drawn; on `IMG_NOTEXT — Fixture.pdf` (no JPEG original) the same place reads a greyed "PDF only" with no capsule
+  and no JPEG side, visibly not clickable.
+- **Status:** `fixed-pending-recheck` — `W40.fix-reader-jpeg-switch-missing` (S3); the owner's recheck is row 8's file.
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-06 W40.g1-reader-2-ledger — `unproven` → `broken`: the switch is to appear only when the PDF has a JPEG partner (greyed with a tooltip since `W40.fix-reader-jpeg-toolbar`), and the owner saw it offer JPEG on a file with none (row 8, A; contradicts the promise). Fix item `W40.fix-reader-jpeg-switch-missing` (S3).
+  - 2026-11-12 W40.fix-reader-jpeg-switch-missing-ui — `broken` → `fixed-pending-recheck`: fix `38a401ce` shipped; the VM UITest passes on macOS 27.2 and the unpaired screenshot shows the greyed "PDF only".
 - **Notes:** the preview sheet shows the choice but never saves it.
 
 ### R-44 · Durable archive links
