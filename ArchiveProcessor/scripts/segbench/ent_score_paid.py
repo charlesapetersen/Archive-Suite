@@ -243,7 +243,7 @@ def with_rules(prompt, rules):
 
 def tagging_prompt_before(text, context):
     import date_tagging as DT
-    return with_rules(DT.build_prompt(text, context), TAGGING_RULES_BEFORE)
+    return with_rules(DT.build_prompt(text, context, ocr_poor=False), TAGGING_RULES_BEFORE)
 
 
 def prompt_for(arm, d):

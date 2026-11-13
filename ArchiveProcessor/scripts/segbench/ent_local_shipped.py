@@ -209,7 +209,7 @@ def cmd_report(a):
     import ent_score as ES
     import ent_truth_owner as EO
     rs = P.rows()
-    same = sum(prompt(d) == DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"])) for _r, d in rs)
+    same = sum(prompt(d) == DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"]), ocr_poor=False) for _r, d in rs)
     P.check_replies("tagging", P.CACHE, lambda d: P.label_prompt("tagging", d))
     T = {k: {r["id"]: r for r in v} for k, v in EO.truths().items() if k in TRUTHS}
     old = ES.reply_preds()

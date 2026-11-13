@@ -241,6 +241,7 @@ Rules:
 - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
 - "subject_tags": 2–6 general-but-specific subject tags (e.g. "Democratic Party", "taxes", "education", "transportation", "business", "literature", "economics", "foreign policy", "civil rights", "military", "journalism", "science", "health care", "labor unions"). Do NOT use overly broad terms like "politics" or "history".
   - **When a custom vocabulary is supplied**, this line is replaced with: `2–6 tags chosen ONLY from this controlled vocabulary: ["…", "…"]. Use only tags from this list that are relevant to the document. Do not invent new tags.`
+- Never emit "OCR Poor": it is a person's assessment, not a subject inferred by the model.
 - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
 - "author_name": author, sender, or writer name if identifiable, or null
 - "recipient_name": recipient or addressee name if identifiable, or null

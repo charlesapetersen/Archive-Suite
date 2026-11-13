@@ -110,6 +110,7 @@ Rules:
 - "day": format "Day D" (e.g. "Day 15", "Day 3"), or null if not determinable
 - "date_uncertain": true if year cannot be determined from the document itself (even if estimated from context)
 - "subject_tags": {subject_rule}
+- Never emit "OCR Poor": it is a person's assessment, not a subject inferred by the model.
 - "format": document type, e.g. "letter", "memo", "newspaper article", "magazine article", "report", "draft", "speech", "press release", "telegram", "photograph", or null if unclear
 - "author_name": author, sender, or writer name if identifiable, or null
 - "recipient_name": recipient or addressee name if identifiable, or null
@@ -123,8 +124,14 @@ SUBJECT_RULE = ('2–6 general-but-specific subject tags (e.g. "Democratic Party
                 'terms like "politics" or "history".')
 
 
-def build_prompt(text, context):
-    return PROMPT.format(text=text[:3000], context=context if context else "(none)", subject_rule=SUBJECT_RULE)
+OCR_POOR_RULE = '- Never emit "OCR Poor": it is a person\'s assessment, not a subject inferred by the model.'
+
+
+def build_prompt(text, context, ocr_poor=True):
+    """The app's tagging prompt. ocr_poor=False leaves out OCR_POOR_RULE (W44.reocr-spec, 2026-11-07): the prompt
+    every bench arm measured before then sent, so their cached replies still match their requests."""
+    p = PROMPT.format(text=text[:3000], context=context if context else "(none)", subject_rule=SUBJECT_RULE)
+    return p if ocr_poor else p.replace("\n" + OCR_POOR_RULE + "\n", "\n", 1)
 
 
 # --- documents --------------------------------------------------------------------------------
@@ -208,7 +215,7 @@ def document_pool():
             pool[cls].append({"id": hashlib.sha1(s["pages"][0].encode()).hexdigest()[:16], "class": cls,
                               "collection": CP.collection_of(f), "pages": len(s["pages"]), "truth": truth,
                               "year_in_text": bool(year_s) and year_s in texts[k][:3000],
-                              "prompt": build_prompt(texts[k], context), "n_near": len(near),
+                              "prompt": build_prompt(texts[k], context, ocr_poor=False), "n_near": len(near),
                               "context_ids": context_ids, "folder": f, "position": k})
     counts["folders"] = len(folders)
     return pool, counts

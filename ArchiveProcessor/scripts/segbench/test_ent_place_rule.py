@@ -20,10 +20,12 @@ class PlaceRule(unittest.TestCase):
             self.assertIn("\n" + line + "\n", DT.PROMPT)
         self.assertNotIn("Only a place the document writes", DT.PROMPT)
         self.assertNotIn("Always a person", DT.PROMPT)
-        self.assertEqual(P.tagging_prompt_before(TEXT, CONTEXT), DT.build_prompt(TEXT, CONTEXT))
+        self.assertEqual(P.tagging_prompt_before(TEXT, CONTEXT), DT.build_prompt(TEXT, CONTEXT, ocr_poor=False))
+        self.assertIn(DT.OCR_POOR_RULE, DT.build_prompt(TEXT, CONTEXT))
 
     def test_earlier_prompts_pinned(self):
-        new = P.with_rules(DT.build_prompt(TEXT, CONTEXT), EPA.NEW_RULES)
+        new = P.with_rules(DT.build_prompt(TEXT, CONTEXT, ocr_poor=False), EPA.NEW_RULES)
+        self.assertNotIn("OCR Poor", new)
         for line in EPA.NEW_RULES.values():
             self.assertIn(line + "\n", new)
         self.assertIn("Always a person", new)

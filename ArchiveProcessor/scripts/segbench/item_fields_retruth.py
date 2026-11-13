@@ -587,7 +587,7 @@ def tagging_prompt(d):
     # Its replies answered the November name rules; W46.tagging-prompt-revert put the app's back, so pin them.
     import ent_prompt_app as EPA
     import ent_score_paid as P
-    return P.with_rules(DT.build_prompt(doc_text(d, marks=False), context), EPA.NEW_RULES)
+    return P.with_rules(DT.build_prompt(doc_text(d, marks=False), context, ocr_poor=False), EPA.NEW_RULES)
 
 
 def cmd_tagging(a):

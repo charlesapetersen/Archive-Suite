@@ -80,7 +80,7 @@ NEW_RULES = {
 
 
 def prompt_new(d):
-    return P.with_rules(DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"])), NEW_RULES)
+    return P.with_rules(DT.build_prompt(P.vision_text(d), P.context_of(d["prompt"]), ocr_poor=False), NEW_RULES)
 
 
 def prompt_v1(d):

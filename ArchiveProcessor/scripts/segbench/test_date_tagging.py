@@ -37,6 +37,11 @@ class PromptIsTheApps(unittest.TestCase):
         self.assertEqual(D.PROMPT.replace("{{", "{").replace("}}", "}"), text)
         self.assertEqual(D.SUBJECT_RULE, rule)
 
+    def test_ocr_poor_pin(self):
+        app, before = D.build_prompt("t", "c"), D.build_prompt("t", "c", ocr_poor=False)
+        self.assertIn("\n" + D.OCR_POOR_RULE + "\n", app)
+        self.assertEqual(app.replace(D.OCR_POOR_RULE + "\n", ""), before)
+
     def test_rendering(self):
         p = D.build_prompt("x" * 4000, "")
         self.assertIn("\n" + "x" * 3000 + "\n---", p)

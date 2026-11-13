@@ -105,7 +105,7 @@ def walk(exclude_sample=True):
             d["class"] = DTR.structural_class(r, info, {d["id"]: info})
             j = ES.neighbour(info, k, -1)
             d["previous"] = ids[j] if j is not None else None
-            d["prompt"] = DT.build_prompt(texts[k], context)
+            d["prompt"] = DT.build_prompt(texts[k], context, ocr_poor=False)
             unprinted.append(d)
     return unprinted, printed
 
@@ -136,7 +136,7 @@ def main():
             y = d["truth"]["year"]
             text = mask_year(d["_text"], y)
             m = {k: v for k, v in d.items() if not k.startswith("_")}
-            m["prompt"] = DT.build_prompt(text, d["_context"])
+            m["prompt"] = DT.build_prompt(text, d["_context"], ocr_poor=False)
             m["text_still_prints"] = str(y) in text[:3000]
             m["context_prints"] = str(y) in d["_context"]
             masked.append(m)

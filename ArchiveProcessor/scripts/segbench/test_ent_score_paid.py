@@ -79,10 +79,11 @@ class City(unittest.TestCase):
 class TaggingBefore(unittest.TestCase):
     """The tagging arm keeps the prompt its cached replies answered: its three entity rules pinned, every other line
     as the app sends it. W46.ent-prompt-app changed those three and W46.tagging-prompt-revert put them back, so today
-    the pinned prompt is the app's own."""
+    the pinned prompt is the app's own but for the "OCR Poor" line W44.reocr-spec added after those replies."""
     def test_three_rules_pinned(self):
-        app = DT.build_prompt("body", "ctx")
+        app = DT.build_prompt("body", "ctx", ocr_poor=False)
         self.assertEqual(P.tagging_prompt_before("body", "ctx"), app)
+        self.assertNotIn("OCR Poor", app)
         for line in P.TAGGING_RULES_BEFORE.values():
             self.assertIn("\n" + line + "\n", app)
 

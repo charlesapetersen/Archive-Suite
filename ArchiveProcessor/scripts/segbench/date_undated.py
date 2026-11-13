@@ -263,7 +263,7 @@ def readable(d):
 def prompt_of(d):
     text, missing = text_of(d["pages"], DOC_PAGES)
     context = "\n---\n".join(text_of(n, NEAR_PAGES)[0][:300] for n in d["near"])
-    return DT.build_prompt(text, context), text, missing
+    return DT.build_prompt(text, context, ocr_poor=False), text, missing
 
 
 # --- the gateway ------------------------------------------------------------------------------------------------

@@ -202,7 +202,7 @@ def cmd_build(a):
                          "title": d["title"], "campaign": d["campaign"], "collection": project,
                          "split": split_of(project), "precision": prec, "truth": d["truth"], "pages": d["pages"],
                          "year_in_text": y in d["text"][:3000],
-                         "prompt": D.build_prompt(d["text"], context)})
+                         "prompt": D.build_prompt(d["text"], context, ocr_poor=False)})
     os.makedirs(CACHE, exist_ok=True)
     rng = random.Random(SEED)
     test = []

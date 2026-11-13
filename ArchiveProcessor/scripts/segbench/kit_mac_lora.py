@@ -178,7 +178,7 @@ def cmd_date_data(a):
     for r, ps, ns in docs:
         text = "\n\n".join(vt(p) for p in ps)
         context = "\n---\n".join(vt(p)[:300] for p in ns)
-        out.append({"messages": [{"role": "user", "content": DT.build_prompt(text, context)},
+        out.append({"messages": [{"role": "user", "content": DT.build_prompt(text, context, ocr_poor=False)},
                                  {"role": "assistant", "content": r["target"]}], "id": r["id"], "class": r["class"]})
     d = OUT / f"date-{len(out)}"
     d.mkdir(parents=True, exist_ok=True)
