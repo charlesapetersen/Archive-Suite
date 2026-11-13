@@ -22,6 +22,8 @@ struct NotesFilterBar: View {
     @State private var pendingTag = ""
     @State private var showingSaveSheet = false
     @State private var showingDateFilter = false
+    /// The Dates button's label while its popover is open: the years as they were when it opened.
+    @State private var datesLabelWhileOpen: String?
     @State private var smartFolderName = ""
 
     var body: some View {
@@ -97,16 +99,27 @@ struct NotesFilterBar: View {
                               identifier: "an.filter.tagInput", chipIdentifier: "an.filter.tagChip",
                               suggestions: { NoteTagChipsField.suggestions(in: nav.model.allItems) })
         }
-        .frame(minWidth: NoteTagChipsField.fieldWidth + 24, idealWidth: 260, maxWidth: 360, alignment: .leading)
+        // As wide as the field alone until a tag is chosen, so Dates follows it as in the Reader's bar; chosen tags get
+        // room to sit beside the field before they wrap.
+        .frame(minWidth: Self.tagFilterMinWidth, idealWidth: nav.filter.tags.isEmpty ? Self.tagFilterMinWidth : 300,
+               maxWidth: nav.filter.tags.isEmpty ? Self.tagFilterMinWidth : 360, alignment: .leading)
         .help("Filter by tag — type to autocomplete the tags on notes; Return adds it; ✕ removes it")
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("an.filter.tags")
     }
 
+    /// The tag icon, its spacing and the field.
+    private static let tagFilterMinWidth = NoteTagChipsField.fieldWidth + 24
+
     /// The Reader's compact Dates button; the year range is in its popover, and the button shows it once set.
+    /// The years apply as they are typed, so the button keeps the label it had while the popover is open: a label
+    /// changing under the open popover closed it after the first digit (the VM's NotesE2SearchTests).
     private var datesButton: some View {
-        Button { showingDateFilter = true } label: {
-            if let years = nav.filter.dateYearsSummary {
+        Button {
+            datesLabelWhileOpen = nav.filter.dateYearsSummary
+            showingDateFilter = true
+        } label: {
+            if let years = showingDateFilter ? datesLabelWhileOpen : nav.filter.dateYearsSummary {
                 Label(years, systemImage: "calendar")
             } else {
                 Label("Dates", systemImage: "calendar").labelStyle(.iconOnly)
