@@ -72,6 +72,7 @@ struct ReOCRJob {
         case imageNotExtracted(page: Int)
         case noCandidate
         case tagsUnreadable
+        case notRestorable(String)
 
         var description: String {
             switch self {
@@ -81,6 +82,7 @@ struct ReOCRJob {
             case .imageNotExtracted(let p): "page \(p + 1) could not be prepared for reading"
             case .noCandidate: "not every selected page was read, so there is nothing to accept"
             case .tagsUnreadable: "the file's tags cannot be read"
+            case .notRestorable(let why): "the old text cannot be put back: \(why)"
             }
         }
     }
@@ -172,6 +174,12 @@ struct ReOCRJob {
         var receiptWritten = false
         /// Nil until a clear was tried; `failed` is retried by `recover`, the others are settled.
         var flag: FlagOutcome?
+        /// Set on a restore's own record: the accepted operation it undid.
+        var restores: UUID?
+        /// Set on an accepted operation's record once a restore undid it.
+        var restoredBy: UUID?
+        /// A restore's re-flag outcome.
+        var reflag: ReflagOutcome?
 
         static let file = "job.json"
     }
@@ -226,17 +234,33 @@ struct ReOCRJob {
             } catch { receiptProblem = "\(error)" }
         }
         let flag: FlagOutcome
-        if let settled = record.flag, !settled.isFailure { flag = settled } else { flag = clearFlag(record, journal) }
+        if record.restores != nil {
+            // A restore clears nothing; its re-flag is decided once, by `restore`. A crash inside that re-flag left this
+            // operation's intent as a barrier: settle it with the tag as it is.
+            _ = try? flags.withLock(record.key, app: Self.app) { l -> Void in
+                if let pending = try l.state().pending, pending.operationID == id {
+                    _ = try l.reconcile(observedFlagged: Self.isFlagged(URL(fileURLWithPath: journal.targetPath)) ?? false)
+                }
+            }
+            flag = .notFlagged
+        } else if let settled = record.flag, !settled.isFailure {
+            flag = settled
+        } else {
+            flag = clearFlag(record, journal)
+        }
         record.flag = flag
         var recordProblem: String?
         do { try writer.writeRecord(record, named: Record.file, for: id) } catch { recordProblem = "\(error)" }
         return (receiptProblem, flag, recordProblem)
     }
 
+    /// The receipt for a published operation: `published` for an acceptance, `restored` for a restore. Before and after
+    /// are the operation's own journal digests (for a restore: the accepted revision, then the original).
     func writeReceipt(_ record: Record, _ journal: ReOCRFileWriter.Journal) throws {
         guard journal.phase == .published, let after = journal.candidateSHA256 else { throw Failure.noCandidate }
         try ImproveOCRReceipt(operationID: journal.operationID, key: record.key, textPages: record.textPages,
-                              beforeSHA256: journal.original.sha256, afterSHA256: after, outcome: .published).write(to: support)
+                              beforeSHA256: journal.original.sha256, afterSHA256: after,
+                              outcome: record.restores == nil ? .published : .restored).write(to: support)
     }
 
     struct Recovered: Equatable, Sendable {
@@ -326,6 +350,118 @@ struct ReOCRJob {
             }
         } catch ImproveOCRFlagStore.StoreError.generationChanged {
             return .changedSinceReview("the file was flagged or unflagged again while it was being read")
+        } catch {
+            return .failed("\(error)")
+        }
+    }
+
+    // MARK: Restore
+
+    enum ReflagOutcome: Codable, Equatable, Sendable {
+        case reflagged
+        /// The original was not flagged, or acceptance never cleared its flag: nothing to put back.
+        case notNeeded
+        /// Someone flagged or unflagged the file after the clear, or the flag is already there: left as it is.
+        case changedSinceClear(String)
+        case failed(String)
+    }
+
+    struct Restored: Sendable {
+        let journal: ReOCRFileWriter.Journal
+        let receiptProblem: String?
+        let flag: ReflagOutcome
+    }
+
+    /// Puts back the text an accepted operation replaced (plan §5): its own guarded transaction through
+    /// `ReOCRFileWriter`, so the accepted revision is kept too and the file's current tags and dates are carried over.
+    /// Refused unless the live file is exactly the accepted revision; the person decides in the review UI otherwise.
+    /// The flag goes back only when acceptance cleared it and no flag action came after that clear.
+    func restore(_ accepted: UUID) throws -> Restored {
+        let journal = try writer.read(accepted)
+        guard journal.phase == .published, let acceptedSHA = journal.candidateSHA256 else { throw Failure.notRestorable("it was not published") }
+        var record = try writer.readRecord(Record.self, named: Record.file, for: accepted)
+        guard record.restoredBy == nil else { throw Failure.notRestorable("it was already restored") }
+        guard record.restores == nil else { throw Failure.notRestorable("it is itself a restore; read the file again instead") }
+        try flags.checkSuitable()
+        let target = URL(fileURLWithPath: journal.targetPath)
+        guard let live = try? ReOCRFileWriter.snapshot(target.path), live.sha256 == acceptedSHA else {
+            throw Failure.notRestorable("the file has changed since the new text was accepted")
+        }
+        let original = try Data(contentsOf: writer.backupURL(accepted))
+        guard ReOCRFileWriter.hex(SHA256.hash(data: original)) == journal.original.sha256 else {
+            throw Failure.notRestorable("the kept original is damaged")
+        }
+        let op = try writer.prepare(target: target)
+        var own = Record(operationID: op.journal.operationID, key: record.key, reviewedGeneration: nil,
+                         flaggedAtReview: false, textPages: record.textPages)
+        own.restores = accepted
+        do {
+            // What `prepare` kept is what is overwritten: it must still be the accepted revision, the published file.
+            guard op.journal.original.sha256 == acceptedSHA, op.journal.original.inode == journal.stagedInode else {
+                throw Failure.notRestorable("the file has changed since the new text was accepted")
+            }
+            try writer.writeRecord(own, named: Record.file, for: op.journal.operationID)
+        } catch {
+            try? writer.reject(op)
+            throw error
+        }
+        let restored: ReOCRFileWriter.Journal
+        do {
+            restored = try writer.accept(op, candidate: original)
+        } catch let failure as ReOCRFileWriter.Failure {
+            // Before the swap nothing changed: this restore is over. After it, launch recovery finishes it.
+            switch failure {
+            case .publishedButUnverified, .publishedRecordPending: break
+            default: try? writer.reject(op)
+            }
+            throw failure
+        }
+        var receiptProblem: String?
+        do {
+            try writeReceipt(own, restored)
+            own.receiptWritten = true
+        } catch { receiptProblem = "\(error)" }
+        let flag = reflag(record, accepted: journal, restore: restored)
+        own.flag = .notFlagged
+        own.reflag = flag
+        record.restoredBy = restored.operationID
+        try? writer.writeRecord(record, named: Record.file, for: accepted)
+        try? writer.writeRecord(own, named: Record.file, for: restored.operationID)
+        return Restored(journal: restored, receiptProblem: receiptProblem, flag: flag)
+    }
+
+    private func reflag(_ record: Record, accepted: ReOCRFileWriter.Journal, restore: ReOCRFileWriter.Journal) -> ReflagOutcome {
+        guard record.flaggedAtReview, record.flag == .cleared else { return .notNeeded }
+        let file = URL(fileURLWithPath: restore.targetPath)
+        do {
+            return try flags.withLock(record.key, app: Self.app) { l -> ReflagOutcome in
+                let now = try l.state()
+                if now.isPending { return .changedSinceClear("another action on this file has not finished") }
+                guard now.lastOperationID == accepted.operationID, now.lastOrigin == .acceptedClear else {
+                    return .changedSinceClear("the file was flagged or unflagged after the new text was accepted")
+                }
+                guard let flagged = Self.isFlagged(file) else { return .failed("its tags cannot be read") }
+                if flagged { return .changedSinceClear("the file is flagged already") }
+                var st = stat()
+                guard lstat(file.path, &st) == 0, st.st_ino == restore.stagedInode else {
+                    return .changedSinceClear("the file was replaced after the old text was put back")
+                }
+                let intent = try l.begin(flagged: true, origin: .restored, ifGenerationIs: now.generation,
+                                         operationID: restore.operationID)
+                do {
+                    _ = try CoordinatedTagWriter.write(file) { tags, label in
+                        tags.contains { isSameTag($0, DocumentTags.poorOCRTag) } ? nil : (tags + [DocumentTags.poorOCRTag], label)
+                    }
+                } catch {
+                    _ = try? l.reconcile(observedFlagged: Self.isFlagged(file) ?? false)
+                    return .failed("\(error)")
+                }
+                let observed = Self.isFlagged(file) ?? false
+                try l.commit(intent, observedFlagged: observed)
+                return observed ? .reflagged : .failed("the flag did not stay on the file")
+            }
+        } catch ImproveOCRFlagStore.StoreError.generationChanged {
+            return .changedSinceClear("the file was flagged or unflagged after the new text was accepted")
         } catch {
             return .failed("\(error)")
         }

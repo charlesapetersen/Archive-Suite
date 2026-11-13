@@ -25,6 +25,8 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   10. Restore puts the original back with later tag edits kept and the flag re-added; refused on a changed file or
+///       a second time; no re-flag after a later flag action or when the original was not flagged.
 @MainActor
 enum ReOCRJobTestDriver {
     private static var didRun = false
@@ -405,6 +407,60 @@ enum ReOCRJobTestDriver {
                       "\(third) \(tags(f))")
                 check("9 the journal cannot be overwritten as a record",
                       (try? j.writer.writeRecord(["x": 1], named: "journal.json", for: id)) == nil)
+            }
+
+            // 10. Restore.
+            do {
+                let d = try folder("restore"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["OCR Poor", "Q2"])
+                let original = try Data(contentsOf: f)
+                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+                let accepted = try Data(contentsOf: f)
+                try tag(f, ["Q2", "Added after"])   // an unrelated edit after acceptance
+                let r = try j.restore(done.journal.operationID)
+                check("10 restore puts the original bytes back", (try? Data(contentsOf: f)) == original)
+                check("10 it keeps later tag edits and puts the flag back",
+                      multisetEqual(tags(f), ["Q2", "Added after", "OCR Poor"]) && r.flag == .reflagged, "\(r.flag) \(tags(f))")
+                check("10 the accepted revision is kept", (try? Data(contentsOf: j.writer.backupURL(r.journal.operationID))) == accepted)
+                let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: r.journal.operationID, in: j.support))
+                check("10 a restore receipt is written", r.receiptProblem == nil && receipt?.outcome == .restored
+                      && receipt?.afterSHA256 == done.journal.original.sha256)
+                let rec = j.recover()
+                check("10 recovery after a restore changes nothing", multisetEqual(tags(f), ["Q2", "Added after", "OCR Poor"])
+                      && rec.allSatisfy { $0.receiptProblem == nil }, "\(rec) \(tags(f))")
+                do { _ = try j.restore(r.journal.operationID); check("10 a restore cannot itself be restored", false) }
+                catch { check("10 a restore cannot itself be restored", (try? Data(contentsOf: f)) == original) }
+                do { _ = try j.restore(done.journal.operationID); check("10 a second restore is refused", false) }
+                catch { check("10 a second restore is refused", { if case ReOCRJob.Failure.notRestorable = error { return true }; return false }()) }
+            }
+            do {
+                let d = try folder("restore-changed"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+                let h = try FileHandle(forWritingTo: f); try h.seekToEnd(); try h.write(contentsOf: Data("\n%e\n".utf8)); try h.close()
+                let edited = try Data(contentsOf: f)
+                do { _ = try j.restore(done.journal.operationID); check("10 restore of a changed file is refused", false) }
+                catch { check("10 restore of a changed file is refused", (try? Data(contentsOf: f)) == edited) }
+                let pendingOps = j.recover().filter { if case .notPublished = $0.writer { return true }; return false }
+                check("10 a refused restore leaves no operation waiting for review", pendingOps.isEmpty, "\(pendingOps)")
+            }
+            do {
+                let d = try folder("restore-unflagged-later"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["OCR Poor"])
+                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+                // The person unflags it explicitly in the Reader after acceptance (it was already clear).
+                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+                _ = try j.flags.withLock(k, app: "Reader") { l in
+                    try l.commit(l.begin(flagged: false, origin: .unflag), observedFlagged: false)
+                }
+                let r = try j.restore(done.journal.operationID)
+                check("10 a flag action after the clear means no re-flag",
+                      { if case .changedSinceClear = r.flag { return true }; return false }() && !tags(f).contains("OCR Poor"), "\(r.flag)")
+            }
+            do {
+                let d = try folder("restore-never-flagged"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+                let r = try j.restore(done.journal.operationID)
+                check("10 an original that was not flagged is not flagged", r.flag == .notNeeded && tags(f).isEmpty)
             }
 
             // 7. A rotated image page.
