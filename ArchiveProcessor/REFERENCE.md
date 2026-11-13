@@ -337,7 +337,8 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   EntityExtractor.swift        W46.ent-feature: the names call (sender, recipients, sending place), its evidence check
                                (quote in the document's own text, ed2 on 5+ letters, else inferred), the sidecar's
                                `entities` object and `EntityRunPolicy` (correspondence only; cloud always, Mac when
-                               names rank; no Vision sender, no Vision hands). Wired in `performTaggingPhase`.
+                               names rank; no Vision sender, no Vision hands). Wired in `performTaggingPhase`
+                               and `LiveCaptureProcessor.liveEntities` (kept in the staging manifest).
   DocumentSegmenter.swift      Infer document boundaries (Start/Continuation) from OCR/classification;
                                `enclosureOf` (W37) from the OCR `[enclosure]` marker, never adjacency.
   CollectionSegmenter.swift    Group files into box/folder collections.

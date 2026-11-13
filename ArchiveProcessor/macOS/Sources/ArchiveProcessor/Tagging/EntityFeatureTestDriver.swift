@@ -13,6 +13,10 @@ import ArchiveCore
 ///   3. The run policy (owner call 11 and the stage's rules).
 ///   4. The sidecar object and `SegmentJSONBuilder` with and without it.
 ///   5. End to end through `performTaggingPhase`, a cloud route and a route on this Mac, on scratch outputs.
+///   6. Live Capture (W46.ent-feature-live): through the real ingest → finalize path with the $0 OCR stand-in, the
+///      sidecar's `entities` object, the names kept in the staging manifest, a rotation-review regeneration that
+///      carries them with no second call, and no call with sidecars off or "No names". Needs the scratch backup root
+///      (`ARCHIVEPROC_TEST_BACKUP_ROOT`) and refuses to run without it.
 @MainActor
 enum EntityFeatureTestDriver {
     nonisolated static let envKey = "ENTITY_FEATURE_TEST"
@@ -47,6 +51,7 @@ enum EntityFeatureTestDriver {
         policy()
         sidecar()
         await endToEnd()
+        await liveCapture()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
         let text = lines.joined(separator: "\n") + "\n"
         if let out = ProcessInfo.processInfo.environment["ENTITY_FEATURE_TEST_OUT"] {
@@ -200,12 +205,9 @@ enum EntityFeatureTestDriver {
               && w["format"] as? String == "letter")
     }
 
-    // MARK: 5. End to end
-
-    private static func endToEnd() async {
-        let fm = FileManager.default
-        check("5 seam dormant before install", !NetworkSession.testTransportIsActive)
-        let wire = Wire()
+    /// Every request answered by `wire`: the tagging and the names prompt told apart by their first words, the
+    /// document by the marker word nearest the start of the prompt (its own text comes first in both).
+    private static func install(_ wire: Wire) {
         NetworkSession.testTransport = { request in
             let body = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             let prompt = ((body?["messages"] as? [[String: Any]])?.first?["content"] as? String) ?? ""
@@ -227,6 +229,15 @@ enum EntityFeatureTestDriver {
             let reply = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content]]]])
             return (reply, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
+    }
+
+    // MARK: 5. End to end
+
+    private static func endToEnd() async {
+        let fm = FileManager.default
+        check("5 seam dormant before install", !NetworkSession.testTransportIsActive)
+        let wire = Wire()
+        install(wire)
         defer { NetworkSession.testTransport = nil }
         guard NetworkSession.testTransportIsActive else {
             check("5 the injected transport is active", false, "stopping before any request")
@@ -349,6 +360,150 @@ enum EntityFeatureTestDriver {
         check("5 \"No names\": tagged, no entity call, the sidecar as before",
               wire.tagging == 5 && wire.entity.isEmpty && json(noNamesOut["L"])["entities"] == nil,
               "\(wire.tagging) \(wire.entity)")
+    }
+
+    // MARK: 6. Live Capture
+
+    private static func liveCapture() async {
+        let fm = FileManager.default
+        guard !(ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"] ?? "").isEmpty else {
+            check("6 Live Capture runs against a scratch backup root (never the operator's)", false)
+            return
+        }
+        guard let route = OpenRouterRoute.catalog.first else { check("6 an OpenRouter route", false); return }
+        let wire = Wire()
+        install(wire)
+        defer { NetworkSession.testTransport = nil; LiveCaptureProcessor._recoveryTestOCRStub = nil }
+        guard NetworkSession.testTransportIsActive else {
+            check("6 the injected transport is active", false, "stopping before any request")
+            return
+        }
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APEntityLive-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: tmp) }
+        try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
+
+        let letter = #"{"year": "1958", "format": "letter", "author_name": "Tagging Sender", "recipient_name": "Tagging Recipient", "author_location": "Tagging Place"}"#
+        wire.taggingReply = ["DOCL": letter, "DOCV": letter, "DOCH": letter, "DOCF": letter,
+                             "DOCR": #"{"year": "1960", "format": "report", "author_name": "Report Author"}"#]
+        let names = #"{"sender": [{"name": "Alice Green", "quote": "Alice Green"}], "recipient": [{"name": "Charles Brown", "quote": "Dr. Brown"}, {"name": "Edith Black", "quote": null}], "sending_place": []}"#
+        wire.entityReply = ["DOCL": names, "DOCV": names, "DOCH": names, "DOCF": "I cannot help with that."]
+        let docs: [(String, String, String)] = [("L", "typewritten", "Gemini"), ("R", "printed", "Gemini"),
+                                                ("V", "typewritten", "Apple Vision"), ("H", "handwritten", "Apple Vision"),
+                                                ("F", "typewritten", "Gemini")]
+
+        func settle(_ cond: () -> Bool) async -> Bool {
+            for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+            return cond()
+        }
+        func json(_ u: URL?) -> [String: Any] {
+            guard let u, let d = try? Data(contentsOf: u),
+                  let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
+            return o
+        }
+        func config(_ out: String, sidecars: Bool = true) -> SessionProcessingConfig {
+            SessionProcessingConfig(
+                provider: .openrouter, model: route.model, thinkingLevel: .low, apiKey: "test-key",
+                taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+                outputDirectory: tmp.appendingPathComponent(out, isDirectory: true),
+                customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: sidecars, tagVocabulary: [], gateway: nil,
+                outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
+        }
+        /// One live session: each document's one page ingested with its stand-in OCR result, resolved, and staged.
+        func session(_ name: String, sidecars: Bool = true,
+                     settings: [String: ResolvedSetting] = [:]) async -> (CaptureSession, URL, SessionProcessingConfig) {
+            let staging = tmp.appendingPathComponent("APStaging-\(name)", isDirectory: true)
+            try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
+            let cfg = config(name, sidecars: sidecars)
+            let s = CaptureSession()
+            s._recoveryTestBeginLive(config: cfg, stagingDir: staging)
+            s.liveProcessor._entityTestSetSettings(settings)
+            for (i, d) in docs.enumerated() {
+                LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
+                    text: "DOC\(d.0) Dear Dr. Brown,\nThank you.\nYours, Alice Green", classification: nil,
+                    errorMessage: nil, errorCode: nil,
+                    pageReader: PageReaderRecord(kind: d.1, confidence: 0.9, reason: .kind, provider: d.2, model: "m"))
+                _ = s.ingest(jpeg: Data("synthetic page bytes".utf8), groupId: d.0, seq: i + 1, type: .document,
+                             quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+            }
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            for d in docs { s.liveProcessor.segmentResolved(groupId: d.0) }
+            let all = await settle { s.liveProcessor.staged.count == docs.count }
+            check("6 \(name): every document stages", all, "\(s.liveProcessor.staged.count)")
+            return (s, staging, cfg)
+        }
+        func sidecar(_ s: CaptureSession, _ gid: String) -> [String: Any] {
+            json(s.liveProcessor.staged.first { $0.groupId == gid }?.jsonURL)
+        }
+
+        // A cloud route, names not ranked: extracted on the letters the policy allows, not shown.
+        let (cloud, cloudStaging, cloudConfig) = await session("live")
+        check("6 Live: every document tagged once", wire.tagging == 5, "\(wire.tagging)")
+        check("6 Live: the entity call on L, V and F, not the report or the hand",
+              wire.entity.sorted() == ["DOCF", "DOCL", "DOCV"], "\(wire.entity)")
+        let l = sidecar(cloud, "L")
+        let le = l["entities"] as? [String: Any] ?? [:]
+        check("6 Live L: extracted, not shown, read by a model, the route named",
+              le["status"] as? String == "extracted" && le["shown"] as? Bool == false
+              && le["text"] as? String == "reader" && le["route"] as? String == "OpenRouter · \(route.model.displayName)",
+              "\(le)")
+        check("6 Live L: the sender read, two recipients, the place Unknown",
+              (le["sender"] as? [[String: Any]])?.first?["evidence"] as? String == "quoted"
+              && (le["recipient"] as? [[String: Any]])?.count == 2
+              && (le["sending_place"] as? [[String: Any]])?.first?["name"] as? String == "Unknown")
+        check("6 Live L: the tagging call's name keys are not beside it",
+              l["author_name"] == nil && l["recipient_name"] == nil && l["format"] as? String == "letter")
+        let r = sidecar(cloud, "R")
+        check("6 Live R: no entities, the tagging call's fields as before",
+              r["entities"] == nil && r["author_name"] as? String == "Report Author")
+        let ve = sidecar(cloud, "V")["entities"] as? [String: Any] ?? [:]
+        check("6 Live V: Apple Vision text, the sender withheld",
+              ve["text"] as? String == "vision" && ve["sender"] == nil && ve["sender_withheld"] != nil)
+        let h = sidecar(cloud, "H")
+        check("6 Live H: no entities on handwriting read by Apple Vision", h["entities"] == nil && !h.isEmpty)
+        check("6 Live F: an unusable reply is recorded as failed, with no names",
+              (sidecar(cloud, "F")["entities"] as? [String: Any])?["status"] as? String == "failed")
+
+        // The staging manifest keeps the names, so a relaunch's rotation review regenerates them.
+        let kept = cloud.liveProcessor._entityTestRetainedEntities("L")
+        check("6 Live: the names are retained with the segment", kept.map {
+            if case .extracted(let f) = $0.outcome { return f.senders.first?.name == "Alice Green" }; return false
+        } == true)
+        let reloaded = CaptureSession()
+        reloaded.liveProcessor._recoveryTestLoadManifest(stagingDir: cloudStaging, config: cloudConfig)
+        check("6 Live: the staging manifest round-trips them", kept != nil
+              && reloaded.liveProcessor._entityTestRetainedEntities("L") == kept
+              && reloaded.liveProcessor._entityTestRetainedEntities("R") == nil)
+
+        // A rotation-review regeneration rewrites the sidecar with the same names and makes no second call.
+        let calls = wire.lock.withLock { wire.entity.count }
+        let before = le as NSDictionary
+        if let src = cloud.photos.first(where: { $0.groupId == "L" })?.url {
+            cloud.liveProcessor.rotationReviewPages = [
+                LiveCaptureProcessor.RotationReviewPage(groupId: "L", pageIndex: 0, order: 1, sourceURL: src,
+                                                        rotationDegrees: 90)
+            ]
+            cloud.liveProcessor.applyRotationReviewAndFinalize()
+            check("6 Live: the rotation change triggers a regeneration", cloud.liveProcessor.isFinalizing)
+            let done = await settle { !cloud.liveProcessor.isFinalizing }
+            let after = sidecar(cloud, "L")["entities"] as? [String: Any] ?? [:]
+            check("6 Live: the regenerated sidecar carries the same names, no second call",
+                  done && (after as NSDictionary) == before && wire.lock.withLock { wire.entity.count } == calls,
+                  "\(after)")
+        } else {
+            check("6 Live: L's source page is on disk", false)
+        }
+
+        // Sidecars off: the names have no output, so no call; "No names": no call either.
+        wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
+        _ = await session("nosidecars", sidecars: false)
+        check("6 Live, sidecars off: tagged, no entity call", wire.tagging == 5 && wire.entity.isEmpty,
+              "\(wire.tagging) \(wire.entity)")
+        wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
+        let (none, _, _) = await session("nonames", settings: [
+            SettingsSheetModel.overrideKey("entities").rawValue: ResolvedSetting(value: .string("none"))])
+        check("6 Live, \"No names\": tagged, no entity call, the sidecar as before",
+              wire.tagging == 5 && wire.entity.isEmpty && sidecar(none, "L")["entities"] == nil
+              && sidecar(none, "L")["author_name"] as? String == "Tagging Sender", "\(wire.tagging) \(wire.entity)")
     }
 }
 

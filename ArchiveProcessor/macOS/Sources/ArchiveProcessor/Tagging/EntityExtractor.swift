@@ -45,7 +45,7 @@ enum EntityExtractor {
 
     // MARK: The evidence check
 
-    enum Evidence: Equatable, Sendable {
+    enum Evidence: Equatable, Sendable, Codable {
         /// The quote is in the document's own text, at this edit distance (0, or up to `nearDistance`).
         case quoted(distance: Int)
         /// No quote, or one the text does not hold: the name is written marked inferred (owner, 2026-11-06).
@@ -97,7 +97,7 @@ enum EntityExtractor {
 
     // MARK: The reply
 
-    struct Name: Equatable, Sendable {
+    struct Name: Equatable, Sendable, Codable {
         let name: String
         /// The model's quote as it answered it (kept when the check found it; dropped from the sidecar otherwise).
         let quote: String?
@@ -112,7 +112,7 @@ enum EntityExtractor {
         }
     }
 
-    struct Fields: Equatable, Sendable {
+    struct Fields: Equatable, Sendable, Codable {
         var senders: [Name] = []
         var recipients: [Name] = []
         var sendingPlaces: [Name] = []
@@ -183,9 +183,11 @@ enum EntityExtractor {
     }
 }
 
-/// One document's names as the sidecar records them.
-struct EntityResult: Equatable, Sendable {
-    enum Outcome: Equatable, Sendable {
+/// One document's names as the sidecar records them. Codable so Live Capture's staging manifest keeps it for a
+/// segment the rotation review regenerates (W46.ent-feature-live): the regenerated sidecar carries the same names, with
+/// no second call.
+struct EntityResult: Equatable, Sendable, Codable {
+    enum Outcome: Equatable, Sendable, Codable {
         case extracted(EntityExtractor.Fields)
         case failed(String)
     }
@@ -252,7 +254,7 @@ enum EntityRunPolicy {
         case plan
     }
 
-    enum TextSource: String, Equatable, Sendable {
+    enum TextSource: String, Equatable, Sendable, Codable {
         /// Apple Vision read at least one of the document's pages.
         case vision
         /// Every page was read by a model.
@@ -286,7 +288,7 @@ enum EntityRunPolicy {
         var route: String
     }
 
-    struct Run: Equatable, Sendable {
+    struct Run: Equatable, Sendable, Codable {
         let route: String
         let textSource: TextSource
         /// The collection ranks names: show them (a cloud route extracts them regardless).
@@ -330,5 +332,47 @@ enum EntityRunPolicy {
         }
         let withheld: String? = i.textSource == .reader ? nil : "never from Apple Vision text"
         return .run(Run(route: i.route, textSource: i.textSource, shown: i.namesRanked, senderWithheld: withheld))
+    }
+}
+
+extension EntityRunPolicy {
+    /// The policy's inputs for one document before the tagging reply gives its `format`: the route's family, who read
+    /// each page (Apple Vision or a model), each page's kind, whether the collection ranks names and whether the user
+    /// chose no names for the stage. `results` holds each page's OCR result (nil when the run has none for it);
+    /// `runProvider` is the run's OCR provider, the reader of a page that names none. Process Files
+    /// (`OCRProcessor.entityInputs`) and Live Capture (`LiveCaptureProcessor.liveEntities`) both read it, so the two
+    /// pipelines decide alike.
+    static func inputs(results: [OCRResult?], runProvider: String?, settings values: [String: ResolvedSetting],
+                       provider: LLMProvider, model: LLMModel, gateway: GatewayConfig?,
+                       localAgent: LocalAgentConfig?) -> Inputs {
+        let family: Family = localAgent != nil ? .plan : (gateway?.isLocalModel == true ? .mac : .cloud)
+        let kinds = results.map { PageKind($0?.pageReader?.kind) }
+        let readers: [String?] = results.map { r in
+            guard let r else { return nil }
+            if let second = r.secondReader { return second.provider }
+            if let page = r.pageReader { return page.provider }
+            if r.imported != nil { return "imported" }
+            return runProvider
+        }
+        let source: TextSource
+        if readers.contains(LLMProvider.appleVision.rawValue) {
+            source = .vision
+        } else if readers.isEmpty || readers.contains(where: { $0 == nil }) {
+            source = .unknown
+        } else {
+            source = .reader
+        }
+        let ranked = values[SettingsKey.priorities.rawValue]?.value.strings?
+            .contains(SettingsPriority.names.rawValue) ?? false
+        // "No names" on the Names card is stored for the whole stage (`SettingsSheetModel.overrideKey`); a per-part key
+        // is read too. Any other route chosen there is not read: the names call takes the run's text route.
+        let part = kinds.contains(.handwritten) ? "correspondence-handwritten" : "correspondence-typed"
+        let routeNone = [SettingsSheetModel.overrideKey("entities"), SettingsKey.override(stage: "entities", part: part)]
+            .contains { values[$0.rawValue]?.value.string == "none" }
+        // With a gateway set, LLMTextClient calls the gateway's model, whatever the provider and model say.
+        let modelName = gateway?.displayName ?? model.displayName
+        let route = (family == .mac ? "this Mac" : (gateway != nil ? "Gateway" : provider.rawValue)) + " · " + modelName
+        return Inputs(family: family, namesRanked: ranked, routeNone: routeNone, format: nil,
+                      textSource: source, pageKinds: kinds, route: route)
     }
 }

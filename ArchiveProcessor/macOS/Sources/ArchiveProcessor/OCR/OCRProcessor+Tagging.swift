@@ -1083,7 +1083,10 @@ extension OCRProcessor {
             )
             var inputs = entityBase[i]
             inputs.format = tags.format
-            guard !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs) else { return (i, tags, nil) }
+            // The sidecar is the names' only output, so with sidecars off the call would be spent for nothing.
+            guard enableSegmentJSON, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs) else {
+                return (i, tags, nil)
+            }
             let names = await EntityExtractor.extract(text: snapshot[i].combinedText, decision: run,
                                                       provider: provider, model: model, apiKey: apiKey,
                                                       gatewayConfig: gateway)
@@ -1134,42 +1137,14 @@ extension OCRProcessor {
                                                    entities: names)
         }
     }
-    /// W46.ent-feature — the names policy's inputs for one segment, before the tagging reply gives its `format`: the
-    /// route's family, who read each page (Apple Vision or a model), each page's kind, whether the collection ranks
-    /// names and whether the user chose no names for the stage.
+    /// W46.ent-feature — the names policy's inputs for one segment, before the tagging reply gives its `format`
+    /// (`EntityRunPolicy.inputs`, which Live Capture reads too).
     func entityInputs(for segment: DocumentSegment, runConfig: SessionProcessingConfig?, provider: LLMProvider,
                       model: LLMModel, gateway: GatewayConfig?, localAgent: LocalAgentConfig?) -> EntityRunPolicy.Inputs {
-        let family: EntityRunPolicy.Family = localAgent != nil ? .plan : (gateway?.isLocalModel == true ? .mac : .cloud)
         let results = segment.pdfURLs.map { url in jobs.first(where: { $0.sourceURL == url })?.result }
-        let kinds = results.map { EntityRunPolicy.PageKind($0?.pageReader?.kind) }
-        let readers: [String?] = results.map { r in
-            guard let r else { return nil }
-            if let second = r.secondReader { return second.provider }
-            if let page = r.pageReader { return page.provider }
-            if r.imported != nil { return "imported" }
-            return runConfig?.provider.rawValue
-        }
-        let source: EntityRunPolicy.TextSource
-        if readers.contains(LLMProvider.appleVision.rawValue) {
-            source = .vision
-        } else if readers.isEmpty || readers.contains(where: { $0 == nil }) {
-            source = .unknown
-        } else {
-            source = .reader
-        }
-        let values = activeResolvedSettings?.values ?? [:]
-        let ranked = values[SettingsKey.priorities.rawValue]?.value.strings?
-            .contains(SettingsPriority.names.rawValue) ?? false
-        // "No names" on the Names card is stored for the whole stage (`SettingsSheetModel.overrideKey`); a per-part key
-        // is read too. Any other route chosen there is not read: the names call takes the run's text route.
-        let part = kinds.contains(.handwritten) ? "correspondence-handwritten" : "correspondence-typed"
-        let routeNone = [SettingsSheetModel.overrideKey("entities"), SettingsKey.override(stage: "entities", part: part)]
-            .contains { values[$0.rawValue]?.value.string == "none" }
-        // With a gateway set, LLMTextClient calls the gateway's model, whatever the provider and model say.
-        let modelName = gateway?.displayName ?? model.displayName
-        let route = (family == .mac ? "this Mac" : (gateway != nil ? "Gateway" : provider.rawValue)) + " · " + modelName
-        return EntityRunPolicy.Inputs(family: family, namesRanked: ranked, routeNone: routeNone, format: nil,
-                                      textSource: source, pageKinds: kinds, route: route)
+        return EntityRunPolicy.inputs(results: results, runProvider: runConfig?.provider.rawValue,
+                                      settings: activeResolvedSettings?.values ?? [:], provider: provider, model: model,
+                                      gateway: gateway, localAgent: localAgent)
     }
     /// W37 — the covering segment's index when `snapshot[i]` carries a usable enclosure relation: the
     /// cover precedes it, is in range, and is a document (never a box/folder label). `nil` otherwise.

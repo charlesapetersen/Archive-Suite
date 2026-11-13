@@ -345,7 +345,11 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     private unowned let session: CaptureSession
-    private var config: SessionProcessingConfig?
+    private var config: SessionProcessingConfig? { didSet { entitySettings = nil } }
+    /// W46.ent-feature-live — the layered settings the names policy reads (names ranked, "No names"), resolved for the
+    /// session's output folder at its first finalize and kept for the session, as a Process Files run freezes them.
+    /// Reset with the config and on Clear.
+    private var entitySettings: [String: ResolvedSetting]?
     private var stagingDir: URL?
     /// A rejected manifest must not be replaced by normal resume/retry/finalize persistence.
     private var stagingManifestBlocked = false
@@ -1179,6 +1183,10 @@ final class LiveCaptureProcessor: ObservableObject {
         var tags = humanOnly
             ? GeneratedTags(subjectTags: mac?.subjects ?? [])
             : await computeTags(group: group, segment: segment, mac: mac, config: config)
+        // W46.ent-feature-live — the names call after the tagging call, on the tagging reply's `format`. The B8 guard
+        // below covers this await too: nothing between here and it touches session state.
+        let entities = humanOnly ? nil
+            : await liveEntities(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
         // Phone's in-the-room date wins (Mac override beats the phone value).
         if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
         if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
@@ -1225,7 +1233,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
                                    localAgentModelName: localAgentModelName, stagingDir: stagingDir, writeJSON: writeJSON,
-                                   jsonTags: jsonTags, texts: texts,
+                                   jsonTags: jsonTags, entities: entities, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1257,7 +1265,7 @@ final class LiveCaptureProcessor: ObservableObject {
             groupId: groupId, type: gType, order: gOrder,
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
-            writeJSON: writeJSON, jsonTags: jsonTags, texts: texts,
+            writeJSON: writeJSON, jsonTags: jsonTags, entities: entities, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
             exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1370,6 +1378,31 @@ final class LiveCaptureProcessor: ObservableObject {
         return GeneratedTags()   // manual mode, no Mac subjects → date/quality only
     }
 
+    /// W46.ent-feature-live — the document's names for its sidecar's `entities` object, on the policy Process Files
+    /// follows (`EntityRunPolicy`, `OCRProcessor.performTaggingPhase`): only a document the tagging call tagged here
+    /// (automatic mode, not Mac-tagged, not a box or folder), only with sidecars on (they are the names' only output),
+    /// and only when the policy runs the feature on it. No nearby documents are sent, as in Process Files. A page whose
+    /// OCR failed counts as a page of unknown reader. nil = no `entities` object, and the sidecar is as before.
+    private func liveEntities(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult],
+                              tags: GeneratedTags, mac: MacSegmentTags?,
+                              config: SessionProcessingConfig) async -> EntityResult? {
+        guard group.type == .document, config.enableSegmentJSON, config.taggingMode == .automatic,
+              (mac?.subjects ?? []).isEmpty, tags.format != nil else { return nil }
+        if entitySettings == nil {
+            entitySettings = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID(),
+                                                                processing: [:]).values
+        }
+        var inputs = EntityRunPolicy.inputs(
+            results: results.map { Self.ocrFailed($0) ? nil : $0 }, runProvider: config.provider.rawValue,
+            settings: entitySettings ?? [:], provider: config.textProvider, model: config.textModel,
+            gateway: config.textGateway, localAgent: config.textLocalAgent)
+        inputs.format = tags.format
+        guard case .run(let run) = EntityRunPolicy.decide(inputs) else { return nil }
+        return await EntityExtractor.extract(text: segment.combinedText, decision: run, provider: config.textProvider,
+                                             model: config.textModel, apiKey: config.textAPIKey,
+                                             gatewayConfig: config.textGateway)
+    }
+
     // MARK: - Off-main file writing (nonisolated static; only touches the filesystem)
 
     private struct PageWork: Sendable, Codable {
@@ -1402,6 +1435,9 @@ final class LiveCaptureProcessor: ObservableObject {
         let localAgentModelName: String?
         let writeJSON: Bool
         let jsonTags: GeneratedTags
+        /// W46.ent-feature-live — the names written into the sidecar, kept so a regenerated sidecar carries them
+        /// without a second call. nil when the feature did not run (and in a manifest written before it).
+        let entities: EntityResult?
         let texts: [String]
         let boxLabelText: String?
         let outputImageFile: Bool
@@ -1417,7 +1453,8 @@ final class LiveCaptureProcessor: ObservableObject {
         init(groupId: String, type: CaptureGroupType, order: Int,
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
              localAgentDisplayName: String?, localAgentModelName: String?,
-             writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
+             writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil, texts: [String],
+             boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
              stampUnread: Bool) {
@@ -1425,7 +1462,7 @@ final class LiveCaptureProcessor: ObservableObject {
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName
             self.localAgentDisplayName = localAgentDisplayName; self.localAgentModelName = localAgentModelName
-            self.writeJSON = writeJSON; self.jsonTags = jsonTags
+            self.writeJSON = writeJSON; self.jsonTags = jsonTags; self.entities = entities
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
             self.taggingMode = taggingMode
@@ -1437,7 +1474,8 @@ final class LiveCaptureProcessor: ObservableObject {
         groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         localAgentDisplayName: String?, localAgentModelName: String?,
-        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, texts: [String], boxLabelText: String?,
+        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil, texts: [String],
+        boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
         stampUnread: Bool
@@ -1519,7 +1557,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var jsonURL: URL? = nil
         if writeJSON, type == .document, let firstPDF = pdfURLs.first {
             let jurl = firstPDF.deletingPathExtension().appendingPathExtension("json")
-            writeSegmentJSON(pageURLs: pages.map { $0.sourceURL }, texts: texts, tags: jsonTags, to: jurl)
+            writeSegmentJSON(pageURLs: pages.map { $0.sourceURL }, texts: texts, tags: jsonTags,
+                             entities: entities?.sidecarObject, to: jurl)
             if fm.fileExists(atPath: jurl.path) { jsonURL = jurl }   // only record it if it actually wrote
         }
 
@@ -1616,8 +1655,10 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// Writes the metadata sidecar (OCR body + fields) via the shared `SegmentJSONBuilder`. This path
     /// is documents-only, so it passes no box/folder label format override.
-    nonisolated private static func writeSegmentJSON(pageURLs: [URL], texts: [String], tags: GeneratedTags, to jsonURL: URL) {
-        guard let data = SegmentJSONBuilder.buildData(fileURLs: pageURLs, texts: texts, tags: tags) else { return }
+    nonisolated private static func writeSegmentJSON(pageURLs: [URL], texts: [String], tags: GeneratedTags,
+                                                     entities: [String: Any]? = nil, to jsonURL: URL) {
+        guard let data = SegmentJSONBuilder.buildData(fileURLs: pageURLs, texts: texts, tags: tags,
+                                                      entities: entities) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
 
@@ -1991,6 +2032,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                            localAgentDisplayName: seg.localAgentDisplayName,
                                            localAgentModelName: seg.localAgentModelName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
+                                           entities: seg.entities,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
@@ -2461,6 +2503,7 @@ final class LiveCaptureProcessor: ObservableObject {
         rotationReviewPages.removeAll()
         currentCollectionKey = "__unfiled__"
         pendingFinish = false
+        entitySettings = nil
         // W3.cap-r3-fu9 — the per-item sheet targets are session state too, and they are now an INPUT to the
         // finish gate (`perItemSheetUp`), so a survivor is not merely a sheet over an empty pane: a target
         // left set names a group that no longer exists and would hold the NEXT session's Finish indefinitely.
@@ -2726,6 +2769,14 @@ final class LiveCaptureProcessor: ObservableObject {
         self.config = config
         loadStagingManifest()
     }
+
+#if DEBUG
+    /// Test-only ($0, W46.ent-feature-live): the names settings the session would resolve from its output folder, set
+    /// directly so a driver writes no collection file (call it after arming, which resets them); and the names a
+    /// finalized segment retained for regeneration.
+    func _entityTestSetSettings(_ values: [String: ResolvedSetting]) { entitySettings = values }
+    func _entityTestRetainedEntities(_ groupId: String) -> EntityResult? { retained[groupId]?.entities }
+#endif
 
     /// Test-only (W3.cap-r6): THE straggler. Appends a staged segment exactly as `finalizeSegment` does, so
     /// a driver can inject one into the window between `finalize` snapshotting `plans` and the move
