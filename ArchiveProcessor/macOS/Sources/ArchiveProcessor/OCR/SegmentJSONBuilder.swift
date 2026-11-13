@@ -33,7 +33,9 @@ enum SegmentJSONBuilder {
     ///   - entities: W46.ent-feature — the entity feature's `entities` object (`EntityResult.sidecarObject`), when it
     ///     ran on this document. It then holds the document's sender, recipients and sending place, each with its
     ///     evidence, so the tagging call's `author_name`, `recipient_name` and `author_location` are left out: one
-    ///     answer per field. `nil` → the sidecar is byte-identical to the output before the feature.
+    ///     answer per field. `nil` → the sidecar is byte-identical to the output before the feature. Where the feature
+    ///     did not run and the page text is Apple Vision's, the callers pass `tags` without the tagging call's sender
+    ///     (`EntityRunPolicy.sidecarTags`, W46.ent-feature-owner-calls), so no sidecar carries a Vision-read sender.
     ///
     ///   - dating: W46.date-route — the dating route's `dating` object (`DateRoute.Decision.sidecarObject`): the
     ///     evidence class, the quote and its place, the interval where measured, second-role dates. `nil` → no key.

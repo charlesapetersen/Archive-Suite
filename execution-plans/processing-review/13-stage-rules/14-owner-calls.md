@@ -55,6 +55,10 @@ calls are section 1.
     runs only when names are ranked, on typed and printed correspondence, the sender never taken from Vision text
     (ent-robust rule), the 4B not offered. No export format until a user asks; CMIF against CSV goes to
     POTENTIAL_FEATURES, not the queue.
+    Changed at the walkthrough of 2026-11-13 (W46.ent-feature-owner-calls): on a cloud route too, names are extracted
+    only when the collection interview ranks them, since the feature became its own call ($2.37 per 1,000
+    correspondence documents) and nothing reads unshown names; and where the feature does not run on Apple Vision
+    text, the sidecar leaves out the tagging call's sender as well.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

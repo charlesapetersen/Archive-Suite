@@ -1218,7 +1218,11 @@ final class LiveCaptureProcessor: ObservableObject {
         let localAgentDisplayName = config.localAgent?.provenanceDisplayName
         let localAgentModelName = config.localAgent?.provenanceModelName
         let writeJSON = config.enableSegmentJSON && gType == .document
-        let jsonTags = tags
+        // W46.ent-feature-owner-calls: where the page text is Apple Vision's, the sidecar carries no tagging-call sender.
+        // Kept in `jsonTags`, so a rotation-review regeneration writes the same sidecar.
+        let jsonTags = EntityRunPolicy.sidecarTags(
+            tags, withholdingSender: writeJSON && tags.authorName != nil
+                && EntityRunPolicy.withholdsTaggingSender(liveEntityInputs(results: results, config: config)))
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
         let taggingMode = config.taggingMode
         let stampUnread = config.taggingMode.stampsUnread
@@ -1406,15 +1410,20 @@ final class LiveCaptureProcessor: ObservableObject {
                               config: SessionProcessingConfig) async -> EntityResult? {
         guard group.type == .document, config.enableSegmentJSON, config.taggingMode == .automatic,
               (mac?.subjects ?? []).isEmpty, tags.format != nil else { return nil }
-        var inputs = EntityRunPolicy.inputs(
-            results: results.map { Self.ocrFailed($0) ? nil : $0 }, runProvider: config.provider.rawValue,
-            settings: liveSettings(config), provider: config.textProvider, model: config.textModel,
-            gateway: config.textGateway, localAgent: config.textLocalAgent)
+        var inputs = liveEntityInputs(results: results, config: config)
         inputs.format = tags.format
         guard case .run(let run) = EntityRunPolicy.decide(inputs) else { return nil }
         return await EntityExtractor.extract(text: segment.combinedText, decision: run, provider: config.textProvider,
                                              model: config.textModel, apiKey: config.textAPIKey,
                                              gatewayConfig: config.textGateway)
+    }
+
+    /// The names policy's inputs for one Live document before the tagging reply's `format`.
+    private func liveEntityInputs(results: [OCRResult], config: SessionProcessingConfig) -> EntityRunPolicy.Inputs {
+        EntityRunPolicy.inputs(
+            results: results.map { Self.ocrFailed($0) ? nil : $0 }, runProvider: config.provider.rawValue,
+            settings: liveSettings(config), provider: config.textProvider, model: config.textModel,
+            gateway: config.textGateway, localAgent: config.textLocalAgent)
     }
 
     /// W46.date-route-other-paths — the dating route for a document the tagging call dated here (automatic mode, not
@@ -2815,6 +2824,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// finalized segment retained for regeneration.
     func _entityTestSetSettings(_ values: [String: ResolvedSetting]) { entitySettings = values }
     func _entityTestRetainedEntities(_ groupId: String) -> EntityResult? { retained[groupId]?.entities }
+    func _entityTestRetainedJSONTags(_ groupId: String) -> GeneratedTags? { retained[groupId]?.jsonTags }
     /// Test-only ($0, W46.date-route-other-paths): the dating decision a finalized segment retained for regeneration.
     func _datingTestRetained(_ groupId: String) -> DateRoute.Decision? { retained[groupId]?.dating }
 #endif

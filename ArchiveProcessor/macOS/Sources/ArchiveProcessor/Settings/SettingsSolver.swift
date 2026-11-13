@@ -117,7 +117,7 @@ struct SettingsPick: Sendable {
     let better: [SettingsBetterRoute]
     /// The reader a failed page goes on to.
     let fallbackRouteID: String?
-    /// Names: shown on the sheet (the collection ranks names); a cloud route extracts them regardless.
+    /// Names: the collection ranks names; no route looks for them otherwise (rule ent-run).
     let shown: Bool
     let usd: Double
     let hours: Double
@@ -794,15 +794,15 @@ struct SettingsSolver {
     func solveEntities(_ stage: SettingsRouteTable.Stage, _ state: inout SolveState) -> [SettingsPick] {
         let docs = Double(answers.documentCount)
         let ranked = answers.priorities.contains(.names)
-        // On the Mac the local extractor runs only when names are ranked; a cloud route extracts them with its call
-        // and shows them when ranked (owner call 11, rule ent-run).
+        // Names run only when they are ranked, on every route (rule ent-run; owner, walkthrough 2026-11-13: the cloud
+        // call costs money and nothing reads unshown names), so unranked only `none` is a candidate.
         // `none` is always there, at 0, so a batch whose limits leave no time for names runs without them.
-        let cands = stage.routes.filter { ranked || $0.family != .mac }
+        let cands = stage.routes.filter { ranked || $0.id == "none" }
             .compactMap { r in (r.figure("sender") ?? (r.id == "none" ? 0 : nil)).map { cand(r, stage: "entities", value: $0, units: docs) } }
         let tie = max(Self.entitiesTie, withinPoint / 100)
         guard let ch = choose(cands, state, tie: { abs($0.value - $1.value) <= tie + 1e-9 }, prefer: defaultPrefer)
         else {
-            let why = ranked ? "no names route can run here" : "names are not ranked, and on this Mac they are read only when they are (owner call 11)"
+            let why = ranked ? "no names route can run here" : "names are not ranked, and they are read only when they are"
             return ["correspondence-typed", "correspondence-handwritten", "non-correspondence"].map {
                 SettingsPick(stage: "entities", part: $0, route: nil, figure: nil, flag: "none",
                              reason: "No names: \(why).", gap: nil,
@@ -811,7 +811,7 @@ struct SettingsSolver {
             }
         }
         if ch.pick.id == "none" {
-            let why = ranked ? "no names route fits this batch" : "names are not ranked, and on this Mac they are read only when they are (owner call 11)"
+            let why = ranked ? "no names route fits this batch" : "names are not ranked, and they are read only when they are"
             return ["correspondence-typed", "correspondence-handwritten", "non-correspondence"].map {
                 SettingsPick(stage: "entities", part: $0, route: ch.pick.route, figure: nil, flag: "none",
                              reason: "No names (none): \(why).", gap: nil,

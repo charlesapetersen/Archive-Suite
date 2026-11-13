@@ -278,9 +278,10 @@ date through the dating route (§9), so no path writes a year without evidence. 
 **Source:** `EntityExtractor.swift` — `prompt(text:)` (W46.ent-feature)
 
 A second, dedicated call after the tagging call, on correspondence only (the tagging reply's `format` is a letter,
-memo or telegram) and only where `EntityRunPolicy` allows it: always on a cloud route, on this Mac's model only when the
-collection ranks names and every page is typed or printed, never on handwriting read by Apple Vision, and never the
-sender from Apple Vision text. Only the document's own text is sent (no nearby documents). Each returned name is
+memo or telegram) and only where `EntityRunPolicy` allows it: on every route only when the collection ranks names
+(owner, walkthrough 2026-11-13), on this Mac's model only when every page is typed or printed, never on handwriting read
+by Apple Vision, and never the sender from Apple Vision text (where the call does not run, the sidecar leaves out the
+tagging reply's `author_name` on Apple Vision text too). Only the document's own text is sent (no nearby documents). Each returned name is
 checked against that text (`EntityExtractor.evidence`) and written to the sidecar's `entities` object as quoted or
 inferred. Measured before it shipped: `segbench-results/ent-feature.md` (the bench copy is `segbench/ent_feature.py`,
 which `test_ent_feature.py` compares with the Swift).

@@ -199,6 +199,14 @@ enum SettingsSheetTestDriver {
               card(noNames, "entities")?.why ?? "nil")
         check("4 names unranked: the Mac name readers are not offered",
               card(free, "entities")?.options.filter { $0.id == "qwen3-vl-8b-mac" }.allSatisfy { $0.blocked != nil } == true)
+        // W46.ent-feature-owner-calls: with a key too, names unranked are not looked for (walkthrough 2026-11-13).
+        let gemUnranked = layer(.general, [(.keys, .strings(["gemini"])),
+                                           (.priorities, .strings(["reading", "findingDocuments", "dates"]))])
+        let gemCard = card(sheet("gem-names-unranked", general: gemUnranked), "entities")
+        check("4 names unranked with a key: the online names call is not offered, and nothing runs",
+              gemCard?.options.filter { $0.id == "gemini-entity-feature" }.allSatisfy { $0.blocked != nil } == true
+              && gemCard?.routeID == "none" && gemCard?.labels.contains { $0.contains("not looked for") } == true,
+              "\(gemCard?.routeID ?? "nil") \(gemCard?.labels ?? [])")
         if let s = card(paid, "segmentation"), let b = s.better.first, let raw = s.routeID.flatMap({ table.stage("segmentation")?.route($0) })?.figure("test-boxes"),
            let other = table.stage("segmentation")?.route(b.id)?.figure("test-boxes") {
             check("4 segmentation gains are against the no-checking figure",

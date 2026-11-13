@@ -10,8 +10,9 @@ import ArchiveCore
 ///   1. The evidence check on the cases shared with the bench (`segbench/fixtures/ent-evidence-cases.json`, path in
 ///      `ENTITY_FEATURE_CASES`; `test_ent_feature.py` runs the same cases through `ent_feature.evidence`).
 ///   2. Parsing a reply: a quoted, an inferred and a neighbour-lifted name, several recipients, "Unknown" dropped.
-///   3. The run policy (owner call 11 and the stage's rules).
-///   4. The sidecar object and `SegmentJSONBuilder` with and without it.
+///   3. The run policy (owner call 11, the walkthrough of 2026-11-13 and the stage's rules).
+///   4. The sidecar object and `SegmentJSONBuilder` with and without it, and the tagging call's sender left out on
+///      Apple Vision text (W46.ent-feature-owner-calls).
 ///   5. End to end through `performTaggingPhase`, a cloud route and a route on this Mac, on scratch outputs.
 ///   6. Live Capture (W46.ent-feature-live): through the real ingest → finalize path with the $0 OCR stand-in, the
 ///      sidecar's `entities` object, the names kept in the staging manifest, a rotation-review regeneration that
@@ -124,17 +125,17 @@ enum EntityFeatureTestDriver {
 
     private static func policy() {
         typealias P = EntityRunPolicy
-        func inputs(_ family: P.Family = .cloud, ranked: Bool = false, none: Bool = false, format: String? = "letter",
+        func inputs(_ family: P.Family = .cloud, ranked: Bool = true, none: Bool = false, format: String? = "letter",
                     source: P.TextSource = .reader, kinds: [P.PageKind] = [.typedOrPrinted]) -> P.Inputs {
             P.Inputs(family: family, namesRanked: ranked, routeNone: none, format: format, textSource: source,
                      pageKinds: kinds, route: "r")
         }
         func runs(_ i: P.Inputs) -> P.Run? { if case .run(let r) = P.decide(i) { return r }; return nil }
-        check("3 cloud: extracted even when names are not ranked, not shown",
-              runs(inputs()).map { !$0.shown && $0.senderWithheld == nil } == true)
-        check("3 cloud: shown when ranked", runs(inputs(ranked: true))?.shown == true)
-        check("3 Mac: not run when names are not ranked", runs(inputs(.mac)) == nil)
-        check("3 Mac: run when ranked, on typed pages", runs(inputs(.mac, ranked: true))?.shown == true)
+        check("3 cloud: not run when names are not ranked (walkthrough 2026-11-13)", runs(inputs(ranked: false)) == nil)
+        check("3 cloud: run when ranked, the sender kept from a model's reading",
+              runs(inputs()).map { $0.senderWithheld == nil } == true)
+        check("3 Mac: not run when names are not ranked", runs(inputs(.mac, ranked: false)) == nil)
+        check("3 Mac: run when ranked, on typed pages", runs(inputs(.mac)) != nil)
         check("3 Mac: never on handwriting, even read by a model",
               runs(inputs(.mac, ranked: true, kinds: [.typedOrPrinted, .handwritten])) == nil)
         check("3 Mac: not on a page of unknown kind", runs(inputs(.mac, ranked: true, kinds: [.unknown])) == nil)
@@ -154,13 +155,16 @@ enum EntityFeatureTestDriver {
               && runs(inputs(format: " Memo ")) != nil && runs(inputs(format: "Telegram")) != nil)
         check("3 a Local Agent plan: not run", runs(inputs(.plan, ranked: true)) == nil)
         check("3 the user's \"No names\": not run", runs(inputs(none: true)) == nil)
+        check("3 the tagging call's sender: withheld on Vision text and an unknown reader, kept from a model's reading",
+              P.withholdsTaggingSender(inputs(ranked: false, source: .vision))
+              && P.withholdsTaggingSender(inputs(.plan, source: .unknown))
+              && !P.withholdsTaggingSender(inputs(ranked: false, source: .reader)))
     }
 
     // MARK: 4. The sidecar
 
     private static func sidecar() {
-        let run = EntityRunPolicy.Run(route: "Gemini · Gemini 3.8 Flash", textSource: .reader, shown: true,
-                                      senderWithheld: nil)
+        let run = EntityRunPolicy.Run(route: "Gemini · Gemini 3.8 Flash", textSource: .reader, senderWithheld: nil)
         let fields = EntityExtractor.Fields(
             senders: [.init(name: "Alice Green", quote: "Alice Green", evidence: .quoted(distance: 0))],
             recipients: [.init(name: "Charles Brown", quote: "Dr. Browm", evidence: .quoted(distance: 1)),
@@ -170,7 +174,7 @@ enum EntityFeatureTestDriver {
         let sender = (o["sender"] as? [[String: Any]])?.first
         let recips = o["recipient"] as? [[String: Any]] ?? []
         let place = o["sending_place"] as? [[String: Any]] ?? []
-        check("4 status, route, text and shown", o["status"] as? String == "extracted" && o["shown"] as? Bool == true
+        check("4 status, route and text", o["status"] as? String == "extracted" && o["shown"] == nil
               && o["text"] as? String == "reader" && o["route"] as? String == "Gemini · Gemini 3.8 Flash")
         check("4 a read name: quote, evidence, confidence", sender?["quote"] as? String == "Alice Green"
               && sender?["evidence"] as? String == "quoted" && sender?["confidence"] as? String == "high"
@@ -182,8 +186,7 @@ enum EntityFeatureTestDriver {
               && recips.last?["inferred_because"] as? String == EntityExtractor.quoteNotInText)
         check("4 an empty field is \"Unknown\"", place.count == 1 && place[0]["name"] as? String == "Unknown"
               && place[0]["evidence"] as? String == "unknown")
-        let vision = EntityRunPolicy.Run(route: "r", textSource: .vision, shown: false,
-                                         senderWithheld: "never from Apple Vision text")
+        let vision = EntityRunPolicy.Run(route: "r", textSource: .vision, senderWithheld: "never from Apple Vision text")
         let v = EntityResult(decision: vision, outcome: .extracted(fields)).sidecarObject
         check("4 Vision text: no sender, and why", v["sender"] == nil
               && v["sender_withheld"] as? String == "never from Apple Vision text" && v["recipient"] != nil)
@@ -203,6 +206,14 @@ enum EntityFeatureTestDriver {
               w["entities"] != nil && w["author_name"] == nil && w["recipient_name"] == nil
               && w["author_location"] == nil && w["recipient_location"] as? String == "Salem"
               && w["format"] as? String == "letter")
+        let kept = EntityRunPolicy.sidecarTags(tags, withholdingSender: false)
+        let withheld = EntityRunPolicy.sidecarTags(tags, withholdingSender: true)
+        let vData = SegmentJSONBuilder.buildData(fileURLs: [url], texts: ["t"], tags: withheld) ?? Data()
+        let vw = (try? JSONSerialization.jsonObject(with: vData) as? [String: Any]) ?? [:]
+        check("4 Vision text, no entities: the tagging call's sender left out, its recipient and place kept",
+              kept.authorName == "A. Green" && vw["author_name"] == nil && vw["recipient_name"] as? String == "C. Brown"
+              && vw["author_location"] as? String == "Boston"
+              && withheld.allTags == tags.allTags)
     }
 
     /// Every request answered by `wire`: the tagging and the names prompt told apart by their first words, the
@@ -301,8 +312,8 @@ enum EntityFeatureTestDriver {
         }
         guard let route = OpenRouterRoute.catalog.first else { check("5 an OpenRouter route", false); return }
 
-        // A cloud route, names not ranked: extracted, not shown.
-        let (cloud, cloudOut) = processor(gateway: nil, ranked: false, out: "cloud")
+        // A cloud route, names ranked: extracted on the letters the policy allows.
+        let (cloud, cloudOut) = processor(gateway: nil, ranked: true, out: "cloud")
         check("5 five segments", cloud.segments.count == 5, "\(cloud.segments.count)")
         await cloud.performTaggingPhase(provider: .openrouter, model: route.model, apiKey: "test-key",
                                         outputDirectory: tmp, enableSegmentJSON: true)
@@ -311,8 +322,8 @@ enum EntityFeatureTestDriver {
               wire.entity.sorted() == ["DOCF", "DOCL", "DOCV"], "\(wire.entity)")
         let l = json(cloudOut["L"])
         let le = l["entities"] as? [String: Any] ?? [:]
-        check("5 L: extracted, not shown, read by a model, the route named", le["status"] as? String == "extracted"
-              && le["shown"] as? Bool == false && le["text"] as? String == "reader"
+        check("5 L: extracted, read by a model, the route named", le["status"] as? String == "extracted"
+              && le["shown"] == nil && le["text"] as? String == "reader"
               && le["route"] as? String == "OpenRouter · \(route.model.displayName)", "\(le["route"] ?? "")")
         check("5 L: the sender read, two recipients, the place Unknown",
               (le["sender"] as? [[String: Any]])?.first?["evidence"] as? String == "quoted"
@@ -326,10 +337,29 @@ enum EntityFeatureTestDriver {
         check("5 V: Vision text, the sender withheld", ve["text"] as? String == "vision" && ve["sender"] == nil
               && ve["sender_withheld"] != nil && ve["recipient"] != nil)
         let h = json(cloudOut["H"])
-        check("5 H: no entities on handwriting read by Apple Vision", h["entities"] == nil && !h.isEmpty)
+        check("5 H: no entities on handwriting read by Apple Vision, nor the tagging call's sender",
+              h["entities"] == nil && !h.isEmpty && h["author_name"] == nil
+              && h["recipient_name"] as? String == "Tagging Recipient")
         let fe = json(cloudOut["F"])["entities"] as? [String: Any] ?? [:]
         check("5 F: an unusable reply is recorded as failed, with no names",
               fe["status"] as? String == "failed" && fe["sender"] == nil)
+
+        // A cloud route, names not ranked: no entity call (walkthrough 2026-11-13); the tagging call's sender only where
+        // a model read the text.
+        wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
+        let (unranked, unrankedOut) = processor(gateway: nil, ranked: false, out: "cloudunranked")
+        await unranked.performTaggingPhase(provider: .openrouter, model: route.model, apiKey: "test-key",
+                                           outputDirectory: tmp, enableSegmentJSON: true)
+        check("5 cloud, names not ranked: tagged, no entity call", wire.tagging == 5 && wire.entity.isEmpty,
+              "\(wire.tagging) \(wire.entity)")
+        let ul = json(unrankedOut["L"]), uv = json(unrankedOut["V"]), uh = json(unrankedOut["H"])
+        check("5 cloud, names not ranked: L (a model's reading) keeps the tagging call's three name keys",
+              ul["entities"] == nil && ul["author_name"] as? String == "Tagging Sender"
+              && ul["recipient_name"] as? String == "Tagging Recipient" && ul["author_location"] as? String == "Tagging Place")
+        check("5 cloud, names not ranked: V and H (Apple Vision text) leave out the sender, keep recipient and place",
+              uv["entities"] == nil && uv["author_name"] == nil && uv["recipient_name"] as? String == "Tagging Recipient"
+              && uv["author_location"] as? String == "Tagging Place" && uh["author_name"] == nil
+              && uh["recipient_name"] as? String == "Tagging Recipient" && uv["format"] as? String == "letter")
 
         // This Mac's model, names not ranked: no entity call at all; ranked: typed pages only.
         let local = GatewayConfig(baseURL: "http://127.0.0.1:1234/v1", modelID: "qwen3-vl-8b", displayName: "Qwen3-VL 8B",
@@ -340,8 +370,9 @@ enum EntityFeatureTestDriver {
                                       outputDirectory: tmp, enableSegmentJSON: true)
         check("5 Mac, names not ranked: tagged, no entity call", wire.tagging == 5 && wire.entity.isEmpty,
               "\(wire.tagging) \(wire.entity)")
-        check("5 Mac, names not ranked: the sidecar as before", json(macOut["L"])["entities"] == nil
-              && json(macOut["L"])["author_name"] as? String == "Tagging Sender")
+        check("5 Mac, names not ranked: no entities, the sender kept from a model's reading, not from Vision text",
+              json(macOut["L"])["entities"] == nil && json(macOut["L"])["author_name"] as? String == "Tagging Sender"
+              && json(macOut["V"])["author_name"] == nil && json(macOut["V"])["recipient_name"] != nil)
         wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
         let (macRanked, macRankedOut) = processor(gateway: local, ranked: true, out: "macranked")
         await macRanked.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "",
@@ -349,8 +380,9 @@ enum EntityFeatureTestDriver {
         check("5 Mac, names ranked: L, V and F, never the hand", wire.entity.sorted() == ["DOCF", "DOCL", "DOCV"],
               "\(wire.entity)")
         let me = json(macRankedOut["L"])["entities"] as? [String: Any] ?? [:]
-        check("5 Mac, names ranked: shown, the route named as this Mac and its own model",
-              me["shown"] as? Bool == true && me["route"] as? String == "this Mac · Qwen3-VL 8B", "\(me["route"] ?? "")")
+        check("5 Mac, names ranked: the route named as this Mac and its own model",
+              me["status"] as? String == "extracted" && me["route"] as? String == "this Mac · Qwen3-VL 8B",
+              "\(me["route"] ?? "")")
 
         // "No names" on the Names card (the sheet stores it for the whole stage): no entity call on any route.
         wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
@@ -435,15 +467,16 @@ enum EntityFeatureTestDriver {
             json(s.liveProcessor.staged.first { $0.groupId == gid }?.jsonURL)
         }
 
-        // A cloud route, names not ranked: extracted on the letters the policy allows, not shown.
-        let (cloud, cloudStaging, cloudConfig) = await session("live")
+        let ranked = [SettingsKey.priorities.rawValue: ResolvedSetting(value: .strings(["reading", "names"]))]
+        // A cloud route, names ranked: extracted on the letters the policy allows.
+        let (cloud, cloudStaging, cloudConfig) = await session("live", settings: ranked)
         check("6 Live: every document tagged once", wire.tagging == 5, "\(wire.tagging)")
         check("6 Live: the entity call on L, V and F, not the report or the hand",
               wire.entity.sorted() == ["DOCF", "DOCL", "DOCV"], "\(wire.entity)")
         let l = sidecar(cloud, "L")
         let le = l["entities"] as? [String: Any] ?? [:]
-        check("6 Live L: extracted, not shown, read by a model, the route named",
-              le["status"] as? String == "extracted" && le["shown"] as? Bool == false
+        check("6 Live L: extracted, read by a model, the route named",
+              le["status"] as? String == "extracted" && le["shown"] == nil
               && le["text"] as? String == "reader" && le["route"] as? String == "OpenRouter · \(route.model.displayName)",
               "\(le)")
         check("6 Live L: the sender read, two recipients, the place Unknown",
@@ -459,7 +492,8 @@ enum EntityFeatureTestDriver {
         check("6 Live V: Apple Vision text, the sender withheld",
               ve["text"] as? String == "vision" && ve["sender"] == nil && ve["sender_withheld"] != nil)
         let h = sidecar(cloud, "H")
-        check("6 Live H: no entities on handwriting read by Apple Vision", h["entities"] == nil && !h.isEmpty)
+        check("6 Live H: no entities on handwriting read by Apple Vision, nor the tagging call's sender",
+              h["entities"] == nil && !h.isEmpty && h["author_name"] == nil && h["recipient_name"] != nil)
         check("6 Live F: an unusable reply is recorded as failed, with no names",
               (sidecar(cloud, "F")["entities"] as? [String: Any])?["status"] as? String == "failed")
 
@@ -493,14 +527,32 @@ enum EntityFeatureTestDriver {
             check("6 Live: L's source page is on disk", false)
         }
 
+        // Names not ranked: no call (walkthrough 2026-11-13); the tagging call's sender only where a model read the
+        // text, also after a manifest reload (it is kept in the retained sidecar tags).
+        wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
+        let (unranked, unrankedStaging, unrankedConfig) = await session("unranked")
+        check("6 Live, names not ranked: tagged, no entity call", wire.tagging == 5 && wire.entity.isEmpty,
+              "\(wire.tagging) \(wire.entity)")
+        let ul = sidecar(unranked, "L"), uv = sidecar(unranked, "V")
+        check("6 Live, names not ranked: L keeps the tagging call's sender, V (Apple Vision text) leaves it out",
+              ul["entities"] == nil && ul["author_name"] as? String == "Tagging Sender"
+              && uv["entities"] == nil && uv["author_name"] == nil
+              && uv["recipient_name"] as? String == "Tagging Recipient" && uv["author_location"] as? String == "Tagging Place")
+        let reloadedUnranked = CaptureSession()
+        reloadedUnranked.liveProcessor._recoveryTestLoadManifest(stagingDir: unrankedStaging, config: unrankedConfig)
+        check("6 Live, names not ranked: the retained sidecar tags carry no Vision-read sender",
+              reloadedUnranked.liveProcessor._entityTestRetainedJSONTags("V")?.authorName == nil
+              && reloadedUnranked.liveProcessor._entityTestRetainedJSONTags("V") != nil
+              && reloadedUnranked.liveProcessor._entityTestRetainedJSONTags("L")?.authorName == "Tagging Sender")
+
         // Sidecars off: the names have no output, so no call; "No names": no call either.
         wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
-        _ = await session("nosidecars", sidecars: false)
+        _ = await session("nosidecars", sidecars: false, settings: ranked)
         check("6 Live, sidecars off: tagged, no entity call", wire.tagging == 5 && wire.entity.isEmpty,
               "\(wire.tagging) \(wire.entity)")
         wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
-        let (none, _, _) = await session("nonames", settings: [
-            SettingsSheetModel.overrideKey("entities").rawValue: ResolvedSetting(value: .string("none"))])
+        let (none, _, _) = await session("nonames", settings: ranked.merging([
+            SettingsSheetModel.overrideKey("entities").rawValue: ResolvedSetting(value: .string("none"))]) { a, _ in a })
         check("6 Live, \"No names\": tagged, no entity call, the sidecar as before",
               wire.tagging == 5 && wire.entity.isEmpty && sidecar(none, "L")["entities"] == nil
               && sidecar(none, "L")["author_name"] as? String == "Tagging Sender", "\(wire.tagging) \(wire.entity)")

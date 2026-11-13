@@ -1,7 +1,9 @@
 #!/bin/bash
 # Key-free ($0) self-test of the entity feature (W46.ent-feature): runs EntityFeatureTestDriver headless, which checks
 # the evidence check on the cases shared with the bench (segbench/fixtures/ent-evidence-cases.json), reply parsing, the
-# run policy, the sidecar object, and the feature end to end through performTaggingPhase with every request answered
+# run policy (names only when ranked, on every route), the sidecar object and the tagging call's sender left out on
+# Apple Vision text (W46.ent-feature-owner-calls), and the feature end to end through performTaggingPhase and Live
+# Capture with every request answered
 # by the injected test transport. No real network, no Keychain read, no window, never the corpus: scratch outputs only.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail

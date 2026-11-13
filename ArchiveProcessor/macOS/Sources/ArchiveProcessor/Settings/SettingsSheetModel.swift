@@ -435,10 +435,7 @@ struct SettingsSheetModel {
             }
         }
         if stage.id == "entities", let p = lead, !p.shown {
-            labels.append(p.route.map { $0.family != .mac && $0.id != "none" } == true
-                ? "Names are not among what matters most for this collection, so they are not shown; the online reading "
-                    + "program still finds them in the same request, at no extra cost."
-                : "Names are not among what matters most for this collection, so they are not looked for.")
+            labels.append("Names are not among what matters most for this collection, so they are not looked for.")
         }
 
         let handsUnread = s.picks.contains { $0.stage == "reading" && $0.part == "handwritten" && $0.flag != nil }
@@ -516,13 +513,13 @@ struct SettingsSheetModel {
                             ? r.figure("test-boxes.checks_per_100").map { String(format: ", about %.0f boundaries to check in 100 pages", $0) } ?? ""
                             : ""))
             }
-        // Names on this Mac run only when names are ranked (owner call 11), which the solver applies by leaving them out.
+        // Names run only when names are ranked, on every route (rule ent-run), which the solver applies by leaving them out.
         let namesUnranked = stage.id == "entities" && !a.priorities.contains(.names)
         let options = stage.routes.filter { !$0.afterTraining && $0.offered && words.mainFigure(stage, $0, solver: solver) != nil }
             .map { r in
                 Option(id: r.id, name: words.display(stage.id, r),
                        blocked: appBlocked[r.id]?.first.map(words.reason)
-                        ?? (namesUnranked && r.family == .mac ? "on this Mac names are found only when they are among what matters most" : nil))
+                        ?? (namesUnranked && r.id != "none" ? "names are found only when they are among what matters most" : nil))
             }
             .sorted { ($0.blocked == nil ? 0 : 1, $0.name) < ($1.blocked == nil ? 0 : 1, $1.name) }
         _ = blocked
@@ -936,7 +933,7 @@ struct SettingsSheetWords {
                 + "Uncertain, and no year is written without the words it came from."
         case "entities":
             return "Who sent each letter, to whom, and from where. Each name is shown with the words it was read from, or "
-                + "marked inferred. With an online reading program it comes at no extra cost, in the same request; on this Mac it needs a downloaded "
+                + "marked inferred. Looked for only when names are among what matters most. With an online reading program it is one more request a letter; on this Mac it needs a downloaded "
                 + "model and typed pages."
         default: return ""
         }

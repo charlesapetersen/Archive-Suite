@@ -10798,7 +10798,7 @@
     },
     {
      "id": "ent-vision-hands",
-     "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text.",
+     "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text, the tagging call's included.",
      "source": "ent-robust.md §Reading",
      "switch": null
     },
@@ -10810,7 +10810,7 @@
     },
     {
      "id": "ent-run",
-     "text": "On a cloud route names are extracted always and shown when the collection interview ranks names; on the Mac the local extractor runs only when names rank, on typed and printed correspondence.",
+     "text": "Names are extracted only when the collection interview ranks names, on every route; on the Mac on typed and printed correspondence only.",
      "source": "14-owner-calls.md §1. The owner's calls",
      "switch": {
       "id": "entities.enabled",

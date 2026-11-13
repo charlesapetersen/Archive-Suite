@@ -226,6 +226,11 @@ enum SettingsSolverTestDriver {
            "gemini-entity-feature")
         check("D1 names: the tagging call's rows are history, not offered",
               !d1.blockers("entities", "gemini-tagging-place").isEmpty)
+        // W46.ent-feature-owner-calls: the cloud call too runs only when names are ranked (walkthrough 2026-11-13).
+        let d1NoNames = solve("D1-nonames", gem, noNames)
+        eq("D1 names not ranked: none on a cloud route too", pick(d1NoNames, "entities", "correspondence-typed"), "none")
+        check("D1 names not ranked: the names call costs nothing",
+              d1NoNames.picks.filter { $0.stage == "entities" }.allSatisfy { $0.usd == 0 })
         skip("D1 dating steps 2 and 4", "pending W46.date-route-pipeline (the 3.7 rows are the gateway's)")
 
         // D2 (and G3). A Gemini key, ceiling $1 for 1,000 pages, 24 hours (batch prices).

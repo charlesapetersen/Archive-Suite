@@ -22,8 +22,8 @@ the real choice is family, not prompt [I].
 ## 3. The rule for the settings layer
 
 Sheet text: "Names: who sent each letter, to whom, and from where. Each name is shown with the words it was read from,
-or marked inferred. Comes free with the tagging call on a cloud route; on this Mac it needs a local model and typed
-pages."
+or marked inferred. Looked for only when names are among what matters most. On a cloud route it is one more request
+a letter; on this Mac it needs a local model and typed pages."
 
 - **Comparison metric.** Sender ed2 F1 on the entity truth as it now stands (`ent_truth.load_truth()`: W46.fix-ent-truth
   with the owner's answers and the sending-place rule), recipient ed2 F1 second, place by city third. Tie rule: a
@@ -36,7 +36,9 @@ pages."
   non-correspondence output is unmeasured (`ent-prompt-app.md` Scope: author_name is now null there). (b) Typed or
   printed pages: every route that clears the bar may show names. (c) Handwritten pages: show names only from the API or
   27B readings, or from the 8B reading with the quote check; never from Apple Vision text (W46.ent-robust's switch-off
-  rule, `ent-robust.md` Reading). (d) The sender field is never shown from Apple Vision text on any kind (same rule).
+  rule, `ent-robust.md` Reading). (d) The sender field is never shown from Apple Vision text on any kind (same rule),
+  and where the feature does not run, the sidecar leaves out the tagging call's `author_name` on Vision text too
+  (owner, walkthrough 2026-11-13; `recipient_name` and `author_location` stay).
   (e) Public pre-modern Latin hands and early print: no route (`ent-robust.md`: 0.02 to 0.37 on L5 and L7).
 - **Evidence rule.** A name whose quote is in the document's own OCR text (spacing-tolerant, edit distance 2) is shown
   as read; a name with no quote is shown marked inferred; a name found nowhere is never shown as read
@@ -45,9 +47,10 @@ pages."
 - **Fallback.** When the chosen route fails on a document (unparsed or length-capped reply), no names, and the sidecar
   says so (`ent-robust.md`: the 8B failed 4 of 96 readings). No silent fallback to another route [I].
 - **Must not run.** On a document the kind stage calls non-correspondence (rule a), on handwritten pages through Vision
-  text (rule c), and with the `none` route. When it runs (owner call 11): on a cloud route names are extracted always,
-  since they come with the call at no cost, and shown when the collection interview ranks names; on the Mac the local
-  extractor runs only when names are ranked, on typed and printed correspondence.
+  text (rule c), and with the `none` route. When it runs: on every route only when the collection interview ranks
+  names (owner, walkthrough 2026-11-13, replacing owner call 11's "extract always on a cloud route": the separate call
+  costs $2.37 per 1,000 correspondence documents and nothing reads unshown names yet); on the Mac on typed and printed
+  correspondence only.
 - **The provisional pick.** The Mac pick (`qwen3-vl-8b-mac`) is scored on the shipped prompt over Vision text
   (`ent-local-shipped.md`: sender 0.60, recipient 0.61, place 0.54, n 138; on the 82, a tie with its old ABBYY-reply
   row on every field). The cluster pick (`qwen3.6-27b`, 0.62) still rests on replies made from ABBYY text
@@ -75,9 +78,9 @@ come from `build_figures.py`'s hand-entered rows with no measuring file behind t
  "kinds": ["correspondence-typed", "correspondence-handwritten", "non-correspondence"],
  "rules": [
   {"id": "ent-correspondence-only", "text": "Runs on correspondence only; non-correspondence output is unmeasured.", "source": "ent-prompt-app.md §Measurement card", "switch": null},
-  {"id": "ent-vision-hands", "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text.", "source": "ent-robust.md §Reading", "switch": null},
+  {"id": "ent-vision-hands", "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text, the tagging call's included.", "source": "ent-robust.md §Reading", "switch": null},
   {"id": "ent-evidence", "text": "Quoted in the document's own text: shown as read; unquoted: written and shown marked inferred; never shown as read without a quote.", "source": "ent-score.md §Reading; G-entities.md §5; 14-owner-calls.md §1. The owner's calls", "switch": null},
-  {"id": "ent-run", "text": "On a cloud route names are extracted always and shown when the collection interview ranks names; on the Mac the local extractor runs only when names rank, on typed and printed correspondence.", "source": "14-owner-calls.md §1. The owner's calls", "switch": {"id": "entities.enabled", "label": "Find senders, recipients and places", "default": false}}
+  {"id": "ent-run", "text": "Names are extracted only when the collection interview ranks names, on every route; on the Mac on typed and printed correspondence only.", "source": "14-owner-calls.md §1. The owner's calls", "switch": {"id": "entities.enabled", "label": "Find senders, recipients and places", "default": false}}
  ],
  "fallback": "none"}
 ```
@@ -323,6 +326,8 @@ keys are field names (`sender`, `recipient`, `sending_place`, `place_city`) and 
    (`12-settings-design.md`). Options: extract always and show only when names rank; extract and show always; extract
    only when names rank. Recommendation [I]: extract always on a cloud route (no cost), show when ranked; on the Mac,
    run the local model only when ranked, since it costs seconds a document. Decided as recommended (owner call 11).
+   Changed at the walkthrough of 2026-11-13: extract only when names rank on every route, since the feature became a
+   separate call ($2.37 per 1,000 correspondence documents, `ent-feature.md`) and nothing reads unshown names.
 5. **The Mac routes' standing.** Names survive Vision text on typed pages and not on hands: the 27B extractor keeps
    0.88 of its names on typed and 0.85 on printed Vision pages, 0.52 on handwritten; through Vision 8 of 17 senders
    match (`ent-robust.md`, consistency, 26.6 text). The Mac LLM's accuracy is 0.58 / 0.55 / 0.46 for the 8B
@@ -387,7 +392,8 @@ the tagging prompt is reverted to its pre-November name behaviour; a name the pa
 marked inferred, as `Date Uncertain` is accepted for years (calls 1 and 6). Owner call 11: on a cloud route names are
 extracted always and shown when the collection interview ranks names; on the Mac the local extractor runs only when
 names are ranked, on typed and printed correspondence, the sender never taken from Vision text, the 4B not offered; no
-export format until a user asks, CMIF against CSV going to POTENTIAL_FEATURES (calls 3, 4 and 5). Section 2's picks,
+export format until a user asks, CMIF against CSV going to POTENTIAL_FEATURES (calls 3, 4 and 5). Walkthrough
+2026-11-13: the cloud route too runs only when names rank, and no sidecar carries the tagging call's Vision-read sender. Section 2's picks,
 open to the owner's veto: the inside-address and non-correspondence-date tests filed, offline on cached text (call 2,
 item 2). Section 3 carries these, and marks the Mac and cluster picks provisional on ABBYY-input figures until item 4.
 

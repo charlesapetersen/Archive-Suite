@@ -338,8 +338,8 @@ Tagging/                       Finder-tag writing + segmentation (Tier-2 — wri
   TagGenerator.swift           LLM tag generation (subjects + date) from OCR text.
   EntityExtractor.swift        W46.ent-feature: the names call (sender, recipients, sending place), its evidence check
                                (quote in the document's own text, ed2 on 5+ letters, else inferred), the sidecar's
-                               `entities` object and `EntityRunPolicy` (correspondence only; cloud always, Mac when
-                               names rank; no Vision sender, no Vision hands). Wired in `performTaggingPhase`
+                               `entities` object and `EntityRunPolicy` (correspondence only, only when names rank;
+                               no Vision sender, the tagging call's included; no Vision hands). Wired in `performTaggingPhase`
                                and `LiveCaptureProcessor.liveEntities` (kept in the staging manifest).
   DateRoute.swift              W46.date-route: the dating route (08-dating.md §3), the bench's own code ported: rule
                                candidates, the trace prompt and reply, the evidence check, the image reading, the

@@ -1072,6 +1072,8 @@ extension OCRProcessor {
             entityInputs(for: $0, runConfig: runConfig, provider: provider, model: model, gateway: gateway,
                          localAgent: localAgent)
         }
+        // W46.ent-feature-owner-calls: where the page text is Apple Vision's, no sidecar carries the tagging call's sender.
+        let senderWithheld = entityBase.map(EntityRunPolicy.withholdsTaggingSender)
 
         // W46.date-route: each document's own text, neighbours and first page images, gathered here; nil for a label,
         // a document with no text, and one whose phone date (Live Capture) wins anyway, so no dating call is made.
@@ -1152,7 +1154,8 @@ extension OCRProcessor {
                                                            enableSegmentJSON: enableSegmentJSON,
                                                            outputDirectory: outputDirectory,
                                                            runConfig: runConfig, entities: names,
-                                                           dating: dating)
+                                                           dating: dating,
+                                                           taggingSenderWithheld: senderWithheld[i])
                 }
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
@@ -1174,7 +1177,8 @@ extension OCRProcessor {
                                                    enableSegmentJSON: enableSegmentJSON,
                                                    outputDirectory: outputDirectory,
                                                    runConfig: runConfig, coverTags: cover ?? GeneratedTags(),
-                                                   entities: names, dating: dating)
+                                                   entities: names, dating: dating,
+                                                   taggingSenderWithheld: senderWithheld[i])
         }
     }
     /// W46.date-route — what segment `i`'s dating route reads, or nil when no dating call is made: a box or folder
@@ -1217,7 +1221,8 @@ extension OCRProcessor {
                                     enableSegmentJSON: Bool, outputDirectory: URL,
                                     runConfig: SessionProcessingConfig?,
                                     coverTags: GeneratedTags? = nil, entities: EntityResult? = nil,
-                                    dating: DateRoute.Decision? = nil) -> GeneratedTags {
+                                    dating: DateRoute.Decision? = nil,
+                                    taggingSenderWithheld: Bool = false) -> GeneratedTags {
         guard i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
         var tags = rawTags
@@ -1257,7 +1262,9 @@ extension OCRProcessor {
             }
         }
         if enableSegmentJSON && !segment.isBox && !segment.isFolder {
-            writeSegmentJSON(segment: segment, tags: tags, outputDirectory: outputDirectory,
+            writeSegmentJSON(segment: segment,
+                             tags: EntityRunPolicy.sidecarTags(tags, withholdingSender: taggingSenderWithheld),
+                             outputDirectory: outputDirectory,
                              enclosureOf: enclosureOfName, entities: entities?.sidecarObject,
                              dating: dating?.sidecarObject())
         }

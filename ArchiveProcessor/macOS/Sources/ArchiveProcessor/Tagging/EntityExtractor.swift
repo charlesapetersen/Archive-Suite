@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 /// W46.ent-feature: who sent a correspondence document, to whom, and from where, each name with the words it was
 /// read from or marked inferred (`execution-plans/processing-review/13-stage-rules/09-entities.md`). One dedicated
@@ -199,8 +200,7 @@ struct EntityResult: Equatable, Sendable, Codable {
     /// field the document does not fill holds the one name "Unknown" (CMIF's convention, G-entities §5), so an empty
     /// field reads apart from one not looked for. Several recipients are kept as separate entries.
     var sidecarObject: [String: Any] {
-        var o: [String: Any] = ["route": decision.route, "text": decision.textSource.rawValue,
-                                "shown": decision.shown]
+        var o: [String: Any] = ["route": decision.route, "text": decision.textSource.rawValue]
         switch outcome {
         case .failed(let why):
             o["status"] = "failed"
@@ -236,7 +236,8 @@ struct EntityResult: Equatable, Sendable, Codable {
     }
 }
 
-/// Whether the entity feature runs on a document, and how (09-entities.md §3; owner call 11, 2026-11-06).
+/// Whether the entity feature runs on a document, and how (09-entities.md §3; owner call 11, 2026-11-06; owner,
+/// walkthrough 2026-11-13: on every route only when the collection ranks names).
 enum EntityRunPolicy {
     /// The tagging call's `format` values the feature runs on: the app has no correspondence classifier, and the
     /// stage runs on correspondence only (rule ent-correspondence-only). On the 138 correspondence documents the
@@ -291,8 +292,6 @@ enum EntityRunPolicy {
     struct Run: Equatable, Sendable, Codable {
         let route: String
         let textSource: TextSource
-        /// The collection ranks names: show them (a cloud route extracts them regardless).
-        let shown: Bool
         /// Why the sender is not written, when it is not: never from Apple Vision text (rule ent-vision-hands).
         let senderWithheld: String?
     }
@@ -304,12 +303,10 @@ enum EntityRunPolicy {
 
     static func decide(_ i: Inputs) -> Decision {
         if i.routeNone { return .skip("the user chose no names") }
-        switch i.family {
-        case .plan: return .skip("a Local Agent plan has no measured names route")
-        case .mac where !i.namesRanked:
-            return .skip("names are not ranked, and on this Mac they are read only when they are")
-        default: break
-        }
+        if i.family == .plan { return .skip("a Local Agent plan has no measured names route") }
+        // On every route, as on this Mac: the call costs money on a cloud route and nothing reads unshown names
+        // (owner, walkthrough 2026-11-13).
+        if !i.namesRanked { return .skip("names are not ranked, and they are read only when they are") }
         guard let f = i.format?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               correspondenceFormats.contains(f) else {
             return .skip("not correspondence")
@@ -331,7 +328,23 @@ enum EntityRunPolicy {
             }
         }
         let withheld: String? = i.textSource == .reader ? nil : "never from Apple Vision text"
-        return .run(Run(route: i.route, textSource: i.textSource, shown: i.namesRanked, senderWithheld: withheld))
+        return .run(Run(route: i.route, textSource: i.textSource, senderWithheld: withheld))
+    }
+
+    /// Whether the sidecar leaves out the tagging call's `author_name` on a document the feature did not run on. The
+    /// tagging call reads the same text, so where that is Apple Vision's (or its reader is unknown, as in `decide`)
+    /// its sender is withheld for the same reason the feature's is: rule ent-vision-hands holds on every sidecar
+    /// (owner, walkthrough 2026-11-13; through Vision text 8 of 17 senders matched, `ent-robust.md` §Reading). The
+    /// recipient and place stay. Where the feature ran, its `entities` object replaces all three keys anyway.
+    static func withholdsTaggingSender(_ i: Inputs) -> Bool { i.textSource != .reader }
+
+    /// The tags the sidecar writes for a document: the tagging reply, without its sender where
+    /// `withholdsTaggingSender` says so. The output PDFs' tags are not touched (they carry no sender).
+    static func sidecarTags(_ tags: GeneratedTags, withholdingSender: Bool) -> GeneratedTags {
+        guard withholdingSender else { return tags }
+        var t = tags
+        t.authorName = nil
+        return t
     }
 }
 
