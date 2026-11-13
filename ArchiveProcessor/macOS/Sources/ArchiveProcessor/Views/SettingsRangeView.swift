@@ -37,6 +37,7 @@ private struct RangeLegend: View {
     let kit: Bool
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
         HStack(alignment: .center, spacing: 14) {
             ForEach([SettingsRouteTable.Family.mac, .cloud, .plan, .cluster], id: \.self) { f in
                 HStack(spacing: 4) {
@@ -52,9 +53,19 @@ private struct RangeLegend: View {
                 RangeMark(family: .mac, state: .outsideLimits, picked: false, kit: false).frame(width: 12, height: 12)
                 Text("breaks your limits").font(.caption2)
             }
+        }
+        HStack(alignment: .center, spacing: 14) {
             HStack(spacing: 4) {
                 RangeMark(family: .mac, state: .usable, picked: true, kit: false).frame(width: 12, height: 12)
                 Text("chosen now").font(.caption2)
+            }
+            HStack(spacing: 4) {
+                Circle().stroke(Color.orange, style: StrokeStyle(lineWidth: 2, dash: [3, 2])).frame(width: 12, height: 12)
+                Text("your choices together").font(.caption2)
+            }
+            HStack(spacing: 4) {
+                Circle().stroke(Color.accentColor, style: StrokeStyle(lineWidth: 1.2, dash: [3, 2])).frame(width: 12, height: 12)
+                Text("nothing beats it").font(.caption2)
             }
             if kit {
                 HStack(spacing: 4) {
@@ -62,6 +73,7 @@ private struct RangeLegend: View {
                     Text("after training").font(.caption2)
                 }
             }
+        }
         }
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .combine)
@@ -150,11 +162,15 @@ private struct RangeChartBlock: View {
                 .frame(height: 280)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("ap.sheet.range.\(chart.id).chart")
+            if let t = chart.together {
+                Text("Orange dashed ring: \(t.text)").font(.caption).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if let c = chart.ceilingText {
                 Text(c).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
             if !chart.offChart.isEmpty {
-                Text("In the table but not on the chart, since they find nothing by themselves: "
+                Text("In the table but not on the chart (they find nothing by themselves, or were measured another way): "
                      + chart.offChart.joined(separator: "; ") + ".")
                     .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -355,7 +371,7 @@ private struct RangePlot: View {
                         .position(x: c.x, y: c.y + 14)
                 }
                 // The pick's name beside its mark.
-                ForEach(chart.points.filter(\.picked)) { pt in
+                ForEach(chart.points.filter(\.lead)) { pt in
                     let c = g.center(pt)
                     Text(pt.name.components(separatedBy: ",")[0].components(separatedBy: " (")[0]).font(.caption2.weight(.semibold))
                         .lineLimit(1)

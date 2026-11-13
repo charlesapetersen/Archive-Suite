@@ -976,9 +976,12 @@ struct SettingsSheetWords {
             "gliner2.5-base-spans-rule": "GLiNER, a small name finder",
             "manual": "No model: you check every place yourself",
             "seg-qwen3.5-2b-8bit": "Qwen3.5 2B, trained for this task by the app's makers, on this Mac (no key)",
+            "seg-qwen3.5-2b-bf16-cluster": "Qwen3.5 2B, trained for this task by the app's makers, on a computing cluster",
+            "seg-qwen3.5-4b-cluster": "Qwen3.5 4B, trained for this task by the app's makers, on a computing cluster",
         ]
         if r.id == "none" { return stage == "dating" ? "No dating" : "No names" }
-        if let p = plain[r.id], stage == "dating" || stage == "entities" || ["manual", "mix-claude-chatgpt", "seg-qwen3.5-2b-8bit"].contains(r.id) {
+        if let p = plain[r.id], stage == "dating" || stage == "entities" || ["manual", "mix-claude-chatgpt", "seg-qwen3.5-2b-8bit", "seg-qwen3.5-2b-bf16-cluster",
+                                                                                     "seg-qwen3.5-4b-cluster"].contains(r.id) {
             return p
         }
         var n = r.name

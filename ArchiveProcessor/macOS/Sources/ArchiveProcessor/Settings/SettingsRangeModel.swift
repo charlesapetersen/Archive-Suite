@@ -28,6 +28,8 @@ struct SettingsRangeChart: Identifiable {
         let tooltip: String
         /// Part of what the sheet now picks for this stage.
         let picked: Bool
+        /// The card's main pick, named beside its mark.
+        let lead: Bool
         let onFrontier: Bool
         /// Clicking it sets the card's override (or clears it, for the app's own pick).
         let choosable: Bool
@@ -152,13 +154,13 @@ extension SettingsSheetModel {
             if x > 0 {
                 let batch = overnight && r.batchUSDPer1000 != nil && x == r.batchUSDPer1000
                 return String(format: "$%.2f per 1,000 \(unitWord)", x) + (batch ? " at the overnight batch price" : "")
-                    + (r.family == .plan && !plan.isEmpty ? " with a key, or no money with the \(plan) plan" : "")
+                    + (r.family == .plan && !plan.isEmpty ? " with a key, or no money if you have the \(plan) plan" : "")
             }
             if stage.id == "entities" && r.family == .cloud {
                 return "no extra money: the names come in the same request that finds each document's date"
             }
-            if r.family == .plan && !plan.isEmpty { return "no money with the \(plan) plan" }
-            if r.family == .cluster { return "no money on a cluster of your own" }
+            if r.family == .plan && !plan.isEmpty { return "no money if you have the \(plan) plan" }
+            if r.family == .cluster { return "no money if you have a cluster of your own" }
             return "no price listed"
         }
 
@@ -175,7 +177,8 @@ extension SettingsSheetModel {
             let c = solver.cand(r, stage: stage.id, value: v ?? 0, units: units)
             var blockers = app.blockers(stage.id, r.id)
             if namesUnranked && r.family == .mac && blockers.isEmpty {
-                blockers = ["on this Mac names are found only when they are among what matters most"]
+                blockers = ["on this Mac names are looked for only when you put names among what matters most (in "
+                            + "“Questions about this material” in Settings)"]
             }
             if !r.offered && blockers.isEmpty, let cond = r.conditions.first { blockers = [cond] }
             let state: SettingsRangeChart.State
@@ -211,7 +214,7 @@ extension SettingsSheetModel {
             guard let y = b.y else { return false }
             return !(y == 0 && (b.route.family == .manual || b.route.id == "none"))
         }
-        let offChart = built.filter { b in b.y != nil && !charted.contains { $0.route.id == b.route.id } }
+        let offChart = built.filter { b in !charted.contains { $0.route.id == b.route.id } }
             .map { words.display(stage.id, $0.route) }
         // The undominated choices within the limits: nothing else within them is both as cheap and as good.
         let within = charted.filter { $0.state == .usable }
@@ -239,6 +242,7 @@ extension SettingsSheetModel {
             return SettingsRangeChart.Point(
                 id: b.route.id, name: name, family: b.route.family, familyWord: words.family(b.route.family),
                 x: b.x, y: b.y!, state: b.state, tooltip: tip, picked: picked.contains(b.route.id),
+                lead: b.route.id == card.routeID,
                 onFrontier: b.state == .usable && !dominated(b),
                 choosable: choosableIDs.contains(b.route.id) && b.route.id != card.routeID)
         }
@@ -257,7 +261,8 @@ extension SettingsSheetModel {
                     figures: Self.rangeFigures(stage, r, y: b.y.map { $0 / scale }, words: words),
                     publicFigure: stage.id == "reading" ? Self.rangePublic(r, picks: s.picks, answers: a, words: words) : nil,
                     listPrice: priceText(r, b.x),
-                    batchCost: batch < 0.005 ? "nothing to pay for this batch" : "about \(words.money(batch)) for this batch",
+                    batchCost: priceText(r, b.x) == "no price listed" ? "its cost for this batch is not known"
+                        : batch < 0.005 ? "nothing to pay for this batch" : "about \(words.money(batch)) for this batch",
                     time: r.family == .manual ? "only your own checking time"
                         : b.ownHours <= 0 ? "its time not measured" : "about \(words.hours(b.ownHours)) on its own"
                             + (r.time?["measured"] == .bool(true) ? "" : " (an estimate)"),
@@ -303,11 +308,13 @@ extension SettingsSheetModel {
         let caption = "Each mark is one choice. Across: what 1,000 \(unitWord) cost you, at the "
             + (overnight ? "overnight batch price where a service has one, else the list price" : "list price")
             + ", on a scale where each step multiplies the price; choices that cost you nothing (this Mac, a plan or "
-            + "cluster you have) sit in the green band at the left, spread out only so they can be told apart. Up: "
+            + "cluster you have) sit in the green band at the left, spread out only so they can be told apart; a plan you do "
+            + "not have sits at its price with a key. Up: "
             + "\(yLabel). Filled marks you can use; hollow ones you cannot here (point at one to see why); faded ones you "
             + "can use but they break your limits. A ring marks what is chosen now. The dashed line joins the choices "
             + "within your limits that no other choice within them beats on both price and figure. Click a mark, or a "
-            + "row below, to choose it."
+            + "row below, to choose it. “This batch” is the \(SettingsSheetModel.count(Int(units), String(unitWord.dropLast()))) "
+            + "the figures are for" + (stage.unit == "documents" ? " (about 3 pages each)" : "") + "."
         return SettingsRangeChart(
             id: stage.id, title: words.stageTitle(stage.id), yLabel: yLabel, xLabel: xLabel, unit: unitWord,
             points: points, together: together, offChart: offChart, ceilingPer1000: leftPer1000,
@@ -319,7 +326,8 @@ extension SettingsSheetModel {
                                      words: Words) -> String {
         guard let y else {
             if stage.id == "dating", let v = r.figure("unprinted_122_doc_year") {
-                return String(format: "%.0f%% exact year on documents whose year is not printed, from the page image", v)
+                return String(format: "%.0f%% exact year on documents whose year is not printed, from the page image; "
+                              + "measured on a different, harder set of documents, so not comparable with the chart", v)
             }
             if stage.id == "reading" {
                 let kinds = [("typewritten", "typewritten"), ("printed", "printed"), ("hands16", "handwritten")]
@@ -393,7 +401,8 @@ extension SettingsSheetModel {
                 if let v = r.figure("owner-heldout-box-sasha") {
                     let n = r.figures["owner-heldout-box-sasha"]?["n"]?.double.map { Int($0) } ?? 0
                     measured = String(format: "%.0f%% of the places where a document begins or goes on found right, on a "
-                                      + "test box of real papers it never saw (%d places)", v, n)
+                                      + "box of real papers it never saw (%d places; a count of places, not of pages as in the "
+                                      + "table)", v, n)
                 }
             case "seg-2b-lora-k200":
                 if let v = r.figure("manuscripts-public.next_box") {
@@ -404,7 +413,8 @@ extension SettingsSheetModel {
                        let range = m.range(of: #"corpus 2B ([\d.]+)%"#, options: .regularExpression) {
                         let num = m[range].split(separator: " ").last.map { String($0.dropLast()) } ?? ""
                         if let b = Double(num) {
-                            before = String(format: ", against %.0f%% for the app's own document finder on that box", b)
+                            before = String(format: ", against %.0f%% for the app's own document finder on that same box, a "
+                                            + "different box from the test boxes in the table", b)
                         }
                     }
                     measured = String(format: "%.0f%% of pages in the right document on the next box of the same "

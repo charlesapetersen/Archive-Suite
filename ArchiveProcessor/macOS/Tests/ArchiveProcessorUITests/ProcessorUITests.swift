@@ -265,22 +265,26 @@ final class ProcessorUITests: XCTestCase {
         }
         XCTAssertTrue(element("ap.sheet.range.reading.chart").exists, "the reading chart is drawn")
         attachScreenshot("processor-settings-sheet-range")
+        // The first route any stage's table offers (in this test's setup the Mac readers need a download, so the
+        // reading table may offer none); its id names the stage: ap.sheet.range.<stage>.choose.<route>.
         let choose = app.descendants(matching: .button)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "ap.sheet.range.reading.choose.")).firstMatch
-        XCTAssertTrue(choose.waitForExistence(timeout: 5), "the reading table offers another route to choose")
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier CONTAINS %@", "ap.sheet.range.", ".choose."))
+            .firstMatch
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "a range table offers another route to choose")
+        let stage = choose.identifier.components(separatedBy: ".").dropFirst(3).first ?? ""
         let scroll = app.sheets.firstMatch.scrollViews.firstMatch
-        for _ in 0..<12 where !choose.isHittable {
+        for _ in 0..<30 where !choose.isHittable {
             scroll.scroll(byDeltaX: 0, deltaY: -300)
         }
         choose.click()
         app.sheets.firstMatch.radioButtons["Choices"].click()
-        let back = element("ap.sheet.reset.reading")
-        XCTAssertTrue(back.waitForExistence(timeout: 5), "choosing from the range marks the reading card Custom, with a way back")
-        for _ in 0..<12 where !back.isHittable {
+        let back = element("ap.sheet.reset.\(stage)")
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "choosing from the range marks the \(stage) card Custom, with a way back")
+        for _ in 0..<30 where !back.isHittable {
             scroll.scroll(byDeltaX: 0, deltaY: -300)
         }
         back.click()
-        XCTAssertTrue(waitUntil { !back.exists }, "the way back returns the reading card to the app's pick")
+        XCTAssertTrue(waitUntil { !back.exists }, "the way back returns the \(stage) card to the app's pick")
         scroll.scroll(byDeltaX: 0, deltaY: 20000)
 
         let rules = app.sheets.firstMatch.radioButtons["Rules"]
