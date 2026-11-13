@@ -1,6 +1,11 @@
 import Foundation
-import ArchiveCore
 
+/// The suite's one typed date field (W40.suite-date-design; owner, notes-2 row 9: "reuse it for every date the suite
+/// sets"). Moved here from Archive Notes, where it is the inspector's and the list's date field, so the Reader's
+/// Inspector and the Processor can type dates by the same rules. Precision is `ArchiveDate.Precision`; what a commit
+/// writes is the year, month and day as numbers (`1968`, `1968-3`, `1968-3-12`), which each app pads and stores in its
+/// own form (Notes: `Item.normalizedDate`; a tag write: `ArchiveDate`).
+///
 /// The pure entry rules behind the metadata strip's DATE row (`NoteMetadataInspector`, W6-S7): given
 /// what is typed/picked in the three fields (year text, month index, day text) and the chosen
 /// precision, what string gets committed, is the day row's "Set" live, and what does the operator
@@ -22,40 +27,43 @@ import ArchiveCore
 /// Gregorian equivalent, so nothing partial is ever converted. Under a calendar, fields that do not
 /// name a whole storable day commit nothing (`Commit.keep`) — never a guessed month, never a clear —
 /// and a stored date that is not a whole day is entered in Gregorian (`seed`).
-enum DateFieldEntry {
+public enum DateFieldEntry {
 
     /// Month names for the picker — one list, shared with the messages below so they can't drift.
-    static let monthNames = ["January", "February", "March", "April", "May", "June",
+    public static let monthNames = ["January", "February", "March", "April", "May", "June",
                              "July", "August", "September", "October", "November", "December"]
 
     /// What a commit does: write `date` (nil clears it), or leave the stored date alone.
-    enum Commit: Equatable {
+    public enum Commit: Equatable {
         case write(String?)
         case keep
     }
 
     /// What the three fields hold.
-    struct Fields: Equatable {
-        var yearText: String
-        var month: Int          // 0 = none
-        var dayText: String
+    public struct Fields: Equatable {
+        public var yearText: String
+        public var month: Int          // 0 = none
+        public var dayText: String
+        public init(yearText: String, month: Int, dayText: String) {
+            (self.yearText, self.month, self.dayText) = (yearText, month, dayText)
+        }
     }
 
     /// The calendar the fields are typed in: the item's active display calendar at day precision,
     /// `.standard` otherwise (and always, with the Settings switch off — `active` is then nil).
-    static func entryCalendar(_ active: DisplayCalendar?, precision: Item.DatePrecision) -> DisplayCalendar {
+    public static func entryCalendar(_ active: DisplayCalendar?, precision: ArchiveDate.Precision) -> DisplayCalendar {
         precision == .day ? (active ?? .standard) : .standard
     }
 
     /// The typed year when it parses to a positive one — the only case any date is written at all.
-    static func year(_ yearText: String) -> Int? {
+    public static func year(_ yearText: String) -> Int? {
         guard let y = Int(yearText.trimmingCharacters(in: .whitespaces)), y > 0 else { return nil }
         return y
     }
 
     /// The month menu's entries for the typed year: 12 Western months under `.standard`/Julian, 13 in a
     /// Hebrew leap year (Adar I, Adar II) and in every French Republican year.
-    static func monthChoices(yearText: String, calendar: DisplayCalendar = .standard) -> [(month: Int, name: String)] {
+    public static func monthChoices(yearText: String, calendar: DisplayCalendar = .standard) -> [(month: Int, name: String)] {
         guard calendar != .standard else { return monthNames.enumerated().map { ($0.offset + 1, $0.element) } }
         let y = year(yearText) ?? 1
         let count = calendar.monthsInYear(y) ?? 12
@@ -66,7 +74,7 @@ enum DateFieldEntry {
     /// value a commit keeps. Nil when the field is empty/unparseable, no month is chosen, the year is
     /// unusable, the day is impossible for that month, or (another calendar) the day converts to a
     /// date outside the years Notes stores.
-    static func acceptedDay(yearText: String, month: Int, dayText: String,
+    public static func acceptedDay(yearText: String, month: Int, dayText: String,
                             calendar: DisplayCalendar = .standard) -> Int? {
         guard let d = Int(dayText.trimmingCharacters(in: .whitespaces)),
               let y = year(yearText), month > 0 else { return nil }
@@ -81,7 +89,7 @@ enum DateFieldEntry {
     /// or a month/year not yet chosen to judge the day against, is the disabled "Set" button's job.
     /// The month **menu** reaches this without any typing — picking February with 31 already in the
     /// field commits immediately — so this message is what explains the result.
-    static func impossibleDayNote(yearText: String, month: Int, dayText: String,
+    public static func impossibleDayNote(yearText: String, month: Int, dayText: String,
                                   calendar: DisplayCalendar = .standard) -> String? {
         guard let d = Int(dayText.trimmingCharacters(in: .whitespaces)), d > 0,
               let y = year(yearText), month > 0 else { return nil }
@@ -109,7 +117,7 @@ enum DateFieldEntry {
     /// Under another calendar, why typed fields are not saved yet: they name no whole day, and nothing
     /// short of one is ever written (`commit` → `.keep`). Nil under `.standard`, with every field empty,
     /// or when `impossibleDayNote` already explains it.
-    static func incompleteNote(yearText: String, month: Int, dayText: String,
+    public static func incompleteNote(yearText: String, month: Int, dayText: String,
                                calendar: DisplayCalendar) -> String? {
         guard calendar != .standard,
               !(yearText.trimmingCharacters(in: .whitespaces).isEmpty && month == 0
@@ -125,9 +133,9 @@ enum DateFieldEntry {
     /// What one typed date field says. The precision is the one typed — `1960s` is a decade, `1968` a
     /// year, `March 1968` or `1968-03` a month, `12 March 1968` or `1968-03-12` a day — so there is no
     /// precision picker; an emptied field clears the date.
-    enum Typed: Equatable {
+    public enum Typed: Equatable {
         case empty
-        case date(Fields, Item.DatePrecision)
+        case date(Fields, ArchiveDate.Precision)
         /// Nothing is written; the text says why.
         case unreadable(String)
     }
@@ -138,7 +146,7 @@ enum DateFieldEntry {
     /// `12 Mar 1968`, `March 12th, 1968`). All-number dates that do not start with the year
     /// (`12/3/1968`) are refused, since day-month and month-day orders cannot be told apart. A day the
     /// month cannot have is kept here; `commit` drops it to the month and `impossibleDayNote` says so.
-    static func parse(_ text: String, calendar: DisplayCalendar = .standard) -> Typed {
+    public static func parse(_ text: String, calendar: DisplayCalendar = .standard) -> Typed {
         let raw = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if raw.isEmpty { return .empty }
         if let m = raw.wholeMatch(of: /(\d{2,})0\s*['’]?s/), let y = Int(m.1 + "0"), y > 0 {
@@ -166,7 +174,7 @@ enum DateFieldEntry {
                 return .unreadable("There is no month \(m) — write the month as a word or a number up to \(choices.count).")
             }
             if let d, d < 1 { return .unreadable("There is no day \(d).") }
-            let precision: Item.DatePrecision = d != nil ? .day : (m != 0 ? .month : .year)
+            let precision: ArchiveDate.Precision = d != nil ? .day : (m != 0 ? .month : .year)
             return .date(Fields(yearText: String(y), month: m, dayText: d.map(String.init) ?? ""), precision)
         }
 
@@ -201,7 +209,7 @@ enum DateFieldEntry {
     /// The typed text and the calendar it is read in. A calendar applies to whole days only, so text
     /// that names less than a day (a year, a month, a decade) is read in Gregorian when it can be — the
     /// way choosing a coarser precision used to switch the fields to Gregorian (W24.cal1-validator).
-    static func resolve(_ text: String, calendar: DisplayCalendar) -> (typed: Typed, calendar: DisplayCalendar) {
+    public static func resolve(_ text: String, calendar: DisplayCalendar) -> (typed: Typed, calendar: DisplayCalendar) {
         let typed = parse(text, calendar: calendar)
         guard calendar != .standard else { return (typed, calendar) }
         if case .date(_, .day) = typed { return (typed, calendar) }
@@ -228,7 +236,7 @@ enum DateFieldEntry {
     /// The text a typed field starts from for a stored date, in the calendar it is typed in — the
     /// inverse of `parse`. Gregorian shows the stored ISO form (a decade as `1960s`); another calendar
     /// shows its whole day in words (`15 Tishri 5786`).
-    static func text(_ fields: Fields, precision: Item.DatePrecision?, calendar: DisplayCalendar) -> String {
+    public static func text(_ fields: Fields, precision: ArchiveDate.Precision?, calendar: DisplayCalendar) -> String {
         guard let y = year(fields.yearText) else { return "" }
         let day = Int(fields.dayText.trimmingCharacters(in: .whitespaces))
         if calendar != .standard, fields.month > 0, let day {
@@ -242,7 +250,7 @@ enum DateFieldEntry {
     }
 
     /// What committing a typed field does, given the stored date it would replace.
-    static func commit(typed: Typed, calendar: DisplayCalendar, storedDate: String?) -> (Commit, Item.DatePrecision?) {
+    public static func commit(typed: Typed, calendar: DisplayCalendar, storedDate: String?) -> (Commit, ArchiveDate.Precision?) {
         switch typed {
         case .empty: return (.write(nil), nil)
         case .unreadable: return (.keep, nil)
@@ -255,8 +263,8 @@ enum DateFieldEntry {
     /// The loose date string the fields describe at `precision`; the model normalizes it afterwards
     /// (zero-pads, floors a decade, downgrades a precision the string can't support).
     /// `nil` ⟹ clear the date. Gregorian fields only — `commit` is the calendar-aware entry point.
-    static func composed(yearText: String, month: Int, dayText: String,
-                         precision: Item.DatePrecision) -> String? {
+    public static func composed(yearText: String, month: Int, dayText: String,
+                         precision: ArchiveDate.Precision) -> String? {
         guard let y = year(yearText) else { return nil }
         switch precision {
         case .decade, .year:
@@ -278,7 +286,7 @@ enum DateFieldEntry {
     /// converted to its ISO day, then cut to `precision` — and anything less is `.keep`. So is a day
     /// that is the one `storedDate` already holds: a pre-1582 Julian leap day on disk (`1500-02-29`)
     /// is not rewritten as `1500-03-10` by a commit that changes nothing.
-    static func commit(yearText: String, month: Int, dayText: String, precision: Item.DatePrecision,
+    public static func commit(yearText: String, month: Int, dayText: String, precision: ArchiveDate.Precision,
                        calendar: DisplayCalendar = .standard, storedDate: String? = nil) -> Commit {
         guard calendar != .standard else {
             return .write(composed(yearText: yearText, month: month, dayText: dayText, precision: precision))
@@ -310,7 +318,7 @@ enum DateFieldEntry {
     /// moves the fields into or out of a calendar. `.standard` is the stored text split as-is. Another
     /// calendar shows only a whole day; nil for anything else — a year or month (no exact
     /// equivalent), or a day before the calendar's epoch (French Republican before 1792).
-    static func fields(storedDate: String?, calendar: DisplayCalendar = .standard) -> Fields? {
+    public static func fields(storedDate: String?, calendar: DisplayCalendar = .standard) -> Fields? {
         let parts = (storedDate ?? "").split(separator: "-").map(String.init)
         guard calendar != .standard else {
             return Fields(yearText: parts.first ?? "",
@@ -325,8 +333,8 @@ enum DateFieldEntry {
 
     /// The fields for a stored date and the calendar they are typed in: the item's calendar at day
     /// precision when the date is empty or a whole day the calendar can show, else `.standard`.
-    static func seed(storedDate: String?, active: DisplayCalendar?,
-                     precision: Item.DatePrecision) -> (fields: Fields, calendar: DisplayCalendar) {
+    public static func seed(storedDate: String?, active: DisplayCalendar?,
+                     precision: ArchiveDate.Precision) -> (fields: Fields, calendar: DisplayCalendar) {
         let calendar = entryCalendar(active, precision: precision)
         if let f = fields(storedDate: storedDate, calendar: calendar) { return (f, calendar) }
         return (fields(storedDate: storedDate) ?? Fields(yearText: "", month: 0, dayText: ""), .standard)
@@ -334,7 +342,7 @@ enum DateFieldEntry {
 
     /// The typed field's starting text and calendar for a stored date. An empty date is typed in the
     /// item's calendar (a whole day is what a calendar stores); a stored year or month in Gregorian.
-    static func seedText(storedDate: String?, precision: Item.DatePrecision?,
+    public static func seedText(storedDate: String?, precision: ArchiveDate.Precision?,
                          active: DisplayCalendar?) -> (text: String, calendar: DisplayCalendar) {
         let s = seed(storedDate: storedDate, active: active, precision: storedDate == nil ? .day : (precision ?? .year))
         return (text(s.fields, precision: precision, calendar: s.calendar), s.calendar)
@@ -343,9 +351,9 @@ enum DateFieldEntry {
     // MARK: The list's Date cell (W40.notes-detail-layout)
 
     /// What a date typed into the list's Date cell does: the inspector's field rules, in one step.
-    enum ListEdit: Equatable {
+    public enum ListEdit: Equatable {
         /// Write `date` (nil clears it) at `precision`; `note` says what was dropped, as the inspector's line does.
-        case write(String?, Item.DatePrecision?, note: String?)
+        case write(String?, ArchiveDate.Precision?, note: String?)
         /// Nothing to write: the text is the stored date's own.
         case unchanged
         /// Nothing written; the message says what to type.
@@ -353,14 +361,14 @@ enum DateFieldEntry {
     }
 
     /// The text the list's Date cell edits, in the calendar it is typed in.
-    static func listSeed(storedDate: String?, precision: Item.DatePrecision?,
+    public static func listSeed(storedDate: String?, precision: ArchiveDate.Precision?,
                          active: DisplayCalendar?) -> (text: String, calendar: DisplayCalendar) {
         seedText(storedDate: storedDate, precision: precision, active: active)
     }
 
     /// Read `text` typed over `seed` (the cell's starting text, typed in `calendar`) for an item whose date is
     /// `storedDate`. An emptied cell clears the date; text the inspector would refuse is refused with its message.
-    static func listEdit(_ text: String, seed: String, calendar: DisplayCalendar, storedDate: String?) -> ListEdit {
+    public static func listEdit(_ text: String, seed: String, calendar: DisplayCalendar, storedDate: String?) -> ListEdit {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != seed.trimmingCharacters(in: .whitespacesAndNewlines) else { return .unchanged }
         let (typed, resolved) = resolve(trimmed, calendar: calendar)

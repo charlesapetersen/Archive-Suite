@@ -15,7 +15,7 @@ import Foundation
 ///     date transcribed off an early-modern document would have been silently rejected.
 /// The rules below are also locale-independent by construction, which `Calendar.current` is not: it
 /// follows the user's chosen calendar identifier, which need not be Gregorian at all.
-enum GregorianDay {
+public enum GregorianDay {
 
     /// Length of `month` in `year`, or nil when `year`/`month` is not a real (positive) year-month.
     ///
@@ -25,7 +25,7 @@ enum GregorianDay {
     /// thrown away; `1900-02-29` and `2026-02-31` are not, and are. The 1582 boundary is a chosen
     /// trade-off, not an oversight: regions on the old calendar into the 20th century did have a
     /// real `1900-02-29`, but honoring that would re-admit the most likely modern typo.
-    static func daysInMonth(year: Int, month: Int) -> Int? {
+    public static func daysInMonth(year: Int, month: Int) -> Int? {
         guard year > 0, (1...12).contains(month) else { return nil }
         switch month {
         case 1, 3, 5, 7, 8, 10, 12: return 31
@@ -37,14 +37,14 @@ enum GregorianDay {
     /// True when `(year, month, day)` names a day that exists — the only question the input seams ask.
     /// A `false` means the triple is **impossible** (`2026-02-31`, `1968-04-31`, day 0, month 13),
     /// never merely unusual, so a seam can reject or coarsen on it without second-guessing the source.
-    static func isValidDay(year: Int, month: Int, day: Int) -> Bool {
+    public static func isValidDay(year: Int, month: Int, day: Int) -> Bool {
         guard let last = daysInMonth(year: year, month: month) else { return false }
         return (1...last).contains(day)
     }
 
     /// Leap year under the reckoning in force for `year` (see `daysInMonth`): Gregorian
     /// (÷4, except ÷100 unless ÷400) from 1582 on, Julian (÷4) before it.
-    static func isLeapYear(_ year: Int) -> Bool {
+    public static func isLeapYear(_ year: Int) -> Bool {
         guard year > 0 else { return false }
         if year < 1582 { return year % 4 == 0 }
         return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)

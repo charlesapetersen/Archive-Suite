@@ -215,6 +215,11 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   loading, or ships a migration in the same commit. Never regenerate or edit a fixture; a new format adds a new
   one beside it (`SavedSearchFixtureTests`). An entry the build cannot read is kept under
   `savedSearches.unreadable` and the sidebar says so once (W40.reader-smart-folders-keep).
+- **Date means the document's own date** (owner, notes-2 row 25; W40.suite-date-design), across the suite: the
+  year range and a new Advanced Search date row test the own date; the sent-with date is a level below, searched
+  when asked ("Also match sent-with dates", or the row's role). A role missing from a saved filter or row reads
+  as `either`, what it meant when saved. A typed date field uses ArchiveCore `DateFieldEntry`, the suite's one
+  date field (the Inspector's adoption is W40.fix-reader-date-fields).
 - **v1 stays sandboxed to one granted root.** Whole-Mac search is an unbuilt feature with a real cost (new code:
   walk N roots, merge, define exclusions; `FileAccessProvider` was never written) — **not** an entitlement or
   config toggle (corrected 2026-08-07, `W26.docs`; history in REFERENCE.md).

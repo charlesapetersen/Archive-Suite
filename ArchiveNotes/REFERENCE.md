@@ -31,7 +31,8 @@ macOS/Sources/ArchiveNotes/
     Item.swift                     Item/ZoteroRef/UnknownKey domain models; normalizedDate is THE
                                    write-path date normalizer (decade floors; month/day downgrade to the
                                    finest precision the string supports — incl. an impossible day, W23.l4)
-    GregorianDay.swift             Does (year, month, day) name a real day? — the calendar every date
+    (GregorianDay.swift            moved to ArchiveCore Calendars/ in W40.suite-date-design)
+                                   Does (year, month, day) name a real day? — the calendar every date
                                    INPUT seam validates against (Item.normalizedDate, DateFieldEntry,
                                    ZoteroCSLItem.mappedDate). Arithmetic, NOT Foundation.Calendar:
                                    ICU's hybrid calls 1500-02-29 valid and 1582-10-10 invalid, both wrong
@@ -380,7 +381,8 @@ macOS/Sources/ArchiveNotes/
                                    focused field, Return/Escape, no blank names (W40.fix-notes-visual-polish)
     LocationsInspector.swift       Inspector "Locations" — every folder the selected item is in, each
                                    a scope shortcut + guarded Remove (replicant→quiet, last→modal) (W6-S5)
-    DateFieldEntry.swift           Pure rules behind NoteMetadataInspector's date fields: `parse` reads
+    (DateFieldEntry.swift          moved to ArchiveCore Tags/ in W40.suite-date-design, the suite's one date field)
+                                   Pure rules behind NoteMetadataInspector's date fields: `parse` reads
                                    one typed date at the precision typed (1960s, 1968, March 1968,
                                    12 March 1968, 1968-03-12; no picker, no Set/Clear — applied on
                                    Return or leaving the field, emptied clears; W40.fix-notes-date-entry),

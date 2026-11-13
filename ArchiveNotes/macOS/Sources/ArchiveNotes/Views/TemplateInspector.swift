@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 
 /// The inspector for the template selected in the templates manager (W40.fix-notes-template-fields, notes-2 row 18:
 /// the owner could not see how to assign a template to a folder, and the inspector showed nothing for a template).

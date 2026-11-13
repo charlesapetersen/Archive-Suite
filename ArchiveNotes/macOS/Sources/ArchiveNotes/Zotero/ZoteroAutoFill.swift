@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 
 // MARK: - CSL → front-matter mapping (00-overview §D.4)
 

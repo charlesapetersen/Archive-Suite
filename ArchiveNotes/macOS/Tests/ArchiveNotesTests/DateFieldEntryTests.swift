@@ -1,4 +1,5 @@
 import Testing
+import ArchiveCore
 import Foundation
 @testable import ArchiveNotes
 

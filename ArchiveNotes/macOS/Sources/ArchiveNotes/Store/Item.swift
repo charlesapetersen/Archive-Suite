@@ -11,7 +11,8 @@ struct UnknownKey: Sendable, Equatable {
 /// Serialized to/from Markdown with YAML front-matter via `FrontMatterCodec`.
 struct Item: Sendable, Equatable, Identifiable {
     enum Kind: String, Sendable, Codable { case note, extract }
-    enum DatePrecision: String, Sendable, Codable { case decade, year, month, day }
+    /// Core's precision, so the suite's typed date field (`ArchiveCore.DateFieldEntry`) reads and writes it directly.
+    typealias DatePrecision = ArchiveDate.Precision
 
     var id: UUID
     var kind: Kind

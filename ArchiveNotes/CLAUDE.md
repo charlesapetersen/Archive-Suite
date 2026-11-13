@@ -82,12 +82,15 @@ Rules for anyone changing this code. The file map is in REFERENCE.md §Implement
   body/title/tag edit (W9.b1, W9.b3). A failed subject edit is retried as the exact delta, never silently dropped;
   the pending-subjects journal keeps Finder-tag removal ownership across a relaunch; nothing retries
   automatically. The terminate flush is bounded and, on failure, offers copies, Retry, Don't Quit or Quit.
-- **Dates.** `GregorianDay` validates every date input with arithmetic, NOT `Foundation.Calendar` (ICU's hybrid
+- **Dates.** `GregorianDay` (ArchiveCore `Calendars/`) validates every date input with arithmetic, NOT `Foundation.Calendar` (ICU's hybrid
   calendar is wrong for archival dates); Feb 29 is accepted under either reckoning (proleptic Gregorian or
   pre-1582 Julian), and `normalizedDate` downgrades an impossible day to the finest precision the string supports
   rather than rejecting it (W23.l4). Display calendars (`DisplayCalendarSettings`, ArchiveCore `Calendars/`)
   are display only — never the stored date; storage and `GregorianDay` stay unchanged. `Item.sortDate` must stay
-  identical to ArchiveCore `DocumentTags.sortDate` (`ItemSortDateTests` is the tripwire).
+  identical to ArchiveCore `DocumentTags.sortDate` (`ItemSortDateTests` is the tripwire). The typed date field's
+  rules are ArchiveCore `Tags/DateFieldEntry.swift`, the suite's one date field (W40.suite-date-design): change them
+  there, for every app. **Date means the item's own date** in every form and filter; Sent with is a level below it
+  (folded in the inspector, an opt-in list column, its own role in Advanced Search and the year range).
 - **Index and organization.** `NotesIndex.open()` is all-or-nothing: a failed PRAGMA/migration/schema step
   discards the handle. Tier-2 in Notes also covers the tag projector, org/replication transactions and the
   hard-delete path. Multi-row org transactions are whole methods, never an exposed BEGIN/COMMIT — no
