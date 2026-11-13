@@ -30,8 +30,8 @@
 #                  detached vm-keep-reaper.sh stops it after VM_KEEP_IDLE s (300) without a run, as soon as
 #                  the Mac's memory pressure leaves normal, or when the calling session exits. A call without
 #                  VM_KEEP=1 takes a kept guest over and stops it at the end; `vm-gui-runner.sh stop` stops it now.
-#                VM_SPLIT=N (xcuitest only): run the selection as N chunks of whole test classes, each in a freshly
-#                  booted guest (the macOS 27.2 guest slows down over a long lane; see README §"Long lanes").
+#                VM_SPLIT=N (xcuitest only): run the selection as at most N chunks balanced by measured test time
+#                  (whole classes, unless one class alone is over a chunk's share), each in a freshly booted guest (the macOS 27.2 guest slows down over a long lane; see README §"Long lanes").
 #                VM_SAMPLE=S: sample host and guest load every S s into $ART/<app>/sampler*.tsv (default 60; 0 = off).
 #
 # The guest's `xcodebuild test` is ended if it outlives its own summary or goes silent (tart_run_test).
@@ -628,56 +628,46 @@ run_xcuitest() {
 
 # --- VM_SPLIT=N: the selection as N chunks of whole classes, each in a freshly booted guest ---
 # W40.vm-macos27-runtime (1): on the macOS 27.2 guest a long lane slows down as it goes. One build, then
-# `-enumerate-tests` names every selected test (so no class can be dropped by a source grep), the classes are
-# dealt into N contiguous chunks in run order, and each chunk runs `test-without-building` after a clean
-# restart and a fresh fixture. xcuitest.log is the chunks' logs in order, so collect_shots and a reader of
-# the log see one run; each chunk keeps its own log, sampler, result bundle and crash harvest.
+# `-enumerate-tests` names every selected test (so no class can be dropped by a source grep), the tests are
+# dealt into at most N contiguous chunks balanced by measured test time (ops/gui/vm-chunks.py, the planner the
+# health gate uses; a class is split only when it alone is over a chunk's share), and each chunk runs
+# `test-without-building` after a clean restart and a fresh fixture. xcuitest.log is the chunks' logs in
+# order, so collect_shots and a reader of the log see one run; each chunk keeps its own log, sampler, result
+# bundle and crash harvest.
 run_split() {
-  local list="$APP_ART/enumerated-tests.txt" classes n k=0 per i chunk args total=0
+  local list="$APP_ART/enumerated-tests.txt" plan="$APP_ART/chunk-plan.txt" line n k=0 chunk args sels total=0
   log "VM_SPLIT=$VM_SPLIT: building once, then enumerating the selection…"
   run_tests build-for-testing "" build
   grep -q '\*\* TEST BUILD SUCCEEDED \*\*' "$APP_ART/build.log" || die "the guest build failed (log: $APP_ART/build.log)"
   # Guarded too (the same build tool), and checked: a bundle that fails to enumerate must not just drop out.
-  : > "$list.raw"
-  local erc=0 sel
-  TART_TEST_STALL=600 tart_run_test "$VM" "$list.raw" "xcodebuild test-without-building -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
-      $TEST_ARGS -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' \
-      -enumerate-tests -test-enumeration-style flat -test-enumeration-format text -test-enumeration-output-path - \
-      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" 900 || erc=$?
-  [ "$erc" = 0 ] && [ -z "$TART_TEST_GUARD" ] || die "test enumeration failed (exit $erc${TART_TEST_GUARD:+, $TART_TEST_GUARD guard}; output: $list.raw)"
-  # Tests are listed as Bundle/Class/test (disabled ones are not, so the chunks run what one run would). The
-  # list is the scheme's whole test plan whatever -only-testing says (measured 2026-11-12, Xcode 27.2), so it is
-  # narrowed to the selectors here, and a selector that matches nothing is an error, never a silent drop.
-  grep -oE '^[[:space:]]*[A-Za-z0-9_]+/[A-Za-z0-9_]+/[A-Za-z0-9_]+' "$list.raw" | tr -d ' \t' > "$list.all" || true
-  : > "$list"
-  for sel in $(printf '%s' "$ONLY_TESTING" | tr ',' ' '); do
-    grep -E "^$sel(/|\$)" "$list.all" >> "$list" || die "the enumeration lists no test for selector $sel (output: $list.raw)"
-  done
-  sort -u -o "$list" "$list"
-  classes="$(awk -F/ '!seen[$1"/"$2]++{print $1"/"$2}' "$list")"
-  n="$(printf '%s\n' "$classes" | sed '/^$/d' | wc -l | tr -d ' ')"
-  [ "$n" -gt 0 ] || die "could not enumerate the selected tests (output: $list.raw)"
-  log "$(wc -l < "$list" | tr -d ' ') tests in $n classes, in $VM_SPLIT chunk(s)"
-  per=$(( (n + VM_SPLIT - 1) / VM_SPLIT ))
+  tart_enumerate_tests "$VM" "$PROJ_REL" "$SCHEME" "$GUEST_DD" "$ONLY_TESTING" "$list" 900 || die "$TART_ENUM_NOTE"
+  python3 "$TART_VM_CHUNKS" plan --tests "$list" --chunks "$VM_SPLIT" \
+    --times "$REPO/ops/gui/vm-test-times.tsv" --times "$(tart_learned_times "$REPO")" > "$plan" \
+    || die "could not plan the chunks (list: $list)"
+  n="$(grep -c . "$plan" || true)"
+  log "$(wc -l < "$list" | tr -d ' ') tests, in $n chunk(s) by measured time (plan: $plan)"
   : > "$APP_ART/xcuitest.log"
   rm -rf "$APP_ART/shots"
-  for (( i = 0; i < n; i += per )); do
+  # fd 3, not stdin: the loop's `tart exec`s would read the plan's remaining lines.
+  while IFS= read -r line <&3; do
+    [ -n "$line" ] || continue
     k=$(( k + 1 )); chunk="chunk$k"
-    args="$(printf '%s\n' "$classes" | sed -n "$(( i + 1 )),$(( i + per ))p" | sed 's/^/-only-testing:/' | tr '\n' ' ')"
+    sels="$(tart_chunk_selectors "$line")"
+    args="$(archive_xcode_test_args "$sels")" || die "$chunk: invalid selector list '$sels'"
     if [ "$k" -gt 1 ]; then
       log "$chunk: restarting the guest…"
       tart_stop_clean "$VM"; VM_BOOTED=0
       ensure_vm; ensure_fixture; assert_accessibility >/dev/null; prepare_guest_for_tests
     fi
-    log "$chunk: $(printf '%s' "$args" | wc -w | tr -d ' ') classes"
+    log "$chunk: $(printf '%s' "$args" | wc -w | tr -d ' ') selectors"
     tart_crash_mark "$VM"
-    run_tests test-without-building "$args" "$chunk" "$(tart_selector_bundles "$(printf '%s' "$args" | sed 's/-only-testing://g; s/ *$//; s/ /,/g')")"
+    run_tests test-without-building "$args" "$chunk" "$(tart_selector_bundles "$sels")"
     cat "$APP_ART/$chunk.log" >> "$APP_ART/xcuitest.log"
     collect_shots "$APP_ART/$chunk.log" keep
     collect_xcresult "$chunk"
     collect_crashes "crashes-$chunk"
     [ "$RUN_VERDICT" = succeeded ] || XCUITEST_FAILED=1
-  done
+  done 3< "$plan"
   # Every enumerated test must have reported (passed, failed or skipped), or the split lost some.
   total="$(cat "$APP_ART"/chunk*.log | grep -cE "^Test Case '-\[[^]]+\]' (passed|failed|skipped) \(" || true)"
   if [ "$total" != "$(wc -l < "$list" | tr -d ' ')" ]; then

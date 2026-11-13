@@ -535,6 +535,49 @@ tart_selector_bundles() {
   printf '%s\n' "$1" | tr ',' '\n' | sed '/^$/d; s#/.*##' | sort -u | wc -l | tr -d ' '
 }
 
+# ---------------------------------------------------------------------------------------------------
+# tart_enumerate_tests VM PROJ SCHEME DD SELECTORS OUT [MAXRUN] — list the tests SELECTORS (comma-separated) run,
+# one Bundle/Class/test per line, sorted, into OUT, from a build already made in DD (`build-for-testing`).
+# 0 = listed; 1 = failed, with the reason in $TART_ENUM_NOTE. The raw output stays in OUT.raw.
+# Shared by the runner's VM_SPLIT and the gate's chunk (W40.vm-gate-unpause), so the two cannot list differently.
+# The list is the scheme's whole test plan whatever -only-testing says (measured 2026-11-12, Xcode 27.2), so it is
+# narrowed to the selectors here, and a selector that matches nothing is an error, never a silent drop. Disabled
+# tests are not listed, so the chunks run what one run would.
+TART_VM_CHUNKS="${TART_VM_CHUNKS:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vm-chunks.py}"
+tart_enumerate_tests() {
+  local vm="$1" proj="$2" scheme="$3" dd="$4" selectors="$5" out="$6" maxrun="${7:-900}" args erc=0 sel
+  TART_ENUM_NOTE=""
+  args="$(archive_xcode_test_args "$selectors")" || { TART_ENUM_NOTE="invalid selector list '$selectors'"; return 1; }
+  : > "$out.raw"
+  TART_TEST_STALL=600 tart_run_test "$vm" "$out.raw" "xcodebuild test-without-building -project '$GUEST_REPO/$proj' -scheme '$scheme' \
+      $args -destination 'platform=macOS' -derivedDataPath '$dd' \
+      -enumerate-tests -test-enumeration-style flat -test-enumeration-format text -test-enumeration-output-path - \
+      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" "$maxrun" || erc=$?
+  if [ "$erc" != 0 ] || [ -n "$TART_TEST_GUARD" ]; then
+    TART_ENUM_NOTE="test enumeration failed (exit $erc${TART_TEST_GUARD:+, $TART_TEST_GUARD guard}; output: $out.raw)"
+    return 1
+  fi
+  grep -oE '^[[:space:]]*[A-Za-z0-9_]+/[A-Za-z0-9_]+/[A-Za-z0-9_]+' "$out.raw" | tr -d ' \t' > "$out.all" || true
+  : > "$out"
+  for sel in $(printf '%s' "$selectors" | tr ',' ' '); do
+    grep -E "^$sel(/|\$)" "$out.all" >> "$out" \
+      || { TART_ENUM_NOTE="the enumeration lists no test for selector $sel (output: $out.raw)"; return 1; }
+  done
+  sort -u -o "$out" "$out"
+  return 0
+}
+
+# tart_learned_times CHECKOUT — the per-test times the health gate learns from its own runs (gitignored, kept in the
+# PRIMARY checkout's .maintenance/, which a worktree shares). The committed seed is ops/gui/vm-test-times.tsv.
+tart_learned_times() {
+  local common
+  common="$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [ -n "$common" ]; then echo "$(dirname "$common")/.maintenance/gui-vm-test-times.tsv"; else echo "$1/.maintenance/gui-vm-test-times.tsv"; fi
+}
+
+# tart_chunk_selectors CHUNK_LINE — a vm-chunks.py chunk line (space-separated) as a comma-separated selector list.
+tart_chunk_selectors() { printf '%s\n' "$1" | tr -s ' ' '\n' | sed '/^$/d' | paste -sd, - ; }
+
 # The kept-guest state (VM_KEEP=1, vm-gui-runner.sh); every entry point that boots or stops the guest clears it.
 TART_KEEP_STATE="${VM_KEEP_STATE:-$HOME/.tart-mirror/.vm-keep}"
 

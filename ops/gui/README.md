@@ -71,8 +71,10 @@ the sighted lane restarts it.
 with SIGTERM when it sits 180 s idle after XCTest's top-level summary (the macOS 27.2 guest's build tool sat 25 min
 there, ignoring SIGINT), or goes 1,500 s without output before one; each end is a `[guard]` line in the log, and
 only the summary end can still give a verdict (the summary line's, never a green on failures). `VM_SPLIT=N` runs
-the selection as N chunks of whole classes, each in a freshly booted guest after one build (`-enumerate-tests`
-names the classes, so none is dropped); chunk logs, result bundles, crash reports and `sampler-<chunk>.tsv`
+the selection as at most N chunks balanced by measured test time, each in a freshly booted guest after one build
+(`-enumerate-tests` names the tests, so none is dropped; `ops/gui/vm-chunks.py` plans the chunks from
+`ops/gui/vm-test-times.tsv` and the gate's learned times, splitting a class into its tests only when it alone is over
+a chunk's share); chunk logs, result bundles, crash reports and `sampler-<chunk>.tsv`
 (host and guest load every `VM_SAMPLE` s) sit beside one combined `xcuitest.log`. Why split: the 2026-11-11 Notes lane
 in one guest ran its late suites 3–4× slower (NotesGUITests 1,255 → 4,180 s, Smoke 4 → 64 s); the same tests in
 4 fresh-guest chunks on 2026-11-12 ran at the baseline's speed (5,650 s against its 5,795 s; NotesGUITests 1,170 s,
@@ -249,10 +251,19 @@ Processor is 4/4 in the VM** (the current suite sizes), so the **warn tier**
 (`AUTONOMOUS_GUI_VM_WARN_APPS`) is **empty by default** and a UITest failure in any app REDs the gate. Don't
 re-add an app to it without a tracked item — a permanent warn tier is a disabled test with extra steps. The gate is **ON by default**
 (`AUTONOMOUS_GUI_VM=0` disables); a missing VM / boot failure / guest-agent timeout **skips** (never parks), and
-it REDs only on a reproducible `** TEST FAILED **` (retry-once). The daemon's gate runs **one** of
-`reader notes processor` per invocation, round-robin via its gitignored `.maintenance/gui-vm-next-app` state
-file (or `AUTONOMOUS_GUI_VM_STATE`); `AUTONOMOUS_GUI_VM_APPS` can narrow that pool while diagnosing. This avoids
-three 20-minute caps exceeding the 50-minute whole-gate deadline. It retains each app's separate DerivedData,
+it REDs only on a reproducible `** TEST FAILED **` (retry-once). The daemon's gate runs **one chunk of one app**
+per invocation (W40.vm-gate-unpause, 2026-11-13), rotating over app × chunk via its gitignored
+`.maintenance/gui-vm-next-app` state (`<app> <chunk> <chunks>`, or `AUTONOMOUS_GUI_VM_STATE`); `AUTONOMOUS_GUI_VM_APPS`
+can narrow the pool while diagnosing. On the macOS 27.2 guest no whole lane fits (Notes ~6,250 s of tests, Reader
+~3,000 s) and the rest of the gate takes ~1,400 s of the engine's 3,000 s, so the gate builds once
+(`build-for-testing`), enumerates, and runs one chunk of at most `AUTONOMOUS_GUI_VM_CHUNK` (600) estimated seconds
+with `test-without-building`; every guest xcodebuild is capped to what is left of the step's
+`AUTONOMOUS_GUI_VM_BUDGET` (1,400 s), and an attempt with no time left SKIPs. A cycle's chunk plan
+(`.maintenance/gui-vm-plan-<app>`) is made at its chunk 0 and kept to its end, so a cycle runs every test once; a
+test added mid-cycle joins the next chunk. The plan uses `ops/gui/vm-test-times.tsv` (measured 2026-11-06/12) and,
+over it, the passed tests' times the gate learns (`.maintenance/gui-vm-test-times.tsv`). The retry reruns only the
+failed tests' classes, and a RED names the `ONLY_TESTING=… vm-gui-runner.sh` command that reruns its chunk. A full
+cycle is about twenty invocations. It retains each app's separate DerivedData,
 prunes stale result bundles, and SKIPs before building when the guest has under 6 GiB free. Sessions also verify
 view/interaction changes here off-screen — the old `gui-mode` flag was retired, GUI is unattended now
 (CLAUDE.md loop step 2 + resume-prompt STEP 3.5), and `.claude/hooks/no-host-gui.sh` now *enforces* that for

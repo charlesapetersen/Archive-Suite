@@ -48,7 +48,25 @@ case "${1:-}" in
     cmd="${*: -1}"
     printf 'guest %s\n' "$cmd" >> "$calls"
     case "$cmd" in
-      *'xcodebuild test'*)
+      *'-enumerate-tests'*)
+        # The scheme's whole plan whatever -only-testing says (as Xcode 27.2 lists it), so the gate must narrow it:
+        # OtherUnitTests is in no app's selectors.
+        [ "${GUI_VM_FAKE_MODE:-pass}" = enum_fail ] && { echo 'xcodebuild: error: enumeration failed'; exit 65; }
+        case "$cmd" in
+          *ArchiveReader*) printf '%s\n' 'ArchiveReaderUITests/AlphaUITests/testOne' 'ArchiveReaderUITests/BetaUITests/testTwo' \
+                             'ArchiveReaderTests/SnapshotTests/testSnapshot' 'ArchiveReaderTests/OtherUnitTests/testUnit' ;;
+          *ArchiveNotes*) printf '%s\n' 'ArchiveNotesUITests/AlphaUITests/testOne' 'ArchiveNotesUITests/BetaUITests/testTwo' ;;
+          *ArchiveProcessor*) printf '%s\n' 'ArchiveProcessorUITests/AlphaUITests/testOne' ;;
+        esac
+        ;;
+      *'xcodebuild build-for-testing'*)
+        if [ "${GUI_VM_FAKE_MODE:-pass}" = build_fail ]; then
+          printf '%s\n' "/Volumes/My Shared Files/repo/X.swift:1:1: error: fake compile error" '** TEST BUILD FAILED **'
+        else
+          printf '%s\n' '** TEST BUILD SUCCEEDED **'
+        fi
+        ;;
+      *'xcodebuild test-without-building'*)
         n=0; [ -f "$count" ] && n="$(cat "$count")"; n=$(( n + 1 )); printf '%s\n' "$n" > "$count"
         app=unknown
         case "$cmd" in
@@ -56,12 +74,19 @@ case "${1:-}" in
           *ArchiveNotes*) app=notes ;;
           *ArchiveProcessor*) app=processor ;;
         esac
-        printf "Test Case '-[Fake.%s testRenderedSurface]' started.\n" "$app"
+        # One case per selector, named the way XCTest names it (Bundle.Class test); the first is the one that fails.
+        cases=""
+        for sel in $(printf '%s\n' "$cmd" | grep -oE -- '-only-testing:[A-Za-z0-9_/]+' | sed 's/^-only-testing://'); do
+          b="${sel%%/*}"; rest="${sel#*/}"; c="${rest%%/*}"; t=testFake; [ "$rest" != "$c" ] && t="${rest#*/}"
+          cases="$cases $b.$c|$t"
+        done
+        first="${cases# }"; first="${first%% *}"
+        for cs in $cases; do printf "Test Case '-[%s %s]' started.\n" "${cs%|*}" "${cs#*|}"; done
         case "${GUI_VM_FAKE_MODE:-pass}:$n" in
           fail:*|flaky:1|processor_no_window:*)
-            printf "Test Case '-[Fake.%s testRenderedSurface]' failed (0.01 seconds).\n" "$app"
+            printf "Test Case '-[%s %s]' failed (0.01 seconds).\n" "${first%|*}" "${first#*|}"
             [ "${GUI_VM_FAKE_MODE:-pass}" = processor_no_window ] && printf '%s\n' 'PROCESSOR_UI_NO_WINDOW'
-            printf '%s\n' '** TEST FAILED **'
+            printf '%s\n' '** TEST EXECUTE FAILED **'
             ;;
           infra:*)
             printf '%s\n' 'guest transport ended before a test verdict'
@@ -83,8 +108,8 @@ case "${1:-}" in
             exit 143
             ;;
           *)
-            printf "Test Case '-[Fake.%s testRenderedSurface]' passed (0.01 seconds).\n" "$app"
-            printf '%s\n' '** TEST SUCCEEDED **'
+            for cs in $cases; do printf "Test Case '-[%s %s]' passed (12.0 seconds).\n" "${cs%|*}" "${cs#*|}"; done
+            printf '%s\n' '** TEST EXECUTE SUCCEEDED **'
             ;;
         esac
         ;;
@@ -125,9 +150,12 @@ run_gate() { # mode expected-exit label
 run_gate pass 0 round-reader
 want "$CALLS" 'ArchiveReader/macOS/ArchiveReader.xcodeproj' 'first round selects Reader'
 want_not "$CALLS" 'ArchiveNotes/macOS/ArchiveNotes.xcodeproj' 'first round does not also run Notes'
-want "$CALLS" '-only-testing:ArchiveReaderUITests -only-testing:ArchiveReaderTests/SnapshotTests' \
-  'Reader gate keeps both the UI suite and VM-only snapshot selector'
-want "$STATE" 'reader' 'state records Reader'
+want "$CALLS" '-only-testing:ArchiveReaderTests/SnapshotTests -only-testing:ArchiveReaderUITests/AlphaUITests -only-testing:ArchiveReaderUITests/BetaUITests' \
+  'Reader chunk keeps both the UI suite and the VM-only snapshot class'
+want_not "$CALLS" 'OtherUnitTests' 'the enumeration is narrowed to the app selectors'
+want "$CALLS" 'xcodebuild build-for-testing' 'the gate builds once, then runs the chunk without building'
+want "$STATE" 'reader 0 1' 'state records Reader, chunk 0 of 1'
+want "$ROOT/state/gui-vm-test-times.tsv" 'ArchiveReaderUITests/AlphaUITests/testFake	12' 'passed tests teach the learned times'
 [ -f "$ART/reader/xcuitest-attempt1.log" ] && pass 'Reader log is namespaced' || bad 'Reader log is namespaced'
 
 run_gate pass 0 round-notes
@@ -147,6 +175,48 @@ printf '%s\n' reader > "$STATE"
 run_gate fail 1 reproducible-failure
 want "$ROOT/reproducible-failure.out" 'RED — reproducible UITest failure in: notes' 'two failed markers RED the selected app'
 [ "$(cat "$ROOT/count")" = 2 ] && pass 'marker failure retries exactly once' || bad 'marker failure retries exactly once'
+[ "$(cat "$ART/notes/xcuitest-attempt2.selectors")" = ArchiveNotesUITests/AlphaUITests ] \
+  && pass 'the retry reruns only the failed test class' || bad "the retry reruns only the failed test class (ran: $(cat "$ART/notes/xcuitest-attempt2.selectors"))"
+want "$ART/gui-vm-notes-LAST-FAILURE.log" "ONLY_TESTING='ArchiveNotesUITests/AlphaUITests,ArchiveNotesUITests/BetaUITests' ops/gui/vm-gui-runner.sh notes xcuitest" \
+  'a RED names the runner command that reruns its chunk'
+
+# The rotation over app × chunk (W40.vm-gate-unpause): with a 50 s chunk and no measured times (40 s a test), each
+# class is a chunk, so Reader has 3 and Notes 2; a cycle runs each once, in order, then moves to the next app.
+: > "$STATE"; rm -f "$ROOT"/state/gui-vm-plan-* "$ROOT/state/gui-vm-test-times.tsv"
+export AUTONOMOUS_GUI_VM_CHUNK=50
+run_gate pass 0 chunk-r1
+want "$STATE" 'reader 0 3' 'rotation: Reader chunk 1 of 3'
+want "$CALLS" '-only-testing:ArchiveReaderTests/SnapshotTests ' 'rotation: chunk 1 is the first class'
+want_not "$CALLS" 'AlphaUITests' 'rotation: chunk 1 runs no other class'
+run_gate pass 0 chunk-r2
+want "$STATE" 'reader 1 3' 'rotation: Reader chunk 2 of 3 next'
+want "$CALLS" '-only-testing:ArchiveReaderUITests/AlphaUITests ' 'rotation: chunk 2 is the second class'
+want "$ROOT/chunk-r2.out" 'GREEN — reader chunk 2/3' 'the verdict names its slice'
+# A cycle keeps its plan. A class added since it was made (here BetaUITests) joins the chunk that runs next, and a
+# class that is gone (GoneUITests) is dropped, so no test falls out of the cycle and none fails for being absent.
+printf '%s\n' 'ArchiveReaderTests/SnapshotTests' 'ArchiveReaderUITests/AlphaUITests' 'ArchiveReaderUITests/GoneUITests' \
+  > "$ROOT/state/gui-vm-plan-reader"
+run_gate pass 0 chunk-r3
+want "$STATE" 'reader 2 3' 'rotation: Reader chunk 3 of 3'
+want "$CALLS" '-only-testing:ArchiveReaderUITests/BetaUITests ' 'a class missing from the stored plan still runs this cycle'
+want_not "$CALLS" 'GoneUITests' 'a class no longer listed is dropped from the stored plan'
+run_gate pass 0 chunk-n1
+want "$STATE" 'notes 0 2' 'rotation: then Notes chunk 1 of 2'
+unset AUTONOMOUS_GUI_VM_CHUNK
+
+# A compile error that reproduces is RED; a failed enumeration and an exhausted budget are inconclusive.
+printf '%s\n' reader > "$STATE"
+run_gate build_fail 1 build-failure
+want "$ROOT/build-failure.out" 'the guest build failed twice' 'a build failing twice REDs'
+want "$ROOT/build-failure.out" 'fake compile error' 'the build RED shows the compiler error'
+[ -z "$(cat "$ROOT/count")" ] && pass 'a failed build runs no tests' || bad 'a failed build runs no tests'
+printf '%s\n' reader > "$STATE"
+run_gate enum_fail 3 enum-failure
+want "$ROOT/enum-failure.out" 'SKIPPED: inconclusive for: notes (test enumeration failed' 'a failed enumeration is SKIPPED'
+printf '%s\n' reader > "$STATE"
+AUTONOMOUS_GUI_VM_BUDGET=60 run_gate pass 3 no-budget
+want "$ROOT/no-budget.out" 'SKIPPED: inconclusive for: notes (the guest build ended with no verdict' 'no budget left is SKIPPED, never run past'
+want_not "$CALLS" 'xcodebuild build-for-testing' 'no budget left starts no build'
 
 printf '%s\n' notes > "$STATE"
 run_gate flaky 0 retry-green
@@ -187,16 +257,16 @@ want "$ROOT/stalled-skip.out" 'SKIPPED: inconclusive for: notes' 'a stalled run 
 run_gate missing_vm 3 missing-vm-skip
 want "$ROOT/missing-vm-skip.out" "VM 'archive-gui-runner' does not exist" 'missing VM is fail-open SKIPPED'
 
-# The pause (W40.vm-gate-unpause): a skip that names its reason, before any boot or Xcode run.
+# A pause: a skip that names its reason, before any boot or Xcode run.
 PAUSED='a test reason' run_gate pass 3 paused-skip
 want "$ROOT/paused-skip.out" 'SKIPPED: paused: a test reason' 'the pause is a SKIPPED that names its reason'
 want_not "$CALLS" 'tart run' 'the pause never boots the VM'
-# Unset (not empty) means the gate's own default pause, which names the item that owns it.
+# Unset means no pause (W40.vm-gate-unpause lifted the 2026-11-06 default): the lane runs.
 ( unset PAUSED; : > "$CALLS"; GUI_VM_FAKE_MODE=pass GUI_VM_FAKE_CALLS="$CALLS" GUI_VM_FAKE_COUNT="$ROOT/count" \
     AUTONOMOUS_GUI_VM_BIN_DIR="$BIN" AUTONOMOUS_GUI_VM_STATE="$STATE" ART_DIR="$ART" TART_LOCK_DIR="$ROOT/lock" \
     env -u AUTONOMOUS_GUI_VM_PAUSED "$GATE" >"$ROOT/default-pause.out" 2>&1; echo "rc=$?" >>"$ROOT/default-pause.out" )
-want "$ROOT/default-pause.out" 'W40.vm-gate-unpause' 'the default pause names W40.vm-gate-unpause'
-want "$ROOT/default-pause.out" 'rc=3' 'the default pause exits 3 (SKIPPED)'
+want_not "$ROOT/default-pause.out" 'paused' 'by default the gate is not paused'
+want "$ROOT/default-pause.out" 'rc=0' 'by default the lane runs and passes (exit 0)'
 
 # A whole run of this proof must stay short: the gate's 50-minute cap has to leave room for the real VM lane.
 [ "$SECONDS" -lt 300 ] && pass "proof ran in ${SECONDS}s (under 300 s)" || bad "proof took ${SECONDS}s (300 s is the most it should take)"
