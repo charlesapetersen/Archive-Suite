@@ -164,20 +164,23 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 
 - **Promise:** a token field filters by subject tags, with the selected tags shown inside the box. Tags
   combine with AND by default. ANY is available through the Options toggle and the tag cloud's All/Any, and
-  NOT is available too. ⌘L focuses the field.
+  NOT is available too. ⌘L focuses the field. *(Changed 2026-11-13, W40.reader-tag-any-drop: the bar's tags
+  always all match; any-of-several is an Advanced Search rule. The All/Any picker, the tag cloud's choice and
+  the Options toggle are gone.)*
 - **Promised in:** `CLAUDE.md` §Decisions ("Subject filters AND by default (OR/NOT via toggle)"),
   §Keyboard map, §Options; `README.md` §What it does; `SUITE_TODO_DONE.md` "Reader tag-filter → token field"
   (`b5a5a01`); `SMOKE_TEST.md` step E.
 - **Reached by:** `SubjectFilterTokenField` (`Views/SubjectFilterTokenField.swift`, placed at
   `Views/NavigationWindowView.swift:470`). ⌘L, `ArchiveReaderCommands.swift:128`, calls
-  `NavigationModel.requestFocusTagFilter` (`:72`). The All/Any picker shows only with two or more tags
-  (`NavigationWindowView.swift:478-486`). The Options toggle is at `Views/OptionsView.swift:49`.
-- **Real-path test:** `ArchiveReaderTests/LibrarySortFilterTests.testSubjectCombineAndVsOr`,
+  `NavigationModel.requestFocusTagFilter` (`:72`). No All/Any picker or Options toggle since
+  W40.reader-tag-any-drop.
+- **Real-path test:** `ArchiveReaderTests/LibrarySortFilterTests.testTagFilterMatchesAllAndTheAnyRuleMatchesAny`,
   `.testCombinedFilterMatchesWorkflowExample` (model only). No UITest drives the token field or ⌘L.
 - **Runtime evidence:** none.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
+  - 2026-11-13 W40.reader-tag-any-drop — the All/Any choice is removed (owner, walkthrough 2026-11-13); the promise changes, the status stands.
 - **Notes:** **Drift.** There is no NOT. `LibraryFilter` has only `subjects` with `.all`/`.any`
   (`Core/LibraryFilter.swift:14-24`).
 
@@ -371,7 +374,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 ### R-18 · Tag cloud
 
 - **Promise:** a tag-cloud panel lists the subjects. Its context menu can add or remove a filter, filter to
-  that tag only, switch All/Any, and select the files carrying the tag.
+  that tag only, and select the files carrying the tag (its All/Any choice went in W40.reader-tag-any-drop).
 - **Promised in:** `SMOKE_TEST.md` Batch 2 (C6); `CLAUDE.md` Implementation map (`NavigationWindowView`).
 - **Reached by:** the toolbar `ar.toolbar.tagCloud` button (`Views/NavigationWindowView.swift:527`) or Show Tag
   Cloud (⌃⌘T, `ArchiveReaderCommands.swift`). The panel is `tagCloudPanel` (`NavigationWindowView.swift:273-330`).
@@ -384,7 +387,7 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-06 W40.g1-reader-2-ledger — stays `unproven`: the session did not use the context menu ([`sessions/reader-2-returned.md`](sessions/reader-2-returned.md)).
-- **Notes:** All/Any appears only with more than one tag selected. The menu also carries Rename tag… and Find
+- **Notes:** The menu also carries Rename tag… and Find
   similar tags… (R-28, R-29).
 
 ## Triage and tag editing

@@ -312,7 +312,7 @@ extension AdvancedSearch {
             var r = SearchRule(field: .folder); r.text = p; rules.append(r)
         }
         if !f.subjects.isEmpty {
-            var r = SearchRule(field: .tags, op: f.subjectCombine == .any ? .hasAny : .hasAll)
+            var r = SearchRule(field: .tags, op: .hasAll)
             r.tags = f.subjects.sorted(); rules.append(r)
         }
         if !f.qualities.isEmpty {

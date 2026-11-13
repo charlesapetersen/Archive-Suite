@@ -11,7 +11,6 @@ enum SettingsKey {
     static let copyLayoutParagraph = "copyParagraphFromLayout"
     static let copyTitleCase = "copyTitleCaseCapitals"
     static let viewerSplit = "viewerSplitFraction"
-    static let subjectCombineAny = "subjectCombineAny"
     static let readFilterDefault = "readFilterDefault"
     static let hiddenColumns = "ar.hiddenColumns"    // [String] — column IDs the user has hidden
     // Document-viewer "last used becomes the default" layout (DV-1/DV-2): zoom per pane, window size.
@@ -87,9 +86,5 @@ enum AppSettings {
 
     static var defaultReadFilter: ReadFilter {
         ReadFilter(rawValue: d.string(forKey: SettingsKey.readFilterDefault) ?? "") ?? .all
-    }
-
-    static var defaultSubjectCombine: SubjectCombine {
-        bool(SettingsKey.subjectCombineAny, false) ? .any : .all
     }
 }

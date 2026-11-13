@@ -376,7 +376,7 @@ Same key, different command, by design: `⌘R` (Reader Mark Read, Processor Star
 - **Document viewer:** default split (image %/text %, 0.2–0.8; a splitter drag clamps to 0.15–0.85 and
   saves to the same setting, so the stored value can sit outside the slider's range). Per-pane zoom, split position, and window
   size are **not** toggles — the viewer persists the *last used* value as the next default (DV-1/DV-2).
-- **Navigation defaults:** default read-state filter (All / Unread / Read / No-read-state) · combine subject filters with ANY (off = ALL).
+- **Navigation defaults:** default read-state filter (All / Unread / Read / No-read-state).
 - **File list:** list text size (10–20 pt; smaller = denser rows).
 
 > PLAN's §Options listed controls that did **not** ship as toggles (viewer zoom/fit-mode & reset-per-
@@ -415,7 +415,8 @@ The decisions are in CLAUDE.md §Decisions (authoritative). Original text:
 - **Discovery = owned filesystem truth** over the granted archive root; `LibraryIndex` is an OS-SQLite
   warm cache, FSEvents supplies live dirtiness, and files tagged `Read`/`Unread` form the visible universe.
   No third-party ORM.
-- **Subject filters AND by default** (ANY/OR via the Options toggle or the tag cloud's All/Any; there is
+- **Subject filters in the bar all match** (matching any of several tags is an Advanced Search rule, not a
+  bar choice: the All/Any picker and its Options toggle went in W40.reader-tag-any-drop, as in Notes; there is
   no NOT); read-state is a tri-state filter; "Mark Read" never adds a read-state token to a marker/neither
   file (hard-coded, not an Options toggle).
 - **Facet classification is display/sort/filter only** — never drives a write.

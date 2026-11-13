@@ -460,12 +460,6 @@ struct NavigationWindowView: View {
                                 Button("Filter to only this tag") { model.filter.subjects = [item.tag] }
                                 Button("Rename tag…") { model.renamingTag = item.tag }
                                 Button("Find similar tags…") { model.showingSimilarTags = true }
-                                if model.filter.subjects.count > 1 {
-                                    Picker("Match tags", selection: $model.filter.subjectCombine) {
-                                        Text("All").tag(SubjectCombine.all)
-                                        Text("Any").tag(SubjectCombine.any)
-                                    }
-                                }
                                 Divider()
                                 Button("Select files with this tag") { model.selectFiles(withTag: item.tag) }
                             }
@@ -689,16 +683,7 @@ struct NavigationWindowView: View {
                 focusToken: tagFilterFocusToken
             )
             .frame(minWidth: 140, idealWidth: 220, maxWidth: 220)   // gives way first in a narrow window
-            .help("Filter by tag — type to autocomplete existing tags; Return adds it; select a token and press ⌫ to remove")
-            if model.filter.subjects.count > 1 {
-                Picker("Match", selection: $model.filter.subjectCombine) {
-                    Text("All").tag(SubjectCombine.all)
-                    Text("Any").tag(SubjectCombine.any)
-                }
-                .pickerStyle(.segmented).fixedSize().labelsHidden()
-                .help("Match documents having all, or any, of the chosen tags")
-                .accessibilityIdentifier("ar.filter.subjectCombine")
-            }
+            .help("Filter by tag — a file must carry every tag here (Advanced Search matches any of several); type to autocomplete existing tags; Return adds it; select a token and press ⌫ to remove")
         }
     }
 

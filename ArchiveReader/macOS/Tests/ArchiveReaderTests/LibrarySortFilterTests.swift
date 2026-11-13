@@ -51,13 +51,17 @@ final class LibrarySortFilterTests: XCTestCase {
         XCTAssertFalse(f.matches(sibling))
     }
 
-    func testSubjectCombineAndVsOr() {
+    /// The bar's tags all match; matching any of them is an Advanced Search rule (W40.reader-tag-any-drop), which
+    /// finds what the bar's old Any did.
+    func testTagFilterMatchesAllAndTheAnyRuleMatchesAny() {
         let both = file("a", ["Jerry Brown", "Economics", "1980", "Unread"])
         let one = file("b", ["Jerry Brown", "1980", "Unread"])
-        let and = LibraryFilter(subjects: ["Jerry Brown", "Economics"], subjectCombine: .all)
-        let or = LibraryFilter(subjects: ["Jerry Brown", "Economics"], subjectCombine: .any)
+        let neither = file("c", ["Reagan", "1980", "Unread"])
+        let and = LibraryFilter(subjects: ["Jerry Brown", "Economics"])
         XCTAssertTrue(and.matches(both));  XCTAssertFalse(and.matches(one))
-        XCTAssertTrue(or.matches(both));   XCTAssertTrue(or.matches(one))
+        var r = SearchRule(field: .tags, op: .hasAny); r.tags = ["Jerry Brown", "Economics"]
+        let or = AdvancedSearch(combine: .all, rules: [r])
+        XCTAssertEqual([both, one, neither].map { or.matches($0, RuleContext()) }, [true, true, false])
     }
 
     /// Tags that differ only in case are one tag (W40.fix-tags-case-insensitive).
@@ -65,10 +69,11 @@ final class LibrarySortFilterTests: XCTestCase {
         let upper = file("a", ["Lincoln", "Grant", "1862"])
         let lower = file("b", ["lincoln", "1862"])
         let neither = file("c", ["Lincolnshire", "1862"])
-        let and = LibraryFilter(subjects: ["LINCOLN", "grant"], subjectCombine: .all)
-        let or = LibraryFilter(subjects: ["LINCOLN", "grant"], subjectCombine: .any)
+        let and = LibraryFilter(subjects: ["LINCOLN", "grant"])
         XCTAssertTrue(and.matches(upper)); XCTAssertFalse(and.matches(lower)); XCTAssertFalse(and.matches(neither))
-        XCTAssertTrue(or.matches(upper));  XCTAssertTrue(or.matches(lower));   XCTAssertFalse(or.matches(neither))
+        var r = SearchRule(field: .tags, op: .hasAny); r.tags = ["LINCOLN", "grant"]
+        let or = AdvancedSearch(combine: .all, rules: [r])
+        XCTAssertEqual([upper, lower, neither].map { or.matches($0, RuleContext()) }, [true, true, false])
 
         var f = LibraryFilter(subjects: ["lincoln"])
         XCTAssertTrue(f.hasSubject("Lincoln"))

@@ -171,13 +171,13 @@ final class AdvancedSearchTests: XCTestCase {
     // MARK: From the filter bar
 
     func testFilterBarStateBecomesEquivalentRules() {
-        var f = LibraryFilter(subjects: ["Press", "Treasury"], subjectCombine: .any, qualities: [2, 3], read: .unread)
+        var f = LibraryFilter(subjects: ["Press", "Treasury"], qualities: [2, 3], read: .unread)
         f.pathPrefix = "/c/Box 12"; f.dateFromYear = 1981; f.searchText = "memo"; f.ambiguousDatesOnly = true
         let s = AdvancedSearch(filter: f, fullTextQuery: "  balanced budget ")
         XCTAssertEqual(s.combine, .all)
         XCTAssertEqual(s.rules.map(\.field), [.ocrText, .folder, .tags, .quality, .readState, .date, .fileName, .ambiguousDate])
         XCTAssertEqual(s.rules[0].text, "balanced budget*")   // the Find box's prefix last word
-        XCTAssertEqual(s.rules[2].op, .hasAny)
+        XCTAssertEqual(s.rules[2].op, .hasAll)   // the bar's tags all match (W40.reader-tag-any-drop)
         XCTAssertEqual(s.rules[5].dateBounds, DateRangeFilter(lower: 19_810_000, upper: nil))
 
         let files = [file("/c/Box 12/memo.pdf", ["Unread", "Q2", "Press", "1982"]),

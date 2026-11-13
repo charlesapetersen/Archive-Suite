@@ -192,7 +192,7 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
 - **Date Uncertain** sorts by its speculative year, rendered *italic* (never dumped to the end).
 - **Discovery = owned filesystem truth** over the granted root; `LibraryIndex` is an OS-SQLite warm cache,
   FSEvents supplies live dirtiness, files tagged `Read`/`Unread` form the visible universe. No third-party ORM.
-- **Subject filters AND by default** (ANY via the Options toggle or the tag cloud; no NOT); read-state is
+- **Subject filters in the bar all match** (any-of-several is an Advanced Search rule, W40.reader-tag-any-drop; no NOT); read-state is
   tri-state; "Mark Read" never adds a read-state token to a marker/neither file (hard-coded).
 - **Facet classification is display/sort/filter only** — never drives a write.
 - **Full tag editing is first-class** (single + group), always via `TagWriter`; free-form subjects with

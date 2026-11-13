@@ -270,7 +270,6 @@ final class NavigationModel: ObservableObject {
             return ResolvedLibraryRoot(url: url, markerGUID: self.rootStore.rootMarker?.guid)
         }
         filter.read = AppSettings.defaultReadFilter
-        filter.subjectCombine = AppSettings.defaultSubjectCombine
         restoreViewState()   // last session's filter + sort override the defaults (C2)
         filterSearchText = filter.searchText   // seed from restored state
         // ArchiveLibrary is @MainActor and only mutates `files` on the main actor, so this publisher
@@ -504,7 +503,7 @@ final class NavigationModel: ObservableObject {
         }
         if let years = f.dateYearsSummary { parts.append(years) }
         if !f.subjects.isEmpty {
-            parts.append(f.subjects.sorted().joined(separator: f.subjectCombine == .all ? " + " : " / "))
+            parts.append(f.subjects.sorted().joined(separator: " + "))
         }
         if let p = f.pathPrefix, !p.isEmpty { parts.append(URL(fileURLWithPath: p).lastPathComponent) }
         let fn = f.searchText.trimmingCharacters(in: .whitespaces)
@@ -716,7 +715,6 @@ final class NavigationModel: ObservableObject {
     func clearUserFilters(recompute doRecompute: Bool = true) {
         filter = LibraryFilter()
         filter.read = AppSettings.defaultReadFilter
-        filter.subjectCombine = AppSettings.defaultSubjectCombine
         filterSearchText = ""
         fullTextQuery = ""
         ftsGeneration += 1

@@ -5,13 +5,20 @@ final class SavedSearchCodableTests: XCTestCase {
     func testFilterCodableRoundtrip() throws {
         var f = LibraryFilter()
         f.subjects = ["Cold War", "Jerry Brown"]
-        f.subjectCombine = .any
         f.qualities = [3, 2]
         f.read = .unread
         f.searchText = "brown"
         let data = try JSONEncoder().encode(f)
         let back = try JSONDecoder().decode(LibraryFilter.self, from: data)
         XCTAssertEqual(f, back)
+    }
+
+    /// A view state written while the bar still had All/Any (W40.reader-tag-any-drop) still decodes, its
+    /// `subjectCombine` ignored: the tags come back, and every one of them must match.
+    func testFilterSavedWithTheOldAnyChoiceStillDecodes() throws {
+        let old = #"{"subjects":["Press","Treasury"],"subjectCombine":"any","qualities":[],"read":"all","searchText":"","needsAttentionOnly":false}"#
+        let back = try JSONDecoder().decode(LibraryFilter.self, from: Data(old.utf8))
+        XCTAssertEqual(back.subjects, ["Press", "Treasury"])
     }
 
     func testPathPrefixCodableRoundtrip() throws {
@@ -97,7 +104,7 @@ final class SavedSearchStoreTests: XCTestCase {
     func testSaveApplyRoundTripReloads() {
         let (store, d, name) = makeStore(); defer { d.removePersistentDomain(forName: name) }
         var f = LibraryFilter()
-        f.subjects = ["Economics"]; f.subjectCombine = .any; f.qualities = [2, 1]
+        f.subjects = ["Economics"]; f.qualities = [2, 1]
         f.read = .read; f.searchText = "memo"; f.pathPrefix = "/root/Box 3"; f.needsAttentionOnly = true
         f.ambiguousDatesOnly = true
         let saved = AdvancedSearch(filter: f, fullTextQuery: "deficit")

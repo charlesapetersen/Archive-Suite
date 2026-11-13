@@ -136,7 +136,7 @@ sheet-confirm flows (save-smart-folder, tag-rename) are `[~]` — verified by un
 - [x] **List font size (C3)** — Options slider (ar.listFontSize) applied to the list.
 - [x] **Active-filter summary (C4, historical Priority UI)** — status bar shows e.g. "· P9" / "· tags: …" when filtering.
 - [~] **Focus shortcuts (C5)** — ⌘L focus tag filter, ⌥⌘F focus OCR search (menu commands → focus signals).
-- [~] **Tag-cloud context menu (C6)** — add/remove filter, filter-to-only, All/Any, select-files-with-tag (wired).
+- [~] **Tag-cloud context menu (C6)** — add/remove filter, filter-to-only, select-files-with-tag (wired; All/Any removed in W40.reader-tag-any-drop).
 - [~] **Open in Default App (C7)** — read-only `NSWorkspace.open` in the row context menu.
 - [x] **Read single-click toggle (C8)** — clicking a Read cell flips Unread↔Read (00015 Unread→Read on
       disk + re-rendered); right-click for explicit set/clear. **PASS** (GUI + `xattr`).

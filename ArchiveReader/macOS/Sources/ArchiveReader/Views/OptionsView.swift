@@ -13,7 +13,6 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.copyLayoutParagraph) private var copyLayoutParagraph: Bool = true
     @AppStorage(SettingsKey.copyTitleCase) private var copyTitleCase: Bool = true
     @AppStorage(SettingsKey.viewerSplit) private var viewerSplit: Double = 0.667
-    @AppStorage(SettingsKey.subjectCombineAny) private var subjectCombineAny: Bool = false
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
     @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
@@ -58,7 +57,6 @@ struct OptionsView: View {
                     Text("Read").tag(ReadFilter.read)
                     Text("No read-state").tag(ReadFilter.noReadState)
                 }
-                Toggle("Combine multiple tag filters with ANY (off = ALL)", isOn: $subjectCombineAny)
             }
             Section("File list") {
                 VStack(alignment: .leading) {

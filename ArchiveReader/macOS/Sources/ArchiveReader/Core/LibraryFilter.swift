@@ -11,16 +11,11 @@ enum ReadFilter: String, Sendable, CaseIterable, Codable {
     case all, read, unread, noReadState
 }
 
-/// How multiple selected subject tags combine.
-enum SubjectCombine: String, Sendable, CaseIterable, Codable {
-    case all   // AND — a file must carry every selected subject
-    case any   // OR  — a file must carry at least one
-}
-
 /// The active filter state of the navigation window.
 struct LibraryFilter: Sendable, Equatable, Codable {
+    /// The tag filter: a file must carry every one of them. Matching any of several tags is an Advanced Search
+    /// rule, not a filter-bar choice (owner, walkthrough 2026-11-13, W40.reader-tag-any-drop, as for Notes).
     var subjects: Set<String> = []
-    var subjectCombine: SubjectCombine = .all
     var qualities: Set<Int> = []      // empty = any quality
     var read: ReadFilter = .all
     /// Filename substring match (corpus-wide OCR full-text search arrives in M1.5).
@@ -96,14 +91,8 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         if !qualities.isEmpty {
             guard let q = file.quality, qualities.contains(q) else { return false }
         }
-        // Subjects
-        // Subjects, by tag identity: "lincoln" in the filter matches a file's "Lincoln".
-        if !subjects.isEmpty {
-            switch subjectCombine {
-            case .all: if !subjects.allSatisfy(file.hasSubject) { return false }
-            case .any: if !subjects.contains(where: file.hasSubject) { return false }
-            }
-        }
+        // Subjects, every one of them, by tag identity: "lincoln" in the filter matches a file's "Lincoln".
+        if !subjects.allSatisfy(file.hasSubject) { return false }
         if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }
         if poorOCROnly, !file.tags.hasPoorOCR { return false }
         // Date range — the chosen roles, the same value meeting both bounds.

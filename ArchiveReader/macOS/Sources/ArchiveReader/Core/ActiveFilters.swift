@@ -60,9 +60,8 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         case .noReadState: add(.read, "No read state", "the no-read-state filter")
         }
         for q in f.qualities.sorted() { add(.quality(q), "Q\(q)", "the Q\(q) filter") }
-        let anyOf = f.subjects.count > 1 && f.subjectCombine == .any
         for t in f.subjects.sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending }) {
-            add(.tag(t), anyOf ? "Tag (any): \(t)" : "Tag: \(t)", "the tag \u{201c}\(t)\u{201d}")
+            add(.tag(t), "Tag: \(t)", "the tag \u{201c}\(t)\u{201d}")
         }
         if let years = f.dateYearsSummary {
             let sent = f.dateRangeRoles == .own ? "" : f.dateRangeRoles == .sentWith ? ", sent-with date" : ", own or sent-with"
