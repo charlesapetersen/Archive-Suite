@@ -361,7 +361,16 @@ grep -qF "is_fail()    { grep -qE '^CRASH_REPORT\[' \"\$(applog \"\$1\" \"\$2\")
   v unknown "$S passed at 1.\n\t Executed 3 tests, with 2 failures (0 unexpected) in 1 (1) seconds\n[guard] summary: x\n"
   v unknown "t = 1s waiting\n[guard] stalled: x\n"
   v unknown "t = 1s waiting\n[guard] maxrun: x\n"
-) && ok "tart_test_verdict: a guard-ended run is green only on a passed summary with 0 failures; a stall is unknown" \
+  # Two bundles (Reader): both summaries, all passed, no failed case — else not green.
+  P="$S passed at 1.\n\t Executed 3 tests, with 0 failures (0 unexpected) in 1 (1) seconds\n"
+  F="$S failed at 1.\n\t Executed 3 tests, with 1 failure (0 unexpected) in 1 (1) seconds\n"
+  w() { printf '%b' "$3" > "$TMP/verdict.log"; [ "$(tart_test_verdict "$TMP/verdict.log" "$2")" = "$1" ] || { echo "verdict($2): wanted $1 for: $3"; exit 1; }; }
+  w unknown 2 "$P[guard] summary: x\n"
+  w succeeded 2 "$P$P[guard] summary: x\n"
+  w failed 2 "$F$P[guard] summary: x\n"
+  w failed 1 "Test Case '-[A.B testC]' failed (1.0 seconds).\n$P[guard] summary: x\n"
+  w unknown 1 "Restarting after unexpected exit, crash, or test timeout\n$P[guard] summary: x\n"
+) && ok "tart_test_verdict: a guard-ended run is green only on every bundle's passed summary, 0 failures, no failed case or restart; a stall is unknown" \
   || no "tart_test_verdict misreads a guard-ended or marker log"
 
 echo "== 13. the crash and hang harvest (W40.e2) =="

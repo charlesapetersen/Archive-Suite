@@ -53,6 +53,33 @@ argument is optional, so the old `vm-gui-runner.sh xcuitest` form still means "r
 `~/.tart-mirror/vm-artifacts/<app>/` — `Read` the PNGs to eyeball renders. Drive the VM with
 `tart exec <vm> …` (no SSH — the guest runs the Tart guest agent).
 
+**Targeted runs: keep the guest up (`VM_KEEP=1`, W40.vm-macos27-runtime).** A plain call boots the guest, builds,
+tests and shuts it down. `VM_KEEP=1 ONLY_TESTING=<App>UITests/<Class>[/<test>] ops/gui/vm-gui-runner.sh <app> xcuitest`
+leaves it booted, and the next call from the same checkout, with the same artifact directory, reuses it: no boot,
+and the warm DerivedData makes an unchanged build a few seconds. Measured 2026-11-12 on Notes' `SmokeUITest`: 82 s
+of runner time with a boot, 21 s per call on the kept guest. A detached `vm-keep-reaper.sh` stops the guest
+(cleanly, under the VM lock, never under a run) after 300 s with no run (`VM_KEEP_IDLE`), at once when the Mac's
+memory pressure leaves normal, or when the calling `claude` session exits; `vm-gui-runner.sh stop` stops it now.
+Its minute log is `~/.tart-mirror/vm-keep.log`. Between calls the guest's 6 GB sit outside the heavy lock (the
+lock waits on every process in a run's session, so the kept guest runs in a session of its own); the pressure stop
+is what bounds that. On a busy Mac it fires often: on 2026-11-12 another session's Xcode build took the heavy
+lock between three separate calls and the guest was stopped each time at level 2. A plain call takes a kept
+guest over and stops it at the end. A call that changes the generated project, mounts another checkout or runs
+the sighted lane restarts it.
+
+**Long lanes** (W40.vm-macos27-runtime). The guest's `xcodebuild test` runs through `tart_run_test`, which ends it
+with SIGTERM when it sits 180 s idle after XCTest's top-level summary (the macOS 27.2 guest's build tool sat 25 min
+there, ignoring SIGINT), or goes 1,500 s without output before one; each end is a `[guard]` line in the log, and
+only the summary end can still give a verdict (the summary line's, never a green on failures). `VM_SPLIT=N` runs
+the selection as N chunks of whole classes, each in a freshly booted guest after one build (`-enumerate-tests`
+names the classes, so none is dropped); chunk logs, result bundles, crash reports and `sampler-<chunk>.tsv`
+(host and guest load every `VM_SAMPLE` s) sit beside one combined `xcuitest.log`. Why split: the 2026-11-11 Notes lane
+in one guest ran its late suites 3–4× slower (NotesGUITests 1,255 → 4,180 s, Smoke 4 → 64 s); the same tests in
+4 fresh-guest chunks on 2026-11-12 ran at the baseline's speed (5,650 s against its 5,795 s; NotesGUITests 1,170 s,
+Smoke 4 s), so the slowdown is the guest's, over a long run. Run a full lane as `VM_SPLIT=4`. The enumeration lists
+the scheme's whole plan whatever `-only-testing` says, so the runner narrows it to the selectors itself; a killed
+runner (TERM, INT, HUP) still stops its guest and drops the VM lock.
+
 **Index warning / recovery check (W23.m9-fu3):** the opt-in `CORRUPT_INDEX_FIXTURE=1` mode seeds only the
 generated Reader or Notes fixture with 1 KiB of invalid SQLite bytes. Run the focused check per app:
 

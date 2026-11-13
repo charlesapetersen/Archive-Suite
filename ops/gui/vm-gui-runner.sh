@@ -54,7 +54,7 @@ AGENT_WAIT="${AGENT_WAIT:-240}"
 VM_KEEP="${VM_KEEP:-0}"
 VM_SPLIT="${VM_SPLIT:-0}"
 VM_SAMPLE="${VM_SAMPLE:-60}"
-KEEP_STATE="${VM_KEEP_STATE:-$HOME/.tart-mirror/.vm-keep}"
+KEEP_STATE="$TART_KEEP_STATE"
 [[ "$VM_SPLIT" =~ ^[0-9]+$ ]] || { echo "VM_SPLIT must be a whole number" >&2; exit 2; }
 [[ "$VM_SAMPLE" =~ ^[0-9]+$ ]] || { echo "VM_SAMPLE must be a whole number of seconds" >&2; exit 2; }
 
@@ -145,6 +145,9 @@ keep_guest() {
 }
 
 trap cleanup EXIT
+# A signal must reach the EXIT trap too: bash skips it on an untrapped TERM, and a runner killed that way left its
+# guest running, the VM lock behind and heavy-run.py waiting on the guest (measured 2026-11-12).
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 tart_lock_acquire "${LOCK_WAIT:-120}" \
   || die "the GUI VM is in use by another run (pid ${TART_LOCK_OWNER:-?}) — wait for it, or check: pgrep -fl gui-vm-gate"
 
@@ -233,6 +236,8 @@ if [ -n "${TEST_ITERATIONS:-}" ]; then
 fi
 if [ "$VM_SPLIT" -gt 0 ]; then
   [ "$LANE" = xcuitest ] || die "VM_SPLIT runs on the xcuitest lane only."
+  printf '%s\n' "$ONLY_TESTING" | tr ',' '\n' | grep -q '/.*/' \
+    && die "VM_SPLIT deals whole classes; select bundles or classes, not single tests."
   [ -z "$CORRUPT_TEST_SELECTOR" ] && [ "${VISUAL_REVIEW:-0}" != 1 ] && [ "${TRANSIENT_VIDEO:-0}" != 1 ] \
     && [ -z "${TEST_ITERATIONS:-}" ] || die "VM_SPLIT cannot be combined with a journey, a fixture variant, VISUAL_REVIEW, TRANSIENT_VIDEO or TEST_ITERATIONS."
 fi
@@ -336,6 +341,8 @@ ensure_vm() {
     tart run "$VM" "${gfx[@]}" --no-clipboard "${mounts[@]}" >>"$runlog" 2>&1 &
   fi
   echo $! > "$APP_ART/tart-run.pid"
+  # Before any wait: a runner killed while the guest boots still leaves it to the reaper.
+  if [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then write_keep_state; fi
   if [ "$LANE" != "xcuitest" ]; then
     # Parse the one-shot VNC endpoint tart prints: vnc://:PASSWORD@127.0.0.1:PORT
     local i; for i in $(seq 1 60); do grep -q 'vnc://' "$runlog" && break; sleep 1; done
@@ -355,7 +362,6 @@ ensure_vm() {
   # see tart-lib.sh. Never exec after a boot without it.
   tart_wait_agent "$VM" "$AGENT_WAIT" || die "Tart Guest Agent never answered within ${AGENT_WAIT}s — check $runlog"
   log "VM up — guest agent ready after ${TART_AGENT_WAITED}s${VNC_PORT:+, VNC $VNC_HOST:$VNC_PORT}"
-  if [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then write_keep_state; fi
   ensure_display
 }
 
@@ -388,6 +394,7 @@ gen_project() {
     [ "$before" = "$after" ] || PROJ_REWRITTEN=1
   else
     xcodegen generate --spec "$REPO/$SPEC_REL" >/dev/null
+    PROJ_REWRITTEN=1   # uncached: always a new bundle, so a kept guest must not read it (it restarts)
   fi
   if [ "$NOTES_INTEGRATIONS" = 1 ]; then
     log "xcodegen generate (reader, for the integration journey)…"
@@ -524,8 +531,9 @@ prepare_guest_for_tests() {
   esac
 }
 
-# run_tests ACTION ARGS NAME — one guarded guest `xcodebuild ACTION` into $APP_ART/NAME.log, result bundle
-# NAME.xcresult, with the load sampler beside it. Leaves its verdict in RUN_VERDICT (tart_test_verdict).
+# run_tests ACTION ARGS NAME [BUNDLES] — one guarded guest `xcodebuild ACTION` into $APP_ART/NAME.log, result
+# bundle NAME.xcresult, with the load sampler beside it. BUNDLES (default 1) is how many test bundles ARGS runs,
+# each with its own top-level summary (tart_selector_bundles). Leaves its verdict in RUN_VERDICT.
 # xcodebuild REFUSES to overwrite an existing -resultBundlePath, so a fixed path makes every re-run fail
 # before executing a single test. Remove it first.
 # CODE_SIGN_IDENTITY=- : the guest has no keychain, so it cannot use the host's "Archive Suite Dev"
@@ -534,12 +542,12 @@ prepare_guest_for_tests() {
 # process (measured — an env var set on this line reads as unset inside the test). SnapshotTests
 # therefore detects this VM from `hw.model` rather than from anything passed in here.
 run_tests() {
-  local action="$1" args="$2" name="$3" glog="$APP_ART/$3.log" t0 bundle="$3"
+  local action="$1" args="$2" name="$3" glog="$APP_ART/$3.log" t0 bundle="$3" bundles="${4:-1}"
   [ "$name" = xcuitest ] && bundle=uitest   # the single run's bundle keeps its long-standing name
   : > "$glog"
   [ "$VM_SAMPLE" -gt 0 ] && tart_sampler_start "$VM" "$APP_ART/sampler-$name.tsv" "$VM_SAMPLE" "$(archive_app_field "$APP" procname)"
   t0="$(date +%s)"
-  tart_run_test "$VM" "$glog" "
+  TART_TEST_SUMMARIES="$bundles" tart_run_test "$VM" "$glog" "
     rm -rf '$GUEST_DD/$bundle.xcresult'
     $TEST_ENV xcodebuild $action \
       -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
@@ -550,7 +558,8 @@ run_tests() {
   tart_sampler_stop
   grep -E "^Test Suite '[^']*' (passed|failed)|^[[:space:]]+Executed [0-9]+ test|\*\* TEST|^\[guard\]" "$glog" || true
   [ -n "$TART_TEST_GUARD" ] && warn "the guest's xcodebuild did not end by itself ($TART_TEST_GUARD guard; see the [guard] line in $glog)"
-  RUN_VERDICT="$(tart_test_verdict "$glog")"
+  RUN_VERDICT="$(tart_test_verdict "$glog" "$bundles")"
+  [ "$action" = build-for-testing ] && { grep -q '\*\* TEST BUILD SUCCEEDED \*\*' "$glog" && RUN_VERDICT=built || RUN_VERDICT=failed; }
   log "$name: $RUN_VERDICT in $(( $(date +%s) - t0 )) s (log: $glog)"
 }
 
@@ -590,7 +599,7 @@ run_xcuitest() {
     log "test: $ONLY_TESTING for $APP in the VM…"
     video_start
     tart_crash_mark "$VM"
-    run_tests test "$TEST_ARGS" xcuitest
+    run_tests test "$TEST_ARGS" xcuitest "$(tart_selector_bundles "$ONLY_TESTING")"
     [ "$PROCESSOR_LIVECAPTURE" = 1 ] && stop_phone_leg
     video_stop
     # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
@@ -623,12 +632,23 @@ run_split() {
   log "VM_SPLIT=$VM_SPLIT: building once, then enumerating the selection…"
   run_tests build-for-testing "" build
   grep -q '\*\* TEST BUILD SUCCEEDED \*\*' "$APP_ART/build.log" || die "the guest build failed (log: $APP_ART/build.log)"
-  tart exec "$VM" bash -lc "xcodebuild test-without-building -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
+  # Guarded too (the same build tool), and checked: a bundle that fails to enumerate must not just drop out.
+  : > "$list.raw"
+  local erc=0 sel
+  TART_TEST_STALL=600 tart_run_test "$VM" "$list.raw" "xcodebuild test-without-building -project '$GUEST_REPO/$PROJ_REL' -scheme '$SCHEME' \
       $TEST_ARGS -destination 'platform=macOS' -derivedDataPath '$GUEST_DD' \
       -enumerate-tests -test-enumeration-style flat -test-enumeration-format text -test-enumeration-output-path - \
-      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" > "$list.raw" 2>&1 || true
-  # Selected tests are listed as Bundle/Class/test (disabled ones are not, so the chunks run what one run would).
-  grep -oE '^[[:space:]]*[A-Za-z0-9_]+/[A-Za-z0-9_]+/[A-Za-z0-9_]+' "$list.raw" | tr -d ' \t' > "$list" || true
+      CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO" 900 || erc=$?
+  [ "$erc" = 0 ] && [ -z "$TART_TEST_GUARD" ] || die "test enumeration failed (exit $erc${TART_TEST_GUARD:+, $TART_TEST_GUARD guard}; output: $list.raw)"
+  # Tests are listed as Bundle/Class/test (disabled ones are not, so the chunks run what one run would). The
+  # list is the scheme's whole test plan whatever -only-testing says (measured 2026-11-12, Xcode 27.2), so it is
+  # narrowed to the selectors here, and a selector that matches nothing is an error, never a silent drop.
+  grep -oE '^[[:space:]]*[A-Za-z0-9_]+/[A-Za-z0-9_]+/[A-Za-z0-9_]+' "$list.raw" | tr -d ' \t' > "$list.all" || true
+  : > "$list"
+  for sel in $(printf '%s' "$ONLY_TESTING" | tr ',' ' '); do
+    grep -E "^$sel(/|\$)" "$list.all" >> "$list" || die "the enumeration lists no test for selector $sel (output: $list.raw)"
+  done
+  sort -u -o "$list" "$list"
   classes="$(awk -F/ '!seen[$1"/"$2]++{print $1"/"$2}' "$list")"
   n="$(printf '%s\n' "$classes" | sed '/^$/d' | wc -l | tr -d ' ')"
   [ "$n" -gt 0 ] || die "could not enumerate the selected tests (output: $list.raw)"
@@ -646,13 +666,19 @@ run_split() {
     fi
     log "$chunk: $(printf '%s' "$args" | wc -w | tr -d ' ') classes"
     tart_crash_mark "$VM"
-    run_tests test-without-building "$args" "$chunk"
+    run_tests test-without-building "$args" "$chunk" "$(tart_selector_bundles "$(printf '%s' "$args" | sed 's/-only-testing://g; s/ *$//; s/ /,/g')")"
     cat "$APP_ART/$chunk.log" >> "$APP_ART/xcuitest.log"
     collect_shots "$APP_ART/$chunk.log" keep
     collect_xcresult "$chunk"
     collect_crashes "crashes-$chunk"
     [ "$RUN_VERDICT" = succeeded ] || XCUITEST_FAILED=1
   done
+  # Every enumerated test must have reported (passed, failed or skipped), or the split lost some.
+  total="$(cat "$APP_ART"/chunk*.log | grep -cE "^Test Case '-\[[^]]+\]' (passed|failed|skipped) \(" || true)"
+  if [ "$total" != "$(wc -l < "$list" | tr -d ' ')" ]; then
+    warn "the chunks reported $total test cases, the enumeration listed $(wc -l < "$list" | tr -d ' ') — the split lost tests"
+    XCUITEST_FAILED=1
+  fi
 }
 
 # --- PROCESSOR_JOURNEY=livecapture: the phone leg on the host, and the guest-side file record afterwards ---

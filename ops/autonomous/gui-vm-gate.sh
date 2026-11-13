@@ -90,6 +90,9 @@ cleanup() {
   return 0
 }
 trap cleanup EXIT
+# So a signal (the health gate's timeout, a stopped session) still stops the guest and drops the lock: bash skips the
+# EXIT trap on an untrapped TERM (W40.vm-macos27-runtime, measured on the runner 2026-11-12).
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
 
 # One writer at a time (see tart_lock_acquire). Waiting a few minutes then SKIPping is the right posture:
 # a busy VM is infra, and infra must never park the run.
@@ -137,6 +140,7 @@ select_app
 # the identical `tart exec` succeeds seconds later. So poll the agent until it actually answers.
 boot_vm() {
   tart_stop_clean "$VM" || true
+  rm -f "$TART_KEEP_STATE"   # any guest VM_KEEP=1 kept is gone now; its reaper exits, and no runner reuses ours
   local mounts=(--dir=repo:"$ROOT" --dir=out:"$ART")
   VM_BOOTED=1
   # --no-clipboard: a host copy otherwise overwrites the guest pasteboard mid-test (W9.g4-flake; see
@@ -179,8 +183,10 @@ applog()     { echo "$(app_art "$1")/xcuitest-attempt$2.log"; }
 # The test verdict is tart_test_verdict's: xcodebuild's marker, or, when tart_run_test's summary guard had to
 # end a build tool that would not exit (W40.vm-macos27-runtime), XCTest's own top-level summary line.
 is_fail()    { grep -qE '^CRASH_REPORT\[' "$(applog "$1" "$2")" 2>/dev/null || tests_failed "$1" "$2"; }
-is_success() { [ "$(tart_test_verdict "$(applog "$1" "$2")")" = succeeded ]; }
-tests_failed() { [ "$(tart_test_verdict "$(applog "$1" "$2")")" = failed ]; }
+# One top-level summary per test bundle the app's selector runs (Reader runs two).
+app_bundles() { tart_selector_bundles "$(archive_app_field "$1" tests)"; }
+is_success() { [ "$(tart_test_verdict "$(applog "$1" "$2")" "$(app_bundles "$1")")" = succeeded ]; }
+tests_failed() { [ "$(tart_test_verdict "$(applog "$1" "$2")" "$(app_bundles "$1")")" = failed ]; }
 # A missing Processor window can mean a guest keychain/unlock/modal failure, not an app regression. The
 # test itself saves a rendered screenshot before emitting this marker; classify it as infrastructure.
 is_processor_no_window() { [ "$1" = processor ] && grep -q '^PROCESSOR_UI_NO_WINDOW$' "$(applog "$1" "$2")" 2>/dev/null; }
@@ -273,7 +279,7 @@ run_app_once() {   # $1 = app, $2 = attempt number
   tart_crash_mark "$VM"
   # tart_run_test, not a bare exec under gtimeout: it also ends a build tool that stays up after its summary
   # or goes silent, each with a [guard] line in the log (MAXRUN stays the per-app cap).
-  tart_run_test "$VM" "$log" "
+  TART_TEST_SUMMARIES="$(app_bundles "$app")" tart_run_test "$VM" "$log" "
     rm -rf '$bundle'
     xcodebuild test -project '$GUEST_REPO/$proj' -scheme '$scheme' \
       $test_args -destination 'platform=macOS' \

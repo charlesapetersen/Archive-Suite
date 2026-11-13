@@ -457,13 +457,15 @@ tart_lock_release() {
 # SIGTERM ended it. A lane must not be able to hang the gate that way. (b) In the full Notes lane the
 # accessibility audits stalled testmanagerd and after ~16 silent minutes the runner lost its channel.
 # Three guards, checked every TART_TEST_POLL seconds, each recorded as one `[guard] …` line in LOG:
-#   summary — the top-level `Test Suite 'All tests'|'Selected tests' passed|failed at` line is in LOG and LOG
-#             has not grown for TART_TEST_GRACE s (default 180). Idle, not elapsed: with -test-iterations the
-#             next iteration writes at once, so only a run that is really over trips this.
+#   summary — every bundle's top-level `Test Suite 'All tests'|'Selected tests' passed|failed at` line is in LOG
+#             (TART_TEST_SUMMARIES of them, default 1: each test bundle's runner prints its own, so a Reader run of
+#             two bundles needs both) and LOG has not grown for TART_TEST_GRACE s (default 180). Idle, not elapsed:
+#             with -test-iterations the next iteration writes at once, so only a run that is really over trips this.
 #   stalled — no summary yet and LOG has not grown for TART_TEST_STALL s (default 1500; a UI test prints a
 #             `t = …` line every few seconds while it waits, so 25 silent minutes is a stuck run).
 #   maxrun  — MAXRUN seconds elapsed (0/absent = no cap; the gate passes its per-app cap).
-# Ending: `pkill -TERM -x xcodebuild` in the guest, up to 30 s for it to go, then the host's `tart exec`.
+# Ending: `pkill -TERM -x xcodebuild` in the guest, up to 30 s for it to go, then the host's `tart exec` (TERM,
+# then KILL after 10 s more, so a transport stuck in `tart exec` cannot hang the run either).
 # TART_TEST_GUARD is left empty (the build tool ended by itself) or names the guard; the return is the
 # `tart exec` status. Read the verdict with tart_test_verdict, not with the status.
 TART_TEST_POLL="${TART_TEST_POLL:-10}"
@@ -481,7 +483,7 @@ tart_run_test() {
     now="$(date +%s)"
     size="$(stat -f %z "$log" 2>/dev/null || echo 0)"
     if [ "$size" != "$last_size" ]; then last_size="$size"; last_grow="$now"; fi
-    if grep -qE "$TART_TEST_SUMMARY_RE" "$log" 2>/dev/null; then
+    if [ "$(grep -cE "$TART_TEST_SUMMARY_RE" "$log" 2>/dev/null)" -ge "${TART_TEST_SUMMARIES:-1}" ]; then
       [ $(( now - last_grow )) -ge "$TART_TEST_GRACE" ] && why=summary
     elif [ $(( now - last_grow )) -ge "$TART_TEST_STALL" ]; then
       why=stalled
@@ -494,32 +496,47 @@ tart_run_test() {
     tart exec "$vm" bash -lc "pkill -TERM -x xcodebuild; true" >/dev/null 2>&1 || true
     for i in 1 2 3 4 5 6; do kill -0 "$pid" 2>/dev/null || break; sleep 5; done
     kill "$pid" 2>/dev/null || true
+    for i in 1 2 3 4 5; do kill -0 "$pid" 2>/dev/null || break; sleep 2; done
+    kill -KILL "$pid" 2>/dev/null || true
     break
   done
   wait "$pid" 2>/dev/null || rc=$?
   return "$rc"
 }
 
-# tart_test_verdict LOG — print `succeeded`, `failed` or `unknown` for one guest test run.
+# tart_test_verdict LOG [SUMMARIES] — print `succeeded`, `failed` or `unknown` for one guest test run.
 # xcodebuild's own marker decides when it printed one. When the summary guard had to end the build tool, the
-# verdict is XCTest's own top-level summary line instead — the line xcodebuild would have turned into the
-# marker — and only when that line says `passed` AND its `Executed …` line reports 0 failures. A stall or a
-# maxrun end is `unknown`: the run did not finish, so it says nothing either way.
+# verdict comes from XCTest's own lines instead — the ones xcodebuild would have turned into the marker — and
+# is green only when all SUMMARIES (default 1, one per test bundle) top-level summaries are there and say
+# `passed`, each `Executed …` line under them reports 0 failures, no test case failed and the runner never
+# restarted after an unexpected exit. A stall or a maxrun end is `unknown`: the run did not finish.
 tart_test_verdict() {
-  local log="$1" top exec_line
+  local log="$1" want="${2:-1}" tops bad
   # `test-without-building` (VM_SPLIT's chunks) prints `** TEST EXECUTE SUCCEEDED|FAILED **` instead.
   grep -qE '\*\* TEST (EXECUTE )?FAILED \*\*' "$log" 2>/dev/null && { echo failed; return 0; }
   grep -qE '\*\* TEST (EXECUTE )?SUCCEEDED \*\*' "$log" 2>/dev/null && { echo succeeded; return 0; }
   if grep -q '^\[guard\] summary:' "$log" 2>/dev/null; then
-    top="$(grep -nE "$TART_TEST_SUMMARY_RE" "$log" | tail -n 1)"
-    exec_line="$(sed -n "$(( ${top%%:*} + 1 ))p" "$log")"
-    case "$top" in
-      *"' failed at "*) echo failed; return 0 ;;
-      *"' passed at "*) case "$exec_line" in *" with 0 failures "*) echo succeeded; return 0 ;; esac ;;
-    esac
+    if grep -qE "^Test Suite '(All tests|Selected tests)' failed at |^Test Case .* failed \(" "$log"; then
+      echo failed; return 0
+    fi
+    tops="$(grep -cE "$TART_TEST_SUMMARY_RE" "$log")"
+    # The line after each top-level summary is its `Executed …` line.
+    bad="$(grep -A1 -E "$TART_TEST_SUMMARY_RE" "$log" | grep -E '^[[:space:]]+Executed ' | grep -vc ' with 0 failures ' || true)"
+    if [ "$tops" -ge "$want" ] && [ "$bad" = 0 ] && ! grep -q 'Restarting after unexpected exit' "$log"; then
+      echo succeeded; return 0
+    fi
   fi
   echo unknown
 }
+
+# tart_selector_bundles SELECTORS — how many test bundles a comma-separated selector list runs (each prints
+# its own top-level summary: the count tart_run_test's summary guard and tart_test_verdict wait for).
+tart_selector_bundles() {
+  printf '%s\n' "$1" | tr ',' '\n' | sed '/^$/d; s#/.*##' | sort -u | wc -l | tr -d ' '
+}
+
+# The kept-guest state (VM_KEEP=1, vm-gui-runner.sh); every entry point that boots or stops the guest clears it.
+TART_KEEP_STATE="${VM_KEEP_STATE:-$HOME/.tart-mirror/.vm-keep}"
 
 # ---------------------------------------------------------------------------------------------------
 # tart_sampler_start VM OUT [SECONDS] / tart_sampler_stop — sample host and guest load across a run
@@ -551,6 +568,8 @@ tart_sampler_start() {
 }
 tart_sampler_stop() {
   [ -n "${TART_SAMPLER_PID:-}" ] || return 0
+  # Its running `sleep` or `tart exec` first: left orphaned in the caller's session, they would hold heavy-run.py.
+  pkill -P "$TART_SAMPLER_PID" 2>/dev/null || true
   kill "$TART_SAMPLER_PID" 2>/dev/null || true
   wait "$TART_SAMPLER_PID" 2>/dev/null || true
   TART_SAMPLER_PID=""
