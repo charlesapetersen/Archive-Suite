@@ -40,6 +40,8 @@ public struct PDFPageHeader: Sendable, Equatable {
     public var kind: OCRPageKind?
     public var documentDate: String?
     public var sentWith: String?
+    /// W46.date-route-header — the evidence behind a non-explicit document date, as one display line.
+    public var dateEvidence: String?
     public var diagnostics: [PDFHeaderDiagnostic] = []
 }
 
@@ -99,6 +101,7 @@ public struct ExtractedContent: Sendable {
 public enum PDFHeaderParser {
     public static let documentDatePrefix = "Document date: "
     public static let sentWithPrefix = "Sent with: "
+    public static let dateEvidencePrefix = "Date evidence: "
     public static let kindPrefix = "Kind: "
 
     public static func extract(_ url: URL) -> ExtractedContent? {
@@ -235,6 +238,8 @@ public enum PDFHeaderParser {
                 field = 2; value = String(line.dropFirst(documentDatePrefix.count))
             } else if line.hasPrefix(sentWithPrefix) {
                 field = 3; value = String(line.dropFirst(sentWithPrefix.count))
+            } else if line.hasPrefix(dateEvidencePrefix) {
+                field = 4; value = String(line.dropFirst(dateEvidencePrefix.count))
             } else { break }
             // Repeated or late Kind is consumed, diagnosed and never trusted. Other out-of-order
             // fields start the body; this preserves an archival Classification: security marking.
@@ -246,6 +251,7 @@ public enum PDFHeaderParser {
             case 0: header.classification = value.isEmpty ? nil : value
             case 2: header.documentDate = value
             case 3: header.sentWith = value
+            case 4: header.dateEvidence = value
             default: break
             }
             lastField = max(lastField, field)
@@ -320,7 +326,7 @@ public enum PDFHeaderParser {
     }
 
     private static func isField(_ line: String) -> Bool {
-        ["Classification:", "Kind:", documentDatePrefix, sentWithPrefix].contains { line.hasPrefix($0) }
+        ["Classification:", "Kind:", documentDatePrefix, sentWithPrefix, dateEvidencePrefix].contains { line.hasPrefix($0) }
     }
 
     private static func endsWithYear(_ text: String) -> Bool {

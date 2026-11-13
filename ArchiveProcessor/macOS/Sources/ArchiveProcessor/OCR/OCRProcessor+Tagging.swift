@@ -1,6 +1,7 @@
 import Foundation
 import ArchiveCore
 import UserNotifications
+import PDFKit
 import os
 
 extension OCRProcessor {
@@ -1204,10 +1205,12 @@ extension OCRProcessor {
             dating?.inherit(fromCover: coverTags, coverFile: snapshot[c].pdfURLs.first?.lastPathComponent)
         }
         dating?.apply(to: &tags)
+        // W46.date-route-header: the evidence of a non-explicit year, for the outputs' header line.
+        var headerEvidence = dating?.headerEvidence
         // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
         if let firstURL = segment.pdfURLs.first,
            let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
-            if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false }
+            if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false; headerEvidence = nil }
             if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
         }
         // W37: the tagger never proposes a sent-with date; only a relation does.
@@ -1221,6 +1224,9 @@ extension OCRProcessor {
         for sourceURL in segment.pdfURLs {
             appliedGeneratedTags[sourceURL] = tags
             if let outputPDF = outputURLMap[sourceURL] {
+                if dating != nil {
+                    writeDateEvidence(headerEvidence, to: outputPDF, source: sourceURL, runConfig: runConfig)
+                }
                 tagOutput(tags, at: outputPDF, source: sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             }
@@ -1235,6 +1241,43 @@ extension OCRProcessor {
         }
         return tags
     }
+    /// W46.date-route-header — put the dating evidence in one output's `Date evidence:` header line (nil removes a stale
+    /// one), through `OutputFileSafety.replaceGeneratedOutput`, before its tags are written. Each page of a document
+    /// carries the line, so a later merge keeps it. An output it cannot safely rewrite is left as it is and logged: the
+    /// sidecar's `dating` object still carries the evidence.
+    @discardableResult
+    func writeDateEvidence(_ evidence: String?, to outputPDF: URL, source: URL,
+                           runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
+        guard let text = jobs.first(where: { $0.sourceURL == source })?.result?.text, !text.isEmpty else {
+            return .skipped("no text")
+        }
+        // Most documents have an explicit year and no old line: settle that from the text page alone, unread bytes.
+        if evidence == nil, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2, let page = doc.page(at: 1),
+           let header = PDFHeaderParser.parse(page).header, header.dateEvidence == nil {
+            return .unchanged
+        }
+        guard !OutputFileSafety.isSameFile(outputPDF, source), let data = try? Data(contentsOf: outputPDF) else {
+            return .skipped("not a readable generated output")
+        }
+        let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
+        let outcome = PDFGenerator().dateEvidenceRewrite(of: data, evidence: evidence, body: text, textColumns: columns)
+        switch outcome {
+        case .rewrite(let new):
+            do {
+                try OutputFileSafety.replaceGeneratedOutput(outputPDF, for: source, with: new)
+            } catch {
+                os_log(.error, "Date evidence not written to %{public}@: %{public}@",
+                       outputPDF.lastPathComponent, String(describing: error))
+                return .skipped(String(describing: error))
+            }
+        case .skipped(let why):
+            os_log(.info, "Date evidence left out of %{public}@: %{public}@", outputPDF.lastPathComponent, why)
+        case .unchanged:
+            break
+        }
+        return outcome
+    }
+
     /// W37.dual-date — after a POST-tagging reclassification, bring every written `Sent With` token (and
     /// each sidecar's `sent_with` / `sent_with_uncertain` / `enclosure_of`) back in line with the
     /// relation the CURRENT segmentation still supports: a relation that no longer holds (the enclosure

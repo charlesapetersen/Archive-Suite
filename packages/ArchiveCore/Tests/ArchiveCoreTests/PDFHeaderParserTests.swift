@@ -200,6 +200,54 @@ final class PDFHeaderParserTests: XCTestCase {
         XCTAssertEqual(PDFHeaderParser.stripHeader(from: pageText), "document date: 1957\n\nBody.")
     }
 
+    // MARK: - W46.date-route-header: the date-evidence header line
+
+    func testDateEvidenceLineIsHeaderAfterTheSourceDates() {
+        let pageText = """
+        Extracted text.
+        scan_001.jpg
+        Anthropic \u{00B7} Claude \u{00B7} 6 October 2026
+        Classification: Document Start
+        Kind: typewritten
+        Document date: 1957
+        Date evidence: estimate from scan_000.pdf; quote "May 3, 1957"; 90% interval 1956-1958
+
+        Report on the harbour works.
+        """
+        let parsed = PDFHeaderParser.parse(pageText)
+        XCTAssertEqual(parsed.body, "Report on the harbour works.")
+        XCTAssertEqual(parsed.header?.classification, "Document Start")
+        XCTAssertEqual(parsed.header?.kind, .typewritten)
+        XCTAssertEqual(parsed.header?.documentDate, "1957")
+        XCTAssertEqual(parsed.header?.dateEvidence,
+                       "estimate from scan_000.pdf; quote \"May 3, 1957\"; 90% interval 1956-1958")
+    }
+
+    func testDateEvidenceAloneWithoutSeparatorIsHeader() {
+        // PDFKit drops the blank separator from a real page: the line is still consumed, never body.
+        let pageText = "Extracted text.\nscan_001.jpg\nAnthropic \u{00B7} Claude \u{00B7} 6 October 2026\n"
+            + "Kind: printed\nDate evidence: inherited from cover.pdf\nDear Sir,"
+        let parsed = PDFHeaderParser.parse(pageText)
+        XCTAssertEqual(parsed.body, "Dear Sir,")
+        XCTAssertEqual(parsed.header?.dateEvidence, "inherited from cover.pdf")
+        XCTAssertNil(parsed.header?.classification)
+    }
+
+    func testDateEvidenceLookalikeInBodyOrOutOfOrderIsKept() {
+        // After the separator it is body; a source-date line after it is out of order and starts the body.
+        let inBody = page("Classification: Continuation", body: "Date evidence: none here.")
+        XCTAssertEqual(PDFHeaderParser.stripHeader(from: inBody), "Date evidence: none here.")
+        XCTAssertNil(PDFHeaderParser.parse(inBody).header?.dateEvidence)
+        let late = "Extracted text.\nscan_001.jpg\nAnthropic \u{00B7} Claude \u{00B7} 6 October 2026\n"
+            + "Date evidence: image; page 1\nDocument date: 1957\n\nBody."
+        let parsed = PDFHeaderParser.parse(late)
+        XCTAssertEqual(parsed.header?.dateEvidence, "image; page 1")
+        XCTAssertNil(parsed.header?.documentDate)
+        XCTAssertEqual(parsed.body, "Document date: 1957\n\nBody.")
+        // The exact, case-sensitive prefix only.
+        XCTAssertEqual(PDFHeaderParser.stripHeader(from: page("date evidence: x")), "date evidence: x\n\nThe quick brown fox.")
+    }
+
     // MARK: - Classification outside the header (W40.fix-core-classification-from-body)
 
     func testClassificationLineInBodyTextIsNotTheClassification() {

@@ -151,6 +151,48 @@ extension DateRoute.Decision {
         quote = nil; line = nil; page = nil; place = nil; sourceFile = coverFile
     }
 
+    /// W46.date-route-header — the PDF header's `Date evidence:` value (owner call 9): for a non-explicit date only (read
+    /// off the page image, estimated, or inherited from the cover), its class, source, place and quote, and the 90%
+    /// interval where the route measured it. Nil for an explicit text year and for no year. One line, never holding the
+    /// provenance separator, the quote cut to `headerQuoteChars`.
+    var headerEvidence: String? {
+        guard year != nil else { return nil }
+        var parts: [String]
+        switch evidenceClass {
+        case .text, .none:
+            return nil
+        case .inherited:
+            parts = ["inherited", "from " + Self.headerSafe(sourceFile ?? "the covering letter", limit: 80)]
+        case .image:
+            parts = ["image"]
+            if let page { parts.append("page \(page)") }
+            if let place, !Self.headerSafe(place, limit: 40).isEmpty { parts.append(Self.headerSafe(place, limit: 40)) }
+        case .estimate:
+            let source = sourceFile ?? (cited == nil || cited == "self" ? "this document" : cited!)
+            parts = ["estimate", "from " + Self.headerSafe(source, limit: 80)]
+            if let line { parts.append("line \(line)") }
+        }
+        if evidenceClass != .inherited, let quote, !Self.headerSafe(quote, limit: Self.headerQuoteChars).isEmpty {
+            parts.append("\"" + Self.headerSafe(quote, limit: Self.headerQuoteChars) + "\"")
+        }
+        if evidenceClass == .estimate, measured, let lo = trace.lo, let hi = trace.hi {
+            parts.append("90% interval \(lo)-\(hi)")
+        }
+        return parts.joined(separator: "; ")
+    }
+
+    static let headerQuoteChars = 60
+
+    /// One header-safe line: control characters and runs of white space become one space, the middle dot a comma (the
+    /// provenance separator must never appear), cut to `limit` characters with an ellipsis.
+    static func headerSafe(_ s: String, limit: Int) -> String {
+        let flat = s.unicodeScalars.map { CharacterSet.controlCharacters.contains($0) || CharacterSet.newlines.contains($0)
+            ? " " : String($0) }.joined()
+            .replacingOccurrences(of: "\u{00B7}", with: ",")
+        let one = flat.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        return one.count > limit ? String(one.prefix(limit - 1)).trimmingCharacters(in: .whitespaces) + "\u{2026}" : one
+    }
+
     /// The sidecar's `dating` object: the evidence class and the quote with its place on every route (owner call 9),
     /// the interval only where measured, second-role dates with role, quote and place. An estimate whose evidence
     /// failed is not shown: no year and no quote, only that none passed.

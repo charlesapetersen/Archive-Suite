@@ -12,14 +12,17 @@ import ArchiveCore
 struct PDFSourceDates: Sendable, Equatable {
     var documentDate: String?
     var sentWith: String?
+    /// W46.date-route-header — the evidence behind a non-explicit document date (`DateRoute.Decision.headerEvidence`).
+    var dateEvidence: String? = nil
 
-    var isEmpty: Bool { documentDate == nil && sentWith == nil }
+    var isEmpty: Bool { documentDate == nil && sentWith == nil && dateEvidence == nil }
 
     /// The header lines, in SPEC order, each with Core's exact prefix.
     var headerLines: [String] {
         var lines: [String] = []
         if let documentDate { lines.append(PDFHeaderParser.documentDatePrefix + documentDate) }
         if let sentWith { lines.append(PDFHeaderParser.sentWithPrefix + sentWith) }
+        if let dateEvidence { lines.append(PDFHeaderParser.dateEvidencePrefix + dateEvidence) }
         return lines
     }
 }
@@ -311,7 +314,12 @@ struct PDFGenerator {
         }
         // W37.dual-date — the document's own date / covering-letter date, after Classification and
         // before the blank separator, only when known at render time (see `PDFSourceDates`).
+        var fitRanges = provenanceRange.map { [$0] } ?? []
         for line in sourceDates?.headerLines ?? [] {
+            // W46.date-route-header: the evidence line quotes the document, so it is fitted to one line like provenance.
+            if line.hasPrefix(PDFHeaderParser.dateEvidencePrefix) {
+                fitRanges.append(NSRange(location: headerLine.utf16.count + 1, length: line.utf16.count))
+            }
             headerLine += "\n\(line)"
         }
         headerLine += "\n\n"
@@ -325,7 +333,12 @@ struct PDFGenerator {
             if let code = result.errorCode { msg += "\n\nError code: \(code)" }
             bodyText = msg
         }
+        return layoutTextPage(headerLine: headerLine, fitRanges: fitRanges, bodyText: bodyText, textColumns: textColumns)
+    }
 
+    /// Lays out one text page: `headerLine` (ending in its blank separator) above `bodyText`. Each of `fitRanges`
+    /// (a whole header line) is shrunk until it fits on one line, so the parser reads it back as one line.
+    func layoutTextPage(headerLine: String, fitRanges: [NSRange], bodyText: String, textColumns: Int) -> PDFPage {
         let headerParaStyle = NSMutableParagraphStyle()
         headerParaStyle.lineSpacing = 4
         headerParaStyle.paragraphSpacing = 2
@@ -358,7 +371,7 @@ struct PDFGenerator {
         let fullTextWidth = pageWidth - 2 * margin
         // Freeform gateway/CLI/cluster labels can wrap across several extracted lines. Fit every
         // provenance line, preserving its full display labels in the same single-line grammar.
-        if let range = provenanceRange {
+        for range in fitRanges {
             // SF's optical metrics change with point size: a one-shot ratio measured at 11pt
             // can still wrap at the smaller font. Re-measure the actual fitted font before layout.
             var pointSize = headerFont.pointSize

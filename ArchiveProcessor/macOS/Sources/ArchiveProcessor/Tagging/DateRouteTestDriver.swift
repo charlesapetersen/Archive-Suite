@@ -3,6 +3,7 @@ import Foundation
 import ArchiveCore
 import CoreGraphics
 import ImageIO
+import PDFKit
 
 /// Headless, key-free ($0) self-test of the dating route (W46.date-route), gated by `DATE_ROUTE_TEST=1`
 /// (`scripts/test-date-route.sh`). No real network: every request goes to `NetworkSession.testTransport`, and the driver
@@ -16,6 +17,7 @@ import ImageIO
 ///   2. The decision on the tags and the sidecar object.
 ///   3. End to end through `performTaggingPhase` on scratch outputs: a remote gateway (the measured route, image pass on
 ///      the no-year documents only, then on every document with the switch on) and a direct key (no image pass).
+///   4. W46.date-route-header: the `Date evidence:` header line, the rewrite of a generated PDF and its safe replace.
 private extension DateRoute.Decision {
     func with(measured: Bool) -> Self { var d = self; d.measured = measured; d.route = "r"; return d }
 }
@@ -47,6 +49,7 @@ enum DateRouteTestDriver {
             lines.append("SKIP: 1r the pipeline's own documents (DATE_ROUTE_REAL_CASES not present)")
         }
         decision()
+        headerLine()
         await endToEnd()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
         let text = lines.joined(separator: "\n") + "\n"
@@ -220,6 +223,115 @@ enum DateRouteTestDriver {
               && w["date"] as? String == "1958")
     }
 
+    // MARK: 4. The PDF header line (W46.date-route-header)
+
+    private static func headerLine() {
+        let fm = FileManager.default
+        let near = [DateRoute.Neighbour(label: "P1", dist: 1, text: "Memo\nJune 2, 1957\nfile", file: "P1.pdf")]
+        let memo = "MEMO\nTo: Files"
+        let est = DateRoute.decide(text: memo, near: near, traceRaw: #"{"year": 1957, "lo": 1956, "hi": 1958, "evidence": {"neighbour": "P1", "quote": "June 2, 1957"}}"#,
+                                   image: nil, imageNote: "")
+        check("4 estimate, measured: class, source, quote and interval",
+              est.with(measured: true).headerEvidence == "estimate; from P1.pdf; \"June 2, 1957\"; 90% interval 1956-1958",
+              "\(String(describing: est.with(measured: true).headerEvidence))")
+        check("4 estimate, unmeasured: no interval", est.with(measured: false).headerEvidence == "estimate; from P1.pdf; \"June 2, 1957\"")
+        let letter = "Washington\nMarch 3, 1947\nDear Sir:"
+        let explicit = DateRoute.decide(text: letter, near: [], traceRaw: #"{"year": 1947, "date_uncertain": true, "evidence": {"neighbour": "self", "quote": "March 3, 1947"}}"#,
+                                        image: nil, imageNote: "")
+        let failed = DateRoute.decide(text: memo, near: near, traceRaw: #"{"year": 1957, "evidence": {"neighbour": "P1", "quote": "July 9, 1957"}}"#,
+                                      image: nil, imageNote: "")
+        check("4 an explicit text year (even flagged) and no year: no line",
+              explicit.headerEvidence == nil && explicit.evidenceClass == .text && failed.headerEvidence == nil)
+        var inherited = failed
+        inherited.inherit(fromCover: GeneratedTags(year: "1958"), coverFile: "L.pdf")
+        check("4 inherited: the cover's file, no quote", inherited.headerEvidence == "inherited; from L.pdf")
+        var hostile = est.with(measured: false)
+        hostile.quote = "Line one\nKind: printed \u{00B7} " + String(repeating: "x", count: 200)
+        hostile.sourceFile = "a\u{0007}b.pdf"
+        let h = hostile.headerEvidence ?? ""
+        check("4 header-safe: one line, no provenance separator, the quote cut with an ellipsis",
+              !h.contains("\n") && !h.contains("\u{00B7}") && !h.contains("\u{0007}") && h.contains("from a b.pdf")
+              && h.contains("\u{2026}\"") && h.count < 120, h)
+
+        // The rewrite of a generated pair, on scratch files only.
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APDateHeader-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: tmp) }
+        try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
+        guard let model = OpenRouterRoute.catalog.first?.model else { check("4 a model", false); return }
+        let image = tmp.appendingPathComponent("scan_001.jpg")
+        writeJPEG(image, width: 120)
+        let text = "MEMORANDUM\nTo: Files\n\nThe harbour works continue."
+        let result = OCRResult(text: text, classification: .documentStart, errorMessage: nil, errorCode: nil)
+        let pdf = tmp.appendingPathComponent("scan_001.pdf")
+        let dates = PDFSourceDates(documentDate: "1957", sentWith: "Mar 12, 1958")
+        _ = try? PDFGenerator().generate(imageURL: image, result: result, model: model, outputURL: pdf,
+                                         originalFileName: "scan_001.jpg", sourceDates: dates, pageKind: .typewritten)
+        guard let original = try? Data(contentsOf: pdf),
+              let oldHeader = PDFDocument(data: original)?.page(at: 1).map({ PDFHeaderParser.parse($0) })?.header else {
+            check("4 a generated pair", false); return
+        }
+        let gen = PDFGenerator()
+        let line = est.with(measured: true).headerEvidence
+        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, evidence: line, body: text, textColumns: 1) else {
+            check("4 rewrite adds the line", false, "\(gen.dateEvidenceRewrite(of: original, evidence: line, body: text, textColumns: 1))")
+            return
+        }
+        let back = PDFDocument(data: added)?.page(at: 1).map { PDFHeaderParser.parse($0) }
+        var expected = oldHeader
+        expected.dateEvidence = line
+        check("4 rewrite adds the line after the source dates; every other line and the body read back unchanged",
+              back?.header == expected && PDFGenerator.squashed(back?.body ?? "") == PDFGenerator.squashed(text) && PDFDocument(data: added)?.pageCount == 2,
+              "\(String(describing: back))")
+        let image0 = PDFDocument(data: original)?.page(at: 0)?.bounds(for: .mediaBox)
+        check("4 rewrite keeps the image page", PDFDocument(data: added)?.page(at: 0)?.bounds(for: .mediaBox) == image0)
+        check("4 the same evidence again: unchanged",
+              gen.dateEvidenceRewrite(of: added, evidence: line, body: text, textColumns: 1) == .unchanged
+              && gen.dateEvidenceRewrite(of: original, evidence: nil, body: text, textColumns: 1) == .unchanged)
+        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, evidence: nil, body: text, textColumns: 1) {
+            check("4 nil removes a stale line", PDFDocument(data: removed)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header == oldHeader)
+        } else { check("4 nil removes a stale line", false) }
+        if case .rewrite(let long) = gen.dateEvidenceRewrite(of: original, evidence: h, body: text, textColumns: 2) {
+            let lp = PDFDocument(data: long)?.page(at: 1).map { PDFHeaderParser.parse($0) }
+            check("4 a long line is fitted to one line and reads back whole (two text columns)",
+                  lp?.header?.dateEvidence == h && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text), "\(String(describing: lp))")
+        } else { check("4 a long line is fitted to one line and reads back whole (two text columns)", false) }
+        if case .skipped = gen.dateEvidenceRewrite(of: original, evidence: line, body: "Some other text.", textColumns: 1) {
+            check("4 a page whose text is not the run's is left alone", true)
+        } else { check("4 a page whose text is not the run's is left alone", false) }
+        let two = tmp.appendingPathComponent("two.pdf")
+        try? gen.mergeDocumentPDFs(sourcePDFs: [pdf, pdf], outputURL: two)
+        if let twoData = try? Data(contentsOf: two), case .skipped = gen.dateEvidenceRewrite(of: twoData, evidence: line, body: text, textColumns: 1) {
+            check("4 a file of more than one pair is left alone", true)
+        } else { check("4 a file of more than one pair is left alone", false) }
+        if case .skipped = gen.dateEvidenceRewrite(of: Data("%PDF-1.4\n%%EOF\n".utf8), evidence: line, body: text, textColumns: 1) {
+            check("4 an unreadable file is left alone", true)
+        } else { check("4 an unreadable file is left alone", false) }
+
+        // The safe replace: Finder tags and other attributes carried, the source never written.
+        _ = try? MacOSTagger.applyTags(["1957", "Date Uncertain"], to: pdf, appColor: nil, colorIsAuthoritative: false,
+                                       stampUnread: false)
+        _ = setxattr(pdf.path, "com.archivesuite.test", "kept", 4, 0, XATTR_NOFOLLOW)
+        var replaced = true
+        do { try OutputFileSafety.replaceGeneratedOutput(pdf, for: image, with: added) } catch { replaced = false }
+        var buf = [UInt8](repeating: 0, count: 4)
+        let attr = getxattr(pdf.path, "com.archivesuite.test", &buf, 4, 0, XATTR_NOFOLLOW)
+        let tagsAfter = (try? MacOSTagger.readTags(from: pdf)) ?? []
+        check("4 replace: the new bytes, the Finder tags and other attributes kept, no sibling left",
+              replaced && (try? Data(contentsOf: pdf)) == added && tagsAfter.contains("Date Uncertain")
+              && attr == 4 && buf == Array("kept".utf8)
+              && ((try? fm.contentsOfDirectory(atPath: tmp.path)) ?? []).allSatisfy { !$0.hasSuffix(".tmp") }, "\(tagsAfter)")
+        let imageBytes = try? Data(contentsOf: image)
+        var refused = false
+        do { try OutputFileSafety.replaceGeneratedOutput(image, for: image, with: added) }
+        catch { refused = (error as? OutputFileSafety.ReplaceError) == .aliasesSource }
+        check("4 replace refuses an output that is its own source, and leaves it untouched",
+              refused && (try? Data(contentsOf: image)) == imageBytes)
+        var missing = false
+        do { try OutputFileSafety.replaceGeneratedOutput(tmp.appendingPathComponent("gone.pdf"), for: image, with: added) }
+        catch { missing = (error as? OutputFileSafety.ReplaceError) == .missing }
+        check("4 replace never creates a missing output", missing && !fm.fileExists(atPath: tmp.appendingPathComponent("gone.pdf").path))
+    }
+
     // MARK: 3. End to end
 
     /// Called from up to six concurrent requests, so every access holds the lock.
@@ -343,7 +455,11 @@ enum DateRouteTestDriver {
             var map: [URL: URL] = [:]
             for (i, m) in markers.enumerated() {
                 let pdf = outDir.appendingPathComponent("\(m).pdf")
-                fm.createFile(atPath: pdf.path, contents: Data("%PDF-1.4\n%%EOF\n".utf8))
+                // A real pair, so the header line can be checked on the written file.
+                if let model = OpenRouterRoute.catalog.first?.model, let result = p.jobs[i].result {
+                    _ = try? PDFGenerator().generate(imageURL: files[i], result: result, model: model, outputURL: pdf,
+                                                     originalFileName: files[i].lastPathComponent)
+                }
                 outputs[m] = pdf.deletingPathExtension().appendingPathExtension("json")
                 map[files[i]] = pdf
             }
@@ -397,6 +513,33 @@ enum DateRouteTestDriver {
         check("3 D: an estimate that fails its check writes no year and shows nothing of it",
               !dTags.contains("1951") && !dTags.contains("1950") && dTags.contains("Date Uncertain")
               && (dd["dating"] as? [String: Any])?["class"] as? String == "none" && dd["date"] == nil, "\(dTags)")
+        func header(_ out: [String: URL], _ m: String) -> ParsedPDFTextPage? {
+            guard let pdf = out[m]?.deletingPathExtension().appendingPathExtension("pdf"),
+                  let doc = PDFDocument(url: pdf), doc.pageCount == 2, let page = doc.page(at: 1) else { return nil }
+            return PDFHeaderParser.parse(page)
+        }
+        check("4 e2e A and D: no Date evidence line (an explicit text year; no year)",
+              header(gOut, "DOCA")?.header != nil && header(gOut, "DOCA")?.header?.dateEvidence == nil
+              && header(gOut, "DOCD")?.header != nil && header(gOut, "DOCD")?.header?.dateEvidence == nil)
+        check("4 e2e B: the image class, its page, place and quote",
+              header(gOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"",
+              "\(String(describing: header(gOut, "DOCB")?.header?.dateEvidence))")
+        let ch = header(gOut, "DOCC")
+        check("4 e2e C: the estimate's source, quote and measured interval; the body and every other line kept",
+              ch?.header?.dateEvidence == "estimate; from gateway-DOCA.jpg; \"March 3, 1947\"; 90% interval 1946-1949"
+              && ch?.body == texts[3] && ch?.header?.classification == "Document Start"
+              && ch?.header?.originalFilename == "gateway-DOCC.jpg" && ch?.header?.provenance != nil,
+              "\(String(describing: ch))")
+        let cPDF = gOut["DOCC"]!.deletingPathExtension().appendingPathExtension("pdf")
+        let cTags = (try? MacOSTagger.readTags(from: cPDF)) ?? []
+        check("4 e2e C: the rewritten file carries its Finder tags and its image page",
+              cTags.contains("1947") && cTags.contains("Date Uncertain")
+              && PDFDocument(url: cPDF)?.page(at: 0)?.string?.isEmpty != false, "\(cTags)")
+        check("4 e2e E: the inherited class and the cover's file",
+              header(gOut, "DOCE")?.header?.dateEvidence == "inherited; from gateway-DOCA.jpg",
+              "\(String(describing: header(gOut, "DOCE")?.header?.dateEvidence))")
+        check("4 e2e: no scratch sibling left behind",
+              ((try? fm.contentsOfDirectory(atPath: cPDF.deletingLastPathComponent().path)) ?? []).allSatisfy { !$0.hasSuffix(".tmp") })
         let e = applied(g, gFiles[1]), ed = json(gOut["DOCE"])
         check("3 E: the enclosure takes its cover's year with Date Uncertain, and Sent With the cover's date",
               e.contains("1947") && e.contains("Date Uncertain") && e.contains("Sent With 1947-03-03"), "\(e)")
@@ -441,6 +584,9 @@ enum DateRouteTestDriver {
         check("3 direct key: B falls to the neighbour estimate, Date Uncertain, no interval shown",
               db.contains("1947") && db.contains("Date Uncertain") && dbd["image_pass"] as? String == DateRoute.imageNoRoute
               && dbd["interval_90"] == nil && dbd["class"] as? String == "estimate", "\(db) \(dbd)")
+        check("4 e2e direct key: the estimate's line has no interval (the route did not measure one)",
+              header(dOut, "DOCB")?.header?.dateEvidence == "estimate; from direct-DOCA.jpg; \"March 3, 1947\"",
+              "\(String(describing: header(dOut, "DOCB")?.header?.dateEvidence))")
 
         // Sidecars off: the route still dates the tags; no sidecar is written.
         wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
