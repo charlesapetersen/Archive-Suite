@@ -149,6 +149,22 @@ and the Reader both accept a plain folder of photos or PDFs from any source.
    subjects as tags. These come from what the Processor already extracts (the page-2 header, the JSON sidecar, the
    date tags). A field the Zotero type cannot hold goes in Extra; an empty field stays empty.
 
+**Owner, 2026-11-13 (walkthrough, `W47.ct-design-ok`): approved, with the amendments the figures in
+`ArchiveProcessor/segbench-results/ct-read.md` call for.** These override the text above where they differ.
+- Readers per field: box and folder numbers from Vision + parser; repository, collection title, collection
+  number and date from GPT 5.6 Luna on the gateway, else Gemma 3 12B, as proposals the user confirms once per run;
+  accession from Luna, else Vision + parser; collection subtitle, box title, folder title and other identifying
+  marks are left to the user. What the photo is comes from the marker's colour. Where Vision reads no box number,
+  a gateway read is the fallback.
+- Design 4's "a box number goes backwards" warning is dropped: 27% of steps between box photos go down.
+- A folder label that names its box is not a check on the box run: Vision misreads it about one time in five, so
+  a flag on disagreement would mostly report misreads.
+- Purple is a folder start; "No Folder" sheets are recognised by their text.
+- `W47.ct-backfill` reads the corpus's markers with Vision for numbers and Luna through the gateway for the rest
+  (about $3.67, under the $7 line).
+- `W47.ct-folder-date`'s questions (the tag a range becomes, Date Uncertain, the month) were not settled here; they
+  go to the owner once that item has measured.
+
 Not in this plan: typed box and folder numbers on the phone (the label read should cover them), finding-aid lookup
 (a later extra once the manual path works), and any citation formatting.
 
