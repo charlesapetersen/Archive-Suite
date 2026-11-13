@@ -1,0 +1,6621 @@
+import AppKit
+import CoreImage
+import Foundation
+import CryptoKit
+import PDFKit
+
+/// Rebuilds a PDF as pages of pure image, so no text layer survives.
+///
+/// Why this exists: mac-ocr's `searchable-pdf` adds its text layer *on top of*
+/// whatever is already there. Feeding it an already-OCR'd scan therefore yields
+/// a file with two text layers, and copied text comes out doubled. Rebuilding
+/// the pages as images first means Vision's pass is the only source of text.
+///
+/// Measured on a 300 DPI mixed-raster book scan: OCR of the rebuilt pages
+/// differs from OCR of the untouched original by 0.13% of characters, so the
+/// rebuild costs essentially nothing in recognition quality.
+enum Flattener {
+
+    enum Mode: String, CaseIterable, Identifiable {
+        /// Per page: 1-bit for text, grey for a halftone, colour for anything
+        /// with real colour in it. The default, because a single global choice
+        /// is wrong every way — forcing 1-bit destroys halftones, forcing grey
+        /// throws away colour plates, and forcing either onto a text-only book
+        /// makes it several times larger than it needs to be.
+        case auto
+        /// 1-bit everywhere. Scanned text compresses far better this way than as
+        /// JPEG (~110 KB/page vs ~1 MB/page at 300 DPI), and OCR is unaffected.
+        case blackAndWhite
+        /// 8-bit grey JPEG everywhere, colour included — an instruction, not a
+        /// question. Much larger than 1-bit, and the mode to pick when you want
+        /// a colour original rendered grey on purpose.
+        case grayscale
+
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .auto: return "Automatic"
+            case .blackAndWhite: return "Black & white"
+            case .grayscale: return "Grayscale"
+            }
+        }
+        var blurb: String {
+            switch self {
+            case .auto: return "1-bit text pages, grey halftones, colour kept where it is."
+            case .blackAndWhite: return "Smallest. Flattens photographs to blotches."
+            case .grayscale: return "Much larger. Keeps photographs, renders colour grey."
+            }
+        }
+        /// JBIG2 is a bilevel codec, so only these modes can produce pages for it.
+        var canUseJBIG2: Bool { self != .grayscale }
+    }
+
+    /// A page whose 1-bit rendering would be this much ink is not text — it's a
+    /// halftone or a dark scan, and thresholding would wreck it.
+    ///
+    /// Calibrated on a 582-page book scan: ordinary text pages land at 6–8.4%,
+    /// and the only pages above 15% were the two covers (100%) and a halftone
+    /// map spread (17.8% and 34.8%). Erring low is the safe direction — a text
+    /// page misrouted to greyscale just costs bytes, whereas a picture misrouted
+    /// to 1-bit is destroyed.
+    static let pictureInkThreshold = 0.15
+
+    /// JPEG quality for the pages that get routed to greyscale.
+    ///
+    /// 0.6, not 0.8: the pages that come here are photographs and noisy
+    /// photocopies, where the extra quality mostly encodes scanner grain.
+    /// Measured on archival typescripts: ~1 MB/page at 0.8.
+    ///
+    /// A constant rather than a defaulted `flatten` parameter. It was the
+    /// latter, and nothing in the app, the tools or the tests ever passed
+    /// anything else — so it read as a knob while being a constant with extra
+    /// steps, and one that had to be threaded through every call site to stay
+    /// consistent.
+    static let pictureJPEGQuality = 0.6
+
+    /// A page with this much continuous tone is a picture, whatever its ink
+    /// coverage. Ink coverage alone was a broken test: warm and light colours
+    /// have a *high* greyscale luminance (pure yellow is 226, pale cyan 217), so
+    /// a page of tinted figures scored near zero coverage — the picture signal
+    /// was at its minimum for exactly the pages thresholding destroys. Measured:
+    /// a tinted isobar figure lost 99.1% of its visible content.
+    static let pictureToneThreshold = 0.12
+
+    /// …but heavy ink on its own is not enough. A page routed to the picture
+    /// path by ink coverage alone must also carry *some* continuous tone.
+    ///
+    /// R38. Dense bilevel type — a broadsheet page, a page of 8-point footnotes,
+    /// a comic strip — reads as heavy ink while both other signals say text
+    /// emphatically, and `isPicture` ORs its signals so one overrode two. Those
+    /// pages then got a JBIG2 stencil *plus* a greyscale DCT background carrying
+    /// nothing the stencil did not already have. Measured on the 232-document
+    /// corpus: `Boltanski_2006` came out **16 MB → 156 MB (9.45x)**, `Noble_1977`
+    /// 17 MB → 87 MB (5.0x), a 1950 comic page 3.48x, a 1926 broadsheet 3.20x.
+    ///
+    /// 0.03 sits in a wide measured gap between the two populations, taken over
+    /// every ink-triggered page in the corpus:
+    ///
+    /// | | tone |
+    /// |---|---|
+    /// | real pictures (Findlay, Black, Ehrenreich, Marth) | 0.0709–0.1453 |
+    /// | dense bilevel type (the four inflating documents) | 0.0017–0.0247 |
+    ///
+    /// **Why this is safe rather than merely smaller.** The picture route exists
+    /// because thresholding destroys an *unresolved* halftone, and an unresolved
+    /// halftone is precisely what puts pixels between paper and ink. Low tone
+    /// means the page is genuinely bimodal, which is exactly the case where 1-bit
+    /// loses nothing. The two riskiest pages this moves — a newspaper comic and a
+    /// dense title spread — were rendered at 1-bit and read clean.
+    ///
+    /// Only the *ink* branch is gated. Tone and saturation still route a page to
+    /// pictures on their own, so the tinted-figure case the tone threshold exists
+    /// for (and the pale-colour case behind `pictureSaturationThreshold`) is
+    /// untouched: both of those fire on pages whose ink coverage is near zero.
+    static let pictureInkMinimumTone = 0.03
+
+    /// And any real colour means a page is not plain text — where "colour" means
+    /// colour the page's own paper does not already have. See `saturation`.
+    ///
+    /// **This gates the ROUTE only, as of 2026-08-26.** It gated the colour
+    /// decision as well until then, which is C9's "the same number charged
+    /// twice" and is C27's item (c): nothing could be given back to the colour
+    /// decision without also admitting pages to the picture route and paying
+    /// bytes on every one of them (R49/R50's trade). `colourSaturationThreshold`
+    /// is that decision's own bar now, and the two are equal today.
+    static let pictureSaturationThreshold = 0.06
+
+    /// …and this much before a page that is *already* on the picture route is
+    /// published in colour rather than in grey.
+    ///
+    /// **Split out of `pictureSaturationThreshold` for C27 (c) on 2026-08-26 and
+    /// deliberately equal to it, so the split changes no page's output.** What
+    /// it buys is that the two decisions can move independently. They could not
+    /// before, and that is why C27 (b) had to price the colour with a tool knob
+    /// (`score-mrc`'s `MRC_COLOUR=`) rather than with a lower bar: a bar low
+    /// enough to keep a page's colour also changed which pages were picture
+    /// pages, so the byte figure was two changes added together.
+    ///
+    /// Lowering this alone gives colour back to pages that reach
+    /// `shouldKeepColour` on their tone or their ink and are published grey
+    /// today, and it adds no page to the picture route — `wantColour` is
+    /// `!useBilevel && shouldKeepColour(…)`, and `useBilevel` is `isPicture`'s
+    /// answer or `spotColourLeavesBilevel`'s (C32, which reads only the sheet),
+    /// and this constant is in neither.
+    ///
+    /// ⛔ **DO NOT QUOTE C27 (b)'s +93.0 KB / 1.048x AS WHAT LOWERING THIS
+    /// BUYS — no legal value of this constant selects that set.** Those 13 are
+    /// *picture-route pages published grey*, and their own mean saturation —
+    /// the statistic this bar is compared against — runs from **0.000** up to
+    /// 0.057 in `C27-MASKTERMS-2026-08-26.tsv`: four of them read 0.000–0.002,
+    /// one reads 0.000, and the comparison is a strict `>`, so a bar cannot
+    /// reach them at any non-negative value. (b)'s figure is what forcing the
+    /// decision costs on that set, not a price for a bar. Found by the
+    /// adversarial review of this diff, which also caught the sentence this
+    /// paragraph replaced restating a 1.048x-against-1.080x comparison the
+    /// register had already retracted twice as a selection effect.
+    ///
+    /// ⛔ **And there is a FLOOR under any useful value, which is C9 again.**
+    /// `saturation(ofRGBA:)` records black text on stocks from white to strong
+    /// ochre reading **0.000–0.008**. A bar under about 0.008 therefore
+    /// re-promotes every tone-routed cream-paper page to three channels — the
+    /// exact mechanism of the 709 MB monograph — on the pages the route bar no
+    /// longer screens for this decision. Between that floor and the pages worth
+    /// reaching the window may be empty; nothing here has measured it.
+    ///
+    /// **No ordering against the route bar is asserted, because neither
+    /// direction is unreachable.** Above it, a page whose only reason for being
+    /// on the picture route is its colour is published in grey — reachable, and
+    /// a bad idea: it pays the picture route's bytes for colour it then discards,
+    /// which is C9's shape reversed. Below it, a page routed by tone or ink keeps
+    /// colour it does not keep today. The suite pins the equality rather than an
+    /// inequality because both are reachable.
+    ///
+    /// It does not reach the three pages of C27's ten that are 1-bit today: a
+    /// page off the picture route never asks this question, because `&&`
+    /// short-circuits on `!useBilevel`. Since C32 `colourSheetFractionThreshold`
+    /// does, through `spotColourLeavesBilevel`. ⛔ The register said
+    /// those three were *"(c)'s ground"*; measured off this call site, they are
+    /// not, and that sentence is corrected in C27's `#### The byte price, MEASURED`.
+    ///
+    /// The value was left at 0.06 by C27's window measurement: no value beats it.
+    static let colourSaturationThreshold = 0.06
+
+    /// C27, the second way a picture-route page keeps its colour: more than this
+    /// share of the thumbnail saturated above `colourSheetPixelFloor`, counting
+    /// only components that do not touch the render's border (`sheetFrac`).
+    ///
+    /// A mean cannot see spot colour — a red rule and a banner are 3-4% of a page
+    /// and need ~8% to reach 0.06 — so this counts coloured pixels instead, and
+    /// drops the border-connected ones because a photographed scanner surround is
+    /// saturated and is not the page (`Ford_1941` p5, `satFrac` 0.041 → 0.0045).
+    /// Measured in `C27-MASKTERMS-2026-08-26.tsv`: over the 48 grey picture-route
+    /// pages of the sample, the six eye-read real-colour pages read 0.0133-0.064
+    /// and every other page reads at most 0.0077 (`Stanford_1891` p3, brown
+    /// foxing). 0.01 sits between the two, ~1.3x from each. It misses
+    /// `Glazer_2002` p1 (a red rule and banner, 0.0055), which sits below two
+    /// artefacts; a rule-shape refinement that reached it would be fitted to that
+    /// one page, and was rejected. An addition to the mean bar, never a
+    /// replacement: `Atkinson_1939` p2 keeps its colour on the mean at a
+    /// `sheetFrac` of 0.0066.
+    ///
+    /// Since C32 it also takes a page off the 1-bit route
+    /// (`spotColourLeavesBilevel`), which the population above did not include;
+    /// C32 has that population's count.
+    static let colourSheetFractionThreshold = 0.01
+
+    /// The per-pixel saturation a pixel must exceed to count toward
+    /// `colourSheetFractionThreshold`. 0.25 is the floor C27 measured at: a scan
+    /// with no spot colour puts ~0.12% of itself above it, black on cream reads
+    /// 0.118 per pixel.
+    static let colourSheetPixelFloor = 0.25
+
+    /// C32: yellow to orange, the hue of aged paper and of ink toned by it.
+    /// Pixels of these hues do not count toward the sheet fraction that takes a
+    /// page off the 1-bit route. Without it the fraction put 41 corpus pages of
+    /// plain black type in colour (`HarpersMagazine-1938-05` pp3-9 read 95-99%
+    /// of their saturated pixels at 60-90°, `Levy and Temin` ~67% at 30-60°),
+    /// against red headings at 330-30°. A yellow or orange spot ink on a 1-bit
+    /// page stays black and white, as it did before C32.
+    static let paperHues: Range<Double> = 30..<90
+
+    /// C32: a page `spotColourLeavesBilevel` kept in colour is published in
+    /// colour only while its image costs at most this many times its own 1-bit
+    /// encoding; past it, it goes back to 1-bit, its answer before C32. Measured
+    /// by running the pipeline: red headings on `1954 - Why` pp5/8 cost 1.18x
+    /// and p9 (headings and a red drawing) 3.43x, while a colour banner costs
+    /// 4.3-4.8x on every page of `2013 - Silicon Valley Program Transcript` and
+    /// 7.4-10.6x on `AI 2027`, which without the limit grew those documents
+    /// 3.84x and 2.40x. Rejected: no limit, for those two growths.
+    static let spotColourPriceLimit = 4.0
+
+    /// C49: a 1-bit page's coloured ink is thresholded by its darkest channel,
+    /// not its luminance, so pink or light red type turns black rather than
+    /// white. `Kristol_1960` p1's pink UNZ notice renders at luminance 143-190,
+    /// above the page's Otsu, and was removed. The saturation bar is
+    /// `colourSheetPixelFloor`'s, and `paperHues` are left alone as C32 leaves them.
+    ///
+    /// Only while the ink it would turn black is type-shaped: past this share of
+    /// the page, or with more than `colourInkFieldLimit` of it inside a field
+    /// `colourInkFieldPoints` thick, the page is thresholded on luminance as
+    /// before, because a coloured panel or highlighter band would otherwise
+    /// become a black block over the words in it.
+    static let colourInkShareLimit = 0.02
+    static let colourInkFieldLimit = 0.2
+    static let colourInkFieldPoints = 2.0
+    /// The thumbnail share of such ink under which a page skips the colour render
+    /// the darkening needs. See `colourInkWorthReading`.
+    static let colourInkThumbnailFloor = 0.0005
+
+    /// Whether a C32 page's colour image, `colour` bytes, is past
+    /// `spotColourPriceLimit` against its `bilevel`-byte 1-bit encoding. An empty
+    /// 1-bit encoding is not a price, and the colour stays.
+    static func spotColourTooDear(colour: Int, bilevel: Int) -> Bool {
+        bilevel > 0 && Double(colour) > spotColourPriceLimit * Double(bilevel)
+    }
+
+    /// A pixel this bright is paper rather than ink, for the purpose of working
+    /// out what colour the paper is.
+    ///
+    /// 176 is 69% of white. Cream book stock measures 219–245 per channel and
+    /// clears it comfortably; text ink on the same page sits under 90. The value
+    /// only has to separate the two populations on a page that *has* two, and it
+    /// is not finely balanced — anything from about 140 to 200 selects the same
+    /// paper on the corpus.
+    static let paperLuminanceFloor = 176.0
+
+    /// …and this much of the page has to be paper before its colour is believed.
+    ///
+    /// Below it there is no paper to speak of — a full-bleed photograph, a dark
+    /// cover — and correcting for a "paper" measured from the brightest corner of
+    /// a photograph would neutralise a real colour cast. Such pages keep the
+    /// uncorrected measure, which is the behaviour that shipped.
+    static let minimumPaperFraction = 0.15
+
+    /// Below this, the largest embedded image is *not* the page's scan — it is a
+    /// logo, a rule or a figure on a born-digital page — and rebuilding at its
+    /// resolution destroys everything else on the sheet.
+    ///
+    /// Measured across the 78-document corpus, 214 sampled pages: 84 report
+    /// under 150 DPI and 35 under 72. The worst is a born-digital magazine page
+    /// carrying 1,846 characters of text whose largest image implies **1.9 DPI**
+    /// — it rebuilt a 595x841 pt page as a **16 x 23 pixel** image. The page
+    /// count still matched, so the run reported success.
+    ///
+    /// A genuine scan is essentially never below this. Treating a real 100 DPI
+    /// scan as 300 upsamples it, which costs bytes and loses nothing;
+    /// treating a logo's 1.9 DPI as the page's resolution loses the page.
+    /// The asymmetry is the whole argument for erring high.
+    static let minimumPlausibleScanDPI: Double = 150
+
+    /// What to rebuild at when the page's own resolution can't be trusted.
+    static let fallbackRebuildDPI: Double = 300
+
+    /// Refuse a page whose raster would be larger than this, rather than trying.
+    ///
+    /// `renderGrey` allocates `width * height` bytes, and a Swift array that
+    /// cannot be allocated is a **crash**, not a catchable error — so an
+    /// enormous sheet at a high native resolution took the whole process down,
+    /// taking every other file in flight with it.
+    ///
+    /// Deliberately a refusal and not a downscale: the policy for this pipeline
+    /// is fidelity, so a page is rendered at its own resolution or not at all.
+    /// A silent downscale would be the "publishing something plausible" that
+    /// invariant 1 forbids.
+    ///
+    /// 400 megapixels is a 33x44 inch E-size sheet at 600 DPI, so it does not
+    /// reject real archival material.
+    ///
+    /// ⛔ **The slack it has over this corpus is 6.17x, not the ~19x this comment
+    /// claimed until 2026-08-28.** That figure was the *78-document* corpus's
+    /// (21.5 MP, a 3600x5967 journal scan). The corpus is 233 files and 16,987
+    /// pages now, and its largest page is **64.84 MP** — recorded in this file
+    /// beside `maximumColourMRCPageMegapixels` (**not** beside
+    /// `maximumColourPageMegapixels` just below, whose *"one 64.8 MP page"* is a
+    /// peak-RSS measurement and a different fact), and in
+    /// `Tools/score-threshold-loss.swift`. The companion reassurance goes the same
+    /// way: not "none exceed 100 MP over 4,992 pages" but **none over 72 MP over
+    /// 16,987**. (The corpus's one duplicated file cannot move a maximum.)
+    /// `REVIEW-2026-08-14.md` had this recorded as an open finding since
+    /// 2026-08-14, citing line numbers that have since moved.
+    ///
+    /// **Nothing pins the 400 itself, on purpose** — `BUGS.md` T5 refused to,
+    /// because pinning it would assert a number rather than a property, and it
+    /// recorded `Tools/mutate.py`'s `const/maximumPageMegapixels` (400 → 40,000)
+    /// as a legitimate SURVIVOR for that reason. ⛔ **It is `killed` as of
+    /// 2026-08-28, by one check written for something else**:
+    /// `maximumColourMRCPageMegapixels` is the *derivation* 400 × 5.5 / 25 = 88,
+    /// and the suite asserts that derivation rather than the literal 88, so moving
+    /// this constant alone reds it in either direction. ⚠️ What is pinned is the
+    /// **relation**, not the value: re-derive `maximumColourMRCPageMegapixels`
+    /// alongside and that check goes green again — though the *next* one along
+    /// ("…and it is below the grey one") then reds, so a deliberate raise is three
+    /// edits. Which is the property T5 wanted: the value stays the corpus's to
+    /// validate, not the suite's.
+    static let maximumPageMegapixels = 400
+
+    /// The most megapixels a page may be before its colour is given up.
+    ///
+    /// Above it the page still rebuilds — in grey, as it always did — because a
+    /// coarser rendering of one big plate is a quality loss, while a failed
+    /// two-gigabyte allocation takes down every file running alongside it.
+    ///
+    /// **Derived from measurement, not from arithmetic.** The first version of
+    /// this said "a colour render is four bytes a pixel where grey is one, so a
+    /// quarter keeps peak memory unchanged", which is wrong twice over: the grey
+    /// buffer is still alive when the RGBA one is allocated, and both are then
+    /// copied into a 24-bit bitmap rep, a JPEG, and a decoded CGImage on the way
+    /// into the PDF. Measured peak RSS on one 64.8 MP page: **356 MB grey,
+    /// 1,261 MB colour** — 5.5 and 19.5 bytes per pixel, a ratio of 3.5, not 4.
+    ///
+    /// What makes 100 defensible is that it lands *below* a ceiling this app
+    /// already lived with: 100 MP of colour peaks near 1.95 GB, and a 400 MP
+    /// grey page — which `maximumPageMegapixels` has always allowed — peaks near
+    /// 2.20 GB. So colour cannot reach a high-water mark grey could not.
+    /// `colourBoundIsWithinTheGreyOne` checks that, so raising either constant
+    /// without re-measuring fails rather than quietly doubling the worst case.
+    static let maximumColourPageMegapixels = 100
+
+    /// Peak process bytes per pixel on each rebuild path, measured rather than
+    /// reasoned about — see `maximumColourPageMegapixels`. Re-measure if the
+    /// encoding path changes; they are here so the bound can be checked.
+    static let measuredGreyBytesPerPixel = 5.5
+    static let measuredColourBytesPerPixel = 19.5
+
+    /// Whether the colour bound's worst case stays inside the grey one's.
+    static var colourBoundIsWithinTheGreyOne: Bool {
+        Double(maximumColourPageMegapixels) * measuredColourBytesPerPixel
+            <= Double(maximumPageMegapixels) * measuredGreyBytesPerPixel
+    }
+
+    // The recogniser's own page-size limit, the DPI ceiling that kept pages
+    // inside it, and `engineAutoDPI` all lived here — about seventy lines of
+    // negotiating with a subprocess that re-rasterised our PDF at a resolution
+    // of its own choosing. 200 megapixels was *mac-ocr's* refusal, not Vision's,
+    // and R39 was the hole in that negotiation. Vision takes a 216-megapixel
+    // CGImage without complaint (measured), and `Recogniser` hands it the
+    // bitmaps this file already drew, so there is nothing left to negotiate.
+    //
+    // `maximumPageMegapixels` above still bounds what we will *render*, for
+    // R24's reason: an allocation that fails is a crash, not a catchable error.
+
+    /// The largest `/Width` or `/Height` worth believing from an image XObject.
+    /// Those are declarations, not measurements: `CGPDFInteger` is 64-bit, the
+    /// stream behind them can be three bytes, and nothing cross-checks the two.
+    /// 200,000 px is a 26-inch sheet at 7,700 DPI — past anything real, and
+    /// small enough that the product of two of them cannot overflow `Int` (R24).
+    static let maximumDeclaredImageSide = 200_000
+
+    /// `Int(_:)` traps for a Double that is not finite or is outside `Int`'s
+    /// range. Every dimension in this file descends from a number some document
+    /// declared, so the conversion is never safe on its own (R24).
+    static func safeInt(_ value: Double) -> Int {
+        guard value.isFinite else { return 0 }
+        if value >= 9.0e18 { return Int(9.0e18) }
+        if value <= -9.0e18 { return Int(-9.0e18) }
+        return Int(value)
+    }
+
+    enum Failure: LocalizedError {
+        case unreadable
+        case cannotWrite
+        case pageFailed(page: Int, of: Int)
+        case locked
+        case pageTooLarge(page: Int, megapixels: Int, dpi: Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadable: return "Could not read the PDF to rebuild it."
+            case .cannotWrite: return "Could not write the rebuilt PDF."
+            case .locked:
+                return "The PDF is password-protected. Enter its password in "
+                    + "Settings, under PDF password."
+            case .pageFailed(let page, let total):
+                return "Page \(page) of \(total) could not be rendered, "
+                    + "so the rebuild would have been missing a page."
+            case .pageTooLarge(let page, let megapixels, let dpi):
+                // Named numbers, so the size and where it came from are visible.
+                //
+                // The remedy has to be one that works. This used to send the
+                // user to "PDF render DPI", which is a real control with a
+                // convincing name and no effect here: it becomes mac-ocr's
+                // --pdf-dpi for the recognition pass, and this throws long
+                // before that runs. Flattener reads nothing from Prefs — the
+                // rebuild resolution is always the page's own. The only setting
+                // that lets the file through is the one that stops the rebuild
+                // happening at all (R26).
+                //
+                // **And the replacement was wrong too, which is R26 recurring**
+                // (A3.3). Turning the rebuild off is *not sufficient*:
+                // `Recogniser.render` applies the same `rebuildDPI` and the same
+                // megapixel guard on the non-rebuild path, and `pdfDPIAuto`
+                // defaults to true — so on a page declaring 2,100 DPI, rebuild off
+                // with Page DPI on Automatic **still fails**, while rebuild off
+                // with Page DPI set to 144 renders 1224×1584 and works. So the
+                // advertised remedy changed the message and not the outcome, while
+                // the setting the message explicitly disclaimed is the only one
+                // that helps. Both halves have to be named, in the order they have
+                // to be done.
+                return "Page \(page) would rebuild to \(megapixels) megapixels at "
+                    + "its own \(dpi) DPI, past the \(maximumPageMegapixels) MP limit. "
+                    + "Nothing was written. To process this file, turn off "
+                    + "\"Replace old selectable text\" in Settings **and** set "
+                    + "\"Reading detail\" to a fixed value such as 144 — leaving it "
+                    + "on Automatic takes the page's own DPI again and fails the "
+                    + "same way."
+            }
+        }
+    }
+
+    /// True if any page carries selectable text — the case that needs rebuilding.
+    /// Stops at the first hit rather than reading a 600-page book to the end.
+    static func hasEmbeddedText(_ url: URL, password: String? = nil) -> Bool {
+        guard let doc = open(url, password: password) else { return false }
+        for i in 0..<doc.pageCount {
+            let s = doc.page(at: i)?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !s.isEmpty { return true }
+        }
+        return false
+    }
+
+    /// Is this page a picture of a page, rather than a page?
+    ///
+    /// A scan is one big raster. 900 px across is about 110 DPI on a Letter
+    /// sheet — below that it is a figure, a logo or a cover thumbnail, not the
+    /// page itself. The upper bound rejects the absurd resolutions that come
+    /// from a mis-declared box rather than a scanner.
+    static func pageIsAnImage(_ page: PDFPage) -> Bool {
+        guard let largest = largestImage(of: page) else { return false }
+        return largest.pixelWidth >= 900 && largest.dpi >= 72 && largest.dpi <= 1400
+    }
+
+    /// Is **this page** born digital — real text of its own, over no page-sized
+    /// raster?
+    ///
+    /// C29. This is the exact predicate `hasDigitalText(in:)` applies to each
+    /// *sampled* page, lifted out and given a name so that the per-page question
+    /// can be asked per page. It is not a new signal: the entry's sharpest
+    /// finding is that the signal a fix needs already exists and is already
+    /// trusted, and only the **decision** was document-wide.
+    ///
+    /// ⛔ Extracted **and called from `hasDigitalText(in:)`**, which is the whole
+    /// point. `Model.swift`'s `willRebuild` comment records what the other shape
+    /// costs: a predicate lifted out "so the prose can be checked" and left with
+    /// no production caller is a duplicate of the thing under test that agrees
+    /// with it by construction, and six checks stayed green over one while the
+    /// product went back to lying. One definition, two callers, one vote — and
+    /// the suite watched it: cutting the raster term out of this function reds
+    /// `hasDigitalText`'s own pins, which is what says the wiring is real.
+    ///
+    /// ⛔ **It inherits every blindness `pageIsAnImage` has, and the one that bites
+    /// is its WIDTH BAR, not the resource cap.** A first draft named only the
+    /// `depth < 4` cap (C24's bare-form chain) — which `c17b3f3`'s 16,987-page sweep
+    /// found no corpus page of, so it bounds nothing real. The live one is
+    /// `pixelWidth >= 900`: an already-OCR'd scan digitised at 800 px across a Letter
+    /// sheet is 94 DPI, in range, under the width bar, so `pageIsAnImage` reads false
+    /// and a page that never had exact text is reported as having lost some. That is a
+    /// FALSE invariant-1 report on the app's own main input class. Not seen — 5 of the
+    /// 392 corpus firings were read at 1:1 and all five were real — but not excluded
+    /// either. Found by the adversarial review of this diff.
+    ///
+    /// ⛔ **AND THE WIDTH BAR IS NOT THE ONLY LIVE ONE — there is a SECOND, and it is
+    /// the INLINE IMAGE.** `pageIsAnImage` reads `largestImage`, which opens with
+    /// `guard drawsAnyXObject(page) != false`, and `drawsAnyXObject` counts **only the
+    /// `Do` operator**. A scan whose bitmap is drawn inline in the content stream
+    /// (`BI` / `ID` / `EI`) therefore reports "draws no XObject", `largestImage`
+    /// returns `nil`, `pageIsAnImage` is false, and an already-OCR'd page with 120
+    /// characters on it is reported as having lost exact text it never had — the same
+    /// false report as the width bar, by a different door. ⚠️ **The `nil` bucket is
+    /// populated**: the corpus table in `BUGS.md` C29 has a firing whose `largestImage`
+    /// is `nil` (`Henry Morgenthau papers` p188). That one was read at 1:1 and is a
+    /// true positive — it is a finding aid, not an inline-image scan — but only 5 of
+    /// the 392 firings were read at all, so nothing excludes the class. Found by the
+    /// adversarial review of the adoption that pushed `591d3f3`, which is the second
+    /// review to add a blindness to this list.
+    ///
+    /// ✅ **Both blindnesses are closed for the already-OCR'd scan, 2026-09-25**, by
+    /// the third term: a page whose own content stream shows more text invisibly
+    /// (render mode 3 or 7) than visibly is an OCR layer over a picture, whatever
+    /// `pageIsAnImage` made of the picture, Form XObjects included. ✅ **And the
+    /// width bar is gone from this predicate, 2026-09-28** (C43): a narrow or inline
+    /// scan whose text layer is drawn visibly, or which has none and a vector header,
+    /// is caught by `pageIsMostlyScan`'s area instead.
+    static func pageHasDigitalText(_ page: PDFPage) -> Bool {
+        // 120 characters is about two lines. Below that a page is a plate, a
+        // blank, or a part title, and `bornDigitalVerdict` asks a stricter
+        // question of it.
+        let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return text.count >= 120 && !pageIsMostlyScan(page) && !carriesAnOCRLayer(page)
+    }
+
+    /// Is this page a scan: is its visible ink mostly images at scan resolution?
+    ///
+    /// C43. The verdict used to ask `pageIsAnImage`, whose question is one image's
+    /// pixel width, and it was wrong both ways: a Newsday page scanned as three
+    /// 448-472 px column strips (79% of the page) passed through unread under a
+    /// ProQuest header, and a transcript with a 1812 px banner over 12% of each page
+    /// was rasterised whole. Two questions replace it. How much of the page do
+    /// images drawn at 50 DPI or more cover — half, or a tenth when one of them is
+    /// page-sized by the old rule (a clipping on a sheet)? And, when that says scan,
+    /// does the page's own text stand beside the images rather than under them:
+    /// `textStandsBesideImages`, which keeps a full-page figure with its caption.
+    /// An unreadable stream falls back to the width rule.
+    static func pageIsMostlyScan(_ page: PDFPage) -> Bool {
+        let box = page.bounds(for: .cropBox)
+        let area = Double(box.width * box.height)
+        guard area > 0, let profile = contentProfile(page) else { return pageIsAnImage(page) }
+        let mostly = profile.scanArea >= 0.5 * area
+        guard mostly || (profile.scanArea >= 0.1 * area && pageIsAnImage(page)) else { return false }
+        return !textStandsBesideImages(page, images: profile.scanRects, box: box,
+                                       minimum: mostly ? 350 : 250)
+    }
+
+    /// Does the page carry at least `minimum` visible characters outside every
+    /// image, and are they three fifths of its text? An OCR layer lies under its
+    /// picture (the corpus's scans put at most 46% beside it), and a vendor's header
+    /// is two or three lines (156-289 characters on the corpus's ProQuest pages); a
+    /// caption or a page of type beside a figure is neither (Surani's full-page maps
+    /// carry 378 and 587, the Silicon Valley transcript's last page 298 beside its
+    /// banner). A character PDFKit places off the page counts as covered: a flipped
+    /// text matrix does that.
+    static func textStandsBesideImages(_ page: PDFPage, images: [CGRect], box: CGRect,
+                                       minimum: Int) -> Bool {
+        let text = (page.string ?? "") as NSString
+        var visible = 0, beside = 0
+        for i in 0..<text.length {
+            guard let scalar = Unicode.Scalar(text.character(at: i)),
+                  !CharacterSet.whitespacesAndNewlines.contains(scalar) else { continue }
+            let bounds = page.characterBounds(at: i)
+            guard !bounds.isEmpty else { continue }
+            visible += 1
+            let middle = CGPoint(x: bounds.midX, y: bounds.midY)
+            if box.contains(middle) && !images.contains(where: { $0.contains(middle) }) { beside += 1 }
+        }
+        return beside >= minimum && beside * 5 >= visible * 3
+    }
+
+    /// Does the page draw most of its text invisibly? That is
+    /// what an OCR layer is. An unreadable stream answers yes: this term can only
+    /// keep a page off the passthrough, and a page nothing recognises is the loss
+    /// the passthrough must never cause.
+    static func carriesAnOCRLayer(_ page: PDFPage) -> Bool {
+        guard let profile = contentProfile(page) else { return true }
+        return profile.invisibleShows > profile.visibleShows
+    }
+
+    /// What `digitalPageRoutes` does with one page.
+    enum BornDigitalVerdict: Equatable {
+        /// Copied through with its own text, fonts and images.
+        case passThrough
+        /// Rasterised and recognised although it carried exact text of its own,
+        /// so the run report names it.
+        case rasterisedExact
+        /// Rasterised and recognised, and nothing is said: a scan, a blank page,
+        /// or an OCR layer being replaced.
+        case rebuild
+    }
+
+    /// C29's per-page rule, including the page under 120 characters.
+    ///
+    /// A long page is `pageHasDigitalText`'s. A SHORT page — a half-title, a part
+    /// title, "this page intentionally left blank" — is passed through only when its
+    /// content stream proves it holds no picture at all: text shown visibly, none
+    /// shown invisibly, no XObject invoked and no inline image.
+    /// That shuts both doors `pageIsAnImage` leaves open (a scan under 900 px
+    /// across, and a scan drawn inline with `BI`/`ID`/`EI`), because a short page
+    /// is never trusted to that width bar at all, and it shuts out every
+    /// already-OCR'd scan by its render mode 3 layer.
+    ///
+    /// Rejected: lowering the 120 bar under the same two terms. A passthrough
+    /// page is never recognised, so a false positive loses the page's text
+    /// silently (invariant 1), and those two terms are exactly the ones with the
+    /// known misses.
+    ///
+    /// A short page with exact visible text that draws an image anyway — a
+    /// half-title with a printer's ornament, or a narrow scan with a vector stamp
+    /// — is still rebuilt, since the picture may be the page, and is REPORTED,
+    /// which is wrong in the loud direction when the picture is a scan. One that
+    /// `pageIsMostlyScan` calls a scan is rebuilt quietly: that is a scan with a
+    /// stamp on it, the app's main input.
+    ///
+    /// The same caution covers the places a picture hides without an XObject: a
+    /// shading, a pattern fill, a Type 3 font (whose glyphs may be bitmaps), an
+    /// annotation other than a link, and type outlined as paths — more than
+    /// `shortPagePathLimit` painted paths. Each sends the page to the report instead.
+    ///
+    /// A LONG page refused only because its text is mostly invisible, but with some
+    /// text drawn visibly and no page-sized picture, is reported too: that is either
+    /// a narrow scan with a vector banner or a born-digital page with hidden text,
+    /// and the second would otherwise lose its exact text in silence.
+    static func bornDigitalVerdict(_ page: PDFPage) -> BornDigitalVerdict {
+        let text = page.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if text.count >= 120 {
+            if pageHasDigitalText(page) { return .passThrough }
+            guard let profile = contentProfile(page), profile.visibleShows > 0,
+                  !pageIsMostlyScan(page) else { return .rebuild }
+            return .rasterisedExact
+        }
+        guard !text.isEmpty, let profile = contentProfile(page),
+              profile.visibleShows > 0, profile.invisibleShows == 0 else { return .rebuild }
+        let annotated = page.annotations.contains { $0.type != "Link" }
+        if profile.xObjects == 0 && profile.inlineImages == 0 && profile.unreadPaint == 0
+            && profile.paintedPaths <= shortPagePathLimit && !annotated { return .passThrough }
+        return pageIsMostlyScan(page) ? .rebuild : .rasterisedExact
+    }
+
+    /// Painted paths a short page may carry and still pass through. A part title's
+    /// rules and ornaments are a handful; a line of outlined type is a path a glyph.
+    static let shortPagePathLimit = 20
+
+    /// Counts over the operators a page draws, Form XObjects entered (an OCR layer
+    /// is often drawn inside one) to a depth of 8. Type 3 glyph procedures, tiling
+    /// patterns and annotation appearances are not entered; the fields below say
+    /// when one was used, so a caller can refuse what this could not read.
+    struct ContentProfile: Equatable {
+        /// Text-showing operators (`Tj`, `TJ`, `'`, `"`) under a visible render mode.
+        var visibleShows = 0
+        /// The same under render mode 3 (invisible) or 7 (clip only).
+        var invisibleShows = 0
+        /// Inline images, `BI` … `EI`, which `drawsAnyXObject` cannot see.
+        var inlineImages = 0
+        /// `Do` operators: images and forms alike.
+        var xObjects = 0
+        /// Paths painted (`f`, `S`, `B` and their variants): outlined type is paths.
+        var paintedPaths = 0
+        /// Shadings (`sh`), pattern colour spaces and Type 3 fonts selected — the
+        /// places a picture can hide that are not read here.
+        var unreadPaint = 0
+        /// Area in points² the page's images are drawn over at 50 DPI or more — each
+        /// `Do` of an image and each inline image, placed by the CTM in force. Overlaps
+        /// count twice. A stretched background or gradient of a few pixels is not a scan.
+        var scanArea: Double = 0
+        /// Where those images are drawn, each as its bounding box in page space.
+        var scanRects: [CGRect] = []
+    }
+
+    /// `nil` when the stream could not be read — no operator of any kind came back,
+    /// `drawsAnyXObject`'s rule.
+    static func contentProfile(_ page: PDFPage) -> ContentProfile? {
+        guard let cgPage = page.pageRef, let table = CGPDFOperatorTableCreate() else { return nil }
+        final class State {
+            var profile = ContentProfile()
+            var operators = 0
+            // The render mode is graphics state, so `q`/`Q` save and restore it.
+            var mode: CGPDFReal = 0
+            var saved: [CGPDFReal] = []
+            var ctm = CGAffineTransform.identity
+            var savedCTM: [CGAffineTransform] = []
+            var depth = 0
+            let table: CGPDFOperatorTableRef
+            init(table: CGPDFOperatorTableRef) { self.table = table }
+            func show() {
+                operators += 1
+                if mode == 3 || mode == 7 { profile.invisibleShows += 1 } else { profile.visibleShows += 1 }
+            }
+        }
+        let state = State(table: table)
+        // One literal closure per operator: a C callback cannot capture.
+        for op in ["Tj", "TJ", "'", "\""] {
+            CGPDFOperatorTableSetCallback(table, op) { _, info in
+                guard let info else { return }
+                Unmanaged<State>.fromOpaque(info).takeUnretainedValue().show()
+            }
+        }
+        CGPDFOperatorTableSetCallback(table, "Tr") { scanner, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            // A number, not an integer: `3.0 Tr` is legal and `PopInteger` refuses it.
+            var mode: CGPDFReal = 0
+            if CGPDFScannerPopNumber(scanner, &mode) { s.mode = mode.rounded() }
+        }
+        CGPDFOperatorTableSetCallback(table, "Tf") { scanner, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            var size: CGPDFReal = 0
+            var name: UnsafePointer<CChar>?
+            guard CGPDFScannerPopNumber(scanner, &size), CGPDFScannerPopName(scanner, &name),
+                  let name,
+                  let font = CGPDFContentStreamGetResource(
+                      CGPDFScannerGetContentStream(scanner), "Font", name) else { return }
+            var dict: CGPDFDictionaryRef?
+            var subtype: UnsafePointer<CChar>?
+            if CGPDFObjectGetValue(font, .dictionary, &dict), let dict,
+               CGPDFDictionaryGetName(dict, "Subtype", &subtype), let subtype,
+               String(cString: subtype) == "Type3" { s.profile.unreadPaint += 1 }
+        }
+        for op in ["cs", "CS"] {
+            CGPDFOperatorTableSetCallback(table, op) { scanner, info in
+                guard let info else { return }
+                let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+                s.operators += 1
+                var name: UnsafePointer<CChar>?
+                guard CGPDFScannerPopName(scanner, &name), let name else { return }
+                let key = String(cString: name)
+                if key == "Pattern" { s.profile.unreadPaint += 1; return }
+                // A named colour space may itself be a pattern space.
+                guard let space = CGPDFContentStreamGetResource(
+                        CGPDFScannerGetContentStream(scanner), "ColorSpace", name) else { return }
+                var array: CGPDFArrayRef?
+                var family: UnsafePointer<CChar>?
+                var bare: UnsafePointer<CChar>?
+                if CGPDFObjectGetValue(space, .array, &array), let array,
+                   CGPDFArrayGetName(array, 0, &family), let family,
+                   String(cString: family) == "Pattern" { s.profile.unreadPaint += 1 }
+                if CGPDFObjectGetValue(space, .name, &bare), let bare,
+                   String(cString: bare) == "Pattern" { s.profile.unreadPaint += 1 }
+            }
+        }
+        CGPDFOperatorTableSetCallback(table, "sh") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            s.profile.unreadPaint += 1
+        }
+        for op in ["f", "F", "f*", "S", "s", "B", "B*", "b", "b*"] {
+            CGPDFOperatorTableSetCallback(table, op) { _, info in
+                guard let info else { return }
+                let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+                s.operators += 1
+                s.profile.paintedPaths += 1
+            }
+        }
+        CGPDFOperatorTableSetCallback(table, "q") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            s.saved.append(s.mode)
+            s.savedCTM.append(s.ctm)
+        }
+        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            if let mode = s.saved.popLast() { s.mode = mode }
+            if let ctm = s.savedCTM.popLast() { s.ctm = ctm }
+        }
+        CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            var v = [CGPDFReal](repeating: 0, count: 6)
+            for i in (0..<6).reversed() { guard CGPDFScannerPopNumber(scanner, &v[i]) else { return } }
+            s.ctm = CGAffineTransform(a: v[0], b: v[1], c: v[2], d: v[3], tx: v[4], ty: v[5])
+                .concatenating(s.ctm)
+        }
+        CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            s.profile.xObjects += 1
+            // Enter a form, the way the renderer does: inside an implicit `q`/`Q`,
+            // with its own resources and the caller's as the fallback.
+            var name: UnsafePointer<CChar>?
+            guard s.depth < 8, CGPDFScannerPopName(scanner, &name), let name else { return }
+            let parent = CGPDFScannerGetContentStream(scanner)
+            var stream: CGPDFStreamRef?
+            var subtype: UnsafePointer<CChar>?
+            guard let object = CGPDFContentStreamGetResource(parent, "XObject", name),
+                  CGPDFObjectGetValue(object, .stream, &stream), let stream,
+                  let dict = CGPDFStreamGetDictionary(stream),
+                  CGPDFDictionaryGetName(dict, "Subtype", &subtype), let subtype else { return }
+            if String(cString: subtype) == "Image" {
+                let area = abs(Double(s.ctm.a * s.ctm.d - s.ctm.b * s.ctm.c))
+                var w: CGPDFInteger = 0, h: CGPDFInteger = 0
+                if area > 0, CGPDFDictionaryGetInteger(dict, "Width", &w),
+                   CGPDFDictionaryGetInteger(dict, "Height", &h),
+                   Double(w) * Double(h) * 72 * 72 >= 50 * 50 * area {
+                    s.profile.scanArea += area
+                    s.profile.scanRects.append(CGRect(x: 0, y: 0, width: 1, height: 1).applying(s.ctm))
+                }
+                return
+            }
+            guard String(cString: subtype) == "Form" else { return }
+            var resources: CGPDFDictionaryRef?
+            _ = CGPDFDictionaryGetDictionary(dict, "Resources", &resources)
+            let child = CGPDFContentStreamCreateWithStream(stream, resources ?? dict, parent)
+            let inner = CGPDFScannerCreate(child, s.table, info)
+            let mode = s.mode, saved = s.saved, ctm = s.ctm, savedCTM = s.savedCTM
+            var matrix: CGPDFArrayRef?
+            var m = [CGPDFReal](repeating: 0, count: 6)
+            if CGPDFDictionaryGetArray(dict, "Matrix", &matrix), let matrix,
+               (0..<6).allSatisfy({ CGPDFArrayGetNumber(matrix, $0, &m[$0]) }) {
+                s.ctm = CGAffineTransform(a: m[0], b: m[1], c: m[2], d: m[3], tx: m[4], ty: m[5])
+                    .concatenating(s.ctm)
+            }
+            s.depth += 1
+            CGPDFScannerScan(inner)
+            s.depth -= 1
+            s.mode = mode; s.saved = saved; s.ctm = ctm; s.savedCTM = savedCTM
+            CGPDFScannerRelease(inner)
+            CGPDFContentStreamRelease(child)
+        }
+        // CoreGraphics hands an inline image to the `EI` callback whole; `BI` and
+        // `ID` never fire (measured 2026-09-25).
+        CGPDFOperatorTableSetCallback(table, "EI") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.operators += 1
+            s.profile.inlineImages += 1
+            // Its size is not read here, so it counts at any resolution.
+            s.profile.scanArea += abs(Double(s.ctm.a * s.ctm.d - s.ctm.b * s.ctm.c))
+            s.profile.scanRects.append(CGRect(x: 0, y: 0, width: 1, height: 1).applying(s.ctm))
+        }
+        for op in ["BT", "re", "gs"] {
+            CGPDFOperatorTableSetCallback(table, op) { _, info in
+                guard let info else { return }
+                Unmanaged<State>.fromOpaque(info).takeUnretainedValue().operators += 1
+            }
+        }
+        let stream = CGPDFContentStreamCreateWithPage(cgPage)
+        let scanner = CGPDFScannerCreate(stream, table, Unmanaged.passUnretained(state).toOpaque())
+        CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+        CGPDFContentStreamRelease(stream)
+        CGPDFOperatorTableRelease(table)
+        return state.operators > 0 ? state.profile : nil
+    }
+
+    /// The 1-based numbers of the pages a rebuild rasterises **even though they
+    /// are born digital** — C29, and invariant 1's "must report it".
+    ///
+    /// A rebuild renders every page to a raster and recognises that, so a page
+    /// that carried exact text of its own comes out carrying OCR of a picture of
+    /// that text instead. On the JSTOR download C29 was found on, page 1's
+    /// *American Sociological Association* came out `AMFAKAN FOCAX ONCAL
+    /// ASSOXUTION`: a search that worked on the input fails on the output. That
+    /// is one text layer replaced by a worse one, and nothing said so.
+    ///
+    /// Measured over the 233-document corpus, 2026-08-25: **42 documents and 392
+    /// pages of 16,987** hold at least one such page, and on **38 of the 42**
+    /// `hasDigitalText` returns false — so on those the run report is the only
+    /// thing that mentions it at all.
+    ///
+    /// ⚠️ Every page is walked, where `hasEmbeddedText` stops at the first hit and
+    /// `hasDigitalText` reads four. It is affordable **only** because the caller
+    /// is already about to render every one of these pages at its own resolution:
+    /// this is one PDFKit text extraction a page, plus — **on the pages that clear the
+    /// character bar** — one whole-content-stream scan and one resource-dictionary
+    /// walk, against one full-page rasterise **and one OCR pass** a page. ⚠️ The text
+    /// extraction is the dominant term and a first draft of this comment omitted it
+    /// (the review of this diff caught that), so on a text-heavy book the walk is not
+    /// as cheap as "a dictionary walk" suggests — only cheap enough. ⛔ **And the
+    /// content-stream scan was omitted TOO, by the same comment, and found by the next
+    /// review**: `pageIsAnImage` → `largestImage` opens with
+    /// `guard drawsAnyXObject(page) != false`, and that builds a `CGPDFOperatorTable`
+    /// and runs `CGPDFScannerScan` over the page's **entire** content stream, once per
+    /// page, with no memo of any kind. ⚠️ **"On the pages that clear the bar" is load
+    /// bearing and a draft of this correction missed it**: `&&` short-circuits, so a
+    /// page under 120 characters pays the text extraction ALONE — which is why a book
+    /// of plates is cheap here and a text-heavy one is not. ⚠️ And do **not** reach for
+    /// `largestImage`'s 5.09 s to price this: that figure is R25's *dictionary re-walk*
+    /// blowup at 60 forms, the cost the `walkedAt` memo REMOVED, and it prices neither
+    /// the scanner nor today's walk. **This cost comment has now been corrected twice
+    /// for an omitted term; price it by reading the call chain, not by reading this
+    /// sentence.** It is also the
+    /// fourth `open` of the same URL in `makeSearchablePDF`. Do not call it on the
+    /// non-rebuild route — nothing is replaced there, so there is nothing to report —
+    /// and the caller guards it on cancellation.
+    ///
+    /// ⚠️ Since 2026-09-25 a page under the bar pays one content-stream scan too, and
+    /// the pages over it a second (`carriesAnOCRLayer`) when `pageIsAnImage` said no.
+    static func digitalTextPages(in url: URL, password: String? = nil) -> [Int] {
+        digitalPageRoutes(in: url, password: password).passThrough
+    }
+
+    /// `bornDigitalVerdict` over every page, in one walk: the 1-based pages to copy
+    /// through, and the short pages rasterised although they carried exact text,
+    /// which the run report names beside the passthrough's residue.
+    static func digitalPageRoutes(in url: URL, password: String? = nil)
+        -> (passThrough: [Int], rasterisedExact: [Int]) {
+        // ⛔ `[]` on a file that will not open is a SILENT answer, and the DIRECTION is
+        // what a draft of this got wrong: it was justified as "`hasEmbeddedText`'s
+        // existing convention", but that function returning `false` on failure makes
+        // the app do *more* work — it declines to suppress a rebuild — whereas `[]`
+        // here makes the app **say nothing**, and is indistinguishable at the call site
+        // from "no affected pages". That is the shape invariant 1 forbids, in the
+        // function written to satisfy it. Kept rather than changed because the caller
+        // has just opened this same URL successfully through `flatten`, so production
+        // reaches it only on a file that stopped being readable mid-run — but it is a
+        // LIMIT, not an inherited convention, and nothing checks it. Refuted by the
+        // adversarial review of the adoption that pushed `591d3f3`.
+        guard let doc = open(url, password: password) else { return ([], []) }
+        var through: [Int] = [], exact: [Int] = []
+        for index in 0..<doc.pageCount {
+            guard let page = doc.page(at: index) else { continue }
+            switch bornDigitalVerdict(page) {
+            case .passThrough: through.append(index + 1)
+            case .rasterisedExact: exact.append(index + 1)
+            case .rebuild: break
+            }
+        }
+        return (through, exact)
+    }
+
+    /// `wanted` page indices spread through a document of `count` pages, in
+    /// ascending order and **never repeating**.
+    ///
+    /// One definition because there were five, four of them different, and two of
+    /// those repeated a page: `score-text-route` measured page 1 **three times**
+    /// on a five-page document (27 of 233 corpus documents are short enough to
+    /// hit it), and `score-routing`'s `[1, n/3, n/2, n*3/4]` is `[1, 1, 2, 3]` at
+    /// n=5. A sample that repeats a page weights it twice in every average taken
+    /// over the sample, and both tools average (`REVIEW-2026-08-14.md` A12.8).
+    ///
+    /// Page 1 is deliberately never chosen when the whole document does not fit:
+    /// a born-digital book often has a raster cover and a scan often has a clean
+    /// title page, so it is the least informative page in either.
+    ///
+    /// Distinct by construction rather than by a `Set`: with `n < count` the step
+    /// `count / (n + 1)` is at least 1, and a half-open interval of length ≥ 1
+    /// always contains an integer, so the floors strictly increase.
+    ///
+    /// The `n == count` line is a statement, not a shortcut: the general formula
+    /// gives `[0 ..< count]` there anyway, since `floor(k·c / (c+1)) = k − 1` for
+    /// every `k ≤ c`. It is kept because "the whole document" should not depend on
+    /// the reader noticing that identity, and the suite's distinctness, order,
+    /// range and count checks pin the two to the same answer.
+    static func sampleIndices(count: Int, wanted: Int) -> [Int] {
+        guard count > 0, wanted > 0 else { return [] }
+        let n = min(wanted, count)
+        if n == count { return Array(0..<count) }
+        return (0..<n).map { ($0 + 1) * count / (n + 1) }
+    }
+
+    /// Does this file already carry **real digital text**, as opposed to an OCR
+    /// layer over a scan?
+    ///
+    /// This is the whole of C17, and the distinction is not "does it have text".
+    /// Both kinds of file do. The difference is what the text sits on:
+    ///
+    /// - a **scan** that has been OCR'd before has text *over a full-page image*.
+    ///   Rebuilding it is right — that strips a previous OCR pass which would
+    ///   otherwise double up, which is why `rebuildImages` defaults on.
+    /// - a **born-digital** page has text and no page-sized raster at all.
+    ///   Rebuilding it throws away better text than Vision can produce and
+    ///   replaces it with OCR of a picture of that text. Measured on three pages
+    ///   of a born-digital book: 1,031 words became 938, and only 86.1% of the
+    ///   output's words existed in the original.
+    ///
+    /// Pages are sampled through the document rather than from the front: a
+    /// born-digital book often has a raster cover, and a scan often has a clean
+    /// title page, so page 1 is the least informative page in either.
+    ///
+    /// Conservative by construction — it answers "yes" only when a majority of
+    /// sampled pages carry substantial text *and* no page-sized image. A
+    /// false negative costs the user nothing but the warning; a false positive
+    /// puts a question in front of someone who did not need one.
+    static func hasDigitalText(_ url: URL, password: String? = nil) -> Bool {
+        guard let doc = open(url, password: password) else { return false }
+        return hasDigitalText(in: doc)
+    }
+
+    /// The same question against a document that is already open.
+    ///
+    /// Exists so a *tool* can ask it without re-opening the file it is already
+    /// holding — and, more to the point, so that no tool has an excuse to
+    /// re-implement the rule. `Tools/classify-source.swift` had its own copy of
+    /// `pageIsAnImage` for a week, with a different predicate, and the corpus
+    /// gate whose only job is D1 consequently admitted the two documents this
+    /// function calls born-digital (`REVIEW-2026-08-14.md` A12.4).
+    static func hasDigitalText(in doc: PDFDocument) -> Bool {
+        guard doc.pageCount > 0 else { return false }
+        let indices = sampleIndices(count: doc.pageCount, wanted: 4)
+
+        var digital = 0, sampled = 0
+        for i in indices {
+            guard let page = doc.page(at: i) else { continue }
+            sampled += 1
+            // Through `pageHasDigitalText`, not a copy of its terms: C29's
+            // report asks the same question of every page, and two copies of one
+            // rule is how `classify-source.swift` came to disagree with this
+            // function for a week (A12.4, cited above).
+            if pageHasDigitalText(page) { digital += 1 }
+        }
+        guard sampled > 0 else { return false }
+        return digital * 2 > sampled
+    }
+
+    /// A PDF wrapping an image file, so the rest of the pipeline — which is all
+    /// PDF-shaped — can accept the PNG/JPEG/HEIC/TIFF inputs the drop box
+    /// advertises. Previously those failed with "Could not read the rebuilt PDF",
+    /// which blamed the user's file.
+    ///
+    /// **One page per image in the file, not one page.** A container format can
+    /// hold many: a multi-page TIFF is the standard output of every sheet-fed
+    /// archival scanner, and reading only image 0 silently discarded every sheet
+    /// after the first — a whole document reduced to its cover page, published
+    /// as a success because one page in is one page out.
+    static func wrapImage(_ url: URL, into directory: URL) -> URL? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        let count = CGImageSourceGetCount(source)
+        guard count > 0 else { return nil }
+
+        /// One image, oriented, with the page size its resolution implies.
+        func page(at index: Int) -> (image: CGImage, box: CGRect)? {
+            guard let decoded = CGImageSourceCreateImageAtIndex(source, index, nil)
+            else { return nil }
+            let props = CGImageSourceCopyPropertiesAtIndex(source, index, nil)
+                as? [CFString: Any]
+
+            // EXIF orientation, which CGImageSourceCreateImageAtIndex does *not*
+            // apply — it hands back the stored pixels. A phone photo shot in
+            // portrait is stored landscape with an orientation tag, so it was
+            // wrapped sideways: a landscape page with the text running up it.
+            //
+            // Rendered through CoreImage rather than by composing the transform
+            // by hand. Hand-rolled quarter-turn arithmetic is what drew rotated
+            // PDF pages off-canvas, and these are single images, not books.
+            var image = decoded
+            let raw = (props?[kCGImagePropertyOrientation] as? UInt32) ?? 1
+            if raw != 1, let orientation = CGImagePropertyOrientation(rawValue: raw) {
+                let oriented = CIImage(cgImage: decoded).oriented(orientation)
+                if let turned = CIContext().createCGImage(oriented, from: oriented.extent) {
+                    image = turned
+                }
+            }
+
+            // Both axes, separately. A scanner or fax can record different
+            // horizontal and vertical resolution — 200x100 dpi is a standard fax
+            // mode — and using the horizontal figure for both squashed the page
+            // by the ratio between them. 72 dpi unless the file says otherwise,
+            // so an image with no resolution recorded still gets a sensible size.
+            // Bounded at **both** ends (A3.4). It only guarded from below, so at
+            // 1.0001 DPI a 200×100 px image became a 200×100 **inch** page and died
+            // at the megapixel gate quoting A3.3's remedy, and at 1e6 DPI it
+            // *succeeded* and published a 1/5000-inch page. Neither is a resolution
+            // any scanner or camera records; both come from a malformed or hostile
+            // file. 4,800 DPI is drum-scanner territory and twice any flatbed's
+            // optical maximum, so anything past it is a declaration to disbelieve
+            // rather than a page to render.
+            func resolution(_ key: CFString) -> Double {
+                (props?[key] as? Double)
+                    .flatMap { $0 > 1 && $0 <= 4800 ? $0 : nil } ?? 72
+            }
+            var dpiX = resolution(kCGImagePropertyDPIWidth)
+            var dpiY = resolution(kCGImagePropertyDPIHeight)
+            // A quarter turn swaps which axis each resolution describes.
+            if [5, 6, 7, 8].contains(raw) { swap(&dpiX, &dpiY) }
+            if dpiX == 72, dpiY == 72, let fitted = cameraResolution(
+                width: image.width, height: image.height, properties: props) {
+                dpiX = fitted; dpiY = fitted
+            }
+
+            return (image, CGRect(x: 0, y: 0,
+                                  width: Double(image.width) * 72.0 / dpiX,
+                                  height: Double(image.height) * 72.0 / dpiY))
+        }
+
+        guard let first = page(at: 0) else { return nil }
+        var box = first.box
+        let dest = directory.appendingPathComponent(
+            url.deletingPathExtension().lastPathComponent + ".pdf")
+        guard let pdf = CGContext(dest as CFURL, mediaBox: &box, nil) else { return nil }
+
+        for index in 0..<count {
+            // Refusing beats dropping: a sheet we cannot decode must not vanish
+            // from the middle of a document with the run still reporting success.
+            guard let this = index == 0 ? first : page(at: index) else {
+                pdf.closePDF()
+                try? FileManager.default.removeItem(at: dest)
+                return nil
+            }
+            // Per-page box as CFData — sheets in one TIFF need not match, and an
+            // NSValue here is silently ignored (invariant 4).
+            var pageBox = this.box
+            let boxData = withUnsafeBytes(of: &pageBox) { Data($0) } as CFData
+            pdf.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+            pdf.draw(this.image, in: pageBox)
+            pdf.endPDFPage()
+        }
+        pdf.closePDF()
+        return dest
+    }
+
+    /// The resolution to give a camera's photo of a page, or `nil` when the image
+    /// is not a camera's.
+    ///
+    /// photo-pdf-size. A camera records 72 dpi, which is no resolution at all, so
+    /// the owner's 1936x2592 phone photo of a typed letter became a 27x36 inch
+    /// page. A camera image is one whose TIFF dictionary names a Make or Model; a
+    /// scanner that names itself and declares a true 72 dpi is fitted too, which
+    /// changes its stated size and nothing else. The caller asks only when the
+    /// file declared 72 dpi or nothing. It is fitted
+    /// to a US Letter sheet in its own orientation, which puts Baker at 236 ppi
+    /// (592x792 pt; ABBYY assumed 290). Rejected: the paper's own size, which
+    /// needs its edge found in the photo, and A4, 3% larger on the long side, a
+    /// difference no reader would notice. Never below 72, so a small photo keeps
+    /// the size it had.
+    static func cameraResolution(width: Int, height: Int,
+                                 properties: [CFString: Any]?) -> Double? {
+        guard cameraTagged(properties), width > 0, height > 0 else { return nil }
+        let short = Double(min(width, height)), long = Double(max(width, height))
+        return max(72, short / 8.5, long / 11)
+    }
+
+    /// Whether an image's TIFF dictionary names a Make or Model: a camera's, or a scanner
+    /// that names itself.
+    static func cameraTagged(_ properties: [CFString: Any]?) -> Bool {
+        let tiff = properties?[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
+        return [kCGImagePropertyTIFFMake, kCGImagePropertyTIFFModel].contains {
+            !((tiff?[$0] as? String) ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    /// Whether an image is a camera's photo by its tags: a Make or Model, and an exposure
+    /// (an f-number, an exposure time or a lens), which a camera records and a scanner
+    /// that names itself does not.
+    static func cameraExposed(_ properties: [CFString: Any]?) -> Bool {
+        let exif = properties?[kCGImagePropertyExifDictionary] as? [CFString: Any]
+        return cameraTagged(properties) && [kCGImagePropertyExifFNumber, kCGImagePropertyExifExposureTime,
+                                            kCGImagePropertyExifLensModel].contains { exif?[$0] != nil }
+    }
+
+    /// Opens a PDF, unlocking it if a password is supplied. Returns nil when the
+    /// file is unreadable or still locked afterwards.
+    static func open(_ url: URL, password: String?) -> PDFDocument? {
+        guard let doc = PDFDocument(url: url) else { return nil }
+        if doc.isLocked, let password, !password.isEmpty {
+            _ = doc.unlock(withPassword: password)
+        }
+        return doc.isLocked ? nil : doc
+    }
+
+    /// What one rebuilt page looked like, for a later compression pass.
+    struct RebuiltPage {
+        /// Which codec this page needs. Automatic mode mixes both in one book.
+        enum Content {
+            /// 1-bit PNG, ready for jbig2enc.
+            case bilevel(URL)
+            /// Already-encoded JPEG, embedded as-is. Grey for a halftone,
+            /// RGB for a page with real colour in it — `isColour` says which,
+            /// because the JBIG2 merge has to declare the right colour space
+            /// and a colour stream labelled /DeviceGray renders as garbage.
+            case jpeg(URL)
+            /// C29. The source page copied through with `drawPDFPage` instead of
+            /// rasterised, because it was born digital: its own text, fonts and
+            /// images reach the destination unchanged.
+            ///
+            /// **It carries no URL because there is no bitmap**, and that is the
+            /// point rather than an omission — nothing to hand jbig2enc, nothing
+            /// to hand Vision, and nothing to draw a second text layer over. The
+            /// three consequences, each load-bearing somewhere else:
+            /// `Recogniser.imageURL(of:)` returns nil and the page is recorded in
+            /// `byPage` as an **empty** array rather than left absent
+            /// (`SearchableWriter.missingPages` refuses a document over an absent
+            /// one); `Model`'s `onPage` closure appends nothing to `encoded`, so
+            /// `encoded.count == bitmaps.count` fails and a mixed document takes
+            /// the Flate route by arithmetic rather than by a new guard; and
+            /// `pixelWidth`/`pixelHeight` are **0**, which only the JBIG2 route
+            /// reads and it is the route this case cannot reach.
+            case passthrough
+        }
+        let content: Content
+        let pixelWidth: Int
+        let pixelHeight: Int
+        let boxSize: CGSize
+        /// True when `content` is a three-channel JPEG.
+        var isColour = false
+        /// Where the **source** page's crop box lands on this rebuilt sheet, or
+        /// nil when the source trimmed nothing.
+        ///
+        /// **The rebuilt file deliberately does not declare it**, and that is not
+        /// an oversight — it is what makes recognition work. On the JBIG2 route
+        /// Vision reads the per-page bitmaps, which are whole sheets, so the
+        /// observations come back normalised to the media box; a crop box on this
+        /// intermediate would make `compose` map them into the trimmed
+        /// rectangle and shift every run on the page. On the Flate route it
+        /// would instead stop the hidden margin being read at all. Either way the
+        /// crop belongs on the **published** page and nowhere else, which is
+        /// where `compose` and `JBIG2.assemble` put it. See `BUGS.md` C23.
+        var sourceCropBox: CGRect?
+        /// C32: the 1-bit rendering of a page `spotColourLeavesBilevel` kept in
+        /// colour, so the compressed build can go back to it when the colour
+        /// costs more than `spotColourPriceLimit` times as much.
+        var bilevelFallback: URL? = nil
+        /// C37: set when this bilevel page is, bit for bit, the source page's own
+        /// 1-bit JBIG2 image (`sourceBitmapMatches`), so the compressed build can
+        /// keep that stream instead of re-encoding the same pixels at up to 2.5x.
+        /// It is `bitmapDigest` of the image, which the build checks the kept
+        /// stream against once it has decoded it back out of its own file.
+        var sourceJBIG2Digest: Data? = nil
+        var matchesSourceJBIG2: Bool { sourceJBIG2Digest != nil }
+        /// C37: set with `sourceJBIG2Digest` when the image is placed on part of
+        /// the sheet, or has other ink over it (`placedSourceRebuild`). The
+        /// bitmap above is then the ordinary rebuild, which recognition reads;
+        /// the kept stream is published at `rect` with `overlay` over it.
+        var sourceJBIG2Placement: SourcePlacement? = nil
+    }
+
+    /// C37. Where a kept stream goes on a page `placedSourceRebuild` proved, and
+    /// the overlay's bitmap, written beside the page's own.
+    struct SourcePlacement {
+        let width: Int, height: Int
+        let rect: CGRect
+        var flipped = false
+        var overlay: (png: URL, width: Int, height: Int, rect: CGRect)?
+    }
+
+    /// Rebuilds `source` into `destination` as image-only pages.
+    /// `progress` is called with (pagesDone, pageCount) and may run on any thread.
+    /// Returns early if `isCancelled` starts returning true.
+    ///
+    /// When `pngDirectory` is given, each page is also written there as a 1-bit
+    /// PNG so an external encoder can compress it better than CoreGraphics can.
+    /// Only black-and-white mode produces those, since JBIG2 is bilevel-only.
+    ///
+    /// ⚠️ **The returned array — and `onPage` — are populated inside that same
+    /// `if let pngDirectory`.** A call without one rebuilds every page and
+    /// returns `[]`, so `pages.count` is not a page count: read the destination
+    /// document. Written down because a C29 probe read `rebuilt=0` off a healthy
+    /// nine-page rebuild and was on its way to being filed as a throw.
+    ///
+    /// `passThrough` names the 1-based pages to copy through **unrasterised**
+    /// (C29). It is data rather than a predicate on purpose: the caller that has
+    /// to *report* which pages were passed through is the same caller that
+    /// decides, so one value serves both and the two cannot disagree. It defaults
+    /// to empty, which is this function's historical contract — "image-only
+    /// pages" — so every existing caller, and every committed measurement taken
+    /// through one, is unchanged by construction.
+    ///
+    /// ⚠️ **A page named here is passed through whether or not it is born
+    /// digital.** `Flattener.digitalTextPages(in:)` is what production asks, and
+    /// naming a scan instead would publish a page nothing ever recognised. The
+    /// guard is not here because a second predicate call inside this loop is a
+    /// second answer to a question the caller has already answered — the shape
+    /// `Model`'s `willRebuild` comment is about — and the check that the two are
+    /// composed correctly is `BUGS.md` C29's, not this function's.
+    @discardableResult
+    static func flatten(
+        _ source: URL,
+        to destination: URL,
+        mode: Mode,
+        password: String? = nil,
+        pngDirectory: URL? = nil,
+        passThrough: Set<Int> = [],
+        keepSourceJBIG2: Bool = false,
+        findPhotographs: Bool = false,
+        cameraExposed: Bool = false,
+        findHandwriting: Bool = false,
+        isCancelled: () -> Bool = { false },
+        progress: (Int, Int) -> Void = { _, _ in },
+        onPage: ((RebuiltPage) throws -> Void)? = nil
+    ) throws -> [RebuiltPage] {
+        tripwire?()
+        var rebuilt: [RebuiltPage] = []
+        guard let doc = open(source, password: password) else {
+            // Distinguish "needs a password" from "not a PDF": the first is
+            // fixable by the user, and a locked document would otherwise render
+            // as blank pages with no complaint.
+            throw PDFDocument(url: source)?.isLocked == true
+                ? Failure.locked : Failure.unreadable
+        }
+        guard doc.pageCount > 0, let first = doc.page(at: 0) else {
+            throw Failure.unreadable
+        }
+
+        // Seed the context with page 1's *media* box. The per-page override
+        // below should govern, but CoreGraphics falls back to this one, so a
+        // rotated first page would otherwise stretch into the wrong shape.
+        var mediaBox = fullBox(of: first)
+        guard let pdf = CGContext(destination as CFURL, mediaBox: &mediaBox, nil) else {
+            throw Failure.cannotWrite
+        }
+
+        // Close the context on every exit, or a throw mid-document leaves a
+        // readable but silently truncated PDF behind.
+        var finished = false
+        defer { if !finished { pdf.closePDF() } }
+
+        let count = doc.pageCount
+        for index in 0..<count {
+            if isCancelled() { break }
+            guard let page = doc.page(at: index) else {
+                throw Failure.pageFailed(page: index + 1, of: count)
+            }
+            // A page with /Rotate set displays at swapped dimensions, and its
+            // content has to be rotated into place. Getting this wrong drew the
+            // page off-canvas and produced a blank rebuild — total content loss
+            // for any sideways plate.
+            // The whole sheet, not the crop: a rebuild that kept only the crop
+            // would silently discard everything outside it. See fullBox.
+            let box = fullBox(of: page)
+
+            // C29. A born-digital page is copied through rather than rasterised:
+            // its exact text survives, where a rebuild replaced it with OCR of a
+            // picture of itself (`American Sociological Association` came out
+            // `AMFAKAN FOCAX ONCAL ASSOXUTION`).
+            //
+            // `drawPDFPage` into a `CGPDFContext` is the operator the app already
+            // runs on every page it publishes (`SearchableWriter.compose`), and
+            // that it preserves the text is measured rather than assumed —
+            // `Tests/main.swift`'s four `ENGINE ASSUMPTION` rows read 302
+            // characters through three hops against 0 from the rasterising arm.
+            //
+            // The drawing transform is `renderGrey`'s, deliberately character for
+            // character minus the scale: rotation, cropping and centring are the
+            // part of this that has silently produced blank pages before, and a
+            // hand-rolled translate drew rotated pages off the canvas entirely.
+            // Not extracted into a shared helper in this commit — changing the
+            // rendering path inside a routing fix is the shape this project's
+            // regressions have, and there are now three copies rather than two.
+            if passThrough.contains(index + 1), let cgPage = page.pageRef {
+                var pageBox = CGRect(origin: .zero, size: box.size)
+                let boxData = withUnsafeBytes(of: &pageBox) { Data($0) } as CFData
+                pdf.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+                pdf.saveGState()
+                pdf.concatenate(cgPage.getDrawingTransform(
+                    .mediaBox, rect: pageBox, rotate: 0, preserveAspectRatio: true))
+                pdf.drawPDFPage(cgPage)
+                pdf.restoreGState()
+                pdf.endPDFPage()
+
+                // Same crop treatment as a rasterised page: the rebuilt sheet
+                // carries only a media box and `compose` puts the crop on the
+                // published one. C23, and `RebuiltPage.sourceCropBox` says why.
+                let region = SearchableWriter.cropRegion(of: page, on: pageBox)
+                if pngDirectory != nil {
+                    // An entry, always, and inside the same `if let pngDirectory`
+                    // the two arms below use — the returned array has to stay
+                    // dense or `bitmaps` stops being indexed by page number, which
+                    // is what `sourceCropBoxes[index + 1]`, `pageTotal` and
+                    // `byPage` all rest on. 0 pixels because there is no bitmap;
+                    // only the JBIG2 route reads those two fields, and it now
+                    // carries such a page rather than refusing it — `JBIG2.splice`,
+                    // C29 (B). ⛔ This comment said "a passthrough page is what
+                    // stops that route being taken" until 2026-08-25, which is now
+                    // the opposite of what production does.
+                    let entry = RebuiltPage(content: .passthrough, pixelWidth: 0,
+                                            pixelHeight: 0, boxSize: box.size,
+                                            sourceCropBox: region == pageBox ? nil : region)
+                    rebuilt.append(entry)
+                    try onPage?(entry)
+                }
+                progress(index + 1, count)
+                continue
+            }
+
+            // Render at the scan's own resolution: no upsampling, no lost
+            // detail — but only when that resolution is believable. See
+            // rebuildDPI.
+            //
+            // C39. At its images' resolution first, which is where every route
+            // decision below was measured. A page bound for 1-bit is rendered again
+            // at its type's (`resolutions`): on a layered scan that is the mask its
+            // ink is drawn through, and a picture's tone has nothing finer to keep.
+            // Decided at the type's instead, Berendzen's Newsday page (`BUGS.md` C39)
+            // read a tone of 0.007 where it reads 0.044, under the 0.03 its heavy ink
+            // needs (R38), and its photograph was thresholded to black.
+            let (typeDPI, imagesDPI) = resolutions(of: page)
+            var dpi = imagesDPI
+            var scale = dpi / 72.0
+
+            // Decide in Double and convert only once the value is known to be
+            // small enough. `Int(_:)` traps for a Double outside Int's range,
+            // and both the box and the scale descend from numbers the file
+            // declared — so the conversion itself was a crash on a malformed
+            // page, before any guard could look at it (R24).
+            let wide = (box.width * scale).rounded()
+            let high = (box.height * scale).rounded()
+            guard wide.isFinite, high.isFinite, wide >= 1, high >= 1 else {
+                throw Failure.pageFailed(page: index + 1, of: count)
+            }
+
+            // Before allocating, not after: renderGrey asks for width * height
+            // bytes and an array that cannot be allocated crashes the process
+            // rather than throwing, which would take every concurrent file with
+            // it. See maximumPageMegapixels — this refuses rather than
+            // downscaling, because the policy here is fidelity.
+            //
+            // In Double as well, for the same reason: multiplying the two in Int
+            // overflowed and trapped *inside the guard meant to prevent exactly
+            // this crash*.
+            guard wide * high <= Double(maximumPageMegapixels) * 1_000_000 else {
+                throw Failure.pageTooLarge(page: index + 1,
+                                           megapixels: safeInt(wide * high / 1_000_000),
+                                           dpi: safeInt(dpi.rounded()))
+            }
+            var width = max(Int(wide), 1)
+            var height = max(Int(high), 1)
+
+            guard var grey = renderGrey(page, box: box, scale: scale,
+                                        width: width, height: height,
+                                        from: .mediaBox) else {
+                throw Failure.pageFailed(page: index + 1, of: count)
+            }
+
+            // Decide per page in automatic mode. One threshold per page, derived
+            // from its own histogram, used for both the rendering and the
+            // is-this-a-picture test.
+            //
+            // Decide *before* rendering anything. This used to build the bilevel
+            // image first and throw it away for picture pages, on the stated
+            // grounds that its ink coverage was what identified a picture — but
+            // `isPicture` reads the grey buffer, not the bilevel one, so the
+            // threshold pass was pure waste on exactly the pages that also pay
+            // for a JPEG.
+            var threshold = otsuThreshold(of: grey)
+            var useBilevel = mode != .grayscale
+            // Measured once and used twice: as one of the three picture signals,
+            // and to decide whether the picture it found is a colour one.
+            let thumb = mode == .auto ? saturationThumbnail(of: page) : nil
+            let sat = thumb.map { saturation(ofRGBA: $0.buffer, width: $0.width,
+                                             height: $0.height) } ?? 0
+            if useBilevel, mode == .auto,
+               isPicture(page, grey: grey, width: width, height: height,
+                         threshold: threshold, saturation: sat) {
+                useBilevel = false
+            }
+
+            // A page with real colour in it keeps its colour, in Automatic only.
+            //
+            // Black & white is an instruction and Grayscale is an instruction;
+            // Automatic is the one that is supposed to work out what the page
+            // needs, and until now its answer for a colour plate was grey — the
+            // detector could *see* the colour, since saturation is one of the
+            // three signals that route the page here, and then threw it away.
+            //
+            // Bounded by megapixels because the colour path costs ~3.5x the
+            // peak memory of the grey one, measured. Over the bound the page
+            // rebuilds grey, exactly as it used to.
+            //
+            // `sheetFrac` (C27) only where it can change the answer: a picture
+            // page the mean has not already kept, or a page bound for 1-bit
+            // (C32), which counts no pixel of `paperHues`. Labelling components
+            // on every thumbnail costs ~2 s on a pathological dot field at the
+            // 4,000 px edge.
+            let sheet = mode == .auto && (useBilevel || sat <= colourSaturationThreshold)
+                ? thumb.flatMap { sheetSaturatedFraction(ofRGBA: $0.buffer, width: $0.width,
+                                                         height: $0.height,
+                                                         above: colourSheetPixelFloor,
+                                                         excludingHues: useBilevel
+                                                             ? paperHues : nil) } ?? 0
+                : 0
+            let spotMoved = useBilevel
+                && spotColourLeavesBilevel(mode: mode, sheetFraction: sheet, pixels: wide * high)
+            if spotMoved { useBilevel = false }
+            let wantColour = !useBilevel
+                && shouldKeepColour(mode: mode, saturation: sat,
+                                    sheetFraction: sheet, pixels: wide * high)
+
+            // C39. The route is decided, so a 1-bit page is rendered again at its
+            // type's resolution, and published there. The recogniser is also given the
+            // page as the images alone would have rebuilt it, `coarse`, for its lines
+            // (`Recogniser.recognisePage(at:)`: reading the finer one alone lost lines).
+            // A render that cannot be had keeps the one in hand, which is that page,
+            // rather than refusing the page.
+            var coarse: CGImage?
+            // C50. The render the page is read at, before the threshold, for the
+            // recogniser's second reading (`Recogniser.greySuffix`).
+            let readGrey = useBilevel && pngDirectory != nil
+                && midtoneShare(of: grey) >= minimumGreyReadingMidtones
+                ? (pixels: grey, width: width, height: height) : nil
+            if useBilevel, typeDPI > dpi {
+                let fineScale = typeDPI / 72.0
+                let fineWide = (box.width * fineScale).rounded()
+                let fineHigh = (box.height * fineScale).rounded()
+                if fineWide.isFinite, fineHigh.isFinite, fineWide >= 1, fineHigh >= 1,
+                   fineWide * fineHigh <= Double(maximumPageMegapixels) * 1_000_000,
+                   let fine = renderGrey(page, box: box, scale: fineScale,
+                                         width: Int(fineWide), height: Int(fineHigh),
+                                         from: .mediaBox) {
+                    let copy = pngDirectory == nil ? nil
+                        : bilevelImage(from: grey, width: width, height: height,
+                                       threshold: threshold)
+                    // Without its copy the page would be read at its type's resolution,
+                    // so a copy that cannot be made keeps the page at its images'.
+                    if pngDirectory == nil || copy != nil {
+                        coarse = copy
+                        dpi = typeDPI; scale = fineScale
+                        width = Int(fineWide); height = Int(fineHigh)
+                        grey = fine
+                        threshold = otsuThreshold(of: grey)
+                    }
+                }
+            }
+
+            // C37. A 1-bit page that is, bit for bit, its source's own JBIG2 image,
+            // so the compressed build can keep that stream. Possibly at the image's
+            // own size rather than this render's, which is then the rebuild: the
+            // same pixels, not resampled by the pixel or two the sheet's aspect
+            // differs by. Only when the caller will keep such a stream: the
+            // decode and a possible second render are not free.
+            //
+            // C49 first, on a copy. Coloured type on a page bound for 1-bit is
+            // thresholded by its darkest channel, so a pink notice turns black rather
+            // than vanishing. A page where that finds ink standing apart from the grey
+            // page's is not kept (C47's review): the proofs threshold a grey render,
+            // where the notice is paper, so the kept stream would drop it. Keyssar's
+            // blue JSTOR link only gains edge pixels (244, none apart) and stays kept,
+            // the link in its overlay.
+            var sourceDigest: Data?
+            var placedSource: PlacedSource?
+            var inked: [UInt8]?
+            if useBilevel || spotMoved, let thumb,
+               colourInkWorthReading(ofRGBA: thumb.buffer, width: thumb.width,
+                                     height: thumb.height) {
+                var copy = grey
+                if darkenColourInk(&copy, page: page, box: box, scale: scale,
+                                   width: width, height: height, threshold: threshold) > 0 {
+                    inked = copy
+                }
+            }
+            if useBilevel, keepSourceJBIG2, pngDirectory != nil,
+               inked.map({ inkApart(grey, $0, width: width, height: height,
+                                    threshold: threshold) == 0 }) ?? true {
+                if let kept = sourceImageRebuild(of: page, box: box, grey: grey, width: width,
+                                                 height: height, threshold: threshold) {
+                    grey = kept.grey; width = kept.width; height = kept.height
+                    threshold = kept.threshold; sourceDigest = kept.digest
+                } else if let placed = placedSourceRebuild(of: page, box: box) {
+                    // The rebuild is left as it is: recognition reads the page on
+                    // the sheet's grid, and only the published pixels change.
+                    placedSource = placed; sourceDigest = placed.digest
+                }
+            }
+
+            // C49. The recogniser takes its lines from the page as it was, `coarse`,
+            // and the words and the lines only this one holds from the inked page:
+            // inked, the notice moved Vision's boxes all over `Kristol_1960` p1, and
+            // PDFKit then read its two columns interleaved (ux-regression wer 0.08 ->
+            // 0.77). Never on a kept page, whose pixels are its stream's.
+            if let inked, sourceDigest == nil {
+                let plain = grey
+                grey = inked
+                if coarse == nil, pngDirectory != nil {
+                    coarse = bilevelImage(from: plain, width: width, height: height,
+                                          threshold: threshold)
+                }
+            }
+
+            // Encoded once, whichever way it goes. The JPEG bytes are reused for
+            // the stream file below rather than encoded a second time.
+            var jpegBytes: Data?
+            var isColour = false
+            let image: CGImage?
+            // C56. The page as Otsu drew it, for the recogniser, when the published
+            // one has had its strokes' fringe lifted: read thinner, Briefer p1's copy
+            // errors rose 0.023 -> 0.062 (ux-regression).
+            var reading: CGImage?
+            if useBilevel {
+                let thinned = sourceDigest == nil
+                    ? strokeWeightGrey(grey, width: width, height: height, threshold: threshold)
+                    : grey
+                if pngDirectory != nil, thinned != grey {
+                    reading = bilevelImage(from: grey, width: width, height: height,
+                                           threshold: threshold)
+                }
+                image = bilevelImage(from: thinned, width: width, height: height,
+                                     threshold: threshold)
+            } else if wantColour,
+                      let rgba = renderRGB(page, box: box, scale: scale,
+                                           width: width, height: height, from: .mediaBox),
+                      let encoded = jpegRGB(from: rgba, width: width, height: height,
+                                            quality: pictureJPEGQuality) {
+                // Falls through to grey if either step fails rather than failing
+                // the page: colour is an improvement on grey, not a requirement,
+                // and there is a correct grey rendering already in hand.
+                jpegBytes = encoded.data
+                image = encoded.image
+                isColour = true
+            } else if spotMoved {
+                // A page C32 took off 1-bit for its colour goes back to 1-bit, its
+                // old answer, rather than to a grey JPEG several times the size.
+                useBilevel = true
+                image = bilevelImage(from: grey, width: width, height: height,
+                                     threshold: threshold)
+            } else {
+                let encoded = jpeg(from: grey, width: width, height: height,
+                                   quality: pictureJPEGQuality)
+                jpegBytes = encoded?.data
+                image = encoded?.image
+            }
+            guard let image else { throw Failure.pageFailed(page: index + 1, of: count) }
+            // C32. A page kept in colour only for its spot colour is 1-bit in this
+            // PDF, which is what publishes when the JBIG2 route is not taken: there
+            // is no layering there, and the colour JPEG alone cost 7.3-10.5x the
+            // 1-bit page on every such page measured. The JBIG2 route gets the
+            // colour with this as `bilevelFallback`, and prices it after layering.
+            let spotBilevel = spotMoved && isColour
+                ? bilevelImage(from: grey, width: width, height: height, threshold: threshold)
+                : nil
+
+            // Per-page media box: page sizes vary across a scanned book, and an
+            // A5 page stamped into a Letter box comes out visibly stretched.
+            //
+            // The value has to be CFData wrapping the CGRect. Passing an NSValue
+            // is accepted and silently ignored, which is how every page ended up
+            // with page 1's dimensions.
+            var pageBox = CGRect(origin: .zero, size: box.size)
+            let boxData = withUnsafeBytes(of: &pageBox) { Data($0) } as CFData
+            pdf.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+            pdf.draw(spotBilevel ?? image, in: pageBox)
+            pdf.endPDFPage()
+
+            // C23. Carried, not declared — `RebuiltPage.sourceCropBox` says why
+            // this page dictionary must keep only a media box while the
+            // published one gets both. Through `SearchableWriter.cropRegion`,
+            // the app's own mapping, because the rebuild bakes `/Rotate` in and
+            // a crop rect written out by hand here would be a second answer to
+            // a question that already has one.
+            let region = SearchableWriter.cropRegion(of: page, on: pageBox)
+            let sourceCrop = region == pageBox ? nil : region
+
+            if let pngDirectory {
+                let stem = String(format: "p%05d", index + 1)
+                // A paste-up's strips, for the recogniser to read one at a time (C39).
+                // Beside the bitmap rather than in `RebuiltPage`, so the helper process,
+                // which is handed only the bitmap's path, finds them too.
+                let regions = mosaicRegions(of: page, box: box)
+                if let regions {
+                    guard let data = try? JSONEncoder().encode(regions),
+                          (try? data.write(to: pngDirectory.appendingPathComponent(
+                              stem + Recogniser.regionsSuffix))) != nil else {
+                        throw Failure.pageFailed(page: index + 1, of: count)
+                    }
+                }
+                // page-kinds-three. A camera's photo, for the recogniser to give the
+                // photographs' reader; judged here, on the source's colour, because the
+                // bitmap it reads has none. Asked only when photographs have a reader.
+                if findPhotographs, photographed(page, box: box, cameraExposed: cameraExposed) {
+                    guard FileManager.default.createFile(
+                        atPath: pngDirectory.appendingPathComponent(stem + Recogniser.photoSuffix).path,
+                        contents: Data()) else {
+                        throw Failure.pageFailed(page: index + 1, of: count)
+                    }
+                }
+                // page-kind-handwriting. A plain grey render of the source, on the rebuilt
+                // page's sheet, for the recogniser to judge a hand on: the page's own bitmap is
+                // thresholded or re-lit. Not for a paste-up, whose ink is never judged. Best
+                // effort; without it the page is judged on its bitmap.
+                if findHandwriting, regions == nil {
+                    let inkScale = CGFloat(rebuildDPI(of: page)) / 72
+                    let inkWidth = Int((box.width * inkScale).rounded())
+                    let inkHeight = Int((box.height * inkScale).rounded())
+                    if inkWidth >= 1, inkHeight >= 1,
+                       Double(inkWidth) * Double(inkHeight) <= Double(maximumPageMegapixels) * 1_000_000,
+                       let ink = renderGrey(page, box: box, scale: inkScale, width: inkWidth,
+                                            height: inkHeight, from: .mediaBox) {
+                        _ = writeGreyJPEG(ink, width: inkWidth, height: inkHeight,
+                                          to: pngDirectory.appendingPathComponent(stem + Recogniser.inkSuffix))
+                    }
+                }
+                if useBilevel {
+                    let png = pngDirectory.appendingPathComponent(stem + ".png")
+                    guard writePNG(image, to: png) else {
+                        // Silently omitting it made the caller fall back to the
+                        // 3x larger route with no explanation, on what is really
+                        // a disk-full or permissions fault.
+                        throw Failure.pageFailed(page: index + 1, of: count)
+                    }
+                    // Without it the page would be read thinner than before, so a copy
+                    // that cannot be written fails the page as the bitmap does.
+                    if let reading {
+                        guard writePNG(reading, to: pngDirectory.appendingPathComponent(
+                            stem + Recogniser.readSuffix)) else {
+                            throw Failure.pageFailed(page: index + 1, of: count)
+                        }
+                    }
+                    // C39. Without it the page would be read at its type's resolution,
+                    // so a copy that cannot be written fails the page as the bitmap does.
+                    if let coarse {
+                        guard writePNG(coarse, to: pngDirectory.appendingPathComponent(
+                            stem + Recogniser.coarseSuffix)) else {
+                            throw Failure.pageFailed(page: index + 1, of: count)
+                        }
+                    }
+                    // C50. The same render in grey, where it has greys to give: a page
+                    // that is its source's own JBIG2 image, or renders with none, reads
+                    // the same either way. Best effort, since without it the page is
+                    // read as it was before.
+                    if sourceDigest == nil, let readGrey {
+                        _ = writeGreyJPEG(readGrey.pixels, width: readGrey.width,
+                                          height: readGrey.height,
+                                          to: pngDirectory.appendingPathComponent(
+                                              stem + Recogniser.greySuffix))
+                    }
+                    // `if true {` stood here and around the JPEG branch below
+                    // (A3.4) — two conditionals that read as gates and were not.
+                    var entry = RebuiltPage(content: .bilevel(png), pixelWidth: width,
+                                            pixelHeight: height, boxSize: box.size,
+                                            sourceCropBox: sourceCrop,
+                                            sourceJBIG2Digest: sourceDigest)
+                    if let placed = placedSource {
+                        var placement = SourcePlacement(width: placed.width, height: placed.height,
+                                                        rect: placed.rect, flipped: placed.flipped)
+                        if let overlay = placed.overlay {
+                            let url = pngDirectory.appendingPathComponent(stem + "-overlay.png")
+                            // Unwritten, the page keeps its encoder rather than
+                            // publishing the image without the ink over it.
+                            if writePNG(overlay.image, to: url) {
+                                placement.overlay = (url, overlay.image.width,
+                                                     overlay.image.height, overlay.rect)
+                                entry.sourceJBIG2Placement = placement
+                            } else {
+                                entry.sourceJBIG2Digest = nil
+                            }
+                        } else {
+                            entry.sourceJBIG2Placement = placement
+                        }
+                    }
+                    rebuilt.append(entry)
+                    try onPage?(entry)
+                } else {
+                    // Literally the bytes embedded in the PDF above, not a second
+                    // encode of the same buffer, so the compressed build and the
+                    // fallback build cannot drift apart. The one exception is a
+                    // C32 page, which the PDF above holds as `spotBilevel`.
+                    let jpeg = pngDirectory.appendingPathComponent(stem + ".jpg")
+                    guard let data = jpegBytes,
+                          (try? data.write(to: jpeg)) != nil else {
+                        throw Failure.pageFailed(page: index + 1, of: count)
+                    }
+                    var fallback: URL?
+                    if let bilevel = spotBilevel {
+                        // Best effort: without it the page keeps its colour at
+                        // whatever it costs, which is still a correct page.
+                        let png = pngDirectory.appendingPathComponent(stem + "-1bit.png")
+                        if writePNG(bilevel, to: png) { fallback = png }
+                    }
+                    let entry = RebuiltPage(content: .jpeg(jpeg), pixelWidth: width,
+                                            pixelHeight: height, boxSize: box.size,
+                                            isColour: isColour, sourceCropBox: sourceCrop,
+                                            bilevelFallback: fallback)
+                    rebuilt.append(entry)
+                    try onPage?(entry)
+                }
+            }
+
+            progress(index + 1, count)
+        }
+        pdf.closePDF()
+        finished = true
+        return rebuilt
+    }
+
+    /// The share of a grey render's pixels in the middle of the scale, 64 to 191 (C50).
+    /// A page whose source is 1-bit renders with none: 0.0000 on every such page of 28
+    /// sampled, and 0.005 to 0.13 on every 1-bit page a grey reading improved.
+    static func midtoneShare(of grey: [UInt8]) -> Double {
+        guard !grey.isEmpty else { return 0 }
+        var mid = 0
+        for v in grey where v >= 64 && v < 192 { mid += 1 }
+        return Double(mid) / Double(grey.count)
+    }
+
+    /// Below this `midtoneShare`, a 1-bit page is not given a grey copy to be read from.
+    static let minimumGreyReadingMidtones = 0.001
+
+    /// A grey render written as a JPEG at 0.9, for the recogniser only (C50): a lossless
+    /// PNG of a 300 dpi scan is megabytes, and every page's is on disk until recognition.
+    static func writeGreyJPEG(_ pixels: [UInt8], width: Int, height: Int, to url: URL) -> Bool {
+        guard width > 0, height > 0, pixels.count == width * height,
+              let provider = CGDataProvider(data: Data(pixels) as CFData),
+              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 8,
+                                  bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                                  bitmapInfo: CGBitmapInfo(rawValue: 0), provider: provider,
+                                  decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+              let dest = CGImageDestinationCreateWithURL(
+                  url as CFURL, "public.jpeg" as CFString, 1, nil) else { return false }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.9]
+                                   as CFDictionary)
+        return CGImageDestinationFinalize(dest)
+    }
+
+    /// CGImageDestination widens the 1-bit image to 8-bit grey on the way out,
+    /// so the file holds only 0 and 255. jbig2enc then re-thresholds at its own
+    /// default (200), which lands every 0 on black and every 255 on white — the
+    /// same bitmap we started with. Harmless, but don't introduce anti-aliasing
+    /// here or the two thresholds would start to disagree.
+    private static func writePNG(_ image: CGImage, to url: URL) -> Bool {
+        guard let dest = CGImageDestinationCreateWithURL(
+            url as CFURL, "public.png" as CFString, 1, nil) else { return false }
+        CGImageDestinationAddImage(dest, image, nil)
+        return CGImageDestinationFinalize(dest)
+    }
+
+    // MARK: - Rendering
+
+    /// The area a viewer shows, with /Rotate applied — the **crop** box.
+    ///
+    /// Measured, not assumed: given a page with MediaBox 612x792 and CropBox
+    /// (100,100)-(412,500), mac-ocr reported a 312x400 render and recognised only
+    /// the word inside the crop. So Vision's normalised observations come back
+    /// relative to the crop box, and anything mapping them onto a page must use
+    /// the same box or every one of them is offset and rescaled.
+    ///
+    /// Use this to agree with a recogniser about a file it was handed. To decide
+    /// what to *keep*, use `fullBox` — see the note there.
+    ///
+    /// `bounds(for: .cropBox)` falls back to the media box when a page has no
+    /// crop box, which is the overwhelmingly common case (44 of 78 corpus
+    /// documents have no crop box at all, and 26 more set it equal to the media
+    /// box).
+    static func displayBox(of page: PDFPage) -> CGRect {
+        boxSize(page.bounds(for: .cropBox), rotation: page.rotation)
+    }
+
+    /// The whole sheet, with /Rotate applied — the **media** box.
+    ///
+    /// The rebuild renders this, not the crop box, because a rebuild that only
+    /// kept the crop would silently discard whatever lies outside it, which
+    /// invariant 1 forbids. It is also measurably worse: cropping the rebuild of
+    /// `Margalit_2013` (media 546x762, crop 504x720) took line separation from
+    /// 100% to 90%.
+    ///
+    /// There is no mismatch in doing so. The rebuilt file carries only a media
+    /// box, so when the recogniser and then `compose` look at *it*, `displayBox`
+    /// falls back to that same media box and all three agree.
+    static func fullBox(of page: PDFPage) -> CGRect {
+        boxSize(page.bounds(for: .mediaBox), rotation: page.rotation)
+    }
+
+    /// PDFKit's `bounds(for:)` reports the unrotated box, so a 90°-rotated page
+    /// has to have its dimensions swapped.
+    private static func boxSize(_ box: CGRect, rotation: Int) -> CGRect {
+        let quarterTurns = ((rotation % 360) + 360) % 360
+        if quarterTurns == 90 || quarterTurns == 270 {
+            return CGRect(origin: .zero, size: CGSize(width: box.height, height: box.width))
+        }
+        return CGRect(origin: .zero, size: box.size)
+    }
+
+    /// 8-bit greyscale render of one page. Greyscale rather than RGB because
+    /// these are scans, and it is a third of the memory.
+    ///
+    /// Draws through `CGPDFPageGetDrawingTransform`, which is the only thing that
+    /// gets rotation, cropping and centring right; a hand-rolled translate drew
+    /// rotated pages off the canvas entirely.
+    /// `from` must be the box `box` was measured with, or the page is drawn to
+    /// the wrong scale: pass `.mediaBox` alongside `fullBox`, `.cropBox`
+    /// alongside `displayBox`.
+    ///
+    /// `scaleY`, when given, is the vertical scale and `scale` the horizontal one.
+    /// Only C37 asks for it: a scan drawn onto a sheet whose aspect differs from
+    /// its own by a pixel or two, rendered at the scan's own size.
+    static func renderGrey(
+        _ page: PDFPage, box: CGRect, scale: CGFloat, width: Int, height: Int,
+        from pdfBox: CGPDFBox = .mediaBox, scaleY: CGFloat? = nil, origin: CGPoint = .zero
+    ) -> [UInt8]? {
+        tripwire?()
+        var buffer = [UInt8](repeating: 255, count: width * height)
+        let ok = buffer.withUnsafeMutableBytes { raw -> Bool in
+            guard let ctx = CGContext(
+                data: raw.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width,
+                space: CGColorSpaceCreateDeviceGray(),
+                bitmapInfo: CGImageAlphaInfo.none.rawValue) else { return false }
+            ctx.setFillColor(gray: 1, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+            guard let cgPage = page.pageRef else {
+                // No CGPDFPage (unlikely): fall back to PDFKit's own drawing.
+                ctx.scaleBy(x: scale, y: scaleY ?? scale)
+                page.draw(with: pdfBox == .cropBox ? .cropBox : .mediaBox, to: ctx)
+                return true
+            }
+            ctx.scaleBy(x: scale, y: scaleY ?? scale)
+            // `origin` is where the bitmap's corner sits on the box, in points: a
+            // grid laid on a placed image rather than on the sheet (C37).
+            ctx.translateBy(x: -origin.x, y: -origin.y)
+            ctx.concatenate(cgPage.getDrawingTransform(
+                pdfBox, rect: CGRect(origin: .zero, size: box.size),
+                rotate: 0, preserveAspectRatio: true))
+            ctx.drawPDFPage(cgPage)
+            return true
+        }
+        return ok ? buffer : nil
+    }
+
+    /// Whether a page already routed away from 1-bit should keep its colour.
+    /// Since C32 `spotColourLeavesBilevel` also asks it of a page still bound
+    /// for 1-bit, through the sheet term alone.
+    ///
+    /// Extracted from `flatten` so the megapixel bound can be checked without
+    /// allocating the page it describes — a check that has to render 100 MP to
+    /// find out is a check nobody runs.
+    ///
+    /// The bar is `colourSaturationThreshold`, this decision's own since
+    /// 2026-08-26 and equal to the route's today (C27 (c)).
+    ///
+    /// Sibling sweep (CONTRIBUTING 4b): this is the only site in **`Sources/`**
+    /// that answers the *colour* question with a saturation bar, and `isPicture`
+    /// is the only other reader of a saturation bar there at all. Outside
+    /// `Sources/`, `Tools/` reads the *answer* rather than the bar
+    /// (`score-mrc`'s `shipWantsColour`, `score-picture-codec`'s population
+    /// filter), so both follow the split by construction.
+    ///
+    /// ⛔ **The sweep's first draft claimed every reader outside `Sources/` was a
+    /// route question and that was FALSE in five places** — three prose
+    /// statements in `score-mrc` and `Tools/README.md` that gave "the constant
+    /// gates both" as `MRC_COLOUR`'s reason for existing, and two *checks* named
+    /// after a colour outcome (*"…and the threshold refuses the colour on both of
+    /// them"*, in `Tests/main.swift` and in `score-threshold-loss`'s `selfTest`)
+    /// that were comparing against the route bar. All five are corrected in the
+    /// same commit; the checks now read `colourSaturationThreshold`, which is
+    /// what their names claim. Found by the adversarial review of this diff,
+    /// which noted that the draft had named the one harmless reader in
+    /// `score-mrc` and walked past the two false statements twenty lines above
+    /// it. **Do not restate the enumeration as exhaustive.**
+    ///
+    /// `sheetFraction` is the second way in (C27, `colourSheetFractionThreshold`):
+    /// spot colour on the sheet that the mean cannot reach.
+    static func shouldKeepColour(mode: Mode, saturation: Double, sheetFraction: Double,
+                                 pixels: Double) -> Bool {
+        guard mode == .auto else { return false }
+        guard saturation > colourSaturationThreshold
+                || sheetFraction > colourSheetFractionThreshold else { return false }
+        return pixels <= Double(maximumColourPageMegapixels) * 1_000_000
+    }
+
+    /// C32: a page `isPicture` sends to 1-bit is kept in colour instead when its
+    /// sheet carries spot colour — red headings on a text page, which 1-bit
+    /// turns black. The sheet term only, never the mean: on a text page the
+    /// mean is mostly the paper's cast. The caller measures the sheet with
+    /// `paperHues` excluded. `1954 - Why` pp5/8/9 read 0.018-0.026; C32 has the corpus
+    /// count of pages this moves.
+    static func spotColourLeavesBilevel(mode: Mode, sheetFraction: Double,
+                                        pixels: Double) -> Bool {
+        sheetFraction > colourSheetFractionThreshold
+            && shouldKeepColour(mode: mode, saturation: 0, sheetFraction: sheetFraction,
+                                pixels: pixels)
+    }
+
+    /// 8-bit RGBA render of one page, for the pages that have colour worth
+    /// keeping. Four bytes a pixel against `renderGrey`'s one — and the grey
+    /// buffer is still alive alongside it, which is half of why
+    /// `maximumColourPageMegapixels` exists and is measured rather than derived.
+    ///
+    /// Identical to `renderGrey` in every other respect, deliberately: same
+    /// drawing transform, same white fill, same fallback. Rotation and cropping
+    /// are the part that has silently produced blank pages before, and having
+    /// two ways to draw a page is how the two drift.
+    static func renderRGB(
+        _ page: PDFPage, box: CGRect, scale: CGFloat, width: Int, height: Int,
+        from pdfBox: CGPDFBox = .mediaBox
+    ) -> [UInt8]? {
+        tripwire?()
+        var buffer = [UInt8](repeating: 255, count: width * height * 4)
+        let ok = buffer.withUnsafeMutableBytes { raw -> Bool in
+            guard let ctx = CGContext(
+                data: raw.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.setFillColor(gray: 1, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+            guard let cgPage = page.pageRef else {
+                ctx.scaleBy(x: scale, y: scale)
+                page.draw(with: pdfBox == .cropBox ? .cropBox : .mediaBox, to: ctx)
+                return true
+            }
+            ctx.scaleBy(x: scale, y: scale)
+            ctx.concatenate(cgPage.getDrawingTransform(
+                pdfBox, rect: CGRect(origin: .zero, size: box.size),
+                rotate: 0, preserveAspectRatio: true))
+            ctx.drawPDFPage(cgPage)
+            return true
+        }
+        return ok ? buffer : nil
+    }
+
+    /// Whether a page is a camera's photo (`Recogniser.isPhotograph`): always, when the
+    /// image it was wrapped from names a camera; otherwise by its colour pixels, rendered
+    /// at `Recogniser.photoSignalSide` on its long side.
+    static func photographed(_ page: PDFPage, box: CGRect, cameraExposed: Bool) -> Bool {
+        if cameraExposed { return true }
+        let scale = CGFloat(Recogniser.photoSignalSide) / max(box.width, box.height, 1)
+        let width = max(1, Int((box.width * scale).rounded()))
+        let height = max(1, Int((box.height * scale).rounded()))
+        guard let rgba = renderRGB(page, box: box, scale: scale, width: width, height: height),
+              let provider = CGDataProvider(data: Data(rgba) as CFData),
+              let image = CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                                  bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                                  provider: provider, decode: nil, shouldInterpolate: false,
+                                  intent: .defaultIntent) else { return false }
+        return Recogniser.isPhotograph(Recogniser.photoSignals(of: image))
+    }
+
+    /// C47. Whether two pages draw the same pixels: a source page and its copy with
+    /// the text taken out (`JBIG2.textlessCopy`). Rendered as `renderRGB` renders, at
+    /// 2x, as a reader on a Retina display meets them, and compared exactly. Text
+    /// hidden under an opaque image, as ProQuest hides it, or drawn invisible, as the
+    /// Internet Archive draws it, changes nothing: 0 pixels on Berendzen, Marth and
+    /// eight pages of Levy/Temin. Anything a reader could see, such as a footer
+    /// printed over the scan, changes pixels, and the page keeps its rebuild.
+    ///
+    /// A sheet larger than `drawsAlikePixels` at 2x is compared at the scale that
+    /// fits, which bounds the two buffers at 64 MB each.
+    static func drawsAlike(_ a: PDFPage, _ b: PDFPage) -> Bool {
+        let box = fullBox(of: a)
+        guard fullBox(of: b) == box, box.width >= 1, box.height >= 1 else { return false }
+        let fit = (drawsAlikePixels / Double(box.width * box.height)).squareRoot()
+        let scale = CGFloat(min(2, fit))
+        let width = Int((box.width * scale).rounded()), height = Int((box.height * scale).rounded())
+        guard width >= 1, height >= 1,
+              let ra = renderRGB(a, box: box, scale: scale, width: width, height: height),
+              let rb = renderRGB(b, box: box, scale: scale, width: width, height: height)
+        else { return false }
+        return ra == rb
+    }
+
+    /// The most pixels `drawsAlike` renders a page at: 16 MP, a broadsheet at 2x.
+    static let drawsAlikePixels = 16_000_000.0
+
+    /// JPEG-encode an RGBA buffer as three-channel colour, giving back the bytes
+    /// and an image over them — the colour twin of `jpeg(from:)`.
+    ///
+    /// The alpha channel is dropped here rather than left to the encoder. Every
+    /// pixel is opaque (the buffer starts as opaque white and the page is drawn
+    /// over it), so there is nothing to composite, and a 24-bit representation
+    /// is what the PDF stream declares: three components, /DeviceRGB.
+    static func jpegRGB(
+        from rgba: [UInt8], width: Int, height: Int, quality: Double
+    ) -> (data: Data, image: CGImage)? {
+        guard width > 0, height > 0, rgba.count >= width * height * 4 else { return nil }
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+            bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: width * 3, bitsPerPixel: 24)
+        else { return nil }
+        guard let dest = rep.bitmapData else { return nil }
+        for pixel in 0..<(width * height) {
+            dest[pixel * 3]     = rgba[pixel * 4]
+            dest[pixel * 3 + 1] = rgba[pixel * 4 + 1]
+            dest[pixel * 3 + 2] = rgba[pixel * 4 + 2]
+        }
+        guard let data = rep.representation(using: .jpeg,
+                                            properties: [.compressionFactor: quality]),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else { return nil }
+        return (data, image)
+    }
+
+    /// Otsu's threshold: the split that best separates the page's two tonal
+    /// populations, paper and ink.
+    ///
+    /// A fixed threshold is wrong for anything but bright white paper. On a grey
+    /// mimeograph or a yellowed typescript the paper itself falls below 186, so
+    /// 86-98% of the page reads as "ink": thresholding turned such pages almost
+    /// solid black, and the ink-coverage test then classified them as pictures and
+    /// sent them down the greyscale path at ~1 MB/page.
+    static func otsuThreshold(of grey: [UInt8]) -> UInt8 {
+        var histogram = [Int](repeating: 0, count: 256)
+        for value in grey { histogram[Int(value)] += 1 }
+        return otsuThreshold(histogram: histogram)
+    }
+
+    /// The same threshold from a 256-bin histogram already counted, for a caller
+    /// that reads the page in strips rather than holding it whole
+    /// (`Recogniser.inkedRows`).
+    static func otsuThreshold(histogram: [Int]) -> UInt8 {
+        guard histogram.count == 256 else { return 186 }
+        let total = histogram.reduce(0, +)
+        guard total > 0 else { return 186 }
+
+        var sum = 0.0
+        for i in 0..<256 { sum += Double(i) * Double(histogram[i]) }
+        var sumB = 0.0, weightB = 0, best = 0.0
+        var chosen = 186
+        for t in 0..<256 {
+            weightB += histogram[t]
+            if weightB == 0 { continue }
+            let weightF = total - weightB
+            if weightF == 0 { break }
+            sumB += Double(t) * Double(histogram[t])
+            let meanB = sumB / Double(weightB)
+            let meanF = (sum - sumB) / Double(weightF)
+            let between = Double(weightB) * Double(weightF) * (meanB - meanF) * (meanB - meanF)
+            if between > best { best = between; chosen = t }
+        }
+        // Keep it in a sane band: a page of solid tone has no meaningful split.
+        return UInt8(min(max(chosen, 90), 230))
+    }
+
+    /// C56. The page with the fringe of its dark strokes lifted to paper, for a 1-bit
+    /// image that keeps the source's stroke weight.
+    ///
+    /// Otsu splits paper from ink, and on a white page with black type it lands at
+    /// 135-154, well above the half-tone of a stroke's edge: the edge pixels between
+    /// the two are drawn as ink and the type comes out near-bold (`Luethy_1955` p2,
+    /// `Ries_Marshall_1955` p54). An edge is half covered at the midpoint of the ink
+    /// and paper peaks, so a pixel at or above that midpoint (the fringe) is paper
+    /// when a chain of fringe pixels, `strokeFringeReach` long at most, joins it to a
+    /// pixel below. A pixel under the threshold further from any core is kept:
+    /// that is a faint mark, pencil or faded type, and thinning it would lose it; one
+    /// crossing the type loses only the reach on either side of the stroke.
+    static func strokeWeightGrey(_ grey: [UInt8], width: Int, height: Int,
+                                 threshold: UInt8) -> [UInt8] {
+        guard width > 0, height > 0, grey.count >= width * height else { return grey }
+        var histogram = [Int](repeating: 0, count: 256)
+        for value in grey { histogram[Int(value)] += 1 }
+        let t = Int(threshold)
+        guard t > 0, t < 256 else { return grey }
+        let ink = (0..<t).max { histogram[$0] < histogram[$1] } ?? 0
+        let paper = (t..<256).max { histogram[$0] < histogram[$1] } ?? 255
+        let middle = (ink + paper + 1) / 2
+        guard middle < t else { return grey }
+        let cleared = strokeFringe(grey, width: width, height: height, ink: ink, middle: middle) {
+            Int(grey[$0]) < t
+        }
+        var out = grey
+        for i in 0..<(width * height) where cleared[i] { out[i] = 255 }
+        return out
+    }
+
+    /// C56. `strokeWeightGrey` for the layered route's stencil, which is Sauvola's local
+    /// cut rather than one threshold (`Gowan and Demos` p1, ink share 1.16 of the
+    /// source's). The ink peak is read over the stencil and the paper peak over the
+    /// words' other pixels, so the midpoint is the page's own; `mask` comes back with
+    /// its strokes' fringe taken out. The tone layers keep the mask as it was cut.
+    static func strokeWeightMask(_ grey: [UInt8], mask: [Bool], region: [Bool],
+                                 width: Int, height: Int) -> [Bool] {
+        let n = width * height
+        guard width > 0, height > 0, grey.count >= n, mask.count == n, region.count == n
+        else { return mask }
+        var inkHistogram = [Int](repeating: 0, count: 256)
+        var paperHistogram = [Int](repeating: 0, count: 256)
+        for i in 0..<n where region[i] {
+            if mask[i] { inkHistogram[Int(grey[i])] += 1 } else { paperHistogram[Int(grey[i])] += 1 }
+        }
+        let ink = (0..<256).max { inkHistogram[$0] < inkHistogram[$1] } ?? 0
+        let paper = (0..<256).max { paperHistogram[$0] < paperHistogram[$1] } ?? 255
+        guard inkHistogram[ink] > 0, paperHistogram[paper] > 0, paper > ink else { return mask }
+        let middle = (ink + paper + 1) / 2
+        let cleared = strokeFringe(grey, width: width, height: height, ink: ink, middle: middle) {
+            mask[$0]
+        }
+        var out = mask
+        for i in 0..<n where cleared[i] { out[i] = false }
+        return out
+    }
+
+    /// The pixels `strokeWeightGrey` and `strokeWeightMask` take out of the ink: `isInk`
+    /// is the cut as drawn, and a pixel of it at or over `middle` is fringe.
+    private static func strokeFringe(_ grey: [UInt8], width: Int, height: Int, ink: Int,
+                                     middle: Int, isInk: (Int) -> Bool) -> [Bool] {
+        // A seed is darker than halfway from the ink peak to the midpoint. Grey ink, a
+        // heading or a rule printed grey beside black type, sits near the midpoint, and
+        // seeded from its own body the lift ate into it rather than its fringe:
+        // `1954 - Why` p9's grey headings and `Glazer_2002` p1's grey masthead kept
+        // 0.79 and 0.76 of their ink (ux-regression `elInk`). It is kept whole.
+        let deep = (ink + middle) / 2
+        // 0 untouched, 1 lifted, 2 a lifted notch filled again, 3 a speck cleared.
+        var state = [UInt8](repeating: 0, count: width * height)
+        func at(_ x: Int, _ y: Int) -> Int? {
+            x >= 0 && x < width && y >= 0 && y < height ? y * width + x : nil
+        }
+        func isCore(_ i: Int) -> Bool { Int(grey[i]) < middle && isInk(i) }
+        func visitFringe(_ i: Int) -> Bool {
+            guard state[i] == 0, Int(grey[i]) >= middle, isInk(i) else { return false }
+            state[i] = 1
+            return true
+        }
+        // A seed is inside a stroke's body, with four or more core pixels beside it. A
+        // dark pixel alone, in a pencil line or a faint dot, seeds nothing, so the mark
+        // it sits in is kept whole rather than cut back around it.
+        func isSeed(_ x: Int, _ y: Int) -> Bool {
+            var core = 0
+            for dy in -1...1 {
+                for dx in -1...1 where dx != 0 || dy != 0 {
+                    if let j = at(x + dx, y + dy), isCore(j) { core += 1 }
+                }
+            }
+            return core >= 4
+        }
+        // Breadth first from the seeds, one ring of fringe per step.
+        var ring: [Int32] = []
+        for y in 0..<height {
+            let row = y * width
+            for x in 0..<width where Int(grey[row + x]) < deep && isCore(row + x) && isSeed(x, y) {
+                for dy in -1...1 {
+                    for dx in -1...1 {
+                        if let i = at(x + dx, y + dy), visitFringe(i) { ring.append(Int32(i)) }
+                    }
+                }
+            }
+        }
+        for _ in 1..<max(strokeFringeReach, 1) where !ring.isEmpty {
+            var next: [Int32] = []
+            for i in ring {
+                let y = Int(i) / width, x = Int(i) % width
+                for dy in -1...1 {
+                    for dx in -1...1 {
+                        if let j = at(x + dx, y + dy), visitFringe(j) { next.append(Int32(j)) }
+                    }
+                }
+            }
+            ring = next
+        }
+        // Judged pixel by pixel, a crisp scan's edges fall in its noise: the lift
+        // notched them and left dark noise pixels standing alone, which cost Kristol p1
+        // 7 KB of JBIG2. A lifted pixel with ink on two opposite sides is a notch and
+        // is ink again; an ink pixel the lift left with none beside it is a speck. A
+        // speck lies within the reach of a stroke's body, so a faint dot clear of the
+        // type is never one.
+        func inkAfterLift(_ x: Int, _ y: Int) -> Bool {
+            guard let i = at(x, y) else { return false }
+            return isInk(i) && state[i] == 0
+        }
+        for i in 0..<(width * height) where state[i] == 1 {
+            let x = i % width, y = i / width
+            if (inkAfterLift(x - 1, y) && inkAfterLift(x + 1, y))
+                || (inkAfterLift(x, y - 1) && inkAfterLift(x, y + 1)) {
+                state[i] = 2
+            }
+        }
+        func inkAfterFill(_ x: Int, _ y: Int) -> Bool {
+            guard let i = at(x, y) else { return false }
+            return isInk(i) && state[i] != 1
+        }
+        for i in 0..<(width * height) where state[i] == 1 {
+            let x = i % width, y = i / width
+            for dy in -1...1 {
+                for dx in -1...1 where dx != 0 || dy != 0 {
+                    let sx = x + dx, sy = y + dy
+                    guard let s = at(sx, sy), state[s] == 0, inkAfterFill(sx, sy) else { continue }
+                    var beside = false
+                    for ey in -1...1 where !beside {
+                        for ex in -1...1 where (ex != 0 || ey != 0) && inkAfterFill(sx + ex, sy + ey) {
+                            beside = true; break
+                        }
+                    }
+                    if !beside { state[s] = 3 }
+                }
+            }
+        }
+        return state.map { $0 == 1 || $0 == 3 }
+    }
+
+    /// How many pixels of fringe `strokeWeightGrey` lifts outward from a stroke's core.
+    static let strokeFringeReach = 3
+
+    /// Threshold to 1 bit, packed MSB-first, 1 = white.
+    private static func bilevelImage(
+        from grey: [UInt8], width: Int, height: Int, threshold: UInt8
+    ) -> CGImage? {
+        // The guard `greyPNG` and `jpegRGB` both have and this one did not
+        // (A7.3): `grey[src + x]` below indexes to `width * height - 1`, so a
+        // buffer shorter than its stated size reads out of bounds rather than
+        // returning nil. No shipped caller mismatches; the sibling sweep's rule is
+        // that a missing guard is recorded and closed, not argued about.
+        guard width > 0, height > 0, grey.count >= width * height else { return nil }
+        let rowBytes = (width + 7) / 8
+        var bits = [UInt8](repeating: 0, count: rowBytes * height)
+        for y in 0..<height {
+            let src = y * width, dst = y * rowBytes
+            for x in 0..<width where grey[src + x] >= threshold {
+                bits[dst + (x >> 3)] |= UInt8(0x80) >> UInt8(x & 7)
+            }
+        }
+        guard let provider = CGDataProvider(data: Data(bits) as CFData) else { return nil }
+        return CGImage(
+            width: width, height: height, bitsPerComponent: 1, bitsPerPixel: 1,
+            bytesPerRow: rowBytes, space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGBitmapInfo(rawValue: 0), provider: provider,
+            decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+    }
+
+    /// C37. The page's one image, decoded, when that image is 1-bit JBIG2: the
+    /// packed rows CoreGraphics decodes it to, 1 = white, the same layout
+    /// `bilevelImage` writes. nil for anything else — two XObjects, a form, another
+    /// filter, a filter chain, or bytes that are not one row per line.
+    ///
+    /// Only half of the proof. What the page *draws* is `sourceBitmapMatches`'s
+    /// question, asked of the render.
+    static func sourceBitmap(of page: PDFPage) -> (width: Int, height: Int, rows: Data)? {
+        guard let stream = soleImageStream(of: page)?.image,
+              let image = CGPDFStreamGetDictionary(stream) else { return nil }
+        var subtype: UnsafePointer<Int8>?, filter: UnsafePointer<Int8>?
+        var filters: CGPDFArrayRef?
+        var width: CGPDFInteger = 0, height: CGPDFInteger = 0
+        // One filter, as a name or as a one-entry array: `[/FlateDecode
+        // /JBIG2Decode]` is a chain whose raw bytes are not a JBIG2 stream, and
+        // keeping them as one would publish noise.
+        if !CGPDFDictionaryGetName(image, "Filter", &filter),
+           CGPDFDictionaryGetArray(image, "Filter", &filters), let filters,
+           CGPDFArrayGetCount(filters) == 1 {
+            _ = CGPDFArrayGetName(filters, 0, &filter)
+        }
+        guard CGPDFDictionaryGetName(image, "Subtype", &subtype), let subtype,
+              String(cString: subtype) == "Image",
+              let filter, String(cString: filter) == "JBIG2Decode",
+              CGPDFDictionaryGetInteger(image, "Width", &width),
+              CGPDFDictionaryGetInteger(image, "Height", &height),
+              width > 0, height > 0, width * height <= maximumPageMegapixels * 1_000_000
+        else { return nil }
+        var format = CGPDFDataFormat.raw
+        guard let data = CGPDFStreamCopyData(stream, &format) as Data?, format == .raw,
+              data.count == (width + 7) / 8 * height else { return nil }
+        return (width, height, data)
+    }
+
+    /// C37. The one XObject a page's own resources name, when it is an image, or
+    /// when it is a form whose own resources name one XObject and that is an
+    /// image (C47: JSTOR's Keyssar and Stiglitz draw their scan through a form).
+    /// `form` is that form, so `sourceImagePlacement` can follow the draw into it.
+    /// One level only; `sourceBitmap` still checks the image is one it can keep.
+    static func soleImageStream(of page: PDFPage) -> (image: CGPDFStreamRef, form: CGPDFStreamRef?)? {
+        func sole(_ resources: CGPDFDictionaryRef) -> CGPDFStreamRef? {
+            var xobjects: CGPDFDictionaryRef?
+            guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects), let xobjects,
+                  CGPDFDictionaryGetCount(xobjects) == 1 else { return nil }
+            final class Found { var stream: CGPDFStreamRef? }
+            let found = Found()
+            CGPDFDictionaryApplyBlock(xobjects, { _, object, info in
+                var stream: CGPDFStreamRef?
+                if CGPDFObjectGetValue(object, .stream, &stream), let info {
+                    Unmanaged<Found>.fromOpaque(info).takeUnretainedValue().stream = stream
+                }
+                return false
+            }, Unmanaged.passUnretained(found).toOpaque())
+            return found.stream
+        }
+        func subtype(_ stream: CGPDFStreamRef) -> String? {
+            var name: UnsafePointer<Int8>?
+            guard let dict = CGPDFStreamGetDictionary(stream),
+                  CGPDFDictionaryGetName(dict, "Subtype", &name), let name else { return nil }
+            return String(cString: name)
+        }
+        guard let dict = page.pageRef?.dictionary else { return nil }
+        var resources: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(dict, "Resources", &resources), let resources,
+              let first = sole(resources) else { return nil }
+        if subtype(first) != "Form" { return (first, nil) }
+        var formResources: CGPDFDictionaryRef?
+        guard let formDict = CGPDFStreamGetDictionary(first),
+              CGPDFDictionaryGetDictionary(formDict, "Resources", &formResources),
+              let formResources, let inner = sole(formResources),
+              subtype(inner) == "Image" else { return nil }
+        return (inner, first)
+    }
+
+    /// C37. A digest of a decoded 1-bit image's pixels, pad bits excluded, or nil
+    /// for an image with no ink in it.
+    ///
+    /// nil for a blank one because that is also what a stream CoreGraphics
+    /// *failed* to decode looks like — the right number of bytes, all white — and
+    /// a render of the same failure is white too, so the two would "match" over a
+    /// page that shows nothing. A page that really is blank costs the encoder a
+    /// few hundred bytes, so it loses nothing by going there.
+    static func bitmapDigest(_ image: (width: Int, height: Int, rows: Data)) -> Data? {
+        let rowBytes = (image.width + 7) / 8
+        guard image.rows.count == rowBytes * image.height else { return nil }
+        let tail = image.width % 8 == 0 ? UInt8(0xFF) : UInt8(0xFF) << UInt8(8 - image.width % 8)
+        var rows = image.rows
+        var ink = false
+        rows.withUnsafeMutableBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            for y in 0..<image.height {
+                let last = y * rowBytes + rowBytes - 1
+                bytes[last] |= ~tail                  // pad bits read as white
+                if !ink {
+                    for i in (y * rowBytes)...last where bytes[i] != 0xFF { ink = true; break }
+                }
+            }
+        }
+        return ink ? Data(SHA256.hash(data: rows)) : nil
+    }
+
+    /// C37. The rebuild of a 1-bit page when it is, bit for bit, the page's own
+    /// JBIG2 image: this render if it already is, or a render at the image's own
+    /// size when the render differs from it by at most half a percent a side and
+    /// that one is. nil otherwise, and the page keeps the render it has.
+    ///
+    /// The second case is a scan the source stretched onto its sheet: Noble 1977's
+    /// 2763x4365 image on a page that renders 2763x4367 at the scan's resolution,
+    /// so the rebuild resampled it by two rows. Drawn at its own size the page is
+    /// the image again, and `sourceBitmapMatches` still has the last word — an
+    /// image *placed* with a margin rather than stretched does not match.
+    ///
+    /// Only an unturned page: the rebuild bakes `/Rotate` in, and a kept stream
+    /// would be drawn unturned.
+    static func sourceImageRebuild(of page: PDFPage, box: CGRect, grey: [UInt8],
+                                   width: Int, height: Int, threshold: UInt8)
+        -> (grey: [UInt8], width: Int, height: Int, threshold: UInt8, digest: Data)? {
+        guard page.rotation % 360 == 0, let source = sourceBitmap(of: page) else { return nil }
+        if source.width == width, source.height == height {
+            guard sourceBitmapMatches(source, grey: grey, width: width, height: height,
+                                      threshold: threshold),
+                  let digest = bitmapDigest(source) else { return nil }
+            return (grey, width, height, threshold, digest)
+        }
+        guard abs(source.width - width) * 200 <= width,
+              abs(source.height - height) * 200 <= height,
+              box.width > 0, box.height > 0,
+              let exact = renderGrey(page, box: box, scale: CGFloat(source.width) / box.width,
+                                     width: source.width, height: source.height,
+                                     from: .mediaBox,
+                                     scaleY: CGFloat(source.height) / box.height)
+        else { return nil }
+        let t = otsuThreshold(of: exact)
+        guard sourceBitmapMatches(source, grey: exact, width: source.width,
+                                  height: source.height, threshold: t),
+              let digest = bitmapDigest(source) else { return nil }
+        return (exact, source.width, source.height, t, digest)
+    }
+
+    /// C37. A page that draws its one JBIG2 image on part of the sheet, perhaps
+    /// with other ink over it: JSTOR's shape, a scan placed 8 pt above the sheet's
+    /// foot with a "This content downloaded from…" line printed across it. The
+    /// page is then the source's stream at `rect` plus `overlay`, the ink the
+    /// image does not have, both in the published page's points.
+    struct PlacedSource {
+        let digest: Data
+        let width: Int, height: Int
+        let rect: CGRect
+        /// Drawn upside down, as the source drew it (C47).
+        var flipped = false
+        /// 1-bit, ink black, `bilevelImage`'s layout; nil when the image is all
+        /// the page draws.
+        var overlay: (image: CGImage, rect: CGRect)?
+    }
+
+    /// C37. Where the page's one image is drawn, from the transform in force at
+    /// its one `Do`, in the page's own space, and through the form's `/Matrix` and
+    /// its own one `Do` when the page draws its image through a form. `flipped`
+    /// when it is drawn upside down, rows counting up from the rect's foot, as
+    /// w5093's scans are (C47). nil for a turned, skewed or mirrored placement, or
+    /// for an image drawn twice or not at all. A hypothesis only:
+    /// `placedSourceRebuild` renders the page and proves it.
+    static func sourceImagePlacement(of page: PDFPage) -> (rect: CGRect, flipped: Bool)? {
+        guard let cgPage = page.pageRef, let sole = soleImageStream(of: page),
+              let table = CGPDFOperatorTableCreate() else { return nil }
+        final class State {
+            var ctm = CGAffineTransform.identity
+            var saved: [CGAffineTransform] = []
+            var draws: [CGAffineTransform] = []
+        }
+        let state = State()
+        CGPDFOperatorTableSetCallback(table, "q") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.saved.append(s.ctm)
+        }
+        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            if let ctm = s.saved.popLast() { s.ctm = ctm }
+        }
+        CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            var v = [CGPDFReal](repeating: 0, count: 6)
+            for i in (0..<6).reversed() {
+                guard CGPDFScannerPopNumber(scanner, &v[i]) else { return }
+            }
+            s.ctm = CGAffineTransform(a: v[0], b: v[1], c: v[2], d: v[3], tx: v[4], ty: v[5])
+                .concatenating(s.ctm)
+        }
+        CGPDFOperatorTableSetCallback(table, "Do") { _, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            s.draws.append(s.ctm)
+        }
+        func scan(_ content: CGPDFContentStreamRef) -> Bool {
+            let scanner = CGPDFScannerCreate(content, table,
+                                             Unmanaged.passUnretained(state).toOpaque())
+            defer { CGPDFScannerRelease(scanner) }
+            return CGPDFScannerScan(scanner)
+        }
+        let content = CGPDFContentStreamCreateWithPage(cgPage)
+        defer { CGPDFContentStreamRelease(content) }
+        guard scan(content), state.draws.count == 1, var m = state.draws.first else { return nil }
+        if let form = sole.form {
+            // The form's own `Do`, under its `/Matrix` and the page's transform.
+            var resources: CGPDFDictionaryRef?, matrix: CGPDFArrayRef?
+            guard let dict = CGPDFStreamGetDictionary(form),
+                  CGPDFDictionaryGetDictionary(dict, "Resources", &resources), let resources
+            else { return nil }
+            var f = CGAffineTransform.identity
+            if CGPDFDictionaryGetArray(dict, "Matrix", &matrix), let matrix {
+                var v = [CGPDFReal](repeating: 0, count: 6)
+                guard CGPDFArrayGetCount(matrix) == 6,
+                      (0..<6).allSatisfy({ CGPDFArrayGetNumber(matrix, $0, &v[$0]) }) else { return nil }
+                f = CGAffineTransform(a: v[0], b: v[1], c: v[2], d: v[3], tx: v[4], ty: v[5])
+            }
+            let inner = CGPDFContentStreamCreateWithStream(form, resources, content)
+            defer { CGPDFContentStreamRelease(inner) }
+            state.ctm = f.concatenating(m); state.saved = []; state.draws = []
+            guard scan(inner), state.draws.count == 1, let drawn = state.draws.first
+            else { return nil }
+            m = drawn
+        }
+        guard m.b == 0, m.c == 0, m.a > 0, m.d != 0 else { return nil }
+        return m.d > 0
+            ? (CGRect(x: m.tx, y: m.ty, width: m.a, height: m.d), false)
+            : (CGRect(x: m.tx, y: m.ty + m.d, width: m.a, height: -m.d), true)
+    }
+
+    /// C37. The page as its source's JBIG2 image at its own placement plus an
+    /// overlay of whatever else the page draws, proved by rendering: the page is
+    /// rendered on the image's own pixel grid, laid out to cover the sheet, and
+    /// every ink pixel of the image must be ink in that render. What else is ink
+    /// there is the overlay. So the image plus the overlay, drawn black, is the
+    /// render's threshold pixel for pixel. nil when the proof fails: an image
+    /// drawn under white, clipped, off its placement or off the sheet all leave
+    /// an image pixel white in the render.
+    ///
+    /// Only an unturned page, for `sourceImageRebuild`'s reason, and only on a
+    /// sheet whose media box PDFKit reports as CoreGraphics does, since the
+    /// placement is measured from the one and published on the other.
+    static func placedSourceRebuild(of page: PDFPage, box: CGRect) -> PlacedSource? {
+        guard page.rotation % 360 == 0, let cgPage = page.pageRef,
+              let source = sourceBitmap(of: page), let digest = bitmapDigest(source),
+              let placed = sourceImagePlacement(of: page) else { return nil }
+        let media = cgPage.getBoxRect(.mediaBox)
+        guard abs(media.width - box.width) < 0.01, abs(media.height - box.height) < 0.01
+        else { return nil }
+        let r = placed.rect.offsetBy(dx: -media.minX, dy: -media.minY)
+        // On the sheet, to two points, and at a size the grid can hold, before
+        // anything becomes an Int: a `0.0001 0 0 0.0001 cm` or a far-off `tx`
+        // would otherwise trap rather than refuse. The part off the sheet is
+        // hidden on both pages alike, so the proof below does not ask about it.
+        guard [r.minX, r.minY, r.maxX, r.maxY].allSatisfy(\.isFinite), r.width > 0, r.height > 0,
+              r.minX >= -2, r.minY >= -2,
+              r.maxX <= box.width + 2, r.maxY <= box.height + 2 else { return nil }
+        let sx = CGFloat(source.width) / r.width, sy = CGFloat(source.height) / r.height
+        guard Double((box.width + 1) * sx) * Double((box.height + 1) * sy)
+                <= Double(maximumPageMegapixels) * 1_000_000 else { return nil }
+        // Whole pixels of sheet on each side of the image, rounded out, so the
+        // grid covers the sheet. A negative margin is an image hanging off the
+        // sheet, by at most the two points above.
+        func margin(_ points: CGFloat, _ scale: CGFloat) -> Int {
+            max(0, Int((points * scale - 1e-6).rounded(.up)))
+        }
+        let left = margin(r.minX, sx), bottom = margin(r.minY, sy)
+        let right = margin(box.width - r.maxX, sx), top = margin(box.height - r.maxY, sy)
+        let width = left + source.width + right, height = bottom + source.height + top
+        guard width * height <= maximumPageMegapixels * 1_000_000 else { return nil }
+        let origin = CGPoint(x: r.minX - CGFloat(left) / sx, y: r.minY - CGFloat(bottom) / sy)
+        guard let grey = renderGrey(page, box: box, scale: sx, width: width, height: height,
+                                    from: .mediaBox, scaleY: sy, origin: origin)
+        else { return nil }
+        let t = otsuThreshold(of: grey)
+        let rowBytes = (source.width + 7) / 8
+        // What the overlay holds, as grey for `bilevelImage`: ink the image lacks.
+        var overlay = [UInt8](repeating: 255, count: width * height)
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        let proved = source.rows.withUnsafeBytes { raw -> Bool in
+            let rows = raw.bindMemory(to: UInt8.self)
+            for y in 0..<height {
+                // A flipped image's first row is drawn at the rect's foot.
+                let iy = placed.flipped ? top + source.height - 1 - y : y - top
+                for x in 0..<width where grey[y * width + x] < t || (
+                    iy >= 0 && iy < source.height && x >= left && x < left + source.width) {
+                    let ix = x - left
+                    let inImage = iy >= 0 && iy < source.height && ix >= 0 && ix < source.width
+                    let imageInk = inImage
+                        && (rows[iy * rowBytes + (ix >> 3)] & (UInt8(0x80) >> UInt8(ix & 7))) == 0
+                    let renderInk = grey[y * width + x] < t
+                    // C47. Except off the sheet, where the published page, at the
+                    // same place on the same box, hides the pixel as the source did:
+                    // w5093's scans hang up to 0.56 pt over an edge.
+                    if imageInk && !renderInk {
+                        let px = origin.x + (CGFloat(x) + 0.5) / sx
+                        let py = origin.y + (CGFloat(height - y) - 0.5) / sy
+                        if px > 0, py > 0, px < box.width, py < box.height { return false }
+                    }
+                    if renderInk && !imageInk {
+                        overlay[y * width + x] = 0
+                        minX = min(minX, x); maxX = max(maxX, x)
+                        minY = min(minY, y); maxY = max(maxY, y)
+                    }
+                }
+            }
+            return true
+        }
+        guard proved else { return nil }
+        var result = PlacedSource(digest: digest, width: source.width, height: source.height,
+                                  rect: r, flipped: placed.flipped, overlay: nil)
+        if maxX >= 0 {
+            // Cropped to its ink: a stamp line is a sliver of the sheet.
+            let w = maxX - minX + 1, h = maxY - minY + 1
+            var crop = [UInt8](repeating: 255, count: w * h)
+            for y in 0..<h {
+                crop.replaceSubrange(y * w..<(y + 1) * w,
+                                     with: overlay[(minY + y) * width + minX..<(minY + y) * width + minX + w])
+            }
+            guard let image = bilevelImage(from: crop, width: w, height: h, threshold: 128)
+            else { return nil }
+            // Rows count down from the grid's top; points count up from its foot.
+            let rect = CGRect(x: origin.x + CGFloat(minX) / sx,
+                              y: origin.y + CGFloat(height - 1 - maxY) / sy,
+                              width: CGFloat(w) / sx, height: CGFloat(h) / sy)
+            result.overlay = (image, rect)
+        }
+        return result
+    }
+
+    /// C37. Whether the rebuild of this page is, bit for bit, its source's own
+    /// 1-bit image — so publishing the source's JBIG2 stream publishes the same
+    /// pixels as re-encoding the rebuild would.
+    ///
+    /// Compared against the threshold of the *render*, which is what the page
+    /// draws: an image placed off the sheet, scaled, cropped, inverted by
+    /// `/Decode`, painted in a colour through `/ImageMask`, or drawn under other
+    /// ink all fail here, because the rendered page then differs from the image.
+    /// That is the whole of the proof, and it is why no one of those cases needs a
+    /// rule of its own. A turned page is refused by the caller, since the
+    /// rebuild bakes `/Rotate` in and the kept stream would not.
+    static func sourceBitmapMatches(_ source: (width: Int, height: Int, rows: Data),
+                                    grey: [UInt8], width: Int, height: Int,
+                                    threshold: UInt8) -> Bool {
+        guard source.width == width, source.height == height,
+              grey.count >= width * height else { return false }
+        let rowBytes = (width + 7) / 8
+        // The pad bits at the end of each row are not pixels, and a decoder is
+        // free to leave anything in them.
+        let tail = width % 8 == 0 ? UInt8(0xFF) : UInt8(0xFF) << UInt8(8 - width % 8)
+        return source.rows.withUnsafeBytes { raw -> Bool in
+            let rows = raw.bindMemory(to: UInt8.self)
+            var row = [UInt8](repeating: 0, count: rowBytes)
+            for y in 0..<height {
+                for i in 0..<rowBytes { row[i] = 0 }
+                let src = y * width, dst = y * rowBytes
+                for x in 0..<width where grey[src + x] >= threshold {
+                    row[x >> 3] |= UInt8(0x80) >> UInt8(x & 7)
+                }
+                for i in 0..<rowBytes {
+                    let mask = i == rowBytes - 1 ? tail : 0xFF
+                    if (row[i] ^ rows[dst + i]) & mask != 0 { return false }
+                }
+            }
+            return true
+        }
+    }
+
+    /// Is this page a picture rather than text? Three signals, because each
+    /// misses cases the others catch:
+    ///
+    ///  - heavy ink: dark scans and coarse halftones — but only when some
+    ///    continuous tone corroborates it, see `pictureInkMinimumTone` (R38);
+    ///  - continuous tone: photographs and tinted figures, which can be *lighter*
+    ///    than text and so invisible to an ink-coverage test;
+    ///  - colour: a coloured page is never plain text, and thresholding it is
+    ///    always destructive.
+    /// Diagnostic view of the three signals, for calibration.
+    static func pictureSignals(_ page: PDFPage, grey: [UInt8], width: Int, height: Int)
+        -> (ink: Double, tone: Double, sat: Double, threshold: Int) {
+        let t = otsuThreshold(of: grey)
+        return (inkCoverage(of: grey, width: width, height: height, threshold: t),
+                toneFraction(of: grey, threshold: t), saturation(of: page), Int(t))
+    }
+
+    /// `saturation` may be passed in when the caller has already measured it.
+    /// The signal costs a second render of the page, and `flatten` needs the
+    /// number anyway to decide between a grey JPEG and a colour one — measuring
+    /// it twice per illustrated page was pure waste.
+    static func isPicture(_ page: PDFPage, grey: [UInt8],
+                          width: Int, height: Int, threshold: UInt8,
+                          saturation precomputed: Double? = nil) -> Bool {
+        let tone = toneFraction(of: grey, threshold: threshold)
+        if tone > pictureToneThreshold { return true }
+        // Heavy ink, but only with corroborating tone. R38 — dense bilevel type
+        // is heavy ink and nothing else, and 1-bit is what it wants.
+        if tone > pictureInkMinimumTone,
+           inkCoverage(of: grey, width: width, height: height,
+                       threshold: threshold) > pictureInkThreshold { return true }
+        if (precomputed ?? saturation(of: page)) > pictureSaturationThreshold { return true }
+
+        // The three signals above are all statistics of the whole sheet, and R56 and
+        // R57 are both pages where that is the defect rather than the threshold: a
+        // plate over a fifth of a page dilutes its own tone by five, and a pale
+        // drawing is not counted by any of them at all. The two below ask about
+        // *things on the page* instead.
+        //
+        // **They are last, and that saves less than it looks.** The pages that reach
+        // here are the ones the three above called text, which is the great majority,
+        // so the cost is paid on nearly every page rather than on a few. Measured, best
+        // of 25 over two real corpus pages: the three above cost 4.8 ms on a 3.4 MP
+        // page and these two add 25.8 ms; at 9.8 MP it is 9.3 ms against 40.3.
+        // Ordering them last buys the picture pages, not the text ones. Worth paying
+        // against a per-page recognition cost two orders of magnitude larger — and
+        // worth knowing that `saturation` measured *without* the caller's precomputed
+        // value costs 85 ms on that 9.8 MP page, more than all of this together, which
+        // is where an optimisation should start.
+        let dpi = renderDPI(of: page, pixelWidth: width)
+        let marks = pageMarks(grey, width: width, height: height,
+                              threshold: threshold, dpi: dpi)
+        // R57. The page's own tone constant, asked about the region the tone is in.
+        if largeMarkTone(marks, grey: grey, width: width, height: height,
+                         threshold: threshold) > pictureToneThreshold { return true }
+        // R56. A pale mark too big to be type and too empty to be a shaded block.
+        return paleDrawing(marks, dpi: dpi).extent > paleDrawingThreshold
+    }
+
+    /// The resolution a render of `page` was taken at, from the render itself.
+    ///
+    /// Derived from the buffer in hand rather than by calling `rebuildDPI` a second
+    /// time, for two reasons: `rebuildDPI` walks the page's resources and is not free,
+    /// and a caller that rendered at some other scale — every tool in `Tools/` at
+    /// some point, and `score-threshold-loss`'s header records what that mistake
+    /// looks like — would otherwise be told about a page nothing produced.
+    static func renderDPI(of page: PDFPage, pixelWidth: Int) -> Double {
+        let box = fullBox(of: page)
+        guard box.width > 0, pixelWidth > 0 else { return 72 }
+        return Double(pixelWidth) * 72.0 / Double(box.width)
+    }
+
+    /// Fraction of pixels that are neither near-white nor near-black. Text is
+    /// bimodal — paper and ink — so only its anti-aliased edges land in between.
+    static func toneFraction(of grey: [UInt8], threshold: UInt8) -> Double {
+        guard !grey.isEmpty else { return 0 }
+        // A band around the split. Text is bimodal, so little lands here; a
+        // photograph or a tint fills it. Measured against the page's own
+        // threshold so grey paper doesn't read as continuous tone.
+        let lo = Int(threshold) - 45, hi = Int(threshold) + 45
+        var mid = 0
+        for value in grey where Int(value) > lo && Int(value) < hi { mid += 1 }
+        return Double(mid) / Double(grey.count)
+    }
+
+    /// The longest edge the routing thumbnail may have.
+    ///
+    /// At 40 DPI a page would have to be **100 inches** on a side to reach this,
+    /// which is past the 200-inch ceiling PDF ≤1.5 imposes on a page box at all
+    /// and far past any archival sheet — so no real document is resized by it.
+    /// What it bounds is the unreal ones: 4,000 px caps the buffer at 64 MB (R29).
+    static let maximumThumbnailEdge = 4_000
+
+    /// Pixel size of the routing thumbnail for a page box, and the scale that
+    /// produces it. Nil when the box is not a usable rectangle.
+    ///
+    /// Separate from `saturation` so the bound can be asserted directly. R24
+    /// bounded `flatten`'s *render*, which is the box scaled by the page's own
+    /// DPI; this is the box scaled by a **fixed** 40 DPI, and the two diverge
+    /// exactly when a huge box carries a small image — `rebuildDPI` then returns
+    /// a tiny DPI, the render is small and passes R24's guard, and this one was
+    /// still sized off the raw box. At `[0 0 1000000000000 1000000000000]`,
+    /// `w * h * 4` overflowed `Int` and took the process down with SIGTRAP (R29).
+    static func thumbnailSize(for box: CGRect) -> (width: Int, height: Int, scale: CGFloat)? {
+        guard box.width.isFinite, box.height.isFinite,
+              box.width > 0, box.height > 0 else { return nil }
+        let longest = max(box.width, box.height)
+        // Never magnify: a small page keeps its 40 DPI thumbnail.
+        let scale: CGFloat = min(40.0 / 72.0, CGFloat(maximumThumbnailEdge) / longest)
+        let w = max(min(safeInt(box.width * scale), maximumThumbnailEdge), 1)
+        let h = max(min(safeInt(box.height * scale), maximumThumbnailEdge), 1)
+        return (w, h, scale)
+    }
+
+    /// Mean saturation from a small RGB thumbnail. Cheap: the page is redrawn at
+    /// about 40 DPI purely to ask whether there is colour on it.
+    static func saturation(of page: PDFPage) -> Double {
+        guard let t = saturationThumbnail(of: page) else { return 0 }
+        return saturation(ofRGBA: t.buffer, width: t.width, height: t.height)
+    }
+
+    /// Both colour signals `flatten` reads, from one thumbnail: the mean
+    /// (`saturation(of:)`, which `isPicture` also reads) and `sheetFrac`
+    /// (`sheetSaturatedFraction`). One render so the two describe the same pixels.
+    static func colourMeasures(of page: PDFPage) -> (saturation: Double, sheetFraction: Double) {
+        guard let t = saturationThumbnail(of: page) else { return (0, 0) }
+        return (saturation(ofRGBA: t.buffer, width: t.width, height: t.height),
+                sheetSaturatedFraction(ofRGBA: t.buffer, width: t.width, height: t.height,
+                                       above: colourSheetPixelFloor) ?? 0)
+    }
+
+    /// The share of the buffer saturated above `floor`, after discarding every
+    /// 8-connected component that touches the buffer's border — a scanner
+    /// surround or a photographed page edge, rather than ink on the sheet. The
+    /// same computation as `Tools/score-threshold-loss`'s `sheetFrac` column.
+    ///
+    /// `nil` when `shapeComponents` exceeds `runLimit`, or the buffer is short;
+    /// the caller reads that as no spot colour, which is the behaviour before C27.
+    ///
+    /// `excludingHues` leaves pixels of those hues out of the mask (C32,
+    /// `paperHues`).
+    static func sheetSaturatedFraction(ofRGBA buffer: [UInt8], width: Int, height: Int,
+                                       above floor: Double,
+                                       excludingHues: Range<Double>? = nil,
+                                       runLimit: Int = maximumShapeRuns) -> Double? {
+        let pixels = width * height
+        guard pixels > 0, buffer.count >= pixels * 4 else { return nil }
+        var mask = [Bool](repeating: false, count: pixels)
+        var i = 0
+        forEachColour(ofRGBA: buffer, width: width, height: height) { s, hue in
+            if s > floor, excludingHues.map({ !$0.contains(hue) }) ?? true { mask[i] = true }
+            i += 1
+        }
+        guard let comps = shapeComponents(mask, width: width, height: height,
+                                          x0: 0, y0: 0, x1: width, y1: height,
+                                          runLimit: runLimit) else { return nil }
+        var sheet = 0
+        for c in comps where c.minX > 0 && c.minY > 0
+                             && c.maxX < width - 1 && c.maxY < height - 1 {
+            sheet += c.area
+        }
+        return Double(sheet) / Double(pixels)
+    }
+
+    /// The ~40 DPI RGBA thumbnail every colour signal is measured on — the page
+    /// the routing decision actually describes.
+    ///
+    /// Split out of `saturation(of:)` for C27, which needs a **different statistic
+    /// of the same pixels**. A tool that rendered its own page at its own
+    /// resolution would be comparing two calibrations, and the number
+    /// `shouldKeepColour` reads is the one taken here. Nothing about the render
+    /// moved: the body is `saturation(of:)`'s, and the two ways that function used
+    /// to answer 0 — no thumbnail size, and a context or page ref it could not get
+    /// — are the two ways this one answers nil.
+    ///
+    /// ⚠️ **Not a pure function of the page, measured 2026-08-19.** On pages whose
+    /// images CoreGraphics caches, what this draws depends on whether the page was
+    /// already rendered at a higher resolution in the same process: `1954 - Why` p7
+    /// gives `saturation(ofRGBA:)` **0.041 after `flatten`'s grey render and 0.044
+    /// taken cold**, and `saturatedFraction(above: 0.25)` **0.02831 against 0.03033**
+    /// (+7.1%); `Schwaller - 2026` p101 moves 0.06367 -> 0.06514; five of seven pages
+    /// tried are identical either way. `flatten` renders grey first, so **production's
+    /// number is the warm one** and so is every committed tool's (they all render the
+    /// page before asking) — but a check or tool that calls this first will not
+    /// reproduce production, and that is a wrong-instrument session waiting to happen.
+    /// C27's `#### The population, swept` has the measurement.
+    static func saturationThumbnail(of page: PDFPage)
+        -> (buffer: [UInt8], width: Int, height: Int)? {
+        // The same area flatten rebuilds, so the routing signal describes the
+        // page that actually gets written.
+        tripwire?()
+        let box = fullBox(of: page)
+        guard let (w, h, scale) = thumbnailSize(for: box) else { return nil }
+        var buffer = [UInt8](repeating: 255, count: w * h * 4)
+        let ok = buffer.withUnsafeMutableBytes { raw -> Bool in
+            guard let ctx = CGContext(
+                data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8,
+                bytesPerRow: w * 4, space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            ctx.setFillColor(gray: 1, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+            guard let cgPage = page.pageRef else { return false }
+            ctx.scaleBy(x: scale, y: scale)
+            ctx.concatenate(cgPage.getDrawingTransform(
+                .mediaBox, rect: CGRect(origin: .zero, size: box.size),
+                rotate: 0, preserveAspectRatio: true))
+            ctx.drawPDFPage(cgPage)
+            return true
+        }
+        guard ok else { return nil }
+        return (buffer, w, h)
+    }
+
+    /// The colour of the page's own paper, or nil when the page has no credible
+    /// paper on it. The mean of every pixel bright enough to be paper.
+    ///
+    /// Split out so it can be asserted directly, and because the "no paper here"
+    /// answer is a real one that the caller has to handle rather than a failure.
+    static func paperColour(ofRGBA buffer: [UInt8], width: Int, height: Int)
+        -> (r: Double, g: Double, b: Double)? {
+        let pixels = width * height
+        guard pixels > 0, buffer.count >= pixels * 4 else { return nil }
+        var sr = 0.0, sg = 0.0, sb = 0.0, n = 0
+        for i in stride(from: 0, to: pixels * 4, by: 4) {
+            let r = Double(buffer[i]), g = Double(buffer[i + 1]), b = Double(buffer[i + 2])
+            guard 0.299 * r + 0.587 * g + 0.114 * b >= paperLuminanceFloor else { continue }
+            sr += r; sg += g; sb += b; n += 1
+        }
+        guard n > 0, Double(n) / Double(pixels) >= minimumPaperFraction else { return nil }
+        return (sr / Double(n), sg / Double(n), sb / Double(n))
+    }
+
+    /// How much colour is on the page, measured against the page's **own paper**
+    /// rather than against grey.
+    ///
+    /// Measuring against grey is what this used to do, and it cost a user a
+    /// 600-page 1964 monograph: 33 MB in, 709 MB out, every page a
+    /// full-resolution three-channel JPEG. Cream book stock has genuine
+    /// saturation — 0.078 to 0.089 measured across that book, against a 0.06
+    /// threshold — so every page read as "coloured" while its ink coverage
+    /// (0.11) and tone fraction (0.009) both said plainly that it was text. The
+    /// same number was then charged twice, because **one constant gated both
+    /// `isPicture` and `shouldKeepColour` until 2026-08-26**: the page lost the
+    /// 1-bit route *and* gained two channels. 1,185 KB/page against 48 KB/page
+    /// as 1-bit. C27 (c) split the two — `colourSaturationThreshold` is the
+    /// colour half — and **the split does not undo this failure**: those pages
+    /// read 0.078–0.089, so they cleared *both* bars, and a separate colour bar
+    /// at the same value promotes them identically. (Strictly, the second half
+    /// is the colour bar's now rather than the route's; what is true of that book
+    /// is that both bars read the same statistic and the page cleared it.) What
+    /// the split changes is that the colour bar can be lowered without the route
+    /// following it — and `colourSaturationThreshold`'s own comment records that
+    /// lowering it far enough puts this failure back.
+    ///
+    /// Moving the threshold cannot fix it. Over the corpus the wrongly-promoted
+    /// text pages span 0.061–0.113 and the genuinely coloured ones span
+    /// 0.061–0.31: the populations overlap, because a mean cannot tell a faint
+    /// tint spread over the whole sheet from a strong colour in one corner of it.
+    ///
+    /// So the page is white-balanced to its own paper first — a von Kries
+    /// correction, each channel divided by the paper's — and the same
+    /// saturation measure is then taken on the corrected pixels. Cream paper
+    /// becomes neutral and scores nothing; an illustration on that same cream
+    /// page still scores, because it was never the paper colour. A page with no
+    /// paper on it is left uncorrected.
+    ///
+    /// Neutral ink over tinted paper picks up a small opposite cast from the
+    /// correction — 0.118 per pixel for pure black on cream, arithmetically —
+    /// which is why this is a mean over the page and not a maximum. In practice
+    /// it stays far below even that, because the signal is measured on a 40 DPI
+    /// thumbnail where almost every text pixel is a blend of ink and paper and
+    /// so lies between the two chromaticities rather than at the neutral end.
+    /// Measured on a sweep of stocks from white through cream, tan, manila and
+    /// legal-pad yellow to a strong ochre, all with black text: **0.000 to
+    /// 0.008**, against a threshold of 0.06 — **both** of them since 2026-08-26,
+    /// `pictureSaturationThreshold` and `colourSaturationThreshold`. The
+    /// correction does not weaken as the tint gets stronger, which was the thing
+    /// worth checking. ⚠️ This range is also the FLOOR under any future value of
+    /// the colour bar: at 0.008 or below it re-promotes every one of these pages,
+    /// which is what `colourSaturationThreshold`'s own comment says and where it
+    /// got the number.
+    static func saturation(ofRGBA buffer: [UInt8], width: Int, height: Int) -> Double {
+        let pixels = width * height
+        guard pixels > 0, buffer.count >= pixels * 4 else { return 0 }
+        var total = 0.0
+        forEachSaturation(ofRGBA: buffer, width: width, height: height) { total += $0 }
+        return total / Double(pixels)
+    }
+
+    /// Every pixel's saturation, corrected for the page's own paper, handed to
+    /// `body` one at a time — **including the zeros**, so a caller can divide by
+    /// the pixel count it passed in and get a mean over the sheet rather than over
+    /// the coloured part of it.
+    ///
+    /// One walk and not two because C27 asks for a *different statistic of the same
+    /// population*: `saturation(ofRGBA:)` above is the mean of exactly these
+    /// values, `saturatedFraction` below counts how many clear a floor. The von
+    /// Kries correction is what a user's 600-page monograph paid for at 709 MB, and
+    /// a second copy of it — in a tool, or in a later fix for C27 — is R23's and
+    /// R29's shape exactly: one instance corrected, its twin left behind holding
+    /// the older definition. So the correction and `(hi - lo) / hi` exist once.
+    ///
+    /// A pure black pixel yields 0 rather than being skipped. That is what the
+    /// version of this loop inside `saturation` did (`if hi > 0 { total += … }`
+    /// over a denominator of every pixel), and adding a literal zero to a running
+    /// `Double` is exact, so the mean is unchanged bit for bit.
+    static func forEachSaturation(ofRGBA buffer: [UInt8], width: Int, height: Int,
+                                  _ body: (Double) -> Void) {
+        forEachColour(ofRGBA: buffer, width: width, height: height) { s, _ in body(s) }
+    }
+
+    /// `forEachSaturation`'s walk with each pixel's hue beside its saturation, in
+    /// degrees [0, 360) of the same paper-corrected colour (0 where the pixel is
+    /// grey). C32 reads the hue; the correction stays here, once.
+    static func forEachColour(ofRGBA buffer: [UInt8], width: Int, height: Int,
+                              _ body: (_ saturation: Double, _ hue: Double) -> Void) {
+        let pixels = width * height
+        guard pixels > 0, buffer.count >= pixels * 4 else { return }
+        var kr = 1.0, kg = 1.0, kb = 1.0
+        if let paper = paperColour(ofRGBA: buffer, width: width, height: height) {
+            let peak = max(paper.r, max(paper.g, paper.b))
+            // Scaled so the brightest channel is unchanged: this removes the
+            // paper's cast without lightening or darkening the page, so the
+            // measure stays comparable to the one the threshold was set against.
+            if peak > 0, paper.r > 0, paper.g > 0, paper.b > 0 {
+                kr = peak / paper.r; kg = peak / paper.g; kb = peak / paper.b
+            }
+        }
+        for i in stride(from: 0, to: pixels * 4, by: 4) {
+            let r = Double(buffer[i]) * kr
+            let g = Double(buffer[i + 1]) * kg
+            let b = Double(buffer[i + 2]) * kb
+            let hi = max(r, max(g, b)), lo = min(r, min(g, b))
+            var hue = 0.0
+            if hi > lo {
+                let c = hi - lo
+                hue = hi == r ? (g - b) / c : hi == g ? 2 + (b - r) / c : 4 + (r - g) / c
+                hue *= 60
+                if hue < 0 { hue += 360 }
+            }
+            body(hi > 0 ? (hi - lo) / hi : 0, hue)
+        }
+    }
+
+    /// C49. Whether a 1-bit page's thumbnail holds enough non-paper colour to be
+    /// worth a colour render for `darkenColourInk`: most 1-bit pages hold none.
+    static func colourInkWorthReading(ofRGBA buffer: [UInt8], width: Int, height: Int) -> Bool {
+        let pixels = width * height
+        guard pixels > 0 else { return false }
+        var n = 0
+        forEachColour(ofRGBA: buffer, width: width, height: height) { s, hue in
+            if s > colourSheetPixelFloor, !paperHues.contains(hue) { n += 1 }
+        }
+        return Double(n) / Double(pixels) > colourInkThumbnailFloor
+    }
+
+    /// C47. How many pixels `inked` has below `threshold` that `grey` has not, with
+    /// no pixel of `grey`'s own ink beside them: ink C49 found that the grey page
+    /// lacks altogether, such as a pink notice, rather than the antialiased edge of
+    /// type that was already there, such as JSTOR's blue link.
+    static func inkApart(_ grey: [UInt8], _ inked: [UInt8], width: Int, height: Int,
+                         threshold: UInt8) -> Int {
+        guard grey.count >= width * height, inked.count >= width * height else { return 0 }
+        var apart = 0
+        for y in 0..<height {
+            for x in 0..<width where inked[y * width + x] < threshold
+                && grey[y * width + x] >= threshold {
+                var beside = false
+                for ny in max(0, y - 1)...min(height - 1, y + 1) where !beside {
+                    for nx in max(0, x - 1)...min(width - 1, x + 1)
+                    where grey[ny * width + nx] < threshold { beside = true; break }
+                }
+                if !beside { apart += 1 }
+            }
+        }
+        return apart
+    }
+
+    /// C49. `darkenColourInk` over a colour render of `page` at `grey`'s size, for
+    /// a page bound for 1-bit. Leaves `grey` as it is, and returns 0, when the
+    /// render cannot be had.
+    static func darkenColourInk(_ grey: inout [UInt8], page: PDFPage, box: CGRect,
+                                scale: CGFloat, width: Int, height: Int,
+                                threshold: UInt8) -> Int {
+        guard Double(width * height) <= Double(maximumColourPageMegapixels) * 1_000_000,
+              let rgba = renderRGB(page, box: box, scale: scale,
+                                   width: width, height: height, from: .mediaBox) else { return 0 }
+        return darkenColourInk(&grey, rgba: rgba, width: width, height: height,
+                               threshold: threshold,
+                               field: Int((colourInkFieldPoints * Double(scale)).rounded()))
+    }
+
+    /// C49. Lowers each coloured pixel of `grey` to its darkest channel in `rgba`,
+    /// the same page at the same size, so type that is coloured but light still
+    /// falls below `threshold`. Returns how many pixels crossed `threshold`, or 0
+    /// with `grey` untouched when that ink is not type-shaped: more than
+    /// `colourInkShareLimit` of the page, or more than `colourInkFieldLimit` of it
+    /// with the pixels `field` away on all four sides crossing too.
+    @discardableResult
+    static func darkenColourInk(_ grey: inout [UInt8], rgba: [UInt8], width: Int, height: Int,
+                                threshold: UInt8, field: Int) -> Int {
+        let pixels = width * height
+        guard pixels > 0, grey.count >= pixels, rgba.count >= pixels * 4 else { return 0 }
+        var dark = [UInt8](repeating: 255, count: pixels)
+        var i = 0
+        forEachColour(ofRGBA: rgba, width: width, height: height) { s, hue in
+            if s > colourSheetPixelFloor, !paperHues.contains(hue) {
+                let p = i * 4
+                dark[i] = min(rgba[p], min(rgba[p + 1], rgba[p + 2]))
+            }
+            i += 1
+        }
+        var crossed = [Bool](repeating: false, count: pixels)
+        var count = 0
+        for j in 0..<pixels where dark[j] < threshold && grey[j] >= threshold {
+            crossed[j] = true; count += 1
+        }
+        guard count > 0, Double(count) <= colourInkShareLimit * Double(pixels) else { return 0 }
+        let d = max(field, 1)
+        var inside = 0
+        if width > 2 * d, height > 2 * d {
+            for y in d..<(height - d) {
+                for x in d..<(width - d) where crossed[y * width + x] {
+                    if crossed[y * width + x - d], crossed[y * width + x + d],
+                       crossed[(y - d) * width + x], crossed[(y + d) * width + x] { inside += 1 }
+                }
+            }
+        }
+        guard Double(inside) <= colourInkFieldLimit * Double(count) else { return 0 }
+        for j in 0..<pixels where dark[j] < grey[j] { grey[j] = dark[j] }
+        return count
+    }
+
+    /// How much of the page carries ink of its own colour, rather than how much
+    /// colour the page carries on average: the fraction of pixels whose
+    /// paper-corrected saturation is **strictly above** `floor`, matching
+    /// `shouldKeepColour`'s own strict comparison against the mean.
+    ///
+    /// **C27 is the whole reason this exists.** No shipped decision reads this
+    /// whole-sheet fraction; the one that ships is `sheetSaturatedFraction`, the
+    /// same count with border-connected components dropped, at the shipped floor
+    /// `colourSheetPixelFloor`. The rest of this comment predates that.
+    /// The route and the colour decision both read the mean — two constants
+    /// since 2026-08-26 (C27 (c)), both of them means, so the split changes
+    /// nothing about this paragraph, and 0.06 is still both their values — and
+    /// reaching 0.06
+    /// there takes something like 6% of the sheet in saturated ink (C27 reasoned
+    /// "roughly 8%" before this column existed; measured on ten real pages, `sat`
+    /// and this fraction at a 0.15 floor differ by 0.69x-1.30x, which puts it
+    /// nearer 6%). Red subheads, rules and a corner cartoon come to 3-4%, so
+    /// either way "this document is printed in two inks"
+    /// is *structurally* invisible to that statistic whatever the constant is set
+    /// to. Measured over the corpus, mean saturation either side of 0.06 is one
+    /// continuum with a 0.004-wide gap, so tinted grey scans and two-ink sheets are
+    /// not separated populations on it. A fraction can hold them apart — a page
+    /// with 3% of its area at saturation 0.8 is not the page with a uniform 0.03
+    /// cast — which is why C27 says the statistic is wrong rather than the number.
+    ///
+    /// `floor` is the caller's and there is deliberately no constant for it here.
+    /// Sizing C27's population was supposed to settle a floor. **That sweep ran on
+    /// 2026-08-19 (`SATFRAC-2026-08-19.tsv`, 233 documents, 441 pages) and settled
+    /// no floor, because measured over the corpus there is not one to settle**: the
+    /// noise is a per-page property, and one page of a 1938 magazine scan reads
+    /// **2.0% of its sheet above a 0.25 floor with no ink of its own on it** — above
+    /// the 1.36% of a page that loses real red ink — while another page of that same
+    /// scan reads 0.04%. So no single value clears the noise everywhere, the answer
+    /// wants a term about *where* the colour is rather than how much (R56's shape),
+    /// and a constant in this file would read as a shipped
+    /// calibration to every later reader — which is what `Tools/score-skew.swift`
+    /// and R56's own refused candidate signal both record as the reason for keeping
+    /// an unshipped measurement out of `Flattener`. This one is here only because it
+    /// cannot be written outside it without a second copy of the correction above.
+    static func saturatedFraction(ofRGBA buffer: [UInt8], width: Int, height: Int,
+                                  above floor: Double) -> Double {
+        let pixels = width * height
+        guard pixels > 0, buffer.count >= pixels * 4 else { return 0 }
+        var saturated = 0
+        forEachSaturation(ofRGBA: buffer, width: width, height: height) {
+            if $0 > floor { saturated += 1 }
+        }
+        return Double(saturated) / Double(pixels)
+    }
+
+    /// Fraction of the page that would be ink once thresholded. Text sits at
+    /// 6–8%; halftones and dark scans run far higher.
+    /// **Both halves come from one population, and that is the whole of A7.2.**
+    /// It used to walk all of `grey` and divide by `width * height`. Told a
+    /// 4,000-pixel buffer was 20x20 it returned **10.0** — a coverage above 1 —
+    /// and told a 100-pixel buffer was 20x20 it under-reported 4x. Every sibling
+    /// fraction in this file takes numerator and denominator from the same place.
+    /// No shipped caller mismatches today; the two constants a rescaled value
+    /// would miscalibrate, `pictureInkThreshold` and `pictureInkMinimumTone`, are
+    /// the two whose miscalibration destroyed content twice.
+    static func inkCoverage(
+        of grey: [UInt8], width: Int, height: Int, threshold: UInt8
+    ) -> Double {
+        guard width > 0, height > 0 else { return 0 }
+        let pixels = min(grey.count, width * height)
+        guard pixels > 0 else { return 0 }
+        var dark = 0
+        for i in 0..<pixels where grey[i] < threshold { dark += 1 }
+        return Double(dark) / Double(pixels)
+    }
+
+    /// The encoded JPEG bytes, so the same data can go into a hand-built PDF.
+    ///
+    /// A3.4 / A4.4. The `grey.count` precondition `greyPNG` and `jpegRGB` both have
+    /// and this one did not. A 16-byte buffer at 100×100 produced a **valid
+    /// 2,055-byte JPEG from 9,984 bytes past the end of the array** — so the
+    /// framing is not "it traps" but **adjacent heap bytes get JPEG-encoded into
+    /// the published page image**, which is memory disclosure into the output
+    /// document. Not reachable from today's three callers (all traced, all pass
+    /// exactly-sized buffers), and `jpegData` is `static` and already called from
+    /// `Tools/`. The unguarded sibling in a family of three is R23's and R29's
+    /// shape, and this is the one where the shape is a memory-safety bug.
+    static func jpegData(
+        from grey: [UInt8], width: Int, height: Int, quality: Double
+    ) -> Data? {
+        guard width > 0, height > 0, grey.count >= width * height else { return nil }
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+            bitsPerSample: 8, samplesPerPixel: 1, hasAlpha: false, isPlanar: false,
+            colorSpaceName: .deviceWhite, bytesPerRow: width, bitsPerPixel: 8)
+        else { return nil }
+        if let dest = rep.bitmapData {
+            grey.withUnsafeBytes { dest.update(from: $0.bindMemory(to: UInt8.self).baseAddress!,
+                                               count: width * height) }
+        }
+        return rep.representation(using: .jpeg, properties: [.compressionFactor: quality])
+    }
+
+    /// JPEG-encode ourselves so the compression is ours to pick, then hand back
+    /// a JPEG-backed image for the PDF context to embed.
+    /// One JPEG encode, giving back both the bytes and an image over them.
+    ///
+    /// These were two functions — `jpegImage` for the PDF and `jpegData` for the
+    /// stream file — and `jpegImage` was itself encoding to JPEG and decoding
+    /// straight back, so a picture page paid for the same encode twice over the
+    /// same buffer. The bytes and the image are now the same bytes, which also
+    /// guarantees the compressed build and the fallback build are identical
+    /// rather than merely meant to be.
+    static func jpeg(
+        from grey: [UInt8], width: Int, height: Int, quality: Double
+    ) -> (data: Data, image: CGImage)? {
+        guard let data = jpegData(from: grey, width: width, height: height,
+                                  quality: quality),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+        else { return nil }
+        return (data, image)
+    }
+
+    // MARK: - MRC layers
+
+    /// Sauvola's k. 0.34 follows `internetarchive/archive-pdf-tools`, which
+    /// produced two of the MRC exemplars this was calibrated against.
+    static let sauvolaK = 0.34
+
+    /// How much the background is shrunk. It is the quality knob and it is
+    /// steep: measured on a page carrying a photograph, 1x saves 1.15x, 2x saves
+    /// 3.05x and 3x saves 4.72x. Over 40 documents, 2x is 3.28x and 3x is 5.15x.
+    ///
+    /// **Those last two are superseded.** They came from the instrument BUGS.md T15
+    /// was about, which never applied R50's all-text shrink; re-measured over 74
+    /// corpus picture pages, 2x is **4.37x** and 3x is **6.66x**, and at 1x three
+    /// layers cost *more* than one image on 31 of the 74 — see `FEATURES.md`. Left
+    /// in place rather than rewritten because the per-page photograph figures above
+    /// are still the ones that chose the value.
+    ///
+    /// 2, not 3, because the pages that reach this route are by definition the
+    /// ones with pictures on them. At 3x the photograph survives but is visibly
+    /// soft; at 2x it is close to what ships today. Trading a picture's
+    /// resolution for bytes on archival material is the R13 decision again, and
+    /// it went the same way.
+    static let mrcBackgroundDownsample = 2
+
+    /// The foreground carries ink colour, which on a scan is nearly flat, so it
+    /// can be shrunk much harder than the background without anything showing.
+    static let mrcForegroundDownsample = 4
+
+    // MARK: - Pages whose ink is all text
+    //
+    // R50. The tone layers, not the stencil, are what keeps a layered file above
+    // the size of a good mixed-raster original. Measured over 568 pages against
+    // the Internet Archive's own scan of the same book: our stencils cost
+    // **21.2 MB against their 21.7**, and our tone layers **40.7 MB against their
+    // 4.3**. The stencil is already right; the tone layers are carried at a
+    // fidelity paper does not need.
+    //
+    // On a page that is nothing but text, the background holds paper and the
+    // foreground holds one nearly-flat ink colour, so both can be shrunk far
+    // harder than `mrcBackgroundDownsample` allows without anything visible
+    // changing. On a page carrying a picture they cannot. So the question is which
+    // kind of page this is — and that question has a cheap, honest answer at this
+    // point in the pipeline that it does not have earlier.
+
+    /// How much of a page's ink Vision found no words for.
+    ///
+    /// **Why this works where three other signals failed.** `isPicture` runs
+    /// before recognition, so it has only the page's own histogram, and a
+    /// histogram cannot tell text from a tinted plate — R49 measured that, twice
+    /// over. This runs *after* recognition, where the word boxes exist, so it can
+    /// ask a structural question instead of a statistical one: ink that is not
+    /// inside any recognised word is not *recognised* text.
+    ///
+    /// ⛔ **That sentence read "is, by construction, not text" until 2026-08-19,
+    /// and it is FALSE — see `C28`, which was opened on it.** Measured over **86
+    /// corpus pages** read at 1:1 (C26 sub-step 4, then C28's four sub-steps of
+    /// 8 + 24 + 20 + 21 — every page this bar still shrinks — all 2026-08-20), the
+    /// ink outside the recognised words was
+    /// content on **24 of them** — **18 of those typeset**: whole lines of running
+    /// prose, values out of a correlation matrix, a paper's displayed estimating
+    /// equation, a page folio; the other 6 hand-made — two signatures, two pencilled
+    /// annotations, a hand-inked margin number and a drawn margin bracket.
+    /// ⛔ **And one of those 24 is a page this function prints as `0.0000`** —
+    /// `_1939_Former students to Board re Merriam_` p2, whose pencilled annotation
+    /// is paler than the page's own Otsu. ⚠️ Stated exactly, because the seam cannot
+    /// do better: it does not flip at an `INKBAR` of 1e-5, which bounds its
+    /// `inkOutsideText` to **[0, 1e-5)** rather than establishing zero. Either way
+    /// no *usable* bar protects it — the guard is a strict `<`, so at exactly 0 only
+    /// a `textPageInkOutsideThreshold` of 0 refuses the shrink, and that value
+    /// refuses it on every page in the corpus; and if the value is positive, the bar
+    /// that would reach it is below 1e-5, some 4,500x under the shipped 0.045. Vision
+    /// misses lines on faint,
+    /// skewed and tightly-set scans, and nothing in this file can tell "the
+    /// recogniser missed this" from "this is not text". A later paragraph in this
+    /// same comment already said words Vision did not box are destroyed at 1/8, so
+    /// the comment contradicted itself; this is the half that was wrong. The signal is
+    /// still the best one available at this point in the pipeline — it is a proxy
+    /// for "is this page a picture" — but it is a proxy, and nothing here measures
+    /// how good a picture detector it is. And it is
+    /// the premise that licensed the "both ways of being wrong are mild" reasoning
+    /// the ⛔ paragraph below retracts: if unboxed ink cannot be text, then a page
+    /// wrongly shrunk can only lose decoration.
+    ///
+    /// Measured. Text pages sit at zero and pictures sit two orders of magnitude
+    /// above them:
+    ///
+    /// | | ink outside the words |
+    /// |---|---|
+    /// | text pages (`Blacks in the City` 41, 163, 244; a synthetic text page) | 0.0000 |
+    /// | 91 real corpus pages, median | 0.017 |
+    /// | a line chart under a paragraph | 0.153 |
+    /// | a seal covering 1% of the sheet | 0.250 |
+    /// | a photograph covering 8% | 0.694 |
+    /// | full-page photogravure plates (`Blacks` 78, 300, 301, 303) | 0.971–0.993 |
+    ///
+    /// **It is a threshold on a continuum, not a gap, and that is stated rather
+    /// than dressed up.** Across the 91 corpus pages the values run smoothly from
+    /// 0 to 0.97. What makes a bar here defensible is not a hole in the
+    /// distribution but where the two ways of being wrong land: a page wrongly
+    /// held at fine resolution costs bytes and nothing else. Every hazard that
+    /// could be constructed for it lands at 0.153 or above, and 0.045 leaves a
+    /// factor of 3.4 below the nearest one.
+    ///
+    /// ⛔ **This paragraph read "0.08 … *both* ways of being wrong are mild — …a
+    /// page wrongly shrunk has its figure softened, never removed" until
+    /// 2026-08-19, and the second half of that is FALSE.** It is what C26 was
+    /// decided against. Measured over 13 of the 16 corpus pages the bar move
+    /// rescues (`INKDUMP` on `Tools/score-text-route.swift`, in the entry's
+    /// "Sub-step 4, the benefit"), 11 lose something and **8 lose content
+    /// outright** — `Xin Qu et al_2018` p20 loses thirteen values out of a
+    /// Pearson correlation matrix, `_1973_Committee Against Racism_` p4 seven
+    /// lines of prose. Words Vision did not box are cut from the stencil by
+    /// `textRegionMask`, left in the background, and destroyed at 1/8. So one
+    /// way of being wrong here is invariant-1 content loss, not softening, and
+    /// the reasoning that sized this constant had it the other way round.
+    ///
+    /// **Why 0.045, measured 2026-08-19 and decided by the owner.** A
+    /// 233-document corpus sweep (`Tools/sweep-ink-bar.py`, committed as
+    /// `INKBAR-2026-08-19.tsv`, 2,129 measured page rows) sized the band
+    /// `[0.045, 0.08)`: **16 pages, all of which stop being shrunk** — 0.75% of
+    /// sampled pages, 18.0% of the 89 shrunk today, over 10 documents of 233. (A
+    /// seventeenth row prints `0.0450`; its true value is under the bar, so it
+    /// does not move and is not in the band.)
+    /// They cost **838,569 -> 3,804,222 B, 4.54x, 185,353 B a page**, which is
+    /// **~21 pages of 16,987 and ~4.0 MB at corpus scale, +0.55%** of R50's
+    /// 721 MB gate (the stratified estimate; pooling the rate is 6x high, and the
+    /// entry says why). R49/R50 set no growth-tolerance bar, so this was the R55
+    /// shape — the campaign measures, the owner closes it on the arithmetic.
+    ///
+    /// ⚠️ **And the counter-finding is recorded rather than waved away: a
+    /// threshold is a blunt instrument here.** 32.4% of the band's byte cost
+    /// lands on two pages a reader cannot tell apart (`RIESMAN_1942` p10, the
+    /// dearest of the 16 at +702,280 B and 6.47x, whose only non-stencil ink is
+    /// a pale scanner-edge strip; and `Riesman - 1954` p18). The question this
+    /// campaign surfaced and this constant cannot answer — why recognised-page
+    /// prose is dropped from the stencil at all — is **`C28`**, opened
+    /// 2026-08-19. C26 itself is `FIXED` as of 2026-08-20, on the render of its
+    /// own founding pages. ⚠️ This comment read "C26 stays OPEN on the question"
+    /// for a day after that question became its own entry, and would have read
+    /// it for longer: nothing in this repo checks a status written in prose, and
+    /// both `check-staleness.sh` and `check-queue-coherence.sh` passed over it.
+    ///
+    /// **What it misses — two cases, both recorded because they will come up.** The
+    /// signal is ink, so anything whose luminance sits near the paper/ink boundary
+    /// is invisible to it:
+    ///
+    /// - a *pale* line drawing reads **0.0000**, because Otsu puts light grey on the
+    ///   paper side and it is therefore not ink at all;
+    /// - a **flat mid-luminance colour field** reads **0.0365**. Measured on a flat
+    ///   red plate: it renders at luminance 96–111 while Otsu on that page lands at
+    ///   **106**, so half the plate is above the threshold. This is why the suite
+    ///   builds a *tonal* plate to test the picture case, and why that fixture must
+    ///   not be "simplified" back to a flat one — it would assert the limitation
+    ///   instead of the behaviour.
+    ///
+    /// Both survive the move to 0.045: a pale drawing still reads 0.0000 (R56's
+    /// shape signal is the term that reaches it, and it is the second half of
+    /// `pageIsAllText()` for that reason), and 0.0365 is still under the bar. ⛔ The
+    /// sentence that stood here — *"Neither is alarming, because this only ever
+    /// changes resolution: the worst it can do is soften something, never remove
+    /// it"* — is **retracted, 2026-08-19**, for the reason given above the table:
+    /// at 8x it removes lines of prose. What is still true is that a flat field
+    /// loses nothing to a downsample, so the second miss is self-cancelling in the
+    /// common case; what suffers is a detailed colour image with no dark tones.
+    /// `PhotoDetail.maximum` is honoured in full for exactly this reason — see the
+    /// `keepEveryPixel` guard in `mrcLayers`.
+    static let textPageInkOutsideThreshold = 0.045
+
+    /// A substitute bar, for a tool asking what a **different** threshold would publish.
+    ///
+    /// `nil` in the app, always — nothing in `Sources/` sets it and no setting reaches it.
+    /// It exists for C26's sub-step 3, which is a pricing question the shipped code cannot
+    /// otherwise be asked: three drawings were erased because `inkOutsideText` reads
+    /// 0.0493–0.0660 against what was then a bar of 0.08, a bar at 0.045 refuses all three,
+    /// and the cost of refusing a page is bytes on every page that newly stays at the
+    /// caller's factor. R49/R50 are the entries about paying those bytes, so the number had
+    /// to be measured before the constant moved. **It was, and the constant moved on
+    /// 2026-08-19 — `textPageInkOutsideThreshold` is 0.045.** So the direction this seam is
+    /// driven in has reversed: substituting 0.045 now asks the shipped question, and it is
+    /// **0.08** that prices the old behaviour. The suite's C26 block was re-paired for
+    /// exactly that reason — a check comparing `nil` against 0.045 is a run compared with
+    /// itself, which is a check that cannot fail.
+    ///
+    /// **It substitutes the bar, not the verdict, and that is the point.** Forcing
+    /// `pageIsAllText()` to return false would measure a proxy: **R56's `paleDrawing` term
+    /// would stop participating**, so a page refused today by that second term would be priced
+    /// as though this first one had moved it. Substituting the comparand leaves the guard in
+    /// place, so what a sweep measures is the proposed change and not a hand-forced outcome.
+    /// (An earlier version of this comment claimed `keepEveryPixel` for the same argument. It
+    /// does not belong there: it is applied *outside* this function — `!keepEveryPixel &&
+    /// pageIsAllText()` — so a forced-false verdict and a `keepEveryPixel` page give the same
+    /// answer, and the only term the choice actually protects is `paleDrawing`. Caught by the
+    /// adversarial review of the diff that added this property.)
+    ///
+    /// Unlike `rebuildDPIOverride` this one needs no `useHelper` caveat: it is read in
+    /// `mrcLayers`, which runs in the app's own process. `visionocr-recognise` compiles this
+    /// file — see `build.sh`'s `HELPER_SOURCES` — but never layers a page, so there is no
+    /// second address space for the value to be `nil` in.
+    nonisolated(unsafe) static var textPageInkOutsideThresholdOverride: Double?
+
+    /// light-tier (lt-audit). The suite sets this to count, per section, calls to the four
+    /// functions that render a page: `flatten`, `renderGrey`, `renderRGB` and
+    /// `saturationThumbnail`. Pixel loops a check runs on a buffer it made itself are not
+    /// counted. `nil` in the app and the helper.
+    nonisolated(unsafe) static var tripwire: (() -> Void)?
+
+    /// What a page of nothing but text shrinks its tone layers to.
+    ///
+    /// 8 and 16, measured on `Blacks in the City` page 41 (1899x3138 at 360 DPI),
+    /// against the 2 and 4 that ship for pages with pictures on them:
+    ///
+    /// | | background | foreground | page |
+    /// |---|---|---|---|
+    /// | 2x / 4x | 36,383 B | 23,894 B | 99,130 B |
+    /// | 8x / 16x | 4,374 B | 3,108 B | **46,332 B** |
+    ///
+    /// At which point the 1-bit stencil is 81% of the page and the tone layers are
+    /// 7.5 KB — the Internet Archive's own are 5.8 KB, so this is the right
+    /// neighbourhood rather than a number pushed until it hurt. Rendered at 100
+    /// DPI beside the 2x/4x version, the text page is indistinguishable.
+    static let textPageBackgroundDownsample = 8
+    /// C28. The resolution an all-text page keeps its pale marks at, in its mark layer
+    /// (`MRCLayers.marks`); its paper stays at `textPageBackgroundDownsample`. At 4,
+    /// `Ford_1941` p1's pencilled insertion was a blur; at 3 and 2 it reads, and 3 cost
+    /// that document +47 KB where 2 cost +92 KB.
+    static let textPageMarkDownsample = 3
+    static let textPageForegroundDownsample = 16
+
+    /// The fraction of the page's ink that falls outside `region`.
+    ///
+    /// The outer sixteenth is ignored on every side. A scan carries the dark edge
+    /// of the platen and the shadow in the gutter, which is ink by any threshold
+    /// and is not content — on `Blacks in the City` it is most of the ink outside
+    /// the words, and counting it put every text page in the book above any
+    /// threshold worth setting.
+    static func inkOutsideText(_ grey: [UInt8], region: [Bool],
+                               width w: Int, height h: Int, threshold: UInt8) -> Double {
+        guard w > 0, h > 0, grey.count >= w * h, region.count >= w * h else { return 1 }
+        let win = interiorWindow(width: w, height: h)
+        var outside = 0, total = 0
+        for y in win.y0..<win.y1 {
+            let row = y * w
+            for x in win.x0..<win.x1 where grey[row + x] < threshold {
+                total += 1
+                if !region[row + x] { outside += 1 }
+            }
+        }
+        // No ink at all is a blank page, and a blank page has no picture on it.
+        return total > 0 ? Double(outside) / Double(total) : 0
+    }
+
+    /// The window `inkOutsideText` walks: the outer sixteenth ignored on every side.
+    ///
+    /// **One copy, because the shape term below has to walk the SAME window.** C28's
+    /// whole instrument rests on the identity that the shape rule reads the ink
+    /// `inkOutsideText` divided by — `score-shape-term.swift` asserts it on every
+    /// printed row and exits 6 otherwise — and two copies of this arithmetic is a
+    /// check that cannot fail, which is a shape this register has recorded ten times.
+    /// So `inkOutsideText` was changed to call this rather than the term being given
+    /// its own; the values are unchanged, which the suite's C26 block pins by
+    /// comparing a published `inkOutsideText` against an independently derived one.
+    static func interiorWindow(width w: Int, height h: Int)
+        -> (x0: Int, y0: Int, x1: Int, y1: Int) {
+        let mx = w / 16, my = h / 16
+        let x1 = max(w - mx, mx + 1), y1 = max(h - my, my + 1)
+        return (mx, my, min(x1, w), min(y1, h))
+    }
+
+    /// C28. Clears `mask` outside both the words and `interiorWindow`: on a page read as
+    /// all text, the ink the stencil may hold beyond the words is the ink the all-text
+    /// terms measured, and no more.
+    static func keepWordsAndInterior(_ mask: inout [Bool], region: [Bool],
+                                     width w: Int, height h: Int) {
+        guard mask.count >= w * h, region.count >= w * h else { return }
+        let win = interiorWindow(width: w, height: h)
+        for y in 0..<h {
+            let row = y * w, inside = y >= win.y0 && y < win.y1
+            for x in 0..<w where !region[row + x] && !(inside && x >= win.x0 && x < win.x1) {
+                mask[row + x] = false
+            }
+        }
+    }
+
+    // MARK: - C28: is the ink outside the recognised words SHAPED like text?
+
+    /// A map component shorter than this many median glyph heights is not a glyph.
+    ///
+    /// 0.5 rather than something tighter because a lower-case `o` and a cap `H` are
+    /// already 2x apart in one line of type, and the median lands between them.
+    static let shapeHeightLow = 0.5
+    /// And taller than this many is not one either. 3.0 admits a display line and a
+    /// two-line-tall brace; it refuses the gutter shadow and the platen edge, which is
+    /// what the four non-losing pages of C28 sub-step 1 are made of.
+    static let shapeHeightHigh = 3.0
+    /// A component whose median horizontal run is wider than this many median glyph
+    /// runs is a solid thing rather than a stroke. This is the term that refuses a
+    /// scanner edge that happens to be the right height.
+    static let shapeRunHigh = 2.0
+    /// Fewer pixels than this is a speck. Dust and JPEG ringing both make them in
+    /// quantity.
+    static let shapeMinimumArea = 4
+    /// A line group needs this many accepted components. Four, so that two words of
+    /// two letters do not make a line out of noise.
+    ///
+    /// ⚠️ Measured cost, both directions: at 4 the term reads 0 on C26's two founding
+    /// cartoons (`1954 - Why` p6/p7, whose out-of-stencil ink never reaches four members
+    /// on a baseline) and it is also what stops a printer's ornament of **664 accepted
+    /// PIXELS** from grouping at all. So this is a two-sided trade
+    /// and not a value to relax casually — `BUGS.md` C28
+    /// `#### Are there PICTURES in the sub-bar 73?` is the measurement.
+    ///
+    /// ⛔ **THREE corrections, and (3) is about the paragraph ABOVE — 2026-09-20.**
+    /// (1) The ornament is 664 **pixels in THREE components**, not "664 accepted
+    /// components": a units error making a singleton and two neighbours sound like a
+    /// crowd, and `lineGapFactor` refuses that rect too, so "it is also what stops"
+    /// overstates THIS constant's part (`#### The ornament's own rect at a relaxed floor`).
+    /// (2) The cartoons' *"372 and 785 accepted pixels"* were the dumped `-textish.png`'s
+    /// PAINTED counts — the dump fills `bbox ∩ map` per accepted component and can enclose
+    /// pixels the rule REFUSED — where `score-shape-term`'s `txtPx` reads **357**/**761**.
+    /// Inferred when this was written; MEASURED since, p6 372-in-7 against 357-in-4 and p7
+    /// 792-in-20 against 761-in-12. (3) ⛔ **"whose out-of-stencil ink never reaches four
+    /// members" credits this constant with p6's whole 0 and only **4.47%** of that rect's
+    /// drawing ink ever reaches it**: the term maps ink inside `interiorWindow` ALONE and
+    /// p6's drawing is the page CORNER, so 3,513 px (**44.02%**) never reach the term at
+    /// all and the component test refuses 4,110 more (**51.50%**), leaving `txtPx` **357**
+    /// in `txtN` **4** for the grouping to answer 0 on. Quantify by ink, not by verdict.
+    static let lineMinimumMembers = 4
+    /// …and no gap between adjacent members wider than this many glyph heights, which
+    /// is what stops a mark at each margin from being read as one line spanning the page.
+    static let lineGapFactor = 3.0
+
+    /// The most horizontal runs the shape analysis will label, whatever the page is.
+    ///
+    /// **R24 and R29's shape, bounded before it shipped rather than after.** The run
+    /// list and its union-find parent array are both proportional to the ink in the
+    /// page, and `maximumMRCPageMegapixels` allows 100 MP — an alternating pixel field
+    /// at that size is 50 million runs, which is 1.2 GB of `Run` plus 400 MB of parent
+    /// on top of the ~500 MB this function's caller is already holding in `grey`,
+    /// `mask` and `region` (`fgHoles` is built after it returns). Both R24 and R29 were an allocation bounded in
+    /// one place and left unbounded in its twin.
+    ///
+    /// 8,000,000 caps `runs` at 192 MB and `parent` at 64 MB. ⛔ **That pair is NOT the peak, and a
+    /// draft of this comment presented it as one** — the review of C28's wiring diff did the rest of the
+    /// arithmetic: at the cap with maximal fragmentation the *components* dominate, roughly 384 MB of
+    /// `ShapeComponent` plus a separately heap-allocated `runLengths` for each, plus a `slot` dictionary
+    /// of the same order — order a gigabyte, not 256 MB, and the `map` this function's caller builds is
+    /// another `w * h` on top. The bound is therefore a bound on the *labelling*, which is the term this
+    /// file can cap cheaply, and not a statement of peak footprint. ⚠️ **The trigger rate is not measured**:
+    /// no page in C28's 73-page population or its 10 picture pages came near it, but
+    /// none was instrumented for it either, so this is a memory bound whose cost is
+    /// reasoned rather than a threshold that was swept.
+    ///
+    /// **Exceeding it returns `nil`, which the caller reads as "do not treat this page
+    /// as all text".** That is the safe direction and it is safe for a reason specific
+    /// to this seam: refusing the all-text verdict stores a page at the caller's own
+    /// factor (`bgFactor = allText ? max(caller, 8) : caller`), no coarser than all text
+    /// would have, so the worst a truncation can cost is bytes on a page too dense to
+    /// analyse. It cannot lose content, which is why no report is owed for it under
+    /// invariant 1. The one exception is a page from an image file with the
+    /// Photographed pages slider at 1/2 and Photo detail at Smallest files (3): refused,
+    /// it is stored at a third where all text would have kept a half, and the photo
+    /// layer at a third is still Smallest files' own published level.
+    static let maximumShapeRuns = 8_000_000
+
+    /// A maximal horizontal run of set pixels. `x1` is exclusive.
+    fileprivate struct ShapeRun { let y: Int, x0: Int, x1: Int }
+
+    /// One connected component, kept as statistics rather than as pixels: a page of
+    /// newsprint has hundreds of thousands of these and its pixel lists would not fit.
+    struct ShapeComponent {
+        var minX = Int.max, maxX = Int.min, minY = Int.max, maxY = Int.min
+        var area = 0
+        var runLengths: [Int] = []
+        var width: Int { maxX - minX + 1 }
+        var height: Int { maxY - minY + 1 }
+        /// The stroke-width proxy: the median of this component's own row runs. A stem
+        /// of type is 2-6 px at these resolutions; a gutter shadow is hundreds.
+        var medianRun: Int {
+            guard !runLengths.isEmpty else { return 0 }
+            let s = runLengths.sorted()
+            return s[s.count / 2]
+        }
+        fileprivate mutating func add(_ r: ShapeRun) {
+            minX = min(minX, r.x0); maxX = max(maxX, r.x1 - 1)
+            minY = min(minY, r.y);  maxY = max(maxY, r.y)
+            area += r.x1 - r.x0
+            runLengths.append(r.x1 - r.x0)
+        }
+    }
+
+    /// 8-connected components of `mask`, over the half-open window only.
+    ///
+    /// Run-based rather than pixel-based: the run lengths are the stroke-width proxy,
+    /// so finding them first and labelling *them* costs one pass instead of two.
+    ///
+    /// `nil` when the run count would exceed `runLimit`. See `maximumShapeRuns` for why
+    /// the bound exists and why `nil` is the safe answer rather than a partial one.
+    ///
+    /// `runLimit` is a defaulted parameter and not a `static var`, so the truncation
+    /// branch can be *executed* by a check rather than reasoned about — CONTRIBUTING
+    /// 4c: R31, R32 and H2 were all careful code in branches nothing ever entered. At
+    /// the shipped 8,000,000 no fixture a suite can build reaches it, so a seam is the
+    /// only way that branch ever runs. A parameter rather than a mutable static
+    /// deliberately: `CLAUDE.md` records that `static var` has produced defects here,
+    /// and C28 refused a second override property beside
+    /// `textPageInkOutsideThresholdOverride`.
+    static func shapeComponents(_ mask: [Bool], width w: Int, height h: Int,
+                                x0: Int, y0: Int, x1: Int, y1: Int,
+                                runLimit: Int = maximumShapeRuns) -> [ShapeComponent]? {
+        guard w > 0, h > 0, mask.count >= w * h, x0 < x1, y0 < y1 else { return [] }
+        var runs: [ShapeRun] = []
+        var rowStart: [Int] = []
+        for y in y0..<y1 {
+            rowStart.append(runs.count)
+            var x = x0
+            let row = y * w
+            while x < x1 {
+                if mask[row + x] {
+                    let s = x
+                    while x < x1, mask[row + x] { x += 1 }
+                    runs.append(ShapeRun(y: y, x0: s, x1: x))
+                    if runs.count > runLimit { return nil }
+                } else {
+                    x += 1
+                }
+            }
+        }
+        rowStart.append(runs.count)
+        guard !runs.isEmpty else { return [] }
+
+        var parent = Array(0..<runs.count)
+        func find(_ a: Int) -> Int {
+            var r = a
+            while parent[r] != r { parent[r] = parent[parent[r]]; r = parent[r] }
+            return r
+        }
+        func union(_ a: Int, _ b: Int) {
+            let ra = find(a), rb = find(b)
+            if ra != rb { parent[max(ra, rb)] = min(ra, rb) }
+        }
+        // Two pointers down each pair of adjacent rows. 8-connectivity, so runs that
+        // only touch at a corner are one component: `a.x0 <= b.x1 && b.x0 <= a.x1`
+        // with `x1` exclusive is exactly that.
+        if rowStart.count >= 3 {
+            for band in 1..<(rowStart.count - 1) {
+                var i = rowStart[band - 1], j = rowStart[band]
+                let iEnd = rowStart[band], jEnd = rowStart[band + 1]
+                while i < iEnd, j < jEnd {
+                    let a = runs[i], b = runs[j]
+                    if a.x0 <= b.x1, b.x0 <= a.x1 { union(i, j) }
+                    if a.x1 < b.x1 { i += 1 } else { j += 1 }
+                }
+            }
+        }
+
+        var slot = [Int: Int](minimumCapacity: runs.count / 4 + 1)
+        var comps: [ShapeComponent] = []
+        for (i, r) in runs.enumerated() {
+            let root = find(i)
+            if let k = slot[root] {
+                comps[k].add(r)
+            } else {
+                slot[root] = comps.count
+                var c = ShapeComponent()
+                c.add(r)
+                comps.append(c)
+            }
+        }
+        return comps
+    }
+
+    /// Which of `comps` are shaped like type at this page's own scale.
+    ///
+    /// Every term is a ratio against the page's own recognised type, so nothing here
+    /// is a size in pixels and the rule travels across the corpus's 72-600 DPI without
+    /// a constant that describes the scanner.
+    static func textShaped(_ comps: [ShapeComponent],
+                           glyphHeight: Double, glyphRun: Double) -> [Int] {
+        guard glyphHeight > 0, glyphRun > 0 else { return [] }
+        return comps.indices.filter { i in
+            let c = comps[i]
+            guard c.area >= shapeMinimumArea else { return false }
+            let hh = Double(c.height)
+            guard hh >= shapeHeightLow * glyphHeight, hh <= shapeHeightHigh * glyphHeight
+            else { return false }
+            return Double(c.medianRun) <= shapeRunHigh * glyphRun
+        }
+    }
+
+    /// One accepted line group: components sharing a horizontal band with no wide gap.
+    struct TextLine {
+        var members: [Int] = []
+        var minX = Int.max, maxX = Int.min, minY = Int.max, maxY = Int.min
+        var area = 0
+    }
+
+    /// Group accepted components into lines: same horizontal band, no adjacent gap
+    /// wider than `lineGapFactor` glyph heights, at least `lineMinimumMembers` members.
+    ///
+    /// The band test is vertical *overlap* rather than a shared centre line, because a
+    /// descender and a cap on the same line of type do not share a centre.
+    static func textLines(_ comps: [ShapeComponent], accepted: [Int],
+                          glyphHeight: Double) -> [TextLine] {
+        guard glyphHeight > 0 else { return [] }
+        let sorted = accepted.sorted { comps[$0].minY < comps[$1].minY }
+        var bands: [[Int]] = []
+        for i in sorted {
+            let c = comps[i]
+            var placed = false
+            for b in bands.indices {
+                // The band's current extent, taken from its last member: bands are
+                // built in increasing `minY`, so the newest member is the one a
+                // candidate can touch.
+                let last = comps[bands[b].last!]
+                let lo = max(c.minY, last.minY), hi = min(c.maxY, last.maxY)
+                let overlap = hi - lo + 1
+                if overlap > 0, Double(overlap) >= 0.5 * Double(min(c.height, last.height)) {
+                    bands[b].append(i)
+                    placed = true
+                    break
+                }
+            }
+            if !placed { bands.append([i]) }
+        }
+        var out: [TextLine] = []
+        for band in bands {
+            let ordered = band.sorted { comps[$0].minX < comps[$1].minX }
+            var run: [Int] = []
+            func flush() {
+                if run.count >= lineMinimumMembers {
+                    var l = TextLine()
+                    for i in run {
+                        let c = comps[i]
+                        l.members.append(i)
+                        l.minX = min(l.minX, c.minX); l.maxX = max(l.maxX, c.maxX)
+                        l.minY = min(l.minY, c.minY); l.maxY = max(l.maxY, c.maxY)
+                        l.area += c.area
+                    }
+                    out.append(l)
+                }
+                run = []
+            }
+            for i in ordered {
+                if let prev = run.last {
+                    let gap = comps[i].minX - comps[prev].maxX
+                    if Double(gap) > lineGapFactor * glyphHeight { flush() }
+                }
+                run.append(i)
+            }
+            flush()
+        }
+        return out
+    }
+
+    private static func medianOf(_ xs: [Int]) -> Double {
+        guard !xs.isEmpty else { return 0 }
+        let s = xs.sorted()
+        return Double(s[s.count / 2])
+    }
+
+    /// How many text-shaped LINE GROUPS the page's ink outside `region` contains.
+    ///
+    /// **C28.** The 1-bit stencil is the intersection of an adaptive binarisation with
+    /// the geometry of the words Vision recognised, so prose the recogniser missed is
+    /// in neither the stencil nor the text layer and survives only in the background —
+    /// which on a page read as all text is stored at an eighth of its resolution.
+    /// Measured over the whole 73-page sub-bar population, this count is `>= 1` on
+    /// **12 of 12** pages that lose typeset content, **1 of 4** losing only a hand-made
+    /// mark, **0 of 6** degraded-but-legible and **3 of 51** that lose nothing — and all
+    /// three of those firings are the *rim* of recognised type, glyph tops poking
+    /// outside a word box on a line that IS in the text layer. `SHAPETERM-73-2026-08-21.tsv`.
+    ///
+    /// ⛔ **It is NOT a picture detector and must not be used as one.** Measured on ten
+    /// picture pages the same week, it fires on 6 of 10 — halftone dots, photograph
+    /// grain inside a plate, a pen ornament's feather strokes — and reads 0 on two pages
+    /// whose content loss C26 measured at 1:1. That is why C28's decision wires it here,
+    /// at the *layering* seam where refusing the verdict only ever keeps resolution, and
+    /// **not** into `textRegionMask`, where admitting those same marks to the 1-bit
+    /// stencil is R57's failure mode. `BUGS.md` C28 `#### THE DECISION`.
+    ///
+    /// The calibration is the page's own recognised type: `stencil`'s components supply
+    /// the median glyph height and the median stroke run every ratio above is taken
+    /// against. A page with no stencil components has nothing to calibrate on, and the
+    /// answer there is 0 rather than a guess.
+    ///
+    /// `nil` means the page was too dense to label within `maximumShapeRuns`; see that
+    /// constant for why the caller must read `nil` as "not all text".
+    static func textLineGroupsOutsideText(_ grey: [UInt8], stencil: [Bool],
+                                          region: [Bool], width w: Int, height h: Int,
+                                          threshold: UInt8,
+                                          runLimit: Int = maximumShapeRuns) -> Int? {
+        guard w > 0, h > 0, grey.count >= w * h,
+              stencil.count >= w * h, region.count >= w * h else { return 0 }
+        let win = interiorWindow(width: w, height: h)
+
+        // The map: interior ink `region` does not cover — `inkOutsideText`'s own
+        // numerator, over the window that function walks, blanked outside it rather
+        // than cropped to it so every component rect is already in the page's frame.
+        var map = [Bool](repeating: false, count: w * h)
+        var outside = 0
+        for y in win.y0..<win.y1 {
+            let row = y * w
+            for x in win.x0..<win.x1 where grey[row + x] < threshold {
+                if !region[row + x] { map[row + x] = true; outside += 1 }
+            }
+        }
+        guard outside > 0 else { return 0 }
+
+        // The calibration: the recognised glyphs are the stencil's own components.
+        guard let glyphComps = shapeComponents(stencil, width: w, height: h,
+                                               x0: win.x0, y0: win.y0,
+                                               x1: win.x1, y1: win.y1,
+                                               runLimit: runLimit) else { return nil }
+        let sized = glyphComps.filter { $0.area >= shapeMinimumArea }
+        let glyphHeight = medianOf(sized.map(\.height))
+        let glyphRun = medianOf(sized.map(\.medianRun))
+        guard glyphHeight > 0, glyphRun > 0 else { return 0 }
+
+        guard let comps = shapeComponents(map, width: w, height: h,
+                                          x0: win.x0, y0: win.y0,
+                                          x1: win.x1, y1: win.y1,
+                                          runLimit: runLimit) else { return nil }
+        let accepted = textShaped(comps, glyphHeight: glyphHeight, glyphRun: glyphRun)
+        return textLines(comps, accepted: accepted, glyphHeight: glyphHeight).count
+    }
+
+    // MARK: - Shape: what is on the page, rather than how dark it is
+
+    /// The resolution the mark analysis runs at, in cells to the inch.
+    ///
+    /// A **physical** cell rather than a fixed reduction factor, because the corpus
+    /// renders between 72 and 600 DPI and every statistic below is a size in inches.
+    /// A fixed factor would make a quarter inch mean 19 cells on one document and 3
+    /// on another, and the constants would then be describing the scanner.
+    ///
+    /// **150, and 75 was tried first and is measurably worse.** 150 ppi is where
+    /// Leptonica's own page segmentation operates: `pixGetRegionsBinary` documents its
+    /// input as 300–400 ppi and reduces 2x, and `pixGenerateHalftoneMask` documents
+    /// *"assumed to be 150 to 200 ppi"* and adds *"this is not intended to work on
+    /// small thumbnails"*. Its 37.5 ppi levels are **seeds** for a morphological
+    /// reconstruction back into a higher-resolution mask, never a surface a decision
+    /// is taken on, and reading them as one is what put the first draft of this at 75.
+    /// `RESEARCH-shape-signals.md` §7 is the survey that settles it.
+    ///
+    /// The cost of the coarser choice was concrete rather than theoretical: at 75 the
+    /// interline gap of a 300 DPI page is one or two cells, a rank-1 reduction bridges
+    /// it, and the show-through on `Ibson_2006` p29 merges into components four inches
+    /// tall — which is exactly what the type ceiling below exists to rule out.
+    ///
+    /// **It is a ceiling on the analysis resolution rather than the resolution.** The
+    /// reduction never *up*samples, so a page rendered below about 225 DPI is analysed
+    /// at its own resolution — 72 to 200 cells an inch, and `rebuildDPI`'s own note
+    /// records 37 real 72 DPI scans in the corpus. Those pages sit in the coarse
+    /// regime the paragraph above rejects, and the honest statement is that they are
+    /// covered by the corpus census rather than by this argument: not one of them
+    /// changes route, and `Himanen_2001` at 144 DPI is one of the two documents that
+    /// measured `minimumMarkContrast`. Upsampling to reach 150 would invent detail,
+    /// which C14 and `rebuildDPI` refuse everywhere else in this file.
+    static let markCellsPerInch = 150.0
+
+    /// The most cells the mark analysis will ever hold, whatever the page is.
+    ///
+    /// **R24 and R29's shape, caught before it shipped rather than after.** The
+    /// reduction factor is derived from the render's DPI, so on a *low*-resolution
+    /// page it is 1 and the analysis runs at full size — and the labelling holds an
+    /// `Int32` a cell. `maximumPageMegapixels` allows 400 MP, which a 200-inch page
+    /// (PDF ≤1.5's own ceiling on a page box) reaches at 100 DPI, and at factor 1
+    /// that is **1.6 GB of labels** on top of a render this file bounds at 5.5 bytes
+    /// a pixel. Both R24 and R29 were an allocation bounded in one place and left
+    /// unbounded in its sibling; this is that sibling, and it is bounded here.
+    ///
+    /// **What 4 million cells actually costs, counted rather than estimated** — the
+    /// first version of this comment said "16 MB of labels and 8 MB of masks" and
+    /// omitted the largest term:
+    ///
+    /// | buffer | at the ceiling |
+    /// |---|---|
+    /// | `labels` `[Int32]` | 16 MB |
+    /// | `ink`, `pale`, and `pale`'s copy in the suppression pass | 12 MB |
+    /// | `area`, `x0`, `x1`, `y0`, `y1` `[Int]`, one entry a *label* | up to 160 MB |
+    ///
+    /// The last row is the one that was missed, and it is worst on the page kind this
+    /// is least interested in: a mask of scanner speckle can produce a label per
+    /// second cell. Measured by the review of this diff on a 2000x2000 speckle mask —
+    /// 1,000,000 labels, 44 MB — and the ceiling is four times that page.
+    ///
+    /// A 300 DPI Letter page uses **1.61 M** of the ceiling: 1,116 x 1,444 after
+    /// **both** insets and the 2x reduction. (The first version said 1,195 x 1,547,
+    /// which is the sixteenth taken off once instead of once at each end — the
+    /// arithmetic contradicted `pageMarks`' own doc comment two screens below it.)
+    /// Real text pages produce a few thousand labels, not a million, so the honest
+    /// figure for the common case is about 1.3 bytes a pixel of render against the
+    /// 5.5 the render itself is budgeted at, and the table above is the worst case.
+    static let markCellCeiling = 4_000_000
+
+    /// A mark taller than this is not a letter, and so is not show-through either.
+    ///
+    /// **Physical, and the page-relative version was tried first and is wrong.** The
+    /// obvious scale is the median height of the page's own ink components — and on
+    /// the halftone fixture that reads 2 cells, because ten thousand halftone dots
+    /// outvote three hundred glyphs. A scale taken from the page's own components is
+    /// corrupted by exactly the pages this exists to judge. Type on a page is under a
+    /// quarter inch: 24 pt has a cap height near 0.24 in, and the corpus holds no body
+    /// face remotely that large. Show-through is the *reverse* page's type, so the
+    /// same bound holds it.
+    ///
+    /// Height only, deliberately. Show-through blurs adjacent glyphs into one
+    /// component the width of a whole line — four or five inches — so any width term
+    /// would put show-through in the same class as a drawing. Its *height* is still a
+    /// line's height.
+    static let typeCeilingInches = 0.25
+
+    /// How far below its paper a mark has to sit before it is a mark at all.
+    ///
+    /// **This constant is two measured corpus failures, and without it the pale layer
+    /// is mostly paper.** The level below which a pixel is not paper was, in
+    /// `score-threshold-loss`'s round 3, the paper's mode less three times the spread
+    /// of the peak's clean upper side. On a scan whose white is *clipped* the mode is
+    /// 255, there is no upper side, the spread is 0.0, and the rule degenerates to
+    /// `paper - 4`. Measured on the corpus that reads a **quarter of the pages of
+    /// `Himanen_2001`** — 228 of 255 — as carrying pale content, when what they carry
+    /// is a page of type whose 1-bit rendering is perfect and whose "pale marks" are
+    /// paper four levels off white.
+    ///
+    /// The second is faint show-through, 8–15 levels below the paper on the corpus
+    /// pages that carry it. That case is *also* held by `maximumInkUnderADrawing`
+    /// below, and deliberately by both: this constant keeps it out of the mask at all,
+    /// and that one keeps what does get in from being called a drawing. Neither is
+    /// sufficient alone — measured, `Ibson_2006` needs the second and `Himanen_2001`
+    /// needs the first.
+    ///
+    /// 24 levels is 9% of the range. The pale-drawing fixture's strokes sit **47**
+    /// below their paper, so the constant has a factor of two of headroom against the
+    /// case it exists to protect, and the corpus population it excludes is 8–15.
+    static let minimumMarkContrast = 24.0
+
+    /// A mark that fills this much of its own bounding box is a filled shape rather
+    /// than a stroke: a shaded table cell, not a drawing.
+    ///
+    /// The two populations are far apart rather than adjacent — a solid rectangle is
+    /// 1.0 and the pale-drawing fixture's strokes are 0.11 — so this is a divider
+    /// between two clusters, not a tuned threshold.
+    static let solidMarkFill = 0.6
+
+    /// A component has to span this much of the sheet before its own tone is asked
+    /// about. Below it, a mark is too small for a misjudgement to cost anything.
+    ///
+    /// **A genuine continuum, and the pages on both sides of it were rendered and
+    /// looked at** — which is the only reason a number here is defensible at all. Of
+    /// the 114 corpus pages this branch moves, **16 have their qualifying mark between
+    /// 0.02 and 0.05 of the sheet**, so that band is what the choice is about:
+    ///
+    /// - it holds **two `Schwaller` photograph pages** (p173 and p191, small figures on
+    ///   a page of type) which 1-bit turns into black shapes;
+    /// - and **three `Doermann_1967` pages** whose mark is a scanner-edge blob just
+    ///   inside the inset. p22 was rendered: a clean typescript that 1-bit prints
+    ///   perfectly, so those three cost bytes and nothing else.
+    ///
+    /// 0.02, because a page wrongly held in greyscale costs bytes and a page wrongly
+    /// thresholded loses its picture. That asymmetry is the register's standing answer
+    /// (R50), and it is the whole of why this sits one step low rather than one high.
+    ///
+    /// *(An earlier draft of this comment justified 0.02 by claiming 0.05 would lose
+    /// `Scott_TK` p13's reversed-out advertisement. It would not: p13 stays at 1-bit at
+    /// **both** values, because its largest mark does not clear `minimumPlateFill`. The
+    /// number was checked against the corpus rather than assumed, and it was wrong —
+    /// the same failure the review of this diff had already caught twice.)*
+    static let largeMarkShare = 0.02
+
+    /// …and it has to *fill* this much of what it spans, or it is a frame rather than
+    /// a plate.
+    ///
+    /// **Both terms, and each was reached by getting the other one wrong.** The first
+    /// version gated on bounding-box area alone: a 3 px rule round the edge of a sheet
+    /// spans the whole page, qualified, and the tone of everything the frame *encloses*
+    /// was then measured — 1.54x the whole-sheet figure on a synthetic framed text
+    /// page, in a branch with no `pictureInkMinimumTone`-style gate to catch it. The
+    /// second version gated on the component's own **ink** instead, which is 0.4% for a
+    /// frame and correctly refused it — and also refused `Scott_TK` p13, a 1915 trade
+    /// magazine page whose reversed-out advertisement really is destroyed at 1-bit.
+    ///
+    /// Fill is what actually separates the two: a frame is 0.02 of its box, a plate is
+    /// 0.5 to 0.9. 0.25 sits in the middle of that gap and is a divider between two
+    /// clusters rather than a tuned value. Held by a check on a synthetic framed page,
+    /// where setting this to 0.0 makes the frame's own tone read **0.1668 against the
+    /// sheet's 0.1223** — and the first version of that check drew its frame inside the
+    /// margin the analysis crops away, so it could not fail. `mutate.py` found that,
+    /// not a person.
+    ///
+    /// **What it gives up, named because it was measured.** `Scott_TK` p13's
+    /// reversed-out advertisement — a 1915 trade-magazine page that 1-bit turns into a
+    /// black rectangle with illegible white text — has a largest mark spanning 0.16 of
+    /// the sheet and does *not* clear this, so the page stays at 1-bit. The
+    /// advertisement is white type on black, so the component that survives the
+    /// reduction is the type rather than the ground. Recorded rather than fixed: the
+    /// term is what keeps a page *frame* from being read as a plate, and no value of it
+    /// separates those two cases.
+    static let minimumPlateFill = 0.25
+
+    /// How much ink may sit inside a pale mark's own rectangle before the mark is
+    /// judged to be lying *in* the type rather than in a space of its own.
+    ///
+    /// **This is the term that separates a drawing from show-through, and it is the
+    /// only one tried that does.** R56's refusal turns on those two being
+    /// indistinguishable, and four rounds of luminance and two of shape agree with it:
+    /// a contrast floor cannot separate them (`Doermann_1967`'s show-through is as far
+    /// below its paper as the fixture's strokes are below theirs), and neither can
+    /// size or fill (at any reduction, show-through merges into components taller than
+    /// a line and emptier than a block).
+    ///
+    /// What does separate them is **where they are**. A figure occupies a part of the
+    /// sheet the type does not; show-through lies *in* the type, because it is the
+    /// reverse page's type and the two pages are set to the same measure. So the
+    /// question is asked of the mark's own rectangle: how much of it is this page's
+    /// ink?
+    ///
+    /// Measured, holding everything else fixed, counting pages over the threshold:
+    ///
+    /// | | term off | at 0.10 | at 0.05 | at 0.02 |
+    /// |---|---|---|---|---|
+    /// | `Doermann_1967`, show-through, 27 pp | 24 | 2 | **1** | 1 |
+    /// | `Ibson_2006`, show-through, 263 pp | 93 | 0 | **0** | 0 |
+    /// | `Boltanski_2006`, dense type, 203 pp | 0 | 0 | **0** | 0 |
+    /// | the pale-drawing fixture | fires | fires | **fires** | fires |
+    ///
+    /// The fixture does not move by a thousandth across the whole range, because its
+    /// plate has no type under it at all. 0.05 is the middle of a range where the
+    /// answer does not change, which is the most a constant can be asked to be.
+    static let maximumInkUnderADrawing = 0.05
+
+    /// How much of the sheet **one** drawing-shaped pale mark has to span before the
+    /// page is kept off the 1-bit route.
+    ///
+    /// **One mark, not the sum of them, and the first version summed.** It summed the
+    /// *ink* of every drawing-shaped mark, which is the wrong statistic twice over: it
+    /// makes a page of scattered specks look like a page with a figure on it, and it
+    /// under-counts the very thing it exists to protect, because a drawing is thin.
+    /// The `pale-chart` fixture — a chart drawn the way charts are drawn, hairline
+    /// plot lines with its own axis numerals inside the frame — scored **0.0115** of
+    /// the sheet in ink against a 0.012 bar and was erased, while the same page's mark
+    /// *spans* 0.2221 of the sheet. R49 said this three days earlier in one sentence:
+    /// text is thousands of small components and a subject is one large one. The
+    /// question is about the mark, not about the page.
+    ///
+    /// 0.05 of a Letter sheet is 4.7 square inches — a mark about 2.2 inches on a
+    /// side. Measured over ten documents chosen for being awkward: the two
+    /// show-through ones, R38's dense-type one, the faded-type one, and four that
+    /// carry real pale marks.
+    ///
+    /// | | pages | over 0.02 | over 0.05 | over 0.10 |
+    /// |---|---|---|---|---|
+    /// | `Doermann_1967` + `Ibson_2006` — show-through | 290 | 1 | **0** | 0 |
+    /// | `Boltanski_2006` — dense type, R38's document | 203 | 2 | **0** | 0 |
+    /// | `Himanen_2001` — faded type | 255 | 0 | **0** | 0 |
+    /// | `Broadhead_1994` | 13 | 13 | **0** | 0 |
+    /// | four documents carrying real pale marks | 61 | 26 | **17** | 11 |
+    /// | the two positive fixtures | 2 | 2 | **2** | 2 |
+    ///
+    /// The confusers cluster under 0.02 and the fixtures sit at 0.2221 and 0.2556, so
+    /// 0.05 is 2.5x above one population and 4.4x below the other. That is a divider
+    /// between two clusters rather than a tuned value — which is the most a constant
+    /// in this neighbourhood has ever managed.
+    ///
+    /// What it gives up is a *small* figure: under 2.2 inches on a side, a pale
+    /// drawing is still erased. That is recorded rather than fixed, because the
+    /// alternative is a threshold inside the confuser cluster.
+    static let paleDrawingThreshold = 0.05
+
+    /// One connected mark: where it is, how big, and how much of its box it fills.
+    struct MarkComponent {
+        var x = 0, y = 0
+        var width = 0, height = 0
+        var area = 0
+        /// Set cells over bounding-box area. A solid rectangle is 1.0; a curved
+        /// stroke is a tenth of that, and that difference is the whole of how a
+        /// drawing is told from a shaded table cell.
+        var fill: Double { Double(area) / Double(max(width * height, 1)) }
+    }
+
+    /// The page at `markCellsPerInch`, in two layers: what the threshold calls ink,
+    /// and the marks it will erase.
+    ///
+    /// **Why a reduced mask and not the render.** Component labelling over a 300 DPI
+    /// page would hold a label per pixel — 4 bytes where the render holds 1 — and
+    /// `maximumPageMegapixels` is sized at 5.5 bytes a pixel for the render alone.
+    /// R24 and R29 are both an allocation bounded in one place and unbounded in its
+    /// sibling; this one is built to stay inside the bound that already exists. On a
+    /// 300 DPI Letter page the two masks and the suppression pass's copy are
+    /// **0.57 bytes a pixel** of render, against the 5.5 the render is budgeted at.
+    /// `markCellCeiling` has the worst case, which is larger and is dominated by a
+    /// term the first version of that comment left out entirely.
+    ///
+    /// **The pale layer is `Tools/score-threshold-loss.swift`'s population, minus its
+    /// fourth property.** Properties 2 and 3 are kept, because both are measured and
+    /// both are about what a mark *is*: an anti-aliased edge is not content, and a
+    /// large pale area must not be allowed to redefine what paper is. Property 4,
+    /// thinness, is deliberately dropped — it exists to suppress table shading, which
+    /// is a judgement about the *kind* of mark, and making that judgement by shape is
+    /// the whole point of this. R56 refused the luminance version of it.
+    struct Marks {
+        var ink: [Bool] = []
+        var pale: [Bool] = []
+        var width = 0, height = 0
+        /// The luminance below which a pixel is too dark to be this page's paper.
+        var paperLimit = 0
+        /// Cells inside the inset, which is what every share below is a share of.
+        var cells = 0
+        /// Render pixels to a cell, and where cell (0, 0) starts in the render.
+        /// Carried rather than recomputed: `largeMarkTone` has to map a component
+        /// back onto the render, and reconstructing the factor by dividing the two
+        /// sizes is a second answer to a question that already has one — C20's shape,
+        /// and it rounds differently.
+        var factor = 1
+        var originX = 0, originY = 0
+        /// Pale cells property 2 threw away: pale, not ink, and 8-adjacent to ink.
+        ///
+        /// Carried for the same reason `factor` is — it cannot be recovered from
+        /// outside without becoming a second answer to a question that already has
+        /// one. Recomputing the pale band needs `limit`, and `paperLimit` is that
+        /// number **floored**, so a replica's `v < paperLimit` and `v <= paperLimit`
+        /// straddle production's own `Double(v) < limit` and each is right on some
+        /// pages and wrong on others. C26's instrument needs the count and nothing
+        /// else does; it is written here rather than guessed there.
+        ///
+        /// Diagnostic only. Nothing in the app reads it and no decision turns on it.
+        var paleBesideInk = 0
+    }
+
+    /// Build both layers in one pass over the render.
+    ///
+    /// The outer sixteenth is dropped on every side, which is `inkOutsideText`'s
+    /// inset and its recorded reason: a scan carries the dark edge of the platen and
+    /// the shadow in the gutter, and that is ink by any threshold and is not content.
+    /// Without it the largest component on a great many corpus pages is the gutter,
+    /// and every statistic here would be describing the scanner.
+    static func pageMarks(_ grey: [UInt8], width w: Int, height h: Int,
+                          threshold: UInt8, dpi: Double,
+                          minimumContrast: Double = minimumMarkContrast) -> Marks {
+        var out = Marks()
+        guard w > 0, h > 0, grey.count >= w * h, dpi > 0 else { return out }
+        // CONTRIBUTING 4b, found by C28's sibling sweep: this was a third copy of
+        // `inkOutsideText`'s inset, character for character, and the comment above
+        // already said it was meant to BE that inset. Three copies of an arithmetic
+        // whose whole job is to be the same one is how a comment comes to describe
+        // something that has since drifted, so both places in this file now call
+        // `interiorWindow`. Behaviour-preserving: `mx`, `my` and both half-open ends
+        // are the same expressions, and R56/R57's routing fixtures are what would
+        // have caught it if they were not.
+        let win = interiorWindow(width: w, height: h)
+        let mx = win.x0, my = win.y0
+        let rows = my..<win.y1, cols = mx..<win.x1
+        guard rows.count > 0, cols.count > 0 else { return out }
+
+        // Property 3: the paper's level is the mode of everything the threshold calls
+        // paper, and its noise is measured from the side of that peak pale content
+        // cannot reach. The mean is unusable — a large pale area is part of the bright
+        // class, so it drags the mean down and inflates the spread until it excludes
+        // itself, which is what defeated round 2 of R56 outright.
+        var histogram = [Int](repeating: 0, count: 256)
+        var bright = 0
+        for y in rows {
+            let row = y * w
+            for x in cols where grey[row + x] >= threshold {
+                histogram[Int(grey[row + x])] += 1; bright += 1
+            }
+        }
+        var paper = Int(threshold), peak = -1
+        for v in Int(threshold)..<256 where histogram[v] > peak {
+            peak = histogram[v]; paper = v
+        }
+        var weighted = 0, counted = 0
+        for v in paper..<256 { weighted += histogram[v] * (v - paper); counted += histogram[v] }
+        let spread = counted > 0 ? Double(weighted) / Double(counted) : 0
+        // The floor is `minimumMarkContrast`, and it is doing most of the work: on a
+        // scan with clipped white the spread is 0.0 and three times nothing is
+        // nothing. See the constant for the two corpus documents that measured it.
+        let limit = bright > 0
+            ? Double(paper) - max(3 * spread, minimumContrast) : Double(threshold)
+        out.paperLimit = Int(max(limit, Double(threshold)))
+
+        // The physical factor, then coarsened further if the page is large enough to
+        // breach the cell ceiling. Both bounds, not either: the first makes the
+        // constants mean inches, the second keeps the allocation finite.
+        //
+        // **`safeInt`, not `Int`.** `dpi` descends entirely from what the file declares
+        // and is bounded above by nothing: `MediaBox [0 0 1e-16 1e-16]` with an image
+        // declaring 2000x2000 gives 1.44e21, which is 4 megapixels — inside both the
+        // render's 400 MP gate and layering's 100 MP one — and `Int(1.44e21/150)` is
+        // an **uncatchable** trap that takes every concurrent file in the batch with
+        // it. This is A7.1's shape at a sixth site in this file, and A7.1 verified the
+        // same reachability end to end at 5.76e19 on shipped defaults. Found by the
+        // review of this diff, using CONTRIBUTING 4b's own suggested grep.
+        var factor = max(safeInt((dpi / markCellsPerInch).rounded()), 1)
+        // **The loop must test the cell count that is actually allocated**, which is
+        // the one below with its `max(…, 1)` in it. Testing the bare floored product
+        // is a bound that does not bind: a 20,000,000 x 1 render floors the height to
+        // zero, the product is zero, the loop exits at once and 8.75 million cells are
+        // allocated against a ceiling of four. R24 and R29 are both a bound written in
+        // one place and not holding in its sibling, and this was very nearly the third
+        // — in the constant whose own comment says it was "caught before it shipped".
+        while factor < Int.max / 2,
+              max(cols.count / factor, 1) * max(rows.count / factor, 1) > markCellCeiling {
+            factor *= 2
+        }
+        let rw = max(cols.count / factor, 1), rh = max(rows.count / factor, 1)
+        out.width = rw; out.height = rh; out.cells = rw * rh
+        out.factor = factor
+        out.originX = cols.lowerBound; out.originY = rows.lowerBound
+        var ink = [Bool](repeating: false, count: rw * rh)
+        var pale = [Bool](repeating: false, count: rw * rh)
+        let hasPale = limit > Double(threshold)
+
+        // A cell is ink if *any* pixel in it is ink, and pale if it is not ink and any
+        // pixel in it is pale. Rank-1, which is Leptonica's own default for keeping
+        // thin strokes through a reduction and the reason a box filter will not do:
+        // R56's whole subject is a hairline at luminance 200, and averaging a 4x4 cell
+        // holding one such stroke puts the cell back on the paper side. A mask that
+        // cannot represent the thing being detected is not a resolution choice, it is
+        // the detector failing silently.
+        for y in rows {
+            let ry = (y - rows.lowerBound) / factor
+            guard ry < rh else { continue }
+            let row = y * w, base = ry * rw
+            for x in cols {
+                let rx = (x - cols.lowerBound) / factor
+                guard rx < rw else { continue }
+                let v = grey[row + x]
+                if v < threshold {
+                    ink[base + rx] = true
+                } else if hasPale, Double(v) < limit {
+                    pale[base + rx] = true
+                }
+            }
+        }
+        // Ink wins the cell, and its neighbours are suppressed as well — property 2,
+        // at this resolution. An edge is always beside ink and a mark is surrounded by
+        // paper, and a cell is 1/150 in at 300 DPI — wider than any anti-aliased edge.
+        for i in 0..<(rw * rh) where ink[i] { pale[i] = false }
+        if hasPale {
+            var kept = pale
+            for y in 0..<rh {
+                for x in 0..<rw where pale[y * rw + x] {
+                    var beside = false
+                    for dy in max(y - 1, 0)...min(y + 1, rh - 1) where !beside {
+                        for dx in max(x - 1, 0)...min(x + 1, rw - 1) where ink[dy * rw + dx] {
+                            beside = true; break
+                        }
+                    }
+                    if beside { kept[y * rw + x] = false; out.paleBesideInk += 1 }
+                }
+            }
+            pale = kept
+        }
+        out.ink = ink
+        out.pale = pale
+        return out
+    }
+
+    /// Connected components of a reduced mask, 8-connected, two passes with a
+    /// union-find.
+    ///
+    /// Components smaller than `minimumCells` are dropped: at 150 cells to the inch
+    /// three cells is about a fiftieth of an inch, which is a speck of scanner noise
+    /// rather than a mark, and a page of dirty photocopy carries thousands of them.
+    /// **The number did not change when the resolution doubled and it should be read
+    /// as a floor, not as a size** — nothing downstream depends on it, because both
+    /// consumers filter far above it: `largeMarkTone` wants 2% of the sheet and
+    /// `paleDrawing` wants a quarter inch of height.
+    static func markComponents(_ mask: [Bool], width w: Int, height h: Int,
+                               minimumCells: Int = 3) -> [MarkComponent] {
+        guard w > 0, h > 0, mask.count >= w * h else { return [] }
+        var labels = [Int32](repeating: 0, count: w * h)
+        var parent: [Int32] = [0]
+        func find(_ a: Int32) -> Int32 {
+            var r = a
+            while parent[Int(r)] != r { r = parent[Int(r)] }
+            var c = a
+            while parent[Int(c)] != c { let n = parent[Int(c)]; parent[Int(c)] = r; c = n }
+            return r
+        }
+        for y in 0..<h {
+            let row = y * w
+            for x in 0..<w where mask[row + x] {
+                var best: Int32 = 0
+                // West, north-west, north, north-east: the four already-labelled
+                // neighbours of an 8-connected pixel in raster order.
+                for (dx, dy) in [(-1, 0), (-1, -1), (0, -1), (1, -1)] {
+                    let nx = x + dx, ny = y + dy
+                    guard nx >= 0, nx < w, ny >= 0 else { continue }
+                    let l = labels[ny * w + nx]
+                    guard l != 0 else { continue }
+                    if best == 0 {
+                        best = l
+                    } else {
+                        let ra = find(best), rb = find(l)
+                        if ra != rb { parent[Int(max(ra, rb))] = min(ra, rb) }
+                        best = min(best, l)
+                    }
+                }
+                if best == 0 {
+                    parent.append(Int32(parent.count))
+                    best = Int32(parent.count - 1)
+                }
+                labels[row + x] = best
+            }
+        }
+        // `Int32`, not `Int`. These are five arrays with one entry per *label*, and a
+        // mask of scanner speckle produces a label per second cell — at
+        // `markCellCeiling` that is 160 MB in `Int`, which is the largest allocation in
+        // this file and the one `markCellCeiling`'s first accounting left out
+        // entirely. Every value is bounded by the mask's own width, height or area, so
+        // 32 bits is not a narrowing.
+        var area = [Int32](repeating: 0, count: parent.count)
+        var x0 = [Int32](repeating: Int32(w), count: parent.count)
+        var x1 = [Int32](repeating: -1, count: parent.count)
+        var y0 = [Int32](repeating: Int32(h), count: parent.count)
+        var y1 = [Int32](repeating: -1, count: parent.count)
+        for y in 0..<h {
+            let row = y * w
+            for x in 0..<w where labels[row + x] != 0 {
+                let r = Int(find(labels[row + x]))
+                area[r] += 1
+                if Int32(x) < x0[r] { x0[r] = Int32(x) }
+                if Int32(x) > x1[r] { x1[r] = Int32(x) }
+                if Int32(y) < y0[r] { y0[r] = Int32(y) }
+                if Int32(y) > y1[r] { y1[r] = Int32(y) }
+            }
+        }
+        var out: [MarkComponent] = []
+        for r in 1..<parent.count where area[r] >= Int32(minimumCells) && x1[r] >= 0 {
+            out.append(MarkComponent(x: Int(x0[r]), y: Int(y0[r]),
+                                     width: Int(x1[r] - x0[r]) + 1,
+                                     height: Int(y1[r] - y0[r]) + 1,
+                                     area: Int(area[r])))
+        }
+        return out
+    }
+
+    /// The most continuous tone found **inside** one of the page's large marks,
+    /// rather than averaged over the sheet.
+    ///
+    /// **R57 in one line.** `pictureToneThreshold` is not miscalibrated — the tonal
+    /// plate reads 0.102 against its 0.12 — it is being asked about the wrong region.
+    /// A plate over a fifth of a page dilutes its own tone by five, and the constant
+    /// was measured on pages a picture *dominates*. A connected component gives the
+    /// tone the region it belongs to, so the existing constant can be asked the
+    /// question it was calibrated for: is *this thing* continuous tone?
+    ///
+    /// It is the same argument `pictureInkMinimumTone` already rests on and it cuts
+    /// the same way. A halftone is bimodal, so a coarse screen's own component reads
+    /// low and stays on the 1-bit route where R38 measured that it belongs; a solid
+    /// black rule or a rubber stamp reads near zero for the same reason. What reads
+    /// high is an unresolved halftone or a photograph, which is exactly what 1-bit
+    /// destroys.
+    static func largeMarkTone(_ marks: Marks, grey: [UInt8], width w: Int, height h: Int,
+                              threshold: UInt8) -> Double {
+        guard marks.cells > 0, w > 0, h > 0, grey.count >= w * h else { return 0 }
+        let factor = max(marks.factor, 1)
+        var best = 0.0
+        for c in markComponents(marks.ink, width: marks.width, height: marks.height) {
+            // Big enough to matter, **and solid enough to be a thing rather than a
+            // frame round other things**. See `minimumPlateFill`: gating on the box
+            // alone admits a page border and then measures the tone of the type inside
+            // it, and gating on the component's own ink instead refuses a real
+            // reversed-out advertisement.
+            guard Double(c.width * c.height) / Double(marks.cells) >= largeMarkShare,
+                  c.fill >= minimumPlateFill else { continue }
+            // Back to the render's own coordinates, clamped: the reduction floors, so
+            // the last cell of a row can name pixels the render does not have.
+            let px0 = min(marks.originX + c.x * factor, w - 1)
+            let py0 = min(marks.originY + c.y * factor, h - 1)
+            let px1 = min(px0 + c.width * factor, w)
+            let py1 = min(py0 + c.height * factor, h)
+            guard px1 > px0, py1 > py0 else { continue }
+            var patch = [UInt8](); patch.reserveCapacity((px1 - px0) * (py1 - py0))
+            for y in py0..<py1 { patch.append(contentsOf: grey[(y * w + px0)..<(y * w + px1)]) }
+            best = max(best, toneFraction(of: patch, threshold: threshold))
+        }
+        return best
+    }
+
+    /// The pale marks on this page that are **shaped like a drawing**: taller than
+    /// any type could be, not a filled block, and not lying in the type.
+    ///
+    /// **R56 in one line.** The blind zone above the threshold holds three kinds of
+    /// thing and luminance cannot separate them — a pale drawing (keep it), decorative
+    /// table shading (harmless to lose) and show-through from the reverse of the sheet
+    /// (losing it is *desirable*). Four rounds of luminance signal were refused on
+    /// exactly that, and the register's own summary is the specification for this
+    /// function: every one of the three is a statement about shape.
+    ///
+    ///  - show-through is the reverse page's type, so it is the size of type. It is
+    ///    under the ceiling, and it is not counted.
+    ///  - shading is a filled rectangle: over the ceiling, and it fills its box.
+    ///  - a drawing's strokes are long and thin, so the box is large and mostly empty.
+    ///    That is what this returns.
+    struct PaleDrawing {
+        /// The largest drawing-shaped mark's bounding box, as a share of the sheet.
+        /// **This is the one the route is decided on.**
+        var extent = 0.0
+        /// The ink of every drawing-shaped mark, as a share of the sheet. Kept
+        /// because it is what the first version decided on, and because the census
+        /// prints both — see `paleDrawingThreshold` for why it was the wrong one.
+        var coverage = 0.0
+    }
+
+    static func paleDrawing(_ marks: Marks, dpi: Double,
+                            maximumInkInBox: Double = maximumInkUnderADrawing)
+        -> PaleDrawing {
+        var out = PaleDrawing()
+        guard marks.cells > 0, dpi > 0 else { return out }
+        // From the reduction the marks were actually taken at, not from
+        // `markCellsPerInch`: `pageMarks` coarsens past that when a page would breach
+        // `markCellCeiling`, and a ceiling computed from the nominal resolution would
+        // then be measuring a different page from the one in hand. Never fewer than
+        // two cells, or at a coarse reduction every mark clears it.
+        let ceiling = max(typeCeilingInches * dpi / Double(max(marks.factor, 1)), 2)
+        /// Ink cells inside a component's bounding rectangle, over that rectangle's
+        /// area — not over `MarkComponent.area`, which is the mark's own ink and is a
+        /// different number.
+        func inkUnder(_ c: MarkComponent) -> Double {
+            guard marks.ink.count >= marks.width * marks.height else { return 1 }
+            var ink = 0
+            for y in c.y..<min(c.y + c.height, marks.height) {
+                let row = y * marks.width
+                for x in c.x..<min(c.x + c.width, marks.width) where marks.ink[row + x] {
+                    ink += 1
+                }
+            }
+            return Double(ink) / Double(max(c.width * c.height, 1))
+        }
+        var drawing = 0, widest = 0
+        for c in markComponents(marks.pale, width: marks.width, height: marks.height)
+        where Double(c.height) > ceiling && c.fill < solidMarkFill
+                && inkUnder(c) <= maximumInkInBox {
+            drawing += c.area
+            widest = max(widest, c.width * c.height)
+        }
+        out.coverage = Double(drawing) / Double(marks.cells)
+        out.extent = Double(widest) / Double(marks.cells)
+        return out
+    }
+
+    /// The largest page that gets layered.
+    ///
+    /// Not `maximumPageMegapixels`, which is the bound on *rendering* a page and
+    /// is sized for the grey buffer at 5.5 bytes a pixel. Layering the same page
+    /// holds a good deal more at once. At 400 MP that would be over 3 GB for a
+    /// saving, on a page nobody asked to be made smaller.
+    ///
+    /// **This paragraph used to enumerate the wrong phase** (A3.1): "the grey
+    /// buffer, the stencil, the text-region map, the filled background, and
+    /// inside `fillHoles` a second copy of the buffer plus two more flag arrays —
+    /// about 8 bytes a pixel". Every item is real and the peak is not among them.
+    /// `sauvolaMask` runs first and holds two `(w+1)(h+1)` `[Double]` integral
+    /// images — **16 bytes a pixel on their own** — and it is not in the list.
+    /// The peak of a function is the maximum over its phases, not the phase
+    /// somebody enumerated.
+    ///
+    /// 100 MP matches `maximumColourPageMegapixels`, which was measured for the
+    /// same reason. Above it the page keeps the single JPEG it already has,
+    /// which is exactly what MRC declining is supposed to do.
+    ///
+    /// R24 and R29 are both this shape — an allocation bounded in one place and
+    /// not in its sibling — so the bound is asserted directly by
+    /// `mrcBoundIsWithinTheRenderOne` rather than left to be inferred.
+    static let maximumMRCPageMegapixels = 100
+
+    /// Peak bytes per pixel while layering, against the render's 5.5.
+    ///
+    /// **Analytic, and named for it** (A3.1). The 8.0 that stood here was an
+    /// RSS measurement of the wrong phase, and RSS is the wrong instrument for
+    /// this question: `ru_maxrss` is a high-water mark and libmalloc keeps freed
+    /// large blocks mapped and dirty, so over a multi-phase function it reads as
+    /// a sum of distinct-size peaks rather than a maximum. The review's control
+    /// settles it — two 8 B/px phases with a `free` between them read 16.38 by
+    /// `ru_maxrss` and 8.00 by live bytes.
+    ///
+    /// So this is counted from the code instead, at the peak phase
+    /// (`sauvolaMask`), which is the one the enumeration above missed:
+    ///
+    /// | buffer | bytes a pixel |
+    /// |---|---|
+    /// | `grey` `[UInt8]` w·h | 1 |
+    /// | `sum` `[Double]` (w+1)(h+1) | 8 |
+    /// | `sq` `[Double]` (w+1)(h+1) | 8 |
+    /// | `mask` `[Bool]` w·h | 1 |
+    /// | `region` `[Bool]` w·h, alive at the second cut on a pale page (C54) | 1 |
+    /// | | **19** |
+    ///
+    /// Corroborated independently, before C54 added the second cut: the review
+    /// measured **19.11 B/px live** on a real page against the 18.005 analytic of
+    /// the first cut, and the phases provably do not overlap — `renderGrey +
+    /// sauvolaMask` and the whole grey `mrcLayers` read the same 1,181.8 MB live
+    /// peak, to the byte. The second cut adds `region`'s byte, so the live figure
+    /// on a pale page is about 20.1 [reasoned, not measured], and the bound below
+    /// still holds at it: 100 × 20.1 = 2.01 GB.
+    ///
+    /// **What this number does not include**, on either side of the comparison:
+    /// CoreGraphics' own buffers for the render and the JPEG encode. The bound
+    /// below is therefore a statement about *this file's* allocations, which is
+    /// what it can honestly be.
+    static let analyticMRCBytesPerPixel = 19.0
+
+    /// Whether layering's worst case stays inside the render's.
+    ///
+    /// 100 × 19.0 = 1.9 GB against 400 × 5.5 = 2.2 GB. It held at the old 8.0 and
+    /// it still holds at the real number, which is the useful thing to be able to
+    /// say after correcting a constant by 2.25x.
+    static var mrcBoundIsWithinTheRenderOne: Bool {
+        Double(maximumMRCPageMegapixels) * analyticMRCBytesPerPixel
+            <= Double(maximumPageMegapixels) * measuredGreyBytesPerPixel
+    }
+
+    /// Vision's boxes are tight around the glyphs it recognised. A stencil
+    /// clipped to them files the ascenders, descenders and anti-aliased edge off
+    /// every character on the page, so they are grown by this much of their own
+    /// height first.
+    static let mrcBoxPadding = 0.25
+
+    /// One page as three layers.
+    struct MRCLayers {
+        /// 1-bit PNG of the text stencil, ready for jbig2enc.
+        let mask: URL
+        /// JPEGs, grey or three-channel as `isColour` says. The background holds
+        /// paper and pictures, the foreground holds ink colour, and the stencil
+        /// says which shows.
+        let background: URL
+        let foreground: URL
+        let backgroundWidth: Int, backgroundHeight: Int
+        let foregroundWidth: Int, foregroundHeight: Int
+        /// True when the two tone layers are three-channel. The assembled stream
+        /// dictionary has to agree: a three-channel JPEG declared /DeviceGray
+        /// draws as noise, and nothing reports it.
+        var isColour = false
+        /// C28. True when `pageIsAllText()` accepted this page, so the all-text rule
+        /// raised both tone-layer factors to 8 and 16 (4 and 8 from an image file).
+        ///
+        /// **This is the lossy case, and it is carried out of here so that something
+        /// can say so.** The stencil holds only what Vision boxed (`textRegionMask`),
+        /// so ink the recogniser missed lives in the background alone — and on an
+        /// accepted page the background is stored at an eighth. Measured over the
+        /// whole population 2026-08-20: **16 of the 73 corpus pages the shipped bar
+        /// still accepts lose content**, 11 of them running prose or table data.
+        /// Invariant 1's second half is that a path which can drop a line must report
+        /// it, and until this field existed nothing downstream could.
+        ///
+        /// The caller's factor is a floor (`max`), so on every shipped Photo detail
+        /// this being true means the factors really rose — Balanced's 2 and Smallest's
+        /// 3 both become 8, and Maximum's 1 never reaches the rule at all.
+        var shrunkAsAllText = false
+        /// The `inkOutsideText` fraction that decision was taken on, or `nil` when it
+        /// was never asked.
+        ///
+        /// `nil` is `PhotoDetail.maximum`: `keepEveryPixel` short-circuits the whole
+        /// guard, deliberately, so that a page nobody is going to shrink does not pay
+        /// a histogram pass over up to 100 megapixels. Reporting the number must not
+        /// be the thing that reintroduces that cost, and a `nil` here is what says it
+        /// did not.
+        ///
+        /// ⛔ **Do not read this as "how much is at risk".** Sorted by it, the pages
+        /// that lose content and the pages that do not INTERLEAVE — measured over all
+        /// 73 — and one of the two losers in the last sub-step reads `0.0000`
+        /// (`_1939_Former students` p2, a pencilled annotation). It is worth printing
+        /// beside a page and worthless as a filter, which is why the caller names
+        /// every accepted page instead of thresholding on it.
+        var inkOutsideText: Double? = nil
+        /// C28. What `pageIsAllText()`'s **third** term — the shape term — answered on
+        /// this page, or that it was never asked.
+        ///
+        /// `inkOutsideText` above carries term 1's quantity for the same reason, and
+        /// this is the same seam a third time: an instrument reads production's own
+        /// answer back rather than deciding for itself. `score-text-route.swift`'s
+        /// replica of this guard was repaired three times and then retired for
+        /// exactly that (`BUGS.md` C28 `#### The replica retired`), and it can never
+        /// mirror this term at all — the term takes the Sauvola stencil, which
+        /// `mrcLayers` builds privately and does not publish as a `[Bool]`.
+        ///
+        /// ⛔ **Three cases and not two, which is what makes the column attributable.**
+        /// The guard is a chain: term 1 (the ink bar), then term 2 (the pale drawing),
+        /// then this. A page refused by either of the first two never reaches the term
+        /// at all, and `PhotoDetail.maximum` short-circuits the whole closure. So a
+        /// `picture` verdict beside `.notAsked` was refused by the BAR, and one beside
+        /// `.groups(n)` with `n > 0` was refused by the TERM — which is the
+        /// distinction `verdict` and `barVerdict` cannot make on their own, and the
+        /// reason `textPageInkOutsideThreshold` cannot be priced going back up today.
+        ///
+        /// ⛔ **`unlabelable` is a REFUSAL, not a missing answer, so it must not fold
+        /// into `.notAsked`.** `textLineGroupsOutsideText` returns `nil` when the page
+        /// exceeds `maximumShapeRuns`, and the wiring reads that as "not asserted to be
+        /// all text" — i.e. the term refused the page. Collapsing it into the
+        /// not-asked case would credit the bar with a refusal the term made, which is
+        /// the confound this field exists to remove, one level down.
+        var shapeTermAnswer: ShapeTermAnswer = .notAsked
+        /// C39. The stencil's pixel size, or `nil` for the rebuilt page's. `mrcLayers`
+        /// cuts a stencil at the page's type resolution, which on a layered scan is
+        /// finer than the images the page and its tone layers are rebuilt at.
+        var maskWidth: Int? = nil, maskHeight: Int? = nil
+        /// C28. The marks too pale for the stencil on a page read as all text, at
+        /// finer than its background (`mrcLayers`), or `nil` when it has none.
+        var marks: Marks? = nil
+
+        /// Every file these layers wrote, so a caller that prices or removes them
+        /// cannot miss the mark layer's two.
+        var files: [URL] {
+            [mask, background, foreground] + (marks.map { [$0.tone, $0.mask] } ?? [])
+        }
+
+        /// A fourth layer: `tone`, a JPEG in the tone layers' colour space, drawn over
+        /// the background where `mask` (a PNG in the stencil's polarity, 0 where the
+        /// mark is, `width`×`height` like `tone`) says, on `rect`: the box around the
+        /// marks as a share of the page, from its bottom left, as PDF draws.
+        struct Marks {
+            let tone: URL
+            let mask: URL
+            let width: Int, height: Int
+            let rect: CGRect
+        }
+    }
+
+    /// C28. `pageIsAllText()`'s third term's answer, carried out on `MRCLayers`.
+    ///
+    /// See `MRCLayers.shapeTermAnswer` for why this is three cases rather than an
+    /// `Int?`.
+    enum ShapeTermAnswer: Equatable {
+        /// The term was never reached: `PhotoDetail.maximum` short-circuited the
+        /// guard, or term 1 or term 2 refused the page first.
+        case notAsked
+        /// The term ran and counted this many text-shaped line groups in the ink
+        /// outside the recognised words. **`0` is the only value that accepts the
+        /// page**; anything higher is the term refusing it.
+        case groups(Int)
+        /// The term ran and could not label the page within `maximumShapeRuns`.
+        /// `pageIsAllText()` reads this as a refusal.
+        case unlabelable
+    }
+
+    /// Peak bytes per pixel while layering a *colour* page.
+    ///
+    /// Colour layering holds, at peak: the grey render the stencil comes from (1),
+    /// the RGBA render (4), the stencil, the text-region map and `fgHoles` (3),
+    /// the channel plane being worked on and its filled copy (2), and inside
+    /// `fillHoles` a second copy of that plane plus two flag arrays (4) — 14 so far.
+    /// The three planes are taken and released one at a time, which is why this is
+    /// not three times the grey figure.
+    ///
+    /// **The interleaved output layer is not always small.** An earlier version of
+    /// this comment said the downsampled layers were "small by construction", which
+    /// is true at every Photo detail level except the one that matters:
+    /// `PhotoDetail.maximum` is a factor of **1**, `downsample` returns its input
+    /// unchanged, and the interleaved RGBA background is then a full-resolution
+    /// 4 B/px buffer with `jpegRGB`'s 24-bit representation another 3 on top of it.
+    /// That is 21, not 14. Found by reviewing this code rather than by running out
+    /// of memory, which is the good way to find it.
+    ///
+    /// **22.0 was that sum rounded up, and it was short by three** (A3.1). Counted
+    /// buffer by buffer at the peak — channel 0 of the interleave, at
+    /// `PhotoDetail.maximum` where every downsample factor is 1:
+    ///
+    /// | buffer | bytes a pixel |
+    /// |---|---|
+    /// | `grey`, `mask`, `region`, `fgHoles`, `maskPixels` | 5 |
+    /// | `rgba` from `renderRGB`, w·h·4 | 4 |
+    /// | `plane`, `filledBG`, `bgPlane`, `filledFG`, `fgPlane` | 5 |
+    /// | `background` w·h·4, `foreground` w·h·4 | 8 |
+    /// | `fillHoles`' own copy and two flag arrays, during the second call | 3 |
+    /// | | **25** |
+    ///
+    /// The old sum reasoned about the interleaved *background* and forgot that the
+    /// **foreground** is a second full-resolution RGBA buffer at that setting, and
+    /// that both `fillHoles` results are alive at once. The review's independent
+    /// measurement reads 42.4 B/px by peak footprint, which is this plus
+    /// CoreGraphics' render and encode buffers — outside what this file allocates
+    /// and outside both sides of the bound below.
+    static let analyticColourMRCBytesPerPixel = 25.0
+
+    /// The largest page that gets layered **in colour**.
+    ///
+    /// A3.1: at the corrected 25 B/px, 100 MP is 2.5 GB against the render's
+    /// 2.2 GB, so the property below was false at the shipped bound while both
+    /// assertions passed — the colour one by sitting exactly on the boundary,
+    /// which the review rightly calls the signature of a constant tuned to pass.
+    ///
+    /// **Derived, not chosen**: 400 × 5.5 / 25 = 88. A colour page larger than
+    /// this is layered in **grey** rather than not at all — the same fallback
+    /// `mrcLayers` already takes when the colour render fails, and for the same
+    /// reason: layering in grey is an improvement on the single JPEG, and nothing
+    /// about the colour route is a requirement.
+    ///
+    /// Corpus impact **none**: the largest page in the 233-document corpus is
+    /// 64.84 MP, and there are no pages over 72 MP.
+    static let maximumColourMRCPageMegapixels = 88
+
+    /// Whether colour layering's worst case stays inside the render's, the same
+    /// property `mrcBoundIsWithinTheRenderOne` asserts for the grey route.
+    ///
+    /// Against `maximumColourMRCPageMegapixels`, not the grey bound: that is the
+    /// correction. Reading the grey bound here was what made a false statement
+    /// pass — the two routes hold different amounts and were compared as if they
+    /// held the same.
+    static var colourMRCBoundIsWithinTheRenderOne: Bool {
+        Double(maximumColourMRCPageMegapixels) * analyticColourMRCBytesPerPixel
+            <= Double(maximumPageMegapixels) * measuredGreyBytesPerPixel
+    }
+
+    /// The local window for a page rendered at `dpi`, bounded at both ends.
+    ///
+    /// A quarter of an inch is the measured choice and stays the choice; this only
+    /// stops a declared-geometry absurdity from reaching the arithmetic. The upper
+    /// bound is half the shorter side, because a window wider than the image is a
+    /// *global* threshold wearing a local threshold's name.
+    ///
+    /// **Truncating, not rounding.** `safeInt(dpi / 4)` is `Int(dpi / 4)` for every
+    /// value in range, so the window this returns for a page the app can actually
+    /// render is the byte-identical one it returned before. A `.rounded()` here
+    /// would move the window by one pixel on about half of all pages — a silent
+    /// change to the 1-bit stencil on the default route, bought for nothing, in a
+    /// fix for a trap. That is this project's own recurring defect shape
+    /// (CONTRIBUTING preamble), so the conversion stays truncating.
+    static func sauvolaWindow(dpi: Double, width w: Int, height h: Int) -> Int {
+        let quarterInch = safeInt(dpi / 4)
+        let ceiling = max(3, min(w, h) / 2)
+        return min(max(quarterInch, 3), ceiling)
+    }
+
+    /// Sauvola's local threshold: `t(x) = m(x) * (1 + k * (s(x)/128 - 1))`.
+    ///
+    /// Local, not global. Otsu picks one threshold for the whole sheet, which is
+    /// the right question for *whether* a page is a picture and the wrong one for
+    /// cutting text out of one: on a page that is half photograph the photograph
+    /// drags the global threshold until the text either bloats or vanishes.
+    /// Integral images, so the window size costs nothing.
+    ///
+    /// `levels` maps each grey to the one thresholded (C54, `paleInkLevels`); nil reads
+    /// the render as it is. A table rather than a remapped copy of the page, so the
+    /// second cut costs no buffer the first did not.
+    static func sauvolaMask(_ grey: [UInt8], width w: Int, height h: Int,
+                            window: Int, levels: [UInt8]? = nil) -> [Bool] {
+        guard w > 0, h > 0, grey.count >= w * h else { return [] }
+        let level = levels?.count == 256 ? levels! : (0...255).map { UInt8($0) }
+        let stride1 = w + 1
+        var sum = [Double](repeating: 0, count: stride1 * (h + 1))
+        var sq = [Double](repeating: 0, count: stride1 * (h + 1))
+        for y in 0..<h {
+            var rs = 0.0, rq = 0.0
+            for x in 0..<w {
+                let v = Double(level[Int(grey[y * w + x])])
+                rs += v; rq += v * v
+                sum[(y + 1) * stride1 + x + 1] = sum[y * stride1 + x + 1] + rs
+                sq[(y + 1) * stride1 + x + 1] = sq[y * stride1 + x + 1] + rq
+            }
+        }
+        // Clamped here as well as by `sauvolaWindow`, because `y + r + 1` below
+        // overflows for an `r` that is merely large — a window a caller obtained
+        // without going through the helper would trap inside this function rather
+        // than at the conversion. Its own invariant, enforced by itself.
+        let r = min(max(window / 2, 1), max(w, h))
+        var mask = [Bool](repeating: false, count: w * h)
+        for y in 0..<h {
+            let y0 = max(y - r, 0), y1 = min(y + r + 1, h)
+            for x in 0..<w {
+                let x0 = max(x - r, 0), x1 = min(x + r + 1, w)
+                let area = Double((y1 - y0) * (x1 - x0))
+                let s = sum[y1 * stride1 + x1] - sum[y0 * stride1 + x1]
+                      - sum[y1 * stride1 + x0] + sum[y0 * stride1 + x0]
+                let q = sq[y1 * stride1 + x1] - sq[y0 * stride1 + x1]
+                      - sq[y1 * stride1 + x0] + sq[y0 * stride1 + x0]
+                let mean = s / area
+                let sd = max(q / area - mean * mean, 0).squareRoot()
+                if Double(level[Int(grey[y * w + x])]) < mean * (1 + sauvolaK * (sd / 128.0 - 1)) {
+                    mask[y * w + x] = true
+                }
+            }
+        }
+        return mask
+    }
+
+    /// C54. Below this many grey levels between a page's paper and its ink, the stencil
+    /// is cut again from the page stretched so its ink reads black and its paper white.
+    ///
+    /// Sauvola's constants assume black type on white paper: where the local spread is
+    /// small its threshold sits a third below the local mean, and pale typewriting on
+    /// grey or yellowed paper is not a third darker than anything. The strokes then
+    /// fall on both sides of the threshold, and the parts that miss the stencil survive
+    /// only in the background, at an eighth of the resolution on a page of text.
+    /// Measured over each page's whole first stencil, not only its words (2026-10-05): the
+    /// four C54 pages read 118 (`Herbert Marks papers` p12, ink core 137 on paper 255),
+    /// 100 (`_1939_Former students` p9, 62 on 162), 155 (`Atkinson_1939` p2) and 144
+    /// (`Ford_1941` p2). Every page of dark type on white in the regression set reads 204
+    /// or more and keeps the stencil it had, byte for byte. In between, `1954 - Why`'s
+    /// yellowed pages read 106-177, and `Ibson_2006` p66 and `Xin Qu_2018` p24 178 and
+    /// 183; the low contrast alone is not enough, see `paleInkMissedShare`.
+    static let paleInkContrast = 160
+
+    /// C54. The least gap between paper and ink that is stretched: below it the "ink" is
+    /// grain or a picture's texture, and the stretch would multiply it (the review's
+    /// simulation: noise in a box went 0.096 -> 0.282 of the stencil).
+    static let paleInkMinimumContrast = 40
+
+    /// C54. The share of the words' dark pixels, darker than halfway from paper to ink,
+    /// that the first stencil must miss before it is cut again. The low contrast alone
+    /// also takes in `1954 - Why`'s yellowed pages, whose first stencil misses none of
+    /// their ink (0.000-0.056 of it over each whole page), and stretching those only
+    /// thickened their type: the regression set's `inkRatio` rose 0.09-0.11 on four of
+    /// them. The broken pages miss 0.17 (`Ford_1941` p2), 0.23 (`_1939_Former students`
+    /// p9) and 0.31 (`Herbert Marks papers` p12); `Atkinson_1939` p2 misses 0.03 and is
+    /// left as it was.
+    static let paleInkMissedShare = 0.10
+
+    /// The level table that stretches a pale page's ink to black and its paper to white,
+    /// or nil when the page's ink already stands `paleInkContrast` or more from its paper,
+    /// stands less than `paleInkMinimumContrast` from it, or is already held by the
+    /// stencil (`paleInkMissedShare`).
+    ///
+    /// Both levels are read inside the words, from the first stencil: the ink is the
+    /// darkest quarter of the stencil, the strokes' core, and the paper is the median of
+    /// the rest of the word boxes. Rejected: a percentile of the whole page (Marks p12 is
+    /// 98% paper, so its first percentile is paper); a lower Sauvola k for pale pages
+    /// (it moves the threshold by a fraction of a mean that grey paper has already
+    /// lowered); a wider window (on `_1939_Former students` it closed few of the gaps).
+    /// Left as it was: a photograph Vision boxed words over is stretched like pale ink
+    /// when its tones are close, and gains speckle in the stencil.
+    static func paleInkLevels(_ grey: [UInt8], stencil: [Bool], region: [Bool]) -> [UInt8]? {
+        guard grey.count == stencil.count, grey.count == region.count else { return nil }
+        var ink = [Int](repeating: 0, count: 256), paper = [Int](repeating: 0, count: 256)
+        for i in 0..<grey.count where region[i] {
+            if stencil[i] { ink[Int(grey[i])] += 1 } else { paper[Int(grey[i])] += 1 }
+        }
+        func level(_ histogram: [Int], _ share: Double) -> Int? {
+            let total = histogram.reduce(0, +)
+            guard total > 0 else { return nil }
+            var seen = 0
+            for v in 0..<256 {
+                seen += histogram[v]
+                if Double(seen) >= share * Double(total) { return v }
+            }
+            return 255
+        }
+        guard let inkLevel = level(ink, 0.25), let paperLevel = level(paper, 0.5),
+              paperLevel - inkLevel >= paleInkMinimumContrast,
+              paperLevel - inkLevel < paleInkContrast else { return nil }
+        let halfway = (inkLevel + paperLevel) / 2
+        let held = ink[0..<halfway].reduce(0, +), missed = paper[0..<halfway].reduce(0, +)
+        guard held + missed > 0,
+              Double(missed) / Double(held + missed) >= paleInkMissedShare else { return nil }
+        let span = Double(paperLevel - inkLevel)
+        return (0...255).map { v in
+            UInt8(max(0, min(255, (Double(v - inkLevel) / span * 255).rounded())))
+        }
+    }
+
+    /// Where the stencil is allowed to look, from Vision's word boxes.
+    ///
+    /// This is what makes MRC safe here. Sauvola cannot tell a halftone dot from
+    /// a full stop, so on its own it pulls photographs into the stencil, and the
+    /// picture is then destroyed by the very layering meant to preserve it —
+    /// measured, on a page carrying one: visibly smeared and streaked, while the
+    /// text on the same page was perfect. Confining the stencil to where words
+    /// were actually recognised leaves pictures wholly in the background.
+    ///
+    /// It is also *smaller*: a mask restricted to text has far fewer connected
+    /// components, so it costs less as JBIG2 than the blind one it replaces.
+    /// 5.15x against 4.96x, better on both axes.
+    ///
+    /// **Re-measured over 74 corpus picture pages (T15), and the "smaller" half is
+    /// the solid one**: the confined stencil is 1.33x smaller in total and *never*
+    /// larger on a single page. The page-total pair above is superseded — a blind
+    /// run also skips R50's shrink and layers colour pages in grey, so most of any
+    /// whole-sample gap is not confinement at all. On the 26 pages where the two
+    /// differ in exactly one way it is 1.07x. `FEATURES.md` has both columns.
+    ///
+    /// ⛔ **What confinement also leaves in the background, and it is not only
+    /// pictures: `C28`, opened 2026-08-19.** Words Vision *failed* to box are
+    /// outside `region` exactly as a photograph is, so they stay wholly in the
+    /// background too — and the background is downsampled, by 8x on a page
+    /// `pageIsAllText()` accepts. Measured over **86 corpus pages** read at 1:1
+    /// (C26 sub-step 4, then C28's four sub-steps of 8 + 24 + 20 + 21 — which is
+    /// every page still shrunk at the shipped bar — all
+    /// 2026-08-20), **24 were losing content that way and 18 of those typeset** —
+    /// running prose, table values, a displayed equation, a page folio — and those
+    /// marks are in no text layer either because these same boxes are what
+    /// `SearchableWriter` draws from. The confinement is still right for the reason
+    /// the first paragraph gives; what is missing is any term that distinguishes
+    /// missed text from a picture. Do not widen this without reading C28 — and note
+    /// which figure above prices it: the 1.33x is the STENCIL total, while the page
+    /// total on the 26 cleanly-comparable pages is **1.07x**, which is the number a
+    /// widening would actually be judged on.
+    static func textRegionMask(_ boxes: [SearchableWriter.BoundingBox],
+                               width w: Int, height h: Int) -> [Bool] {
+        // The guard first. `[Bool](repeating:count:)` was being asked for `w * h`
+        // on the line *above* the check that either is positive — A7.3's list, and
+        // the shape R24 and R29 are both made of.
+        guard w > 0, h > 0 else { return [] }
+        var region = [Bool](repeating: false, count: w * h)
+        for b in boxes {
+            // A non-finite or absurd word box traps the conversion, uncatchably,
+            // 1,300 lines below the `safeInt` that exists for exactly this (A3.2).
+            // Skipped rather than clamped: a box this arithmetic cannot describe is
+            // not a region to include, and including the whole page would put a
+            // picture into the stencil — which is what `textRegionMask` exists to
+            // prevent.
+            guard b.x.isFinite, b.y.isFinite, b.width.isFinite, b.height.isFinite
+            else { continue }
+            // The pad is a fraction of the box's *height* in both directions, so
+            // it is converted through the aspect ratio for the horizontal one.
+            let padY = b.height * mrcBoxPadding
+            let padX = padY * Double(h) / Double(w)
+            let x0 = max(safeInt((b.x - padX) * Double(w)), 0)
+            let x1 = min(safeInt((b.x + b.width + padX) * Double(w)) &+ 1, w)
+            let y0 = max(safeInt((b.y - padY) * Double(h)), 0)
+            let y1 = min(safeInt((b.y + b.height + padY) * Double(h)) &+ 1, h)
+            guard x0 < x1, y0 < y1 else { continue }
+            for y in y0..<y1 { for x in x0..<x1 { region[y * w + x] = true } }
+        }
+        return region
+    }
+
+    /// Fill the pixels under `holes` from their surroundings.
+    ///
+    /// Both layers get this treatment before they are shrunk, and it is not
+    /// cosmetic: a background with the text punched out of it as hard-edged
+    /// holes costs *more* to compress than the background with the text still
+    /// in it, because the edges are exactly the high frequencies the codec is
+    /// bad at. Filling them flat is what makes the layer cheap.
+    ///
+    /// The radius doubles on each pass so an isolated hole is reached quickly
+    /// and a large one still terminates. Anything never reached takes the mean
+    /// of what was kept, rather than being left at its original ink value where
+    /// it would show through as a ghost.
+    static func fillHoles(_ src: [UInt8], holes: [Bool], width w: Int, height h: Int,
+                          radius: Int, passes: Int = 3) -> [UInt8] {
+        guard w > 0, h > 0, src.count >= w * h, holes.count >= w * h else { return src }
+        var out = src, live = holes, rad = max(radius, 1)
+        for _ in 0..<passes {
+            var next = out, still = live
+            var any = false
+            for y in 0..<h {
+                for x in 0..<w where live[y * w + x] {
+                    any = true
+                    var acc = 0, cnt = 0
+                    let step = max(rad / 3, 1)
+                    var dy = -rad
+                    while dy <= rad {
+                        let yy = y + dy
+                        if yy >= 0, yy < h {
+                            var dx = -rad
+                            while dx <= rad {
+                                let xx = x + dx
+                                if xx >= 0, xx < w, !live[yy * w + xx] {
+                                    acc += Int(out[yy * w + xx]); cnt += 1
+                                }
+                                dx += step
+                            }
+                        }
+                        dy += step
+                    }
+                    if cnt > 0 { next[y * w + x] = UInt8(acc / cnt); still[y * w + x] = false }
+                }
+            }
+            out = next; live = still
+            if !any { break }
+            rad *= 2
+        }
+        if live.contains(true) {
+            var total = 0, count = 0
+            for i in 0..<(w * h) where !holes[i] { total += Int(out[i]); count += 1 }
+            let mean = UInt8(count > 0 ? total / count : 255)
+            for i in 0..<(w * h) where live[i] { out[i] = mean }
+        }
+        return out
+    }
+
+    /// Box-average shrink by an integer factor.
+    /// **The last `w mod f` columns and `h mod f` rows are not sampled** (A3.4),
+    /// and `JBIG2.assemble` then stretches the layer over the whole page box: at
+    /// 1,899 px and f=16 that drops 11 columns, a **0.58% horizontal stretch**. Only
+    /// ever the tone layers, and only where they are flat enough to have been
+    /// downsampled by 16 in the first place, so it is invisible in practice — but it
+    /// was undocumented, which is how a 0.58% geometric error becomes somebody's
+    /// afternoon. Not fixed: sampling the ragged edge would need a partial-window
+    /// mean, and the layer it affects is a blur by construction.
+    static func downsample(_ src: [UInt8], width w: Int, height h: Int, by f: Int)
+        -> (pixels: [UInt8], width: Int, height: Int) {
+        guard f > 1, w > 0, h > 0 else { return (src, w, h) }
+        let nw = max(w / f, 1), nh = max(h / f, 1)
+        var out = [UInt8](repeating: 255, count: nw * nh)
+        for y in 0..<nh {
+            for x in 0..<nw {
+                var acc = 0, cnt = 0
+                for dy in 0..<f where y * f + dy < h {
+                    let row = (y * f + dy) * w
+                    for dx in 0..<f where x * f + dx < w {
+                        acc += Int(src[row + x * f + dx]); cnt += 1
+                    }
+                }
+                out[y * nw + x] = UInt8(cnt > 0 ? acc / cnt : 255)
+            }
+        }
+        return (out, nw, nh)
+    }
+
+    /// C28. How much darker than its paper a background pixel must be to be a mark.
+    /// Pencil on `Ford_1941` p1 sits 14 levels under its paper at its darkest, and
+    /// the paper between type lines wanders by 10-15 levels across a page, which
+    /// is why the comparison is with the paper around the pixel and not one level.
+    static let paleMarkDepth = 8
+
+    /// `src` (w×h) box-averaged by `f` and read back at every pixel, bilinear between
+    /// the cell centres: the paper an eighth-resolution background shows, without
+    /// the cell edges a nearest read would draw.
+    static func smoothedPaper(_ src: [UInt8], width w: Int, height h: Int, by f: Int)
+        -> (pixels: [UInt8], width: Int, height: Int, factor: Int) {
+        let (small, sw, sh) = downsample(src, width: w, height: h, by: f)
+        return (small, sw, sh, max(f, 1))
+    }
+
+    /// The value of `smoothedPaper` at (x, y).
+    @inline(__always)
+    static func paperAt(_ p: (pixels: [UInt8], width: Int, height: Int, factor: Int),
+                        _ x: Int, _ y: Int) -> Int {
+        let f = Double(p.factor)
+        let fx = min(max((Double(x) + 0.5) / f - 0.5, 0), Double(p.width - 1))
+        let fy = min(max((Double(y) + 0.5) / f - 0.5, 0), Double(p.height - 1))
+        let x0 = Int(fx), y0 = Int(fy)
+        let x1 = min(x0 + 1, p.width - 1), y1 = min(y0 + 1, p.height - 1)
+        let ax = fx - Double(x0), ay = fy - Double(y0)
+        let a = Double(p.pixels[y0 * p.width + x0]), b = Double(p.pixels[y0 * p.width + x1])
+        let c = Double(p.pixels[y1 * p.width + x0]), d = Double(p.pixels[y1 * p.width + x1])
+        return Int(((a * (1 - ax) + b * ax) * (1 - ay) + (c * (1 - ax) + d * ax) * ay).rounded())
+    }
+
+    /// C28. The marks a page read as all text keeps in its mark layer: pixels of the
+    /// filled background `filled` outside `stencil`, darker than their `paper` by
+    /// `paleMarkDepth`, not within `2 * halo` of type (`core`, the stencil's dark core:
+    /// type's anti-aliased edge, which the stencil already draws), with at least four
+    /// such pixels in the 5×5 around them, in groups large enough or near enough to a
+    /// large one (below), grown by `2 * halo` so a stroke keeps its edge. Only inside
+    /// `interiorWindow`, the area the all-text terms read: the scanner's edge is not a
+    /// mark.
+    ///
+    /// Pencil is the case: too pale for any 1-bit cut (pencil and paper overlap in
+    /// level), so it is in neither the stencil nor the text layer, and at the eighth an
+    /// all-text background is stored at its strokes average into the paper.
+    ///
+    /// About 11 bytes a pixel of its own at the peak (`near` 4, four flag arrays, the
+    /// stack at worst 4), which with `mrcLayers`' render, masks, `filled` and `core`
+    /// stays under the Sauvola phase's 19 (`analyticMRCBytesPerPixel`) [counted, not
+    /// measured].
+    static func paleMarks(_ filled: [UInt8], stencil: [Bool], core: [Bool],
+                          width w: Int, height h: Int,
+                          paper: (pixels: [UInt8], width: Int, height: Int, factor: Int),
+                          halo: Int, reach: Int, minimumPixels: Int) -> [Bool] {
+        guard w > 0, h > 0, filled.count >= w * h, stencil.count >= w * h,
+              core.count >= w * h else { return [] }
+        let r = max(halo, 1)
+        // Integral of the stencil's dark core, so "within `halo` of type" is one lookup a
+        // pixel. The core and not the whole stencil, because the halo to stay clear of
+        // is type's, and on an all-text page the stencil also holds specks of the pencil
+        // itself (`outsideWords`), which clearing around would cut out of the mark layer.
+        let iw = w + 1
+        var near = [Int32](repeating: 0, count: iw * (h + 1))
+        func build(_ on: (Int) -> Bool) {
+            for y in 0..<h {
+                var run: Int32 = 0
+                for x in 0..<w {
+                    if on(y * w + x) { run += 1 }
+                    near[(y + 1) * iw + x + 1] = near[y * iw + x + 1] + run
+                }
+            }
+        }
+        func count(_ x0: Int, _ y0: Int, _ x1: Int, _ y1: Int) -> Int32 {
+            let a = max(x0, 0), b = max(y0, 0), c = min(x1, w - 1) + 1, d = min(y1, h - 1) + 1
+            return near[d * iw + c] - near[b * iw + c] - near[d * iw + a] + near[b * iw + a]
+        }
+        let win = interiorWindow(width: w, height: h)
+        let clear = 2 * r
+        build { core[$0] }
+        var dark = [Bool](repeating: false, count: w * h)
+        var touching = [Bool](repeating: false, count: w * h)
+        for y in win.y0..<win.y1 {
+            for x in win.x0..<win.x1 {
+                if count(x - 1, y - 1, x + 1, y + 1) > 0 { touching[y * w + x] = true }
+                guard !stencil[y * w + x],
+                      paperAt(paper, x, y) - Int(filled[y * w + x]) >= paleMarkDepth else { continue }
+                if count(x - clear, y - clear, x + clear, y + clear) == 0 { dark[y * w + x] = true }
+            }
+        }
+        build { dark[$0] }
+        var seed = [Bool](repeating: false, count: w * h)
+        for y in win.y0..<win.y1 {
+            for x in win.x0..<win.x1 where dark[y * w + x] && count(x - 2, y - 2, x + 2, y + 2) >= 4 {
+                seed[y * w + x] = true
+            }
+        }
+        dark = []
+        // A mark is a stroke, and grain is specks: on `Ford_1941` p3, a page with no
+        // pencil on it, the seeds were dots of under 40 pixels, and they put a mark
+        // layer in every JPEG block. So seeds are grouped, 8-connected once each is
+        // grown by `2 * halo` (a pencil stroke's seeds are broken, and grouped bare they
+        // fell under the floor one piece at a time), and a group stays when it holds at
+        // least `minimumPixels` seeds. Two floods from each start, the first counting and
+        // the second keeping, so the only buffer is the stack. `state`: 0 not grown, 1
+        // grown and not yet reached, 2 counted, 3 kept.
+        build { seed[$0] }
+        var state = [UInt8](repeating: 0, count: w * h)
+        for y in win.y0..<win.y1 {
+            for x in win.x0..<win.x1 where count(x - clear, y - clear, x + clear, y + clear) > 0 {
+                state[y * w + x] = 1
+            }
+        }
+        var stack: [Int32] = []
+        func flood(_ start: Int, from: UInt8, to: UInt8,
+                   touches zone: ((Int, Int) -> Bool)? = nil) -> (seeds: Int, inZone: Bool) {
+            var n = 0, inZone = false
+            state[start] = to; stack.append(Int32(start))
+            while let p = stack.popLast().map(Int.init) {
+                if seed[p] { n += 1 }
+                let px = p % w, py = p / w
+                if let zone, !inZone, zone(px, py) { inZone = true }
+                for qy in max(py - 1, 0)...min(py + 1, h - 1) {
+                    for qx in max(px - 1, 0)...min(px + 1, w - 1) where state[qy * w + qx] == from {
+                        state[qy * w + qx] = to; stack.append(Int32(qy * w + qx))
+                    }
+                }
+            }
+            return (n, inZone)
+        }
+        for s in 0..<(w * h) where state[s] == 1 {
+            if flood(s, from: 1, to: 2).seeds >= minimumPixels { _ = flood(s, from: 2, to: 3) }
+        }
+        // A pencilled line breaks into groups, and the faint ones fall under the floor
+        // ("be a", "of our" in `Ford_1941` p1's insertion) while their neighbours pass.
+        // So a smaller group, of an eighth of the floor or more, stays when it lies
+        // within `reach` of a group that passed: specks of grain lie far apart, and the
+        // words of a pencilled line beside each other. Joining every group across
+        // `reach` instead joined the grain too, and cost Ford's six pages 250 KB.
+        // `zone` is on cells of `cell` pixels, so it costs a byte for every `cell²`.
+        let cell = max(reach / 4, 4), zw = (w + cell - 1) / cell, zh = (h + cell - 1) / cell
+        var strong = [Bool](repeating: false, count: zw * zh)
+        for i in 0..<(w * h) where state[i] == 3 { strong[(i / w / cell) * zw + (i % w) / cell] = true }
+        var zone = [Bool](repeating: false, count: zw * zh)
+        let k = max(reach / cell, 1)
+        for zy in 0..<zh {
+            for zx in 0..<zw where strong[zy * zw + zx] {
+                for y in max(zy - k, 0)...min(zy + k, zh - 1) {
+                    for x in max(zx - k, 0)...min(zx + k, zw - 1) { zone[y * zw + x] = true }
+                }
+            }
+        }
+        strong = []
+        let weakFloor = max(minimumPixels / 8, 1)
+        for s in 0..<(w * h) where state[s] == 2 {
+            let found = flood(s, from: 2, to: 4) { x, y in zone[(y / cell) * zw + x / cell] }
+            if found.inZone && found.seeds >= weakFloor { _ = flood(s, from: 4, to: 3) }
+        }
+        stack = []
+        seed = []
+        // A kept group's seeds grown by `2 * halo`, not only the seeds: the faint
+        // stretches of a stroke between them are the stroke too, and the layer is the
+        // scan's own tone there.
+        var marks = [Bool](repeating: false, count: w * h)
+        for y in win.y0..<win.y1 {
+            for x in win.x0..<win.x1 where state[y * w + x] == 3 && !touching[y * w + x]
+                && count(x - clear, y - clear, x + clear, y + clear) > 0 { marks[y * w + x] = true }
+        }
+        return marks
+    }
+
+    /// C28. `marks` (w×h) on `downsample`'s grid at factor `f`: a cell is a mark when
+    /// any of its pixels is.
+    static func markCellMask(_ marks: [Bool], width w: Int, height h: Int, by f: Int)
+        -> (mask: [Bool], width: Int, height: Int) {
+        let f = max(f, 1), cw = max(w / f, 1), ch = max(h / f, 1)
+        var cells = [Bool](repeating: false, count: cw * ch)
+        guard marks.count >= w * h else { return (cells, cw, ch) }
+        for y in 0..<min(ch * f, h) {
+            for x in 0..<min(cw * f, w) where marks[y * w + x] { cells[(y / f) * cw + x / f] = true }
+        }
+        return (cells, cw, ch)
+    }
+
+    /// C28. The mark layer's tones for one plane: `plane` (w×h) box-averaged onto the
+    /// cells, and every cell outside the marks made flat, so the JPEG pays for the
+    /// marks and almost nothing else. A JPEG block with no mark in it takes the mean
+    /// of all the marks; within a block that has one, the mean of that block's marks.
+    /// Neither shows: the mask hides them. A smooth paper field here instead cost
+    /// 61 KB a page on `Ford_1941`, where the marks alone are 8.
+    static func markTone(_ plane: [UInt8], cells: (mask: [Bool], width: Int, height: Int),
+                         width w: Int, height h: Int, by f: Int) -> [UInt8] {
+        var (tone, cw, ch) = downsample(plane, width: w, height: h, by: f)
+        guard cw == cells.width, ch == cells.height else {
+            return [UInt8](repeating: 255, count: cells.width * cells.height)
+        }
+        var all = 0, allN = 0
+        for i in 0..<(cw * ch) where cells.mask[i] { all += Int(tone[i]); allN += 1 }
+        let everywhere = UInt8(allN > 0 ? all / allN : 255)
+        for by in stride(from: 0, to: ch, by: 8) {
+            for bx in stride(from: 0, to: cw, by: 8) {
+                var sum = 0, n = 0
+                for y in by..<min(by + 8, ch) {
+                    for x in bx..<min(bx + 8, cw) where cells.mask[y * cw + x] {
+                        sum += Int(tone[y * cw + x]); n += 1
+                    }
+                }
+                let fill = n > 0 ? UInt8(sum / n) : everywhere
+                for y in by..<min(by + 8, ch) {
+                    for x in bx..<min(bx + 8, cw) where !cells.mask[y * cw + x] {
+                        tone[y * cw + x] = fill
+                    }
+                }
+            }
+        }
+        return tone
+    }
+
+    /// An 8-bit grey PNG from a raw buffer, for the layers that have to reach an
+    /// external encoder as a file.
+    static func greyPNG(_ pixels: [UInt8], width w: Int, height h: Int) -> Data? {
+        guard w > 0, h > 0, pixels.count >= w * h,
+              let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,
+                samplesPerPixel: 1, hasAlpha: false, isPlanar: false,
+                colorSpaceName: .deviceWhite, bytesPerRow: w, bitsPerPixel: 8)
+        else { return nil }
+        if let dest = rep.bitmapData {
+            pixels.withUnsafeBytes { dest.update(from: $0.bindMemory(to: UInt8.self).baseAddress!,
+                                                 count: w * h) }
+        }
+        return rep.representation(using: .png, properties: [:])
+    }
+
+    /// Where the foreground is NOT sampled: everything except the dark core of the
+    /// strokes under `stencil`.
+    ///
+    /// C31. The foreground used to be filled from every stencil pixel, and Sauvola
+    /// admits a stroke's light anti-aliased edge along with its core. On `1954 -
+    /// Why.pdf` p6 at 111 ppi the source under the stencil reads 24 at the 5th
+    /// percentile and 108 at the median, so the averaged ink came out about twice
+    /// as light as the type and varied cell to cell — body text painted through a
+    /// solid stencil in a mottled grey-brown. Here a stencil pixel is kept only
+    /// when it is no lighter than the mean of the kept pixels around it, and that
+    /// is done twice, which leaves roughly the darkest quarter of each stroke.
+    ///
+    /// Local, not a page-wide percentile, so a red heading keeps its own core
+    /// rather than being judged against black body text. The window is the 3x3
+    /// `block` cells around a pixel, and `block` is a fixed 4 px, not the
+    /// foreground's shrink factor: a first version used the factor, and at the
+    /// all-text shrink of 16 its 48 px window judged a short red word between black
+    /// ones against the black and painted it black (found by the review of this
+    /// change). At 4 px only ink within about 8 px of darker ink is judged against
+    /// it — a red underline under black descenders darkens. Block sums rather than
+    /// integral images keep the added memory at 12 / block² bytes a pixel.
+    ///
+    /// Rejected: painting the stencil a flat colour per glyph (a connected-component
+    /// pass over the full render, and it discards genuine colour variation within a
+    /// word); a finer foreground (costs bytes and keeps the mixing, only finer);
+    /// giving an emptied cell its own darker half back (on thin type most cells hold
+    /// only halo, so it restored the halo everywhere — measured, body 22 -> 112);
+    /// comparing each pixel only with its own ink class by largest channel (a pale
+    /// halo of brown or blue-black ink falls below any chroma floor into the neutral
+    /// class and survives, as does colour fringing on black type — the review's
+    /// simulation — and at 4 px it changed no red-beside-black layout tried).
+    static let foregroundCoreBlock = 4
+
+    static func foregroundHoles(_ grey: [UInt8], stencil: [Bool], width w: Int, height h: Int,
+                                block: Int = foregroundCoreBlock, passes: Int = 2) -> [Bool] {
+        guard w > 0, h > 0, grey.count >= w * h, stencil.count >= w * h else {
+            return stencil.map { !$0 }
+        }
+        var holes = stencil.map { !$0 }
+        let b = max(block, 1)
+        let bw = (w + b - 1) / b, bh = (h + b - 1) / b
+        for _ in 0..<passes {
+            var sum = [Int](repeating: 0, count: bw * bh)
+            var count = [Int32](repeating: 0, count: bw * bh)
+            for y in 0..<h {
+                let row = (y / b) * bw
+                for x in 0..<w where !holes[y * w + x] {
+                    sum[row + x / b] += Int(grey[y * w + x]); count[row + x / b] += 1
+                }
+            }
+            for y in 0..<h {
+                let by = y / b
+                let y0 = max(by - 1, 0), y1 = min(by + 1, bh - 1)
+                for x in 0..<w where !holes[y * w + x] {
+                    let bx = x / b
+                    let x0 = max(bx - 1, 0), x1 = min(bx + 1, bw - 1)
+                    var s = 0, n = 0
+                    for yy in y0...y1 {
+                        for xx in x0...x1 { s += sum[yy * bw + xx]; n += Int(count[yy * bw + xx]) }
+                    }
+                    // Compared as products so nothing is rounded. The pixel is in
+                    // its own window, so one darkest in its own window is always kept.
+                    if Int(grey[y * w + x]) * n > s { holes[y * w + x] = true }
+                }
+            }
+        }
+        return holes
+    }
+
+    /// Build the three layers for one page, or nil when the page should keep the
+    /// single image it already has.
+    ///
+    /// Nil, not a throw, and deliberately: MRC is an improvement on a working
+    /// page, never a requirement. Every way this can decline — no words found,
+    /// a render that failed, an encode that failed — leaves the caller with the
+    /// JPEG it already had. A page that costs more is a far better outcome than
+    /// a page that fails, and the alternative is a route whose failures are
+    /// invisible until someone opens the book.
+    ///
+    /// `inColour` layers the page's three channels instead of its luminance, for
+    /// a page Automatic decided to keep in colour. It is the same decomposition
+    /// run once per channel — deliberately, rather than a colour-specific
+    /// algorithm: `fillHoles` and `downsample` are the two pieces whose constants
+    /// were measured, and reusing them per plane keeps that calibration rather
+    /// than inventing a second version of it to re-measure.
+    static func mrcLayers(for page: PDFPage, boxes: [SearchableWriter.BoundingBox],
+                          into directory: URL, stem: String,
+                          backgroundDownsample: Int = mrcBackgroundDownsample,
+                          foregroundDownsample: Int = mrcForegroundDownsample,
+                          inColour: Bool = false,
+                          fromImage image: Prefs.ImageDetail? = nil,
+                          stencil cut: (png: Data, width: Int, height: Int)? = nil) -> MRCLayers? {
+        // No words means a plate with no text on it. An empty stencil would put
+        // the whole page into a downsampled background — publishing a picture at
+        // half its resolution for no compression benefit at all.
+        guard !boxes.isEmpty else { return nil }
+
+        let box = fullBox(of: page)
+        // C39. Everything below at the images' resolution, which is the JPEG's these
+        // layers replace, except the stencil, which is cut at the type's
+        // (`mrcStencil`). The downsample factors are relative to the render, so at
+        // the type's the tone layers of the 35 documents it reaches came to 25.6 MB
+        // where they are 14.2, resolution the page's images never had; and
+        // `pageIsAllText()` refused 4 pages it accepts here.
+        let (typeDPI, dpi) = resolutions(of: page)
+        let scale = dpi / 72.0
+        let wide = (box.width * scale).rounded(), high = (box.height * scale).rounded()
+        guard wide.isFinite, high.isFinite, wide >= 1, high >= 1,
+              wide * high <= Double(maximumMRCPageMegapixels) * 1_000_000 else { return nil }
+        // A3.1. Colour layering holds 25 bytes a pixel against grey's 18, so it
+        // stops sooner — and stopping means *grey* layering, not none.
+        if inColour, wide * high > Double(maximumColourMRCPageMegapixels) * 1_000_000 {
+            return mrcLayers(for: page, boxes: boxes, into: directory, stem: stem,
+                             backgroundDownsample: backgroundDownsample,
+                             foregroundDownsample: foregroundDownsample, inColour: false,
+                             fromImage: image)
+        }
+        // C39. The finer stencil is cut first, before anything below is allocated, so
+        // its Sauvola peak is the only one alive: `analyticMRCBytesPerPixel` at no more
+        // than `maximumMRCPageMegapixels`, the grey bound's own terms. It comes back as
+        // a PNG, and the recursion below is handed it rather than cutting it again.
+        var fine = cut ?? (typeDPI > dpi ? mrcStencil(page, box: box, boxes: boxes, dpi: typeDPI) : nil)
+        let w = max(Int(wide), 1), h = max(Int(high), 1)
+        guard let grey = renderGrey(page, box: box, scale: scale,
+                                    width: w, height: h, from: .mediaBox) else { return nil }
+
+        // `safeInt`, not `Int`, and clamped at both ends. `dpi` descends entirely
+        // from what the file declares and is *not* covered by the megapixel guard
+        // above, because `wide` reduces algebraically to the declared `/Width`:
+        // `MediaBox [0 0 1e-14 1.3e-14]` with an image declaring 8000x10400 gives
+        // dpi 5.76e+19, both gates pass, and `Int(1.44e19)` against `Int.max`
+        // 9.22e18 **trapped uncatchably**, taking every concurrent file with it
+        // (A7.1, verified end to end on shipped defaults). The upper clamp is the
+        // second half: at a merely large DPI the window computed to 3.6e12, so
+        // Sauvola's radius covered the whole image and it silently degenerated
+        // into the single global threshold its own doc comment exists to avoid.
+        var mask = sauvolaMask(grey, width: w, height: h,
+                               window: sauvolaWindow(dpi: dpi, width: w, height: h))
+        guard mask.count == w * h else { return nil }
+        let region = textRegionMask(boxes, width: w, height: h)
+        for i in 0..<(w * h) where !region[i] { mask[i] = false }
+        // C54. Pale ink is cut again with the page's levels stretched. The first mask is
+        // released before the second cut, so the peak is one byte a pixel over the
+        // first's: `region`, which the first cut did not have.
+        let paleInk = paleInkLevels(grey, stencil: mask, region: region)
+        if let levels = paleInk {
+            mask = []
+            mask = sauvolaMask(grey, width: w, height: h,
+                               window: sauvolaWindow(dpi: dpi, width: w, height: h),
+                               levels: levels)
+            guard mask.count == w * h else { return nil }
+            for i in 0..<(w * h) where !region[i] { mask[i] = false }
+        }
+        // A stencil with nothing in it is not a layering, it is a downsampled
+        // page. Refuse it the same way an empty box list is refused.
+        guard mask.contains(true) else { return nil }
+
+        // R50. A page whose ink is all text has nothing in its tone layers worth
+        // full resolution, so both are shrunk far harder. See
+        // `textPageInkOutsideThreshold` for why this is asked here and not in
+        // `isPicture`, and for the two page kinds it misses.
+        //
+        // `max` rather than a replacement: the caller's factor is a floor, so a
+        // page that *does* carry a picture is never shrunk harder than the setting
+        // asked for. On a page with no picture, Photo detail is governing a
+        // photograph that is not there.
+        //
+        // **Except when the caller asked for every pixel.** `PhotoDetail.maximum`
+        // is a factor of 1, and it promises "photographs keep every pixel" — an
+        // instruction, in the sense `Flattener.Mode` already uses the word, where
+        // Black & white and Grayscale are instructions and Automatic is the one
+        // that works out what the page needs. This signal has two recorded misses,
+        // and one of them — a pale line drawing — is a picture it reads as text, so
+        // honouring the instruction is what keeps the miss from costing that user
+        // resolution they explicitly asked to keep. Found by reviewing this diff:
+        // the first version applied the shrink at every setting, so Maximum stored
+        // such a page at an eighth of its resolution with no way to override it.
+        // **And the pale drawing is asked about again here**, because closing R56 in
+        // `isPicture` alone would have moved the harm rather than removed it. That
+        // page now reaches the picture path — and this rule, whose signal is ink, was
+        // still reading it as all text and storing it at an eighth of its resolution.
+        // R50 recorded that miss and correctly judged it harmless *"because this only
+        // ever changes resolution"*; it is harmless at 2x and much less so at 8x, and
+        // it is the same miss in front of a second decision. CONTRIBUTING 4b: the
+        // register's most repeated shape is a fix that closed one instance of a defect
+        // and left its twin.
+        //
+        // Both new terms are behind the short circuit, deliberately. A first version
+        // hoisted the threshold out to a `let` and every layered page then paid a
+        // full histogram pass over up to 100 megapixels for a value that
+        // `PhotoDetail.maximum` never reads — found by the review of this diff.
+        let keepEveryPixel = backgroundDownsample <= 1
+        // C28. Kept so the layers can carry it out to a caller that reports the page.
+        // Assigned inside the closure rather than hoisted for the reason the paragraph
+        // above gives: at `PhotoDetail.maximum` the closure is never called, and this
+        // stays `nil` — which is the difference between reporting the decision and
+        // paying for a decision nobody takes.
+        var measuredInkOutside: Double?
+        // C28. The third term's answer, carried out for the same reason and assigned
+        // in the same place — at the term, not before it. A page refused by term 1 or
+        // term 2 never reaches the assignment and keeps `.notAsked`, which is the
+        // whole information content of this field: it says WHICH term refused.
+        var measuredShapeTerm = ShapeTermAnswer.notAsked
+        func pageIsAllText() -> Bool {
+            let pageThreshold = otsuThreshold(of: grey)
+            // C26. The bar is substitutable so a tool can price a different one; `nil`
+            // means "the shipped bar", not "refuse the page", and every other term of
+            // this guard is untouched. See `textPageInkOutsideThresholdOverride`.
+            let bar = textPageInkOutsideThresholdOverride ?? textPageInkOutsideThreshold
+            let outside = inkOutsideText(grey, region: region, width: w, height: h,
+                                         threshold: pageThreshold)
+            measuredInkOutside = outside
+            guard outside < bar else { return false }
+            guard paleDrawing(pageMarks(grey, width: w, height: h,
+                                        threshold: pageThreshold, dpi: dpi),
+                              dpi: dpi).extent <= paleDrawingThreshold else { return false }
+            // C28, decided 2026-08-22. The two terms above are quantities — how much
+            // ink is outside the words, and how pale a drawing is — and both are
+            // measured NOT to order the loss: sorted by `inkOutsideText` the eight
+            // pages nearest the bar read lose / no / lose / no / no / lose / no / lose,
+            // and `paleDrawing(…).extent` reads 0.00000 on two of the pages that lose
+            // the most. This third term is a SHAPE, which is R56's lesson in a third
+            // place: not how dark a mark is but whether it is laid out like a line of
+            // type. Over the 73 sub-bar pages it reads >= 1 on 12 of 12 that lose
+            // typeset content and 3 of 51 that lose nothing.
+            //
+            // **Third and not first, deliberately.** It is the dearest of the three
+            // (two connected-component passes over the full-resolution render), so it
+            // is asked only about the pages the cheap terms would already have shrunk
+            // 8x — which is both the cheapest placement and the one that changes the
+            // fewest pages. The reordering of `paleDrawing` from a `return` to a
+            // `guard` is what makes that possible and changes no verdict.
+            //
+            // **`nil` refuses the page.** A page too dense to label within
+            // `maximumShapeRuns` is not asserted to be all text; refusing only ever
+            // stores it at more resolution, never less. See `textLineGroupsOutsideText`
+            // and `BUGS.md` C28 `#### THE DECISION` for why this seam and not
+            // `textRegionMask`, where the same term admits halftone dots to the 1-bit
+            // stencil and is R57's failure mode.
+            let groups = textLineGroupsOutsideText(grey, stencil: mask, region: region,
+                                                   width: w, height: h,
+                                                   threshold: pageThreshold)
+            measuredShapeTerm = groups.map { ShapeTermAnswer.groups($0) } ?? .unlabelable
+            return groups == 0
+        }
+        let allText = !keepEveryPixel && pageIsAllText()
+        // C28. On a page read as all text, the ink outside the recognised words goes into
+        // the stencil too. Confined to the words, ink Vision did not box (a signature,
+        // pencil, a word or a column of figures it missed) was in neither the stencil nor
+        // the text layer, only in a background shrunk to an eighth, and illegible there.
+        // Only inside `interiorWindow`, because that is all the terms above looked at: a
+        // halftone logo in the margin passes them unseen, and Sauvola would speckle it
+        // (R57). Cut again rather than kept from the first cut, so the peak is the pale
+        // re-cut's.
+        if allText {
+            mask = []
+            // The finer stencil the same, cut before the mask comes back so that only the
+            // render and `region` are alive beside its peak, at under 0.7 of its pixels
+            // (`minimumMaskRaise`). `cut` was handed down by a caller that has already
+            // done this. The finer stencil is cut twice on such a page; the first is
+            // needed before `pageIsAllText` can be asked.
+            if fine != nil, cut == nil {
+                fine = mrcStencil(page, box: box, boxes: boxes, dpi: typeDPI, outsideWords: true)
+            }
+            mask = sauvolaMask(grey, width: w, height: h,
+                               window: sauvolaWindow(dpi: dpi, width: w, height: h),
+                               levels: paleInk)
+            guard mask.count == w * h else { return nil }
+            keepWordsAndInterior(&mask, region: region, width: w, height: h)
+        }
+        // photo-pdf-size. A page that came from an image file takes the user's
+        // `ImageDetail` as it stands, finer or coarser than Photo detail: it is the
+        // setting that names such a page.
+        let bgFactor = !allText ? backgroundDownsample
+            : image?.backgroundDownsample ?? max(backgroundDownsample, textPageBackgroundDownsample)
+        let fgFactor = !allText ? foregroundDownsample
+            : image?.foregroundDownsample ?? max(foregroundDownsample, textPageForegroundDownsample)
+
+        // The stencil is the same either way: it comes from the luminance render,
+        // so a colour page's text is cut out exactly as a grey one's is. `fine`, cut
+        // at the type's resolution, when there is one (C39); the tone layers below
+        // keep `mask`, at theirs.
+        let stencil: (png: Data, width: Int, height: Int)
+        if let fine {
+            stencil = fine
+        } else {
+            // C56. The published stencil with its strokes' fringe taken out, except on
+            // pale ink, whose re-cut exists because its strokes came out too thin (C54).
+            let published = paleInk == nil
+                ? strokeWeightMask(grey, mask: mask, region: region, width: w, height: h) : mask
+            var maskPixels = [UInt8](repeating: 255, count: w * h)
+            for i in 0..<(w * h) where published[i] { maskPixels[i] = 0 }
+            guard let png = greyPNG(maskPixels, width: w, height: h) else { return nil }
+            stencil = (png, w, h)
+        }
+        let maskPNG = stencil.png
+        // C28. Pencil, and any mark too pale for the stencil, is in the background
+        // alone, and the eighth an all-text background is stored at averages its
+        // strokes into the paper. So such a page gets a fourth layer: those marks at
+        // `textPageMarkDownsample`, drawn over the background through a mask of their
+        // own, and nothing else (`paleMarks`, `markTone`). Storing the whole background
+        // finer instead cost 6x its bytes on `Ford_1941`, nearly all of it paper.
+        var filledGrey: [UInt8]?
+        var markCells: (mask: [Bool], width: Int, height: Int)?
+        let markFactor = max(backgroundDownsample, textPageMarkDownsample)
+        if allText {
+            let filled = fillHoles(grey, holes: mask, width: w, height: h, radius: 10)
+            // A thirty-second of the square of the page's median line height: a pencilled
+            // word is hundreds of seed pixels, a speck of grain a few. A box's shorter
+            // side, because on a page turned sideways the height is the line's length
+            // (`_1939_Former students` p2 read 909 px, and its floor 25,800 seeds).
+            let heights = boxes.map {
+                min(Double($0.height) * Double(h), Double($0.width) * Double(w))
+            }.sorted()
+            let line = heights[heights.count / 2]
+            let ink = otsuThreshold(of: grey)
+            var core = [Bool](repeating: false, count: w * h)
+            for i in 0..<(w * h) where mask[i] && grey[i] < ink { core[i] = true }
+            let found = paleMarks(filled, stencil: mask, core: core, width: w, height: h,
+                                  paper: smoothedPaper(filled, width: w, height: h,
+                                                       by: bgFactor),
+                                  halo: 2, reach: safeInt(line),
+                                  minimumPixels: max(safeInt(line * line / 32), 16))
+            let cells = markCellMask(found, width: w, height: h, by: markFactor)
+            // photo-pdf-size. A photographed page's background at the slider's 1/2 or 1/3
+            // is already as fine as the marks would be, so it keeps them itself; a mark
+            // layer there would paint them coarser over it. Every other page's background
+            // is at 1/4 or coarser.
+            if markFactor < bgFactor, cells.mask.contains(true) { markCells = cells }
+            if !inColour { filledGrey = filled }
+        }
+        var markTones: [UInt8] = []
+
+        let bw: Int, bh: Int, fw: Int, fh: Int
+        let bgData: Data, fgData: Data
+        if inColour {
+            // Falls back to the grey layering rather than failing the page if the
+            // colour render does not come back: layering in colour is an
+            // improvement on layering, which is itself an improvement on the
+            // single JPEG. Nothing here is a requirement.
+            guard let rgba = renderRGB(page, box: box, scale: scale,
+                                       width: w, height: h, from: .mediaBox) else {
+                return mrcLayers(for: page, boxes: boxes, into: directory, stem: stem,
+                                 backgroundDownsample: backgroundDownsample,
+                                 foregroundDownsample: foregroundDownsample,
+                                 inColour: false, fromImage: image, stencil: fine)
+            }
+            // C31. The foreground is sampled from the dark core of the strokes, not
+            // from every stencil pixel. See `foregroundHoles`.
+            let fgHoles = foregroundHoles(grey, stencil: mask, width: w, height: h)
+            var background: [UInt8] = [], foreground: [UInt8] = []
+            var sizes: (bw: Int, bh: Int, fw: Int, fh: Int) = (0, 0, 0, 0)
+            for channel in 0..<3 {
+                // One plane at a time, and released before the next is taken, so
+                // three channels do not mean three times the peak.
+                var plane = [UInt8](repeating: 0, count: w * h)
+                for i in 0..<(w * h) { plane[i] = rgba[i * 4 + channel] }
+                let filledBG = fillHoles(plane, holes: mask, width: w, height: h, radius: 10)
+                if let cells = markCells {
+                    let tone = markTone(filledBG, cells: cells, width: w, height: h, by: markFactor)
+                    if channel == 0 {
+                        markTones = [UInt8](repeating: 255, count: cells.width * cells.height * 4)
+                    }
+                    for i in 0..<tone.count { markTones[i * 4 + channel] = tone[i] }
+                }
+                let (bgPlane, pbw, pbh) = downsample(filledBG, width: w, height: h,
+                                                     by: max(bgFactor, 1))
+                let filledFG = fillHoles(plane, holes: fgHoles, width: w, height: h, radius: 3)
+                let (fgPlane, pfw, pfh) = downsample(filledFG, width: w, height: h,
+                                                     by: max(fgFactor, 1))
+                if channel == 0 {
+                    sizes = (pbw, pbh, pfw, pfh)
+                    background = [UInt8](repeating: 255, count: pbw * pbh * 4)
+                    foreground = [UInt8](repeating: 255, count: pfw * pfh * 4)
+                }
+                // A channel that came back a different size would interleave
+                // garbage into the other two rather than fail, so it is checked
+                // instead of assumed.
+                guard (pbw, pbh, pfw, pfh) == sizes else { return nil }
+                for i in 0..<(pbw * pbh) { background[i * 4 + channel] = bgPlane[i] }
+                for i in 0..<(pfw * pfh) { foreground[i * 4 + channel] = fgPlane[i] }
+            }
+            (bw, bh, fw, fh) = sizes
+            guard let bg = jpegRGB(from: background, width: bw, height: bh,
+                                   quality: pictureJPEGQuality)?.data,
+                  let fg = jpegRGB(from: foreground, width: fw, height: fh,
+                                   quality: pictureJPEGQuality)?.data
+            else { return nil }
+            bgData = bg; fgData = fg
+        } else {
+            let bgFull = filledGrey ?? fillHoles(grey, holes: mask, width: w, height: h, radius: 10)
+            filledGrey = nil
+            if let cells = markCells {
+                markTones = markTone(bgFull, cells: cells, width: w, height: h, by: markFactor)
+            }
+            let (bg, gbw, gbh) = downsample(bgFull, width: w, height: h,
+                                            by: max(bgFactor, 1))
+            let fgHoles = foregroundHoles(grey, stencil: mask, width: w, height: h)
+            let fgFull = fillHoles(grey, holes: fgHoles, width: w, height: h, radius: 3)
+            let (fg, gfw, gfh) = downsample(fgFull, width: w, height: h,
+                                            by: max(fgFactor, 1))
+            bw = gbw; bh = gbh; fw = gfw; fh = gfh
+            guard let b = jpegData(from: bg, width: bw, height: bh, quality: pictureJPEGQuality),
+                  let f = jpegData(from: fg, width: fw, height: fh, quality: pictureJPEGQuality)
+            else { return nil }
+            bgData = b; fgData = f
+        }
+
+        let maskURL = directory.appendingPathComponent(stem + ".mask.png")
+        let bgURL = directory.appendingPathComponent(stem + ".bg.jpg")
+        let fgURL = directory.appendingPathComponent(stem + ".fg.jpg")
+        guard (try? maskPNG.write(to: maskURL)) != nil,
+              (try? bgData.write(to: bgURL)) != nil,
+              (try? fgData.write(to: fgURL)) != nil else {
+            for u in [maskURL, bgURL, fgURL] { try? FileManager.default.removeItem(at: u) }
+            return nil
+        }
+        // C28. The mark layer, when there is one: its tones as a JPEG and where they
+        // show as a stencil PNG in `maskPNG`'s polarity, 0 where the mark is. A page
+        // whose marks cannot be written is refused, not published without them.
+        var markLayer: MRCLayers.Marks?
+        if let cells = markCells {
+            let toneURL = directory.appendingPathComponent(stem + ".marks.jpg")
+            let cellURL = directory.appendingPathComponent(stem + ".marks.png")
+            // Cropped to the box around the marks. A JPEG pays a few bits for every
+            // block however flat, and over a whole page at the half that floor was
+            // 16 KB of a 17 KB layer on `Ford_1941` pages with one pencilled word.
+            var x0 = cells.width, y0 = cells.height, x1 = 0, y1 = 0
+            for y in 0..<cells.height {
+                for x in 0..<cells.width where cells.mask[y * cells.width + x] {
+                    x0 = min(x0, x); x1 = max(x1, x + 1); y0 = min(y0, y); y1 = max(y1, y + 1)
+                }
+            }
+            // From a multiple of 16, a colour JPEG's block, so the blocks `markTone`
+            // made flat are still the encoder's blocks after the crop.
+            x0 -= x0 % 16; y0 -= y0 % 16
+            let cw = x1 - x0, ch = y1 - y0, channels = inColour ? 4 : 1
+            var cellPixels = [UInt8](repeating: 255, count: cw * ch)
+            var cropped = [UInt8](repeating: 255, count: cw * ch * channels)
+            for y in 0..<ch {
+                for x in 0..<cw {
+                    let from = (y + y0) * cells.width + x + x0
+                    if cells.mask[from] { cellPixels[y * cw + x] = 0 }
+                    for k in 0..<channels {
+                        cropped[(y * cw + x) * channels + k] = markTones[from * channels + k]
+                    }
+                }
+            }
+            let tone = inColour
+                ? jpegRGB(from: cropped, width: cw, height: ch, quality: pictureJPEGQuality)?.data
+                : jpegData(from: cropped, width: cw, height: ch, quality: pictureJPEGQuality)
+            let gw = Double(cells.width), gh = Double(cells.height)
+            let rect = CGRect(x: Double(x0) / gw, y: Double(cells.height - y1) / gh,
+                              width: Double(cw) / gw, height: Double(ch) / gh)
+            guard let tone, let png = greyPNG(cellPixels, width: cw, height: ch),
+                  (try? tone.write(to: toneURL)) != nil, (try? png.write(to: cellURL)) != nil else {
+                for u in [maskURL, bgURL, fgURL, toneURL, cellURL] {
+                    try? FileManager.default.removeItem(at: u)
+                }
+                return nil
+            }
+            markLayer = MRCLayers.Marks(tone: toneURL, mask: cellURL, width: cw, height: ch,
+                                        rect: rect)
+        }
+        return MRCLayers(mask: maskURL, background: bgURL, foreground: fgURL,
+                         backgroundWidth: bw, backgroundHeight: bh,
+                         foregroundWidth: fw, foregroundHeight: fh,
+                         isColour: inColour,
+                         shrunkAsAllText: allText,
+                         inkOutsideText: measuredInkOutside,
+                         shapeTermAnswer: measuredShapeTerm,
+                         maskWidth: stencil.width, maskHeight: stencil.height,
+                         marks: markLayer)
+    }
+
+    /// `mrcLayers`' stencil cut at `dpi`, the page's type resolution, from the same
+    /// words: Sauvola at that resolution's own window, confined to `boxes`, 0 for ink,
+    /// as a PNG. nil when the page at `dpi` is past `maximumMRCPageMegapixels`, does not
+    /// render, or holds no ink inside the words, and the caller keeps the stencil it
+    /// cuts at its tone layers' resolution.
+    ///
+    /// On ProQuest's layered pages the type is a 300 DPI mask over 150 DPI images, so
+    /// this is the source's own type, where the stencil at 150 was a resampling of it.
+    ///
+    /// `outsideWords` keeps the ink outside the words too, for a page read as all text
+    /// (C28, in `mrcLayers`), as far as `keepWordsAndInterior` allows.
+    static func mrcStencil(_ page: PDFPage, box: CGRect, boxes: [SearchableWriter.BoundingBox],
+                           dpi: Double,
+                           outsideWords: Bool = false) -> (png: Data, width: Int, height: Int)? {
+        let scale = dpi / 72.0
+        let wide = (box.width * scale).rounded(), high = (box.height * scale).rounded()
+        guard wide.isFinite, high.isFinite, wide >= 1, high >= 1,
+              wide * high <= Double(maximumMRCPageMegapixels) * 1_000_000 else { return nil }
+        let w = max(Int(wide), 1), h = max(Int(high), 1)
+        guard let grey = renderGrey(page, box: box, scale: scale,
+                                    width: w, height: h, from: .mediaBox) else { return nil }
+        var mask = sauvolaMask(grey, width: w, height: h,
+                               window: sauvolaWindow(dpi: dpi, width: w, height: h))
+        let region = textRegionMask(boxes, width: w, height: h)
+        guard mask.count == w * h, region.count == w * h else { return nil }
+        // C54, as in `mrcLayers`, decided at this resolution from this render.
+        if let levels = paleInkLevels(grey, stencil: mask, region: region) {
+            mask = []
+            mask = sauvolaMask(grey, width: w, height: h,
+                               window: sauvolaWindow(dpi: dpi, width: w, height: h),
+                               levels: levels)
+            guard mask.count == w * h else { return nil }
+        } else {
+            // C56, as in `mrcLayers`. Confined to the words first, which is all the
+            // stencil keeps, so the peaks are read where it is published.
+            if !outsideWords { for i in 0..<(w * h) where !region[i] { mask[i] = false } }
+            mask = strokeWeightMask(grey, mask: mask, region: region, width: w, height: h)
+        }
+        if outsideWords { keepWordsAndInterior(&mask, region: region, width: w, height: h) }
+        var pixels = [UInt8](repeating: 255, count: w * h)
+        var inked = false
+        for i in 0..<(w * h) where mask[i] && (outsideWords || region[i]) {
+            pixels[i] = 0
+            inked = true
+        }
+        guard inked, let png = greyPNG(pixels, width: w, height: h) else { return nil }
+        return (png, w, h)
+    }
+
+    // MARK: - Resolution
+
+    /// The resolution to rebuild a page at.
+    ///
+    /// `nativeDPI` reports a fact — the resolution implied by the largest image
+    /// on the page — and on a born-digital page that image is decoration, not
+    /// the page. This applies the policy.
+    ///
+    /// A low implied DPI has two quite different causes, and the first version of
+    /// this check conflated them:
+    ///
+    /// - a **logo** on a born-digital page. Its DPI is meaningless and rendering
+    ///   the page at it destroys everything else (C9: a 595x841 pt page carrying
+    ///   1,846 characters rebuilt as 16x23 px).
+    /// - a **genuine low-resolution scan**, where the image really is the page.
+    ///   Rendering that at 300 is pure upsampling: 4x the linear scale, 17x the
+    ///   pixels, for no more detail — and with several files in flight it is the
+    ///   difference between comfortable and gigabytes.
+    ///
+    /// The pixel width separates them, cleanly. Measured over the corpus, the 84
+    /// sampled pages below the DPI floor split into 47 logos, 16–96 px wide, and
+    /// 37 real 72 DPI scans, 1936–2592 px wide. Nothing lands in between, so the
+    /// threshold is not finely balanced.
+    ///
+    /// **The measurement is `drawnLargestImage`, not `largestImage` — C24, closed
+    /// 2026-08-17.** The policy above is unchanged; what changed is which number it is
+    /// applied to. `largestImage` walks the page's `/Resources`, and 4 of the corpus's
+    /// 208 multi-page documents share one dictionary across every page, so a page was
+    /// told its resolution by a *neighbour's* plate. C24's structural half fixed the 85
+    /// pages that draw nothing at all; this fixes the **45 that draw a different image
+    /// than the dictionary holds** — `AI 2027` 38, `Sherman_1986` 5, `Batzell` 2.
+    /// Measured over all 16,987 corpus pages, before against after: exactly those 45
+    /// change resolution and not one other.
+    ///
+    /// **`.unreadable` keeps the `/Resources` answer**, which is T14's rule one level up
+    /// from the walk that already obeys it: a `Do` whose name would not resolve is
+    /// evidence the instrument read nothing, never evidence the page draws nothing.
+    /// Dropping such a page to the fallback would refuse a real scan's resolution on the
+    /// strength of a failed read. 3 corpus pages, all of `Astin__The Challenge of Open
+    /// Admissions`, and all three keep the 302.6 DPI they have today.
+    ///
+    /// **Not wired here: `pageIsAnImage`**, which asks a different question — is the page
+    /// a raster rather than what should it be rebuilt at — and feeds `Model`'s
+    /// text-extraction skip marker, `hasDigitalText` and `Tools/classify-source.swift`,
+    /// which is D1's corpus gate (R55). Applying its predicate to both columns of the
+    /// 16,987-page sweep in `DRAWN-2026-08-17.tsv`, wiring the drawn walk there would flip
+    /// exactly **2** pages: `Batzell` p22 (600 px, under the 900 floor) and `AI 2027` p1
+    /// (245 px). Both have embedded text, so neither reaches `Model`'s marker branch; the
+    /// reason to leave it is that it moves a corpus gate the owner closed on its own
+    /// arithmetic, not that it is unaffected. Nor is it given the masks below: whether a
+    /// page is a raster is a question about its images.
+    ///
+    /// **Not the type's (C39).** `resolutions` lets the mask an image is drawn through
+    /// raise a 1-bit page's published resolution and a stencil's, which on a layered scan
+    /// is where the type is. This stays the resolution a page is routed and read at.
+    static func rebuildDPI(of page: PDFPage) -> Double { resolutions(of: page).images }
+
+    /// The resolution of a page's type, and the one its images alone ask for, which is
+    /// `rebuildDPI`.
+    ///
+    /// They differ only where a mask raises the first (C39, `drawnLargestMask`): a
+    /// layered scan's type is in the mask its ink is drawn through, at twice its images'
+    /// resolution on ProQuest's pages. A mask raises the resolution and never lowers it,
+    /// only when it is `minimumMaskRaise` finer, not past `maximumMaskDPI`, and not
+    /// past `maximumPageMegapixels`, counted as `flatten` counts it, so no page the
+    /// images alone would rebuild is refused for its mask. Measured over the corpus's
+    /// 16,987 pages, 603 in 35 documents have a finer mask, 586 of them about twice as
+    /// fine. Letting the mask win by area, as the images do, lowered two: `_1958_Executive
+    /// Pay` p1's 332 DPI photograph gave way to its 300 DPI mask.
+    ///
+    /// **What is made at which.** `flatten` decides a page's route at `images`, where
+    /// the route's constants were measured, and rebuilds a 1-bit page at `type`; a
+    /// picture page and `mrcLayers`' tone layers stay at `images`, and its stencil is
+    /// cut at `type`. A page C32 takes off 1-bit for a spot colour keeps its 1-bit
+    /// fallback at `images`. Every page's lines are still read at `images`: a 1-bit
+    /// page's from the copy `flatten` writes beside it (`Recogniser.recognitionImage`),
+    /// with their words from the page at `type` where it read the same lines
+    /// (`Recogniser.finerReading`), and a page it does not rebuild through
+    /// `Recogniser.render`. Read at `type` alone, the 35 corpus documents this reaches
+    /// read 4,876 more dictionary words and lost 14 printed lines on 6 pages (`BUGS.md` C39).
+    static func resolutions(of page: PDFPage) -> (type: Double, images: Double) {
+        if let override = rebuildDPIOverride, let answer = override(page) { return (answer, answer) }
+        let images = imageDPI(of: page)
+        guard case let .largest(mask, _) = drawnLargestMask(of: page),
+              mask >= images * minimumMaskRaise
+        else { return (images, images) }
+        let raised = max(images, min(mask, maximumMaskDPI))
+        let box = fullBox(of: page)
+        let wide = (box.width * raised / 72).rounded(), high = (box.height * raised / 72).rounded()
+        guard wide.isFinite, high.isFinite, wide * high <= Double(maximumPageMegapixels) * 1_000_000
+        else { return (images, images) }
+        return (raised, images)
+    }
+
+    /// The most a mask raises a page's resolution to (`resolutions`). The corpus's
+    /// finest masks are 600 DPI (`Ibson_2006`); at this a 14.8 x 21.5 inch newspaper
+    /// sheet is 115 megapixels.
+    static let maximumMaskDPI: Double = 600
+
+    /// How much finer than a page's images its mask must be to raise the page
+    /// (`resolutions`), so that a second render buys some detail. Of the corpus's 603
+    /// pages with a finer mask, 586 are about twice as fine and 6 are under 1.25x:
+    /// three by 1.2% or less, which bought nothing but a second render, then 1.056,
+    /// 1.139 and 1.246.
+    static let minimumMaskRaise: Double = 1.2
+
+    /// `rebuildDPI` without the masks: the resolution a page's images ask for.
+    static func imageDPI(of page: PDFPage) -> Double {
+        if let override = rebuildDPIOverride, let answer = override(page) { return answer }
+        // A page pasted up from strips is rebuilt at the strips' own resolution. The
+        // walk below divides the largest image's width by the *page's*, and on
+        // `BUGS.md` C39's newspaper page, whose largest strip is drawn 442 pt wide
+        // on a 1,067 pt sheet, that read 125 DPI for 300 DPI scans.
+        if let tiles = mosaic(of: page), let largest = tiles.max(by: {
+            $0.rect.width * $0.rect.height < $1.rect.width * $1.rect.height }) {
+            return min(maximumMosaicDPI,
+                       rebuildDPI(from: (dpi: Double(largest.pixelWidth) / (largest.rect.width / 72),
+                                         pixelWidth: largest.pixelWidth)))
+        }
+        switch drawnLargestImage(of: page) {
+        case .unreadable: return rebuildDPI(from: largestImage(of: page))
+        case .noImage: return rebuildDPI(from: nil)
+        case let .largest(dpi, pixelWidth):
+            return rebuildDPI(from: (dpi: dpi, pixelWidth: pixelWidth))
+        }
+    }
+
+    /// One image a page draws, where it lands on the sheet and how wide it is in pixels.
+    struct Tile: Equatable {
+        /// In points, from the media box's lower-left corner.
+        let rect: CGRect
+        let pixelWidth: Int
+    }
+
+    /// The images a page is pasted up from, or nil when it is not a paste-up (C39).
+    ///
+    /// A ProQuest newspaper page is thirty-odd scanned strips, one per block of a
+    /// column, each drawn where it sat on the sheet. Vision shown the whole sheet
+    /// reads lines straight across the narrow gutters between them; shown one strip
+    /// at a time it cannot. So a page qualifies only when every question has a
+    /// clear answer: it draws images from its own content stream and no form or inline
+    /// image, all upright and unturned, no two overlapping by more than a tenth, none
+    /// covering half the sheet (that is a scan with something on it), together at least
+    /// `minimumMosaicCoverage` of it, at least `minimumMosaicTiles` of a real size, and
+    /// two of those side by side.
+    static func mosaic(of page: PDFPage) -> [Tile]? {
+        guard page.rotation % 360 == 0, let cgPage = page.pageRef else { return nil }
+        final class State {
+            var ctm = CGAffineTransform.identity
+            var stack: [CGAffineTransform] = []
+            var tiles: [Tile] = []
+            var refused = false
+        }
+        let state = State()
+        guard let table = CGPDFOperatorTableCreate() else { return nil }
+        CGPDFOperatorTableSetCallback(table, "q") { _, info in
+            let s = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            s.stack.append(s.ctm)
+        }
+        CGPDFOperatorTableSetCallback(table, "Q") { _, info in
+            let s = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            if let top = s.stack.popLast() { s.ctm = top } else { s.refused = true }
+        }
+        CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
+            let s = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            var v = [CGPDFReal](repeating: 0, count: 6)
+            for i in (0..<6).reversed() {
+                guard CGPDFScannerPopNumber(scanner, &v[i]) else { s.refused = true; return }
+            }
+            s.ctm = CGAffineTransform(a: v[0], b: v[1], c: v[2], d: v[3], tx: v[4], ty: v[5])
+                .concatenating(s.ctm)
+        }
+        CGPDFOperatorTableSetCallback(table, "EI") { _, info in
+            Unmanaged<State>.fromOpaque(info!).takeUnretainedValue().refused = true
+        }
+        CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
+            let s = Unmanaged<State>.fromOpaque(info!).takeUnretainedValue()
+            var name: UnsafePointer<Int8>?
+            var stream: CGPDFStreamRef?
+            var subtype: UnsafePointer<Int8>?
+            var w: CGPDFInteger = 0
+            guard CGPDFScannerPopName(scanner, &name), let name,
+                  let object = CGPDFContentStreamGetResource(
+                      CGPDFScannerGetContentStream(scanner), "XObject", name),
+                  CGPDFObjectGetValue(object, .stream, &stream), let stream,
+                  let dict = CGPDFStreamGetDictionary(stream),
+                  CGPDFDictionaryGetName(dict, "Subtype", &subtype), let subtype,
+                  String(cString: subtype) == "Image",
+                  CGPDFDictionaryGetInteger(dict, "Width", &w),
+                  w > 0, w <= CGPDFInteger(Flattener.maximumDeclaredImageSide),
+                  s.ctm.b == 0, s.ctm.c == 0, s.ctm.a > 0, s.ctm.d > 0
+            else { s.refused = true; return }
+            s.tiles.append(Tile(rect: CGRect(x: 0, y: 0, width: 1, height: 1).applying(s.ctm),
+                                pixelWidth: Int(w)))
+        }
+        let content = CGPDFContentStreamCreateWithPage(cgPage)
+        let scanner = CGPDFScannerCreate(content, table, Unmanaged.passUnretained(state).toOpaque())
+        CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+        CGPDFContentStreamRelease(content)
+        CGPDFOperatorTableRelease(table)
+
+        guard !state.refused, state.tiles.count >= minimumMosaicTiles else { return nil }
+        let media = page.bounds(for: .mediaBox)
+        let sheet = media.width * media.height
+        guard sheet > 0 else { return nil }
+        let tiles = state.tiles.map {
+            Tile(rect: $0.rect.offsetBy(dx: -media.minX, dy: -media.minY), pixelWidth: $0.pixelWidth)
+        }
+        let area = { (r: CGRect) in r.width * r.height }
+        let sheetRect = CGRect(origin: .zero, size: media.size)
+        var covered: CGFloat = 0
+        for (i, t) in tiles.enumerated() {
+            guard t.rect.width.isFinite, t.rect.height.isFinite, area(t.rect) > 0,
+                  area(t.rect) < sheet / 2,
+                  area(t.rect.intersection(sheetRect)) >= 0.9 * area(t.rect) else { return nil }
+            for u in tiles[(i + 1)...] {
+                let overlap = t.rect.intersection(u.rect)
+                // C39's strips share up to 2.4% of the smaller one at a column edge.
+                if !overlap.isNull, area(overlap) > 0.1 * min(area(t.rect), area(u.rect)) {
+                    return nil
+                }
+            }
+            covered += area(t.rect)
+        }
+        guard covered >= minimumMosaicCoverage * sheet else { return nil }
+        // Counted over tiles of a real size only, so a figure with four symbols set in
+        // its text lines (`full chapter` p11) is not a paste-up. And two of them must
+        // stand side by side: one scan stored as a stack of full-width bands passes
+        // every test above, and read band by band it would cut the lines at each seam.
+        let sizeable = tiles.filter { area($0.rect) >= minimumMosaicTileShare * sheet }
+        let sideBySide = sizeable.indices.contains { i in
+            sizeable.indices.contains { j in
+                let a = sizeable[i].rect, b = sizeable[j].rect
+                return a.maxX <= b.minX + 0.1 * min(a.width, b.width)
+                    && min(a.maxY, b.maxY) - max(a.minY, b.minY) >= 0.5 * min(a.height, b.height)
+            }
+        }
+        return sizeable.count >= minimumMosaicTiles && sideBySide ? tiles : nil
+    }
+
+    /// `mosaic`'s tiles as fractions of the rebuilt bitmap, top-left origin, clipped to
+    /// it. `box` is the rebuild's `fullBox`; a turned page is never a mosaic, so the
+    /// media box maps onto it without a turn.
+    static func mosaicRegions(of page: PDFPage, box: CGRect) -> [SearchableWriter.BoundingBox]? {
+        guard let tiles = mosaic(of: page), box.width > 0, box.height > 0 else { return nil }
+        let sheet = CGRect(origin: .zero, size: box.size)
+        return tiles.compactMap {
+            let r = $0.rect.intersection(sheet)
+            guard !r.isNull, r.width > 0, r.height > 0 else { return nil }
+            return SearchableWriter.BoundingBox(x: r.minX / box.width,
+                                                y: (box.height - r.maxY) / box.height,
+                                                width: r.width / box.width,
+                                                height: r.height / box.height)
+        }
+    }
+
+    /// Fewer images than this is a page with a few pictures on it, not a paste-up.
+    static let minimumMosaicTiles = 4
+    /// Of the sheet's area, for a tile to count towards `minimumMosaicTiles`. 21 of C39's
+    /// 30 strips reach it; the other 9 are one-line headings, and still read as strips.
+    static let minimumMosaicTileShare: CGFloat = 0.005
+    /// The most a paste-up is rebuilt at. Its strips' resolution is its own, but four
+    /// small photographs drawn from large files would otherwise ask for 1,500 DPI.
+    static let maximumMosaicDPI: Double = 600
+    /// Of the sheet's area. C39's page is 69% strips.
+    static let minimumMosaicCoverage: CGFloat = 0.4
+
+    /// A substitute resolution, for a tool asking what a page **would** rebuild at.
+    ///
+    /// `nil` in the app, always — nothing in `Sources/` sets it, and the settings panel
+    /// has no control that reaches it. It exists because "what would this page recognise at
+    /// some other resolution" is a question the shipped code cannot be asked: `Flattener`
+    /// reads nothing from `Prefs`, so the rebuild resolution is always the page's own, and
+    /// `Recogniser.render`'s manual "PDF render DPI" governs the *non*-rebuild route only.
+    /// Measuring it therefore meant either a tool reproducing `flatten`'s render — the
+    /// divergence T15 charges for — or this. C24's second half is what wanted it first, and
+    /// the same seam then ran that half's corpus gate; it is not specific to either.
+    ///
+    /// **One hook rather than a parameter, because there are three consumers.**
+    /// `flatten` and `mrcLayers` each call `resolutions(of:)`, and `Recogniser.render`
+    /// `rebuildDPI(of:)`, independently, and a page measured at one resolution and
+    /// layered at another is a worse instrument than no instrument. `resolutions` answers
+    /// both its resolutions from the hook, and `rebuildDPI` is one of them, so all three
+    /// move together; see "a measurement override reaches every page
+    /// the rebuild renders" in the suite, which asserts exactly that rather than trusting
+    /// it.
+    ///
+    /// **It cannot cross a process boundary.** Recognition may run in
+    /// `visionocr-recognise`, which has its own address space and its own `nil` here, so a
+    /// tool that sets this must keep `useHelper` false. `Tools/score-rebuild-dpi.swift`
+    /// does, and says so.
+    ///
+    /// Returning `nil` from the closure means "no opinion about this page", so a sweep can
+    /// move one page and leave the rest of the document on the shipped policy.
+    nonisolated(unsafe) static var rebuildDPIOverride: ((PDFPage) -> Double?)?
+
+    /// The policy alone, over a measurement someone else took.
+    ///
+    /// Split out so `Tools/score-drawn-images.swift` can apply the *shipped* policy to
+    /// `drawnLargestImage`'s answer instead of carrying a second copy of these three
+    /// branches — T15 is what a drifting copy costs, and the whole question C24's open
+    /// half asks is what this policy does to a different measurement.
+    static func rebuildDPI(from found: (dpi: Double, pixelWidth: Int)?) -> Double {
+        guard let found else { return fallbackRebuildDPI }
+        // Comfortably a scan.
+        if found.dpi >= minimumPlausibleScanDPI { return found.dpi }
+        // Below the floor, but page-sized: a real scan that happens to be coarse.
+        // Trust it rather than inventing detail it does not have.
+        if found.pixelWidth >= minimumScanPixelWidth { return found.dpi }
+        // Small and low-resolution: decoration. Ignore it.
+        return fallbackRebuildDPI
+    }
+
+    /// Wide enough that the image plausibly *is* the page rather than something
+    /// sitting on it. A Letter sheet scanned at even 72 DPI is 612 px across;
+    /// the corpus's logos top out at 96.
+    static let minimumScanPixelWidth = 600
+
+    /// The DPI of the largest image embedded on the page — the same thing
+    /// mac-ocr's `--pdf-dpi auto` works out. Recurses into Form XObjects, where
+    /// scanners often nest the scan itself.
+    ///
+    /// A measurement, not a decision: it will happily report 1.9 DPI for a page
+    /// whose only image is a logo. Use `rebuildDPI` to render with.
+    ///
+    /// ⚠️ **No production caller as of 2026-08-26** — `Tests/main.swift` and two
+    /// `Tools/` comments are the whole of it — and that is load-bearing, not
+    /// trivia. This reads `largestImage` with **no drawn walk in front of it**, so
+    /// on a chain of bare Form XObjects it answers a resolution `rebuildDPI(of:)`
+    /// discards (`BUGS.md` C24 `#### The coverage boundary, CLOSED`, and the
+    /// queue's `bare-form-reach`). `pageIsAnImage` is the only such reader today,
+    /// and one check pins it on that fixture. **Adding a production caller here
+    /// re-opens that exposure with nothing watching**; pin it on
+    /// `shared-resources.pdf` pages 11-14 in the same commit if you do.
+    static func nativeDPI(of page: PDFPage) -> Double? { largestImage(of: page)?.dpi }
+
+    /// Does this page's content stream invoke **any** XObject?
+    ///
+    /// `nil` means the question could not be answered — an unreadable page, or a
+    /// content stream the scanner returned no operators at all for. A caller must treat
+    /// that as "assume it does", because the alternative is deciding a page draws
+    /// nothing on the strength of an instrument that measured nothing. T14's rule, in
+    /// the one place here where getting it wrong loses detail rather than bytes.
+    ///
+    /// **This is C24's structural half.** `largestImage` walks the page's `/Resources`,
+    /// and 4 of the corpus's 208 multi-page documents share one `/Resources` across
+    /// every page — so a page that draws nothing at all is told its resolution by
+    /// another page's plate. Asking whether the page draws anything needs no threshold
+    /// and no coverage rule, which is what killed the entry's first two repairs: it is
+    /// a fact about the content stream.
+    ///
+    /// Any `Do` counts, including a form's. A scan nested one level down inside a Form
+    /// XObject — which scanner drivers routinely produce, and which broke the entry's
+    /// second repair — still reaches this as the `Do` that invokes the form.
+    static func drawsAnyXObject(_ page: PDFPage) -> Bool? {
+        guard let cgPage = page.pageRef else { return nil }
+        final class Count { var draws = 0; var operators = 0 }
+        let seen = Count()
+        guard let table = CGPDFOperatorTableCreate() else { return nil }
+        // Two callbacks: `Do` counts what we are after, and `q` counts *anything at
+        // all*, so a stream the scanner could not read is distinguishable from a page
+        // that genuinely draws nothing. Every real content stream has a `q` in it; a
+        // page with neither is one this cannot speak for.
+        CGPDFOperatorTableSetCallback(table, "Do") { _, info in
+            guard let info else { return }
+            Unmanaged<Count>.fromOpaque(info).takeUnretainedValue().draws += 1
+        }
+        for op in ["q", "Q", "cm", "BT", "re", "gs"] {
+            CGPDFOperatorTableSetCallback(table, op) { _, info in
+                guard let info else { return }
+                Unmanaged<Count>.fromOpaque(info).takeUnretainedValue().operators += 1
+            }
+        }
+        let stream = CGPDFContentStreamCreateWithPage(cgPage)
+        let scanner = CGPDFScannerCreate(stream, table, Unmanaged.passUnretained(seen).toOpaque())
+        CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+        CGPDFContentStreamRelease(stream)
+        CGPDFOperatorTableRelease(table)
+        if seen.draws > 0 { return true }
+        return seen.operators > 0 ? false : nil
+    }
+
+    /// The largest embedded image's implied resolution *and* its pixel width.
+    /// `rebuildDPI` needs both to tell a coarse scan from a logo.
+    ///
+    /// **A page that draws no XObject has no image on it, whatever its `/Resources`
+    /// says it may reach** — C24. Refused here rather than in `rebuildDPI` because it
+    /// is a correction to the *measurement*: this function's own doc calls itself "the
+    /// largest embedded image's implied resolution", and on those pages there is no
+    /// embedded image. `nativeDPI` reads better for it too, and the three tools that
+    /// refuse a row when production and an extracted copy disagree stop refusing on
+    /// the pages where the disagreement was production's fault.
+    static func largestImage(of page: PDFPage) -> (dpi: Double, pixelWidth: Int)? {
+        guard drawsAnyXObject(page) != false else { return nil }
+        guard let cgPage = page.pageRef, let dict = cgPage.dictionary else { return nil }
+
+        final class Largest { var width = 0; var height = 0 }
+        let largest = Largest()
+
+        // A form's /Resources is frequently an indirect reference to the page's
+        // own, and forms on one page routinely share a single dictionary. The
+        // depth cap below bounds recursion but not breadth, so without this the
+        // same dictionary is re-walked once per referring form at every level —
+        // N + N² + N³ + N⁴ block invocations instead of N. Measured at 60 forms:
+        // 5.09 s for a page with 61 real entries (R25).
+        // The shallowest depth each dictionary has been walked at, not merely
+        // whether it has been. A plain visited set would be wrong: a dictionary
+        // first reached at depth 3 has its own children cut off by the depth cap,
+        // and a later path arriving at depth 1 — which *would* explore them —
+        // must not be turned away by the earlier, poorer visit.
+        // ✅ **Reasoned from 2026-08-09 to 2026-08-29; there is now a measurement, and
+        // the case is one a fixture reaches.** On two-entry `/XObject` dictionaries
+        // `CGPDFDictionaryApplyBlock` was measured to hand back the SECOND entry
+        // written first (4 files, 2 key sequences x 2 object assignments; larger
+        // dictionaries and other key names are UNMEASURED), so putting the LONG route
+        // second makes CoreGraphics walk it first — and over that one traversal a plain
+        // visited set answers `nil` where this map answers 777.
+        // ⚠️ That 2026-08-29 reading was a REPLICA of this function
+        // (`alltext-replica`'s shape): no single build can run both prune rules over
+        // one traversal, so the split was measured outside the tree.
+        // ✅ **THE GUARD BELOW — `if let seen = walkedAt[identity], seen <= depth` inside
+        // `walk` — IS PINNED AS OF 2026-08-30, and both diverging readings are now
+        // PRODUCTION's.** (The referent is named because this fixture has already cost
+        // twenty-one days to one misplaced one.) `Tests/main.swift` builds four "reachable by two routes"
+        // fixtures; the two that write the SHORT key first put the long route second, so
+        // CoreGraphics walks it first, and they assert 777 through this function. Under
+        // `logic/R25-depth-aware-prune` — this `if` with the depth term removed — those
+        // two go RED, printing `largestImage nil`, and the other two stay GREEN
+        // (`1359/1361 passed`, `killed`, 296 s) — which is what says the depth term and
+        // not the memo is what saves the image. Four further rows assert, per fixture,
+        // WHICH route the framework yields first, so a changed yield order reports itself
+        // instead of quietly retiring the discriminating pair. ⚠️ The memo's own load-bearing assumption is separate and is
+        // corroborated by the 60-form check, which needs a shared `/Resources` to
+        // resolve to ONE pointer and is green under both rules. R25
+        // `#### The fixture, IN THE SUITE`.
+        var walkedAt: [UnsafeRawPointer: Int] = [:]
+
+        func walk(_ resources: CGPDFDictionaryRef, depth: Int) {
+            // Resource *dictionaries* counted from the page's own at 0, so refusing 4 means
+            // images inside three nested resource-carrying forms are in reach and a fourth is
+            // not. `drawnLargestImage` writes `< 3` for the same reach on such a chain,
+            // because it counts *forms entered*; pages 11-13 of `shared-resources.pdf` pin
+            // the two equal there. Do not "reconcile" the numbers — see that guard's comment.
+            //
+            // ⚠️ **This walk is the WIDER of the two, and a bare form is why.** The `case
+            // "Form"` arm below descends only a form that has `/Resources`, and it loses
+            // nothing by skipping the rest: a bare form's names resolve in the invoker's
+            // dictionary, which is the one being scanned right now. So a chain of bare forms
+            // costs this walk no depth at all while costing the drawn walk one level each,
+            // and on four bare levels this walk answers an image the drawn walk does not
+            // reach — page 14 of the fixture. ⛔ **Raising this cap does not equalise
+            // anything**; it widens the wider walk. ⛔ **`< 4` has still never been moved over
+            // the corpus and the 2026-08-26 census does NOT stand in for it**, so the
+            // byte-identical sweep the other guard cites is not evidence about this number and
+            // neither is the census: `formNesting` installs one callback, `"Do"`, so it measures
+            // only chains a page actually DRAWS, while this walk descends `/Resources` whether
+            // the form is drawn or not — which is the very reason the register gives for the
+            // other sweep not covering this cap. A page can read `formDepth 1` with five
+            // undrawn resource levels under it. What the census DOES bound here is this cap
+            // restricted to drawn images (`n <= 3` implies `r <= 3`).
+            // ✅ It bounds the DRAWN cap outright: `formDepth` max **1** and `bareDepth` max
+            // **0** over the 16,984 pages it speaks for (3 of 16,987 read `partial`, where the
+            // maxima are floors). The queue's `bare-form-reach` is CLOSED `WONTFIX` on that
+            // number; C24 `#### The corpus census, MEASURED`. ⚠️ A draft of this comment said
+            // the census "covers both caps at once" and said 16,987; both were corrected by the
+            // adversarial review of the adopting diff, on the same day.
+            guard depth < 4 else { return }
+            // Identity, not contents: CoreGraphics resolves an indirect
+            // reference to the same dictionary pointer every time, which is what
+            // makes this work. CGPDFDictionaryRef is an opaque pointer with no
+            // Swift-visible conversion, hence the bitcast.
+            let identity = unsafeBitCast(resources, to: UnsafeRawPointer.self)
+            if let seen = walkedAt[identity], seen <= depth { return }
+            walkedAt[identity] = depth
+            var xobjects: CGPDFDictionaryRef?
+            guard CGPDFDictionaryGetDictionary(resources, "XObject", &xobjects),
+                  let xobjects else { return }
+            var nestedResources: [CGPDFDictionaryRef] = []
+
+            CGPDFDictionaryApplyBlock(xobjects, { _, value, info in
+                let found = Unmanaged<Largest>.fromOpaque(info!).takeUnretainedValue()
+                var stream: CGPDFStreamRef?
+                guard CGPDFObjectGetValue(value, .stream, &stream), let stream,
+                      let streamDict = CGPDFStreamGetDictionary(stream) else { return true }
+                var subtype: UnsafePointer<Int8>?
+                guard CGPDFDictionaryGetName(streamDict, "Subtype", &subtype),
+                      let subtype else { return true }
+
+                switch String(cString: subtype) {
+                case "Image":
+                    var w: CGPDFInteger = 0, h: CGPDFInteger = 0
+                    // /Width and /Height are whatever the file declares —
+                    // CGPDFInteger is 64-bit and nothing cross-checks them
+                    // against the stream, which can be three bytes. Reject the
+                    // implausible here so no arithmetic downstream can overflow
+                    // (R24), rather than at each place that multiplies them.
+                    guard CGPDFDictionaryGetInteger(streamDict, "Width", &w),
+                          CGPDFDictionaryGetInteger(streamDict, "Height", &h),
+                          w > 0, h > 0,
+                          w <= CGPDFInteger(maximumDeclaredImageSide),
+                          h <= CGPDFInteger(maximumDeclaredImageSide)
+                    else { return true }
+                    if Int(w) * Int(h) > found.width * found.height {
+                        found.width = Int(w); found.height = Int(h)
+                    }
+                case "Form":
+                    // Scanner drivers often nest the scan one level down. Missing
+                    // this silently upsampled nested scans (2.25x the bytes for no
+                    // detail) and downsampled 400/600 DPI ones, losing detail.
+                    var nested: CGPDFDictionaryRef?
+                    if CGPDFDictionaryGetDictionary(streamDict, "Resources", &nested),
+                       let nested {
+                        nestedResources.append(nested)
+                    }
+                default:
+                    break
+                }
+                return true
+            }, Unmanaged.passUnretained(largest).toOpaque())
+            for nested in nestedResources { walk(nested, depth: depth + 1) }
+        }
+
+        var resources: CGPDFDictionaryRef?
+        if CGPDFDictionaryGetDictionary(dict, "Resources", &resources), let resources {
+            walk(resources, depth: 0)
+        }
+        guard largest.width > 0 else { return nil }
+        // Media box, to match the area flatten renders — see fullBox.
+        let widthPt = page.bounds(for: .mediaBox).width
+        guard widthPt > 0 else { return nil }
+        return (dpi: Double(largest.width) / (Double(widthPt) / 72.0),
+                pixelWidth: largest.width)
+    }
+
+    /// What `drawnLargestImage` found, with "could not tell" kept apart from "nothing".
+    enum DrawnImage: Equatable {
+        /// The question could not be answered — an unreadable page, a content stream that
+        /// yielded no operators, a `Do` whose operand name would not pop, or a name that
+        /// resolves to nothing. A caller must fall back to the `/Resources` answer rather
+        /// than conclude the page draws nothing: `drawsAnyXObject`'s rule and T14's, in
+        /// the one place here where believing an instrument that measured nothing costs
+        /// detail rather than bytes.
+        case unreadable
+        /// The page draws no image. It may still draw forms, rules and text.
+        case noImage
+        case largest(dpi: Double, pixelWidth: Int)
+    }
+
+    /// The largest image the page actually **draws**, found by resolving every `Do` the
+    /// content stream issues rather than by walking `/Resources`.
+    ///
+    /// **This was C24's open half; it is what `rebuildDPI` reads.** `largestImage` answers a
+    /// question about the resource dictionary, and 4 of the corpus's 208 multi-page documents
+    /// share one dictionary across every page. `drawsAnyXObject` closed the degenerate case —
+    /// a page that invokes nothing at all — and **45 corpus pages invoked a *different* image
+    /// than the shared dictionary holds**, so they took a neighbour's plate resolution.
+    /// Measured with this function: **39 draw a smaller image and 6 draw a wider one**, the
+    /// six being pages of `AI 2027`. "Smaller" was the entry's word for all 45 and is wrong
+    /// for those six — both walks pick the largest image by *area* and then report its
+    /// *width*, so a subset's winner can be the wider of two.
+    ///
+    /// **Wired into `rebuildDPI(of:)` on 2026-08-17, and the reason it was not has been
+    /// answered twice.** Restricting the walk to the invoked names is structural: it needs no
+    /// coverage rule and no threshold, which is what killed the entry's second repair. What
+    /// this comment then said it needed was a constant recalibrated —
+    /// `minimumScanPixelWidth` separated 47 logos of 16–96 px from 37 page-sized scans of
+    /// 1936–2592 px measured against each document's *maximum*, and the entry's first repair
+    /// sent `Batzell` p22 from 369.6 DPI to **70.6** because that page's own figure is 600 px
+    /// wide. This comment called that "C9 again", **which was reasoned and is measured
+    /// false** (C24, 2026-08-17): p22 at 70.6 DPI retains 92.8% of its own 291 words against
+    /// 94.2% at 369.6 and 93.8% at the 300 fallback, for 87% fewer published bytes, and the
+    /// other two pages the constant faces are right as well. C9 was a page rebuilt as
+    /// 16 x 23 px; this is 600 x 776.
+    ///
+    /// **Then the corpus gate ran, over 12 of the 45 pages the wiring moves.** Retention
+    /// against each page's own embedded text is flat to slightly up — `AI 2027` p16 gains 11
+    /// words of 386 and p47 gains 13 of 446, `Batzell`'s two lose 4 each — while published
+    /// bytes fall 25% on `AI 2027`'s five, 81% on `Batzell`'s two and 3% on `Sherman_1986`'s
+    /// five. `Tools/score-rebuild-dpi.swift` took those figures and
+    /// `REBUILD-DPI-WIRING-2026-08-17.tsv` is the run; `Tools/score-drawn-images.swift` is
+    /// the per-page population and the before/after over all 16,987.
+    ///
+    /// Forms are followed by scanning their own content streams, which is the only way to
+    /// learn what a form draws. C24's second repair died on that shape: `Lyons oral
+    /// history` puts its scan one level down inside a form on 114 of 114 pages, and
+    /// scanner drivers routinely produce it.
+    static func drawnLargestImage(of page: PDFPage) -> DrawnImage {
+        drawnLargest(of: page, masks: false)
+    }
+
+    /// The largest `/Mask` or `/SMask` an image the page draws is drawn through, by the
+    /// same walk as `drawnLargestImage`, with its resolution stated the same way: its
+    /// width over the page's. `.noImage` when the page draws images and none has one.
+    ///
+    /// ProQuest stores a page in layers: a 150 DPI greyscale background, and the type as
+    /// a 300 DPI JBIG2 `/Mask` on a 75 DPI image drawn over it. Measured by its images
+    /// alone, such a page was rebuilt at 150 DPI, recognised at half the resolution of
+    /// its type and published with a stencil at that half: the Newsday and *Wall Street
+    /// Journal* pages in `BUGS.md` C39, and 601 other corpus pages in 33 documents. The
+    /// mask is drawn where its image is, so its pixels are the page's detail.
+    static func drawnLargestMask(of page: PDFPage) -> DrawnImage {
+        drawnLargest(of: page, masks: true)
+    }
+
+    /// An image's declared pixel size, nil when implausible. The same guards
+    /// `largestImage` applies, for the same reason: /Width and /Height are whatever the
+    /// file declares, and nothing cross-checks them against a stream that can be three
+    /// bytes long (R24, A7.1).
+    static func declaredSize(of image: CGPDFDictionaryRef) -> (width: Int, height: Int)? {
+        var w: CGPDFInteger = 0, h: CGPDFInteger = 0
+        guard CGPDFDictionaryGetInteger(image, "Width", &w),
+              CGPDFDictionaryGetInteger(image, "Height", &h),
+              w > 0, h > 0,
+              w <= CGPDFInteger(maximumDeclaredImageSide),
+              h <= CGPDFInteger(maximumDeclaredImageSide)
+        else { return nil }
+        return (Int(w), Int(h))
+    }
+
+    /// The declared size of the larger of an image's `/Mask` and `/SMask`, or nil when
+    /// it has neither. A `/Mask` that is an array is a range of colours to leave out,
+    /// not an image, and has no size.
+    static func maskSize(of image: CGPDFDictionaryRef) -> (width: Int, height: Int)? {
+        var best: (width: Int, height: Int)?
+        for key in ["Mask", "SMask"] {
+            var mask: CGPDFStreamRef?
+            guard CGPDFDictionaryGetStream(image, key, &mask), let mask,
+                  let maskDict = CGPDFStreamGetDictionary(mask), let m = declaredSize(of: maskDict),
+                  m.width * m.height > (best.map { $0.width * $0.height } ?? 0)
+            else { continue }
+            best = m
+        }
+        return best
+    }
+
+    /// `drawnLargestImage`'s walk, over the images themselves or over their masks.
+    private static func drawnLargest(of page: PDFPage, masks: Bool) -> DrawnImage {
+        // The shipped guard first, unchanged, so this cannot disagree with it about
+        // whether the page draws anything — and so the two mutants protecting it still
+        // protect this.
+        switch drawsAnyXObject(page) {
+        case nil: return .unreadable
+        case false: return .noImage
+        default: break
+        }
+        guard let cgPage = page.pageRef else { return .unreadable }
+
+        /// One form stream scanned in one resource scope. **Both halves are load-bearing**,
+        /// and the stream alone is not enough: a form with no `/Resources` of its own
+        /// resolves its names against whatever invoked it, so the same stream reached from
+        /// two scopes is two different measurements and must be scanned twice. Keying on
+        /// the stream alone silently kept the first answer for both.
+        struct Visit: Hashable {
+            let stream: UnsafeRawPointer
+            let scope: UnsafeRawPointer
+        }
+        final class State {
+            var width = 0, height = 0
+            var unreadable = false
+            /// Measure the masks images are drawn through, not the images.
+            var masks = false
+            var depth = 0
+            /// The shallowest depth each (form stream, scope) pair has been entered at.
+            /// R25's memo for R25's *shape* — the depth cap bounds recursion and not
+            /// breadth, so one stream reachable by many paths is otherwise re-scanned once
+            /// per path at every level, N + N² + N³ + N⁴ where N is 1 walk. R25's own 5.09 s
+            /// figure belongs to `largestImage` and its dictionary-keyed memo; this is the
+            /// same blow-up over streams, not that measurement.
+            var enteredAt: [Visit: Int] = [:]
+            var table: CGPDFOperatorTableRef?
+            /// The resource scope in effect: the page's to begin with, then each form's as
+            /// it is entered, restored on the way out.
+            var resources: CGPDFDictionaryRef?
+        }
+        let state = State()
+        state.masks = masks
+        if let dict = cgPage.dictionary {
+            var resources: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(dict, "Resources", &resources) {
+                state.resources = resources
+            }
+        }
+        guard let table = CGPDFOperatorTableCreate() else { return .unreadable }
+        state.table = table
+
+        CGPDFOperatorTableSetCallback(table, "Do") { scanner, info in
+            guard let info else { return }
+            let s = Unmanaged<State>.fromOpaque(info).takeUnretainedValue()
+            var name: UnsafePointer<Int8>?
+            let cs = CGPDFScannerGetContentStream(scanner)
+            guard CGPDFScannerPopName(scanner, &name), let name,
+                  let object = CGPDFContentStreamGetResource(cs, "XObject", name) else {
+                s.unreadable = true
+                return
+            }
+            var stream: CGPDFStreamRef?
+            guard CGPDFObjectGetValue(object, .stream, &stream), let stream,
+                  let streamDict = CGPDFStreamGetDictionary(stream) else {
+                s.unreadable = true
+                return
+            }
+            var subtype: UnsafePointer<Int8>?
+            guard CGPDFDictionaryGetName(streamDict, "Subtype", &subtype), let subtype else {
+                s.unreadable = true
+                return
+            }
+            switch String(cString: subtype) {
+            case "Image":
+                // The image itself, or when asked for masks the `/Mask` or `/SMask` it
+                // is drawn through (C39, `drawnLargestMask`).
+                guard let size = s.masks ? Flattener.maskSize(of: streamDict)
+                                         : Flattener.declaredSize(of: streamDict)
+                else { return }
+                if size.width * size.height > s.width * s.height {
+                    s.width = size.width
+                    s.height = size.height
+                }
+            case "Form":
+                // **`< 3` here and `< 4` in `largestImage` are two numbers for ONE reach on a
+                // chain whose forms each carry their own `/Resources`, because the two count
+                // in different frames.** That walk counts resource *dictionaries*, starting
+                // at the page's own at `depth 0`, and refuses `depth 4`; this one counts
+                // *forms entered*, incrementing after the guard, and refuses a fourth. On
+                // such a chain both therefore see an image inside three nested forms and
+                // neither sees one inside a fourth, so raising this to `< 4` would let the
+                // drawn walk enter a fourth form and see an image the dictionary walk cannot
+                // — *creating* the divergence such a change is always proposed to remove.
+                // Read the frames before "fixing" the mismatch.
+                //
+                // ⛔ **The two reaches are NOT equal in general, and the exception is bare
+                // forms.** Below, a form carrying no `/Resources` of its own is still entered
+                // and still costs a level; in `largestImage` such a form is not descended at
+                // all and costs nothing, because its names live in the invoker's dictionary,
+                // which that walk has already scanned. So each bare form in a chain narrows
+                // THIS walk and not that one, and the drawn reach is strictly the smaller of
+                // the two. **The gap grows with the number of bare forms, so no pair of caps
+                // closes it** — which is a reason to leave both alone rather than a reason to
+                // raise either. Measured on page 14 of `Tests/main.swift`'s
+                // `shared-resources.pdf`: four bare levels, `largestImage` answers 1800 px,
+                // this walk answers `.noImage`, and because `rebuildDPI` routes `.noImage` to
+                // the fallback rather than to `largestImage` the way it routes `.unreadable`,
+                // the page loses a resolution that was read. ⚠️ Latent — and as of 2026-08-26
+                // that is MEASURED directly rather than inferred from the weak bound below:
+                // the census in `Tools/score-drawn-images.swift` counts the nesting on every
+                // corpus page it can read and finds `formDepth` max **1** and `bareDepth` max
+                // **0** over **16,984** of 16,987 (3 read `partial`, where both maxima are
+                // floors), so the corpus is three form levels short of this guard ever firing
+                // and **0 pages have the shape, on either of its two terms**. The queue's
+                // `bare-form-reach` is CLOSED `WONTFIX` on that number; C24
+                // `#### The corpus census, MEASURED`. ⛔ **That entry ALSO records what the
+                // census does NOT license, and a draft of this comment got it wrong: the reason
+                // to leave this alone is that no CORPUS page exercises the guard, not that
+                // nothing anywhere does.** Page 14 above IS the shape, is in the tree, and the
+                // suite pins today's answer on it — so a change here could be gated on the
+                // fixture; what is missing is evidence about real documents, in both directions.
+                // The harm half of that is provably empty on this corpus rather than merely
+                // unmeasured, which is an argument for the change and not against it; the
+                // decision rests on the corpus absence plus `.unreadable` being load-bearing
+                // elsewhere (T14). Found by the adversarial review of the diff that
+                // added the fixture, which had asserted equal reach unconditionally here.
+                //
+                // The production reason for three is that three is what shipped. A scan
+                // nested deeper behind resource-carrying forms is not mis-measured, it is not
+                // measured: both walks answer nothing, and `rebuildDPI` takes
+                // `fallbackRebuildDPI` exactly as it does for a page with no image on it.
+                // Nothing in the corpus nests that deep — moving THIS cap between `< 4` and
+                // `< 3` produced byte-identical sweeps over all 16,987 pages (`c17b3f3`),
+                // which is also why a corpus sweep can never verify any of this and pages
+                // 11-14 of the fixture do: one chain of four nested resource-carrying forms
+                // entered at three levels, asserting both walks find the third level and
+                // neither finds the fourth, plus the bare-form page where they differ.
+                // ⚠️ That sweep says nothing about `largestImage`'s `< 4`, which has never
+                // been moved over the corpus.
+                //
+                // This comment used to justify `< 3` by instrument symmetry — the
+                // drawn-versus-dictionary sweep isolating one variable — and to say that if
+                // the walk were ever wired into `rebuildDPI` the cap "wants re-measuring
+                // then". `c17b3f3` did that wiring in 2026-08-17 and revisited neither. The
+                // re-measurement is the fixture named above (2026-08-23); the decision is
+                // unchanged, and what moved is the scope of the claim beside it.
+                guard s.depth < 3, let table = s.table else { return }
+                // A form need not carry `/Resources`; PDF then resolves its names against
+                // the scope that **invoked** it, which is not the same thing as the page.
+                // Skipping resource-less forms would go blind on exactly the nesting that
+                // scanner drivers produce, and that is how the entry's second repair died.
+                //
+                // **The invoker's scope, not the page's**, and the review of this diff
+                // caught the page's being used. On the ninth page of `shared-resources.pdf`
+                // — a bare form nested inside a form that carries its own `/Resources`,
+                // where the form and the page each define `/Ix` — resolving against the page
+                // answered its 3000 px plate instead of the 1500 px image the form draws.
+                //
+                // *And the obvious way to get this right does not work.* Passing the form's
+                // own stream dictionary and letting `CGPDFContentStreamCreateWithStream`'s
+                // `parent` argument inherit — which an earlier comment here asserted it
+                // would — measured `.unreadable` on **both** that page and the fifth,
+                // because `CGPDFContentStreamGetResource` does not search the parent chain
+                // for a name absent from the dictionary it was handed. Verified by running
+                // it, which is the only reason this reads the way it does.
+                var formResources: CGPDFDictionaryRef?
+                _ = CGPDFDictionaryGetDictionary(streamDict, "Resources", &formResources)
+                let inherited = s.resources
+                let resources = formResources ?? inherited ?? streamDict
+                // The memo, after the scope is known rather than before: what this scan will
+                // answer is a function of the pair, so the pair is what may be skipped.
+                let visit = Visit(stream: unsafeBitCast(stream, to: UnsafeRawPointer.self),
+                                  scope: unsafeBitCast(resources, to: UnsafeRawPointer.self))
+                if let seen = s.enteredAt[visit], seen <= s.depth { return }
+                s.enteredAt[visit] = s.depth
+                let nested = CGPDFContentStreamCreateWithStream(stream, resources, cs)
+                let nestedScanner = CGPDFScannerCreate(nested, table, info)
+                s.depth += 1
+                s.resources = resources
+                CGPDFScannerScan(nestedScanner)
+                s.resources = inherited
+                s.depth -= 1
+                CGPDFScannerRelease(nestedScanner)
+                CGPDFContentStreamRelease(nested)
+            default:
+                // A `/PS` XObject, or a subtype this does not know. Resolvable, and not an
+                // image: it contributes nothing and hides nothing.
+                break
+            }
+        }
+
+        let stream = CGPDFContentStreamCreateWithPage(cgPage)
+        let scanner = CGPDFScannerCreate(stream, table,
+                                        Unmanaged.passUnretained(state).toOpaque())
+        CGPDFScannerScan(scanner)
+        CGPDFScannerRelease(scanner)
+        CGPDFContentStreamRelease(stream)
+        CGPDFOperatorTableRelease(table)
+
+        if state.unreadable { return .unreadable }
+        guard state.width > 0 else { return .noImage }
+        // Media box, to match `largestImage` and the area flatten renders — see fullBox.
+        let widthPt = page.bounds(for: .mediaBox).width
+        guard widthPt > 0 else { return .unreadable }
+        return .largest(dpi: Double(state.width) / (Double(widthPt) / 72.0),
+                        pixelWidth: state.width)
+    }
+}

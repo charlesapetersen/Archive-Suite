@@ -1,0 +1,2435 @@
+import AppKit
+import CoreText
+import Foundation
+import PDFKit
+
+/// Builds the searchable PDF ourselves, from Vision's line observations.
+///
+/// Why not just use `mac-ocr searchable-pdf`: its text layer positions each word
+/// as its own run without emitting real space characters, so text extractors
+/// have to infer word gaps from geometry and frequently miss them. Measured over
+/// three pages of a 300 DPI book scan, word-level extraction accuracy against
+/// the same recognition was 64% (PDFKit) and 27% (poppler). Writing one run per
+/// *line*, spaces and all, sized from the line's height, gives 99.8% and 97%.
+///
+/// One run per line is the design, but Vision does not always give a whole line
+/// — on a newspaper column it hands back fragments sitting side by side, and
+/// there is no space character between two runs. `reserveEms` is what keeps
+/// them from welding into one word. See C18.
+///
+/// Vision itself is not the problem — it returns whole lines with correct
+/// spacing, which is why `mac-ocr --format text` reads perfectly.
+enum SearchableWriter {
+
+    /// Where the baseline sits inside Vision's box, as a fraction of its height
+    /// measured up from the bottom.
+    ///
+    /// Calibrated, not derived. The sweep that produced 0.22 lived in `Tests`
+    /// and no longer exists; what re-measures it now is
+    /// `Tools/probe-text-offset.swift`, which slides a probe down each line to
+    /// find where the text actually sits and reports the offset from the ink
+    /// (0.00 = dead on it). The shipped value holds median 0.00 across the
+    /// 78-document corpus, worst case 0.20. Change it and re-run that probe:
+    /// this constant is what "the highlight sits on the line" means.
+    static var baselineFraction: CGFloat = 0.22
+
+    /// Fraction of the gap to a neighbouring line that a run's glyphs may occupy.
+    ///
+    /// **Higher means shorter glyphs**, and less chance that two runs overlap
+    /// and Preview stops seeing them as separate lines — `headroom` *divides*
+    /// the measured gap by this. (The prose here used to say the opposite. Fix
+    /// the prose, never the code: the value is corpus-calibrated, and inverting
+    /// the arithmetic to match a wrong sentence would undo the measurement
+    /// below.)
+    ///
+    /// Measured on tightly-set archival material: raising this from 0.95 to 1.5
+    /// took line-by-line selection from 80-83% to 84-91% of lines on 1920s-50s
+    /// letters and typescripts, and to 100% on modern print, with no loss in
+    /// line-edge coverage or word accuracy. It costs only highlight thickness,
+    /// since width is set by font size and height by the vertical squash in the
+    /// text matrix — the two are independent.
+    static var headroomFactor: CGFloat = 1.5
+
+    /// Space kept clear before a run's right-hand neighbour on the same line.
+    ///
+    /// **This is the fourth property, and it used to hold by accident.**
+    /// CLAUDE.md invariant 3 names three that fight each other; this is a
+    /// fourth. Vision splits one visual line of a newspaper column into
+    /// fragments sitting side by side, and there is no space character between
+    /// them — each is its own `CTLineDraw`. PDFKit synthesises the space from
+    /// the geometric gap, and stops doing it below roughly 0.15 em.
+    ///
+    /// Nothing was reserving that gap. It existed because `minimumVertical`
+    /// capped the font size, leaving 4-16 pt of unused slack at each run's
+    /// right edge — a side effect of a constant chosen for something else
+    /// entirely. Widening the runs to their true box width (which is what fixes
+    /// line-end selectability) removes the slack, and adjacent words weld:
+    /// "valuablestudy", "Londos,and". Measured: no characters lost, word
+    /// boundaries lost, 5-18 welded pairs per newspaper page.
+    ///
+    /// So reserve it deliberately: a quarter of the run's own size. Measured in
+    /// ems rather than points on purpose — the thresholds extractors apply are
+    /// themselves proportional to the font size, so 0.25 em clears them at
+    /// *every* size and no absolute floor is needed. One was tried, at 0.5, 2 and
+    /// 4 pt: all three scored identically to no floor at all across 25 newspaper
+    /// scans, so it is not here. A line with no right-hand neighbour on it is
+    /// untouched.
+    ///
+    /// **0.25 was calibrated, and it is now bounded** (`RESEARCH-2026-08-16.md`).
+    /// Three of the four extractors that matter are readable, and every one of
+    /// them re-derives word breaks from the drawn gap:
+    ///
+    /// | extractor | needs at least | complains above |
+    /// |---|---|---|
+    /// | poppler `minWordBreakSpace` | 0.10 em | ~1.0 em, read as a column gap |
+    /// | pdf.js `TRACKING_SPACE_FACTOR` | 0.102 em | 0.6 em, which breaks the span |
+    /// | mupdf `SPACE_DIST` | 0.15 em | **0.30 em, where it emits _two_ spaces** |
+    /// | PDFKit | unknown, and closed | unknown |
+    ///
+    /// So the window is **(0.15, 0.30) em** and this sits in the middle of it.
+    /// Below 0.15 poppler and mupdf stop seeing a word break at all; above 0.30
+    /// mupdf doubles the space. That is the derivation this constant never had.
+    ///
+    /// **A real space character does not remove the need for the gap**, which is
+    /// the counter-intuitive part and the reason this constant cannot be retired
+    /// by writing spaces: poppler consumes a `U+0020` as a word *terminator* and
+    /// then discards it, re-deciding from geometry; pdf.js drops whitespace
+    /// before its heuristic runs. Only mupdf honours it outright.
+    static var reserveEms: CGFloat = 0.25
+
+    /// Floor on the vertical squash in the text matrix.
+    ///
+    /// When a line needs a big font to span its box but the gap to its
+    /// neighbours is small, `draw` has to choose. Squashing further is one
+    /// answer; capping the font size is the other. This is where that line
+    /// sits — below it, the size gets capped instead.
+    ///
+    /// **Capping the size costs width, not height.** The drawn height is
+    /// `min(wanted, 3 * widthSize)` and `minimumVertical` does not appear in it:
+    /// in the capping branch `size = wanted/minimumVertical` and `vertical`
+    /// clamps back to exactly `minimumVertical`, so the product is `wanted` for
+    /// any floor. (`reserveEms` is not quite so clean — it reduces `widthSize`,
+    /// which lowers the height once `vertical` has hit its 3.0 clamp: measured,
+    /// 17.081 pt to 17.037 pt. Always *shorter*, so it cannot cause overlap.)
+    /// A capped run is simply narrower; a capped run is simply
+    /// narrower than its box, so its last words fall outside it — which is why
+    /// this was 0.5 and line-end selectability bottomed out at 71% on dense
+    /// newsprint, with 72% of those misses being a run that simply stopped
+    /// short. At 0.25, across the 84-document corpus: 28 documents better on
+    /// line-end, 1 worse, worst case 71% -> 91%, and vertical overlap and text
+    /// offset both unchanged to the digit.
+    ///
+    /// Lowering it alone welded adjacent words together — see `reserveEms`,
+    /// which is the other half of this change and must not be removed without
+    /// putting this back up. Exposed so the trade can be measured rather than
+    /// argued about: `score-corpus.swift` takes it as argv[4].
+    static var minimumVertical: CGFloat = 0.25
+
+    /// The text layer's one face, shared by `compose` and `wouldSpan`.
+    static let textFace = "Helvetica"
+
+    /// A line the writer could not place, and why.
+    ///
+    /// The pipeline's only integrity check is page count, so a line abandoned
+    /// inside `draw` would otherwise be undetectable. `compose` **returns**
+    /// these rather than recording them in a static: files are OCR'd
+    /// concurrently (up to `Prefs.maxConcurrency`), and a shared static was a
+    /// real content-loss race — the next file's `compose` reset it before the
+    /// previous file's caller had read it, so a document that lost lines was
+    /// published as a success. See BUGS.md C8.
+    struct Unplaced {
+        let page: Int
+        let text: String
+        let reason: String
+    }
+
+    // MARK: - Vision's output, as mac-ocr reports it
+
+    /// **`Encodable` as well, because the recognition helper writes these.**
+    /// R40's helper process recognises a page and hands the observations back as
+    /// JSON, and the app decodes them into this same type — so the two halves of
+    /// that round trip are one declaration rather than two that agree today.
+    /// `Codable`'s synthesis is what keeps them in step: a field added here
+    /// appears on both sides or on neither.
+    struct Observation: Codable {
+        let boundingBox: BoundingBox
+        let text: String
+        let confidence: Double
+        /// Which way the line reads, in quarter turns anticlockwise from upright:
+        /// 1 reads up the page, 2 is upside down, 3 reads down. Nil is upright, and
+        /// is left out of the JSON, so an upright page's observations encode as before.
+        /// `compose` draws a turned line in a frame turned with it (C36).
+        var quarterTurns: Int? = nil
+        /// Which strip of a pasted-up page the line was read in, counted in reading
+        /// order (`Recogniser.recognisePage(_:regions:…)`, C39). `prepared` keeps each
+        /// strip's lines together, so a selection down one column of a newspaper stays
+        /// in it. Nil everywhere else, and left out of the JSON like `quarterTurns`.
+        var region: Int? = nil
+    }
+
+    /// Normalised to the page, with a top-left origin.
+    struct BoundingBox: Codable {
+        let x, y, width, height: Double
+    }
+
+    enum Failure: LocalizedError {
+        case unreadableSource
+        case unreadableObservations
+        case cannotWrite
+        case textPages(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .textPages(let why): return "The handwritten pages' text pages could not be added: \(why); nothing was written."
+            case .unreadableSource: return "Could not read the page images to build the PDF."
+            case .unreadableObservations: return "Could not read Vision's output."
+            case .cannotWrite: return "Could not write the searchable PDF."
+            }
+        }
+    }
+
+    // `observations(fromJSONLines:)` and `observations(fromJSONAt:)` used to sit
+    // here, and A1.3 records them as dead since recognition came in-process:
+    // nothing had called either since R40, and they were divergent siblings —
+    // one refused an undecodable line and an empty result, the other refused
+    // neither. `Recogniser.HelperPage` is the live decoder of this shape, and
+    // one decoder is the point (C20). Removed with R81; `Failure` keeps
+    // `unreadableObservations`, which is part of the type's public surface and
+    // reads correctly for a caller that adds a parser back.
+
+    // MARK: - Composing
+
+    /// Draws `visible` page by page and lays an invisible text layer over it.
+    ///
+    /// `visible` must be what was OCR'd, or the boxes won't line up with the ink.
+    /// When `drawImages` is false, the pages carry only the invisible text and
+    /// stay transparent — a layer to be merged over separately-compressed page
+    /// images. `visible` is still needed, for page count and geometry. A layer
+    /// never carries a crop box, whatever `cropBoxes` says (C42).
+    /// Returns the lines it could not place — empty means every line landed.
+    @discardableResult
+    static func compose(
+        visible: URL,
+        observations byPage: [Int: [Observation]],
+        to destination: URL,
+        drawImages: Bool = true,
+        password: String? = nil,
+        joinHyphenated: Bool = true,
+        cropBoxes: [Int: CGRect] = [:],
+        isCancelled: () -> Bool = { false },
+        progress: (Int, Int) -> Void = { _, _ in }
+    ) throws -> [Unplaced] {
+        // Through Flattener.open, so an encrypted source is unlocked rather than
+        // rendering as blank pages — which previously produced an empty-looking
+        // document reported as a success.
+        var skipped: [Unplaced] = []
+        guard let doc = Flattener.open(visible, password: password), doc.pageCount > 0,
+              let first = doc.page(at: 0) else { throw Failure.unreadableSource }
+
+        // The published page is the **whole sheet**, not the crop.
+        //
+        // Observations are normalised to the crop box (that is what mac-ocr
+        // renders — see Flattener.displayBox), but publishing at the crop box
+        // would silently drop whatever the crop excludes. On the non-rebuild
+        // path `visible` is the user's own file, so that is real content
+        // disappearing from their copy with the run still reported as a success,
+        // which invariant 1 forbids.
+        //
+        // So: page at fullBox, and the observations mapped into the sub-rectangle
+        // where the crop actually lands. When a page has no crop box — 44 of the
+        // 78 corpus documents, plus every rebuilt file, which carries only a
+        // media box — the two coincide and this is exactly the old behaviour.
+        var mediaBox = Flattener.fullBox(of: first)
+        guard let pdf = CGContext(destination as CFURL, mediaBox: &mediaBox, nil) else {
+            throw Failure.cannotWrite
+        }
+
+        // One face is enough: the size adapts to each line's measured width, and
+        // the height is corrected separately. See draw(_:).
+        let base = CTFontCreateWithName(textFace as CFString, 12, nil)
+        let count = doc.pageCount
+
+        for index in 0..<count {
+            if isCancelled() { break }
+            guard let page = doc.page(at: index) else { continue }
+            let box = Flattener.fullBox(of: page)
+            let pageBox = CGRect(origin: .zero, size: box.size)
+
+            // Where the crop box lands on the published page. Derived by putting
+            // the crop rect through the very transform CoreGraphics uses to draw
+            // the media box, so /Rotate is handled once, by the framework, rather
+            // than by hand here.
+            let region = cropRegion(of: page, on: pageBox)
+
+            // CFData, not NSValue: an NSValue here is accepted and silently
+            // ignored, so every page inherited page 1's size. In a book whose
+            // pages vary (456x710 against 461x725) the text layer then had the
+            // wrong shape, and qpdf scaled it to fit the image layer — drifting
+            // the text down by up to a full line, which is what made the first
+            // line of a selection disappear.
+            var mutableBox = pageBox
+            let boxData = withUnsafeBytes(of: &mutableBox) { Data($0) } as CFData
+            var pageInfo: [String: Any] = [kCGPDFContextMediaBox as String: boxData]
+
+            // Carry the crop box across too, or the copy is not the same document.
+            //
+            // Publishing at the media box keeps every mark on the sheet (C10),
+            // but writing *only* a media box drops the trim: a page the original
+            // displayed at 420x250 came out displaying 612x792, revealing margin
+            // notes and running heads the viewer had been hiding — and since the
+            // recogniser only ever saw the crop, that newly-visible ink carries
+            // no text layer. The result looked like a successful OCR of a
+            // document that had suddenly grown unsearchable furniture.
+            //
+            // Media box for what is kept, crop box for what is shown.
+            //
+            // C23: `region` is derived from `visible`, and on **every rebuild
+            // route** `visible` is the rebuilt copy, which carries only a media
+            // box — so this wrote the media box twice and the published page
+            // displayed the black scanner gutter the original hid. The caller
+            // knows the source's crop and passes it in this page's own space;
+            // `region` remains what the observations are normalised to, which on
+            // that route is the whole sheet and must stay that way.
+            //
+            // Deliberately two different rectangles, because they answer two
+            // questions: where the text goes, and what the reader is shown.
+            //
+            // C42: never on a layer (`drawImages` false). `qpdf --overlay` wraps
+            // a stamped page in a form whose `/BBox` is its crop box and centres
+            // that box on the media box, so a layer carrying an off-centre crop
+            // was drawn shifted by how far off centre it was: 81 pt on a book
+            // spread. The crop goes on after the merge (`JBIG2.setCropBoxes`).
+            let displayed = cropBoxes[index + 1] ?? region
+            if drawImages, displayed != pageBox {
+                var cropRect = displayed
+                let cropData = withUnsafeBytes(of: &cropRect) { Data($0) } as CFData
+                pageInfo[kCGPDFContextCropBox as String] = cropData
+            }
+            pdf.beginPDFPage(pageInfo as CFDictionary)
+
+            if drawImages, let cgPage = page.pageRef {
+                // The whole sheet, drawn through the page's own transform so
+                // rotation is honoured. `.mediaBox` to match the page box above:
+                // drawing the crop here would put the ink somewhere the text
+                // layer is not.
+                pdf.saveGState()
+                pdf.concatenate(cgPage.getDrawingTransform(
+                    .mediaBox, rect: pageBox, rotate: 0, preserveAspectRatio: true))
+                pdf.drawPDFPage(cgPage)
+                pdf.restoreGState()
+            }
+
+            // The text, invisible, over the top.
+            pdf.saveGState()
+            pdf.setTextDrawingMode(.invisible)
+            for layer in layers(byPage[index + 1] ?? [], nextPage: byPage[index + 2] ?? [],
+                                in: region, joinHyphenated: joinHyphenated) {
+                let (lines, frame) = (layer.lines, layer.region)
+                pdf.saveGState()
+                if let turn = layer.transform { pdf.concatenate(turn) }
+                let ceilings = ceilings(for: lines, in: frame)
+                for (position, observation) in lines.enumerated() {
+                    if let reason = draw(observation, in: frame,
+                                         ceiling: ceilings[position],
+                                         rightLimit: rightLimit(for: position, among: lines,
+                                                                in: frame),
+                                         gapAbove: gapAbove(for: position, among: lines,
+                                                            in: frame),
+                                         font: base, into: pdf) {
+                        skipped.append(Unplaced(page: index + 1, text: observation.text,
+                                                reason: reason))
+                    }
+                }
+                pdf.restoreGState()
+            }
+            pdf.restoreGState()
+
+            pdf.endPDFPage()
+            progress(index + 1, count)
+        }
+        pdf.closePDF()
+        return skipped
+    }
+
+    /// The observations a page's text layer is actually built from: everything
+    /// `compose` does to a page's raw recognition before any geometry is
+    /// computed from it.
+    ///
+    /// Split out of `compose` for the same reason `placement` was: an instrument
+    /// that measures the text layer has to start from the list the writer draws,
+    /// and the alternative is a second copy of this sequence drifting out of step
+    /// with it (C20). The order matters and is asserted by the suite — dedup
+    /// before joining, so a line reported twice cannot be joined to its own twin.
+    static func prepared(
+        _ raw: [Observation],
+        nextPage: [Observation] = [],
+        in region: CGRect,
+        joinHyphenated: Bool = true
+    ) -> [Observation] {
+        // A13.4: there was a `minimumConfidence` here and on `compose`, filtering
+        // by a threshold `Recogniser.recognise` has already applied — a second
+        // live definition of one rule, with **no shipped caller setting it**. The
+        // confidence filter belongs where the confidences are produced, and now
+        // it is only there. `ocrAllPages` is the same shape and is in the
+        // register for it.
+        func usable(_ lines: [Observation]) -> [Observation] {
+            lines.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        }
+        // Column order before joining, so the line after a hyphen is the next line
+        // of its own column (C34). A pasted-up page's strips are each a column
+        // already, and ordered across the page they interleave again (C39: the
+        // columns of a newspaper page are too close for any gutter to separate), so
+        // each strip is ordered on its own, in the order the strips arrive. The boxes
+        // are cleared of every gutter found, so that PDFKit finds the columns too (C52).
+        let aspect = region.width > 0 ? Double(region.height / region.width) : 1
+        var strips: [Int?] = []
+        var byStrip: [Int?: [Observation]] = [:]
+        for o in deduplicated(usable(raw), in: region) {
+            if byStrip[o.region] == nil { strips.append(o.region) }
+            byStrip[o.region, default: []].append(o)
+        }
+        let lines = strips.flatMap {
+            columnOrdered(byStrip[$0] ?? [], aspect: aspect, clearingGutters: true)
+        }
+        guard joinHyphenated else { return gridded(lines, in: region) }
+        // The next page's topmost lines, so a word carried over a page break can
+        // be joined. The caller already holds them — no extra render, no extra
+        // recognition. In column order, so the first column's top line comes before
+        // the one beside it (C34: on `Hughes` p2 the right column's `ployes` took
+        // `ques-`, whose tail `tion` opens the left).
+        let next = columnOrdered(usable(nextPage).sorted { $0.boundingBox.y < $1.boundingBox.y },
+                                 aspect: region.width > 0 ? Double(region.height / region.width) : 1)
+            .prefix(SearchableWriter.continuationCandidates)
+        // Last, so the rows moved onto their column's pitch are the joined ones, and every
+        // instrument that starts here measures the layer at the places it is drawn (C52).
+        return gridded(joiningHyphenatedWords(lines, in: region, continuation: Array(next)),
+                       in: region)
+    }
+
+    // MARK: - Turned lines (C36)
+
+    /// A page's text layer as the groups `compose` draws: the upright lines as they
+    /// always were (no transform), then each group of turned lines, `prepared` in a
+    /// frame turned so that they read upright, with the transform onto the page. An
+    /// instrument that measures the layer should start here, as `prepared` says.
+    ///
+    /// Turns are reduced mod 4 before the split, so no value can fall between the
+    /// groups and leave a line undrawn and unreported (invariant 1).
+    static func layers(_ raw: [Observation], nextPage: [Observation] = [], in region: CGRect,
+                       joinHyphenated: Bool = true)
+        -> [(lines: [Observation], region: CGRect, transform: CGAffineTransform?)] {
+        func turn(_ o: Observation) -> Int { (((o.quarterTurns ?? 0) % 4) + 4) % 4 }
+        var out = [(lines: prepared(raw.filter { turn($0) == 0 },
+                                    nextPage: nextPage.filter { turn($0) == 0 },
+                                    in: region, joinHyphenated: joinHyphenated),
+                    region: region, transform: CGAffineTransform?.none)]
+        for turns in 1...3 {
+            let group = raw.filter { turn($0) == turns }
+            guard !group.isEmpty else { continue }
+            let frame = turnedFrame(turns, of: region)
+            out.append((prepared(group.map { uprighted($0, turns) }, in: frame.region,
+                                 joinHyphenated: joinHyphenated),
+                        frame.region, frame.transform))
+        }
+        return out
+    }
+
+    /// The frame in which lines turned `turns` quarter turns anticlockwise read
+    /// upright: a region at the origin, `region`'s sides swapped for an odd turn, and
+    /// the transform that takes it onto `region` on the page. Concatenated onto the
+    /// context, it lets `prepared`, `headroom`, `rightLimit` and `draw` lay out a
+    /// sideways table exactly as they lay out an upright one, so each run is drawn
+    /// along its printed line and at the printed size.
+    static func turnedFrame(_ turns: Int, of region: CGRect)
+        -> (region: CGRect, transform: CGAffineTransform) {
+        let w = region.width, h = region.height
+        switch ((turns % 4) + 4) % 4 {
+        case 1:
+            return (CGRect(x: 0, y: 0, width: h, height: w),
+                    CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: region.maxX, ty: region.minY))
+        case 2:
+            return (CGRect(x: 0, y: 0, width: w, height: h),
+                    CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: region.maxX, ty: region.maxY))
+        case 3:
+            return (CGRect(x: 0, y: 0, width: h, height: w),
+                    CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: region.minX, ty: region.maxY))
+        default:
+            return (CGRect(origin: .zero, size: region.size),
+                    CGAffineTransform(translationX: region.minX, y: region.minY))
+        }
+    }
+
+    /// `o`'s box restated in `turnedFrame(turns, …)`'s region, still normalised with
+    /// a top-left origin, so the line it holds reads left to right there.
+    static func uprighted(_ o: Observation, _ turns: Int) -> Observation {
+        let b = o.boundingBox
+        let box: BoundingBox
+        switch ((turns % 4) + 4) % 4 {
+        case 1: box = BoundingBox(x: 1 - b.y - b.height, y: b.x, width: b.height, height: b.width)
+        case 2: box = BoundingBox(x: 1 - b.x - b.width, y: 1 - b.y - b.height,
+                                  width: b.width, height: b.height)
+        case 3: box = BoundingBox(x: b.y, y: 1 - b.x - b.width, width: b.height, height: b.width)
+        default: box = b
+        }
+        return Observation(boundingBox: box, text: o.text, confidence: o.confidence)
+    }
+
+    /// One entry of a document outline, detached from PDFKit.
+    ///
+    /// Neutral on purpose: the Flate route hands the outline back to PDFKit, and
+    /// the JBIG2 route writes it into a hand-assembled PDF by hand, so neither
+    /// can depend on the other's representation.
+    struct OutlineItem {
+        let title: String
+        /// Zero-based page in the *output*, or nil for an entry that points
+        /// nowhere. Page count is 1:1 through the pipeline, so the source's
+        /// index carries over unchanged.
+        ///
+        /// Optional because real outlines are full of pure labels — "Contents",
+        /// an issue masthead — and giving those a page would fabricate a
+        /// destination the author never wrote.
+        let pageIndex: Int?
+        /// Destination coordinates in PDF user space, each nil when the source
+        /// left it unspecified.
+        ///
+        /// Separate optionals rather than a `CGPoint`, because "unspecified" is a
+        /// real and common state that a point cannot represent. PDFKit collapses
+        /// `/Fit`, `/FitH` and `/XYZ null null null` into a point whose members
+        /// are `kPDFDestinationUnspecifiedValue` (3.4e38); writing that through a
+        /// coordinate formatter turned every one of them into `/XYZ 0 0`, which
+        /// lands the reader at the *bottom* of the page. Nil here becomes `null`
+        /// in the `/XYZ` array, which means "leave this as it is".
+        let left: CGFloat?
+        let top: CGFloat?
+        let children: [OutlineItem]
+    }
+
+    /// How deep an outline may nest before we stop descending.
+    ///
+    /// `convert` recurses once per level on an `OperationQueue` worker, whose
+    /// stack is 512 KB — around 1,200 levels. A PDF nested deeper than that
+    /// (malformed, or hostile) killed the whole process with SIGBUS, taking
+    /// every *other* file in the batch down with it and publishing nothing.
+    /// A stack overflow is not catchable, so the only defence is not to reach it.
+    ///
+    /// No real outline is anywhere near this. Deepest in the corpus is 3.
+    static let maximumOutlineDepth = 32
+
+    /// Reads a document's outline into `OutlineItem`s. Empty when there is none.
+    ///
+    /// Bounded in depth and in total size: an outline is navigation, and no
+    /// document needs an unbounded amount of it. Losing a pathological outline
+    /// costs the user nothing; crashing the batch costs them every file in it.
+    static func readOutline(from source: URL, password: String? = nil) -> [OutlineItem] {
+        guard let doc = Flattener.open(source, password: password),
+              let root = doc.outlineRoot else { return [] }
+
+        var budget = 20_000            // total entries, against a cyclic outline
+
+        func convert(_ node: PDFOutline, depth: Int) -> OutlineItem? {
+            guard depth < maximumOutlineDepth, budget > 0 else { return nil }
+            budget -= 1
+            var kids: [OutlineItem] = []
+            for i in 0..<node.numberOfChildren {
+                if let child = node.child(at: i), let built = convert(child, depth: depth + 1) {
+                    kids.append(built)
+                }
+            }
+            let label = node.label ?? ""
+            var index: Int?
+            var left: CGFloat?
+            var top: CGFloat?
+            if let destination = node.destination, let page = destination.page {
+                // Bounded, like `copyOutline`'s mirror of this line: `index(for:)`
+                // answers `NSNotFound` for a page this document does not hold, and
+                // an entry pointing at page 9,223,372,036,854,775,807 is worse
+                // than one pointing nowhere — nowhere is a state the type has.
+                let found = doc.index(for: page)
+                index = (found >= 0 && found < doc.pageCount) ? found : nil
+                let p = destination.point
+                // kPDFDestinationUnspecifiedValue is how PDFKit reports "the
+                // source did not say" — for /Fit, /FitH and /XYZ null alike.
+                let hasX = p.x.isFinite && p.x != kPDFDestinationUnspecifiedValue
+                let hasY = p.y.isFinite && p.y != kPDFDestinationUnspecifiedValue
+                if hasX || hasY {
+                    // Through the same transform the ink goes through.
+                    //
+                    // The pipeline republishes each page derotated into a box at
+                    // the origin, so a coordinate from the source means something
+                    // different on the output: a /Rotate 180 page's heading at
+                    // (72, 700) ends up at (540, 92), and on a /Rotate 90 page
+                    // y=700 falls off the top of a 612-tall box entirely. Copied
+                    // verbatim, the bookmark lands hundreds of points from its
+                    // heading and no guard fires, because nothing is out of range.
+                    if hasX && hasY {
+                        let moved = mapToOutput(p, on: page)
+                        left = moved.x
+                        top = moved.y
+                    } else {
+                        // Only one member is real. Keep the output axis it
+                        // actually lands on, which is not its own under a
+                        // quarter turn (C21).
+                        (left, top) = mapSingleAxis(hasX ? p.x : p.y,
+                                                    isVertical: !hasX, on: page)
+                    }
+                }
+            }
+            // Keep entries that point nowhere. Real outlines are full of them —
+            // "Contents", an issue masthead, a publisher's banner — and measured
+            // across the corpus they are the majority: dropping destination-less
+            // entries lost 26 of 41 on `2380659` and 21 of 27 on `Ladimeji_1974`,
+            // silently re-shaping the author's outline. A title-only item is
+            // valid PDF (only /Title and /Parent are required) and behaves
+            // exactly as it did in the original: clicking it does nothing.
+            // Keep it if it has *any* of the three things an outline entry can
+            // carry. The earlier rule tested only title and children, so a
+            // blank-titled entry with a real destination was dropped here while
+            // copyOutline kept it — the two routes disagreeing about the same
+            // document.
+            guard !label.isEmpty || !kids.isEmpty || index != nil else { return nil }
+            return OutlineItem(title: label, pageIndex: index,
+                               left: left, top: top, children: kids)
+        }
+
+        var top: [OutlineItem] = []
+        for i in 0..<root.numberOfChildren {
+            if let child = root.child(at: i), let built = convert(child, depth: 0) {
+                top.append(built)
+            }
+        }
+        return top
+    }
+
+    /// Maps a point in a source page's user space to where it lands on the
+    /// republished page.
+    ///
+    /// The published page is `fullBox` — the media box, derotated, at the origin
+    /// — and the ink gets there through `getDrawingTransform(.mediaBox, …)`. A
+    /// destination has to make the same journey or it no longer points at the
+    /// thing it named.
+    static func mapToOutput(_ point: CGPoint, on page: PDFPage) -> CGPoint {
+        guard let cgPage = page.pageRef else { return point }
+        let box = Flattener.fullBox(of: page)
+        let transform = cgPage.getDrawingTransform(
+            .mediaBox, rect: CGRect(origin: .zero, size: box.size),
+            rotate: 0, preserveAspectRatio: true)
+        let moved = point.applying(transform)
+        // Clamp rather than emit a destination outside the page: a viewer would
+        // silently ignore it, which looks identical to a bookmark that works.
+        return CGPoint(x: min(max(moved.x, 0), box.width),
+                       y: min(max(moved.y, 0), box.height))
+    }
+
+    /// Where a *single* specified destination coordinate lands, when the other
+    /// member is unspecified.
+    ///
+    /// PDFKit collapses `/FitH 700` into a point whose x is
+    /// `kPDFDestinationUnspecifiedValue`, and R19 measured 276 of those against
+    /// 80 fully-specified across the corpus — so this is the common case, not the
+    /// exotic one. Substituting 0 for the missing member and keeping `moved.y` is
+    /// correct only while the transform is axis-aligned. At `/Rotate 90` and
+    /// `/Rotate 270` the axes swap: `moved.y` becomes a function of the
+    /// substituted zero, and the one coordinate the destination actually carried
+    /// lands in `moved.x`, where it was being discarded. A `/FitH` on a
+    /// 270-rotated plate came out as `/XYZ null 0 null` — the foot of the page,
+    /// which is the symptom R19 fixed for the `/XYZ 0 0` case (C21).
+    ///
+    /// Returns whichever output axis the source axis really drives; the other is
+    /// nil and stays unspecified. Under a quarter turn a `/FitH` becomes a
+    /// horizontal destination, which is what the geometry means.
+    static func mapSingleAxis(_ value: CGFloat, isVertical: Bool,
+                              on page: PDFPage) -> (left: CGFloat?, top: CGFloat?) {
+        guard let cgPage = page.pageRef else {
+            return isVertical ? (nil, value) : (value, nil)
+        }
+        let box = Flattener.fullBox(of: page)
+        let t = cgPage.getDrawingTransform(
+            .mediaBox, rect: CGRect(origin: .zero, size: box.size),
+            rotate: 0, preserveAspectRatio: true)
+        // x' = a·x + c·y + tx,  y' = b·x + d·y + ty. So a source y contributes
+        // c to x' and d to y'; a source x contributes a and b.
+        let towardsX = isVertical ? t.c : t.a
+        let towardsY = isVertical ? t.d : t.b
+        let moved = mapToOutput(CGPoint(x: isVertical ? 0 : value,
+                                        y: isVertical ? value : 0), on: page)
+        return abs(towardsY) >= abs(towardsX) ? (nil, moved.y) : (moved.x, nil)
+    }
+
+    /// Copies the source document's outline onto a finished file, in place.
+    ///
+    /// `compose` rebuilds pages through a `CGContext`, which copies page content
+    /// and nothing else, so the chapter outline an institutional repository
+    /// attaches to a digitised book did not survive into the copy. For an
+    /// archival pipeline that outline is a large part of what makes a scan
+    /// usable.
+    ///
+    /// Annotations are deliberately **not** copied. They are a much larger
+    /// surface — links, highlights, form fields, each with its own coordinate
+    /// space to remap — and nothing downstream depends on them.
+    ///
+    /// CoreGraphics cannot write an outline at all, so this is a PDFKit pass over
+    /// the finished file, which re-serialises it. That is the risk: the invisible
+    /// text layer is the most delicate thing in this codebase. It is guarded by
+    /// "the outline survives and the text layer is unharmed", which re-measures
+    /// extraction and run geometry after the rewrite.
+    ///
+    /// Writes to `out` rather than in place, so a failed rewrite can never damage
+    /// the composed file — the caller falls back to publishing that instead.
+    /// Returns false if there was nothing to copy or the copy failed; losing an
+    /// outline must never cost the user their OCR.
+    @discardableResult
+    static func copyOutline(from source: URL, of composed: URL, to out: URL,
+                            password: String? = nil) -> Bool {
+        guard let src = Flattener.open(source, password: password),
+              let root = src.outlineRoot, root.numberOfChildren > 0,
+              let dst = PDFDocument(url: composed), dst.pageCount > 0 else { return false }
+
+        // The same two bounds `readOutline` has, for the same reason and with the
+        // same numbers (R23). This is the Flate route's mirror of that function
+        // and it had neither, which was hidden by the way it is reached: Model
+        // gates the call on `!readOutline(...).isEmpty`, and readOutline satisfies
+        // that for a 4,000-level chain precisely *by truncating it at 32* — so
+        // the truncation that concealed the depth is what licensed the unbounded
+        // pass over the untruncated tree.
+        var budget = 20_000            // total entries, against a cyclic outline
+
+        /// Rebuilds one node against the destination's pages, matched by index.
+        /// Page count is 1:1 through the pipeline, so the index is the mapping.
+        func rebuild(_ node: PDFOutline, depth: Int) -> PDFOutline? {
+            guard depth < maximumOutlineDepth, budget > 0 else { return nil }
+            budget -= 1
+            let copy = PDFOutline()
+            copy.label = node.label
+            if let source = node.destination, let page = source.page,
+               case let index = src.index(for: page), index < dst.pageCount,
+               let target = dst.page(at: index) {
+                // Unspecified members pass through verbatim — substituting
+                // .zero turned a /Fit bookmark into a jump to the foot of the
+                // page — but a real coordinate has to be moved into the
+                // republished page's space, exactly as on the JBIG2 route.
+                let p = source.point
+                let hasX = p.x.isFinite && p.x != kPDFDestinationUnspecifiedValue
+                let hasY = p.y.isFinite && p.y != kPDFDestinationUnspecifiedValue
+                if hasX || hasY {
+                    let placed: (left: CGFloat?, top: CGFloat?)
+                    if hasX && hasY {
+                        let moved = mapToOutput(p, on: page)
+                        placed = (moved.x, moved.y)
+                    } else {
+                        placed = mapSingleAxis(hasX ? p.x : p.y,
+                                               isVertical: !hasX, on: page)
+                    }
+                    // The member this axis does not drive stays unspecified,
+                    // rather than carrying a value derived from a substituted 0.
+                    copy.destination = PDFDestination(
+                        page: target,
+                        at: CGPoint(x: placed.left ?? CGFloat(kPDFDestinationUnspecifiedValue),
+                                    y: placed.top ?? CGFloat(kPDFDestinationUnspecifiedValue)))
+                } else {
+                    copy.destination = PDFDestination(page: target, at: p)
+                }
+            }
+            var kept = 0
+            for i in 0..<node.numberOfChildren {
+                guard let child = node.child(at: i),
+                      let built = rebuild(child, depth: depth + 1) else { continue }
+                copy.insertChild(built, at: kept)
+                kept += 1
+            }
+            // Same rule as readOutline: a destination-less entry is still part
+            // of the outline the author wrote.
+            return (copy.destination != nil || kept > 0 || !(copy.label ?? "").isEmpty)
+                ? copy : nil
+        }
+
+        // The root is not an entry, and `readOutline` has always known that:
+        // it walks `root`'s children at depth 0. This called `rebuild(root, 0)`,
+        // so the root itself spent a level and real entries started at 1 —
+        // **31 levels here against 32 there** (A1.3). Mirrors that disagree
+        // about their own bound is R23 exactly, and the disagreement is invisible
+        // until a document is deep enough to be truncated by one of them.
+        let newRoot = PDFOutline()
+        var kept = 0
+        for i in 0..<root.numberOfChildren {
+            guard let child = root.child(at: i),
+                  let built = rebuild(child, depth: 0) else { continue }
+            newRoot.insertChild(built, at: kept)
+            kept += 1
+        }
+        guard kept > 0 else { return false }
+        dst.outlineRoot = newRoot
+        return dst.write(to: out)
+    }
+
+    /// Page numbers the recogniser never reported at all.
+    ///
+    /// mac-ocr emits one JSON Lines record per page **including blank ones** —
+    /// verified: a 3-page document with a blank middle page yields three records,
+    /// the middle one with an empty `observations` array. So a page number
+    /// missing from the output means that page was never recognised, not that it
+    /// had nothing on it.
+    ///
+    /// Worth checking separately because it is invisible to every other guard:
+    /// the page still gets composed, still counts toward `produced == expected`,
+    /// and simply carries no text. A silently untextable page in the middle of a
+    /// book is exactly what invariant 1 is about.
+    static func missingPages(in byPage: [Int: [Observation]], of pageCount: Int) -> [Int] {
+        guard pageCount > 0 else { return [] }
+        return (1...pageCount).filter { byPage[$0] == nil }
+    }
+
+    /// Where a page's crop box lands once the whole sheet is drawn into `pageBox`.
+    ///
+    /// Observations are normalised to the crop box, but the published page is the
+    /// media box, so they have to be placed inside this sub-rectangle rather than
+    /// across the whole page. Computed by running the crop rect through the same
+    /// `getDrawingTransform` CoreGraphics uses for the media box, which is what
+    /// makes /Rotate come out right without any hand-rolled quarter-turn
+    /// arithmetic — the class of thing that previously drew pages off-canvas.
+    ///
+    /// Falls back to the whole page whenever the two boxes coincide, which is the
+    /// common case and every rebuilt file.
+    static func cropRegion(of page: PDFPage, on pageBox: CGRect) -> CGRect {
+        let media = page.bounds(for: .mediaBox)
+        let crop = page.bounds(for: .cropBox)
+        guard crop != media, !crop.isEmpty, let cgPage = page.pageRef else { return pageBox }
+        let transform = cgPage.getDrawingTransform(
+            .mediaBox, rect: pageBox, rotate: 0, preserveAspectRatio: true)
+        let mapped = crop.applying(transform)
+        // A crop box larger than the media box is out of spec; the PDF spec says
+        // to intersect them. Never hand back something off the page.
+        let clipped = mapped.intersection(pageBox)
+        return clipped.isNull || clipped.isEmpty ? pageBox : clipped
+    }
+
+    /// How far apart two same-text observations may sit vertically and still be
+    /// one observation reported twice, as a fraction of the box height.
+    ///
+    /// 0.3 rather than 1.0. The duplicates this exists for — `auto`'s
+    /// partitioned pass emitting a line twice — are co-located to within
+    /// rounding, so the tolerance only has to survive sub-point jitter. A whole
+    /// line height instead reached the adjacent row: D3 measured 295 of 14,782
+    /// adjacent horizontally-overlapping pairs across the corpus at a pitch
+    /// below 0.6 of a box height, and this test is the looser `< 1.0` (C22).
+    ///
+    /// Below 0.3 of a box height two rows would have to overlap by seventy per
+    /// cent, which is not typesetting — it is the same line reported twice.
+    static var duplicateBaselineFraction: CGFloat = 0.3
+
+    /// Removes observations that repeat the same text in the same place.
+    ///
+    /// The recogniser can report a line twice — mac-ocr's `auto` strategy is
+    /// documented as emitting overlapping observations on large pages — and both
+    /// copies were drawn, so the line extracted as "the text the text".
+    static func deduplicated(_ lines: [Observation], in box: CGRect) -> [Observation] {
+        var kept: [Observation] = []
+        for line in lines {
+            let isDuplicate = kept.contains { other in
+                guard other.text == line.text else { return false }
+                // Same words in nearly the same spot, not merely the same words:
+                // a running head can legitimately repeat a phrase from the body.
+                let dx = abs(other.boundingBox.x - line.boundingBox.x) * box.width
+                let dy = abs(other.boundingBox.y - line.boundingBox.y) * box.height
+                let h = max(line.boundingBox.height * box.height, 1)
+                // Vertically this has to mean "on top of", not "near". A twin
+                // from `auto`'s partitioned pass sits at the same y to within
+                // rounding; a full line height of tolerance also swallowed the
+                // NEXT ROW, because Vision's boxes carry ascender and descender
+                // space, so ordinary 12 pt leading inside a 13 pt box satisfied
+                // it. A column repeating a figure lost every row after the
+                // first, silently — this is the one line-dropping path in the
+                // writer that produces no `Unplaced` (C22).
+                //
+                // Horizontally a full line height stays: that half was always
+                // about telling a running head from the body text under it, and
+                // it was never the problem.
+                return dx < h && dy < h * duplicateBaselineFraction
+            }
+            if !isDuplicate { kept.append(line) }
+        }
+        return kept
+    }
+
+    // MARK: - Columns (C34)
+
+    /// A vertical strip of the page, in normalised x, that separates two columns
+    /// of text.
+    struct Gutter: Equatable {
+        let from, to: Double
+    }
+
+    /// The gutter between two columns of `lines`, or nil when they are one column.
+    ///
+    /// Found from the boxes alone: a run of x that at most a tenth of the lines,
+    /// or two, cross (headings, a running head, a line Vision read across both columns),
+    /// at least a third of a line height wide, with three or more column-wide
+    /// lines — ten line heights or more — wholly on each side at the same height.
+    /// Boxes under two line heights wide (a folio, a stray mark in the gutter) are
+    /// left out of the count, so they neither make nor break one. The width and
+    /// the side-by-side test are what keep an indent, a centred heading or a
+    /// table of figures from reading as columns; a table whose cells hold lines
+    /// of text that wide is read as columns, and a page with more fused rows
+    /// than the allowance finds no gutter. Of several candidates, the one with
+    /// the most lines on its lesser side wins.
+    ///
+    /// `aspect` is the page's height over its width, to state widths in line
+    /// heights. On `Hughes` p3 the gutter is 0.018 of the width, 0.75 of a line.
+    ///
+    /// When that finds nothing, it is asked once more without counting the lines
+    /// centred on the text block and under three quarters of its width: a running
+    /// head, a figure's caption, a footer. On `Hughes` p5 those five and three fused
+    /// rows made eight crossings, one over the allowance, and the page had no gutter
+    /// at all (C40). Only up to the allowance's number of them are left out, and
+    /// they still count in the allowance, and as crossing lines in `columnOrdered`
+    /// and `splitAtGutter`. The first question is kept as it was, so a page that
+    /// had a gutter keeps the same one. One stray box far out in a margin moves the
+    /// block's centre off them, and the page finds no gutter, as before.
+    static func columnGutter(of lines: [Observation], aspect: Double) -> Gutter? {
+        guard let line = lineWidth(of: lines, aspect: aspect) else { return nil }
+        let boxes = lines.map(\.boundingBox).filter {
+            $0.x.isFinite && $0.width.isFinite && $0.y.isFinite && $0.height.isFinite
+                && $0.width >= 2 * line
+        }
+        guard boxes.count >= 6 else { return nil }
+        if let g = gutter(in: boxes, counting: boxes, line: line) { return g }
+        let left = boxes.map(\.x).min()!, right = boxes.map { $0.x + $0.width }.max()!
+        let centre = (left + right) / 2
+        let body = boxes.filter {
+            abs($0.x + $0.width / 2 - centre) > line || $0.width >= 0.75 * (right - left)
+        }
+        // No more of them than the allowance itself: a verse page under a centred
+        // title and headnote, or a table with centred rows across it, is mostly
+        // such lines, and read its halves one after the other.
+        let leftOut = boxes.count - body.count
+        guard leftOut > 0, leftOut <= max(2, boxes.count / 10) else { return nil }
+        return gutter(in: boxes, counting: body, line: line)
+    }
+
+    /// How finely `columnGutter` resolves the width of the page. At 400 a strip's
+    /// edges were rounded out to the next four-hundredth on both sides: on `_1953_99
+    /// Cong_ 2` p16 that made a strip 0.0068 of the page wide one bin, 0.0025, under
+    /// the third of a line (0.0035) it asks, and two of the page's three columns read
+    /// as one (C52).
+    static let gutterBins = 4000
+
+    /// How many of `boxes` cover each of `gutterBins` strips of the width.
+    private static func coverage(of boxes: [BoundingBox]) -> [Int] {
+        let bins = gutterBins
+        var change = [Int](repeating: 0, count: bins + 1)
+        for b in boxes {
+            // Clamped before the `Int` conversion, which traps outside `Int`'s range.
+            let left = min(max(b.x, 0), 1), right = min(max(b.x + b.width, 0), 1)
+            let first = Int((left * Double(bins)).rounded(.down))
+            let last = min(bins - 1, Int((right * Double(bins)).rounded(.up)) - 1)
+            if first <= last { change[first] += 1; change[last + 1] -= 1 }
+        }
+        var cover = [Int](repeating: 0, count: bins)
+        var running = 0
+        for i in 0..<bins { running += change[i]; cover[i] = running }
+        return cover
+    }
+
+    /// `columnGutter`'s search, with the gutter's crossings counted over `counted`
+    /// and the allowance and the columns over `boxes`.
+    private static func gutter(in boxes: [BoundingBox], counting counted: [BoundingBox],
+                               line: Double) -> Gutter? {
+        let bins = gutterBins
+        let cover = coverage(of: counted)
+        let allowed = max(2, boxes.count / 10)
+        var best: (gutter: Gutter, score: Int)?
+        var i = 0
+        while i < bins {
+            guard cover[i] <= allowed else { i += 1; continue }
+            var j = i
+            while j + 1 < bins, cover[j + 1] <= allowed { j += 1 }
+            let g = Gutter(from: Double(i) / Double(bins), to: Double(j + 1) / Double(bins))
+            i = j + 1
+            guard g.to - g.from >= line / 3, let score = columnsBeside(g, in: boxes, line: line)
+            else { continue }
+            if best.map({ score > $0.score }) ?? true { best = (g, score) }
+        }
+        return best?.gutter
+    }
+
+    /// Whether three or more column-wide lines, ten line heights or more, stand wholly
+    /// on each side of `g` at the same height as three of the other side's: the lesser
+    /// side's count when they do, which ranks candidates, and nil when they do not.
+    private static func columnsBeside(_ g: Gutter, in boxes: [BoundingBox], line: Double) -> Int? {
+        let wide = boxes.filter { $0.width >= 10 * line }
+        let left = wide.filter { $0.x + $0.width <= g.to && $0.x < g.from }
+        let right = wide.filter { $0.x >= g.from && $0.x + $0.width > g.to }
+        guard left.count >= 3, right.count >= 3 else { return nil }
+        // Side by side: each side's lines lie within the other side's height.
+        func span(_ s: [BoundingBox]) -> (Double, Double) {
+            (s.map(\.y).min()!, s.map { $0.y + $0.height }.max()!)
+        }
+        let (lt, lb) = span(left), (rt, rb) = span(right)
+        let beside = { (s: [BoundingBox], top: Double, bottom: Double) in
+            s.filter { $0.y + $0.height / 2 > top && $0.y + $0.height / 2 < bottom }.count
+        }
+        guard beside(left, rt, rb) >= 3, beside(right, lt, lb) >= 3 else { return nil }
+        return min(left.count, right.count)
+    }
+
+    /// Whether a box runs across the whole of a gutter.
+    static func crosses(_ b: BoundingBox, _ g: Gutter) -> Bool {
+        b.x < g.from && b.x + b.width > g.to
+    }
+
+    /// Whether a box runs across a gutter as a heading or a fused row does: across the
+    /// whole of it, and not lying almost all on one side. A box reaching under `reach`
+    /// past one edge and over it past the other belongs to that other side's column
+    /// and overshoots its ink into the gutter: on `Riesman_1949` p2 the middle column's
+    /// last line ran 0.002 of the page past the gutter, and read as a heading it cut
+    /// the right column's lines off from the rest of their column (C52). A short line
+    /// centred over the gutter (`Fig. 3`) reaches little past both edges and still
+    /// reads across.
+    static func readsAcross(_ b: BoundingBox, _ g: Gutter, reach: Double) -> Bool {
+        crosses(b, g) && (g.from - b.x > reach) == (b.x + b.width - g.to > reach)
+    }
+
+    /// The median line height of `lines` in widths of the page, the unit
+    /// `columnGutter` states its lengths in; nil when no box has a height.
+    static func lineWidth(of lines: [Observation], aspect: Double) -> Double? {
+        let heights = lines.map(\.boundingBox.height).filter { $0.isFinite && $0 > 0 }.sorted()
+        guard !heights.isEmpty, aspect.isFinite, aspect > 0 else { return nil }
+        return heights[heights.count / 2] * aspect
+    }
+
+    /// `lines` in reading order column by column, so a drag selection down one
+    /// column stays in it (C34). PDFKit selects in the order runs are drawn, and
+    /// they were drawn in the order recognition returned them, which on `1954 -
+    /// Why` p5 (a two-page spread) took four lines of one page, two of the other,
+    /// one of the first, and so on.
+    ///
+    /// First the page is cut into slabs at every blank band across its whole width
+    /// over one and a half line heights tall, top to bottom, and each slab is
+    /// ordered on its own: a block of picture captions under a two-column story
+    /// has columns of its own, and against the story's gutter a caption crossing
+    /// it cut the text between `type-` and `writer` (`Fairchild` 1950 p22).
+    ///
+    /// With a gutter (`columnGutter`), the lines crossing it — headings, running
+    /// heads, anything set across both columns — cut the slab into sections, top
+    /// to bottom. Each section is its left column then its right, each column
+    /// ordered again the same way (a third column), and each crossing line comes
+    /// before the section under it. A line crossing a gutter by less than a line
+    /// height is not a crossing line but its column's (`readsAcross`). A slab with no
+    /// gutter of its own takes the nearest slab's when its lines stand on both sides of
+    /// it. Within a column, and on a page where no slab has a gutter, the order is the
+    /// one given: a single-column page comes back unchanged.
+    ///
+    /// `clearingGutters` also cuts back every box that reaches past a gutter's middle
+    /// (`cleared`), which is what makes PDFKit keep the columns apart; `prepared` asks
+    /// for it. Without it this only reorders, which `Recogniser` relies on.
+    static func columnOrdered(_ lines: [Observation], aspect: Double,
+                              clearingGutters: Bool = false) -> [Observation] {
+        guard allFinite(lines) else { return lines }
+        return reordered(lines, aspect: aspect, depth: 0, clearing: clearingGutters)?.lines ?? lines
+    }
+
+    /// Every gutter `columnOrdered` orders `lines` by, outermost first, each with the
+    /// lines it was found among. `Recogniser.splitAtGutter` asks each of them for the
+    /// lines Vision read across it (C52: on `Riesman_1949` p2, a three-column page,
+    /// the fused rows crossed the second gutter, and only the first was asked).
+    static func columnGutters(of lines: [Observation], aspect: Double)
+        -> [(gutter: Gutter, among: [Observation])] {
+        guard allFinite(lines) else { return [] }
+        var found: [(gutter: Gutter, among: [Observation])] = []
+        _ = reordered(lines, aspect: aspect, depth: 0, clearing: false,
+                      visit: { found.append(($0, $1)) })
+        return found
+    }
+
+    /// For each of `lines`, the column `columnOrdered` reads it in, counted in reading
+    /// order: one side of a gutter within one section, not cut again. Nil for a line
+    /// read across a gutter, and for every line of a page, or a slab, with none.
+    static func columnMembers(of lines: [Observation], aspect: Double) -> [Int?] {
+        var out = [Int?](repeating: nil, count: lines.count)
+        guard allFinite(lines) else { return out }
+        let tagged = lines.enumerated().map { i, o -> Observation in
+            var t = o
+            t.region = i
+            return t
+        }
+        var count = 0
+        _ = reordered(tagged, aspect: aspect, depth: 0, clearing: false, leaf: { part in
+            for o in part { if let i = o.region { out[i] = count } }
+            count += 1
+        })
+        return out
+    }
+
+    private static func allFinite(_ lines: [Observation]) -> Bool {
+        lines.allSatisfy { o in
+            [o.boundingBox.x, o.boundingBox.y, o.boundingBox.width, o.boundingBox.height]
+                .allSatisfy(\.isFinite)
+        }
+    }
+
+    /// `columnOrdered`'s work, nil when no gutter was found anywhere in `lines`, with
+    /// the gutter `lines` were cut at when they were cut at one. `given` is a
+    /// neighbouring slab's gutter to try instead of searching; `visit` hears of each
+    /// gutter used, with the lines it was used on, and `leaf` of each column, a side of
+    /// a gutter in one section that is not cut again.
+    private static func reordered(_ lines: [Observation], aspect: Double, depth: Int,
+                                  clearing: Bool, given: Gutter? = nil,
+                                  visit: ((Gutter, [Observation]) -> Void)? = nil,
+                                  leaf: (([Observation]) -> Void)? = nil)
+        -> (lines: [Observation], gutter: Gutter?)? {
+        guard depth < 8, lines.count >= 6 else { return nil }
+        let slabs = given == nil ? horizontalSlabs(of: lines) : [lines]
+        if slabs.count > 1 {
+            var parts = slabs.map {
+                reordered($0, aspect: aspect, depth: depth + 1, clearing: clearing, visit: visit,
+                          leaf: leaf)
+            }
+            // A slab with no gutter of its own is tried at the nearest slab's, and takes
+            // it when column-wide lines stand on both sides of it: a chart set across
+            // two columns crosses their gutter without joining them. On `Marth` 1982 p2
+            // seven of a chart's labels crossed the gutter of the columns under it, two
+            // over the allowance, and those columns read into each other; the slab
+            // above the chart had found the same gutter (C52).
+            let own = parts.map { $0?.gutter }
+            for k in parts.indices where parts[k] == nil {
+                guard let n = own.indices.filter({ own[$0] != nil })
+                        .min(by: { abs($0 - k) < abs($1 - k) }),
+                      let g = own[n] else { continue }
+                parts[k] = reordered(slabs[k], aspect: aspect, depth: depth + 1,
+                                     clearing: clearing, given: g, visit: visit, leaf: leaf)
+            }
+            guard parts.contains(where: { $0 != nil }) else { return nil }
+            return (zip(parts, slabs).flatMap { $0?.lines ?? $1 }, nil)
+        }
+        guard let line = lineWidth(of: lines, aspect: aspect) else { return nil }
+        let g: Gutter
+        if let given {
+            // Taken only where this slab's own lines fit it: column lines on both sides,
+            // no more lines read across it than stand on either side, and no more reaching
+            // past its middle than a gutter found here would allow. A gutter from a slab
+            // laid out otherwise (three columns over two) crosses this slab's lines and is
+            // refused, rather than read row by row or cleared through their ink.
+            let boxes = lines.map(\.boundingBox).filter { $0.width >= 2 * line }
+            let middle = (given.from + given.to) / 2
+            guard let beside = columnsBeside(given, in: boxes, line: line),
+                  boxes.filter({ readsAcross($0, given, reach: line) }).count <= beside,
+                  boxes.filter({ $0.x < middle && $0.x + $0.width > middle
+                                    && !readsAcross($0, given, reach: line) }).count
+                      <= max(2, boxes.count / 10)
+            else { return nil }
+            g = given
+        } else {
+            guard let found = columnGutter(of: lines, aspect: aspect) else { return nil }
+            g = found
+        }
+        visit?(g, lines)
+        func middle(_ o: Observation) -> Double { o.boundingBox.y + o.boundingBox.height / 2 }
+        let across = lines.filter { readsAcross($0.boundingBox, g, reach: line) }
+            .enumerated().sorted { (middle($0.1), $0.0) < (middle($1.1), $1.0) }.map(\.1)
+        let cuts = across.map(middle)
+        let centre = (g.from + g.to) / 2
+        var left = [[Observation]](repeating: [], count: across.count + 1)
+        var right = left
+        for o in lines where !readsAcross(o.boundingBox, g, reach: line) {
+            let section = cuts.filter { $0 < middle(o) }.count
+            let onLeft = o.boundingBox.x + o.boundingBox.width / 2 < centre
+            let kept = clearing ? cleared(o, of: g, onLeft: onLeft, line: line) : o
+            if onLeft { left[section].append(kept) } else { right[section].append(kept) }
+        }
+        var out: [Observation] = []
+        for section in 0...across.count {
+            if section > 0 { out.append(across[section - 1]) }
+            for part in [left[section], right[section]] {
+                if let cut = reordered(part, aspect: aspect, depth: depth + 1, clearing: clearing,
+                                       visit: visit, leaf: leaf) {
+                    out += cut.lines
+                } else {
+                    if !part.isEmpty { leaf?(part) }
+                    out += part
+                }
+            }
+        }
+        return (out, g)
+    }
+
+    /// `o` cut back to its own side of `g`'s middle, less a clearance, so that no run
+    /// reaches across the gutter into the other column's width (C52).
+    ///
+    /// PDFKit, and so Preview, finds a page's columns from where the text lies, and
+    /// one run reaching into the next column's width loses them. On a two-column page
+    /// with a 6 pt gutter, two runs in thirty drawn 8 pt past their column made PDFKit
+    /// read the whole page line by line across both columns; 3 pt, still inside the
+    /// gutter, changed nothing [measured, synthetic]. Vision's boxes overshoot the
+    /// ink: on `Riesman_1949` p2 the middle column's ink ends by 397.9 pt and its boxes
+    /// by 402.8, and the right column's boxes start at 400.0. With every box cleared
+    /// of the middle by 0.3 pt and the fused rows split, each of that page's three
+    /// columns selected as one [measured]. The clearance is a thousandth of the page,
+    /// or a quarter of the gutter when that is less, so a line ending at the gutter's
+    /// edge is untouched. A box under two line heights wide (a folio, a mark in the
+    /// gutter) is left as it is, and so is one that would lose half its width.
+    private static func cleared(_ o: Observation, of g: Gutter, onLeft: Bool,
+                                line: Double) -> Observation {
+        let b = o.boundingBox
+        guard b.width >= 2 * line else { return o }
+        let middle = (g.from + g.to) / 2, clearance = min(0.001, (g.to - g.from) / 4)
+        var left = b.x, right = b.x + b.width
+        if onLeft { right = min(right, middle - clearance) } else { left = max(left, middle + clearance) }
+        guard right - left < b.width, right - left >= b.width / 2 else { return o }
+        return Observation(boundingBox: BoundingBox(x: left, y: b.y, width: right - left,
+                                                    height: b.height),
+                           text: o.text, confidence: o.confidence,
+                           quarterTurns: o.quarterTurns, region: o.region)
+    }
+
+    /// `lines` in groups, top to bottom, split wherever no line covers a band of
+    /// the page over one and a half median line heights tall; each group in the
+    /// order given.
+    static func horizontalSlabs(of lines: [Observation]) -> [[Observation]] {
+        let heights = lines.map(\.boundingBox.height).sorted()
+        guard !heights.isEmpty else { return [] }
+        let gap = 1.5 * heights[heights.count / 2]
+        var slab = [Int](repeating: 0, count: lines.count)
+        var count = 0
+        var bottom = -Double.greatestFiniteMagnitude
+        for i in lines.indices.sorted(by: { lines[$0].boundingBox.y < lines[$1].boundingBox.y }) {
+            let b = lines[i].boundingBox
+            if count == 0 || b.y - bottom > gap { count += 1 }
+            slab[i] = count - 1
+            bottom = max(bottom, b.y + b.height)
+        }
+        var out = [[Observation]](repeating: [], count: count)
+        for (i, o) in lines.enumerated() { out[slab[i]].append(o) }
+        return out
+    }
+
+    // MARK: - Words broken across a line
+
+    /// The characters a typesetter may break a word with.
+    ///
+    /// Not just `-`: archival scans are full of the Unicode hyphen (U+2010) and
+    /// the non-breaking one (U+2011), and Vision reports what it sees. A rule
+    /// that only knew about ASCII would silently do nothing on exactly the older
+    /// material this app exists for.
+    static let breakHyphens: Set<Character> = ["-", "\u{2010}", "\u{2011}", "\u{00AD}"]
+
+    /// Rejoins a word a line break split in two, so the whole word can be found.
+    ///
+    /// A word broken over two lines reaches the text layer as Vision read it —
+    /// `merito-` ending one line and `cracy` beginning the next — so searching
+    /// the finished PDF for `meritocracy` finds nothing. In narrow columns that
+    /// is a lot of words, and they are disproportionately the long specific ones
+    /// people search for.
+    ///
+    /// The joined word is written **over the first fragment**, and the tail line
+    /// loses its first word, so a copy reads the word once (C44). It used to be
+    /// left in place, which put `difference ference` in every copy of hyphenated
+    /// prose. When what the tail would keep is too short to span its ink
+    /// (`wouldSpan`), the word goes on the tail and the head loses its stem
+    /// instead, so no ink is left without text; when neither can, the echo
+    /// stays. Text is moved, never removed: every character recognised is still
+    /// in the layer, which keeps this within invariant 1. A word carried over a
+    /// page break keeps its tail on the next page, which this page cannot rewrite.
+    ///
+    /// The cost: the tail's remaining words are fitted to its whole box, so each
+    /// sits up to the given-up word's width left of its ink, less toward the
+    /// line's end, and Find highlights it there. Placing them exactly was tried
+    /// and measured worse: as separate runs, PDFKit read the columns of two pages
+    /// of 43 out of order (`ux-regression`, Marth p2 and Hughes p5); as one run
+    /// with a widened space, the space cannot be hit, and a click on the tail's
+    /// ink selected nothing or the line above.
+    ///
+    /// Geometry is untouched. `draw` fits each run to its own box by choosing a
+    /// font size, so a longer string means narrower glyphs in the same
+    /// rectangle; every measurement invariant 3 cares about — where the run
+    /// starts, how wide it is, its baseline, its height — is unchanged.
+    ///
+    /// Conservative about what counts as a break:
+    ///
+    /// - the tail must start lower-case, so `Smith-` / `Jones` stays apart;
+    /// - the tail's first word must be alphabetic, so a hyphen followed by a
+    ///   figure or a bullet is left alone;
+    /// - the head must have something before the hyphen, so a line that is only
+    ///   a dash — a rule, an em-dash used as punctuation — is not a candidate;
+    /// - the two lines must be *consecutive in reading order and vertically
+    ///   adjacent*, not merely one after the other in the array.
+    ///
+    /// What it cannot do is tell a broken word from a real compound: `well-`
+    /// followed by `known` becomes `wellknown`. That needs a dictionary this app
+    /// does not have and should not grow. The damage is bounded — a copy reads
+    /// `wellknown`, and a search for `well` or `known` still matches inside
+    /// it — so it is accepted rather than guessed at.
+    /// `continuation` is the first line of the *next page*, so a word broken by a
+    /// page break can be joined too. Nil on the last page.
+    ///
+    /// That case is not rare, and the first attempt at it wrongly concluded it
+    /// was. Measured over 45 documents and 1,225 pages, **29 pages — 2.37%, in 11
+    /// of the 45 — end on a hyphenated line.** The three documents used to test
+    /// the first attempt held twelve such pages between them and it joined none
+    /// of them, which was read as the case being rare rather than as the code
+    /// being wrong. `JOIN_DEBUG` now reports every candidate and the guard that
+    /// rejected it, precisely so that mistake cannot repeat: silence there means
+    /// no candidates, not no opportunities.
+    static func joiningHyphenatedWords(_ lines: [Observation], in box: CGRect,
+                                       continuation: [Observation] = []) -> [Observation] {
+        guard !lines.isEmpty else { return lines }
+        let debug = ProcessInfo.processInfo.environment["JOIN_DEBUG"] != nil
+        func note(_ m: String) {
+            if debug { FileHandle.standardError.write((m + "\n").data(using: .utf8)!) }
+        }
+        var out = lines
+        for i in 0..<out.count {
+            let head = out[i].text
+            guard let last = head.last, breakHyphens.contains(last) else { continue }
+            let stem = String(head.dropLast())
+            // Something must precede the hyphen, and it must end in a letter —
+            // `page 3-` is a range, not a broken word.
+            guard let stemLast = stem.last, stemLast.isLetter else { continue }
+
+            // Candidates, in reading order: the next line on this page, then —
+            // for a head at the foot of the page — the first line of the next.
+            let headBottom = out[i].boundingBox.y + out[i].boundingBox.height
+            let atFoot = headBottom >= 1 - edgeOfPage
+            var candidates: [(Observation, Bool)] = []
+            if i + 1 < out.count { candidates.append((out[i + 1], false)) }
+            if atFoot {
+                // The next page's *first few* lines, not only its topmost.
+                //
+                // Taking one was the whole reason the first attempt joined
+                // nothing: the topmost thing on a page is the folio or the
+                // running head — measured, the two candidates offered were
+                // `6130` and `CONGRESSIONAL `. Both are correctly refused by
+                // the lower-case test, and with only one candidate on offer the
+                // refusal ended the search instead of moving past the furniture
+                // to the body text underneath.
+                candidates += continuation.map { ($0, true) }
+            }
+            note(String(format: "  [cand] %@… bottom=%.3f atFoot=%@ candidates=%d",
+                        String(stem.suffix(18)), headBottom, atFoot ? "y":"n", candidates.count))
+            guard !candidates.isEmpty else { continue }
+
+            var chosen: Observation?
+            var chosenAcrossPage = false
+            for (tailLine, acrossPage) in candidates {
+                if !acrossPage {
+                    guard !isSameVisualLine(out[i], tailLine, in: box) else {
+                        note("    reject: same visual line"); continue
+                    }
+                }
+                if acrossPage {
+                    // The tail must be at the head of the next sheet — otherwise it
+                    // is a running head, a folio or a caption, and joining to it
+                    // invents a word.
+                    guard tailLine.boundingBox.y <= edgeOfPage else {
+                        note(String(format: "    reject: tail not at top (%.3f > %.3f)",
+                                    tailLine.boundingBox.y, edgeOfPage)); continue
+                    }
+                } else {
+                    // Below, and close below. Vision returns reading order, but a
+                    // multi-column page can put the next entry at the top of the
+                    // next column, and joining across that is joining two unrelated
+                    // words.
+                    let drop = drawnBaseline(out[i], in: box) - drawnBaseline(tailLine, in: box)
+                    let pitch = max(out[i].boundingBox.height * box.height, 1)
+                    guard drop > 0, drop < pitch * maximumJoinPitch else {
+                        note(String(format: "    reject: pitch (drop %.1f, limit %.1f)",
+                                    drop, pitch * maximumJoinPitch)); continue
+                    }
+                }
+
+                // Same column. Vertical adjacency alone is not enough and this was
+                // measured, not imagined: on a two-column page the next entry in
+                // reading order is often the next line of the *other* column at a
+                // similar height, and joining across produced `adminis+put`,
+                // `bipar+put`, `mi+appears`, `that+cerning` — a real word welded to
+                // a fragment of an unrelated one, which is worse than the hyphen it
+                // replaced. Columns do not overlap horizontally, so requiring the
+                // two spans to share most of their width rules the whole class out.
+                if !acrossPage {
+                    let overlap = sharedWidthFraction(out[i].boundingBox, tailLine.boundingBox)
+                    guard overlap >= minimumColumnOverlap else {
+                        note(String(format: "    reject: different column (%.2f overlap)",
+                                    overlap)); continue
+                    }
+                }
+
+                let tail = tailLine.text
+                guard let firstScalar = tail.first, firstScalar.isLowercase else {
+                    note("    reject: tail not lower-case (\(tail.prefix(14)))"); continue
+                }
+                guard !tail.prefix(while: { $0.isLetter }).isEmpty else {
+                    note("    reject: tail starts with no letter"); continue
+                }
+                chosen = tailLine
+                chosenAcrossPage = acrossPage
+                break
+            }
+
+            guard let tailLine = chosen else { note("    -> no candidate taken"); continue }
+            // The next page's tail is drawn by the next page, so it keeps its word:
+            // an echo there needs a copy that spans the page break.
+            guard !chosenAcrossPage else {
+                let word = tailLine.text.prefix { $0.isLetter }
+                note("    -> join ACROSS PAGE: \(stem)+\(word)")
+                out[i] = with(out[i], stem + word)
+                continue
+            }
+            // On the page, the tail gives its first word up (C44). PDFKit reads no
+            // `/ActualText` and drops a run's leading spaces, so nothing drawn over
+            // the tail's ink can be selectable and copy as nothing; the rest of the
+            // line is drawn across the whole box instead, which keeps it selectable.
+            let tail = tailLine.text
+            let token = tail.prefix { !$0.isWhitespace }
+            let rest = String(tail.dropFirst(token.count).drop { $0.isWhitespace })
+            let headWords = stem.split(separator: " ", omittingEmptySubsequences: false)
+            let broken = headWords.count > 1 ? String(headWords.last ?? "") : ""
+            let before = headWords.dropLast().joined(separator: " ")
+                .trimmingCharacters(in: .whitespaces)
+            if !rest.isEmpty, wouldSpan(rest, over: tailLine, in: box) {
+                note("    -> join: \(stem)+\(token) | \(rest.prefix(14))")
+                out[i] = with(out[i], stem + token)
+                out[i + 1] = with(out[i + 1], rest)
+            } else if !broken.isEmpty, !before.isEmpty, wouldSpan(before, over: out[i], in: box) {
+                // What the tail would keep is too short to span its ink (`it.` of
+                // `ference it.`, or nothing), so the whole word goes on the tail and
+                // the head gives up its stem.
+                note("    -> join on tail: \(before) | \(broken)+\(tail.prefix(14))")
+                out[i] = with(out[i], before)
+                out[i + 1] = with(out[i + 1], broken + tail)
+            } else {
+                // Neither line can give text up and still span its ink, so the
+                // tail keeps its echo.
+                let word = tail.prefix { $0.isLetter }
+                note("    -> join, tail kept: \(stem)+\(word)")
+                out[i] = with(out[i], stem + word)
+            }
+        }
+        return out
+    }
+
+    /// `o` with other text, keeping everything else about it.
+    static func with(_ o: Observation, _ text: String) -> Observation {
+        var copy = Observation(boundingBox: o.boundingBox, text: text,
+                               confidence: o.confidence, quarterTurns: o.quarterTurns)
+        copy.region = o.region
+        return copy
+    }
+
+    /// Whether `text` drawn over `o`'s box would reach its right edge. `placement`
+    /// caps a run's size at `0.86 × height / minimumVertical`, so a short string
+    /// over a wide box stops partway and the rest of the ink has no text: `it.`
+    /// over the box of `ference it.` covered 52% of it (C44). Measured in the
+    /// writer's own face; a ceiling from the line above only lowers the cap.
+    static func wouldSpan(_ text: String, over o: Observation, in box: CGRect) -> Bool {
+        let width = CGFloat(o.boundingBox.width) * box.width
+        let height = max(CGFloat(o.boundingBox.height) * box.height, 1)
+        let font = CTFontCreateWithName(textFace as CFString, height, nil)
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: [.font: font]))
+        let advance = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+        return advance * 0.86 / minimumVertical >= width * 0.95
+    }
+
+    /// How far below a line its continuation may sit, in multiples of the line's
+    /// own height, before the pair stops being consecutive lines of one column.
+    ///
+    /// 2.5 covers ordinary leading and a paragraph break; it does not reach the
+    /// top of the next column, which on any real page is a whole column height
+    /// away and usually *above* rather than below.
+    static var maximumJoinPitch: CGFloat = 2.5
+
+    /// How much of the **narrower** box two horizontal spans have in common, as a
+    /// fraction of it. Negative when they do not overlap at all, and 0 for a box
+    /// with no width — which no caller may treat as an overlap.
+    ///
+    /// One definition, two questions. `joiningHyphenatedWords` asks whether two
+    /// lines are in the same column (`minimumColumnOverlap`); `rightLimit` asks
+    /// whether two same-line boxes are describing the same ink
+    /// (`sharedInkFraction`). The measure is identical and the thresholds are
+    /// deliberately not — a constant serving two questions is what C20 was, and
+    /// A1.1 is `sameLineBaselineFraction` still being shared by two.
+    ///
+    /// The narrower box is the denominator on purpose: a short last line of a
+    /// paragraph still sits inside the column above it, and a small fragment
+    /// swallowed whole by a mis-grouped observation is entirely inside it.
+    static func sharedWidthFraction(_ a: BoundingBox, _ b: BoundingBox) -> Double {
+        let shared = min(a.x + a.width, b.x + b.width) - max(a.x, b.x)
+        let narrower = min(a.width, b.width)
+        guard narrower > 0 else { return 0 }
+        return shared / narrower
+    }
+
+    /// How much of their width two lines must share before they count as being
+    /// in the same column.
+    ///
+    /// 0.6, which a two-column layout cannot satisfy across the gutter and which
+    /// ordinary consecutive lines clear easily — a short last line of a paragraph
+    /// still sits inside the column above it, so the *narrower* span is the
+    /// denominator rather than the wider one.
+    static var minimumColumnOverlap: Double = 0.6
+
+    /// How near the foot or head of a page a line must be to take part in a join
+    /// across the page break, as a fraction of page height.
+    ///
+    /// **Measured, after a guess got it wrong.** 0.18 was the guess, and it
+    /// admitted nothing at all: the deepest hyphenated line on a Congressional
+    /// report sits at 0.82 of the page, which is exactly the boundary `1 - 0.18`
+    /// produces, so every candidate failed on a rounding. Page margins are
+    /// larger than they look — a bottom margin plus the last line's descender
+    /// box is comfortably a fifth of the sheet.
+    ///
+    /// 0.25 clears the measured 0.82 with room. It is only reachable by a line
+    /// that is already the *last* candidate on its page and already ends in a
+    /// hyphen, so widening it does not open the door to the mid-column failures
+    /// (`adminis+put`, `bipar+put`) that `minimumColumnOverlap` exists for —
+    /// those are same-page joins and never reach this test.
+    static var edgeOfPage: Double = 0.25
+
+    /// How many of the next page's opening lines to offer as continuations.
+    ///
+    /// Three, because the furniture above the first line of body text is a folio,
+    /// a running head, or both — never more than that on the archival material
+    /// this handles. Each is still put through every guard, so a wrong one is
+    /// refused rather than taken; the count only decides how far past the
+    /// furniture the search is allowed to look.
+    static var continuationCandidates: Int = 3
+
+
+    /// Where this observation's text is actually *drawn*, not where its box
+    /// bottom sits. Comparing box bottoms over-estimates the gap by 0.22 x the
+    /// height difference, which let a short superscript overlap a taller line —
+    /// and, in `rightLimit`, let a display numeral count a body line two rows
+    /// away as its own line's neighbour.
+    ///
+    /// Not `private`, and not for the app's benefit: `Tools/score-line-separation`
+    /// has to group fragments into visual lines the way this file does, and a
+    /// second definition of "one visual line" living in an instrument is C20's
+    /// shape with the writer and its own measuring stick as the two halves.
+    static func drawnBaseline(_ o: Observation, in box: CGRect) -> CGFloat {
+        let h = o.boundingBox.height * box.height
+        let bottom = box.height - (o.boundingBox.y * box.height) - h
+        return bottom + h * baselineFraction
+    }
+
+    /// The text face's ascent and descent as shares of their sum (0.770 and 0.230
+    /// for Helvetica): where a run's glyphs stand above and below its baseline.
+    static let glyphShares: (ascent: CGFloat, descent: CGFloat) = {
+        let font = CTFontCreateWithName(textFace as CFString, 1, nil)
+        let ascent = CTFontGetAscent(font), descent = CTFontGetDescent(font)
+        let total = max(ascent + descent, 0.01)
+        return (ascent / total, descent / total)
+    }()
+
+    /// How far below the nearest line above this one's baseline is: the room a
+    /// squashed run may rise into (`placement`, C55). `.greatestFiniteMagnitude` when
+    /// nothing is above. The same neighbours `headroom` counts, so the room is
+    /// measured against lines whose own runs are no taller than this gap allows.
+    static func gapAbove(for position: Int, among lines: [Observation],
+                         in box: CGRect) -> CGFloat {
+        let me = lines[position]
+        let mine = drawnBaseline(me, in: box)
+        let myLeft = me.boundingBox.x * box.width
+        let myRight = myLeft + me.boundingBox.width * box.width
+        var nearest = CGFloat.greatestFiniteMagnitude
+        for (i, other) in lines.enumerated() where i != position {
+            let left = other.boundingBox.x * box.width
+            let right = left + other.boundingBox.width * box.width
+            guard min(myRight, right) - max(myLeft, left) > 1,
+                  !isSameVisualLine(me, other, in: box) else { continue }
+            let gap = drawnBaseline(other, in: box) - mine
+            if gap > 0.5 { nearest = min(nearest, gap) }
+        }
+        return nearest
+    }
+
+    /// The share of its box a run's glyphs stand at when no neighbour is in the way.
+    static let idealShare: CGFloat = 0.86
+
+    /// How far two drawn baselines may differ and still be one visual line, as a
+    /// fraction of the shorter box's height.
+    ///
+    /// The shorter of the two, not the taller: a tall display numeral must not
+    /// be able to claim a body line two rows away — that was measured, and it is
+    /// why `rightLimit` uses `min`.
+    static var sameLineBaselineFraction: CGFloat = 0.4
+
+    /// How much of the smaller of two same-line boxes the other may cover before
+    /// they stop being two fragments and start being two readings of one piece
+    /// of ink.
+    ///
+    /// Sequential fragments of a line do not overlap: their boxes meet, or miss
+    /// by a point or two of Vision's own jitter. A box covering *half* of its
+    /// neighbour is not the next thing along the line — it is the same words
+    /// recognised twice, or a mis-grouped observation swallowing a real one, and
+    /// `rightLimit` must not shrink a run to make room for it. That is A1.2:
+    /// `('their', 19.4 pt)` against `('their eder but', 63.3 pt)` starting 1.0 pt
+    /// later, and the first drawn at 5.0% of its box.
+    ///
+    /// **This constant sits in a continuum, not a gap, and the honest defence is
+    /// that it barely matters where in the continuum it sits.** Measured over 852
+    /// limited runs on 24 real newspaper pages (`Tools/score-run-width`), with
+    /// "harmed" meaning drawn under half its box:
+    ///
+    /// | shared ink | pairs | of those, drawn under half their box |
+    /// |---|---|---|
+    /// | ≤ 0.47 | 779 | 1 |
+    /// | 0.47–0.53 | 3 | 1 |
+    /// | ≥ 0.53 | 70 | 60 |
+    ///
+    /// Three pairs of 852 lie in the band this constant could move through, and
+    /// moving it from 0.5 to 0.4 or 0.6 changes the verdict on **six** — 75
+    /// neighbours refused instead of 71, or 69. Nothing here is calibrated on a
+    /// knife edge, which is the property to check, since the corpus has no gap
+    /// to put a threshold in and a constant chosen inside a continuum is how
+    /// `BUGS.md` C24's repairs went wrong.
+    ///
+    /// Both directions of error were priced before choosing. Refusing a genuine
+    /// neighbour risks a weld; but two boxes overlapping by half the smaller are
+    /// drawn over each other whatever this says, so the gap PDFKit would read
+    /// between them is not a gap in the first place. Keeping a false neighbour
+    /// costs a line nobody can highlight, which is the defect being fixed.
+    ///
+    /// `Double`, like `minimumColumnOverlap` and unlike the geometry constants
+    /// around it, because `sharedWidthFraction` works in the observations' own
+    /// normalised coordinates and that is the type they arrive in.
+    static var sharedInkFraction: Double = 0.5
+
+    /// Whether two observations are fragments of **one visual line**.
+    ///
+    /// One definition, because there were two and they disagreed (C20).
+    /// `rightLimit` called a neighbour same-line below `0.4 · min(height)`;
+    /// `headroom` called one a *vertical* neighbour above 0.5 pt with more than
+    /// 1 pt of horizontal overlap. Everything in the band between — and two
+    /// fragments sharing a true baseline land there whenever one has a descender
+    /// and the other does not, about 1.7 pt on 10 pt text — satisfied both. Such
+    /// a pair was shrunk by the reserve (right, it is one line) *and* crushed by
+    /// the ceiling (wrong) at the same time. Measured on the Harper's 1938
+    /// corpus page: eight observations across four pages, worst case a run drawn
+    /// 0.71 pt tall against a natural 9.04 pt, at a quarter of its box width.
+    ///
+    /// C18's overlap tolerance is what opened the door: it established that
+    /// Vision's fragment boxes routinely overlap by a point or two, and an
+    /// overlap in (1, 2] pt clears `headroom`'s `> 1` test.
+    ///
+    /// Not `private`, for the reason `drawnBaseline` gives: the instrument that
+    /// measures line separation groups fragments with *this* predicate rather
+    /// than a copy of it.
+    ///
+    /// **Which height the tolerance scales with is the caller's question, not a
+    /// second predicate.** C20 unified two functions that disagreed about "one
+    /// visual line"; A1.1 is the discovery that the two callers really do want
+    /// different tolerances, and the way to have that without re-creating C20 is
+    /// one function, one constant and an explicit argument at each call site.
+    /// `.shorter` is what C20 chose and what `headroom` still asks for; `.taller`
+    /// is what the horizontal reserve asks for and why is in `Scale`.
+    enum Scale {
+        /// 0.4 × the shorter box. A tall display numeral cannot claim a body line
+        /// two rows away — measured, and the reason `min` was chosen.
+        case shorter
+        /// 0.4 × the taller box. Two fragments of one line whose heights differ —
+        /// a headline word beside a body word, a figure beside its caption — get
+        /// a tolerance of 1.4–2.1 pt under `.shorter`, and in the band above it
+        /// no reserve is opened, the run is drawn to its full box width and the
+        /// words weld (`REVIEW-2026-08-14.md` A1.1, `BUGS.md` R82).
+        case taller
+    }
+
+    static func isSameVisualLine(_ a: Observation, _ b: Observation,
+                                 in box: CGRect, _ scale: Scale = .shorter) -> Bool {
+        let heights = (a.boundingBox.height * box.height, b.boundingBox.height * box.height)
+        let reference = scale == .shorter ? min(heights.0, heights.1)
+                                          : max(heights.0, heights.1)
+        let tolerance = reference * sameLineBaselineFraction
+        return abs(drawnBaseline(a, in: box) - drawnBaseline(b, in: box)) < tolerance
+    }
+
+    /// The ceiling each of `lines` is drawn under, as `compose` draws them: its
+    /// `headroom`, and for a body line in a column (`columnMembers`) no more than the
+    /// height nine in ten of its column's lines would be drawn at, unless that would
+    /// narrow its run (C52).
+    ///
+    /// PDFKit reads a page's blocks by where their tops are, so a column cut into two
+    /// blocks takes the next column's in between, and a line drawn taller than its
+    /// column can start a block. Drawn heights follow Vision's boxes and each line's
+    /// headroom: 0.8 to 1.6 of the median over the body lines of one column on the
+    /// pages C52 names. On `Hughes` p3 one line read with a box 2 pt taller split the
+    /// right column in two, and capped it selects column by column again [measured].
+    /// Only the tallest tenth: capped at the median, Hughes p3 and `_1953_99 Cong_ 2`
+    /// p16 read better still, but `Donahue` p1's left column, drawn thinner, broke at a
+    /// paragraph space and read into the next one (1.00 -> 0.50) [measured].
+    ///
+    /// A line outside every column (a heading across the columns, any line of a page
+    /// with none) keeps its own ceiling, and so does a heading inside one: a box over
+    /// one and a half of its column's median height. Capped, headlines, bylines and pull
+    /// quotes were drawn at the body's height, and the larger ones narrower: PDFKit
+    /// selected `Raskin` p1's headline 10 pt tall, 23 pt uncapped, and `Glazer_2002`
+    /// p1's `DIARIST` over 73% of the width it has uncapped [measured], and the suite's
+    /// 48 pt headline in one column over 76% of its box. Headings still count among the
+    /// nine in ten: left out, the cap drew `Donahue` p1's pull quote, eleven lines of
+    /// `Fiedler`'s headlines and advertisements and `Peters` p2's running foot thinner,
+    /// and no drag read better [measured]. No cap goes below what keeps a run the size it is drawn
+    /// at under its own ceiling (`minimumVertical` of it), or `placement` would shrink
+    /// the run to keep the glyphs short: a sparse row such as `1 24` would lose a
+    /// quarter of its width (invariant 3) [measured on the suite's fixture].
+    ///
+    /// Not `private`, for the reason `rightLimit` is not: `Tools/score-run-width`
+    /// measures both halves of the fight — how wide a run is drawn and how far
+    /// the ceiling squashed it — and C20 is the entry about a pair getting both
+    /// treatments at once, so an instrument that can see only one of them cannot
+    /// see C20 at all.
+    static func ceilings(for lines: [Observation], in box: CGRect) -> [CGFloat] {
+        var ceilings = lines.indices.map { headroom(for: $0, among: lines, in: box) }
+        let columns = columnMembers(of: lines,
+                                    aspect: box.width > 0 ? Double(box.height / box.width) : 1)
+        var drawn: [Int: [CGFloat]] = [:], boxes: [Int: [Double]] = [:]
+        for (i, column) in columns.enumerated() {
+            guard let column else { continue }
+            let wanted = CGFloat(lines[i].boundingBox.height) * box.height * 0.86
+            drawn[column, default: []].append(min(wanted, ceilings[i]))
+            boxes[column, default: []].append(lines[i].boundingBox.height)
+        }
+        let caps = drawn.mapValues { heights in heights.sorted()[heights.count * 9 / 10] }
+        let medians = boxes.mapValues { heights in heights.sorted()[heights.count / 2] }
+        let font = CTFontCreateWithName(textFace as CFString, 12, nil)
+        for (i, column) in columns.enumerated() {
+            guard let column, let cap = caps[column], cap < ceilings[i],
+                  let median = medians[column], lines[i].boundingBox.height <= 1.5 * median
+            else { continue }
+            var floor: CGFloat = 0
+            if case .placed(let run) = placement(of: lines[i], in: box, ceiling: ceilings[i],
+                                                 rightLimit: rightLimit(for: i, among: lines, in: box),
+                                                 font: font) {
+                floor = minimumVertical * run.size
+            }
+            ceilings[i] = min(ceilings[i], max(cap, floor))
+        }
+        return ceilings
+    }
+
+    /// How far a row may stand from its column's pitch and still be moved onto it, as
+    /// a share of the pitch. `Marth_1982` p2's two rows needed 0.17 and 0.14; a row set
+    /// with space under a sub-heading stands half a pitch off and stays.
+    static var gridTolerance: CGFloat = 0.3
+
+    /// The least a row is moved, as a share of the pitch: a row within this of the fit is
+    /// left where Vision put it. Every column's rows jitter by a few tenths of a point, and
+    /// moving all of them changed PDFKit's reading of `Raskin` p1, a newspaper page whose
+    /// columns stand 4.5 pt apart: four columns that read whole came back cut into bands
+    /// of three or four lines [measured]. Marth p2's two rows stood 0.14 and 0.17 off.
+    static var gridMinimumMove: CGFloat = 0.07
+
+    /// The narrowest gutter, as a share of the column's median box height, beside which a
+    /// column's rows are still moved. Where columns stand closer than this PDFKit's own
+    /// reading of the page is fragile either way: on `Raskin` p1 (4.5 pt between columns
+    /// of 7.8 pt boxes, 0.58) one row moved 1.6 pt and PDFKit read the two columns beside
+    /// it line by line, four columns 1.00 -> 0.2-0.4; on the 1969 `Wall Street Journal`
+    /// page (2.5 pt) seven columns fell and its blocks went 41 -> 145 [measured]. Marth
+    /// p2's columns stand 7.8 pt apart over 9.5 pt boxes (0.82).
+    static var gridGutterMinimum: CGFloat = 0.7
+
+    /// How far apart, as a share of the pitch, the steps above and below a row must be,
+    /// one short and one long, for the row to count as standing off the line its
+    /// neighbours define. Those rows alone are moved: that is the defect, a row Vision
+    /// placed off its line (Marth p2's `more."`, steps 7.4 and 10.1 over a pitch of 8.7;
+    /// `Motorola took to learn…`, 8.1 and 9.9). Rows that merely jitter are left as read.
+    static var gridDisplacement: CGFloat = 0.15
+
+    /// `lines` with each column's rows that stand off their line moved onto the column's
+    /// baseline pitch (C52).
+    ///
+    /// PDFKit groups a page's lines into blocks before it orders them, and a column
+    /// whose baselines fall at uneven steps is cut where a step is long. On
+    /// `Marth_1982` p2 a short line Vision boxed without descenders (`more."`, its
+    /// baseline 1.2 pt high) and a hyphen-joined one (`wanted from their jobs.`) each
+    /// opened a gap of 4.5 pt under the line above against the column's 3, each column
+    /// read as two blocks with the neighbour's between them, and a drag down either
+    /// copied the other. The source's own layer, set at one pitch, reads each as one
+    /// block. With the rows moved onto the pitch their steps agree on, both columns read
+    /// whole; drawn at one height but left at their own steps, one still broke; and
+    /// closing only the two widest steps moved the breaks to other rows [all measured
+    /// through PDFKit's reading order on the published page].
+    ///
+    /// A row is a column's fragments on one visual line (`isSameVisualLine`). A row over
+    /// one and a half of its column's median height is a heading (`ceilings`): it keeps
+    /// its place and does not vote. The pitch is the median step between a column's body
+    /// rows, refined by least squares over each run of rows within a fifth of that step,
+    /// and only a row standing off the line its neighbours define (`gridDisplacement`),
+    /// which is the defect, is moved onto it; a
+    /// row further than `gridTolerance` of a pitch from the fit, or nearer than
+    /// `gridMinimumMove`, or sharing a grid line with another, stays where it was, and so
+    /// does one whose move would leave a step to the line above or below less regular than
+    /// Vision left it. (A lone row more than a fifth off its neighbours opens a run of its
+    /// own and is never moved; only a drifting run of rows reaches the full tolerance.) A
+    /// column standing nearer than `gridGutterMinimum` to a column beside it, a
+    /// column of fewer than four
+    /// body rows, or whose steps do not agree (fewer than half within a quarter of the
+    /// median), is left alone, and so is every line outside a column: this runs after the
+    /// gutters are found, in `prepared`, so `headroom` and `placement` see the moved boxes
+    /// and no run is drawn into a neighbour it would have cleared.
+    static func gridded(_ lines: [Observation], in box: CGRect) -> [Observation] {
+        guard box.height > 0, lines.count >= 4, allFinite(lines) else { return lines }
+        let columns = columnMembers(of: lines,
+                                    aspect: box.width > 0 ? Double(box.height / box.width) : 1)
+        var out = lines
+        var members: [Int: [Int]] = [:]
+        for (i, column) in columns.enumerated() { if let column { members[column, default: []].append(i) } }
+        func span(_ o: Observation) -> (left: Double, right: Double) {
+            (o.boundingBox.x, o.boundingBox.x + o.boundingBox.width)
+        }
+        // Each column's extent over its body-height lines, in points, for the gutter test.
+        var extents: [Int: (left: CGFloat, right: CGFloat, top: CGFloat, bottom: CGFloat, height: CGFloat)] = [:]
+        for (column, indices) in members {
+            let heights = indices.map { CGFloat(lines[$0].boundingBox.height) * box.height }.sorted()
+            let median = heights[heights.count / 2]
+            let body = indices.filter { CGFloat(lines[$0].boundingBox.height) * box.height <= 1.5 * median }
+            guard !body.isEmpty else { continue }
+            extents[column] = (
+                body.map { CGFloat(span(lines[$0]).left) * box.width }.min()!,
+                body.map { CGFloat(span(lines[$0]).right) * box.width }.max()!,
+                body.map { drawnBaseline(lines[$0], in: box) + CGFloat(lines[$0].boundingBox.height) * box.height }.max()!,
+                body.map { drawnBaseline(lines[$0], in: box) }.min()!,
+                median)
+        }
+        for column in members.keys.sorted() {
+            let indices = members[column]!
+            guard indices.count >= 4, let extent = extents[column] else { continue }
+            let narrow = extents.contains { other, e in
+                guard other != column, e.top > extent.bottom, e.bottom < extent.top else { return false }
+                let gap = max(e.left - extent.right, extent.left - e.right)
+                return gap < gridGutterMinimum * extent.height
+            }
+            guard !narrow else { continue }
+            // Rows: fragments on one visual line, keyed by the widest fragment's baseline.
+            var rows: [(baseline: CGFloat, height: CGFloat, members: [Int])] = []
+            for i in indices.sorted(by: { drawnBaseline(lines[$0], in: box) > drawnBaseline(lines[$1], in: box) }) {
+                if let r = rows.indices.last(where: { r in
+                    rows[r].members.contains { m in isSameVisualLine(lines[m], lines[i], in: box) }
+                }) {
+                    rows[r].members.append(i)
+                    if lines[i].boundingBox.width > lines[rows[r].members[0]].boundingBox.width {
+                        rows[r].baseline = drawnBaseline(lines[i], in: box)
+                        rows[r].members.swapAt(0, rows[r].members.count - 1)
+                    }
+                    rows[r].height = max(rows[r].height, CGFloat(lines[i].boundingBox.height) * box.height)
+                } else {
+                    rows.append((drawnBaseline(lines[i], in: box),
+                                 CGFloat(lines[i].boundingBox.height) * box.height, [i]))
+                }
+            }
+            // A row's baseline is its widest fragment's, which can arrive after a row below
+            // it was opened, so sort before taking steps.
+            rows.sort { $0.baseline > $1.baseline }
+            let heights = rows.map(\.height).sorted()
+            let median = heights[heights.count / 2]
+            let bodyRows = rows.indices.filter { rows[$0].height <= 1.5 * median }
+            let body = bodyRows.map { rows[$0] }
+            guard body.count >= 4 else { continue }
+            let steps = zip(body, body.dropFirst()).map { $0.baseline - $1.baseline }
+            let sorted = steps.sorted()
+            let pitch = sorted[sorted.count / 2]
+            guard pitch > 0.5,
+                  steps.filter({ abs($0 - pitch) <= 0.25 * pitch }).count * 2 >= steps.count
+            else { continue }
+            let tolerance = min(gridTolerance * pitch, 0.35 * median)
+            // Runs of rows at the column's step; a step a fifth off it (a paragraph set
+            // with space, a sub-heading, an entry gap in a list) starts a new run with its
+            // own phase. Counted as one step, `Bird` p5's entry gaps of 1.25 pitches put
+            // every row after them a quarter pitch off the fit, and two rows were moved
+            // toward each other by 2.7 pt and drawn squashed [measured].
+            var segments: [[Int]] = [[0]]
+            for (k, step) in steps.enumerated() {
+                if step < 0.8 * pitch || step > 1.2 * pitch { segments.append([k + 1]) }
+                else { segments[segments.count - 1].append(k + 1) }
+            }
+            let segmentOf = Dictionary(uniqueKeysWithValues: segments.enumerated()
+                .flatMap { n, segment in segment.map { ($0, n) } })
+            // Which of this column's body rows, and which run, a line belongs to, for the
+            // neighbours a move must respect.
+            var bodyOfLine: [Int: Int] = [:]
+            for (s, r) in bodyRows.enumerated() { for i in rows[r].members { bodyOfLine[i] = s } }
+            for (n, segment) in segments.enumerated() where segment.count >= 3 {
+                // Only the rows off the line their neighbours define are moved, onto the
+                // pitch the whole run is fitted to; the rows around them keep their jitter.
+                // Fitting the run entire mended Marth too, but on `Donahue` p1 moved two
+                // rows beside a drop cap by 1.1 and 1.2 pt and PDFKit cut the column at a
+                // paragraph gap whose own geometry had not changed (1.00 -> 0.49), where
+                // moving the out-of-line rows alone leaves it whole [measured].
+                let displaced = segment.dropFirst().dropLast().filter { s in
+                    let before = body[s - 1].baseline - body[s].baseline
+                    let after = body[s].baseline - body[s + 1].baseline
+                    return (before - pitch) * (after - pitch) < 0
+                        && abs(before - after) >= gridDisplacement * pitch
+                }
+                guard !displaced.isEmpty else { continue }
+                let first = body[segment[0]].baseline
+                let ks = segment.map { ((first - body[$0].baseline) / pitch).rounded() }
+                // Least squares over (k, baseline) when there are rows enough to trust
+                // the slope, else the column's pitch and this run's median phase.
+                var slope = pitch
+                let count = CGFloat(segment.count)
+                let meanK = ks.reduce(0, +) / count
+                let meanB = segment.map { body[$0].baseline }.reduce(0, +) / count
+                if segment.count >= 6 {
+                    var num: CGFloat = 0, den: CGFloat = 0
+                    for (k, s) in zip(ks, segment) {
+                        num += (k - meanK) * (body[s].baseline - meanB)
+                        den += (k - meanK) * (k - meanK)
+                    }
+                    if den > 0 { slope = -num / den }
+                    if abs(slope - pitch) > 0.1 * pitch { slope = pitch }
+                }
+                let phases = zip(ks, segment).map { body[$1].baseline + slope * $0 }.sorted()
+                let phase = phases[phases.count / 2]
+                for (k, s) in zip(ks, segment) where displaced.contains(s) {
+                    let residual = body[s].baseline - (phase - slope * k)
+                    guard abs(residual) <= tolerance, abs(residual) >= gridMinimumMove * pitch,
+                          zip(ks, segment).filter({ $0.0 == k }).count == 1 else { continue }
+                    // No move may leave a step to the nearest line above or below that
+                    // shares horizontal space less regular than it was, every line measured
+                    // where Vision put it: against a row of this run the step must come no
+                    // further from the pitch, and against anything else (a heading, a
+                    // caption, a line of no column, a row across a long step) it must not
+                    // shrink below what it was, or below a pitch. A row whose grid line lies
+                    // the wrong side of a neighbour stays, whatever the fit says.
+                    let target = body[s].baseline - residual
+                    var above: (gap: CGFloat, line: Int)?, below: (gap: CGFloat, line: Int)?
+                    for j in lines.indices where !body[s].members.contains(j) {
+                        let (l, r) = span(lines[j])
+                        guard body[s].members.contains(where: { m in
+                            let (ml, mr) = span(lines[m])
+                            return (min(mr, r) - max(ml, l)) * box.width > 1
+                        }) else { continue }
+                        let gap = drawnBaseline(lines[j], in: box) - body[s].baseline
+                        if gap > 0.5, gap < above?.gap ?? .infinity { above = (gap, j) }
+                        if gap < -0.5, -gap < below?.gap ?? .infinity { below = (-gap, j) }
+                    }
+                    let regular = [above, below].compactMap { $0 }.allSatisfy { neighbour in
+                        let before = neighbour.gap
+                        let after = abs(target - drawnBaseline(lines[neighbour.line], in: box))
+                        if let b = bodyOfLine[neighbour.line], segmentOf[b] == n {
+                            return abs(after - pitch) <= abs(before - pitch) + 0.05
+                        }
+                        return after >= min(before, pitch) - 0.05
+                    }
+                    guard regular else { continue }
+                    let moved = body[s].members.map { i -> Observation in
+                        let o = out[i]
+                        var m = Observation(
+                            boundingBox: BoundingBox(x: o.boundingBox.x,
+                                                     y: o.boundingBox.y + Double(residual / box.height),
+                                                     width: o.boundingBox.width,
+                                                     height: o.boundingBox.height),
+                            text: o.text, confidence: o.confidence)
+                        m.quarterTurns = o.quarterTurns
+                        m.region = o.region
+                        return m
+                    }
+                    // A move that makes a line share a visual line with one it did not,
+                    // or part it from one it did, is refused: `headroom` would then stop
+                    // counting the neighbour and draw both runs tall into each other. On
+                    // `Marth_1982` p2 the row under a drop cap, moved 0.34 pt toward it,
+                    // came within the tolerance (3.89 pt against 3.92) and the two were
+                    // drawn 8.4 and 5.8 pt tall over a 3.9 pt step [measured].
+                    let flips = zip(body[s].members, moved).contains { i, m in
+                        out.indices.contains { j in
+                            guard j != i, !body[s].members.contains(j) else { return false }
+                            let o = out[j]
+                            let overlap = min(m.boundingBox.x + m.boundingBox.width,
+                                              o.boundingBox.x + o.boundingBox.width)
+                                - max(m.boundingBox.x, o.boundingBox.x)
+                            guard overlap * box.width > 1 else { return false }
+                            return isSameVisualLine(out[i], o, in: box) != isSameVisualLine(m, o, in: box)
+                                || isSameVisualLine(out[i], o, in: box, .taller)
+                                    != isSameVisualLine(m, o, in: box, .taller)
+                        }
+                    }
+                    guard !flips else { continue }
+                    for (i, m) in zip(body[s].members, moved) { out[i] = m }
+                }
+            }
+        }
+        return out
+    }
+
+    /// How tall this line's glyphs may be before they collide with the nearest
+    /// line above or below.
+    ///
+    /// Necessary because Vision's lines sit much closer together than a naive
+    /// font size implies — a superscript footnote marker can be 8 pt from the
+    /// line beneath it. Where invisible runs overlap, Preview stops treating them
+    /// as separate lines and a drag-selection runs straight past one.
+    static func headroom(for position: Int, among lines: [Observation],
+                         in box: CGRect) -> CGFloat {
+        func baseline(_ o: Observation) -> CGFloat { drawnBaseline(o, in: box) }
+        func span(_ o: Observation) -> (CGFloat, CGFloat) {
+            let x = o.boundingBox.x * box.width
+            return (x, x + o.boundingBox.width * box.width)
+        }
+        let me = lines[position]
+        let mine = baseline(me)
+        let (myLeft, myRight) = span(me)
+
+        var nearest = CGFloat.greatestFiniteMagnitude
+        for (i, other) in lines.enumerated() where i != position {
+            // Only lines sharing horizontal space can collide. Two fragments of
+            // one visual line sit at the same baseline side by side; treating
+            // those as vertical neighbours crushed the font to a couple of points.
+            let (left, right) = span(other)
+            guard min(myRight, right) - max(myLeft, left) > 1 else { continue }
+            // A fragment of my own line is rightLimit's business, not mine.
+            // These two used to answer that question differently, and a pair in
+            // the band between the two answers got both treatments (C20).
+            guard !isSameVisualLine(me, other, in: box) else { continue }
+            let gap = abs(baseline(other) - mine)
+            if gap > 0.5 { nearest = min(nearest, gap) }
+        }
+        guard nearest < .greatestFiniteMagnitude else { return .greatestFiniteMagnitude }
+        // CTFont reports Helvetica as ascent 0.770 + descent 0.230 = 1.0 em, and
+        // that is what CoreGraphics embeds; the old 0.925 estimate let every
+        // clamped run come out 5% taller than the gap it had to fit.
+        return nearest / max(headroomFactor, 0.1)
+    }
+
+    /// How far right this run may extend before it runs into the next fragment
+    /// of the same visual line. `.greatestFiniteMagnitude` when there is none.
+    ///
+    /// The mirror of `headroom`, and for the mirrored reason: that one stops
+    /// runs colliding *vertically*, this one stops them colliding
+    /// *horizontally*. Same-baseline neighbours only — a line on the row below
+    /// is `headroom`'s business, and treating it as a horizontal obstacle would
+    /// crush every run on a tightly-set page.
+    ///
+    /// Not `private`, for the reason `isSameVisualLine` and `drawnBaseline` are
+    /// not: `Tools/score-run-width` has to ask which neighbour limited a run, and
+    /// a second implementation of that question in an instrument is C20's shape.
+    static func rightLimit(for position: Int, among lines: [Observation],
+                           in box: CGRect) -> CGFloat {
+        let me = lines[position]
+        let myLeft = me.boundingBox.x * box.width
+
+        var nearest = CGFloat.greatestFiniteMagnitude
+        for (i, other) in lines.enumerated() where i != position {
+            // Baselines, and the TALLER of the two heights. The same predicate
+            // `headroom` uses — one function, one constant — asked at the scale
+            // this direction needs: a short fragment beside a tall one is one
+            // line, and under `.shorter` its tolerance is 1.4–2.1 pt, so the
+            // reserve never opened and the words welded (A1.1).
+            guard isSameVisualLine(me, other, in: box, .taller) else { continue }
+
+            // Anything starting to the right of MY LEFT edge is after me on this
+            // line. The test used to be `>= myRight - 0.5`, which is a cliff:
+            // Vision's fragment boxes routinely overlap by a point or two — 0.5 pt
+            // is two pixels at 300 DPI — and past it the neighbour was dropped
+            // entirely and the words silently welded again. Measured: welds
+            // returned for overlaps of 0.51-2.0 pt.
+            let otherLeft = other.boundingBox.x * box.width
+            guard otherLeft > myLeft else { continue }
+
+            // …but "to the right of my left edge" also accepts a box sitting on
+            // top of mine, and that is A1.2: the run is then shrunk to the couple
+            // of points before the intruder starts and a whole line is drawn at
+            // 5% of its width, silently. This is the test the comment above used
+            // to claim `allowed > 0` was making, which it never was — `allowed`
+            // is positive for *any* neighbour right of my left edge, measured
+            // 4,338 times out of 4,338, the smallest at 1.97e-07 pt.
+            // The same measure `joiningHyphenatedWords` uses for "same column",
+            // against a threshold of its own: see `sharedWidthFraction`.
+            guard sharedWidthFraction(me.boundingBox, other.boundingBox)
+                    <= sharedInkFraction else { continue }
+
+            nearest = min(nearest, box.minX + otherLeft)
+        }
+        return nearest
+    }
+
+    /// Where one run lands, and how big it is: everything `draw` decides before
+    /// it draws anything.
+    ///
+    /// Split out of `draw` so an instrument can ask the writer what it *will*
+    /// draw instead of re-deriving it. `Tools/score-run-width` measures property
+    /// (c) — does the run span its ink — over thousands of fragments, and the
+    /// only honest way to do that is with this arithmetic rather than a second
+    /// copy of it: C20 is in the register because two functions held two
+    /// definitions of one idea, and `score-line-separation` already had to stop
+    /// keeping its own "one visual line".
+    struct Run {
+        /// The font size the glyphs are drawn at, after both the width fit and
+        /// the vertical cap.
+        let size: CGFloat
+        /// The y scale in the text matrix — how far the glyphs are squashed.
+        let vertical: CGFloat
+        /// Origin of the run in PDF user space.
+        let left, bottom: CGFloat
+        /// Where the glyphs' baseline is drawn: `drawnBaseline` for a run at its
+        /// full height, higher for a squashed one, toward the middle it would have
+        /// unsquashed as far as the line above leaves room (C55).
+        let baseline: CGFloat
+        /// The observation's own box, in points.
+        let boxWidth, boxHeight: CGFloat
+        /// The advance this text has at `reference`, from which the drawn
+        /// advance scales linearly.
+        let naturalAdvance, reference: CGFloat
+        /// How tall the glyphs would stand if no neighbouring line were in the
+        /// way: the ink's own height, less the `0.86` the writer never exceeds.
+        let idealHeight: CGFloat
+        /// True when a same-visual-line neighbour to the right shortened it.
+        let limitedByNeighbour: Bool
+
+        /// How wide the run is actually drawn, in points.
+        var advance: CGFloat { naturalAdvance * size / reference }
+        /// The share of its own box the run covers. Property (c) lives here: at
+        /// 5% of the box, a click past the first tenth of the line selects some
+        /// other line (`REVIEW-2026-08-14.md` A1.2).
+        var widthShare: CGFloat { boxWidth > 0 ? advance / boxWidth : 0 }
+        /// How tall the glyphs are actually drawn, in points.
+        var drawnHeight: CGFloat { size * vertical }
+        /// The share of the height it wanted that the ceiling left it. C20 is
+        /// what happens when this and `widthShare` are both small on one run —
+        /// measured there at a quarter of its box width and 0.71 pt against a
+        /// natural 9.04 pt.
+        var heightShare: CGFloat { idealHeight > 0 ? drawnHeight / idealHeight : 0 }
+    }
+
+    /// The placement of one observation, or the reason it cannot be placed.
+    enum Placement {
+        case placed(Run)
+        case refused(String)
+    }
+
+    /// What `draw` will do with this observation, without a context to draw into.
+    ///
+    /// `draw` is this function plus four lines of CoreText, so the two cannot
+    /// disagree about what gets drawn. `gapAbove` is `gapAbove(for:among:in:)`, and
+    /// left out it lets a squashed run rise as far as its own box allows.
+    static func placement(
+        of observation: Observation,
+        in box: CGRect,
+        ceiling: CGFloat,
+        rightLimit: CGFloat,
+        gapAbove: CGFloat = .greatestFiniteMagnitude,
+        font: CTFont
+    ) -> Placement {
+        let text = observation.text
+        guard !text.isEmpty else { return .refused("empty text") }
+
+        // Vision's boxes are normalised with a top-left origin; PDF user space
+        // has its origin at the bottom left.
+        //
+        // `box` is the region the observations were normalised to — the crop box
+        // as it lands on the published page — which is usually but not always the
+        // whole page, so its origin has to be added rather than assumed zero.
+        let width = observation.boundingBox.width * box.width
+        let height = observation.boundingBox.height * box.height
+        let left = box.minX + observation.boundingBox.x * box.width
+        let bottom = box.minY + box.height - (observation.boundingBox.y * box.height) - height
+        guard width > 0.5, height > 0.5 else {
+            return .refused(String(format: "box too small (%.2f x %.2f pt)", width, height))
+        }
+
+        // Width and height are set independently, which is the only way to get
+        // all three properties at once:
+        //
+        //  - advances natural at the chosen size, so extractors never see an
+        //    exaggerated inter-glyph gap and split a word ("accom plished");
+        //  - the run spans the ink, so a selection highlight reaches the end of
+        //    the line and every word is clickable;
+        //  - glyphs no taller than the ink, so neighbouring lines never overlap
+        //    and line-by-line selection works.
+        //
+        // So: pick the size that makes the natural width match the box, then
+        // compress vertically in the text matrix. Scaling y leaves every
+        // horizontal metric alone, which is what the extractors look at. Fitting
+        // width by stretching x instead exaggerates the gaps; fitting it by size
+        // alone leaves the glyphs too tall.
+        let reference = max(height, 1)
+        let probeFont = CTFontCreateCopyWithAttributes(font, reference, nil, nil)
+        let probe = CTLineCreateWithAttributedString(
+            NSAttributedString(string: text, attributes: [.font: probeFont]))
+        let probeWidth = CTLineGetTypographicBounds(probe, nil, nil, nil)
+        guard probeWidth > 0 else { return .refused("text has no typographic width") }
+
+        // Clamped, not abandoned. This band used to drop real content — a "I 3"
+        // table row (420.9), an em-rule over a wide box (428), a lone page number
+        // in a wide column (550), and any very long line (0.44). A clamped line is
+        // slightly the wrong width; a dropped line is missing text.
+        var widthSize = min(max(reference * (width / probeWidth), 0.5), 400)
+
+        // Keep clear of the next fragment on this line. Without this, widening
+        // runs to their true box width — which is what makes line ends
+        // selectable — closes the geometric gap PDFKit reads as a space, and
+        // two words weld into one. See `reserveEms`.
+        var limited = false
+        if rightLimit < .greatestFiniteMagnitude {
+            // Solve for the size, don't budget against the pre-shrink one.
+            //
+            // Taking `gap = widthSize * reserveEms` and then recomputing
+            // `widthSize` from what is left makes the realised gap larger than
+            // asked, because the run it is measured against got smaller. When
+            // the box hugs its text the reserve becomes a flat 0.25 x line
+            // height whatever the fragment's length, so the cost is ~0.5/n for
+            // an n-character fragment: measured, `I` kept 21% of its width and
+            // a single `i` in a narrow box collapsed to 0.11 pt — past the 0.5 pt
+            // size floor, where `size * vertical == wanted` stops holding and
+            // the glyph stops tracking the ink at all.
+            //
+            // Width and gap both scale with size, so the fixed point is exact:
+            //   probeWidth * s / reference + s * reserveEms = rightLimit - left
+            // Clamped: this is non-monotonic as a knob. Past about 1 em the
+            // run shrinks to nothing and the reserve reads as harmless in a
+            // sweep, which in this project is how a calibration goes wrong.
+            let ems = min(max(reserveEms, 0), 1)
+            let room = rightLimit - left
+            let allowed = room / (1 + ems * reference / probeWidth)
+            if allowed > 0, allowed < width {
+                widthSize = min(max(reference * (allowed / probeWidth), 0.5), 400)
+                limited = true
+            }
+        }
+
+        // How much to squash so the glyphs stand no taller than the ink.
+        let idealHeight = height * idealShare
+        let wanted = min(idealHeight, ceiling)
+
+        // A sparse row — "1 24" in a table of contents, a lone page number in a
+        // wide column — needs a huge size to span its box, and squashing that back
+        // used to hit a 0.15 floor. Past the floor the glyphs stayed taller than
+        // the ink and welded onto the line above: a TOC row extracted as
+        // "…book page 2 1 24" with no line break.
+        //
+        // When the two demands conflict, height wins. Selection breaks when runs
+        // overlap; a run that stops short of the box edge only shortens the
+        // highlight. So cap the size instead of flooring the squash.
+        let minimumVertical = Self.minimumVertical
+        var size = widthSize
+        if wanted / size < minimumVertical { size = wanted / minimumVertical }
+        let vertical = min(max(wanted / size, minimumVertical), 3.0)
+        // C55: squashed about its baseline, a run kept to a third of its line's height
+        // sat in the bottom of the ink, and the top of the line was nearer the run
+        // above. On `1951 - Briefer Book Notes` p1 Vision's box for `members of the
+        // Department…` reaches 5 pt below the baseline, the run stood at 110.6-114.4 pt
+        // over ink at 113-123, and a drag at 119 copied the line above [measured
+        // through PDFKit]. So a squashed run is raised to keep the middle of where its
+        // glyphs would stand unsquashed, as far as the line above leaves room: that
+        // line's run is no taller than the gap over the headroom factor, so its
+        // descent takes at most that share of it, and this run's ascent stops below.
+        // A run at its full height is where it always was.
+        let drawn = size * vertical
+        let (ascent, descent) = glyphShares
+        let wantedRise = (ascent - descent) / 2 * (idealHeight - drawn)
+        let room = gapAbove < .greatestFiniteMagnitude
+            ? gapAbove * (1 - descent / max(headroomFactor, 0.1)) - ascent * drawn
+            : wantedRise
+        let baseline = bottom + height * baselineFraction + max(0, min(wantedRise, room))
+
+        return .placed(Run(size: size, vertical: vertical, left: left, bottom: bottom,
+                           baseline: baseline,
+                           boxWidth: width, boxHeight: height,
+                           naturalAdvance: probeWidth, reference: reference,
+                           idealHeight: idealHeight, limitedByNeighbour: limited))
+    }
+
+    /// Returns nil when the line was placed, or a reason when it could not be.
+    @discardableResult
+    private static func draw(
+        _ observation: Observation,
+        in box: CGRect,
+        ceiling: CGFloat,
+        rightLimit: CGFloat,
+        gapAbove: CGFloat,
+        font: CTFont,
+        into pdf: CGContext
+    ) -> String? {
+        switch placement(of: observation, in: box, ceiling: ceiling,
+                         rightLimit: rightLimit, gapAbove: gapAbove, font: font) {
+        case .refused(let why):
+            return why
+        case .placed(let run):
+            let sized = CTFontCreateCopyWithAttributes(font, run.size, nil, nil)
+            let line = CTLineCreateWithAttributedString(
+                NSAttributedString(string: observation.text, attributes: [.font: sized]))
+            var matrix = CGAffineTransform(a: 1, b: 0, c: 0, d: run.vertical, tx: 0, ty: 0)
+            matrix.tx = run.left
+            matrix.ty = run.baseline
+            pdf.textMatrix = matrix
+            CTLineDraw(line, pdf)
+            return nil
+        }
+    }
+}
+
+// MARK: - Text pages (hw-qwen)
+
+extension SearchableWriter {
+    /// One handwritten page's text page: the page it follows, counted from 1, and the reading.
+    struct TextPage: Equatable {
+        let page: Int
+        let text: String
+    }
+
+    /// The text page's layout, borrowed from Archive Suite's (`PDFGenerator.makeTextPage`): a
+    /// letter-wide page, a grey header, the reading in 11 pt Georgia, the page as tall as the
+    /// text needs and never shorter than a letter page. A reading too long for one page of the
+    /// tallest size PDF allows runs on to another.
+    static let textPageWidth: CGFloat = 612
+    static let textPageMinHeight: CGFloat = 792
+    static let textPageMaxHeight: CGFloat = 14_400
+    static let textPageMargin: CGFloat = 54
+
+    /// The words on a text page above the reading.
+    static func textPageHeader(page: Int, reader: String) -> String {
+        "Text of the handwritten page before this one, page \(page) of the original, as \(reader) read it. "
+            + "Its words are not placed on that page's image, which keeps Vision's own text.\n\n"
+    }
+
+    /// The words above a reading that runs on to another text page.
+    static func textPageContinued(page: Int) -> String {
+        "Text of the handwritten page \(page) of the original, continued:\n\n"
+    }
+
+    /// Writes `pages`' text pages, in order, to one PDF at `url`, and returns the text drawn on
+    /// each of each one's pages, headers included. Ligatures are off, so a search or a copy finds
+    /// the letters that were read.
+    static func writeTextPages(_ pages: [TextPage], reader: String, to url: URL) throws -> [[String]] {
+        var box = CGRect(x: 0, y: 0, width: textPageWidth, height: textPageMinHeight)
+        guard let context = CGContext(url as CFURL, mediaBox: &box, nil) else { throw Failure.cannotWrite }
+        defer { context.closePDF() }
+        let width = textPageWidth - 2 * textPageMargin
+        func style(_ spacing: CGFloat) -> CTParagraphStyle {
+            var lineSpacing: CGFloat = 4, paragraphSpacing = spacing
+            var wrap = CTLineBreakMode.byWordWrapping
+            return withUnsafeBytes(of: &lineSpacing) { ls in
+                withUnsafeBytes(of: &paragraphSpacing) { ps in
+                    withUnsafeBytes(of: &wrap) { w in
+                        let settings = [
+                            CTParagraphStyleSetting(spec: .lineSpacingAdjustment, valueSize: ls.count, value: ls.baseAddress!),
+                            CTParagraphStyleSetting(spec: .paragraphSpacing, valueSize: ps.count, value: ps.baseAddress!),
+                            CTParagraphStyleSetting(spec: .lineBreakMode, valueSize: w.count, value: w.baseAddress!),
+                        ]
+                        return CTParagraphStyleCreate(settings, settings.count)
+                    }
+                }
+            }
+        }
+        let headerFont = CTFontCreateUIFontForLanguage(.emphasizedSystem, 11, nil)
+            ?? CTFontCreateWithName("Helvetica-Bold" as CFString, 11, nil)
+        let bodyFont = CTFontCreateWithName("Georgia" as CFString, 11, nil)
+        let headerAttributes: [NSAttributedString.Key: Any] = [
+            kCTFontAttributeName as NSAttributedString.Key: headerFont,
+            kCTForegroundColorAttributeName as NSAttributedString.Key: CGColor(gray: 0.33, alpha: 1),
+            kCTParagraphStyleAttributeName as NSAttributedString.Key: style(2),
+            kCTLigatureAttributeName as NSAttributedString.Key: 0]
+        let bodyAttributes: [NSAttributedString.Key: Any] = [
+            kCTFontAttributeName as NSAttributedString.Key: bodyFont,
+            kCTForegroundColorAttributeName as NSAttributedString.Key: CGColor(gray: 0, alpha: 1),
+            kCTParagraphStyleAttributeName as NSAttributedString.Key: style(6),
+            kCTLigatureAttributeName as NSAttributedString.Key: 0]
+        var drawn: [[String]] = []
+        for page in pages {
+            var rest = page.text.trimmingCharacters(in: .whitespacesAndNewlines) as NSString
+            var these: [String] = []
+            while rest.length > 0 {
+                let header = these.isEmpty ? textPageHeader(page: page.page, reader: reader)
+                    : textPageContinued(page: page.page)
+                let text = NSMutableAttributedString(string: header, attributes: headerAttributes)
+                text.append(NSAttributedString(string: rest as String, attributes: bodyAttributes))
+                let setter = CTFramesetterCreateWithAttributedString(text as CFAttributedString)
+                let all = CFRange(location: 0, length: text.length)
+                let need = CTFramesetterSuggestFrameSizeWithConstraints(
+                    setter, all, nil, CGSize(width: width, height: .greatestFiniteMagnitude), nil).height
+                let height = min(max(textPageMinHeight, ceil(need) + 8 + 2 * textPageMargin), textPageMaxHeight)
+                var media = CGRect(x: 0, y: 0, width: textPageWidth, height: height)
+                let frame = CTFramesetterCreateFrame(setter, all, CGPath(
+                    rect: CGRect(x: textPageMargin, y: textPageMargin, width: width, height: height - 2 * textPageMargin),
+                    transform: nil), nil)
+                // Some of the reading on every page, or the loop would never end.
+                let shown = CTFrameGetVisibleStringRange(frame).length - (header as NSString).length
+                guard shown > 0 else { throw Failure.cannotWrite }
+                let boxData = Data(bytes: &media, count: MemoryLayout<CGRect>.size) as CFData
+                context.beginPDFPage([kCGPDFContextMediaBox as String: boxData] as CFDictionary)
+                CTFrameDraw(frame, context)
+                context.endPDFPage()
+                these.append(header + rest.substring(to: min(shown, rest.length)))
+                rest = rest.substring(from: min(shown, rest.length)) as NSString
+            }
+            drawn.append(these)
+        }
+        return drawn
+    }
+
+    /// The `qpdf --pages` arguments that put each of `counts`' text pages, from `text`, after
+    /// the page of `file` it follows. `file` is the primary input, so its outline, its page
+    /// labels and every page object with its marks are kept as they are.
+    static func textPageArguments(_ pages: [TextPage], counts: [Int], file: URL, pageCount: Int,
+                                  text: URL, to destination: URL) -> [String] {
+        var arguments = [file.path, "--pages"]
+        var from = 1, next = 1
+        for (page, count) in zip(pages, counts) {
+            if page.page >= from { arguments += [file.path, from == page.page ? "\(from)" : "\(from)-\(page.page)"] }
+            arguments += [text.path, count == 1 ? "\(next)" : "\(next)-\(next + count - 1)"]
+            from = page.page + 1
+            next += count
+        }
+        if from <= pageCount { arguments += [file.path, from == pageCount ? "\(from)" : "\(from)-\(pageCount)"] }
+        return arguments + ["--", destination.path]
+    }
+
+    /// The letters and digits a search can find, compatibility-folded so a ligature is its letters,
+    /// and sorted: PDFKit gives some scripts' vowel signs in the order they are drawn, not read
+    /// (Devanagari's), so only which letters came back, and how many, is compared.
+    static func searchableLetters(_ s: String) -> [Unicode.Scalar] {
+        s.precomposedStringWithCompatibilityMapping.unicodeScalars
+            .filter { CharacterSet.letters.contains($0) || CharacterSet.decimalDigits.contains($0) }
+            .sorted { $0.value < $1.value }
+    }
+
+    /// Puts `pages`' text pages after their pages of `file`, a finished PDF of `pageCount`
+    /// pages, into `destination`, and returns how many pages were added. Throws unless the
+    /// result has exactly that many more pages and each text page reads back, through PDFKit,
+    /// with every letter of its header and reading.
+    static func insertTextPages(_ pages: [TextPage], reader: String, into file: URL, pageCount: Int,
+                                scratch: URL, to destination: URL, using qpdf: String,
+                                register: (Process) -> Void = { _ in }) throws -> Int {
+        guard !pages.isEmpty else { return 0 }
+        guard pages.allSatisfy({ (1...pageCount).contains($0.page) }),
+              zip(pages, pages.dropFirst()).allSatisfy({ $0.page < $1.page }) else {
+            throw Failure.textPages("a page number was out of order")
+        }
+        let text = scratch.appendingPathComponent("text-pages.pdf")
+        let drawn: [[String]]
+        do { drawn = try writeTextPages(pages, reader: reader, to: text) }
+        catch { throw Failure.textPages("they could not be drawn") }
+        let counts = drawn.map(\.count)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: qpdf)
+        process.arguments = textPageArguments(pages, counts: counts, file: file, pageCount: pageCount,
+                                              text: text, to: destination)
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        register(process)
+        process.waitUntilExit()
+        // 3 is qpdf's warning, which a file it wrote whole still earns.
+        guard process.terminationStatus == 0 || process.terminationStatus == 3 else {
+            throw Failure.textPages("qpdf exited with code \(process.terminationStatus)")
+        }
+        let added = counts.reduce(0, +)
+        guard let out = PDFDocument(url: destination), out.pageCount == pageCount + added else {
+            throw Failure.textPages("the result did not have \(pageCount + added) pages")
+        }
+        var at = 0, before = 0
+        for (page, these) in zip(pages, drawn) {
+            at = page.page + before
+            let read = (at..<(at + these.count)).compactMap { out.page(at: $0)?.string }.joined()
+            // What was drawn reads back, and what was drawn, its headers aside, is the whole reading.
+            let headers = these.indices.map { $0 == 0 ? textPageHeader(page: page.page, reader: reader)
+                                                      : textPageContinued(page: page.page) }
+            guard searchableLetters(read) == searchableLetters(these.joined()),
+                  zip(these, headers).allSatisfy({ $0.hasPrefix($1) }),
+                  searchableLetters(zip(these, headers).map { String($0.dropFirst($1.count)) }.joined())
+                      == searchableLetters(page.text)
+            else {
+                throw Failure.textPages("page \(page.page)'s text page did not read back as written")
+            }
+            before += these.count
+        }
+        return added
+    }
+}
