@@ -15802,3 +15802,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   TextZoomUITests, RotationUITests and ViewerUITests/testToolbarImageSourceSwitch green (5 tests). Bench cache:
   nothing written.
   <!-- /W40.reader-zoom-levels -->
+- [x] **W40.reader-page-position-memory — paging back returns to where you were on that page [S-M]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — SHIPPED 2026-11-13.
+  Owner, 2026-11-13: after reading the bottom of a page, going to the next page and coming back shows the bottom
+  of the earlier page, not the top. Each pane's `PDFPaneController` keeps, for the window's life (never on disk),
+  the region last seen on each page — its centre as fractions of the page as shown plus the pane's size, the same
+  `Viewport` the PDF / JPEG switch already carries — recorded from the clip view's bounds changes of the pane's
+  current, windowed view (not while `show` lays a page out), and reapplied by `show` when the page's fresh view is
+  built. A page not seen yet, or seen fitted (whole page in view), opens at its top. Keys: file path + pair, and
+  the image page's turn (`DocumentViewerModel.imagePositionKey` / `textPositionKey`); the JPEG switch shares the
+  image page's key, and its own captured region still wins. A find hit on a remembered page still scrolls to the
+  hit. The preview passes no key and remembers nothing.
+  Verified: `PDFPaneViewportTests` (10, two new: paging A→B→A in a never-ordered window returns A to its bottom
+  and B to its top; fitted or unkeyed panes remember nothing), the Reader unit bundle (857, 0 failures), and in
+  the Tart VM `ViewerUITests` (20, 0 failures). No new warnings. Bench cache: nothing written.
+  <!-- /W40.reader-page-position-memory -->

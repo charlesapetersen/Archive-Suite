@@ -316,6 +316,10 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
   Upright (four turns, or Reset Rotation) deletes the row. Each row is a page the Processor left sideways
   (`W46.rotation-default`), so `PageTurnStore.turnedPages()` can later serve as rotation truth. Unit-test and
   fixture launches keep turns in memory only.
+- Paging back opens a page where the reader left it (`W40.reader-page-position-memory`): each pane's
+  `PDFPaneController` notes the region seen on each page as it scrolls, by file, pair and (image page) turn, and
+  reapplies it when the page's fresh view is shown. In memory for the window's life only; a page not seen yet, or
+  seen fitted, opens at its top. The preview remembers nothing.
 - `⌃⌘I` View ▸ Invert Image Colors, with a toolbar button in the document window and the preview sheet
   (`W40.reader-image-invert`): the image page, PDF or JPEG original, and the thumbnail and contact-sheet tiles are
   drawn dark, the paper near black and the ink near white; the OCR text page is not changed. A smart invert on sRGB
@@ -592,7 +596,8 @@ Views/
   DocumentWindowView.swift    Two-up layout, draggable splitter, per-pane zoom, focus border, ⌘F find bar
                               (highlight-all + next/prev ⌘G/⇧⌘G + "N of M" across open docs).
   PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/focus/selection; find
-                              highlight reapplied on rebuild, like zoom; a view turn on its page copy).
+                              highlight reapplied on rebuild, like zoom; a view turn on its page copy;
+                              each page's last-seen region, per window).
   DarkPageImages.swift        View ▸ Invert Image Colors (W40.reader-image-invert): the sRGB colour cube, put on
                               the image pane as a layer filter and drawn into the tiles' bitmaps.
   (Core/)DocumentFind.swift   Pure FindNavigator (match list + wrap cursor) + DocumentFindScanner (per-pane
