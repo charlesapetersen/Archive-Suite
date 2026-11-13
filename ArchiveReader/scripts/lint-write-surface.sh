@@ -149,6 +149,19 @@ ALLOW=(
   # derived from the ledger's own URL; the segment is kept, never rewritten or deleted.
   "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}try FileManager.default.moveItem(at: url, to: segment)"
 
+  # ── rule 4 (raw POSIX write) ────────────────────────────────────────────────────────────────────
+  # The audit ledger's append handle (already audited above as the ledger's own file).
+  "posixwrite${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC)"
+  # W44.reocr-processor: Improve OCR's flag generations, in the connected SHARED SUPPORT folder only (never an
+  # archive: `checkSuitable` refuses a folder inside a root marker). Lock file, private folders, temporary-then-link
+  # publication of intent/event files, removal of a finished intent and of the temporary.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}let fd = open(lockPath, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0o600)"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}guard unlink(intentURL.path) == 0 || errno == ENOENT else { throw StoreError.io(\"intent: \\(String(cString: strerror(errno)))\") }"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}if mkdir(url.path, 0o700) != 0 && errno != EEXIST { throw StoreError.io(\"\\(url.lastPathComponent): \\(String(cString: strerror(errno)))\") }"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}let fd = open(temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}defer { unlink(temp) }"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}guard link(temp, url.path) == 0 else { throw StoreError.io(\"\\(url.lastPathComponent): \\(String(cString: strerror(errno)))\") }"
+
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
   # deleted the call (discovery is `ArchiveCore.CorpusWalker` now, which passes an `errorHandler:`),
@@ -274,6 +287,18 @@ scan destructive \
   "destructive / content-write API in the linted trees (or an allowed line that changed):" \
   '\.(removeItem|moveItem|trashItem|replaceItem|replaceItemAt|createFile)\(|FileHandle[^)]*forWriting|PDFDocument[^)]*\.write\(|\.write\(to:' \
   "${SRC_DESTRUCTIVE[@]}"
+
+# 4) raw POSIX writes (W44.reocr-processor): the Foundation spellings above have Darwin equivalents that rule 2 never
+#    saw — opening for writing, creating, linking, renaming, removing, truncating, copying metadata. Same trees as
+#    rule 2. A comment line and a Swift method declaration (`func rename(`) are not calls.
+posix_write_hits() {   # <source root…>
+  local re='(^|[^A-Za-z0-9_.]|Darwin\.|Glibc\.)(unlink|unlinkat|link|linkat|symlink|rmdir|mkdir|mkdirat|rename|renameat|renamex_np|truncate|ftruncate|removexattr|fremovexattr|copyfile|fcopyfile|clonefile|exchangedata|chmod|chflags|utimes|utimensat|setattrlist)\(|O_CREAT|O_TRUNC|O_WRONLY|O_RDWR'
+  grep -rnE "$re" "$@" --include='*.swift' 2>/dev/null \
+    | LINT_RE="$re" /usr/bin/perl -ne 'next if /^[^:]+:\d+:\s*(?:\/\/|\/\*|\*)/; my $code = $_; $code =~ s/^[^:]+:\d+://; $code =~ s/\bfunc\s+\w+\s*\(//g; print if $code =~ /$ENV{LINT_RE}/' || true
+}
+scan_stream posixwrite \
+  "raw POSIX write in the linted trees (or an allowed line that changed):" \
+  < <(posix_write_hits "${SRC_DESTRUCTIVE[@]}")
 
 # 3) FileManager.enumerator without an errorHandler: — a silent skip of what it cannot read.
 scan_stream enumerator \
