@@ -1518,7 +1518,8 @@ review on the strongest model reads what has landed and reworks the queue.
 
 **Cadence.** `measure-review.py upkeep` (the upkeep hook) ticks `W46.measure-review-due` in `## RECURRING` once 12
 items have finished with a result since the last review (owner, 2026-11-11; it was 8 from 2026-11-04). An item counts when a commit on
-origin/main names it in its subject and touched `ArchiveProcessor/segbench-results/` or `ArchiveOCRBench/data/`, and
+origin/main names it in its subject and touched `ArchiveProcessor/segbench-results/` or `ArchiveOCRBench/data/` other
+than a built table or index there (`settings-routes.json`, `ocr-page-guidance.json`, `SUMMARY.md`: pass 14), and
 the item is ticked in `SUITE_TODO_DONE.md`; its checkpoint commits count once, when it is done. Items the review filed
 do not count. They are read from the pass's note: **each item a pass files is named first on a `**Queue:**` line of its
 note**, as every pass since the third has done; a DONE entry whose first line opens its description with "Measurement

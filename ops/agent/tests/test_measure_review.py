@@ -223,6 +223,22 @@ class Cadence(Base):
         self.run_mr("upkeep", now=NOW + DAY)
         self.assertFalse(self.ticked())
 
+    def test_a_built_table_alone_is_not_a_result(self):
+        # Pass 14: four app and documentation items had counted by regenerating settings-routes.json alone.
+        self.seed()
+        for _ in range(mr.MIN_ITEMS - 1):
+            self.result()
+        self.result("settings-routes.json", card=False)
+        self.result("ocr-page-guidance.json", card=False)
+        self.result("SUMMARY.md", card=False)
+        self.run_mr("upkeep", now=NOW + DAY)
+        self.assertFalse(self.ticked())
+        self.result()                                     # a real result beside a built file counts
+        self.result("settings-routes.json", card=False, tag="W9.both")
+        self.result("real.json", card=False, tag="W9.both")
+        self.run_mr("upkeep", now=NOW + DAY)
+        self.assertTrue(self.ticked())
+
     def test_done_moves_the_window_and_a_ticked_gate_is_left_alone(self):
         self.seed()
         for _ in range(mr.MIN_ITEMS):
@@ -253,6 +269,7 @@ class Checks(Base):
         self.result("bad.md", card=False)
         self.result("data.json", card=False)
         self.result("method.summary-section.md", card=False)
+        self.result("SUMMARY.md", card=False)             # a built index, not a report (pass 14)
         self.assertEqual(mr.cards(mr.Env(type("A", (), {"repo": self.repo, "state": self.state, "plan": self.plan,
                                                         "now": NOW})())),
                          ["ArchiveProcessor/segbench-results/bad.md"])
