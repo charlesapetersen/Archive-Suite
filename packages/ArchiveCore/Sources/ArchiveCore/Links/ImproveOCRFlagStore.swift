@@ -114,10 +114,15 @@ public struct ImproveOCRFlagStore: Sendable {
         public let pending: Intent?
         /// An unfinished action whose record cannot be read; also a barrier until `reconcile`.
         public let pendingUnreadable: Bool
+        /// The operation and origin of the latest finished action, so a caller can tell its own earlier attempt.
+        public let lastOperationID: UUID?
+        public let lastOrigin: Origin?
 
-        public init(generation: UUID?, flagged: Bool?, pending: Intent?, pendingUnreadable: Bool = false) {
+        public init(generation: UUID?, flagged: Bool?, pending: Intent?, pendingUnreadable: Bool = false,
+                    lastOperationID: UUID? = nil, lastOrigin: Origin? = nil) {
             self.generation = generation; self.flagged = flagged; self.pending = pending
             self.pendingUnreadable = pendingUnreadable
+            self.lastOperationID = lastOperationID; self.lastOrigin = lastOrigin
         }
 
         public var isPending: Bool { pending != nil || pendingUnreadable }
@@ -173,11 +178,11 @@ public struct ImproveOCRFlagStore: Sendable {
         public func state() throws -> State {
             let events = try eventFiles()
             let last = try events.last.map { try ImproveOCRFlagStore.decode(Event.self, from: eventsURL.appendingPathComponent($0)) }
-            guard FileManager.default.fileExists(atPath: intentURL.path) else {
-                return State(generation: last?.generation, flagged: last?.flagged, pending: nil)
-            }
-            let pending = try? ImproveOCRFlagStore.decode(Intent.self, from: intentURL)
-            return State(generation: last?.generation, flagged: last?.flagged, pending: pending, pendingUnreadable: pending == nil)
+            let pending = FileManager.default.fileExists(atPath: intentURL.path)
+                ? Optional(try? ImproveOCRFlagStore.decode(Intent.self, from: intentURL)) : nil
+            return State(generation: last?.generation, flagged: last?.flagged, pending: pending ?? nil,
+                         pendingUnreadable: pending.map { $0 == nil } ?? false,
+                         lastOperationID: last?.operationID, lastOrigin: last?.origin)
         }
 
         /// Records that an action is about to set the tag to `flagged`, with a new generation. Refuses while another
@@ -265,7 +270,7 @@ public struct ImproveOCRFlagStore: Sendable {
 
     /// Refuses a support folder on a network or synced volume, or inside an archive root (marked by
     /// `RootMarker.filename` in it or any folder above it).
-    func checkSuitable() throws {
+    public func checkSuitable() throws {
         var fs = statfs()
         guard statfs(support.path, &fs) == 0 else { throw StoreError.unsuitableFolder("it cannot be read") }
         guard fs.f_flags & UInt32(MNT_LOCAL) != 0 else { throw StoreError.unsuitableFolder("it is not on a local disk") }

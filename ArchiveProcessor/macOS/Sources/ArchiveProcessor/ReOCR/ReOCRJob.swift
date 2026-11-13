@@ -19,13 +19,29 @@ import UniformTypeIdentifiers
 ///    300 dpi rendering. The old text pages are never read. A failure after `prepare` records the operation rejected.
 /// 3. When every selected pair has a reading, the replacement pages go through `ReOCRIncrementalWriter`, which proves
 ///    the candidate kept the rest. One failed pair means no candidate: a partial batch cannot be accepted.
-/// 4. `accept` publishes through `ReOCRFileWriter`; `reject` records the verdict and leaves the file as it is.
+/// 4. `accept` publishes through `ReOCRFileWriter`, then writes the content receipt for the Reader and clears only
+///    the `OCR Poor` flag generation the review saw (plan §5 step 5, §6): tag clearing and replacement are not one
+///    atomic step, so a flag that cannot be cleared leaves the good text in place and is reported, and `clearFlag`
+///    retries that step alone. `reject` records the verdict and leaves the file as it is.
+/// It needs the connected shared support folder (receipts and flag generations) and the file's archive root; without
+/// them it refuses before keeping or reading anything, never falling back to an unshared record.
 ///
 /// The reader is injected: the dialog passes the chosen route, the self-test a fake. Nothing here spends money.
 struct ReOCRJob {
     let writer: ReOCRFileWriter
     /// Private scratch for the image inputs; the caller removes it.
     let scratch: URL
+    /// The connected shared support folder.
+    let support: URL
+
+    var flags: ImproveOCRFlagStore { ImproveOCRFlagStore(support: support) }
+    static let app = "Processor"
+
+    /// The archive the file belongs to: its root marker's GUID and the folder the Processor was granted.
+    struct Root: Sendable {
+        let guid: UUID
+        let url: URL
+    }
 
     typealias Reader = @Sendable (_ image: URL, _ pair: ReOCRPairs.Pair, _ kind: OCRPageKind?) async -> OCRResult
 
@@ -39,6 +55,10 @@ struct ReOCRJob {
 
     struct Review: Sendable {
         let operation: ReOCRFileWriter.Operation
+        let key: ImproveOCRFlagStore.FileKey
+        /// The flag generation and the tag when the review began: acceptance clears only this generation.
+        let reviewedGeneration: UUID?
+        let flaggedAtReview: Bool
         let results: [PairResult]
         /// Present only when every selected pair was read and the candidate passed the preservation check.
         let candidate: Data?
@@ -51,6 +71,7 @@ struct ReOCRJob {
         case nothingSelected
         case imageNotExtracted(page: Int)
         case noCandidate
+        case tagsUnreadable
 
         var description: String {
             switch self {
@@ -59,15 +80,20 @@ struct ReOCRJob {
             case .nothingSelected: "no page was selected"
             case .imageNotExtracted(let p): "page \(p + 1) could not be prepared for reading"
             case .noCandidate: "not every selected page was read, so there is nothing to accept"
+            case .tagsUnreadable: "the file's tags cannot be read"
             }
         }
     }
 
     /// `textPages` selects pairs by their text page's 0-based index (nil: every pair); `kinds` overrides a pair's
     /// Kind by the same index (absent: the header's own).
-    func start(file: URL, textPages: Set<Int>? = nil, kinds: [Int: OCRPageKind] = [:], model: LLMModel,
+    func start(file: URL, root: Root, textPages: Set<Int>? = nil, kinds: [Int: OCRPageKind] = [:], model: LLMModel,
                gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                read: Reader) async throws -> Review {
+        try flags.checkSuitable()
+        let key = try ImproveOCRFlagStore.FileKey(rootGUID: root.guid, root: root.url, file: file)
+        let reviewed = try flags.withLock(key, app: Self.app) { try $0.state() }
+        guard let flaggedAtReview = Self.isFlagged(file) else { throw Failure.tagsUnreadable }
         let live = try Data(contentsOf: file)
         let pairs: [ReOCRPairs.Pair]
         switch ReOCRPairs.validate(live) {
@@ -120,21 +146,113 @@ struct ReOCRJob {
             try? writer.reject(op)
             throw error
         }
-        guard replacements.count == selected.count else {
-            return Review(operation: op, results: results, candidate: nil, candidateProblem: nil)
+        func review(_ candidate: Data?, _ problem: String?) -> Review {
+            Review(operation: op, key: key, reviewedGeneration: reviewed.generation, flaggedAtReview: flaggedAtReview,
+                   results: results, candidate: candidate, candidateProblem: problem)
         }
+        guard replacements.count == selected.count else { return review(nil, nil) }
         do {
-            let candidate = try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements)
-            return Review(operation: op, results: results, candidate: candidate, candidateProblem: nil)
+            return review(try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements), nil)
         } catch {
-            return Review(operation: op, results: results, candidate: nil, candidateProblem: "\(error)")
+            return review(nil, "\(error)")
         }
     }
 
-    @discardableResult
-    func accept(_ review: Review) throws -> ReOCRFileWriter.Journal {
+    enum FlagOutcome: Equatable, Sendable {
+        case cleared
+        /// The file was not flagged when reviewed and is not now: nothing to clear.
+        case notFlagged
+        /// Someone flagged or unflagged it since the review, or their action is unfinished: left for the person.
+        case changedSinceReview(String)
+        case failed(String)
+    }
+
+    struct Accepted: Sendable {
+        let journal: ReOCRFileWriter.Journal
+        /// Nil when written; else why not (the text is in place regardless; `writeReceipt` retries).
+        let receiptProblem: String?
+        let flag: FlagOutcome
+    }
+
+    /// Publishes, then records the receipt, then clears the reviewed flag. The publication throws: before the swap the
+    /// file is as it was; `publishedButUnverified` or `publishedRecordPending` mean the new text is in place but its
+    /// record is not finished, which launch recovery completes (receipt and flag included). The two steps after a
+    /// clean publication report their outcome instead, so the person sees "text accepted; flag still needs clearing".
+    func accept(_ review: Review) throws -> Accepted {
         guard let candidate = review.candidate else { throw Failure.noCandidate }
-        return try writer.accept(review.operation, candidate: candidate)
+        try flags.checkSuitable()
+        let journal = try writer.accept(review.operation, candidate: candidate)
+        var receiptProblem: String?
+        do { try writeReceipt(review, journal) } catch { receiptProblem = "\(error)" }
+        return Accepted(journal: journal, receiptProblem: receiptProblem, flag: clearFlag(review, journal))
+    }
+
+    func writeReceipt(_ review: Review, _ journal: ReOCRFileWriter.Journal) throws {
+        guard journal.phase == .published, let after = journal.candidateSHA256 else { throw Failure.noCandidate }
+        try ImproveOCRReceipt(operationID: journal.operationID, key: review.key,
+                              textPages: review.results.map(\.pair.textIndex), beforeSHA256: journal.original.sha256,
+                              afterSHA256: after, outcome: .published).write(to: support)
+    }
+
+    /// Clears `OCR Poor` from the published file, but only the generation the review saw: under the file's flag lock,
+    /// `begin(ifGenerationIs:)`, the tag removed through ArchiveCore's coordinated tag writer (all spellings of the
+    /// flag; nothing else), then the value read back is committed. Safe to call again.
+    ///
+    /// A retry after this operation's own failed or interrupted clear is recognised by the operation ID its intent and
+    /// event carry, so it is not mistaken for someone else's change.
+    func clearFlag(_ review: Review, _ journal: ReOCRFileWriter.Journal) -> FlagOutcome {
+        let file = review.operation.target
+        let op = journal.operationID
+        do {
+            return try flags.withLock(review.key, app: Self.app) { l -> FlagOutcome in
+                var now = try l.state()
+                if let pending = now.pending, pending.operationID == op {
+                    // This operation's own clear, cut off before it finished: record what the tag is, then go on.
+                    try l.reconcile(observedFlagged: Self.isFlagged(file) ?? true)
+                    now = try l.state()
+                }
+                if now.isPending { return .changedSinceReview("another action on this file has not finished") }
+                let ownEarlierAttempt = now.lastOperationID == op
+                guard now.generation == review.reviewedGeneration || ownEarlierAttempt else {
+                    return .changedSinceReview("the file was flagged or unflagged again while it was being read")
+                }
+                guard let flagged = Self.isFlagged(file) else { return .failed("its tags cannot be read") }
+                guard flagged else {
+                    if ownEarlierAttempt { return .cleared }
+                    return review.flaggedAtReview ? .changedSinceReview("the flag was removed outside the suite") : .notFlagged
+                }
+                // Flagged now but not when reviewed: someone set it during the read (perhaps outside the suite).
+                guard review.flaggedAtReview else { return .changedSinceReview("the file was flagged while it was being read") }
+                // Still the file this operation published, not one put in its place since.
+                var st = stat()
+                guard lstat(file.path, &st) == 0, st.st_ino == journal.stagedInode else {
+                    return .changedSinceReview("the file was replaced after the new text was put in place")
+                }
+                let intent = try l.begin(flagged: false, origin: .acceptedClear, ifGenerationIs: now.generation, operationID: op)
+                do {
+                    _ = try CoordinatedTagWriter.write(file) { tags, label in
+                        let kept = tags.filter { !shouldRemoveTag($0, matching: DocumentTags.poorOCRTag) }
+                        return kept.count == tags.count ? nil : (kept, label)
+                    }
+                } catch {
+                    // The barrier must not outlive this call: record what the tag is now.
+                    _ = try? l.reconcile(observedFlagged: Self.isFlagged(file) ?? true)
+                    return .failed("\(error)")
+                }
+                let observed = Self.isFlagged(file) ?? true
+                try l.commit(intent, observedFlagged: observed)
+                return observed ? .failed("the flag is still on the file") : .cleared
+            }
+        } catch ImproveOCRFlagStore.StoreError.generationChanged {
+            return .changedSinceReview("the file was flagged or unflagged again while it was being read")
+        } catch {
+            return .failed("\(error)")
+        }
+    }
+
+    /// Whether the file carries `OCR Poor` in any spelling; nil when its tags cannot be read.
+    static func isFlagged(_ file: URL) -> Bool? {
+        TagReading.read(file).tagNames.map { $0.contains { isSameTag($0, DocumentTags.poorOCRTag) } }
     }
 
     func reject(_ review: Review) throws {

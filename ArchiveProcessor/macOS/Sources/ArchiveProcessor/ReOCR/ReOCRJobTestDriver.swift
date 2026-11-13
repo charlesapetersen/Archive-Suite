@@ -21,6 +21,9 @@ import PDFKit
 ///   6c. The JPEG fast path takes a page only when it shows exactly its JPEG (a full or letterboxed upright image);
 ///       cropped, flipped, clipped, masked, twice-drawn or text-bearing pages are rendered.
 ///   7. A rotated image page is rendered rather than extracted, and still reaches the reader as a JPEG.
+///   8. After publication the receipt is written and the reviewed `OCR Poor` generation cleared, other tags kept; a
+///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
+///      nothing to clear; a file outside its root is refused.
 @MainActor
 enum ReOCRJobTestDriver {
     private static var didRun = false
@@ -72,10 +75,21 @@ enum ReOCRJobTestDriver {
         return dir
     }
 
+    private static let rootGUID = UUID(uuidString: "5d1e0c2a-7b44-4c1e-9a0f-3c2b1a0d9e8f")!
+
+    /// The case folder stands in for the archive root; the shared support folder sits beside it, outside.
+    private static func support(_ dir: URL) -> URL {
+        let url = root.appendingPathComponent("support-\(dir.lastPathComponent)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return url
+    }
+
     private static func job(_ dir: URL) -> ReOCRJob {
         ReOCRJob(writer: ReOCRFileWriter(versionsRoot: dir.appendingPathComponent("Versions", isDirectory: true)),
-                 scratch: dir.appendingPathComponent("scratch", isDirectory: true))
+                 scratch: dir.appendingPathComponent("scratch", isDirectory: true), support: support(dir))
     }
+
+    private static func archive(_ dir: URL) -> ReOCRJob.Root { ReOCRJob.Root(guid: rootGUID, url: dir) }
 
     private static func jpeg(_ url: URL, seed: Int) throws {
         let w = 160, h = 200
@@ -132,6 +146,12 @@ enum ReOCRJobTestDriver {
         return out
     }
 
+    private static func tag(_ url: URL, _ tags: [String]) throws {
+        _ = try CoordinatedTagWriter.write(url) { _, label in (tags, label) }
+    }
+
+    private static func tags(_ url: URL) -> [String] { TagReading.read(url).tagNames ?? [] }
+
     private static func text(_ url: URL, _ page: Int) -> String {
         PDFDocument(url: url)?.page(at: page)?.string ?? ""
     }
@@ -147,7 +167,7 @@ enum ReOCRJobTestDriver {
             do {
                 let d = try folder("two"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
                 let original = try Data(contentsOf: f)
-                let review = try await j.start(file: f, model: model, read: reader.read)
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
                 check("1 the reader is asked once, for the image page", reader.calls.map(\.imageIndex) == [0])
                 let source = try Data(contentsOf: d.appendingPathComponent("IMG1.jpg"))
                 check("1 the reader gets the source JPEG byte for byte", reader.calls.first?.image == source,
@@ -159,7 +179,7 @@ enum ReOCRJobTestDriver {
                       (try? review.results.first?.outcome.get())?.contains("New reading of image page 1.") == true)
                 check("1 there is a candidate", review.candidate != nil, review.candidateProblem ?? "")
                 check("1 the file is unchanged before accept", (try? Data(contentsOf: f)) == original)
-                try j.accept(review)
+                _ = try j.accept(review)
                 check("1 accepting publishes the new text", text(f, 1).contains("New reading of image page 1.")
                       && !text(f, 1).contains("Old reading"))
                 check("1 the old file is kept", (try? Data(contentsOf: j.writer.backupURL(review.operation.journal.operationID))) == original)
@@ -168,13 +188,13 @@ enum ReOCRJobTestDriver {
             // 2. One pair of three.
             do {
                 let d = try folder("one-of-three"), f = try file(d, pairs: 3), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, textPages: [3], model: model, read: reader.read)
+                let review = try await j.start(file: f, root: archive(d), textPages: [3], model: model, read: reader.read)
                 check("2 only the selected pair's image is read", reader.calls.map(\.imageIndex) == [2])
-                try j.accept(review)
+                _ = try j.accept(review)
                 check("2 its text page changes", text(f, 3).contains("New reading of image page 3."))
                 check("2 the others keep their text", text(f, 1).contains("Old reading of image 1.")
                       && text(f, 5).contains("Old reading of image 3."))
-                do { _ = try await j.start(file: f, textPages: [2], model: model, read: reader.read); check("2 an image page is not selectable", false) }
+                do { _ = try await j.start(file: f, root: archive(d), textPages: [2], model: model, read: reader.read); check("2 an image page is not selectable", false) }
                 catch { check("2 an image page is not selectable", (error as? ReOCRJob.Failure) == .noSuchPair(page: 2), "\(error)") }
             }
 
@@ -182,11 +202,11 @@ enum ReOCRJobTestDriver {
             do {
                 let d = try folder("failed-pair"), f = try file(d, pairs: 3), j = job(d), reader = FakeReader(failing: [2])
                 let original = try Data(contentsOf: f)
-                let review = try await j.start(file: f, model: model, read: reader.read)
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
                 check("3 every pair is still tried", reader.calls.map(\.imageIndex) == [0, 2, 4])
                 check("3 a failed pair means no candidate", review.candidate == nil)
                 check("3 the failure is shown for its page", { if case .failure = review.results[1].outcome { return true }; return false }())
-                do { try j.accept(review); check("3 accept is refused", false) }
+                do { _ = try j.accept(review); check("3 accept is refused", false) }
                 catch { check("3 accept is refused", (error as? ReOCRJob.Failure) == .noCandidate, "\(error)") }
                 check("3 the file is untouched", (try? Data(contentsOf: f)) == original)
                 try j.reject(review)
@@ -196,9 +216,9 @@ enum ReOCRJobTestDriver {
             // 4. A Kind chosen by the person.
             do {
                 let d = try folder("kind"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, kinds: [1: .forms], model: model, read: reader.read)
+                let review = try await j.start(file: f, root: archive(d), kinds: [1: .forms], model: model, read: reader.read)
                 check("4 the reader is told the chosen Kind", reader.calls.first?.kind == .forms)
-                try j.accept(review)
+                _ = try j.accept(review)
                 let header = PDFDocument(url: f)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
                 check("4 the new header has the chosen Kind", header?.kind == .forms, "\(String(describing: header))")
             }
@@ -208,7 +228,7 @@ enum ReOCRJobTestDriver {
                 let d = try folder("ineligible"), j = job(d), reader = FakeReader()
                 let f = d.appendingPathComponent("raw.pdf")
                 let doc = PDFDocument(); doc.insert(PDFPage(), at: 0); try doc.dataRepresentation()?.write(to: f)
-                do { _ = try await j.start(file: f, model: model, read: reader.read); check("5 a one-page file is refused", false) }
+                do { _ = try await j.start(file: f, root: archive(d), model: model, read: reader.read); check("5 a one-page file is refused", false) }
                 catch { check("5 a one-page file is refused", { if case ReOCRJob.Failure.notEligible = error { return true }; return false }(), "\(error)") }
                 check("5 nothing was kept or read", reader.calls.isEmpty
                       && !FileManager.default.fileExists(atPath: j.writer.versionsRoot.path))
@@ -217,10 +237,10 @@ enum ReOCRJobTestDriver {
             // 6. Changed between run and accept.
             do {
                 let d = try folder("changed"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
-                let review = try await j.start(file: f, model: model, read: reader.read)
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
                 let h = try FileHandle(forWritingTo: f); try h.seekToEnd(); try h.write(contentsOf: Data("\n%e\n".utf8)); try h.close()
                 let edited = try Data(contentsOf: f)
-                do { try j.accept(review); check("6 a changed file is refused at accept", false) }
+                do { _ = try j.accept(review); check("6 a changed file is refused at accept", false) }
                 catch { check("6 a changed file is refused at accept", (error as? ReOCRFileWriter.Failure) == .targetChanged, "\(error)") }
                 check("6 the edit stays", (try? Data(contentsOf: f)) == edited)
             }
@@ -231,8 +251,8 @@ enum ReOCRJobTestDriver {
                 let blocker = d.appendingPathComponent("not-a-folder")
                 try Data("x".utf8).write(to: blocker)
                 let j = ReOCRJob(writer: ReOCRFileWriter(versionsRoot: d.appendingPathComponent("Versions", isDirectory: true)),
-                                 scratch: blocker.appendingPathComponent("scratch", isDirectory: true))
-                do { _ = try await j.start(file: f, model: model, read: reader.read); check("6b a failure after prepare throws", false) }
+                                 scratch: blocker.appendingPathComponent("scratch", isDirectory: true), support: support(d))
+                do { _ = try await j.start(file: f, root: archive(d), model: model, read: reader.read); check("6b a failure after prepare throws", false) }
                 catch { check("6b a failure after prepare throws", true) }
                 let r = j.writer.recover()
                 check("6b the operation is recorded rejected", r.count == 1 && { if case .rejected = r[0] { return true }; return false }(), "\(r)")
@@ -274,6 +294,84 @@ enum ReOCRJobTestDriver {
                       && CGImageSourceCreateWithURL(rendered as CFURL, nil).flatMap { CGImageSourceGetType($0) as String? } == "public.jpeg")
             }
 
+            // 8. After publication: the receipt, and the reviewed flag cleared, other tags kept.
+            do {
+                let d = try folder("flag-cleared"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["Q2", "OCR Poor", "1952"])
+                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+                // The Reader's flag action, recorded as the protocol says.
+                let flaggedGen = try j.flags.withLock(k, app: "Reader") { l in
+                    try l.commit(l.begin(flagged: true, origin: .flag), observedFlagged: true).generation
+                }
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                check("8 the review saw the Reader's generation", review.reviewedGeneration == flaggedGen && review.flaggedAtReview)
+                let done = try j.accept(review)
+                check("8 the flag is cleared", done.flag == .cleared, "\(done.flag)")
+                check("8 the other tags stay", multisetEqual(tags(f), ["Q2", "1952"]), "\(tags(f))")
+                let st = try j.flags.withLock(k, app: "Reader") { try $0.state() }
+                check("8 the clear is a new generation, recorded unflagged", st.generation != flaggedGen && st.flagged == false)
+                let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: done.journal.operationID, in: j.support))
+                check("8 the receipt names the file and both digests", done.receiptProblem == nil && receipt?.relativePath == "Letter.pdf"
+                      && receipt?.beforeSHA256 == done.journal.original.sha256 && receipt?.afterSHA256 == done.journal.candidateSHA256
+                      && receipt?.textPages == [1] && receipt?.outcome == .published, "\(String(describing: receipt))")
+                check("8 a retry of its own finished clear reports it cleared", j.clearFlag(review, done.journal) == .cleared)
+            }
+            do {
+                let d = try folder("flag-again"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["OCR Poor"])
+                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                // The person flags it again while the re-read runs.
+                _ = try j.flags.withLock(k, app: "Reader") { l in try l.commit(l.begin(flagged: true, origin: .flag), observedFlagged: true) }
+                let done = try j.accept(review)
+                check("8 a flag set again during the read is left", { if case .changedSinceReview = done.flag { return true }; return false }()
+                      && tags(f) == ["OCR Poor"], "\(done.flag) \(tags(f))")
+                check("8 the text is accepted all the same", text(f, 1).contains("New reading of image page 1."))
+            }
+            do {
+                let d = try folder("finder-flag"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                try tag(f, ["OCR Poor"])   // flagged in Finder while it is read: no suite event
+                let done = try j.accept(review)
+                check("8 a flag set outside the suite during the read is left", { if case .changedSinceReview = done.flag { return true }; return false }()
+                      && tags(f) == ["OCR Poor"], "\(done.flag) \(tags(f))")
+            }
+            do {
+                let d = try folder("resume-clear"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["OCR Poor", "Q1"])
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                // Published, then the Processor died just after beginning its clear.
+                let journal = try j.writer.accept(review.operation, candidate: review.candidate ?? Data())
+                _ = try j.flags.withLock(review.key, app: "Processor") {
+                    try $0.begin(flagged: false, origin: .acceptedClear, operationID: journal.operationID)
+                }
+                let outcome = j.clearFlag(review, journal)
+                check("8 an interrupted clear of its own is resumed", outcome == .cleared && tags(f) == ["Q1"], "\(outcome) \(tags(f))")
+                let st = try j.flags.withLock(review.key, app: "Reader") { try $0.state() }
+                check("8 and leaves no barrier", !st.isPending && st.flagged == false)
+            }
+            do {
+                let d = try folder("unflagged"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                let done = try j.accept(try await j.start(file: f, root: archive(d), model: model, read: reader.read))
+                check("8 an unflagged file has nothing to clear", done.flag == .notFlagged && done.receiptProblem == nil, "\(done.flag)")
+            }
+            do {
+                let d = try folder("pending"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["OCR Poor"])
+                let k = try ImproveOCRFlagStore.FileKey(rootGUID: rootGUID, root: d, file: f)
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                _ = try j.flags.withLock(k, app: "Reader") { try $0.begin(flagged: false, origin: .unflag) }   // dies mid-action
+                let done = try j.accept(review)
+                check("8 an unfinished action elsewhere leaves the flag", { if case .changedSinceReview = done.flag { return true }; return false }()
+                      && tags(f) == ["OCR Poor"], "\(done.flag)")
+            }
+            do {
+                let d = try folder("outside-root"), f = try file(d, pairs: 1), reader = FakeReader()
+                let other = try folder("other-root")
+                do { _ = try await job(d).start(file: f, root: archive(other), model: model, read: reader.read); check("8 a file outside its root is refused", false) }
+                catch { check("8 a file outside its root is refused", (error as? ImproveOCRFlagStore.StoreError) == .notInRoot && reader.calls.isEmpty, "\(error)") }
+            }
+
             // 7. A rotated image page.
             do {
                 let d = try folder("rotated"), f = try file(d, pairs: 1), reader = FakeReader()
@@ -283,7 +381,7 @@ enum ReOCRJobTestDriver {
                 }
                 let data = try Data(contentsOf: f)
                 check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 0) == nil)
-                let review = try await job(d).start(file: f, model: model, read: reader.read)
+                let review = try await job(d).start(file: f, root: archive(d), model: model, read: reader.read)
                 let src = reader.calls.first.flatMap { CGImageSourceCreateWithData($0.image as CFData, nil) }
                 let props = src.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
                 let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0, h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
