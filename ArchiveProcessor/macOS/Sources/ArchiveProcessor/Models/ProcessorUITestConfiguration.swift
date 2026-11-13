@@ -114,14 +114,14 @@ enum ProcessorUITestConfiguration {
         }
     }
 
-    /// `-APUITestRankNames` (W46.settings-range-view): the scratch output folder's collection ranks every step, names
-    /// included, so Apple's built-in name finder can run and the settings sheet's range tab has a route to choose in
-    /// a setup where every other route needs a key or a download. Written by the sheet's own writer into the test's
-    /// disposable output folder only.
+    /// `-APUITestRangeOverride` (W46.settings-range-view): the scratch output folder's collection overrides the dating
+    /// card with Gemini 3.8 Flash, which cannot run without a key, so the card is Custom and the settings sheet's range
+    /// tab offers the app's own pick as the way back. Written by the sheet's own writer into the test's disposable
+    /// output folder only.
     @MainActor static func installScratchCollectionSettings() {
-        guard isActive, arguments.contains("-APUITestRankNames"), let folder = outputDirectory else { return }
+        guard isActive, arguments.contains("-APUITestRangeOverride"), let folder = outputDirectory else { return }
         _ = SettingsSheetWriter(store: .shared, folder: folder)
-            .set(.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)), doc: nil)
+            .set(SettingsSheetModel.overrideKey("dating"), .string("gemini3.8-flash-oneshot"), doc: nil)
     }
 
     /// A headless driver launch (`ARCHIVEPROC_HEADLESS=1`, the gate's recovery and retry-backend checks) must not

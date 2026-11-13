@@ -278,36 +278,34 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(waitUntil { !self.element("ap.sheet").exists }, "Done closes the sheet")
     }
 
-    /// W46.settings-range-view: a row's Choose on the Range tab sets that stage's override (the card turns Custom, with
-    /// a way back), and the way back clears it. Names are ranked in the scratch collection so Apple's built-in name
-    /// finder can run; every other route here needs a key or a download.
+    /// W46.settings-range-view: choosing on the Range tab writes the card's choice. The scratch collection overrides
+    /// the dating card with a route that cannot run here (no key), so the card is Custom; the range's row for the
+    /// app's own pick goes back to it, and the card is no longer Custom. (With no key and this guest's memory, no
+    /// other route can be chosen, so the way back is the click there is to check.)
     func testRangeChoosingSetsTheCardsOverrideAndTheWayBack() throws {
-        relaunch(extra: ["-APUITestRankNames"])
+        relaunch(extra: ["-APUITestRangeOverride"])
         let sheetButton = element("ap.segmentation.openSettingsSheet")
         XCTAssertTrue(sheetButton.waitForExistence(timeout: 10), "the chooser opens the settings sheet")
         sheetButton.click()
         XCTAssertTrue(element("ap.sheet").waitForExistence(timeout: 10), "the settings sheet appears")
+        let reset = element("ap.sheet.reset.dating")
+        XCTAssertTrue(reset.waitForExistence(timeout: 5), "the overridden dating card is Custom, with a way back")
         app.sheets.firstMatch.radioButtons["Range"].click()
-        let choose = app.descendants(matching: .button)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier CONTAINS %@", "ap.sheet.range.", ".choose."))
-            .firstMatch
-        XCTAssertTrue(choose.waitForExistence(timeout: 5), "a range table offers another route to choose")
-        // ap.sheet.range.<stage>.choose.<route>
-        let stage = choose.identifier.components(separatedBy: ".").dropFirst(3).first ?? ""
+        // The app's own pick depends on the guest's memory; its row's button is "Go back to it".
+        let back = app.descendants(matching: .button)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label == %@", "ap.sheet.range.dating.choose.",
+                                  "Go back to it")).firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "the dates table offers the app's own pick as the way back")
         let scroll = app.sheets.firstMatch.scrollViews.firstMatch
-        for _ in 0..<40 where !choose.isHittable {
+        for _ in 0..<60 where !back.isHittable {
             scroll.scroll(byDeltaX: 0, deltaY: -300)
         }
-        choose.click()
-        app.sheets.firstMatch.radioButtons["Choices"].click()
-        let back = element("ap.sheet.reset.\(stage)")
-        XCTAssertTrue(back.waitForExistence(timeout: 5), "choosing from the range marks the \(stage) card Custom, with a way back")
-        attachScreenshot("processor-settings-sheet-range-chosen")
-        for _ in 0..<40 where !back.isHittable {
-            scroll.scroll(byDeltaX: 0, deltaY: -300)
-        }
+        attachScreenshot("processor-settings-sheet-range-way-back")
         back.click()
-        XCTAssertTrue(waitUntil { !back.exists }, "the way back returns the \(stage) card to the app's pick")
+        app.sheets.firstMatch.radioButtons["Choices"].click()
+        XCTAssertTrue(element("ap.sheet.card.dating").waitForExistence(timeout: 5), "the Choices tab is back")
+        XCTAssertTrue(waitUntil { !self.element("ap.sheet.reset.dating").exists },
+                      "choosing the app's pick on the range clears the dating card's override")
         element("ap.sheet.done").click()
     }
 

@@ -288,6 +288,20 @@ enum SettingsSheetTestDriver {
                   !net.isEmpty && net.allSatisfy { $0.state == .unusable && $0.tooltip.contains("keep them on this Mac") },
                   net.first { $0.state != .unusable }?.id ?? "")
         } else { check("8 stays-on-mac reading chart", false) }
+        // The UI suite's way-back setup (-APUITestRangeOverride): dating overridden with a route that cannot run with
+        // no key; the range offers the app's own pick, marked as the way back (testRangeChoosingSetsTheCardsOverride…).
+        for gb in [8.0, 16.0] {
+            let ui = sheet("ui-suite-\(Int(gb))", general: SettingsLayer(kind: .general, name: "General"),
+                           collection: layer(.collection, [(SettingsSheetModel.overrideKey("dating"), .string("gemini3.8-flash-oneshot"))]),
+                           gb: gb)
+            let d = ui.ranges.first { $0.id == "dating" }
+            let row = d?.rows.first { $0.id == d?.appPickID }
+            check("8 the UI suite's way back on \(Int(gb)) GB: the dates table offers the app's pick to go back to",
+                  card(ui, "dating")?.isCustom == true && d?.appPickID != nil && d?.appPickID != "gemini3.8-flash-oneshot"
+                    && row?.choosable == true && row?.appPick == true
+                    && d?.rows.filter(\.appPick).count == 1,
+                  "\(d?.appPickID ?? "nil") \(row.map { "\($0.choosable) \($0.appPick)" } ?? "no row")")
+        }
         check("8 F no: no after-training point anywhere", (free.ranges + paid.ranges).allSatisfy { $0.kit.isEmpty })
         let agentSeg = agent.ranges.first { $0.id == "segmentation" }?.kit ?? []
         check("8 F coding agent: the Mac LoRA listed as not offered, no cluster rows",

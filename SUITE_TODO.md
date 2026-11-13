@@ -624,7 +624,7 @@ in `13-profile-tests.md`), and files its build here. These items replace the int
 table and the router) and 6 (plan this batch), which are not filed. The order is the dependency order: the table first,
 since the solver, the sheet and the stage rules all read it.
 
-- [ ] **`W46.settings-range-view` — the range view [M]** (lane: processor) (uses: build,vm) (blocked-on: W46.settings-sheet) — One chart per stage: cost per 1,000 units at list price on a log scale with a band for free routes, accuracy for the user's mix, one mark per route shaped by family, hollow when infeasible with the reason in the tooltip, faded when outside the limits, the undominated line, the line for what is left of the ceiling once the other stages are paid, click to choose; the full table beneath; after-training points when the fine-tuning answer allows them, with the kit's conditions.
+Every `W46.settings-*` item has shipped; their entries are in `SUITE_TODO_DONE.md`.
 
 
 ## Archival containers — W47 (owner, 2026-10-21)
