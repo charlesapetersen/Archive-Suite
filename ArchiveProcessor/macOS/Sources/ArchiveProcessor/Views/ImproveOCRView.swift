@@ -32,7 +32,14 @@ final class ImproveOCRController: ObservableObject {
 
     /// `<Processor Application Support>/ImproveOCR`, where kept versions and journals live.
     static var privateFolder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        #if DEBUG
+        // The UI suite's launches keep their versions beside their scratch shared folder, never in the real one.
+        if let test = ProcessorUITestConfiguration.improveOCRSupport {
+            return test.folder.deletingLastPathComponent()
+                .appendingPathComponent("archive-processor-uitest-private-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
+        #endif
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent(Bundle.main.bundleIdentifier ?? "com.archiveprocessor.app", isDirectory: true)
             .appendingPathComponent("ImproveOCR", isDirectory: true)
     }
@@ -203,6 +210,7 @@ struct ImproveOCRHooks: ViewModifier {
     @Binding var message: String?
     let files: [URL]
     let canOpen: Bool
+    @State private var showsHistory = false
 
     func body(content: Content) -> some View {
         content
@@ -214,6 +222,11 @@ struct ImproveOCRHooks: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRHandoff)) { _ in takePending() }
             .onAppear { takePending() }
             .sheet(item: $selection) { ImproveOCRView(files: $0.files) }
+            .onReceive(NotificationCenter.default.publisher(for: .improveOCRHistoryRequested)) { _ in
+                guard canOpen, selection == nil, !SheetGuard.sheetIsUp else { return }
+                showsHistory = true
+            }
+            .sheet(isPresented: $showsHistory) { ImproveOCRHistoryView() }
             .alert("Improve OCR", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("OK") { message = nil }
             } message: {
@@ -237,6 +250,103 @@ extension ImproveOCRHooks {
         case .open(let found): selection = ImproveOCRSelection(files: found)
         case .message(let text): message = text
         }
+    }
+}
+
+/// Processing ▸ Improve OCR History…: every change Improve OCR kept a copy for, newest first, with Restore for an accepted
+/// change and Remove (after a confirmation) for a decided one. Restore and removal run off the main thread.
+struct ImproveOCRHistoryView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var entries: [ReOCRHistory.Entry] = []
+    @State private var note: String?
+    @State private var confirmRemove: ReOCRHistory.Entry?
+
+    private var history: ReOCRHistory {
+        ReOCRHistory(writer: ReOCRFileWriter(versionsRoot: ImproveOCRController.privateFolder.appendingPathComponent("Versions", isDirectory: true)))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Improve OCR History").font(.title2.bold())
+            Text("Kept copies stay until you remove them. \(ByteCountFormatter.string(fromByteCount: entries.reduce(0) { $0 + $1.bytes }, countStyle: .file)) kept.")
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("ap.reocr.history.total")
+            if entries.isEmpty {
+                Text("Nothing yet.").foregroundStyle(.secondary).accessibilityIdentifier("ap.reocr.history.empty")
+            }
+            List(entries) { entry in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(entry.file.lastPathComponent).bold()
+                        Text("\(Self.describe(entry.state)) · \(entry.date.formatted(date: .abbreviated, time: .shortened)) · \(ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if entry.canRestore {
+                        Button("Restore") { restore(entry) }.accessibilityIdentifier("ap.reocr.history.restore")
+                    }
+                    Button("Remove\u{2026}") { confirmRemove = entry }
+                        .disabled(!entry.canRemove)
+                        .accessibilityIdentifier("ap.reocr.history.remove")
+                }
+            }
+            .frame(minHeight: 220)
+            if let note { Text(note).font(.callout).accessibilityIdentifier("ap.reocr.history.note") }
+            HStack { Spacer(); Button("Close") { dismiss() }.keyboardShortcut(.cancelAction) }
+        }
+        .padding(20)
+        .frame(minWidth: 620, minHeight: 380)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ap.reocr.history")
+        .onAppear { entries = history.entries() }
+        .confirmationDialog("Remove the kept copy?", isPresented: Binding(get: { confirmRemove != nil }, set: { if !$0 { confirmRemove = nil } }),
+                            presenting: confirmRemove) { entry in
+            Button("Remove", role: .destructive) { remove(entry) }
+        } message: { _ in
+            Text("After this, this change can no longer be undone from here.")
+        }
+    }
+
+    static func describe(_ state: ReOCRHistory.Entry.State) -> String {
+        switch state {
+        case .accepted: "Accepted"
+        case .restoredEarlier: "Old text put back"
+        case .undone: "Accepted, then undone"
+        case .rejected: "Rejected"
+        case .undecided: "Not decided"
+        case .interrupted: "Stopped during publication"
+        case .unreadable: "Record unreadable"
+        }
+    }
+
+    private func restore(_ entry: ReOCRHistory.Entry) {
+        guard case .success(let s) = Result(catching: { try ImproveOCRController.connection().resolve() }) else {
+            note = "Connect the shared folder first (Improve OCR\u{2026})."
+            return
+        }
+        let job = ReOCRJob(writer: history.writer, scratch: FileManager.default.temporaryDirectory.appendingPathComponent("ImproveOCR-\(UUID().uuidString)"),
+                           support: s.url)
+        Task.detached {
+            let text: String
+            do {
+                let r = try job.restore(entry.id)
+                switch r.flag {
+                case .reflagged: text = "The old text is back, and so is the OCR Poor flag."
+                case .notNeeded: text = "The old text is back."
+                case .changedSinceClear(let why): text = "The old text is back. The flag was left: \(why)."
+                case .failed(let why): text = "The old text is back; the flag could not be put back (\(why))."
+                }
+            } catch { text = "\(error)" }
+            await MainActor.run {
+                note = text
+                entries = ReOCRHistory(writer: job.writer).entries()
+            }
+        }
+    }
+
+    private func remove(_ entry: ReOCRHistory.Entry) {
+        do { try history.remove(entry.id); note = "Removed." } catch { note = "\(error)" }
+        entries = history.entries()
     }
 }
 

@@ -25,6 +25,8 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   15. The history lists each change with its state and size; Remove takes only that change's copy, an undecided one
+///       too, never one stopped during publication; only an accepted change offers Restore.
 ///   14. A Reader hand-off resolves only files inside the named archive (saved grant, else the person's choice,
 ///       checked against the root marker), comes up once, and not at all without the shared folder.
 ///   13. The dialog's model: Kind groups, a Kind change re-ranks, the estimate, Run's blocker, per-Kind readers and models.
@@ -644,6 +646,46 @@ enum ReOCRJobTestDriver {
                 check("14 without the shared folder nothing comes up",
                       isMessage(ImproveOCRHandoff.handle(third, connection: ReOCRSupportConnection(defaults: noneDefaults),
                                                          defaults: defaults, chooseRoot: { _ in nil }), "shared folder"))
+            }
+
+            // 15. The history: what was kept, what it is, Restore and Remove.
+            do {
+                let d = try folder("history"), j = job(d), reader = FakeReader()
+                let h = ReOCRHistory(writer: j.writer)
+                check("15 an empty history", h.entries().isEmpty && h.totalBytes == 0)
+                let a = try file(d, pairs: 1)
+                let accepted = try j.accept(try await j.start(file: a, root: archive(d), model: model, read: reader.read))
+                let restored = try j.restore(accepted.journal.operationID)
+                let rejectedReview = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
+                try j.reject(rejectedReview)
+                let undecided = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
+                let states = Dictionary(uniqueKeysWithValues: h.entries().map { ($0.id, $0.state) })
+                check("15 each change is listed with what it is",
+                      states[accepted.journal.operationID] == .undone(by: restored.journal.operationID)
+                      && states[restored.journal.operationID] == .restoredEarlier(accepted.journal.operationID)
+                      && states[rejectedReview.operation.journal.operationID] == .rejected
+                      && states[undecided.operation.journal.operationID] == .undecided, "\(states)")
+                check("15 the kept size is counted", h.totalBytes > 0 && h.entries().allSatisfy { $0.bytes > 0 })
+                check("15 only an accepted change offers Restore", h.entries().filter(\.canRestore).isEmpty)
+                try h.remove(rejectedReview.operation.journal.operationID)
+                check("15 removing one change removes only its copy",
+                      !FileManager.default.fileExists(atPath: j.writer.backupURL(rejectedReview.operation.journal.operationID).path)
+                      && FileManager.default.fileExists(atPath: j.writer.backupURL(accepted.journal.operationID).path))
+                try h.remove(undecided.operation.journal.operationID)
+                check("15 an undecided change can be removed", !h.entries().contains { $0.id == undecided.operation.journal.operationID })
+                // A change stopped during publication waits for launch recovery.
+                let b = try file(try folder("history-b"), pairs: 1)
+                let jb = job(b.deletingLastPathComponent())
+                let stopped = try await jb.start(file: b, root: archive(b.deletingLastPathComponent()), model: model, read: reader.read)
+                _ = try? jb.writer.accept(stopped.operation, candidate: stopped.candidate ?? Data(),
+                                          faults: { if $0 == .afterAcceptReady { throw ReOCRFileWriter.InjectedCrash() } })
+                let hb = ReOCRHistory(writer: jb.writer)
+                check("15 a change stopped during publication cannot be removed",
+                      (try? hb.remove(stopped.operation.journal.operationID)) == nil
+                      && hb.entries().first?.state == .interrupted, "\(hb.entries().map(\.state))")
+                let fresh = try await j.start(file: a, root: archive(d), model: model, read: reader.read)
+                _ = try j.accept(fresh)
+                check("15 a new acceptance offers Restore", h.entries().first { $0.id == fresh.operation.journal.operationID }?.canRestore == true)
             }
 
             // 7. A rotated image page.

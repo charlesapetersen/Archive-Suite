@@ -169,6 +169,19 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(done.firstMatch.waitForExistence(timeout: 30), "the dialog reports the acceptance")
         XCTAssertFalse(run.isEnabled, "Run is not offered again over the now-stale file list")
         attachScreenshot("processor-improve-ocr-accepted")
+
+        // The history lists the acceptance and puts the old text back.
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(element("ap.reocr.dialog").waitForNonExistence(timeout: 5), "the dialog closes")
+        XCTAssertTrue(app.menuBars.menuItems["Improve OCR History…"].exists, "the Processing menu lists the history")
+        app.menuBars.menuItems["Improve OCR History…"].click()
+        XCTAssertTrue(element("ap.reocr.history").waitForExistence(timeout: 10), "the history opens")
+        let restore = element("ap.reocr.history.restore")
+        XCTAssertTrue(restore.waitForExistence(timeout: 5), "the accepted change offers Restore")
+        restore.click()
+        let back = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'The old text is back' OR value BEGINSWITH 'The old text is back'"))
+        XCTAssertTrue(back.firstMatch.waitForExistence(timeout: 30), "Restore puts the old text back and says so")
+        attachScreenshot("processor-improve-ocr-history-restored")
     }
 
     func testInstitutionalComputingImportOffersNeutralFolderChooser() throws {

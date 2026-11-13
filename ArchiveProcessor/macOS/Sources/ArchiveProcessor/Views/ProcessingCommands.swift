@@ -32,6 +32,8 @@ extension Notification.Name {
     /// Posted by `ContentView.onOpenURL` with an `archiveprocessor://improve-ocr` link from the Reader (W44); `OCRView`
     /// resolves it (`ImproveOCRHandoff`) and opens the dialog, which only ever opens: nothing runs from a link.
     static let improveOCRHandoff = Notification.Name("ImproveOCRHandoff")
+    /// Posted from Processing ▸ Improve OCR History…; `OCRView` shows what Improve OCR has kept (W44).
+    static let improveOCRHistoryRequested = Notification.Name("ImproveOCRHistoryRequested")
 }
 
 /// Whether a text field / field editor currently holds keyboard focus. Global shortcuts stand down when
@@ -94,6 +96,9 @@ struct ProcessingCommands: Commands {
                 NotificationCenter.default.post(name: .improveOCRRequested, object: nil)
             }
             .keyboardShortcut("i", modifiers: [.command, .shift])
+            Button("Improve OCR History\u{2026}") {
+                NotificationCenter.default.post(name: .improveOCRHistoryRequested, object: nil)
+            }
         }
     }
 }
