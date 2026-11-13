@@ -280,6 +280,54 @@ Links are never followed. A page pair or line that was reviewed more than once c
 The count does not check the gate's held-out box: that needs a further box of the same material with at least 267
 known gaps in 10 documents, which `train_seg.py check` enforces.
 
+## The continuation: the 2B adapted to your material
+
+Once one material holds 200 gaps you ruled on, the kit can train a LoRA continuation of the shipped 2B on them for the
+next boxes of that material (`seg-2b-lora-k200`). It was measured on one material: on the next box of a Lincoln
+series, its errors fell from 17.2 to 4.9 per 100 gaps, but it lost one document start the 2B had found
+(`segbench-results/seg-adapt-lora.md`). Keep the review's flagging on after you adopt it. The app loads it only once
+it has passed the gate. `kit_continuation.py` builds its inputs from your review records and your source images, the
+same photos you processed, which it finds by their SHA-256. Run it on the Mac with a Python that has Pillow and numpy:
+
+```bash
+python3 kit_continuation.py pack "/path/to/Box 1" --sources "/path/to/Box 1 photos" --out ~/kit/train
+python3 kit_continuation.py heldout "/path/to/Box 2" --sources "/path/to/Box 2 photos" --train ~/kit/train --out ~/kit/heldout
+```
+
+- **`pack`** builds the training windows, as the app sends them to the 2B: seven pages, three apart, upright, at 1,024 px,
+  with each page's OCR text from its output PDF (`--text pdf`, read with `pdftotext`; `--text none` sends none). A
+  window holds only gaps the records hold. It refuses a material with fewer than 200 gaps ruled on by a person; gaps
+  you left as proposed can sit in a window, but they do not count. Give `--pool` or `--material` as for
+  `kit_corrections.py`.
+- **`heldout`** builds the next box of the same material, for the gate. It writes `labels.jsonl`, which holds every
+  recorded gap at the call you left, and `ruled.csv`, which holds the gaps you checked or changed. It refuses fewer
+  than 267 known gaps or 10 documents (the gate's own minimum), and it refuses any page the training pack holds. Run
+  it before booking GPU time: a box that is too small cannot pass however good the model is. Nothing in the records
+  says two boxes are one material. That is your word. A gap you accepted through the skim carries the proposing model's call.
+  When that model was the shipped 2B, the comparison leans toward it, which makes the gate harder to pass, never easier.
+
+On the cluster, with the merged shipped 2B at full precision (not yet published: `W41.app-local-seg-publish`), the
+packs, and an anchor pack (`public_segmentation.py pack --key fs-seg-2b`), every model served under the name `seg-2b`:
+
+```bash
+# 1. the shipped 2B answers the training windows
+IC_STUDENT=/path/to/seg-2b-merged IC_STUDENT_NAME=seg-2b IC_SEG_KEY=fs-seg-2b bash submit.sh seg seg-student --pack ~/kit/train
+# 2. its replies, with every boundary set to your call, plus three corpus windows replayed for each (the measured recipe)
+python3 kit_continuation.py rows --pack ~/kit/train --answers RUNS/<label>/answers.jsonl --replay /path/to/a/train_seg/data --out ~/kit/rows
+# 3. train onto the merged 2B (train.sbatch, as above) with TRAIN_DATA=~/kit/rows TRAIN_MODEL=/path/to/seg-2b-merged
+#    TRAIN_ARGS='--epochs 2 --max-len 20480'; it merges at the end
+# 4. serve the merged continuation and the shipped 2B on ~/kit/heldout and the anchor pack, twice each (submit.sh seg seg-student)
+```
+
+The replay set is a `train_seg.py data` set whose no-text windows are mixed in, three for each correction window, so
+the continuation keeps what the 2B knew. The measured run replayed the corpus 2B's own training set. The kit does not
+distribute that set, since it is one owner's archive. `--no-replay` trains on the corrections alone, and `data.json`
+then records that this is not the measured recipe. On a container profile (Sherlock), `train.sbatch` refuses to run,
+and training goes as `../sherlock/seg-adapt-lora/train-job.sh` does it: the rows at `ROOT/data/k200` are used as
+they are. Then, on the Mac, `train_seg.py mac` on the merged continuation, and `train_seg.py check` (above) with
+`--labels ~/kit/heldout/labels.jsonl --ruled ~/kit/heldout/ruled.csv` and both runs of each model. The manifest the
+check writes beside the build is what lets the app load it.
+
 ## Licences
 
 A model you run on your own cluster through this kit may carry a research-only or non-commercial licence. The kit
@@ -326,6 +374,7 @@ rotation are not supported. This route reads pages directly; it does not require
 ```bash
 python3 -m unittest test_institutional_compute
 python3 -m unittest test_kit_corrections
+python3 -m unittest test_kit_continuation   # Pillow and numpy
 ```
 
 Tests use synthetic scratch images and a fake localhost vLLM server, validate every profile and 24/48/80 GB

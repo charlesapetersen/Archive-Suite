@@ -340,6 +340,8 @@ enum SettingsSheetTestDriver {
         check("8 F cluster: the student and the continuation listed with their conditions",
               Set(clusterSeg.map(\.id)) == ["kit-seg-lora-mac", "kit-seg-student-tags", "seg-2b-lora-k200"]
                 && clusterSeg.first { $0.id == "seg-2b-lora-k200" }?.condition.contains("200 places") == true
+                // W46.kit-continuation: the gate's further box is stated before the user starts correcting
+                && clusterSeg.first { $0.id == "seg-2b-lora-k200" }?.condition.contains("267 places, in 10 documents") == true
                 && clusterSeg.first { $0.id == "kit-seg-student-tags" }?.condition.contains("tags") == true,
               clusterSeg.map { "\($0.id): \($0.condition)" }.joined(separator: " | "))
         let kitAll = (agent.ranges + clusterKit.ranges).flatMap(\.kit)

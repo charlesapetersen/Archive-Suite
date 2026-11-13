@@ -130,7 +130,7 @@ hold out whole collections or boxes, never a random page split).
   "memory":{"peak_gb":null,"measured_on":"unmeasured: an adapter or merged continuation on the Mac was not measured; the shipped 2B 8-bit it continues peaks at 4.4 GB on the M3 Pro (seg-students.md); Mac training not measured to fit (P9-12)","source":null},
   "caveats":["the pre-set rule (no loss of start recall) is not met: at k = 200 each box loses one start (box 2 finds 67 of 69 catalogue starts against the 2B's 68)","one material (Lincoln correspondence), two adjacent boxes, one training seed","box 2's truth holds no scored start inside an item (P9-8)","k = 50 buys a tie on box 2 and loses two catalogue starts there"],
   "kind_rules":["per material: the next boxes of the material the corrections came from"],"fallback":"seg-qwen3.5-2b-8bit",
-  "conditions":["the fine-tuning answer is 'on a cluster' (14-owner-calls.md call 7)","at least 200 corrected gaps of one material in the review records (trigger: note 07)","labelled 'measured on one material'","review flagging by disagreement with a second model stays on after adaptation","the kit's gate passes on a held-out box of the same material holding at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, its interval resampling that box's documents (note 12, seg-kit-gate.md)"]},
+  "conditions":["the fine-tuning answer is 'on a cluster' (14-owner-calls.md call 7)","at least 200 corrected gaps of one material in the review records (trigger: note 07)","labelled 'measured on one material'","review flagging by disagreement with a second model stays on after adaptation","the kit's gate passes on a held-out box of the same material holding at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, in at least 10 documents, its interval resampling that box's documents (note 12, seg-kit-gate.md)"]},
  {
   "id": "kit-seg-lora-mac",
   "name": "Segmentation LoRA trained on this Mac",
@@ -318,7 +318,7 @@ support applies to it. So that box needs at least 267 known gaps (owner-ruled or
 than Lincoln box 2's 244; the gate resamples its documents (W46.kit-gate-groups), so one box gets a real interval.
 That box also needs at least 10 documents (W46.kit-gate-docs): a material of a few long documents (bound volumes,
 registers) needs a next box, or several, holding ten; owner-like boxes hold about 1.8 gaps a document, so 267 gaps
-are about 150 documents.
+are about 150 documents. Built (W46.kit-continuation, 2026-11-13): `institutional-compute/kit_continuation.py` `pack` (refused below 200 ruled gaps), `heldout` (the next box, refused below 267 known gaps or 10 documents and on any page trained on) and `rows` (the shipped 2B's replies set to the person's calls, three corpus windows replayed a correction); README §"The continuation". A kit user without the owner's corpus replay set runs an unmeasured recipe: W46.kit-continuation-replay.
 
 **7.6 The fine-tuning answer's mapping.** Section 3 reads "with a coding agent" as Mac-side steps and "on a cluster" as
 adding cluster rows [I]. Confirm, or make the coding agent a requirement for the cluster rows too. Decided (session,

@@ -20,7 +20,7 @@ records says two boxes are one material: that is the user's word, as with `kit_c
 THE REQUEST is the one the app sends the shipped 2B (`window-local-seg-2b`, prompt c1, method_local.request): seven
 pages, stride three, each page's source image at 1024 px and its OCR text cut at 2,500 characters. The images are
 the source files the review records name, found by SHA-256 in the --sources folders (else by a name that is unique
-there); the text is the output PDF's text page (`--text pdf`, read with pdftotext: the body after the header's blank
+there) and turned upright by their EXIF orientation, as the app reads them; the text is the output PDF's text page (`--text pdf`, read with pdftotext: the body after the header's blank
 line) or "(no text found)" for every page (`--text none`). Page numbers are the run's. A window holds only recorded
 gaps, so a page the records do not name (a box or folder photo, a removed page) splits the run there.
 
@@ -93,12 +93,18 @@ def stretches(material):
         used.add(stem)
         cur = []
         for k in sorted(gaps):
-            if cur and k != cur[-1][0] + 1:
+            if cur and (k != cur[-1][0] + 1 or not same_page(cur[-1][1]["right"], gaps[k]["left"])):
                 out.append((stem, cur)); cur = []
             cur.append((k, gaps[k]))
         if cur:
             out.append((stem, cur))
     return out
+
+
+def same_page(a, b):
+    if a.get("sha256") and b.get("sha256"):
+        return a["sha256"] == b["sha256"]
+    return a.get("name") == b.get("name")
 
 
 def source_index(dirs):
@@ -116,6 +122,23 @@ def source_index(dirs):
     return by_sha, by_name
 
 
+def upright_jpeg(path):
+    """The page as the app sends it: turned upright by its EXIF orientation (the app reads images with the transform
+    applied), then method_openrouter.image_jpeg's 1024 px LANCZOS JPEG at quality 90. None when it cannot be read
+    (a HEIC file without pillow-heif, a damaged file): the page then counts as one without a source."""
+    import io
+    from PIL import Image, ImageOps
+    try:
+        with Image.open(path) as im:
+            im = ImageOps.exif_transpose(im).convert("RGB")
+    except Exception:
+        return None
+    im.thumbnail((SIDE, SIDE), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=90)
+    return buf.getvalue()
+
+
 def find_source(page, index):
     by_sha, by_name = index
     if page.get("sha256") and page["sha256"] in by_sha:
@@ -126,6 +149,11 @@ def find_source(page, index):
     return None
 
 
+def pdftotext():
+    tool = shutil.which("pdftotext") or "/opt/homebrew/bin/pdftotext"
+    return tool if os.access(tool, os.X_OK) else None
+
+
 def pdf_text(folder, output):
     """The OCR text on the output PDF's text page: everything after the header's blank line, "" for the app's
     "No text returned by model." page. None when the PDF is not found."""
@@ -133,11 +161,14 @@ def pdf_text(folder, output):
         return None
     p = Path(folder) / output
     if not p.is_file():
-        hits = [Path(t) / output for t, _, fs in os.walk(folder, followlinks=False) if output in fs]
+        name = Path(output).name
+        hits = [Path(t) / name for t, _, fs in os.walk(folder, followlinks=False) if name in fs]
         if len(hits) != 1:
             return None
         p = hits[0]
-    tool = shutil.which("pdftotext") or "/opt/homebrew/bin/pdftotext"
+    tool = pdftotext()
+    if not tool:
+        return None
     r = subprocess.run([tool, "-f", "2", "-l", "2", "-enc", "UTF-8", str(p), "-"], capture_output=True, text=True)
     if r.returncode != 0:
         return None
@@ -185,6 +216,9 @@ def build(a, out, want_gaps):
     out = Path(out)
     if out.exists():
         raise SystemExit(f"{out} exists; pick a new path")
+    if a.text == "pdf" and not pdftotext():
+        raise SystemExit("--text pdf reads each output PDF's text page with pdftotext, which is not installed "
+                         "(brew install poppler); or give --text none")
     index = source_index(a.sources)
     tmp = out.with_name(out.name + ".tmp")
     if tmp.exists():
@@ -196,6 +230,8 @@ def build(a, out, want_gaps):
         recs = [run[0][1]["left"]] + [rec["right"] for _, rec in run]
         folder = run[0][1]["folder"]
         srcs = [find_source(p, index) for p in recs]
+        jpegs = [upright_jpeg(s) if s is not None else None for s in srcs]
+        srcs = [s if j is not None else None for s, j in zip(srcs, jpegs)]
         if any(s is None for s in srcs):
             # a page with no source splits the stretch: each side keeps what it can
             missing += [p.get("name") for p, s in zip(recs, srcs) if s is None]
@@ -223,7 +259,7 @@ def build(a, out, want_gaps):
                     dst = tmp / "images" / box / f"{nums[j]}.jpg"
                     if not dst.exists():
                         dst.parent.mkdir(parents=True, exist_ok=True)
-                        dst.write_bytes(R.image_jpeg(srcs[j], SIDE))
+                        dst.write_bytes(jpegs[j])
                         shas.add(recs[j].get("sha256") or hashlib.sha256(srcs[j].read_bytes()).hexdigest())
                     thumbs.append(dst)
                 prompt = render(wn, [texts[j] for j in idx])
@@ -286,6 +322,9 @@ def cmd_heldout(a):
         train = None
     if not isinstance(train, dict) or train.get("role") != "train":
         raise SystemExit(f"--train {a.train} is not a training pack (kit_continuation.py pack)")
+    if a.text != train.get("text"):
+        raise SystemExit(f"--text {a.text}, but the training pack was built with --text {train.get('text')}: the gate "
+                         f"must score the request the continuation was trained on")
     tmp, meta, truth = build(a, a.out, lambda m: None)
     overlap = set(meta["page_sha256"]) & set(train["page_sha256"])
     labels = [{"folder_id": t["folder_id"], "n": t["n"], "split": "holdout",
@@ -325,17 +364,23 @@ def cmd_heldout(a):
 
 def corrected(reply, nums, calls):
     """(target, flips): the 2B's reply with every boundary set to the person's call; None when it cannot be."""
+    import method_window as W
     from seg_adapt_lora import reply_text
     try:
-        obj = json.loads(reply)
-    except ValueError:
-        return None
-    if not isinstance(obj, dict) or not isinstance(obj.get("pages"), list) or not isinstance(obj.get("boundaries"), list):
+        W.parse_answer(reply, nums)        # what cluster_seg.py counted as ok
+        s = re.sub(r"^```(?:json)?\s*|\s*```$", "", reply.strip())
+        obj = json.loads(s[s.find("{"):s.rfind("}") + 1])
+        for p in obj["pages"]:
+            # every page beside a recorded gap is a document: gaps beside box or folder photos are never recorded
+            p["page"], p["kind"] = int(p["page"]), "document"
+        for bd in obj["boundaries"]:
+            bd["between"] = [int(v) for v in bd["between"]]
+    except Exception:
         return None
     want = {(x, x + 1) for x in nums[:-1]}
     seen, flips = set(), 0
     for bd in obj["boundaries"]:
-        pair = tuple(bd.get("between") or ()) if isinstance(bd, dict) else ()
+        pair = tuple(bd["between"])
         if pair not in want or pair in seen or bd.get("decision") not in ("new", "continue"):
             return None
         seen.add(pair)
@@ -376,8 +421,15 @@ def cmd_rows(a):
                      "text": meta["text"], "flips": got[1]})
         flips += got[1]
     why["not answered"] += len(wins) - len(seen)
-    if not rows:
-        raise SystemExit("no window of the pack has a usable answer from the shipped 2B")
+    rulings = {}
+    for line in (pack / "truth.jsonl").read_text().splitlines():
+        t = json.loads(line)
+        rulings[(t["folder_id"], t["n"])] = t["ruling"]
+    trained = {(r["box"], x) for r in rows for x in r["window"][:-1]}
+    ruled = sum(rulings.get(k) in ("checked", "changed") for k in trained)
+    if ruled < K.GAPS_FLOOR:
+        raise SystemExit(f"the usable answers cover {ruled} ruled gaps ({why}); the continuation needs {K.GAPS_FLOOR}: "
+                         f"rerun the shipped 2B on the pack (the same --label resumes it) before training")
     replay, src, images = [], None, {}
     if a.replay:
         src = Path(a.replay).resolve()
@@ -389,7 +441,11 @@ def cmd_rows(a):
             raise SystemExit(f"{src}: no no-text image windows to replay")
         random.Random(SEED).shuffle(corpus)
         replay = corpus[:REPLAY_RATIO * len(rows)]
-        rimages = Path(rmeta["images"])
+        rimages = Path(a.replay_images or rmeta["images"])
+        if not rimages.is_absolute():
+            rimages = (src / rimages).resolve() if (src / rimages).is_dir() else rimages.resolve()
+        if not rimages.is_dir():
+            raise SystemExit(f"replay images not found at {rimages}; give --replay-images where they are now")
         for box in {r["box"] for r in replay}:
             images[box] = rimages / box
     for box in {r["box"] for r in rows}:
@@ -413,14 +469,14 @@ def cmd_rows(a):
     body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in all_rows)
     (tmp / "train.jsonl").write_text(body)
     summary = {"item": "W46.kit-continuation", "rule": "corrections+replay" if replay else "corrections only",
-               "measured_recipe": bool(replay), "material": meta["material"], "material_name": meta["material_name"],
+               "measured_recipe": len(replay) == REPLAY_RATIO * len(rows), "ruled_gaps_trained": ruled, "material": meta["material"], "material_name": meta["material_name"],
                "corrections": len(rows), "flipped_decisions": flips, "replay": len(replay),
                "replay_from": str(src) if src else None, "dropped": why, "windows": len(all_rows),
                "images": str(out.resolve() / "images"), "pack_made": meta["made"],
                "train_sha256": hashlib.sha256(body.encode()).hexdigest()}
-    if not replay:
-        summary["note"] = ("no replay: W46.seg-adapt-lora replayed three corpus windows for each correction window; "
-                           "these rows are not the measured recipe")
+    if not summary["measured_recipe"]:
+        summary["note"] = (f"{len(replay)} replay windows for {len(rows)} correction windows: W46.seg-adapt-lora "
+                           f"replayed {REPLAY_RATIO} corpus windows for each, so these rows are not the measured recipe")
     (tmp / "data.json").write_text(json.dumps(summary, indent=1) + "\n")
     tmp.rename(out)
     print(json.dumps(summary, indent=1))
@@ -444,6 +500,7 @@ def main(argv=None):
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--replay", help="a train_seg.py data set (train.jsonl, data.json) whose no-text windows are replayed")
     g.add_argument("--no-replay", action="store_true")
+    p.add_argument("--replay-images", help="where the replay set's images are now, if not where its data.json says")
     a = ap.parse_args(argv)
     return {"pack": cmd_pack, "heldout": cmd_heldout, "rows": cmd_rows}[a.cmd](a)
 

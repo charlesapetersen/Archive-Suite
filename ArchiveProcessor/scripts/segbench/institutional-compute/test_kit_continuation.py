@@ -120,6 +120,30 @@ class Pack(Fixture):
         self.assertIn("have both pages in --sources", str(e.exception))
         self.assertIn("IMG_0050.jpg", str(e.exception))
 
+    def test_a_photo_tagged_to_turn_goes_in_upright(self):
+        from PIL import Image
+        p = self.src / "x.jpg"
+        p.parent.mkdir(parents=True)
+        exif = Image.Exif()
+        exif[0x0112] = 6                      # rotate 90 CW to display, as an iPhone portrait photo is stored
+        Image.new("RGB", (400, 200), (10, 20, 30)).save(p, "JPEG", exif=exif.tobytes())
+        import io
+        with Image.open(io.BytesIO(KC.upright_jpeg(p))) as im:
+            self.assertEqual(im.size, (200, 400))
+        (self.src / "bad.heic").write_bytes(b"not an image")
+        self.assertIsNone(KC.upright_jpeg(self.src / "bad.heic"))
+
+    def test_pdf_text_needs_pdftotext(self):
+        box = self.collection("a", 0, 210, lambda g: "checked")
+        found, KC.pdftotext = KC.pdftotext, lambda: None
+        try:
+            with self.assertRaises(SystemExit) as e:
+                self.run_kc("pack", box, "--sources", self.src, "--out", self.root / "train")
+            self.assertIn("brew install poppler", str(e.exception))
+            self.assertFalse((self.root / "train.tmp").exists())
+        finally:
+            KC.pdftotext = found
+
     def test_several_materials_need_one_named(self):
         a = self.collection("a", 0, 210, lambda g: "checked")
         b = self.collection("b", 500, 20, lambda g: "checked")
@@ -180,6 +204,13 @@ class Heldout(Fixture):
             self.heldout(again)
         self.assertIn("are in the training pack", str(e.exception))
 
+    def test_the_request_must_be_the_one_trained_on(self):
+        nxt = self.collection("e", 3000, 290, lambda g: "checked")
+        with self.assertRaises(SystemExit) as e:
+            self.run_kc("heldout", nxt, "--sources", self.src, "--text", "pdf", "--train", self.train,
+                        "--out", self.root / "held")
+        self.assertIn("training pack was built with --text none", str(e.exception))
+
     def test_a_next_box_writes_what_check_reads(self):
         nxt = self.collection("e", 3000, 290, lambda g: "changed" if g % 7 == 0 else "accepted" if g % 2 else "checked")
         out = self.heldout(nxt)
@@ -215,12 +246,12 @@ class Rows(Fixture):
         self.train = self.pack(self.collection("a", 0, 210, lambda g: "changed" if g % 2 else "checked"))
         self.wins = [json.loads(l) for l in (self.train / "windows.jsonl").read_text().splitlines()]
 
-    def answers(self, decide, broken=()):
+    def answers(self, decide, broken=(), kind="document"):
         path = self.root / "answers.jsonl"
         with open(path, "w") as f:
             for i, w in enumerate(self.wins):
                 nums = w["window"]
-                reply = {"pages": [{"page": n, "kind": "document"} for n in nums],
+                reply = {"pages": [{"page": n, "kind": kind} for n in nums],
                          "boundaries": [{"between": [x, x + 1], "decision": decide(x), "cue": "2B", "confidence": 0.6}
                                         for x in nums[:-1]]}
                 f.write(json.dumps({"cache_key": w["cache_key"], "collection": w["box"], "window": nums,
@@ -247,6 +278,34 @@ class Rows(Fixture):
         img = Path(data["images"])
         self.assertTrue(all((img / r["box"] / f"{n}.jpg").is_file() for r in rows for n in r["window"]))
 
+    def test_the_targets_parse_as_the_cluster_counted_them(self):
+        nums = [4, 5, 6]
+        calls = {4: "new", 5: "continue"}
+        fenced = "```json\n" + json.dumps({"pages": [{"page": "4", "kind": "folder"}, {"page": 5, "kind": "document"},
+                                                     {"page": 6, "kind": "document"}],
+                                           "boundaries": [{"between": ["4", "5"], "decision": "continue", "cue": "x",
+                                                           "confidence": 0.9},
+                                                          {"between": [5, 6], "decision": "continue", "cue": "y",
+                                                           "confidence": 0.8}]}) + "\n```"
+        target, flips = KC.corrected(fenced, nums, calls)
+        obj = json.loads(target)
+        self.assertEqual(flips, 1)
+        self.assertEqual([p["kind"] for p in obj["pages"]], ["document"] * 3)
+        self.assertEqual([b["between"] for b in obj["boundaries"]], [[4, 5], [5, 6]])
+        self.assertEqual(obj["boundaries"][0]["cue"], "corrected by the reviewer")
+        nested = json.dumps({"pages": [{"page": n, "kind": "document"} for n in nums],
+                             "boundaries": [{"between": [[4], [5]], "decision": "new"}]})
+        self.assertIsNone(KC.corrected(nested, nums, calls))
+
+    def test_too_few_usable_answers_are_refused(self):
+        with self.assertRaises(SystemExit) as e:
+            self.run_kc("rows", "--pack", self.train, "--answers",
+                        self.answers(lambda x: "new", broken=set(range(len(self.wins))) - set(range(0, len(self.wins), 4))),
+                        "--no-replay",
+                        "--out", self.root / "data")
+        self.assertIn("rerun the shipped 2B", str(e.exception))
+        self.assertFalse((self.root / "data").exists())
+
     def test_replay_is_three_corpus_windows_a_correction(self):
         corpus = self.root / "corpus"
         for n in range(7):
@@ -257,15 +316,18 @@ class Rows(Fixture):
                          "text": "none" if i % 4 else "abbyy"})
         rows.append({"box": "F1", "window": [0, 1], "prompt": "ABBYY text: x", "target": "t", "text": "none"})
         (corpus / "train.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-        (corpus / "data.json").write_text(json.dumps({"windows": len(rows), "images": str(corpus / "images")}))
-        self.run_kc("rows", "--pack", self.train, "--answers", self.answers(lambda x: "new"), "--replay", corpus,
-                    "--out", self.root / "data")
+        # train_seg.py data records the images folder as given, often relative to where it ran
+        (corpus / "data.json").write_text(json.dumps({"windows": len(rows), "images": "images"}))
+        self.run_kc("rows", "--pack", self.train, "--answers", self.answers(lambda x: "new", kind="folder"),
+                    "--replay", corpus, "--out", self.root / "data")
         data = json.loads((self.root / "data" / "data.json").read_text())
         self.assertEqual(data["replay"], min(3 * data["corrections"], 300))
         self.assertTrue(data["measured_recipe"])
         got = [json.loads(l) for l in (self.root / "data" / "train.jsonl").read_text().splitlines()]
         self.assertFalse(any(r.get("text") == "abbyy" or "ABBYY" in r["prompt"] for r in got))
         self.assertTrue((self.root / "data" / "images" / "F1" / "0.jpg").is_file())
+        mine = [r for r in got if r["box"] != "F1"]
+        self.assertTrue(all(p["kind"] == "document" for r in mine for p in json.loads(r["target"])["pages"]))
 
     def test_a_held_out_pack_is_not_a_training_pack(self):
         bogus = self.root / "bogus"

@@ -481,10 +481,13 @@ extension SettingsSheetModel {
         }
         if let m = r.range(of: #"^needs 200 corrected gaps of one material \((\d+) so far"#, options: .regularExpression) {
             let n = r[m].split(separator: "(").last?.split(separator: " ").first ?? "0"
-            return "Appears once you have corrected 200 places where documents begin, in one kind of papers (\(n) so far)."
+            return "Appears once you have corrected 200 places where documents begin, in one kind of papers (\(n) so far). "
+                + "Before it is used, it is checked on a further box of the same papers that you reviewed: at least 267 "
+                + "places, in 10 documents."
         }
         if r.hasPrefix("the next boxes of this material") {
-            return "For the next boxes of the same papers; places it is unsure of are still shown to you to check."
+            return "For the next boxes of the same papers, once it passes a check on a further box of them that you "
+                + "reviewed (at least 267 places, in 10 documents); places it is unsure of are still shown to you to check."
         }
         return r.prefix(1).uppercased() + r.dropFirst()
     }
