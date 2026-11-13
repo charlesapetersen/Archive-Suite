@@ -21,6 +21,9 @@ SEP=$'\x1f'
 ALLOW=(
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}guard pdfDocument.write(to: outputURL) else {"
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}guard merged.write(to: outputURL) else { throw PDFError.writeFailed }"
+  # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
+  # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
+  "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"
 )
 
 PASS=0

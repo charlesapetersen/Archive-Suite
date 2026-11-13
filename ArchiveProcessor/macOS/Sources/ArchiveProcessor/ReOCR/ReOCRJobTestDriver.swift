@@ -207,7 +207,7 @@ enum ReOCRJobTestDriver {
             do {
                 let d = try folder("ineligible"), j = job(d), reader = FakeReader()
                 let f = d.appendingPathComponent("raw.pdf")
-                let doc = PDFDocument(); doc.insert(PDFPage(), at: 0); _ = doc.write(to: f)
+                let doc = PDFDocument(); doc.insert(PDFPage(), at: 0); try doc.dataRepresentation()?.write(to: f)
                 do { _ = try await j.start(file: f, model: model, read: reader.read); check("5 a one-page file is refused", false) }
                 catch { check("5 a one-page file is refused", { if case ReOCRJob.Failure.notEligible = error { return true }; return false }(), "\(error)") }
                 check("5 nothing was kept or read", reader.calls.isEmpty
@@ -279,7 +279,7 @@ enum ReOCRJobTestDriver {
                 let d = try folder("rotated"), f = try file(d, pairs: 1), reader = FakeReader()
                 if let doc = PDFDocument(url: f), let p = doc.page(at: 0) {
                     p.rotation = 90
-                    _ = doc.write(to: f)
+                    try doc.dataRepresentation()?.write(to: f)
                 }
                 let data = try Data(contentsOf: f)
                 check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 0) == nil)

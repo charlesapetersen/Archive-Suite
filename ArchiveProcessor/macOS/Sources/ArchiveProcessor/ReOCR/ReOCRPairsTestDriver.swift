@@ -138,9 +138,10 @@ enum ReOCRPairsTestDriver {
                     $0 == .imagePageLooksLikeText(page: 0)
                 }
             }
-            let enc = dir.appendingPathComponent("enc.pdf")
-            if let doc = PDFDocument(data: one), doc.write(to: enc, withOptions: [.userPasswordOption: "", .ownerPasswordOption: "o"]) {
-                refused("2 an encrypted file is refused", try Data(contentsOf: enc)) { $0 == .locked }
+            if let doc = PDFDocument(data: one),
+               let enc = doc.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "",
+                                                          PDFDocumentWriteOption.ownerPasswordOption: "o"]) {
+                refused("2 an encrypted file is refused", enc) { $0 == .locked }
             } else { check("2 the encrypted fixture is written", false) }
             refused("2 something that is not a PDF is refused", Data("no".utf8)) { $0 == .unreadable }
 

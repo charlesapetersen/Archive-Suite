@@ -78,11 +78,9 @@ enum ReOCRFileWriterTestDriver {
         try PDFGenerator().generate(imageURL: jpg, result: ocr("The old reading."), model: model, outputURL: pdf)
         try FileManager.default.removeItem(at: jpg)
         // Metadata: tags (a duplicate on purpose), a label, a custom attribute, a resource fork, mode and dates.
-        try (ReOCRFileWriter.fresh(pdf) as NSURL).setResourceValue(["Q2", "1952", "Q2"], forKey: .tagNamesKey)
-        try (ReOCRFileWriter.fresh(pdf) as NSURL).setResourceValue(3, forKey: .labelNumberKey)
-        _ = "kept".withCString { setxattr(pdf.path, "org.archivesuite.test", $0, 4, 0, XATTR_NOFOLLOW) }
-        let fork: [UInt8] = Array(repeating: 0x5A, count: 300)
-        _ = fork.withUnsafeBytes { setxattr(pdf.path, XATTR_RESOURCEFORK_NAME, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW) }
+        try setTags(pdf, ["Q2", "1952", "Q2"], label: 3)
+        try setAttribute(pdf, "org.archivesuite.test", Data("kept".utf8))
+        try setAttribute(pdf, XATTR_RESOURCEFORK_NAME, Data(repeating: 0x5A, count: 300))
         chmod(pdf.path, 0o640)
         var times = [timespec(tv_sec: 0, tv_nsec: Int(UTIME_OMIT)), timespec(tv_sec: 1_000_000_000, tv_nsec: 0)]
         utimensat(AT_FDCWD, pdf.path, &times, 0)
@@ -98,6 +96,18 @@ enum ReOCRFileWriterTestDriver {
         let candidate = try ReOCRIncrementalWriter.candidate(original: original, replacements: [1: page])
         let writer = ReOCRFileWriter(versionsRoot: dir.appendingPathComponent("Versions", isDirectory: true))
         return Case(file: pdf, writer: writer, original: original, candidate: candidate)
+    }
+
+    /// Fixture tags and label, through the suite's own audited tag writer (as the Processor writes them).
+    private static func setTags(_ url: URL, _ tags: [String], label: Int) throws {
+        _ = try CoordinatedTagWriter.write(url) { _, _ in (tags, label) }
+    }
+
+    /// A raw extended attribute on a scratch fixture (a custom attribute, a resource fork): the one audited raw
+    /// attribute write in this driver (`scripts/lint-write-surface.sh` allows exactly this line).
+    private static func setAttribute(_ url: URL, _ name: String, _ value: Data) throws {
+        let rc = value.withUnsafeBytes { setxattr(url.path, name, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW) }
+        if rc != 0 { throw CocoaError(.fileWriteUnknown) }
     }
 
     private static func tags(_ url: URL) -> [String] {
@@ -130,9 +140,7 @@ enum ReOCRFileWriterTestDriver {
                     .map { ReOCRFileWriter.metadataDifference(before, $0, dates: false) == nil } == true)
             check("1 the journal records the original's metadata", op.journal.originalMetadata == before)
             // A tag added between prepare and accept must survive.
-            try (ReOCRFileWriter.fresh(c.file) as NSURL).setResourceValue(["Q2", "1952", "Q2", "Added later"], forKey: .tagNamesKey)
-            // Writing tag names clears the colour label; put it back, so publication has a label to keep.
-            try (ReOCRFileWriter.fresh(c.file) as NSURL).setResourceValue(3, forKey: .labelNumberKey)
+            try setTags(c.file, ["Q2", "1952", "Q2", "Added later"], label: 3)
             let fresh = try ReOCRFileWriter.metadata(c.file.path)
             let j = try c.writer.accept(op, candidate: c.candidate)
             check("1 the journal says published", j.phase == .published && (try? c.writer.read(op.journal.operationID).phase) == .published)
@@ -214,7 +222,7 @@ enum ReOCRFileWriterTestDriver {
                 let op = try c.writer.prepare(target: c.file)
                 do {
                     try c.writer.accept(op, candidate: c.candidate, faults: {
-                        if $0 == .afterAcceptReady { _ = "x".withCString { setxattr(c.file.path, "org.archivesuite.late", $0, 1, 0, XATTR_NOFOLLOW) } }
+                        if $0 == .afterAcceptReady { try? setAttribute(c.file, "org.archivesuite.late", Data("x".utf8)) }
                     })
                     check("2c a tag changed after staging is refused", false)
                 } catch {

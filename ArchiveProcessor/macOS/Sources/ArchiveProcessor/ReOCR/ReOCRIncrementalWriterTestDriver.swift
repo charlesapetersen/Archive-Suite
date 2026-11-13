@@ -154,10 +154,9 @@ enum ReOCRIncrementalWriterTestDriver {
             refuses("4 an unreadable original is refused", Data("not a pdf".utf8), [1: replacement]) {
                 if case .originalUnreadable = $0 { return true } else { return false }
             }
-            let encURL = dir.appendingPathComponent("encrypted.pdf")
             if let doc = PDFDocument(data: two),
-               doc.write(to: encURL, withOptions: [.userPasswordOption: "", .ownerPasswordOption: "owner"]),
-               let enc = try? Data(contentsOf: encURL) {
+               let enc = doc.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "",
+                                                          PDFDocumentWriteOption.ownerPasswordOption: "owner"]) {
                 refuses("4 an encrypted original is refused", enc, [1: replacement]) { $0 == .encrypted }
             } else {
                 check("4 the encrypted fixture is written", false)
