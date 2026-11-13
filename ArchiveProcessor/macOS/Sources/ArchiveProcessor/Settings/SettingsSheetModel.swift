@@ -397,6 +397,13 @@ struct SettingsSheetModel {
                         + "handwritten letters, so expect fewer.")
             }
         }
+        // W46.seg-g2-offsets: a segmentation figure is one test run; where three were measured, the card gives the range.
+        if stage.id == "segmentation", let r = route, let rg = r.figures["test-boxes.offset_range"],
+           let lo = rg["low"]?.double, let hi = rg["high"]?.double {
+            labels.append("\(words.display(stage.id, r)): in three test runs that started the groups of pages at "
+                          + String(format: "different places, %.1f%% to %.1f%% of pages were in the right document; ", lo, hi)
+                          + "the figure shown is one of those runs.")
+        }
         if stage.id == "entities", let p = lead, !p.shown {
             labels.append(p.route.map { $0.family != .mac && $0.id != "none" } == true
                 ? "Names are not among what matters most for this collection, so they are not shown; the online reading "

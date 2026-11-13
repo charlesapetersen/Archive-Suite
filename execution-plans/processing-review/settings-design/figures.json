@@ -3,7 +3,7 @@
  "table_built": "2026-11-13",
  "noise": {
   "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
-  "seg_rerun_pages_exact_points": "under the rerun floor of 1.4 to 3.2 points of pages exact a box (3.2 for pooled test-box figures); in gap accuracy the paired interval decides",
+  "seg_rerun_pages_exact_points": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g1 2.1, so 4.2 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
   "truth_note": "The 96's truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner; close rows among those families are provisional. Ties: on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3 (ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair)."
  },
  "ocr": [
@@ -1631,7 +1631,7 @@
    "s_page": 5.33,
    "s_est": true,
    "peak_gb": 0,
-   "note": "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key); single g2 run, no measured offset range (P7-4); 3.7's range on g1 at this level is 83.0-85.2% no checking",
+   "note": "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key); the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 88.8-89.1% no checking, 25.3-29.2 checks per 100 pages, 100.0% after checking and no unflagged error (seg-g2-offsets.md); 3.7's range on g1 at this level is 83.0-85.2%",
    "source": "settings-routes.json, stage segmentation, row gemini3.8-flash",
    "nocheck": 88.8,
    "checks_per_100": 25.3,

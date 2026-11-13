@@ -119,6 +119,8 @@ enum SettingsSheetTestDriver {
             if s.routeID == "gemini3.8-flash" {
                 check("3 Gemini 3.8's segmentation card labels its figures as 3.7's", s.labels.contains { $0.contains("Gemini 3.7") })
                 check("3 Gemini 3.8's magazine figure ranks", s.parts.first { $0.id == "magazine" }?.label2 == nil)
+                check("3 Gemini 3.8's segmentation card gives the range over three offsets (W46.seg-g2-offsets)",
+                      s.labels.contains { $0.contains("88.8% to 89.1%") }, s.labels.joined(separator: " | "))
             } else {
                 lines.append("SKIP 3 Gemini segmentation labels: the pick is \(s.routeID ?? "nil")")
             }

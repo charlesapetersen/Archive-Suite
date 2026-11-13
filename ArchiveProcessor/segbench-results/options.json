@@ -287,6 +287,33 @@
      "unflagged_errors": 3,
      "unflagged_errors_per_500_pages": 2.722323049001815
     }
+   },
+   "offsets": {
+    "item": "W46.seg-g2-offsets",
+    "result": "segbench-results/seg-g2-offsets.md",
+    "offsets": [
+     0,
+     1,
+     2
+    ],
+    "range": {
+     "pages_exact_no_review": [
+      0.8878787878787879,
+      0.8909090909090909
+     ],
+     "flagged_per_100_pages": [
+      25.34435261707989,
+      29.201101928374655
+     ],
+     "pages_exact_after_review": [
+      1.0,
+      1.0
+     ],
+     "unflagged_errors_per_500_pages": [
+      0.0,
+      0.0
+     ]
+    }
    }
   },
   {

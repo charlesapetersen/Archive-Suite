@@ -262,10 +262,14 @@ enum SettingsSolverTestDriver {
         d5r.keys = ["gemini"]
         var cheap = SettingsAnswers()
         cheap.preference = .cheapestWithinPoint
-        // W46.seg-magazine-rule-app: Gemini's 88.8 (3.7's g2 answers) is 3.3 points over Claude's 85.5, past the
-        // 3.2 floor; on g1's 87.3 it was a tie and the plan won on money.
-        eq("D5 segmentation: Gemini 3.3 points ahead, beyond the 3.2 floor", pick(solve("D5", d5r, cheap), "segmentation"),
-           "gemini3.8-flash")
+        // W46.seg-g2-offsets: Gemini's 88.8 (3.7's g2 answers, 88.8-89.1 over three window offsets) is 3.3 points
+        // over Claude's 85.5, under the 4.2 floor (twice 2.1, the larger offset range of the two: Claude has none
+        // measured and takes the largest), so a tie and the plan wins on money.
+        eq("D5 segmentation: Gemini 3.3 points ahead, under the 4.2 floor, so the plan", pick(solve("D5", d5r, cheap), "segmentation"),
+           "claude-sonnet5.5")
+        let ranges = (table.stage("segmentation")?.routes ?? []).compactMap { $0.figure("test-boxes.offset_range") }
+        check("segmentation floor is twice the largest measured offset range",
+              abs(SettingsSolver.segmentationTie - 2 * (ranges.max() ?? 0)) < 0.05, "\(ranges)")
 
         // E. A cluster (Sherlock), two GPUs a job, no key; nothing downloaded to the Mac.
         var cl = mac(16, downloads: false)

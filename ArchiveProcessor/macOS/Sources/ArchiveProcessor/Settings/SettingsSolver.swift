@@ -179,8 +179,12 @@ struct SettingsSolver {
     /// Mac routes, 0.60 for hands) and falls back to these floors where a pair has no per-page scores.
     static let readingHostedFloor = 0.49
     static let readingHandsFloor = 0.60
-    /// Segmentation: the pooled test boxes' rerun floor (`seg-boxes-score.md`).
-    static let segmentationTie = 3.2
+    /// Segmentation, built as reading's is: twice the larger window-offset range of the two routes compared, in
+    /// pooled test-box pages exact (`test-boxes.offset_range`), a route with no range taking the largest measured.
+    /// Measured: Gemini 3.7 on g2 0.3 points, on g1 2.1 (`seg-g2-offsets.md`, `seg-boxes-score.md`); no other route
+    /// has one, so every pair the table holds is twice 2.1 (W46.seg-g2-offsets; 07-segmentation.md §3). The test
+    /// driver checks this against the table.
+    static let segmentationTie = 4.2
     /// Dating: the rerun floor is the same year on 94% (85/90) of documents between identical runs, read as a gap of
     /// up to 6 points of exact year; reading the rate as points is the note's [I] (08-dating.md §3).
     static let datingTie = 6.0

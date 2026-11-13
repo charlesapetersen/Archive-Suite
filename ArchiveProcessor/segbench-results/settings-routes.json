@@ -37,8 +37,8 @@
   },
   "segmentation": {
    "metric": "pages_exact",
-   "tie": "under the rerun floor of 1.4 to 3.2 points of pages exact a box (3.2 for pooled test-box figures); in gap accuracy the paired interval decides",
-   "source": "seg-boxes-score.md §Paired differences"
+   "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g1 2.1, so 4.2 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
+   "source": "seg-g2-offsets.md §Reading; seg-boxes-score.md §Paired differences"
   },
   "dating": {
    "metric": "not_in_text",
@@ -8161,6 +8161,19 @@
         "value": "88.8%"
        }
       },
+      "test-boxes.offset_range": {
+       "value": 0.3,
+       "low": 88.8,
+       "high": 89.1,
+       "n": 363,
+       "truth": "owner-test",
+       "source": {
+        "file": "seg-g2-offsets.md",
+        "route": "Gemini 3.7",
+        "attribute": "spread of pages exact, no checking, over window offsets 0, 1 and 2",
+        "value": "0.3 points"
+       }
+      },
       "test-boxes.checks_per_100": {
        "value": 25.3,
        "n": 363,
@@ -8248,7 +8261,7 @@
      },
      "caveats": [
       "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)",
-      "single g2 run, no measured offset range (P7-4); 3.7's range on g1 at this level is 83.0-85.2% no checking",
+      "the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 88.8-89.1% no checking, 25.3-29.2 checks per 100 pages, 100.0% after checking and no unflagged error (seg-g2-offsets.md); 3.7's range on g1 at this level is 83.0-85.2%",
       "introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1",
       "no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)",
       "the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"
@@ -8284,6 +8297,19 @@
         "route": "3.7, offset 0",
         "attribute": "pages in an exact document, no checking (range 83.0-85.2%)",
         "value": "85.2%"
+       }
+      },
+      "test-boxes.offset_range": {
+       "value": 2.1,
+       "low": 83.0,
+       "high": 85.2,
+       "n": 363,
+       "truth": "owner-test",
+       "source": {
+        "file": "seg-boxes-score.md",
+        "route": "Gemini 3.7",
+        "attribute": "window offsets move no-check exact pages",
+        "value": "2.1 points"
        }
       },
       "test-boxes.checks_per_100": {

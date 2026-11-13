@@ -4564,7 +4564,11 @@ const DATA = {
 "unflagged":0,
 "std":3.61,
 "batch":1.81,
-"source":"options.md"
+"source":"options.md",
+"range":[
+88.8,
+89.1
+]
 },
 {
 "name":"ChatGPT only",
@@ -68988,6 +68992,9 @@ function labelPlugin(P, freeSep = true) {
       const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, acc = css('--accent'), oth = css('--other');
       g.save(); g.strokeStyle = css('--rule'); g.lineWidth = 1; g.setLineDash([3, 3]);
       if (freeSep) { const sx = x.getPixelForValue(0.215); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
+      g.setLineDash([]); g.lineWidth = 2;   // a measured range (segmentation: Gemini over three window offsets)
+      P.filter(p => p.r.range).forEach(p => { g.strokeStyle = p.front ? acc : oth; const px = x.getPixelForValue(p.x);
+        g.beginPath(); g.moveTo(px, y.getPixelForValue(p.r.range[0])); g.lineTo(px, y.getPixelForValue(p.r.range[1])); g.stroke(); });
       g.setLineDash([2, 4]); g.lineWidth = 2;
       P.filter(p => p.b).forEach(b => { const s = P.find(q => q.r === b.r && !q.b); g.strokeStyle = (s.front || b.front) ? acc : oth;
         g.beginPath(); g.moveTo(x.getPixelForValue(s.x), y.getPixelForValue(s.y)); g.lineTo(x.getPixelForValue(b.x), y.getPixelForValue(b.y)); g.stroke(); });
@@ -68998,7 +69005,7 @@ function render() {
   const acc = css('--accent'), oth = css('--other'), surf = css('--panel'), grid = css('--grid'), mut = css('--muted'), sec = css('--fg-2');
   charts.forEach(o => {
     if (o.chart) o.chart.destroy();
-    const ys = o.P.map(p => p.y), lo = Math.floor((Math.min(...ys) - 2) / 5) * 5, hi = Math.min(100, Math.ceil((Math.max(...ys) + 1) / 5) * 5);
+    const ys = o.P.flatMap(p => p.r && p.r.range ? [p.y, ...p.r.range] : [p.y]), lo = Math.floor((Math.min(...ys) - 2) / 5) * 5, hi = Math.min(100, Math.ceil((Math.max(...ys) + 1) / 5) * 5);
     const front = o.P.filter(p => p.front).sort((a, b) => a.x - b.x);
     const col = p => p.front ? acc : oth;
     o.chart = new Chart(o.canvas, { type: 'scatter',
@@ -69013,7 +69020,7 @@ function render() {
       options: { responsive: true, maintainAspectRatio: false, animation: false, layout: { padding: { right: 18, top: 6 } },
         plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 1, callbacks: {
           title: i => i[0].raw.r.num + '. ' + i[0].raw.r.name,
-          label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking',
+          label: i => { const p = i.raw, r = p.r; if (o.seg) return [p.y.toFixed(1) + '% of pages in the exact document, no checking' + (r.range ? ' (' + r.range[0].toFixed(1) + '–' + r.range[1].toFixed(1) + '% over three window offsets)' : ''),
             money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
             return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
             r.free_cluster ? 'no hosted price: free on a university cluster · ' + gpuText(r)
@@ -69044,7 +69051,7 @@ segP.forEach(p => { p.front = !segP.some(q => q !== p && q.x <= p.x && q.y >= p.
 const segTop = SEG.filter(a => a.nocheck === SEG[0].nocheck).map(a => a.name);
 document.getElementById('seg-note').textContent = 'Highest: ' + segTop.join(' and ') + (segTop.length > 1 ? ', tied' : '') + ' at ' + SEG[0].nocheck.toFixed(1) + '%. Best-value points: ' +
   segP.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '. ' + (f => f ? 'With checking, ' + f.name + ' reaches 100% with the fewest checks (' + f.checks.toFixed(1) + ' per 100 pages).' : '')(SEG.filter(a => a.nocheck !== null && a.after === 100).sort((a, b) => a.checks - b.checks)[0]);
-document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + '</td><td>' + a.checks.toFixed(1) +
+document.getElementById('seg-rows').innerHTML = SEG.map(a => '<tr><td>' + a.num + '</td><td>' + a.name + '</td><td>' + pct1(a.nocheck) + (a.range ? ' (' + a.range[0].toFixed(1) + '–' + a.range[1].toFixed(1) + ' over three window offsets)' : '') + '</td><td>' + a.checks.toFixed(1) +
   '</td><td>' + pct1(a.after) + '</td><td>' + a.unflagged + '</td><td>' + (a.farmshare ? (a.std ? money(a.std) + ' (OpenRouter rate)' : 'free, fits on the Mac') : a.mac ? 'free, on your Mac' : a.std ? money(a.std) : 'none') + '</td><td>' + (a.batch ? money(a.batch) : '—') + '</td></tr>').join('');
 charts.push({ P: segP, canvas: document.querySelector('#seg-chart canvas'), seg: true });
 

@@ -18,7 +18,7 @@ Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every
 | GLM-5.3 Flash only (budget) | 80.6% | 33.1 | 97.0% | 4.1 (3) | $1.16 / none |
 | Corpus-trained Qwen3.5 2B on this Mac (no key) | 80.3% | 78.8 | 98.8% | 1.4 (1) | $0.000 / none |
 
-Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and this row's level and figures are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them (segbench-results/seg-magazine-rule-app.md). Gemini 3.8 on g1 at <= 0.965 scored 87.3% no checking, 24.2 checks per 100 pages, 98.5% after checking and 2 unflagged errors. Its token and price row below is 3.8's, measured on g1.
+Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and this row's level and figures are Gemini 3.7 Flash's g2 answers through the Stanford gateway, the level fitted on them (segbench-results/seg-magazine-rule-app.md). Gemini 3.8 on g1 at <= 0.965 scored 87.3% no checking, 24.2 checks per 100 pages, 98.5% after checking and 2 unflagged errors. Its token and price row below is 3.8's, measured on g1. The row is one run at window offset 0; over offsets 0, 1 and 2 (segbench-results/seg-g2-offsets.md) the same route scores 88.8%–89.1% no checking, 25.3–29.2 checks per 100 pages, 100.0%–100.0% after checking, 0.0–0.0 unflagged errors per 500 pages.
 
 ## Held out on the development boxes (each box at the level fitted on the other two)
 

@@ -300,7 +300,19 @@ def render(out) -> str:
           f"Against Claude only's {_p(out['claude_o0'])} (prompt w1, one offset-0 run, options.md) the low end is "
           f"{100 * (rng['pages_exact_no_review'][0] - out['claude_o0']):+.1f} points and offset 0 "
           f"{100 * (rows['o0']['figures']['pages_exact_no_review'] - out['claude_o0']):+.1f}. "
-          "How the settings layer reads this is 07-segmentation.md's tie rule.", "",
+          "The pooled spread is narrow because the boxes move apart: Stanton "
+          + "–".join(_p(f(rows[f"o{o}"]["by_box"]["Stanton"]["pages_exact_no_review"] for o in OFFSETS)) for f in (min, max))
+          + ", RG165 "
+          + "–".join(_p(f(rows[f"o{o}"]["by_box"]["RG165"]["pages_exact_no_review"] for o in OFFSETS)) for f in (min, max))
+          + ", so a per-box figure is far less settled than the pooled one.", "",
+          f"The settings layer's tie rule (07-segmentation.md §3) is now reading's construction: twice the larger "
+          f"offset range of the two routes compared, a route with none held to the largest measured (g1's "
+          f"{sp['g1']:.1f}), so {2 * round(max(sp['g1'], sp['g2']), 1):.1f} points for every pair the table holds. "
+          f"Gemini's {100 * (rng['pages_exact_no_review'][0] - out['claude_o0']):.1f}-"
+          f"{100 * (rng['pages_exact_no_review'][1] - out['claude_o0']):.1f} points over Claude is under it, a tie, "
+          "so profile D5 (a Claude plan and a Gemini key) goes back to the plan route on money; on the 3.2 floor of "
+          "one range it had passed by 0.1. Claude's w1 carries no article rule, so the gap is not like for like either "
+          "way.", "",
           "## Gateway", "",
           f"{gw['calls']} settled calls, {gw['input_tokens']:,} input and {gw['output_tokens']:,} output tokens, "
           f"${gw['spent_usd']:.4f} counted of the ${CAP:.2f} cap ({gw['billed_note']}), {gw['invalid']} invalid. "

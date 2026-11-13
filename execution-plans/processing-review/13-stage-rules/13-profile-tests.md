@@ -61,8 +61,8 @@ hollow with the reason "stays on the Mac"; picks as B1.
   to `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16 92.61); `mistral-large4` ties it (−0.42 [−1.45, +0.68], n 16,
   owner96/hands16/strict, floor 0.60) at $2.69, dearer, and every other OpenRouter route without Gemini trails beyond
   the floor (note 04 §9 profile 2). Not pending: every OpenRouter route has a hands16 figure.
-- Segmentation: `glm5.3-flash` (80.6%, $1.16) ties the 2B (80.3%) and the 2B wins on cost when the Mac has 16 GB;
-  GLM when it does not.
+- Segmentation: `glm5.3-flash` (80.6%, $1.16) ties the 2B (80.3%; under the 4.2 floor, 07 §3) and the 2B wins on cost
+  when the Mac has 16 GB; GLM when it does not.
 - Dating: steps 1 and 4 `gemini3.7-flash-trace-neigh` only if the key reaches Gemini, else the Mac route of B1 (no
   trace row for an OpenRouter-only model; pending `W46.date-route-pipeline`).
 - Entities: `qwen3.6-27b` (sender 0.62) on correspondence, extracted always on a cloud route, shown when names rank;
@@ -73,8 +73,9 @@ hollow with the reason "stays on the Mac"; picks as B1.
 
 **D1. A Gemini key.** Reading `gemini3.8-flash` ($3.22, batch $1.61; 96.47) over `gemini3.1-pro` (96.85, $21.92), a
 tie, cheaper wins; handwritten `gemini3.8-flash` labelled "conditional on the truth" (OCR-1). Segmentation
-`gemini3.8-flash` (88.8%, $3.61; 25.3 checks per 100 pages; 100.0% after checking; prompt g2, every figure Gemini
-3.7's g2 answers, W46.seg-magazine-rule-app) with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
+`gemini3.8-flash` (88.8%, 88.8-89.1% over three window offsets, $3.61; 25.3 checks per 100 pages, 25.3-29.2; 100.0%
+after checking; prompt g2, every figure Gemini 3.7's g2 answers, W46.seg-magazine-rule-app, W46.seg-g2-offsets),
+beyond the 4.2 floor over every route the key reaches, with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
 on documents with no year in the text ($2.75 per 1,000, 5.3 s), step 4 `gemini3.7-flash-trace-neigh`. Entities
 `gemini-entity-feature`, the entity feature's own prompt (owner call 10; sender 0.69, $2.37 per 1,000, 5.1 s,
 `ent-feature.md`), extracted always, shown when ranked; `gemini-tagging-place` and `gemini-entity8k` are not offered. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
@@ -93,11 +94,13 @@ no plan rows (the Claude arms were dropped, owner 2026-10-30), so the Mac route 
 
 **D4. The ChatGPT plan only.** Reading: no measured row; the sheet says so and falls to B1. Segmentation
 `chatgpt-only` as the app's table carries it. **Both plans:** segmentation `mix-claude-chatgpt` (90.9%, 10.2 checks)
-over Claude alone, beyond the floor.
+over Claude alone (85.5%), 5.4 points, beyond the 4.2 floor.
 
-**D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Segmentation: 85.5 against 88.8 is 3.3 points,
-just beyond the 3.2 floor, so `gemini3.8-flash` wins (W46.seg-magazine-rule-app; on g1's 87.3 it was a tie and the plan
-route won on money).
+**D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Segmentation: Claude's 85.5 against
+Gemini's 88.8-89.1% over three window offsets is 3.3 to 3.6 points, under the 4.2 floor (twice the larger offset range
+of the two; Claude has none measured and is held to the largest, Gemini 3.7 g1's 2.1), so a tie and
+`claude-sonnet5.5` wins on money (W46.seg-g2-offsets; on the 3.2 floor W46.seg-magazine-rule-app had picked Gemini by
+0.1, and on g1's 87.3 it was a tie).
 
 ## E. A cluster (Sherlock), no key
 
