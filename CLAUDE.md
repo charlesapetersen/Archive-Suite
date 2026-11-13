@@ -195,6 +195,10 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   $50 a month may go to the review, none for its own sake. Personal keys only for what the gateway cannot serve (Azure, Textract, Document AI checks;
   one Gemini 3.7-against-3.8 Flash check on the 96). The
   $7-per-item rule still applies. Newer gateway models need the owner to request access.
+  **No direct Gemini key (owner, 2026-11-13 walkthrough):** the Processor's own Gemini key (AI Studio prepay) is empty
+  and will not be topped up; no bench or review work plans on it. Gemini goes through the gateway only; newer Google
+  models are requested for the gateway at nice-to-have (`W46.gateway-google-models`). The app's Gemini-key route for
+  users is unchanged.
 - ✅ **Benchmark uploads are authorized (owner, 2026-10-25).** The frozen 96 owner benchmark pages and 12 public pages,
   with their region and tile crops, may go to `https://aiapi-prod.stanford.edu/v1/chat/completions` (Processor Gateway
   key, Gemini 3.7 Flash); adjudicated truth text is not sent. Comparable benchmark image uploads and experiment work
