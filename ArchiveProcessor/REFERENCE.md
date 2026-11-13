@@ -382,6 +382,14 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                `onlyRoutes`. View: `Views/SettingsSheetView.swift`, opened from the segmentation
                                chooser and the Provider section. Self-test: `SettingsSheetTestDriver`,
                                `scripts/test-settings-sheet.sh` (words, labels, a no-bench-ids check, offscreen pages).
+  SettingsRangeModel.swift     The sheet's Range tab (§3.4): one chart per card stage from the same solution — list
+                               price per 1,000 units (free band: this Mac, a plan or cluster the user has) against the
+                               card's comparable figure; marks hollow with every blocker, faded when the route alone
+                               would break what the other stages leave of the ceiling or the hours; the undominated
+                               line over usable routes; the red line for the ceiling left; the full table; the kit's
+                               after-training points by the fine-tuning answer. A click sets the card's override, the
+                               app's own pick clears it. View: `Views/SettingsRangeView.swift` (plain shapes, so the
+                               offscreen render sees it); self-test section 8 of `SettingsSheetTestDriver`.
 ReOCR/                         W44 Improve OCR (Tier-2: it replaces archive PDFs' text pages). Contract:
                                `SPEC/improve-ocr.md`; design: `execution-plans/reocr/00-plan.md`.
   ReOCRPairs.swift             Positive validation of suite image/text pairs; the replacement text page (header kept).

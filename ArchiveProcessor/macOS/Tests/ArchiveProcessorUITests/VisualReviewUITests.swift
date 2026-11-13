@@ -375,7 +375,7 @@ final class VisualReviewUITests: XCTestCase {
         return true
     }
 
-    /// W46.settings-sheet: the settings sheet from Settings, both tabs, each scrolled through.
+    /// W46.settings-sheet: the settings sheet from Settings, its three tabs, each scrolled through.
     private func settingsSheet(_ settings: XCUIElement) {
         let button = element("ap.settings.openSettingsSheet")
         guard button.waitForExistence(timeout: 3) else { missing.append("settings sheet button"); return }
@@ -389,6 +389,13 @@ final class VisualReviewUITests: XCTestCase {
         if waitForSheet(), element("ap.sheet").waitForExistence(timeout: 5) {
             shoot("settings-sheet")
             scrollSheet("settings-sheet")
+            let range = app.sheets.firstMatch.radioButtons["Range"]
+            if range.waitForExistence(timeout: 2) {
+                range.click()
+                pause(0.8)
+                shoot("settings-sheet-range")
+                scrollSheet("settings-sheet-range")
+            } else { missing.append("settings sheet Range tab") }
             let rules = app.sheets.firstMatch.radioButtons["Rules"]
             if rules.waitForExistence(timeout: 2) {
                 rules.click()

@@ -255,6 +255,34 @@ final class ProcessorUITests: XCTestCase {
                       "each card says what a better figure would need")
         attachScreenshot("processor-settings-sheet-choices")
 
+        // W46.settings-range-view: the Range tab, one chart per stage; a row's Choose sets the card's override, and the
+        // card's way back clears it.
+        let range = app.sheets.firstMatch.radioButtons["Range"]
+        XCTAssertTrue(range.waitForExistence(timeout: 5), "the sheet has a Range tab")
+        range.click()
+        for stage in ["reading", "segmentation", "dating", "entities"] {
+            XCTAssertTrue(element("ap.sheet.range.\(stage)").waitForExistence(timeout: 5), "the Range tab charts \(stage)")
+        }
+        XCTAssertTrue(element("ap.sheet.range.reading.chart").exists, "the reading chart is drawn")
+        attachScreenshot("processor-settings-sheet-range")
+        let choose = app.descendants(matching: .button)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "ap.sheet.range.reading.choose.")).firstMatch
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "the reading table offers another route to choose")
+        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
+        for _ in 0..<12 where !choose.isHittable {
+            scroll.scroll(byDeltaX: 0, deltaY: -300)
+        }
+        choose.click()
+        app.sheets.firstMatch.radioButtons["Choices"].click()
+        let back = element("ap.sheet.reset.reading")
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "choosing from the range marks the reading card Custom, with a way back")
+        for _ in 0..<12 where !back.isHittable {
+            scroll.scroll(byDeltaX: 0, deltaY: -300)
+        }
+        back.click()
+        XCTAssertTrue(waitUntil { !back.exists }, "the way back returns the reading card to the app's pick")
+        scroll.scroll(byDeltaX: 0, deltaY: 20000)
+
         let rules = app.sheets.firstMatch.radioButtons["Rules"]
         XCTAssertTrue(rules.waitForExistence(timeout: 5), "the sheet has a Rules tab")
         rules.click()

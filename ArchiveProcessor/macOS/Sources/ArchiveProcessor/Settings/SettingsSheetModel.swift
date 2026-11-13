@@ -982,7 +982,7 @@ struct SettingsSheetWords {
             return p
         }
         var n = r.name
-        for (a, b) in [(" bf16", ""), (" 8-bit", ""), (" 4-bit", ""), (" fp8", ""), (", hosted fp8", ""),
+        for (a, b) in [(" medium on blla lines", ""), (" bf16", ""), (" 8-bit", ""), (" 4-bit", ""), (" fp8", ""), (", hosted fp8", ""),
                        (" (Mac CPU)", " (on this Mac)"), (" (Mac)", ""), ("(your Claude plan)", "(a Claude subscription)"),
                        ("(your cluster)", "(on a computing cluster)"), ("(your cluster or OpenRouter)", "(a computing cluster or OpenRouter)")] {
             n = n.replacingOccurrences(of: a, with: b)
@@ -1039,6 +1039,8 @@ struct SettingsSheetWords {
         guard total > 0 else { return overall }
         var sum = 0.0
         for k in kinds {
+            // Apple Vision never reads handwriting (owner call 4): its handwritten pages count as 0, as a flagged kind does.
+            if k == "handwritten" && r.id == "apple-vision" { continue }
             guard let v = k == "handwritten" ? (r.figure("hands16") ?? r.figure(k)) : r.figure(k) else { return overall }
             sum += v * (answers.mix[k] ?? 0) / total
         }
@@ -1105,7 +1107,9 @@ struct SettingsSheetWords {
     /// The solver's blocker and limit phrases, in the sheet's words.
     func reason(_ r: String) -> String {
         if r == "not in this comparison" { return "you chose another option for this step" }
-        if r == "this batch stays on the Mac" { return "it sends pages online, and you chose to keep them on this Mac" }
+        if r == "this batch stays on the Mac" {
+            return "it sends pages off this Mac (online or to a cluster), and you chose to keep them on this Mac"
+        }
         if r == "ties the pick and costs more or is slower" { return "no better within the bench's margin of error, and costs more or is slower" }
         if r.hasPrefix("waits for: ") { return "not ready in the app yet" }
         if r.hasPrefix("not offered by the app") { return "the app does not offer it yet" }

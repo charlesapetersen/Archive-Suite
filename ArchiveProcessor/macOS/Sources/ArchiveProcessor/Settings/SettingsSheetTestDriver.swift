@@ -211,15 +211,74 @@ enum SettingsSheetTestDriver {
                                                                               (.staysOnMac, .bool(true))]))
         let agent = sheet("kit-agent", general: layer(.general, [(.fineTuning, .string(FineTuningAnswer.codingAgent.rawValue))]))
         let clusterKit = sheet("kit-cluster", general: layer(.general, [(.fineTuning, .string(FineTuningAnswer.cluster.rawValue)),
-                                                                          (.cluster, .bool(true))]))
+                                                                          (.cluster, .bool(true)), (.staysOnMac, .bool(false))]))
+        // A Custom pick that spends more than the ceiling: the other steps then break it, and a free route that adds
+        // nothing is not faded for it.
+        let over = sheet("over-ceiling", general: layer(.general, [(.keys, .strings(["gemini"])),
+                                                                     (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
+                                                                     (.batchCeilingUSD, .double(1)), (.staysOnMac, .bool(false))]),
+                         collection: layer(.collection, [(SettingsSheetModel.overrideKey("segmentation"), .string("gemini3.8-flash"))]))
+        if let r = over.ranges.first(where: { $0.id == "reading" }) {
+            check("8 over the ceiling elsewhere: a free mark is not faded for money",
+                  r.points.filter { $0.x == 0 }.allSatisfy { !($0.state == .outsideLimits && $0.tooltip.contains("cost")) },
+                  r.points.first { $0.x == 0 && $0.state == .outsideLimits }?.tooltip ?? "")
+        } else { check("8 over-ceiling reading chart", false) }
+        // Overnight: reading pays the batch price, and the chart places a route there.
+        let night = sheet("overnight", general: layer(.general, [(.keys, .strings(["gemini"])),
+                                                                   (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
+                                                                   (.batchCeilingUSD, .double(10)), (.hours, .double(24)),
+                                                                   (.staysOnMac, .bool(false))]))
+        if let r = night.ranges.first(where: { $0.id == "reading" }),
+           let g = table.stage("reading")?.route("gemini3.8-flash"), let batch = g.batchUSDPer1000 {
+            check("8 overnight: a paid reader sits at its batch price, and the axis says so",
+                  r.points.first { $0.id == "gemini3.8-flash" }.map { abs($0.x - batch) < 1e-9 } == true && r.xLabel.contains("batch"),
+                  "\(r.points.first { $0.id == "gemini3.8-flash" }?.x ?? -1) vs \(batch)")
+        } else { lines.append("SKIP 8 overnight: no batch price for Gemini 3.8 Flash") }
+        check("8 a $10 ceiling: some reading mark is faded with its reason",
+              paid.ranges.first { $0.id == "reading" }?.points.contains { $0.state == .outsideLimits } == true)
+        // Apple Vision never reads handwriting: its height counts the handwritten pages as 0, and the free pick's
+        // routes together sit at the card's figure.
+        if let r = free.ranges.first(where: { $0.id == "reading" }), let v = table.stage("reading")?.route("apple-vision"),
+           let tw = v.figure("typewritten"), let pr = v.figure("printed") {
+            let mix = free.answers.mix
+            let total = (mix["typewritten"] ?? 0) + (mix["printed"] ?? 0) + (mix["handwritten"] ?? 0)
+            let want = ((mix["typewritten"] ?? 0) * tw + (mix["printed"] ?? 0) * pr) / total
+            check("8 Apple Vision's mark counts its unread handwriting as 0",
+                  r.points.first { $0.id == "apple-vision" }.map { abs($0.y - want) < 1e-6 } == true,
+                  "\(r.points.first { $0.id == "apple-vision" }?.y ?? -1) vs \(want)")
+            let base = SettingsSheetModel.comparable("reading", free.solution, words: .init(table: table, answers: free.answers,
+                                                                                           resources: free.resources)).base
+            check("8 the free pick's readers together sit at the card's figure",
+                  r.together.map { abs($0.y - (base ?? -1)) < 1e-6 && $0.x == 0 } == true || r.points.filter(\.picked).count < 2,
+                  "\(r.together?.y ?? -1) vs \(base ?? -1)")
+        } else { check("8 free reading chart and Vision's figures", false) }
+        // F with 160 corrected lines of one hand on kraken: the star on the reading chart, at the gain on the
+        // handwritten share.
+        var kitAnswers = agent.answers
+        kitAnswers.correctedLinesOneHand = 160
+        kitAnswers.onlyRoutes["reading"] = ["apple-vision", "ppocrv6-kraken-blla"]
+        let kitSolution = SettingsSolver(table: table, pairs: pairs, resources: agent.resources, answers: kitAnswers).solve()
+        let kitWords = SettingsSheetWords(table: table, answers: kitAnswers, resources: agent.resources)
+        if kitSolution.pick("reading", "handwritten")?.routeID == "ppocrv6-kraken-blla",
+           let g = table.stage("training-kit")?.route("kit-hands-ppocrv6-ft")?.figure("handwritten-one-hand-160-lines") {
+            let charts = SettingsSheetModel.ranges(table: table, solution: kitSolution, app: kitSolution, answers: kitAnswers,
+                                                   cards: agent.cards, words: kitWords)
+            let star = charts.first { $0.id == "reading" }?.kit.first { $0.id == "kit-hands-ppocrv6-ft" }
+            let base = SettingsSheetModel.comparable("reading", kitSolution, words: kitWords).base ?? 0
+            let mix = kitAnswers.mix
+            let share = (mix["handwritten"] ?? 0) / ((mix["typewritten"] ?? 0) + (mix["printed"] ?? 0) + (mix["handwritten"] ?? 0))
+            check("8 F 160 lines on kraken: the fine-tune is a star at the gain on the handwritten share",
+                  star?.y.map { abs($0 - (base + g * share)) < 1e-6 } == true, "\(star?.y ?? -1) vs \(base + g * share)")
+        } else { lines.append("SKIP 8 F star: kraken does not read the handwriting on this Mac") }
         for (name, m) in [("free", free), ("gemini", paid), ("custom", custom), ("small", small), ("stays-on-mac", onMac),
-                          ("kit-cluster", clusterKit)] {
+                          ("kit-cluster", clusterKit), ("over-ceiling", over), ("overnight", night)] {
             range(name, m, table: table)
         }
         if let r = custom.ranges.first(where: { $0.id == "reading" }) {
             let app = r.points.first { $0.id == r.appPickID }
             check("8 custom: the app's own pick is on the chart and can be clicked as the way back",
-                  r.appPickID != nil && r.appPickID != "apple-vision" && app?.choosable == true, r.appPickID ?? "nil")
+                  r.appPickID != nil && r.appPickID != "apple-vision" && app?.choosable == true
+                    && app?.tooltip.contains("goes back") == true, r.appPickID ?? "nil")
             check("8 custom: the chosen route is marked, and clicking it again does nothing",
                   r.points.first { $0.id == "apple-vision" }.map { $0.picked && !$0.choosable } == true)
         } else { check("8 custom reading chart", false) }
@@ -239,7 +298,7 @@ enum SettingsSheetTestDriver {
         check("8 F coding agent: the handwriting fine-tune only where kraken reads the handwriting, and off the chart below 80 lines",
               handPick == "ppocrv6-kraken-blla"
                 ? handKit.first.map { $0.y == nil && $0.condition.contains("80 lines") } == true
-                : handKit.allSatisfy { $0.y == nil }, "\(handPick ?? "nil") \(handKit.map(\.condition))")
+                : handKit.isEmpty, "\(handPick ?? "nil") \(handKit.map(\.condition))")
         let clusterSeg = clusterKit.ranges.first { $0.id == "segmentation" }?.kit ?? []
         check("8 F cluster: the student and the continuation listed with their conditions",
               Set(clusterSeg.map(\.id)) == ["kit-seg-lora-mac", "kit-seg-student-tags", "seg-2b-lora-k200"]
@@ -310,13 +369,13 @@ enum SettingsSheetTestDriver {
             if let pick = card.routeID, c.points.contains(where: { $0.id == pick }) {
                 check("\(tag): the card's pick is marked", c.points.first { $0.id == pick }?.picked == true)
             }
-            let used = c.points.filter { $0.state != .unusable }
+            let used = c.points.filter { $0.state == .usable }
             func beats(_ q: SettingsRangeChart.Point, _ p: SettingsRangeChart.Point) -> Bool {
                 q.id != p.id && q.x <= p.x && q.y >= p.y && (q.x < p.x || q.y > p.y)
             }
-            check("\(tag): nothing usable beats a mark on the dashed line",
+            check("\(tag): nothing within the limits beats a mark on the dashed line",
                   c.frontier.allSatisfy { p in !used.contains { beats($0, p) } })
-            check("\(tag): every usable mark off the line is beaten",
+            check("\(tag): every mark within the limits off the line is beaten",
                   used.filter { !$0.onFrontier }.allSatisfy { p in used.contains { beats($0, p) } })
             check("\(tag): hollow and faded marks say why",
                   c.points.allSatisfy { p in
