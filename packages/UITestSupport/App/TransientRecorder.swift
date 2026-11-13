@@ -98,6 +98,10 @@ final class TransientRecorder {
     private var aheadInARow = 0
     private var plantedThisTransition = false
     private var hiddenByPlant: NSView?
+    /// `samples` when the plant hid the content, so it is shown again only after a later sample.
+    private var plantPass = 0
+    /// Wakes the run loop while the plant is hidden, so a pass draws and samples it.
+    private var plantWake: Timer?
     private var panel: NSPanel?
     private var field: NSTextField?
     private var published = ""
@@ -149,6 +153,7 @@ final class TransientRecorder {
             changing.insert(prefix)
             changed = true
         }
+        endPlantIfSampled()
         guard changed else { return }
         let entries = prefixes.flatMap { snapshot[$0]?.entries ?? [] }
         for (n, link) in links.enumerated() {
@@ -367,19 +372,33 @@ final class TransientRecorder {
 
     // MARK: - the planted flicker
 
+    /// The content is hidden in one pass and shown again only after a later pass has drawn and sampled it hidden.
+    /// A fixed 80 ms timer that showed it again used to be enough, but on macOS 27 nothing else woke the run loop
+    /// in between (measured in the 27.2 guest, 2026-11-12: Notes, 1 plant, no sample of the hidden state), so the
+    /// pass the timer woke showed the content again before any pass had drawn it hidden: nothing blinked, on
+    /// screen or in the recorder. The wake timer now only wakes the run loop; `sample` shows the content again.
     private func plant() {
         guard let content = (NSApp.keyWindow ?? NSApp.mainWindow)?.contentView, !content.isHidden else { return }
         plantedThisTransition = true
         plants += 1
         content.isHidden = true
         hiddenByPlant = content
-        let timer = Timer(timeInterval: 0.08, repeats: false) { _ in
-            MainActor.assumeIsolated {
-                TransientRecorder.shared?.hiddenByPlant?.isHidden = false
-                TransientRecorder.shared?.hiddenByPlant = nil
-            }
-        }
+        plantPass = samples
+        let timer = Timer(timeInterval: 0.08, repeats: true) { _ in }
         RunLoop.main.add(timer, forMode: .common)
+        plantWake = timer
+    }
+
+    /// Shows the planted content again once a sample after the planting pass has recorded it hidden.
+    private func endPlantIfSampled() {
+        guard let hidden = hiddenByPlant, samples > plantPass else { return }
+        hidden.isHidden = false
+        hiddenByPlant = nil
+        // One more wake, so a pass draws the content shown again, then none.
+        plantWake?.invalidate()
+        let timer = Timer(timeInterval: 0.08, repeats: false) { _ in }
+        RunLoop.main.add(timer, forMode: .common)
+        plantWake = nil
     }
 
     // MARK: - the report

@@ -147,6 +147,7 @@ enum TransientCheck {
         let summary = "transient: \(name): \(after.transitions - before.transitions) transition(s), "
             + "\(lines.count) finding(s), \(after.samples - before.samples) samples, walk ≤ \(after.walkMaxMs) ms"
             + (after.ahead > before.ahead ? ", \(after.ahead - before.ahead) ahead of the screen (skipped)" : "")
+            + (after.plants > before.plants ? ", \(after.plants - before.plants) planted blink(s)" : "")
         print(([summary] + changes.map { "  · " + $0 } + lines.map { "  " + $0 }).joined(separator: "\n"))
         let attachment = XCTAttachment(string: ([summary] + lines).joined(separator: "\n"))
         attachment.name = "transient — \(name)"
