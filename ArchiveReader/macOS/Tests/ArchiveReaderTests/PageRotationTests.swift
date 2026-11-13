@@ -163,6 +163,83 @@ final class PageRotationTests: XCTestCase {
         }
     }
 
+    // MARK: the image page's right-click menu (W40.reader-image-context-menu)
+
+    func testCopyImageIsTheShownPageTurnedAndTheFileIsUntouched() throws {
+        let dir = makeTempDir("copy-image")
+        let pdf = try makeScanPDF(in: dir)
+        let before = try sha256(pdf)
+        let store = PageTurnStore(url: nil)
+        let model = DocumentViewerModel(persists: false, pageTurns: store, thumbnailer: nil)
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        XCTAssertEqual(model.shownImageFileURL?.path, pdf.path, "Reveal in Finder selects the PDF")
+        // 400 × 520 points at 300 dpi; a quarter turn swaps the sides.
+        let short = Int((400 * 300 / 72.0).rounded()), long = Int((520 * 300 / 72.0).rounded())
+        for turns in 0..<4 {
+            store.set(turns, path: pdf.path, page: 0)
+            let image = try XCTUnwrap(model.shownImage, "turns \(turns)")
+            XCTAssertEqual([image.width, image.height], turns % 2 == 0 ? [short, long] : [long, short],
+                           "turns \(turns)")
+            try assertTurned(image, band: Self.topEdge(turns), named: "w40-copy-image-\(turns * 90).png",
+                             "Copy Image, turns \(turns)")
+            XCTAssertEqual(model.imagePage?.rotation, 0, "the model's page is not turned")
+        }
+
+        let board = NSPasteboard(name: NSPasteboard.Name("ArchiveReaderTests.copyImage.\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        model.copyImage(to: board)
+        let pasted = try XCTUnwrap(board.readObjects(forClasses: [NSImage.self])?.first as? NSImage)
+        XCTAssertEqual(pasted.size, NSSize(width: long, height: short), "the pasteboard holds the image as shown")
+        XCTAssertEqual(try sha256(pdf), before, "copying the image never touches the file")
+    }
+
+    func testAJPEGOriginalIsCopiedOneToOneAndTurned() throws {
+        let jpeg = try makeJPEGPage(width: 800, height: 1040)
+        let image = try XCTUnwrap(PDFPaneController.render(jpeg, turns: 1, scale: 1))
+        XCTAssertEqual([image.width, image.height], [1040, 800], "the JPEG's own pixels, turned once")
+        try assertTurned(image, band: .right, named: "w40-copy-image-jpeg-90.png", "JPEG Copy Image, turns 1")
+        XCTAssertEqual(jpeg.rotation, 0, "the JPEG's page is not turned")
+    }
+
+    func testTheImagePaneMenuOffersCopyImageAndRevealInFinder() throws {
+        let (controller, view, window) = makePane()
+        defer { window.close() }
+        let doc = try XCTUnwrap(PDFDocument(url: try makeScanPDF(in: makeTempDir("image-menu"))))
+        controller.show(try XCTUnwrap(doc.page(at: 0)), reference: nil, in: view)
+        let pdfView = try XCTUnwrap(view as? ReaderPDFView)
+        pdfView.paneController = controller
+        let click = try XCTUnwrap(NSEvent.mouseEvent(with: .rightMouseDown, location: CGPoint(x: 180, y: 180),
+                                                     modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber,
+                                                     context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+
+        XCTAssertFalse(pdfView.menu(for: click)?.items.contains { $0.title == ReaderCommand.copyImage.title } ?? false,
+                       "a pane without the image actions (the text page) keeps PDFKit's menu")
+
+        var copied = 0, revealed = 0, hasImage = true
+        controller.copyImage = { copied += 1 }
+        controller.revealImageFile = { revealed += 1 }
+        controller.hasImage = { hasImage }
+        let menu = try XCTUnwrap(pdfView.menu(for: click))
+        XCTAssertEqual(menu.items.prefix(2).map(\.title), ["Copy Image", "Reveal in Finder"])
+        let copy = menu.items[0], reveal = menu.items[1]
+        XCTAssertTrue(pdfView.validateMenuItem(copy))
+        XCTAssertTrue(pdfView.validateMenuItem(reveal))
+        NSApp.sendAction(try XCTUnwrap(copy.action), to: copy.target, from: copy)
+        NSApp.sendAction(try XCTUnwrap(reveal.action), to: reveal.target, from: reveal)
+        XCTAssertEqual([copied, revealed], [1, 1])
+        hasImage = false
+        XCTAssertFalse(pdfView.validateMenuItem(copy), "nothing to copy without an image")
+        XCTAssertFalse(pdfView.validateMenuItem(reveal))
+    }
+
+    func testTheViewerGivesTheImagePaneAloneTheImageActions() {
+        let model = DocumentViewerModel(persists: false, pageTurns: PageTurnStore(url: nil), thumbnailer: nil)
+        XCTAssertNotNil(model.leftController.copyImage)
+        XCTAssertNotNil(model.leftController.revealImageFile)
+        XCTAssertNil(model.rightController.copyImage, "the text page keeps PDFKit's own menu")
+        XCTAssertEqual(model.leftController.hasImage?(), false, "nothing loaded, nothing to copy")
+    }
+
     // MARK: - Geometry
 
     enum Side: CustomStringConvertible { case top, right, bottom, left
@@ -181,6 +258,23 @@ final class PageRotationTests: XCTestCase {
         let image = page.thumbnail(of: CGSize(width: 260, height: 260), for: .mediaBox)
         var proposed = CGRect(origin: .zero, size: image.size)
         let cg = try XCTUnwrap(image.cgImage(forProposedRect: &proposed, context: nil, hints: nil))
+        try assertTurned(cg, band: band, named: name, message, file: file, line: line)
+    }
+
+    /// `full` is not blank, and its dark pixels' centre lies toward `band`. A large image is first drawn down to
+    /// about 260 pixels on its longer side, the size the panes' render guards check.
+    private func assertTurned(_ full: CGImage, band: Side, named name: String, _ message: String,
+                              file: StaticString = #filePath, line: UInt = #line) throws {
+        var cg = full
+        let factor = 260 / Double(max(full.width, full.height))
+        if factor < 1 {
+            let w = max(1, Int(Double(full.width) * factor)), h = max(1, Int(Double(full.height) * factor))
+            let ctx = try XCTUnwrap(CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                              space: CGColorSpaceCreateDeviceRGB(),
+                                              bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+            ctx.draw(full, in: CGRect(x: 0, y: 0, width: w, height: h))
+            cg = try XCTUnwrap(ctx.makeImage())
+        }
         let png = try XCTUnwrap(RenderProbe.pngData(from: cg))
         writeRenderArtifact(png, named: name)
         let stats = PixelStats.from(cgImage: cg)

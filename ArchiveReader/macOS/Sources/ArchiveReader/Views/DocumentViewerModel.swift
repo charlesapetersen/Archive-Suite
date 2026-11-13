@@ -203,6 +203,13 @@ final class DocumentViewerModel: ObservableObject {
             }
             controller.zoomChanged = { [weak self] in self?.objectWillChange.send() }
         }
+        // Right-click on the image page (W40.reader-image-context-menu); the text page keeps PDFKit's menu.
+        leftController.copyImage = { [weak self] in self?.copyImage() }
+        leftController.revealImageFile = { [weak self] in self?.revealShownImageFile() }
+        leftController.hasImage = { [weak self] in
+            guard let self else { return false }
+            return !self.showingAllPages && self.shownImageFileURL != nil
+        }
     }
 
     /// Which pane keyboard focus / zoom acts on. ⌘↑/⌘↓ zoom this pane; ⌘⌥←/→ switch it.
@@ -520,6 +527,36 @@ final class DocumentViewerModel: ObservableObject {
         guard let text, !text.isEmpty else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    // MARK: The image pane's own menu — Copy Image, Reveal in Finder (W40.reader-image-context-menu)
+
+    /// The image page as the pane shows it: the PDF's image page or its JPEG original, turned as `pageTurns`
+    /// says. Drawn from a private copy of the page, so neither the file nor the model's page is turned. A JPEG
+    /// original's page is sized in pixels and is drawn one to one; a PDF page, in points, at 300 dpi.
+    var shownImage: CGImage? {
+        guard !showingAllPages, let page = displayedImagePage else { return nil }
+        return PDFPaneController.render(page, turns: imageTurns, scale: isShowingJPEG ? 1 : 300 / 72)
+    }
+
+    /// The file the shown image comes from: the JPEG original while it is shown, else the PDF.
+    var shownImageFileURL: URL? {
+        guard displayedImagePage != nil else { return nil }
+        if isShowingJPEG { return loadedPartner.map { URL(fileURLWithPath: $0.path) } }
+        return currentURL
+    }
+
+    /// Copy Image: the shown image on the pasteboard, as an image other apps paste.
+    func copyImage(to pasteboard: NSPasteboard = .general) {
+        guard let image = shownImage else { return }
+        pasteboard.clearContents()
+        pasteboard.writeObjects([NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))])
+    }
+
+    /// Reveal in Finder: the shown image's file, selected in a Finder window. Read-only.
+    func revealShownImageFile() {
+        guard let url = shownImageFileURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     // MARK: In-document find (⌘F) — highlight all matches, next/prev across every open PDF

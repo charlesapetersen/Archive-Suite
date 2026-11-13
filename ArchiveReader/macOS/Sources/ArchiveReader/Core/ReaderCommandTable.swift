@@ -89,6 +89,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     // Preview's page views, on Preview's keys ⌥⌘2 / ⌥⌘6 (W40.reader-page-views). Show/Hide Thumbnails is one
     // item that toggles the sidebar, as Preview's ⌥⌘2 does (W40.reader-thumbnails-toggle).
     case showThumbnails, contactSheet
+    // The image page's right-click menu, beside Reveal in Finder (W40.reader-image-context-menu)
+    case copyImage
 
     var context: CommandContext {
         switch self {
@@ -169,6 +171,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .resetRotation: return "Reset Rotation"
         case .showThumbnails: return "Show Thumbnails"
         case .contactSheet: return "Contact Sheet"
+        case .copyImage: return "Copy Image"
         }
     }
 
@@ -248,6 +251,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .resetRotation: return nil
         case .showThumbnails: return CommandKey("2", [.command, .option])
         case .contactSheet: return CommandKey("6", [.command, .option])
+        case .copyImage: return nil
         }
     }
 
@@ -285,6 +289,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .resetRotation: return "Show the image page as it is in the file"
         case .showThumbnails: return "Show or hide a thumbnail of each scan of the open files beside the page"
         case .contactSheet: return "Show every PDF page of the open files as a numbered tile"
+        case .copyImage: return "Copy the image page as it is shown, turned as the viewer turns it"
         case .previewPreviousFile: return "Previous file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewNextFile: return "Next file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewPreviousPage: return "Previous page in the selection"

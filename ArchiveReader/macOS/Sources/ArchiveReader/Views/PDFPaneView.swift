@@ -60,6 +60,12 @@ final class PDFPaneController {
     /// Called after the zoom is recorded or reset, so the viewer can republish what depends on it (whether
     /// Reset Zoom has anything to do). Set by `DocumentViewerModel`.
     var zoomChanged: (() -> Void)?
+    /// The image pane's right-click items, Copy Image and Reveal in Finder, and whether there is an image for
+    /// them to act on. Set by `DocumentViewerModel` on the image pane only; nil leaves PDFKit's menu as it is.
+    /// W40.reader-image-context-menu.
+    var copyImage: (() -> Void)?
+    var revealImageFile: (() -> Void)?
+    var hasImage: (() -> Bool)?
 
     /// True while the pane fits its page, i.e. no explicit zoom is held.
     var isFitted: Bool { savedScale == nil }
@@ -257,6 +263,28 @@ final class PDFPaneController {
 
     private static func quarterTurns(_ page: PDFPage) -> Int { quarter(page.rotation / 90) }
     static func quarter(_ turns: Int) -> Int { (turns % 4 + 4) % 4 }
+
+    /// The page as a pane shows it, `turns` quarter turns clockwise on top of its own `/Rotate`, drawn on white
+    /// at `scale` pixels per page unit (W40.reader-image-context-menu's Copy Image). Drawn from a copy, as `show`
+    /// does, so the page itself is never turned. The longer side is held to `maxPixels`.
+    static func render(_ page: PDFPage, turns: Int, scale: CGFloat, maxPixels: CGFloat = 8000) -> CGImage? {
+        guard let copy = page.copy() as? PDFPage else { return nil }
+        copy.rotation = quarter(page.rotation / 90 + turns) * 90
+        let box = PDFDisplayBox.cropBox
+        let shown = displayedSize(copy, box: box)
+        guard shown.width > 0, shown.height > 0, scale > 0 else { return nil }
+        let s = min(scale, maxPixels / max(shown.width, shown.height))
+        let width = max(1, Int((shown.width * s).rounded())), height = max(1, Int((shown.height * s).rounded()))
+        guard let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        ctx.setFillColor(.white)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.interpolationQuality = .high
+        ctx.scaleBy(x: CGFloat(width) / shown.width, y: CGFloat(height) / shown.height)
+        copy.draw(with: box, to: ctx)   // applies the copy's turn and moves the box to the bitmap's origin
+        return ctx.makeImage()
+    }
 
     /// A text selection is drawn under page overlays, so the placeholder steps aside for good once one
     /// appears (a drag-select, Select All). Clearing the selection does not bring it back.
@@ -645,6 +673,29 @@ final class ReaderPDFView: PDFView {
         clip.enclosingScrollView?.reflectScrolledClipView(clip)
     }
 
+    // MARK: Right-click on the image page (W40.reader-image-context-menu)
+
+    /// The owner, 2026-11-13: right-clicking the image offers Copy Image and Reveal in Finder, above PDFKit's
+    /// own items. Both only read. The text page has no `copyImage` and keeps PDFKit's menu unchanged.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event)
+        guard paneController?.copyImage != nil else { return menu }
+        let full = menu ?? NSMenu()
+        let items = [NSMenuItem(title: ReaderCommand.copyImage.title, action: #selector(copyImageFromMenu(_:)),
+                                keyEquivalent: ""),
+                     NSMenuItem(title: ReaderCommand.revealInFinder.title,
+                                action: #selector(revealImageFileFromMenu(_:)), keyEquivalent: "")]
+        if !full.items.isEmpty { full.insertItem(.separator(), at: 0) }
+        for item in items.reversed() {
+            item.target = self
+            full.insertItem(item, at: 0)
+        }
+        return full
+    }
+
+    @objc func copyImageFromMenu(_ sender: Any?) { paneController?.copyImage?() }
+    @objc func revealImageFileFromMenu(_ sender: Any?) { paneController?.revealImageFile?() }
+
     override func becomeFirstResponder() -> Bool {
         let became = super.becomeFirstResponder()
         if became { paneController?.tookFocus?() }
@@ -687,6 +738,9 @@ extension ReaderPDFView: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(copy(_:)), let canCopy = paneController?.canCopySelection {
             return canCopy()
+        }
+        if menuItem.action == #selector(copyImageFromMenu(_:)) || menuItem.action == #selector(revealImageFileFromMenu(_:)) {
+            return paneController?.hasImage?() ?? false
         }
         let selector = #selector(NSMenuItemValidation.validateMenuItem(_:))
         guard PDFView.instancesRespond(to: selector) else { return true }
