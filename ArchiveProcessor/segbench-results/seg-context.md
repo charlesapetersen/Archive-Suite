@@ -78,3 +78,13 @@ student's CREST gain of 9.4 points is one vote, the same as its rerun noise.
 - **Comparison.** Each model sees the same windows in both arms, which differ only by the block. The base request is byte-identical to FarmShare's 2026-10-18 request (asserted at pack time), and both arms ran in one Sherlock vLLM 0.31.0 run on an L40S. The block's facts differ by box type: a catalogue count for the public boxes, label OCR for the owner's.
 - **Noise.** One run per arm. The rerun floor, measured here as votes flipped between this run's base arm and FarmShare's, is 0 to 6 votes a box, and one vote can move pages exact by several points (the 2B's CREST +9.4 is one vote); SEG-10 puts it at 1.4-3.2 points a box. Only Lincoln's flips (22 against 6, 9 against 3) clear it. `seg-context.json`'s Lincoln and CREST boundary columns (gaps, true boundaries, boundary F1, kappa) leave the unsure gaps out (W46.seg-unsure-mask), rescored 2026-10-31 from the Sherlock answers kept with the pack: boundary F1 on those boxes fell 0.1 to 0.6 points; false splits and merges and pages exact are unchanged by the mask (an unsure gap already took the route's own call).
 - **Scope.** Two open models, one block design, one count per box. Gemini (`W46.seg-context-paid`, behind nice-to-have) and a per-folder catalogue count are untested.
+
+## Rescored 2026-11-13 (W46.seg-truth-owner-fixes)
+
+`seg-context.json` was rescored from the same cached answers on the owner's corrected Stanton and RG165 truth (8 gaps
+changed, RG165 79|80 and 99|100 left out as unsure; `seg-truth-owner-fixes.json`). Pages exact moved by at most 2.1
+points a row: teacher Stanton base 79.8 -> 80.2%, block 81.1 -> 81.5%; teacher RG165 86.2 -> 85.1% both arms; student
+Stanton base 76.1 -> 78.2%, block 76.1 -> 75.7%; student RG165 94.3 -> 93.1% both arms. The prose above is on the
+earlier truth; on the test boxes the block arm's edge over base is now +1.2 points for the teacher on Stanton and -2.5
+for the student, both inside the rerun floor, so the reading that the block context makes no clear difference there
+stands.

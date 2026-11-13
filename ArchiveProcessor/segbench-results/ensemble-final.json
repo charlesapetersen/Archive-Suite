@@ -1,48 +1,47 @@
 {
- "date": "2026-10-11",
+ "date": "2026-11-13",
  "finalists": {
   "C": {
    "level": 0.85,
    "Stanton": {
     "flagged": 32,
-    "errors_left": 2,
-    "pe_auto": 0.8477366255144033,
-    "pe_review": 0.9711934156378601
+    "errors_left": 1,
+    "pe_auto": 0.8518518518518519,
+    "pe_review": 0.9794238683127572
    },
    "RG165": {
     "flagged": 5,
-    "errors_left": 1,
-    "pe_auto": 0.8735632183908046,
-    "pe_review": 0.9770114942528736
+    "errors_left": 0,
+    "pe_auto": 1.0,
+    "pe_review": 1.0
    },
    "pooled": {
     "flagged": 37,
-    "errors_left": 3,
-    "pe_auto": 0.8545454545454545,
-    "pe_review": 0.9727272727272728
+    "errors_left": 1,
+    "pe_auto": 0.8909090909090909,
+    "pe_review": 0.9848484848484849
    }
   },
   "CW": {
    "level": 0.85,
    "Stanton": {
     "flagged": 33,
-    "errors_left": 2,
-    "pe_auto": 0.8724279835390947,
-    "pe_review": 0.9711934156378601
+    "errors_left": 1,
+    "pe_auto": 0.8683127572016461,
+    "pe_review": 0.9794238683127572
    },
    "RG165": {
     "flagged": 6,
-    "errors_left": 1,
-    "pe_auto": 0.8735632183908046,
-    "pe_review": 0.9770114942528736
+    "errors_left": 0,
+    "pe_auto": 1.0,
+    "pe_review": 1.0
    },
    "pooled": {
     "flagged": 39,
-    "errors_left": 3,
-    "pe_auto": 0.8727272727272727,
-    "pe_review": 0.9727272727272728
+    "errors_left": 1,
+    "pe_auto": 0.9030303030303031,
+    "pe_review": 0.9848484848484849
    }
   }
- },
- "rescored": "2026-11-11, W46.stale-figures: Stanton truth with the owner's 2026-10-31 rulings"
+ }
 }

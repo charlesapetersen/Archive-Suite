@@ -17,57 +17,57 @@
  "test": {
   "gaps": 315,
   "new": 130,
-  "wrong": 29,
-  "auc_p_new_vs_new": 0.9579209979209979,
-  "auc_low_confidence_vs_wrong": 0.697371593923318,
-  "auc_disagree_vs_wrong": 0.660176030865686,
-  "raw_brier": 0.0713313492063492,
-  "raw_ece": 0.04750793650793648,
+  "wrong": 27,
+  "auc_p_new_vs_new": 0.9656340956340956,
+  "auc_low_confidence_vs_wrong": 0.7332175925925926,
+  "auc_disagree_vs_wrong": 0.7135416666666666,
+  "raw_brier": 0.05974404761904762,
+  "raw_ece": 0.0475079365079365,
   "distinct_p_new": 20,
   "wrong_caught_reviewing": {
-   "10%": 0.4482758620689655,
-   "20%": 0.4482758620689655
+   "10%": 0.48148148148148145,
+   "20%": 0.48148148148148145
   },
-  "cal_brier": 0.07448706925237394,
-  "cal_ece": 0.06031037019311725,
-  "wrong_after_calibration": 26
+  "cal_brier": 0.0634330589640971,
+  "cal_ece": 0.06031037019311728,
+  "wrong_after_calibration": 22
  },
  "test_by_box": {
   "Stanton": {
    "gaps": 238,
-   "new": 107,
-   "wrong": 27,
-   "auc_p_new_vs_new": 0.948277092102447,
-   "auc_low_confidence_vs_wrong": 0.7094962260839038,
-   "auc_disagree_vs_wrong": 0.6709671757065122,
-   "raw_brier": 0.08528865546218488,
-   "raw_ece": 0.06319327731092433,
+   "new": 108,
+   "wrong": 24,
+   "auc_p_new_vs_new": 0.9594017094017094,
+   "auc_low_confidence_vs_wrong": 0.73851246105919,
+   "auc_disagree_vs_wrong": 0.7174844236760125,
+   "raw_brier": 0.06974243697478992,
+   "raw_ece": 0.055084033613445334,
    "distinct_p_new": 20,
    "wrong_caught_reviewing": {
-    "10%": 0.4444444444444444,
-    "20%": 0.48148148148148145
+    "10%": 0.5,
+    "20%": 0.5
    },
-   "cal_brier": 0.08991980493693978,
-   "cal_ece": 0.0707743734009517,
-   "wrong_after_calibration": 24
+   "cal_brier": 0.07295523016230632,
+   "cal_ece": 0.06657269272868277,
+   "wrong_after_calibration": 19
   },
   "RG165": {
    "gaps": 77,
-   "new": 23,
-   "wrong": 2,
-   "auc_p_new_vs_new": 0.9826892109500805,
-   "auc_low_confidence_vs_wrong": 0.5766666666666667,
-   "auc_disagree_vs_wrong": 0.49333333333333335,
-   "raw_brier": 0.02819058441558442,
-   "raw_ece": 0.023441558441558444,
+   "new": 22,
+   "wrong": 3,
+   "auc_p_new_vs_new": 0.9822314049586777,
+   "auc_low_confidence_vs_wrong": 0.722972972972973,
+   "auc_disagree_vs_wrong": 0.6666666666666666,
+   "raw_brier": 0.028839935064935065,
+   "raw_ece": 0.024090909090909093,
    "distinct_p_new": 12,
    "wrong_caught_reviewing": {
-    "10%": 0.0,
-    "20%": 0.0
+    "10%": 0.3333333333333333,
+    "20%": 0.3333333333333333
    },
-   "cal_brier": 0.026785886227352264,
-   "cal_ece": 0.03373909332272575,
-   "wrong_after_calibration": 2
+   "cal_brier": 0.03400089344235948,
+   "cal_ece": 0.04095410053773296,
+   "wrong_after_calibration": 3
   }
  },
  "development_by_box": {

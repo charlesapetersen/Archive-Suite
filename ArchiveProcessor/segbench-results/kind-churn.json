@@ -1,8 +1,8 @@
 {
  "pages": 848,
  "documents": 463,
- "multi_page_documents": 193,
- "multi_page_pages": 578,
+ "multi_page_documents": 194,
+ "multi_page_pages": 579,
  "pages_below_floor": 78,
  "hand_counts": {
   "typewritten": 471,
@@ -27,21 +27,21 @@
   ],
   "Stanton": [
    11,
-   63
+   64
   ],
   "RG165": [
    7,
    15
   ]
  },
- "minority_pages": 28,
+ "minority_pages": 29,
  "minority_where": {
   "last page": 13,
   "first page": 5,
-  "between": 10
+  "between": 11
  },
- "minority_below_floor": 16,
- "minority_conf_median": 0.7756400960711257,
+ "minority_below_floor": 17,
+ "minority_conf_median": 0.7651573547185392,
  "all_conf_median": 0.9883868855763799,
  "churn_pairs": {
   "printed + typewritten": 21,

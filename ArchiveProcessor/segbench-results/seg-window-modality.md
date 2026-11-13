@@ -105,3 +105,11 @@ Teacher 1,260 vote windows in 6,350 s (5.0 s a window); 4B 1,260 in 1,161 s (0.9
 - **Comparison.** Within the sweep, one model (the 2B) and one batch. A K-page window steps (K-1)//2, so every gap is judged about twice at every K. Text-only puts the 2B off its image training shape. The whole-folder image cell drops Dean (2 of 21 units unparseable), so it covers two boxes where text covers three. The vote arms are six runs per model in one Sherlock batch (20261029-102545).
 - **Noise.** One run per arm. A byte-identical rerun moved the 2B's Stanton by about 3 points, and the floor is 1.4-3.2 points a box (SEG-10), so the K spread (3.3 points pooled) and every vote-against-default gap (at most 1.5 points) are ties; the text-only costs of 4.6-19.7 points are not. `seg-window-modality.json`'s Lincoln boundary columns (gaps, true boundaries, boundary F1, kappa) leave the unsure gaps out (W46.seg-unsure-mask), rescored 2026-10-31 from the Sherlock answers kept with the pack: Lincoln's boundary F1 fell by under a point in every arm; false splits and merges and pages exact are unchanged by the mask (an unsure gap already took the route's own call).
 - **Scope.** The sweep covers the 2B only; whether a strong model is insensitive to window size and images is `W46.seg-window-modality-paid`'s question. Lincoln's `w1` lead is on one public box, and the speeds are cluster throughput, not the laptop.
+
+## Rescored 2026-11-13 (W46.seg-truth-owner-fixes)
+
+`seg-window-modality.json` was rescored from the same cached answers on the owner's corrected Stanton and RG165 truth
+(8 gaps changed, RG165 79|80 and 99|100 left out as unsure; `seg-truth-owner-fixes.json`). The RG165 rows move most,
+because RG165 85|86 is now a continuation: most arms gain 8 to 13 points there (the 2B's six-run vote 87.4 -> 100.0%,
+the 4B's 79.3 -> 92.0%, the teacher's 87.4 -> 100.0%); Stanton moves 0 to 3 points (the 2B's vote 80.2 -> 81.1%, the
+teacher's 81.5 -> 81.9%). Figures quoted in the prose above are on the earlier truth; the JSON holds the rescored ones.
