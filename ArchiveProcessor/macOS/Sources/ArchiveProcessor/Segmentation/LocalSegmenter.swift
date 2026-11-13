@@ -9,7 +9,9 @@ import Foundation
 /// What the bench says, and so what the chooser says: on the development boxes the 8-bit build put 90.3% of pages in
 /// the exact document unchecked (Gemini 3.8 Flash 90.7%), 18 s a seven-page window and a 4.4 GB peak on an 18 GB
 /// M3 Pro; on the locked test boxes (full precision) 80.3% against Gemini's 88.8% (Gemini 3.7's g2 answers; 3.8 on
-/// g1 had 87.3%). Its confidences make no useful flag, so the review asks about most gaps: a first draft the user skims. It was trained on one owner's archives.
+/// g1 had 87.3%). Its confidences make no useful flag, so alone the review asks about most gaps; beside an online partner
+/// the user checks only where the two disagree (`WindowCombineRule.disagreement`, W46.seg-review-rule). It was trained
+/// on one owner's archives, so on anyone else's it is zero-shot.
 enum LocalSegmenter {
     /// The voter's model id in `WindowVoter.catalog` and options.json: the build, not where it is downloaded from.
     static let buildID = "seg-qwen3.5-2b-8bit"
@@ -56,20 +58,40 @@ enum LocalSegmenter {
     static let startHint = "Start mlx-vlm on this Mac (pip install mlx-vlm, then mlx_vlm.server --port 8080); "
         + "it downloads the model, about 2.5 GB, on the first run."
 
-    /// The chooser's lines for this Mac: what was measured, whether its memory is enough, and where the model learned.
-    static func notes(memoryGB: Double, mac: SegmentationOptions.Mac?) -> [String] {
+    /// The chooser's lines for this Mac: what was measured, whether its memory is enough, where the model learned, the
+    /// manuscript warning and the review rule (note 07 §3, owner's calls 3 and 7 of 2026-11-06, W46.seg-review-rule).
+    /// `partner` names the online model it is checked against; `onlineReachable` says one could be.
+    static func notes(memoryGB: Double, mac: SegmentationOptions.Mac?, partner: String? = nil,
+                      onlineReachable: Bool = false) -> [String] {
         var out: [String] = []
         if let mac {
-            out.append("On this Mac, no key and no cost. Measured on an \(mac.measuredOn): about "
+            out.append((partner == nil ? "On this Mac, no key and no cost." : "On this Mac, at no cost; its second model's is above.")
+                       + " Measured on an \(mac.measuredOn): about "
                        + "\(SegmentationRow.twoSignificant(mac.secondsPerPage)) s a page, "
                        + "\(SegmentationRow.twoSignificant(mac.peakMemoryGB)) GB of memory at its peak, a "
                        + "\(SegmentationRow.twoSignificant(mac.downloadGB)) GB download.")
         }
         out.append(memoryNote(memoryGB: memoryGB))
-        out.append("Trained on one owner's archives: on boxes it never saw it was about ten points behind Gemini 3.8 "
-                   + "Flash and further behind ChatGPT, and its doubts are no guide, so skim every boundary it proposes.")
+        out.append(zeroShotNote)
+        out.append(manuscriptWarning)
+        if let partner {
+            out.append("Checked against \(partner): you check only the boundaries where the two disagree. On the boxes "
+                       + "measured this found more errors per check than the model's own doubts.")
+        } else {
+            out.append("On its own its doubts are no guide, so it asks you to check most boundaries."
+                       + (onlineReachable ? " With your key, an online model does better; or keep this one and check it "
+                          + "against that model, so you check only where the two disagree." : ""))
+        }
         return out
     }
+
+    /// Owner's call 7 (a): the card says the model reads the user's material zero-shot.
+    static let zeroShotNote = "Zero-shot on your material: it was trained on one owner's archives and has never seen "
+        + "yours, so the owner's figures are not a forecast for your collection."
+    /// Note 07 §3 kind rule (c), seg-lincoln-cloud.md: the 2B on Lincoln's manuscripts against the cloud voters.
+    static let manuscriptWarning = "On handwritten manuscripts (a published set of 19th-century letters) this model put "
+        + "35.6% of pages in the right document, against 86 to 90% for the online models: for handwritten material, "
+        + "use an online model where you can."
 
     // MARK: The model's manifest (W46.kit-gate)
 

@@ -323,6 +323,11 @@ enum SegmentationEngineTestDriver {
             for (name, ok) in await localChecks(options: options) { check(name, ok) }
         }
 
+        // 11. The 2B checked against an online partner (W46.seg-review-rule).
+        if let options {
+            for (name, ok) in await partnerChecks(options: options) { check(name, ok) }
+        }
+
         // Fatal: the run stops at once and no window is retried.
         if let options, let spec = try? options.spec(for: .claude) {
             final class Refusing: WindowTransport, @unchecked Sendable {
@@ -369,6 +374,100 @@ enum SegmentationEngineTestDriver {
         check("page and photo counts must match", mismatchRefused)
 
         finish(results)
+    }
+
+    /// The 2B beside a partner (note 07 §3 "Review rule"): the pair's spec, the disagreement rule, each voter's page
+    /// size, and the 2B's windows one at a time while the partner's run beside them.
+    private static func partnerChecks(options: SegmentationOptions) async -> [(String, Bool)] {
+        var out: [(String, Bool)] = []
+        func check(_ name: String, _ ok: Bool) { out.append((name, ok)) }
+
+        let pair = try? options.spec(for: .local, partner: .gemini)
+        check("partner: the 2B first, then Gemini, rule disagreement, the 2B's level and page size, Gemini's 1,600 px also loaded",
+              pair?.voters.map(\.name) == ["window-local-seg-2b", "window-gemini-3.8-flash-low"]
+              && pair?.rule == .disagreement && pair?.level == options.approach(.local)?.level
+              && pair?.thumbnailLongEdgePx == 1024 && pair?.otherLongEdges == [1600]
+              && pair.map { $0.longEdge(for: $0.voters[1]) } == 1600)
+        check("partner: Claude can stand beside the 2B",
+              (try? options.spec(for: .local, partner: .claude))?.voters.last?.provider == .anthropic)
+        check("partner: only the measured partners, and only beside the 2B",
+              (try? options.spec(for: .local, partner: .glm)) == nil && (try? options.spec(for: .local, partner: .mix)) == nil
+              && (try? options.spec(for: .gemini, partner: .claude)) == nil
+              && (try? options.spec(for: .local, partner: .local)) == nil)
+        check("partner: options.json may not name the disagreement rule", {
+            guard var json = try? JSONSerialization.jsonObject(with: Data(contentsOf: Bundle.main.url(
+                forResource: SegmentationOptions.resourceName, withExtension: "json")!)) as? [String: Any],
+                  var approaches = json["approaches"] as? [[String: Any]],
+                  let i = approaches.firstIndex(where: { $0["id"] as? String == "claude" }) else { return false }
+            approaches[i]["rule"] = "disagreement"
+            json["approaches"] = approaches
+            guard let data = try? JSONSerialization.data(withJSONObject: json),
+                  let edited = try? SegmentationOptions.decode(data) else { return false }
+            return edited.problems().contains { $0.hasPrefix("claude: rule") }
+        }())
+        let suite = "seg-partner-test-\(UUID().uuidString)"
+        if let d = UserDefaults(suiteName: suite) {
+            let unset = SegmentationApproach.storedLocalPartner(d)
+            d.set("gemini", forKey: DefaultsKeys.localSegmenterPartner)
+            let gemini = SegmentationApproach.storedLocalPartner(d)
+            d.set("glm", forKey: DefaultsKeys.localSegmenterPartner)
+            let glm = SegmentationApproach.storedLocalPartner(d)
+            d.set("", forKey: DefaultsKeys.localSegmenterPartner)
+            let empty = SegmentationApproach.storedLocalPartner(d)
+            check("partner setting: none unless a measured partner is saved",
+                  unset == nil && gemini == .gemini && glm == nil && empty == nil)
+            d.removePersistentDomain(forName: suite)
+        }
+
+        func v(_ d: GapDecision, _ c: Double) -> VoterGapVerdict {
+            VoterGapVerdict(pNew: d == .new ? c : 1 - c, decision: d, confidence: c, cue: "")
+        }
+        let agree = WindowCombiner.judge([v(.new, 0.6), v(.new, 0.7)], rule: .disagreement, level: 0.995)
+        let differ = WindowCombiner.judge([v(.continue, 0.999), v(.new, 0.99)], rule: .disagreement, level: 0.5)
+        check("disagreement: two that agree are not flagged, however unsure (the 2B's own level is not used)",
+              agree == .init(decision: .new, flagged: false, confidence: 0.6, agreed: true))
+        check("disagreement: the 2B decides where they differ, flagged at its own confidence, however sure either is",
+              differ == .init(decision: .continue, flagged: true, confidence: 0.999, agreed: false))
+        let missing = WindowCombiner.proposals(photoKinds: [nil, nil],
+            voters: [[v(.new, 0.99)], [nil]], rule: .disagreement, level: 0.5)
+        check("disagreement: a gap the partner did not answer is flagged, decided by the 2B",
+              missing.first.map { $0.flagged && $0.decision == .new } ?? false)
+
+        // A run: pages carry both sizes; each voter gets its own; never two of the 2B's windows at once.
+        guard let pair else { return out }
+        final class Recorder: WindowTransport, @unchecked Sendable {
+            let lock = NSLock()
+            var localNow = 0, localMax = 0, cloudMax = 0, cloudNow = 0
+            var images: [String: Set<Data>] = [:]
+            func send(_ r: WindowRequest) async throws -> String {
+                let local = r.voter.provider == .local
+                lock.withLock {
+                    if local { localNow += 1; localMax = max(localMax, localNow) } else { cloudNow += 1; cloudMax = max(cloudMax, cloudNow) }
+                    images[r.voter.name, default: []].formUnion(r.images)
+                }
+                try? await Task.sleep(for: .milliseconds(local ? 15 : 5))
+                lock.withLock { if local { localNow -= 1 } else { cloudNow -= 1 } }
+                let pages = r.pageNumbers.map { #"{"page":\#($0),"kind":"document"}"# }.joined(separator: ",")
+                let gaps = zip(r.pageNumbers, r.pageNumbers.dropFirst()).map { a, b in
+                    #"{"between":[\#(a),\#(b)],"decision":"\#(local || a != 4 ? "continue" : "new")","cue":"c","confidence":0.9}"#
+                }.joined(separator: ",")
+                return #"{"pages":[\#(pages)],"boundaries":[\#(gaps)]}"#
+            }
+        }
+        let rec = Recorder()
+        let small = Data([1]), large = Data([2])
+        let pages = (0..<16).map { _ in PageInput(jpeg: small, text: "", otherSizes: [1600: large]) }
+        var seg = WindowSegmenter.instant(rec)
+        seg.maxConcurrent = 3
+        let res = try? await seg.segment(pages: pages, photoKinds: Array(repeating: nil, count: 16), approach: pair)
+        check("partner run: the 2B reads its 1,024 px pages and Gemini its 1,600 px pages",
+              rec.images["window-local-seg-2b"] == [small] && rec.images["window-gemini-3.8-flash-low"] == [large])
+        check("partner run: the 2B's windows one at a time (max \(rec.localMax)) while Gemini's run beside them (max \(rec.cloudMax))",
+              rec.localMax == 1 && rec.cloudMax >= 2)
+        let p = res?.proposals ?? []
+        check("partner run: only the gap where Gemini disagrees is flagged, and the 2B's continue stands",
+              p.count == 15 && p.filter(\.flagged).map(\.gap) == [3] && p[3].decision == .continue)
+        return out
     }
 
     /// The `local` approach: its spec, the request the model was trained on, the reply guards, the keyless route, and

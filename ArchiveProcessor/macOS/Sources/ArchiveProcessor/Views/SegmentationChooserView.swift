@@ -79,6 +79,7 @@ struct SegmentationChooserView: View {
 
             if SegmentationRow.providers(approach, options: options).contains(.local) {
                 LocalSegmenterControls()
+                LocalPartnerControls(routes: $routes, options: options)
             }
 
             if let row = rows.first(where: { $0.approach == approach }) {
@@ -122,6 +123,45 @@ struct SegmentationChooserView: View {
         case .openai: return .openai
         case .openrouter: return .openrouter
         case .local: return nil
+        }
+    }
+}
+
+/// The online model the 2B on this Mac is checked against (W46.seg-review-rule; owner's call 7 (b), 2026-11-06): an
+/// option, never a default. With one, the user checks only the boundaries where the two disagree; with none, the 2B
+/// flags by its own level, which asks about most of them. Only partners the user can run are listed.
+struct LocalPartnerControls: View {
+    @AppStorage(DefaultsKeys.localSegmenterPartner) private var partnerRaw = ""
+    @Binding var routes: SegmentationRoutes
+    let options: SegmentationOptions?
+
+    var body: some View {
+        let runnable = SegmentationOptions.partnerApproaches.filter { p in
+            let providers = SegmentationRow.providers(p, options: options)
+            return !providers.isEmpty && providers.allSatisfy(routes.canRun)
+        }
+        if !runnable.isEmpty || !partnerRaw.isEmpty {
+            Picker(selection: $partnerRaw) {
+                Text("No second model").tag("")
+                ForEach(runnable, id: \.self) { p in
+                    Text(options?.approach(p)?.label ?? p.rawValue).tag(p.rawValue)
+                }
+                // A saved partner whose key has gone stays shown, so the run's stop is not a surprise.
+                if let saved = SegmentationApproach(rawValue: partnerRaw), !runnable.contains(saved) {
+                    Text("\(options?.approach(saved)?.label ?? saved.rawValue) (unavailable)").tag(saved.rawValue)
+                }
+            } label: {
+                HStack {
+                    Text("Check it against")
+                    HelpButton(text: "On its own this model's doubts are no guide, so it asks you to check most boundaries. Checked against an online model, it keeps its own boundaries and puts to you only the ones where the two disagree; that online model's cost applies. Where both models are wrong together nothing is flagged, so skim the result.")
+                }
+            }
+            .controlSize(.small)
+            .accessibilityIdentifier("ap.segmentation.local.partner")
+            .onChange(of: partnerRaw) { _, raw in
+                routes.localPartner = SegmentationApproach(rawValue: raw)
+                    .flatMap { SegmentationOptions.partnerApproaches.contains($0) ? $0 : nil }
+            }
         }
     }
 }

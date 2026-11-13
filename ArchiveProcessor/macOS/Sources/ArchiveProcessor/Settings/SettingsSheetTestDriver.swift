@@ -107,6 +107,17 @@ enum SettingsSheetTestDriver {
                   s.parts.contains { $0.id == "checking" && $0.sample?.contains("20 seconds") == true })
             check("2 a segmentation pick Process Files can run is offered to it",
                   s.routeID == "seg-qwen3.5-2b-8bit" ? s.apply == .segmentation(.local) : true, "\(s.apply as Any)")
+            // W46.seg-review-rule: the 2B's card says it is zero-shot, carries the manuscript warning, and offers a partner.
+            if s.routeID == "seg-qwen3.5-2b-8bit" {
+                check("2 the 2B's card: zero-shot, the owner's figures not a forecast",
+                      s.labels.contains { $0.contains("zero-shot") && $0.contains("not a forecast") }, s.labels.joined(separator: " | "))
+                check("2 the 2B's card: the manuscript warning against the online models' range",
+                      s.labels.contains { $0.contains("35.6%") && $0.contains("86 to 90%") }, s.labels.joined(separator: " | "))
+                check("2 the 2B's card: checking against an online model, only where the two disagree",
+                      s.labels.contains { $0.contains("Check it against") && $0.contains("disagree") })
+            } else {
+                lines.append("SKIP 2 the 2B's labels: the pick is \(s.routeID ?? "nil")")
+            }
         } else { check("2 segmentation card", false) }
         check("2 reading already runs: nothing to apply", card(free, "reading")?.apply == nil)
 
@@ -121,6 +132,10 @@ enum SettingsSheetTestDriver {
                 check("3 Gemini 3.8's magazine figure ranks", s.parts.first { $0.id == "magazine" }?.label2 == nil)
                 check("3 Gemini 3.8's segmentation card gives the range over three offsets (W46.seg-g2-offsets)",
                       s.labels.contains { $0.contains("88.8% to 89.1%") }, s.labels.joined(separator: " | "))
+                check("3 the range is labelled as Gemini 3.7's runs, the 3.8 run a single one (owner's call 8)",
+                      s.labels.contains { $0.contains("88.8% to 89.1%") && $0.contains("three test runs of Gemini 3.7")
+                          && $0.contains("single run") }, s.labels.joined(separator: " | "))
+                check("3 Gemini's card carries no 2B label", !s.labels.contains { $0.contains("zero-shot") })
             } else {
                 lines.append("SKIP 3 Gemini segmentation labels: the pick is \(s.routeID ?? "nil")")
             }

@@ -13,6 +13,13 @@ import Foundation
 struct PageInput: Sendable {
     let jpeg: Data
     let text: String
+    /// The same page at the other long edges the approach's voters were measured at (`ApproachSpec.longEdges`):
+    /// the 2B beside a cloud partner reads 1,024 px pages, the partner 1,600.
+    var otherSizes: [Int: Data] = [:]
+
+    func image(longEdge: Int, primary: Int) -> Data {
+        longEdge == primary ? jpeg : otherSizes[longEdge] ?? jpeg
+    }
 }
 
 /// A box or folder label photo, known before segmentation (BoxFolderConfirmSheet). Every gap beside one is a
@@ -308,6 +315,10 @@ enum WindowCombiner {
                 decision = best.decision
             }
             return Judgement(decision: decision, flagged: !(agreed && lo > level), confidence: lo, agreed: agreed)
+        case .disagreement:
+            // seg-adapt-curve.md finding 3: the first voter (the 2B) decides; the user checks the gaps where its
+            // partner decides otherwise. The confidence is the first voter's, so the least sure come first.
+            return Judgement(decision: js[0].decision, flagged: !agreed, confidence: js[0].confidence, agreed: agreed)
         case .mean:
             // options.py mean_judge.
             let ps = js.map { $0.decision == .new ? $0.confidence : 1 - $0.confidence }
@@ -413,11 +424,17 @@ struct WindowSegmenter: Sendable {
         var fatal: String?
         let retryDelay = self.retryDelay
         try await withThrowingTaskGroup(of: (WindowKey, Result<WindowAnswer, Error>).self) { group in
-            var next = 0
+            var waiting = jobs[...]
+            // A model on this Mac reads one window at a time (one model, one GPU), even beside a cloud partner.
+            var localInFlight = 0
+            var inFlight = 0
             func launch() {
-                guard next < jobs.count else { return }
-                let (v, w) = jobs[next]
-                next += 1
+                guard inFlight < max(1, maxConcurrent),
+                      let at = waiting.indices.first(where: { waiting[$0].0.provider != .local || localInFlight == 0 })
+                else { return }
+                let (v, w) = waiting.remove(at: at)
+                inFlight += 1
+                if v.provider == .local { localInFlight += 1 }
                 let request = makeRequest(voter: v, window: w, pages: pages, approach: approach)
                 let transport = self.transport
                 group.addTask {
@@ -426,6 +443,8 @@ struct WindowSegmenter: Sendable {
             }
             for _ in 0..<max(1, maxConcurrent) { launch() }
             while let (k, result) = try await group.next() {
+                inFlight -= 1
+                if approach.voters.first(where: { $0.name == k.voter })?.provider == .local { localInFlight -= 1 }
                 var landed = false
                 switch result {
                 case .success(let a):
@@ -442,7 +461,14 @@ struct WindowSegmenter: Sendable {
                 case .failure:
                     failed.append(k)
                 }
-                if limit == nil && pause == nil && fatal == nil { launch() }
+                // Refill every free slot: a local window landing can free the one slot a cloud window waits behind.
+                if limit == nil && pause == nil && fatal == nil {
+                    while inFlight < max(1, maxConcurrent), !waiting.isEmpty {
+                        let before = inFlight
+                        launch()
+                        if inFlight == before { break }
+                    }
+                }
                 // After the next window is on its way, so the save does not hold it up.
                 if landed, let onAnswer { await onAnswer(answered) }
             }
@@ -480,7 +506,10 @@ struct WindowSegmenter: Sendable {
         let nums = w.map { $0 + 1 }
         let prompt = WindowPromptRenderer.render(voter.prompt, pageNumbers: nums, texts: w.map { pages[$0].text },
                                                  maxText: approach.ocrTextChars)
-        return WindowRequest(voter: voter, prompt: prompt, images: w.map { pages[$0].jpeg }, pageNumbers: nums)
+        let edge = approach.longEdge(for: voter)
+        return WindowRequest(voter: voter, prompt: prompt,
+                             images: w.map { pages[$0].image(longEdge: edge, primary: approach.thumbnailLongEdgePx) },
+                             pageNumbers: nums)
     }
 
     /// One window: a failure or an unparseable answer is retried once, after `retryDelay`; a usage limit or a

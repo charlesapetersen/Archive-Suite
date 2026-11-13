@@ -43,7 +43,9 @@ struct FlaggedBoundaryReviewSheet: View {
                 Text("Check Flagged Boundaries")
                     .font(.title2)
                     .fontWeight(.semibold)
-                Text("\(processor.flaggedReviewApproachName) was unsure about these boundaries. "
+                Text((processor.flaggedReviewPartnerName.map {
+                        "\(processor.flaggedReviewApproachName) and \($0) disagree about these boundaries. "
+                    } ?? "\(processor.flaggedReviewApproachName) was unsure about these boundaries. ")
                      + "Keys: Return=Keep  S=Split  J=Join  \u{2190}\u{2192}=Move")
                     .font(.caption)
                     .foregroundStyle(.primary)

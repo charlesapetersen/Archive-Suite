@@ -63,8 +63,10 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return .stopped }
 
         let pages = windowStagePages(files: files)
+        // Read once for the whole stage, so the proposals, the review's heading and the skim agree.
+        let partner = approach == .local ? SegmentationApproach.storedLocalPartner() : nil
         let proposals: [GapProposal]
-        switch await windowProposals(pages: pages, approach: approach) {
+        switch await windowProposals(pages: pages, approach: approach, partner: partner) {
         case .some(let p): proposals = p
         case .none: return .stopped
         }
@@ -79,6 +81,7 @@ extension OCRProcessor {
             flaggedGapFocus = items.firstIndex { $0.answer == nil } ?? 0
             flaggedReviewApproachName = SegmentationOptionsStore.shared?.approach(approach)?.label
                 ?? approach.rawValue
+            flaggedReviewPartnerName = partner.map { SegmentationOptionsStore.shared?.approach($0)?.label ?? $0.rawValue }
             statusMessage = "Check \(items.count) flagged boundar\(items.count == 1 ? "y" : "ies")."
             awaitingFlaggedReview = true
             let done = await withCheckedContinuation { continuation in
@@ -100,7 +103,7 @@ extension OCRProcessor {
             }
         }
         reviewCheckedFileIndices = Set(items.map { pages.fileIndices[$0.id + 1] })
-        reviewSkimNote = FlaggedReview.skimNote(approach, options: SegmentationOptionsStore.shared)
+        reviewSkimNote = FlaggedReview.skimNote(approach, partner: partner, options: SegmentationOptionsStore.shared)
         await showFullSegmentationReview(files: files, runConfig: runConfig, showsDocumentClasses: true)
         reviewCheckedFileIndices = []
         reviewSkimNote = nil
@@ -112,11 +115,18 @@ extension OCRProcessor {
 
     /// The approach's proposal for every gap, or nil when the run stops here. A usage limit or an error that no
     /// window can get past asks the user whether to check the unanswered gaps themselves or stop.
-    private func windowProposals(pages: WindowStagePages, approach: SegmentationApproach) async -> [GapProposal]? {
+    private func windowProposals(pages: WindowStagePages, approach: SegmentationApproach,
+                                 partner: SegmentationApproach?) async -> [GapProposal]? {
         let spec: ApproachSpec
         do {
             guard let options = SegmentationOptionsStore.shared else { throw SegmentationOptionsError.missingResource }
-            spec = try options.spec(for: approach)
+            // The 2B beside the online model the user chose: only the gaps where the two disagree are put to the
+            // user (W46.seg-review-rule). A partner that cannot run stops the run with what it needs, like any voter.
+            if let partner {
+                spec = try options.spec(for: approach, partner: partner)
+            } else {
+                spec = try options.spec(for: approach)
+            }
         } catch {
             return await stopOrCheckAll(pages: pages, spec: nil, answered: [:],
                                         message: error.localizedDescription)
@@ -124,7 +134,7 @@ extension OCRProcessor {
         let prior = activePendingRun?.segmentationWindows ?? [:]
         // The Claude plan's meter and pauses (W36.seg-opt-subscription). Used only if Claude goes by the plan.
         let calibration = PlanCalibrationStore.load()
-        let notional = SegmentationRow.planNotionalUSD(approach, options: SegmentationOptionsStore.shared,
+        let notional = SegmentationRow.planNotionalUSD(partner ?? approach, options: SegmentationOptionsStore.shared,
                                                        pageCount: pages.urls.count) ?? 0
         let gate = PlanRunGate(
             pagesPerCall: spec.windowStride, folderNotionalUSD: notional,
@@ -156,9 +166,16 @@ extension OCRProcessor {
         // A single-page PDF input was converted to a temporary JPEG for OCR; the windows read that image.
         let urls = pages.urls.map { pdfToImageMap[$0] ?? $0 }
         let texts = pages.fileIndices.map { jobs[$0].result?.text ?? "" }
-        let longEdge = spec.thumbnailLongEdgePx
+        let longEdge = spec.thumbnailLongEdgePx, otherEdges = spec.otherLongEdges
         let loaded: [PageInput?] = await Task.detached(priority: .userInitiated) {
-            zip(urls, texts).map { Self.windowPage(url: $0, text: $1, longEdge: longEdge) }
+            zip(urls, texts).map { url, text in
+                guard var page = Self.windowPage(url: url, text: text, longEdge: longEdge) else { return nil }
+                for edge in otherEdges {
+                    guard let other = Self.windowPage(url: url, text: text, longEdge: edge) else { return nil }
+                    page.otherSizes[edge] = other.jpeg
+                }
+                return page
+            }
         }.value
         if let bad = loaded.firstIndex(where: { $0 == nil }) {
             return await stopOrCheckAll(pages: pages, spec: spec, answered: prior,
@@ -372,6 +389,7 @@ extension OCRProcessor {
         ]
         flaggedGapFocus = 0
         flaggedReviewApproachName = "Claude"
+        flaggedReviewPartnerName = nil
         awaitingFlaggedReview = true
         Task { @MainActor in
             let done = await withCheckedContinuation { flaggedReviewContinuation = $0 }

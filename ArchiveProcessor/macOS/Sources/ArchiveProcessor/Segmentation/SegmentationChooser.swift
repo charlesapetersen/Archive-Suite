@@ -24,6 +24,8 @@ struct SegmentationRoutes: Equatable, Sendable {
     var planCalibration = PlanCalibrationStore()
     /// This Mac's memory, which decides whether the model on this Mac is recommended (W41.app-local-seg).
     var memoryGB: Double = LocalModelRoute.thisMacMemoryGB
+    /// The online approach the 2B on this Mac is checked against, or nil (`SegmentationApproach.storedLocalPartner`).
+    var localPartner: SegmentationApproach?
 
     static let none = SegmentationRoutes()
 
@@ -51,7 +53,8 @@ struct SegmentationRoutes: Equatable, Sendable {
             chatGPTAccount: ChatGPTAuth.shared.signedInAccount(),
             chatGPTStale: ChatGPTAuth.shared.hasStaleRegistration,
             chatGPTRoute: ChatGPTRoute.stored(defaults),
-            planCalibration: PlanCalibrationStore.load(defaults))
+            planCalibration: PlanCalibrationStore.load(defaults),
+            localPartner: SegmentationApproach.storedLocalPartner(defaults))
     }
 
     /// `current()` for the views that show the chooser: once the keys are read, an unsaved approach is
@@ -161,6 +164,30 @@ struct SegmentationRow: Equatable, Sendable {
             ? costLines(entry, pageCount: n, routes: routes, today: today)
             : (["No cost"], [], 0)
 
+        // The 2B checked against an online model (W46.seg-review-rule): the 2B's boundaries, the partner's cost, and
+        // only the gaps where the two disagree to check. No figure was measured for the pair on the test boxes.
+        if approach == .local, let partner = routes.localPartner {
+            var alone = routes
+            alone.localPartner = nil
+            let other = make(partner, options: options, pageCount: n, routes: alone, today: today)
+            let why = [reason, other.unavailableReason.map { "Its second model, \(other.label): " + $0.prefix(1).lowercased() + $0.dropFirst() }]
+                .compactMap { $0 }
+            return SegmentationRow(
+                approach: approach, label: "\(label), checked against \(other.label)", pageCount: n,
+                rightWithNoChecking: fig.pagesExactNoReview.map { "about \(percent($0)) of pages" },
+                toCheck: "only the boundaries where the two disagree: about 1 to 17 in every 100 pages on the seven "
+                    + "boxes measured",
+                rightAfterChecking: "not measured for the pair",
+                unshownErrors: "not measured for the pair; where both are wrong together nothing is flagged",
+                costLines: lines + other.costLines.map { "\(other.label): \($0)" },
+                priceNotes: notes + other.priceNotes,
+                apiDollars: why.isEmpty ? other.apiDollars : nil,
+                footnote: footnote,
+                unavailableReason: why.isEmpty ? nil : why.joined(separator: " "),
+                missingKeys: missingKeys + other.missingKeys,
+                notes: LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac, partner: other.label))
+        }
+
         return SegmentationRow(
             approach: approach, label: label, pageCount: n,
             rightWithNoChecking: fig.pagesExactNoReview.map { "about \(percent($0)) of pages" },
@@ -171,7 +198,10 @@ struct SegmentationRow: Equatable, Sendable {
             apiDollars: reason == nil ? dollars : nil, footnote: footnote,
             unavailableReason: reason, missingKeys: missingKeys,
             notes: (entry.figuresNote.map { [$0] } ?? [])
-                + (providers.contains(.local) ? LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac) : []))
+                + (providers.contains(.local) ? LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac,
+                                                                     onlineReachable: SegmentationOptions.partnerApproaches.contains {
+                                                                         SegmentationRow.providers($0, options: options).allSatisfy(routes.canRun)
+                                                                     }) : []))
     }
 
     static func all(options: SegmentationOptions, pageCount: Int, routes: SegmentationRoutes,

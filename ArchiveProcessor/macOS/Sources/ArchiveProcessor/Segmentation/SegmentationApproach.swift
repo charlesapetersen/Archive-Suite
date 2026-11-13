@@ -70,6 +70,12 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
         }
     }
 
+    /// The online approach the user chose to check the 2B on this Mac against, or nil (W46.seg-review-rule).
+    static func storedLocalPartner(_ defaults: UserDefaults = .standard) -> SegmentationApproach? {
+        defaults.string(forKey: DefaultsKeys.localSegmenterPartner).flatMap(SegmentationApproach.init(rawValue:))
+            .flatMap { SegmentationOptions.partnerApproaches.contains($0) ? $0 : nil }
+    }
+
     /// Saves `preferredDefault` when no choice is saved yet. A saved choice, manual included, is never
     /// overridden. Returns whether it saved.
     @discardableResult
@@ -325,7 +331,9 @@ struct SegmentationOptions: Decodable, Sendable {
             } else {
                 out.append("\(a.id): no cost")
             }
-            if WindowCombineRule(rawValue: a.rule ?? "") == nil { out.append("\(a.id): rule \(a.rule ?? "nil")") }
+            if WindowCombineRule(rawValue: a.rule ?? "") == nil || a.rule == WindowCombineRule.disagreement.rawValue {
+                out.append("\(a.id): rule \(a.rule ?? "nil")")
+            }
             let voters = a.voters ?? []
             if voters.isEmpty { out.append("\(a.id): no voters") }
             var edges = Set<Int?>()
@@ -372,7 +380,27 @@ struct SegmentationOptions: Decodable, Sendable {
         return ApproachSpec(voters: voters, rule: rule, level: level,
                             windowPages: window.pages, windowStride: window.stride,
                             thumbnailLongEdgePx: voters[0].thumbnailLongEdgePx ?? window.thumbnailLongEdgePx,
-                            ocrTextChars: window.ocrTextCharsPerPage)
+                            ocrTextChars: window.ocrTextCharsPerPage, windowLongEdgePx: window.thumbnailLongEdgePx)
+    }
+
+    /// The approaches that can stand beside the 2B as its partner: one cloud voter each.
+    /// Only the two the bench measured beside it (seg-adapt-curve.md: Gemini 3.8 Flash on the owner's boxes, Claude
+    /// Sonnet 5.5 on Lincoln and CREST); GLM and ChatGPT were never run as its partner.
+    static let partnerApproaches: [SegmentationApproach] = [.gemini, .claude]
+
+    /// The 2B on this Mac checked against a partner (W46.seg-review-rule; note 07 §3 "Review rule", owner's call 3
+    /// (a) and call 7 (b), 2026-11-06): the 2B's boundaries, and the user checks only the gaps where the partner
+    /// decides otherwise. Each voter reads its pages at the size it was measured at, so the one-size rule of a mix
+    /// does not apply. The partner's own level is not used: the measured rule is disagreement alone.
+    func spec(for a: SegmentationApproach, partner: SegmentationApproach) throws -> ApproachSpec {
+        let first = try spec(for: a)
+        guard a == .local, Self.partnerApproaches.contains(partner) else { throw SegmentationOptionsError.incomplete(partner.rawValue) }
+        let other = try spec(for: partner)
+        guard first.voters.count == 1, other.voters.count == 1 else { throw SegmentationOptionsError.incomplete(partner.rawValue) }
+        return ApproachSpec(voters: first.voters + other.voters, rule: .disagreement, level: first.level,
+                            windowPages: window.pages, windowStride: window.stride,
+                            thumbnailLongEdgePx: first.thumbnailLongEdgePx, ocrTextChars: window.ocrTextCharsPerPage,
+                            windowLongEdgePx: window.thumbnailLongEdgePx)
     }
 }
 
@@ -406,6 +434,10 @@ enum WindowCombineRule: String, Sendable {
     /// `options.py` `mean_judge`: the voters' P(new) averaged; flagged when max(m, 1 − m) is at or below the
     /// level. For one voter the two rules are the same.
     case mean
+    /// The 2B's review beside a partner (note 07 §3 "Review rule", seg-adapt-curve.md finding 3): the first voter
+    /// decides, and a gap is flagged where a partner decides otherwise, whatever the confidences. Never read from
+    /// options.json: `spec(for:partner:)` builds it.
+    case disagreement
 }
 
 /// One approach, fully resolved: its voters, its rule and level, and the bench's window shape.
@@ -415,8 +447,18 @@ struct ApproachSpec: Sendable {
     let level: Double
     let windowPages: Int
     let windowStride: Int
+    /// The first voter's page size, the one `PageInput.jpeg` is loaded at.
     let thumbnailLongEdgePx: Int
     let ocrTextChars: Int
+    /// The file's window figure, for a voter that names no size of its own.
+    var windowLongEdgePx: Int? = nil
+
+    func longEdge(for v: WindowVoter) -> Int { v.thumbnailLongEdgePx ?? windowLongEdgePx ?? thumbnailLongEdgePx }
+
+    /// The page sizes besides the first voter's that a run loads (`PageInput.otherSizes`).
+    var otherLongEdges: [Int] {
+        Array(Set(voters.map(longEdge(for:)))).filter { $0 != thumbnailLongEdgePx }.sorted()
+    }
 }
 
 /// The provider a voter's model is reached through.

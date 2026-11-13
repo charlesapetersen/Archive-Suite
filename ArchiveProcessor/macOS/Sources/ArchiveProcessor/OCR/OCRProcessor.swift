@@ -161,6 +161,8 @@ class OCRProcessor: ObservableObject {
     @Published var flaggedGapFocus = 0
     @Published var awaitingFlaggedReview = false
     @Published var flaggedReviewApproachName = ""
+    /// The online model the 2B was checked against (W46.seg-review-rule): the flagged gaps are where the two disagree.
+    @Published var flaggedReviewPartnerName: String?
     var flaggedReviewContinuation: CheckedContinuation<Bool, Never>?
     /// The skim after the flagged pass: the note at its top, and the files whose boundary before them the
     /// user answered (marked as checked). Empty outside that skim.

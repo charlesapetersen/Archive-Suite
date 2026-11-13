@@ -398,11 +398,41 @@ struct SettingsSheetModel {
             }
         }
         // W46.seg-g2-offsets: a segmentation figure is one test run; where three were measured, the card gives the range.
+        // On the 3.8 card the runs are Gemini 3.7's (owner, 2026-11-06 call 8: no 3.8 offsets run), and it says so.
         if stage.id == "segmentation", let r = route, let rg = r.figures["test-boxes.offset_range"],
            let lo = rg["low"]?.double, let hi = rg["high"]?.double {
-            labels.append("\(words.display(stage.id, r)): in three test runs that started the groups of pages at "
+            let lent = r.id.contains("3.8") && r.caveats.contains { $0.contains("3.7") }
+            labels.append("\(words.display(stage.id, r)): in three test runs " + (lent ? "of Gemini 3.7 Flash " : "")
+                          + "that started the groups of pages at "
                           + String(format: "different places, %.1f%% to %.1f%% of pages were in the right document; ", lo, hi)
-                          + "the figure shown is one of those runs.")
+                          + (lent ? "the figure shown is one of those runs, also Gemini 3.7's, and Gemini 3.8 has had a single run."
+                              : "the figure shown is one of those runs."))
+        }
+        // W46.seg-review-rule (note 07 §3; owner's calls 3 and 7, 2026-11-06): a trained Qwen student reads the
+        // user's material zero-shot, carries the manuscript warning, and on this Mac can be checked against an online
+        // model so that only the gaps where the two disagree are put to the user.
+        if stage.id == "segmentation", let r = route, r.id.hasPrefix("seg-qwen") {
+            labels.append("\(words.display(stage.id, r)): zero-shot on your material. It was trained on one owner's "
+                          + "archives and has never seen yours, so the owner's figures are not a forecast for your collection.")
+            if r.kindRules.contains(where: { $0.hasPrefix("manuscripts: warning") }),
+               let m = r.figure("manuscripts-public") ?? stage.route("seg-qwen3.5-2b-8bit")?.figure("manuscripts-public") {
+                // Every online route measured there (seg-lincoln-cloud.md: 86.2-90.4%), shipped or lent its figures.
+                let online = stage.routes.filter { [.cloud, .plan].contains($0.family) }
+                    .compactMap { $0.figure("manuscripts-public") }
+                let span = online.min().map { lo in
+                    let hi = online.max() ?? lo
+                    return hi - lo < 0.5 ? String(format: "%.0f%%", lo) : String(format: "%.0f to %.0f%%", lo, hi)
+                }
+                labels.append(String(format: "On handwritten manuscripts (a published set of 19th-century letters) it put "
+                                     + "%.1f%% of pages in the right document", m)
+                              + (span.map { ", against \($0) for the online models" } ?? "")
+                              + ": for handwritten material, choose an online model where you can.")
+            }
+            if r.family == .mac {
+                labels.append("On its own its doubts are no guide, so it asks you to check most places. With an online "
+                              + "model's key it can be checked against that model (Process Files, Segmentation, \"Check it "
+                              + "against\"): it keeps its own boundaries and you check only the places where the two disagree.")
+            }
         }
         if stage.id == "entities", let p = lead, !p.shown {
             labels.append(p.route.map { $0.family != .mac && $0.id != "none" } == true

@@ -88,6 +88,10 @@ enum DefaultsKeys {
     /// `ChatGPTRoute` rawValue: ChatGPT's windows by API key or by the user's ChatGPT plan (Sign in with ChatGPT),
     /// asked only when both exist (W36.seg-opt-siwc). Absent ⇒ API key.
     static let segmentationChatGPTRoute = "segmentationChatGPTRoute"
+    /// `SegmentationApproach` rawValue of the online approach the 2B on this Mac is checked against
+    /// (`SegmentationOptions.partnerApproaches`, W46.seg-review-rule): the user then checks the gaps where the two
+    /// disagree. An option, never a default. Absent, empty or unknown ⇒ none, and the 2B flags by its own level.
+    static let localSegmenterPartner = "localSegmenterPartner"
     /// Sign in with ChatGPT's `ext_agent_host_id` for this installation: made once, reused on every sign-in. Not a
     /// secret; the tokens are in the Keychain (`KeychainChatGPTCredentialStore`).
     static let chatGPTHostID = "chatGPTHostID"

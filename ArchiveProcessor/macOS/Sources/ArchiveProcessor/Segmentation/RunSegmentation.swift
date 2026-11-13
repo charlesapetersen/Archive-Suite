@@ -164,7 +164,14 @@ enum FlaggedReview {
 
     /// The note at the top of the skim (§5), from the shipped figures: "About 1 in 120 pages may still be
     /// wrong without having been flagged; a skim catches them."
-    static func skimNote(_ approach: SegmentationApproach, options: SegmentationOptions?) -> String {
+    /// Beside a partner only the gaps where the two disagree were flagged, and no figure was measured for the pair.
+    static func skimNote(_ approach: SegmentationApproach, partner: SegmentationApproach? = nil,
+                         options: SegmentationOptions?) -> String {
+        if let partner {
+            let name = options?.approach(partner)?.label ?? partner.rawValue
+            return "Only the boundaries where \(name) disagreed were flagged. Where both models are wrong together "
+                + "nothing was flagged, so skim every boundary."
+        }
         guard let f = options?.approach(approach)?.figures?.test else {
             return "Some boundaries may still be wrong without having been flagged; a skim catches them."
         }

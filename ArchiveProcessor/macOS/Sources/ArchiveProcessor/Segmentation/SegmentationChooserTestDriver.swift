@@ -254,10 +254,31 @@ enum SegmentationChooserTestDriver {
         eq("7 local cost", local.costLines, ["none: it runs on this Mac"])
         eq("7 local adds no dollars", local.apiDollars, 0)
         eq("7 local cost pane", local.costSummary, CostEstimate.money(0))
-        check("7 local notes: the Mac figures, recommended at 18 GB, trained on one owner's archives",
-              local.notes.count == 3 && local.notes[0].contains("4.4 GB") && local.notes[0].contains("6 s a page")
-              && local.notes[1].contains("recommended") && local.notes[2].contains("one owner's archives"),
+        check("7 local notes: the Mac figures, recommended at 18 GB, zero-shot, the manuscript warning, its doubts no guide",
+              local.notes.count == 5 && local.notes[0].contains("4.4 GB") && local.notes[0].contains("6 s a page")
+              && local.notes[1].contains("recommended") && local.notes[2].contains("one owner's archives")
+              && local.notes[2].contains("not a forecast") && local.notes[3].contains("35.6%")
+              && local.notes[4].contains("no guide") && !local.notes[4].contains("disagree"),
               "\(local.notes)")
+        check("7 local with a Gemini key: an online model recommended, and checking against it offered",
+              row(.local, 1000, SegmentationRoutes(hasGeminiKey: true, memoryGB: 18)).notes[4].contains("disagree"))
+
+        // 7b. The 2B checked against Gemini (W46.seg-review-rule): Gemini's cost, only disagreements to check.
+        let paired = row(.local, 1000, SegmentationRoutes(hasGeminiKey: true, memoryGB: 18, localPartner: .gemini))
+        let geminiAlone = row(.gemini, 1000, SegmentationRoutes(hasGeminiKey: true, memoryGB: 18))
+        eq("7b paired runs with the Gemini key", paired.unavailableReason, nil)
+        eq("7b paired adds Gemini's dollars", paired.apiDollars, geminiAlone.apiDollars)
+        check("7b paired: the 2B's boundaries, only disagreements to check, no after-checking figure for the pair",
+              paired.rightWithNoChecking == local.rightWithNoChecking && paired.toCheck.contains("disagree")
+              && paired.rightAfterChecking.contains("not measured") && paired.label.contains("checked against"),
+              "\(paired)")
+        check("7b paired cost: free on this Mac, then Gemini's line",
+              paired.costLines.first == "none: it runs on this Mac" && paired.costLines.count == 1 + geminiAlone.costLines.count
+              && paired.notes.contains { $0.contains("Checked against") }, "\(paired.costLines)")
+        let pairedNoKey = row(.local, 1000, SegmentationRoutes(memoryGB: 18, localPartner: .gemini))
+        check("7b paired without the key: cannot run, says why, offers the Gemini key, adds nothing",
+              pairedNoKey.unavailableReason?.contains("second model") == true && pairedNoKey.missingKeys == [.gemini]
+              && pairedNoKey.apiDollars == nil, "\(pairedNoKey.unavailableReason ?? "nil")")
         check("7 local at 8 GB: unmeasured, not recommended",
               row(.local, 1000, SegmentationRoutes(memoryGB: 8)).notes[1].contains("not been measured"))
         check("7 local at 64 GB: ample", row(.local, 1000, SegmentationRoutes(memoryGB: 64)).notes[1].contains("ample"))
