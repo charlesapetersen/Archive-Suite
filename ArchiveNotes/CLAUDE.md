@@ -47,8 +47,9 @@ per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read 
 - **Visual / render verification:** `ArchiveNotesUITests` asserts the accessibility tree, not pixels — it
   won't catch a PDF pane / page-thumbnail that renders blank; a render change needs a pixel guard
   (`RenderProbe` / `DocumentRenderGuardTests`, the `W9.b4` Notes thumbnail regression). For the running app use
-  the live sighted loop (`ops/gui/capture-window.sh` + `cliclick` → read the shot,
-  → [`../ops/gui/README.md`](../ops/gui/README.md)).
+  the VM's sighted lane (`ops/gui/vm-gui-runner.sh notes sighted` → read the shot); the host loop
+  (`ops/gui/capture-window.sh` + `cliclick`) takes over the owner's screen, so it is for interactive sessions with
+  his agreement (→ [`../ops/gui/README.md`](../ops/gui/README.md)).
 - **Durable-link E2E + safety (W8-S9):** `scripts/e2e-durable-links.sh` (build-free, GUI-free filesystem proof)
   plus `DurableLinkE2ETests` in the unit gate.
 - **Bundle ID:** `com.archivenotes.app`. Signed with the suite's local self‑signed cert
@@ -56,10 +57,9 @@ per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read 
   §*Conventions*). Notes' **Debug** entitlements (`ArchiveNotes.uitest.entitlements`) carry
   `disable-library-validation` + `get-task-allow`; the Release file must never gain either.
 
-## Code invariants (moved here from the Implementation Map)
+## Code invariants
 
-These were stated inside the file map; they are rules for anyone changing that code. The map itself is in
-REFERENCE.md §Implementation Map.
+Rules for anyone changing this code. The file map is in REFERENCE.md §Implementation Map.
 
 - **Single seams — don't add a second one.** `NotesTagProjector` is THE audited Finder-tag mirror; its DEBUG
   scratch-write guard is test/GUI-drive only, off in the real app and out of Release. `Item.normalizedDate` is

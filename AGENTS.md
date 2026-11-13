@@ -14,16 +14,12 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 - **Worktree-first — mandatory, not optional.** Before *any* edit/build/commit, be in your own git
   worktree; never work in the primary checkout, even if you think you're the only instance running. Run the
   idempotent first-step check in [`CLAUDE.md`](CLAUDE.md) → **"Worktree-first"** (it creates
-  `../suite-wt-<stamp>` only if you're not already isolated, so it's safe to run every session). Per‑worktree
+  `/Users/cp1/Claude/.worktrees/archive-suite/suite-wt-<stamp>` only if you're not already isolated, so it's safe to run every session). Per‑worktree
   DerivedData (`-derivedDataPath ./build/DD`, already the default in each `launch.sh`) keeps parallel builds
   from colliding. **Remove your worktree once your work is pushed** so they don't pile up for the owner.
   **Only ever touch worktrees you created** — another agent's uncommitted WIP is not yours to clean up.
-  *Superseded 2026-07-29:* the long-standing "never touch the Codex worktree
-  `~/Documents/GPT/archive-suite-processor-fixes`" instruction is **retired** — the owner asked for it to be
-  removed and it is gone (its work was preserved first; see §"Working the to-do list as an external agent",
-  rule 6). Don't go looking for it. The standing rule is unchanged and matters more than the
-  exception: if you find a stray worktree carrying uncommitted work, **preserve it before removing anything**,
-  and **never `--force` past a git refusal**.
+  If you find a stray worktree carrying uncommitted work, **preserve it before removing anything**, and
+  **never `--force` past a git refusal**.
 - **After any pull/switch, `xcodegen generate`** (or the app's `bootstrap.sh`) — the `.xcodeproj` is gitignored.
 - **Stay in your lane.** A change scoped to one app touches only that subdir. Loading the *other* app is
   almost always unnecessary (see the token‑efficiency directive in [`CLAUDE.md`](CLAUDE.md)).
@@ -102,10 +98,8 @@ of what the owner had just decided. All ten passed every existing check, because
 state and **none reads prose**. So after changing policy, sweep for RESTATEMENTS, not just the defining file —
 especially `.maintenance/AUTONOMOUS_PLAN.md` and `ops/autonomous/resume-prompt.txt`, which no commit hook can
 see — then run **`ops/autonomous/check-policy-coherence.sh`** and add a rule for what you changed.
-⚠️ **This very section was DELETED by accident on 2026-08-13** while trimming this file under its byte budget,
-leaving four dangling pointers to it and no policy anywhere; the coherence checker passed, because it looked
-only for forbidden phrases and not for the policy's PRESENCE. It now asserts this heading exists. When you trim
-a doc, diff what left — a byte count falling is not evidence of compression.
+The coherence checker also asserts this heading exists, since a byte-budget trim can delete a policy while every
+phrase check still passes. When you trim a doc, diff what left — a byte count falling is not evidence of compression.
 
 **A genuine behaviour question is still a question.** Where an item says "decide X versus Y" and there is no
 correct answer, bring it to the owner as a *question* at Daemon Report — file it and move on; do not park the
@@ -156,7 +150,7 @@ phone↔Mac round-trip E2E on the emulator, the functional test for `Capture/`/`
 changes are Tier‑2 (adversarial review + tests on scratch copies).
 ⚠️ **`ArchiveReader/scripts/lint-write-surface.sh` also covers `packages/ArchiveCore` now** (W26.lint), so run
 it for **any** ArchiveCore change, not just a Reader one. Run it *yourself* rather than waiting for the gate:
-`W26.lint-fu` (`f64649b`) made it a `health-gate.sh` step, but that is a backstop every
+`health-gate.sh` runs it (`W26.lint-fu`), but that is a backstop every
 `AUTONOMOUS_GATE_EVERY` commits, not a per-change check.
 
 ⚠️ **Quote every path expansion in a gate script — a worktree hides the bug the gate will hit.** A worktree
@@ -171,7 +165,7 @@ will run it, make your worktree path contain a space.
 ### GUI verification — you can drive it yourself; don't punt it to the owner
 
 **All the TCC grants are in place (verified 2026-07-16): Screen Recording, Accessibility, and Automation** —
-plus `cliclick` at `/opt/homebrew/bin/cliclick`, and the Processor's Keychain **"Always Allow" is seeded as of 2026-08-13** (`W21.seed`; it was asserted here from 2026-07-16 but was NOT actually true until then — and it takes ~6 prompts, one per credential, not one) so
+plus `cliclick` at `/opt/homebrew/bin/cliclick`, and the Processor's Keychain **"Always Allow"** is seeded for each of its ~6 credentials (`W21.seed`, 2026-08-13) so
 its GUI launches unattended. Quick self-check: `screencapture -x /tmp/x.png` writes a non-empty file, and
 `osascript -e 'tell application "System Events" to return name of first process whose frontmost is true'`
 returns the frontmost app.

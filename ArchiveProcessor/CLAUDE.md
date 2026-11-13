@@ -140,9 +140,10 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **LLM/API calls are allowed and expected**; the constraint is **cost, not permission**.
 - **Never store API keys in code or config files** — Keychain or user-provided at runtime only.
 - Before any **paid** run: (1) a short test plan, (2) estimate the cost **and state it**, (3) an already-provisioned
-  key (`$OCR_KEY` / Keychain). No permission step (de-gated 2026-08-13, `../AGENTS.md` §*Gating baseline*); ask the
-  owner ONLY if no key exists for that provider at all.
-- Keep costs low: the cheapest capable model (e.g. `gemini-2.5-flash-lite`, `claude-sonnet-4-6`), the smallest
+  key (`$OCR_KEY` / Keychain). No per-item owner grant (`../AGENTS.md` §*Gating baseline*), but $7 of real money per
+  piece of work is the ceiling without asking: if this run plus what the item has already spent would pass $7, ask
+  first (unattended: in the Daemon Report; root `../CLAUDE.md`). Also ask if no key exists for that provider.
+- Keep costs low: the cheapest capable model as `../ArchiveOCRBench/` currently measures it, the smallest
   input set that proves the behaviour.
 
 ## Concurrent / multi-agent development
@@ -178,8 +179,9 @@ Tagging `{Views, Tagging}`.
 files, including in `ArchiveCaptureiOS/`); keep commits small and rebase often; build-verify before every commit.
 
 **Code-structure rules** (REFERENCE.md §Project Structure, §Implementation map):
-- `OCRProcessor` methods go in the matching `OCRProcessor+{Pipeline,OCR,Tagging,ReviewFlows}.swift` extension
-  (deliberately coarse: no `+Persistence`/`+BatchOCR`/`+MainPipeline`); **all stored properties stay in `OCRProcessor.swift`**.
+- `OCRProcessor` methods go in the matching per-area `OCRProcessor+<Area>.swift` extension (Pipeline, OCR, Tagging,
+  ReviewFlows, WindowSegmentation, MixedPDFRecovery; types in `+Types.swift`). Keep them coarse: a new file only for a
+  new pipeline area. **All stored properties stay in `OCRProcessor.swift`**.
 - Verifying a move-only refactor: run the move-proof (`git show --color-moved | grep …`) **tty-independently**
   (piped, it passes for any commit); census-diff private members for access-level changes (grep can't see
   `internal`); gate on a warnings delta (beware a cached "0 warnings"). `LiveCaptureTestDriver` does **not**
@@ -235,7 +237,8 @@ milestone, gated by the Tier-3 review. Push often, release rarely.
 
 ## Releasing (macOS DMG + GitHub release)
 
-- Version by **git tag** `vMAJOR.MINOR.PATCH` (the source of truth; `CFBundleShortVersionString` stays "1.0").
+- Releases ship in the combined Suite DMG, tagged `suite-vMAJOR.MINOR.PATCH` (root [`../CLAUDE.md`](../CLAUDE.md)
+  §*Releasing*); the bare `vX.Y.Z` tags (to `v3.8.2`) are this app's pre-merge history. `CFBundleShortVersionString` stays "1.0".
   Patch for internal-only changes, minor for user-facing features. Distribution is owner-only.
 - Signed with the self-signed **`CODE_SIGN_IDENTITY: "Archive Suite Dev"`** (not ad-hoc), not notarized. The
   target **declares no** `get-task-allow` / `disable-library-validation` (entitlements aren't config-scoped, so

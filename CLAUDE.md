@@ -194,8 +194,7 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   ahead of the Claude and ChatGPT plan routes and ahead of personal keys. It is real money on a Stanford PTA: up to its
   $50 a month may go to the review, none for its own sake. Personal keys only for what the gateway cannot serve (Azure, Textract, Document AI checks;
   one Gemini 3.7-against-3.8 Flash check on the 96). The
-  $7-per-item rule still applies, except W46.seg-window-modality's full 551-page sweep (approved at about $8 list /
-  $4 batch). Newer gateway models need the owner to request access.
+  $7-per-item rule still applies. Newer gateway models need the owner to request access.
 - ✅ **Benchmark uploads are authorized (owner, 2026-10-25).** The frozen 96 owner benchmark pages and 12 public pages,
   with their region and tile crops, may go to `https://aiapi-prod.stanford.edu/v1/chat/completions` (Processor Gateway
   key, Gemini 3.7 Flash); adjudicated truth text is not sent. Comparable benchmark image uploads and experiment work
@@ -203,19 +202,14 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   rules and the Sherlock handoff remain.
 - ⛔ **Plan routes wait for the gateway (owner, 2026-10-21).** No bench or experiment arm runs a model through the
   Claude or ChatGPT plan (`claude -p`, `codex exec`, the app's Local Agent backend) until `W46.gateway-models-ok` is
-  ticked; that arm then runs through the gateway, in the item's `-paid` half. Held: `W46.seg-lincoln-cloud` and
-  `W46.seg-lincoln-cloud-codex` outright; the plan-route arms of `W46.ocr-regions`, `W46.date-traceable`,
-  `W46.marks-detect`, `W46.ent-robust`, `W46.ent-score` and the `claude -p` voter in `W46.kit-gate` are skipped, and
-  the rest of each item goes ahead (the Claude c1
-  windows of 14:31 stay as results). Coding sessions (the engine running on the plan) are not arms.
+  ticked; that arm then runs through the gateway, in the item's `-paid` half, and the rest of the item goes ahead.
+  Coding sessions (the engine running on the plan) are not arms.
 - ⛔ **A coding session's subagents are not readers either (owner, 2026-10-30).** The plan's usage is for building
   the app. Reading corpus pages or texts as data (truth drafts, labels, rulings, page-by-page readings) goes to the
-  gateway (Gemini 3.7 Flash first) or an open model, never to Claude subagents in the session; W46.seg-boxes-sir-article
-  had four do it. No Claude arm is added where Gemini already answers the question, and the skipped Claude arms of
-  `W46.ent-robust` and `W46.ent-score` above are dropped, not moved to the gateway: their `-paid` halves run Gemini.
+  gateway (Gemini 3.7 Flash first) or an open model, never to Claude subagents in the session. No Claude arm is added
+  where Gemini already answers the question.
 - ⛔ **No ABBYY text (owner, 2026-10-30).** The app will not use the corpus PDFs' ABBYY text layer, because LLM OCR
-  is much better. No new arm, prompt, route or training row takes it as input; the remaining arms of
-  `W46.date-image` and `W46.date-image-paid` run on the images alone. Results already scored stay as they are. A set
+  is much better. No new arm, prompt, route or training row takes it as input. Results already scored stay as they are. A set
   chosen by the ABBYY text (W46.date-image's unprinted-year documents: the year is not in the ABBYY text) says so
   where it is reported. Images already follow the JPEG-originals rule (2026-10-22).
 - ⛔ **Cluster work runs on Sherlock; the engine prepares it, the owner's session submits it (owner, 2026-10-22).**
@@ -243,8 +237,8 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   split, a whole mirror or a full grid is the ceiling, not the plan); (4) the verdict, useful now or nice-to-have. The owner's session reads it before
   submitting. Focus on what is really useful now: a nice-to-have item, Sherlock or not, goes behind
   `W46.nice-to-have` (`(blocked-on: W46.nice-to-have)`; `SUITE_TODO.md` §"Nice-to-have, end of project"), which the
-  owner opens once the useful work is done. W46.ocr-new-open-sherlock stays useful now: many users of the kit will
-  have a cluster like Sherlock, so a cluster-only reader is a real route for them.
+  owner opens once the useful work is done. A cluster-only reader counts as useful now: many users of the kit will
+  have a cluster like Sherlock.
 - ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models first; paid hosted bench runs wait
   for `W43.sweep` at the end of the queue, behind a full price estimate. A session that defers a paid run adds a line to
   [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md) in the same commit, so none is lost.
@@ -269,7 +263,7 @@ environment and what may move to the backup:
 
 - **Build:** XcodeGen. `project.yml` is authoritative; the `.xcodeproj` is generated and **gitignored**
   — always `xcodegen generate` (or run the app's `bootstrap.sh`) after cloning/pulling. `brew install xcodegen`, Xcode 16, macOS 14+, Swift 6.
-- **Run:** `./launch.sh reader|processor` from the root (build‑if‑stale, then launch), or `cd <app> && ./launch.sh`.
+- **Run:** `./launch.sh reader|processor|notes` from the root (build‑if‑stale, then launch), or `cd <app> && ./launch.sh`.
 - **Per‑worktree DerivedData** (`-derivedDataPath ./build/DD`) so concurrent agents/worktrees don't collide. `build/` is gitignored.
 - **Three apps, three bundle IDs** (`com.archiveprocessor.app`, `com.archivereader.app`, `com.archivenotes.app`) — never merged.
 - **Signing:** local self-signed `CODE_SIGN_IDENTITY: "Archive Suite Dev"`, never ad-hoc on the host;
@@ -397,10 +391,6 @@ this repo:
 - **Publish:** `/opt/homebrew/bin/gh release create suite-v<ver> /tmp/ArchiveSuite-<ver>.dmg --repo charlesapetersen/Archive-Suite --title "Archive Suite <ver>" --notes "…"`.
   ⚠️ Use the **full path** `/opt/homebrew/bin/gh` — a shadowing Python tool named `gh` is first on PATH and fails.
 - Cut DMG/GitHub releases sparingly; push commits frequently.
-
-The two repos were merged into this monorepo and Archive Suite v1.0.0 shipped (see `git log` for the
-record). De‑nesting shipped (`7706368`); `packages/ArchiveCore` shipped in the W0 refactor
-(`49c0162`–`b90800f`).
 
 ## ⚠️ The history was rewritten when this repo went public (2026‑08‑12) — every SHA before then changed
 

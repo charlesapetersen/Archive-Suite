@@ -1,7 +1,7 @@
 # AGENTS.md — working on Archive Reader with multiple agents
 
 Start with **[CLAUDE.md](CLAUDE.md)** — the authoritative project guide (Core Directive, Verified
-Facts, `TagWriter` Safety Protocol, architecture, Archive Suite plan). This file is the short version
+Facts, `TagWriter` Safety Protocol, architecture, decisions). This file is the short version
 for coordinating **multiple concurrent agents/instances**. Mirrors the sibling Archive Processor's
 process.
 
@@ -10,15 +10,13 @@ process.
 checkout — **even if you think you're the only instance** (you can't know another won't start, and the
 owner doesn't track worktrees). Two instances in one working directory clobber each other's uncommitted
 edits and race the build cache. Suite-wide idempotent first-step check: root [`../CLAUDE.md`](../CLAUDE.md)
-→ "Worktree-first". The commands below isolate a Reader worktree specifically.
+→ "Worktree-first" (it creates the worktree under `/Users/cp1/Claude/.worktrees/archive-suite/` and says how to remove it). The commands below build the Reader inside it.
 
 ```bash
-git worktree add "../ar-wt-<lane>" -b <branch>              # isolated checkout (paths have a space → quote)
-cd "../ar-wt-<lane>/ArchiveReader" && xcodegen generate     # .xcodeproj is NOT committed — regenerate first
+cd ArchiveReader/macOS && xcodegen generate   # .xcodeproj is NOT committed — regenerate first
 xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build   # per-worktree DerivedData
-git worktree remove "../ar-wt-<lane>"                        # ./build is gitignored, won't block removal
 ```
-Prereq: `brew install xcodegen` (or run `./bootstrap.sh` from the worktree root). `-derivedDataPath`
+Prereq: `brew install xcodegen` (or run `ArchiveReader/bootstrap.sh`, which installs XcodeGen if missing). `-derivedDataPath`
 isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per
 worktree."
 
@@ -38,18 +36,18 @@ worktree."
 
 ## Ownership lanes (one agent each)
 - **Core** — `Sources/ArchiveReader/Core/` — UI-free domain: tag facets, `TagWriter`, PDF/
-  classification model, date parsing, file-link formatting. **Package-ready** (becomes `ArchiveCore`
-  at suite convergence — keep it free of SwiftUI/AppKit imports).
+  classification model, date parsing, file-link formatting. Keep it free of SwiftUI/AppKit imports;
+  shared tag/PDF/link code lives in `packages/ArchiveCore`.
 - **Search/Index** — filesystem discovery (`ArchiveCore.CorpusWalker` + the FSEvents `CorpusWatcher` +
   the `LibraryIndex` warm-start cache; **no Spotlight**) + the SQLite FTS content index.
 - **Nav UI** — the navigation window: table, filters, tag editor, copy-links, mark-read.
 - **Doc UI** — the document window: two-up PDF viewer, zoom, splitter, intelligent copy, find.
 
 ## Shared hotspots — coordinate before editing
-- **The tag/PDF contract** (`CLAUDE.md` → Verified Facts). Both Archive Reader and Archive Processor
-  must interpret it identically; a divergence risks corrupting/mis-reading irreplaceable data.
+- **The tag/PDF contract** ([`../SPEC/tag-format.md`](../SPEC/tag-format.md), authoritative). Reader, Processor and
+  Notes must interpret it identically; a divergence risks corrupting/mis-reading irreplaceable data.
 - **`project.yml`** (never hand-edit `.pbxproj`; edit `project.yml` + `xcodegen generate`).
-- **`Core/` public API** once it is extracted into the `ArchiveCore` package.
+- **`packages/ArchiveCore` public API** — shared with Processor and Notes; a change builds and tests all three apps.
 
 ## Rules
 - Never hand-edit `.pbxproj` — edit `project.yml` + `xcodegen generate` (required after clone too).

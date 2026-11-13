@@ -10,15 +10,13 @@ tests + GUI drives lives in **[GUI_SAFETY.md](GUI_SAFETY.md)**.
 checkout — **even if you think you're the only instance** (you can't know another won't start, and the
 owner doesn't track worktrees). Two instances in one working directory clobber each other's uncommitted
 edits and race the build cache. Suite-wide idempotent first-step check: root [`../CLAUDE.md`](../CLAUDE.md)
-→ "Worktree-first". The commands below isolate a Notes worktree specifically.
+→ "Worktree-first" (it creates the worktree under `/Users/cp1/Claude/.worktrees/archive-suite/` and says how to remove it). The commands below build Notes inside it.
 
 ```bash
-git worktree add "../an-wt-<lane>" -b <branch>          # isolated checkout (paths have a space → quote)
-cd "../an-wt-<lane>/ArchiveNotes" && xcodegen generate   # .xcodeproj is NOT committed — regenerate first
+cd ArchiveNotes/macOS && xcodegen generate   # .xcodeproj is NOT committed — regenerate first
 xcodebuild -scheme ArchiveNotes -configuration Debug -derivedDataPath ./build/DD build   # per-worktree DerivedData
-git worktree remove "../an-wt-<lane>"                    # ./build is gitignored, won't block removal
 ```
-Prereq: `brew install xcodegen` (or run `./bootstrap.sh` from the worktree root). `-derivedDataPath`
+Prereq: `brew install xcodegen` (or run `ArchiveNotes/bootstrap.sh`, which installs XcodeGen if missing). `-derivedDataPath`
 isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per
 worktree." Notes depends on the local `packages/ArchiveCore` Swift package.
 

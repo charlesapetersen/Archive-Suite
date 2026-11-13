@@ -3,22 +3,20 @@
 Start with **[CLAUDE.md](CLAUDE.md)** — it's the authoritative project guide. This file is the short version for coordinating **multiple concurrent agents/instances**.
 
 ## Golden rule
-**Worktree-first, mandatory before any edit.** Be in your own git worktree; never work in the primary checkout — **even if you think you're the only instance** (you can't know another won't start, and the owner doesn't track worktrees). Two instances in one working directory clobber each other's uncommitted edits and race the build cache. Suite-wide idempotent first-step check: root [`../CLAUDE.md`](../CLAUDE.md) → "Worktree-first". The commands below isolate a Processor worktree specifically.
+**Worktree-first, mandatory before any edit.** Be in your own git worktree; never work in the primary checkout — **even if you think you're the only instance** (you can't know another won't start, and the owner doesn't track worktrees). Two instances in one working directory clobber each other's uncommitted edits and race the build cache. Suite-wide idempotent first-step check: root [`../CLAUDE.md`](../CLAUDE.md) → "Worktree-first" (it creates the worktree under `/Users/cp1/Claude/.worktrees/archive-suite/` and says how to remove it). The commands below build the Processor inside that worktree.
 
 ```bash
-git worktree add "../ap-wt-<lane>" -b <branch>          # isolated checkout (paths have a space → quote)
-cd "../ap-wt-<lane>/ArchiveProcessor" && xcodegen generate   # .xcodeproj is NOT committed — regenerate first
+cd ArchiveProcessor/macOS && xcodegen generate   # .xcodeproj is NOT committed — regenerate first
 xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD build   # per-worktree DerivedData
-git worktree remove "../ap-wt-<lane>"                   # ./build is gitignored, so it won't block removal
 ```
-Prereq: `brew install xcodegen` (or just run `./bootstrap.sh` from the worktree root — it installs XcodeGen if missing and regenerates every project). `-derivedDataPath` isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per worktree."
+Prereq: `brew install xcodegen` (or just run `ArchiveProcessor/bootstrap.sh`, which installs XcodeGen if missing). `-derivedDataPath` isolates DerivedData (not the shared user-level Clang cache) — treat it as "separate DerivedData per worktree."
 
 ## Lanes, hotspots & split classes (quick reference)
 The **authoritative, detailed** versions — ownership lanes, the shared hotspots, and the `OCRProcessor` /
 `OCRView` split-class rules — live in **[CLAUDE.md](CLAUDE.md) → "Concurrent / multi-agent development."**
 Kept here as a glance so this file stands alone; edit the detail in CLAUDE.md, not here.
 - **Lanes** (one agent each): Android `ArchiveCapture/` · iPhone `ArchiveCaptureiOS/` (revived by W40.i1, 2026-10-21; the gate builds it) · macOS OCR core `Sources/ArchiveProcessor/{OCR,Models,Capture,Net}` · macOS Views+Tagging `Sources/ArchiveProcessor/{Views,Tagging}`.
-- **Coordinate before editing:** the `ProviderModels.swift` persisted enums (all `String`-backed — never rename a case or change an explicit rawValue string; appending is safe, reordering is harmless); the phone↔Mac protocol (`Net/CaptureServer.swift` ⇄ iOS `Net/MacClient.swift` — change both sides); the two `project.yml` files.
+- **Coordinate before editing:** the `ProviderModels.swift` persisted enums (all `String`-backed — never rename a case or change an explicit rawValue string; appending is safe, reordering is harmless); the phone↔Mac protocol (`Net/CaptureServer.swift` ⇄ both companions' `MacClient` (iOS `Net/MacClient.swift`, Android `net/MacClient.kt`) — change all sides); the two `project.yml` files.
 - **Split classes:** `OCRProcessor.swift` = stored state only (methods in `OCRProcessor+*.swift`, types in `+Types.swift`); `OCRView.swift` = main view (sheets/rows/diff in `OCRView+*.swift`).
 
 ## Rules
