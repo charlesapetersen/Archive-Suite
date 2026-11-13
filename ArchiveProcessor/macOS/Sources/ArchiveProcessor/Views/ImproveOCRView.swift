@@ -72,6 +72,13 @@ final class ImproveOCRController: ObservableObject {
         loadProblem = nil
         root = Self.findRoot(for: files)
         if root == nil { rootProblem = "these files are not inside one archive folder with a suite root marker" }
+        // Pages whose header names no Kind get the classifier's provisional call.
+        if let model {
+            Task { [weak self] in
+                await model.classifyUnknownPages()
+                self?.revision += 1
+            }
+        }
         if case .success(let s) = support { recover(s.url) }
     }
 
@@ -409,6 +416,12 @@ struct ImproveOCRView: View {
                         }
                         .frame(width: 220)
                         .accessibilityIdentifier("ap.reocr.kind.\(file.url.lastPathComponent)")
+                        if let p = controller.model?.provisional(file: file.id) {
+                            Text(p.confidence >= PageKindRouting.minimumConfidence
+                                 ? "suggested: \(p.kind.displayName), \(Int(p.confidence * 100))%"
+                                 : "unsure (\(p.kind.displayName)?, \(Int(p.confidence * 100))%): choose")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     case .failure(let refusal):
                         Text(refusal.description).foregroundStyle(.secondary)
                     }

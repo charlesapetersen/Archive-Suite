@@ -55,6 +55,34 @@ final class ReOCRDialogModel {
 
     // MARK: Kinds
 
+    /// Asks the page-kind classifier about every page with no Kind from its header or the person (plan §4): its answer
+    /// is provisional, shown as such, and below the routing threshold (`PageKindRouting.minimumConfidence`) it is no
+    /// Kind at all, so the page still needs the person's choice. The image page is read, never the old text.
+    func classifyUnknownPages() async {
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("ImproveOCR-kinds-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        for i in pages.indices where pages[i].origin == nil {
+            let page = pages[i]
+            guard let file = files.first(where: { $0.id == page.fileID }), let data = try? Data(contentsOf: file.url) else { continue }
+            let image = scratch.appendingPathComponent("\(i).jpg")
+            guard ReOCRJob.writeImageInput(data, pageIndex: page.pairIndex - 1, to: image),
+                  let cg = PageKindClassifier.loadImage(image) else { continue }
+            let call = await PageKindClassifier.classify(cg)
+            try? FileManager.default.removeItem(at: image)
+            guard let call, let kind = OCRPageKind(rawValue: call.kind), pages[i].origin == nil else { continue }
+            pages[i].kind = kind
+            pages[i].origin = .classifier
+            pages[i].confidence = call.confidence
+        }
+    }
+
+    /// The classifier's provisional call for a file's first page, for display: its Kind and confidence.
+    func provisional(file: String) -> (kind: OCRPageKind, confidence: Double)? {
+        guard let p = pages.first(where: { $0.fileID == file }), p.origin == .classifier, let k = p.kind else { return nil }
+        return (k, p.confidence ?? 0)
+    }
+
     /// The person's Kind for one page (by its text page's index), or for every page of a file when `pairIndex` is nil.
     func setKind(_ kind: OCRPageKind?, file: String, pairIndex: Int? = nil) {
         for i in pages.indices where pages[i].fileID == file && (pairIndex == nil || pages[i].pairIndex == pairIndex) {

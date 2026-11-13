@@ -560,6 +560,13 @@ enum ReOCRJobTestDriver {
                 check("13 every file is listed, the raw one refused", m.files.count == 3
                       && { if case .failure = m.files[2].eligibility { return true }; return false }())
                 check("13 the header's Kind is used, the unknown page waits", m.groups.map(\.kind) == [.typewritten, nil], "\(m.groups.map(\.kind))")
+                await m.classifyUnknownPages()
+                let call = m.pages.first { $0.fileID == unknown.path }
+                check("13 the classifier gives the unknown page a provisional Kind", call?.origin == .classifier && call?.kind != nil
+                      && m.pages.first { $0.fileID == typed.path }?.origin == .header, "\(String(describing: call))")
+                lines.append("INFO 13 classifier: \(String(describing: call?.kind)) at \(String(describing: call?.confidence))")
+                // Whatever it said, the test's next steps decide the Kind; start from "no Kind" again.
+                m.setKind(nil, file: unknown.path)
                 check("13 Run waits for a Kind", m.runBlocker?.contains("Kind") == true, m.runBlocker ?? "")
                 m.setKind(.handwritten, file: unknown.path)
                 check("13 choosing a Kind re-groups", m.groups.map(\.kind) == [.handwritten, .typewritten] || m.groups.map(\.kind) == [.typewritten, .handwritten],
