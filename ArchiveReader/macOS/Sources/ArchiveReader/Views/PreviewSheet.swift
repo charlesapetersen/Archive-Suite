@@ -35,6 +35,7 @@ struct PreviewSheet: View {
     @ObservedObject private var prefetcher = PreviewImagePrefetcher.shared
     /// The sheet remembers its own thumbnail sidebar, apart from the document window's.
     @AppStorage("ar.preview.thumbnailsVisible") private var thumbnailsVisible = false
+    @AppStorage("ar.preview.invertImages") private var invertImages = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,12 +50,14 @@ struct PreviewSheet: View {
         .archiveLinkCopyError(model: model)
         .onAppear {
             model.showingThumbnails = thumbnailsVisible
+            model.invertingImages = invertImages
             model.load(selection)
             published = model            // → the nav window publishes it to the scene while we are up
             DispatchQueue.main.async { model.leftController.focus() }
         }
         .onDisappear { published = nil; nav.endFileOnView(by: model) }
         .onChange(of: model.showingThumbnails) { _, visible in thumbnailsVisible = visible }
+        .onChange(of: model.invertingImages) { _, on in invertImages = on }
         // ↑/↓ browse the underlying file list: move the nav selection, then re-load the preview to match. After
         // ⇧↑/⇧↓ it opens on the row just added (the cursor), not on the run's first file.
         .onChange(of: nav.selection) { model.load(nav.documentSelection(), showing: nav.selectionCursorPath) }
@@ -106,6 +109,7 @@ struct PreviewSheet: View {
                 .disabled(!model.canRotate)
                 .help(ReaderCommand.rotateRight.help)
                 .accessibilityIdentifier("ar.preview.rotateRight")
+            InvertImagesToggle(model: model, idPrefix: "ar.preview").labelStyle(.iconOnly)
             // Neither copy button binds its key: ⌘C is Edit ▸ Copy, which reaches the sheet's panes through the
             // responder chain and leaves selectable embedded text its own copy (W48.reader-copy-shortcut), and
             // ⇧⌘C is Edit ▸ Copy Cleaned for Prose, which reaches this sheet's published model. This button bound
@@ -172,7 +176,7 @@ struct PreviewSheet: View {
             // document 0 each time, so `pageIdentity` alone repeats, and a placeholder for the new file
             // must never land on a view still showing the old one.
             PDFPaneView(page: model.imagePage, controller: model.leftController, id: "ar.preview.imagePane",
-                        placeholder: imagePlaceholder, turns: model.imageTurns)
+                        placeholder: imagePlaceholder, turns: model.imageTurns, inverted: model.invertingImages)
                 .id("\(model.currentFilePath ?? "")#\(model.pageIdentity)#\(model.imageTurns)")
                 .frame(maxWidth: .infinity)
             Divider()

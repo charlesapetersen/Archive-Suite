@@ -267,6 +267,12 @@ struct ArchiveReaderCommands: Commands {
                 .keyboardShortcut(.rotateRight).disabled(!(doc?.canRotate ?? false))
             Button(ReaderCommand.resetRotation.title) { doc?.resetRotation() }
                 .disabled(!(doc?.canRotate ?? false) || !(doc?.isRotated ?? false))
+            // W40.reader-image-invert: a dark view of the image page and the page tiles, the window's own setting.
+            Toggle(ReaderCommand.invertImages.title, isOn: Binding(
+                get: { doc?.invertingImages ?? false }, set: { doc?.invertingImages = $0 }
+            ))
+            .keyboardShortcut(.invertImages)
+            .disabled(doc == nil)
             Divider()
             // These three need MORE than a published viewer: they need one whose view renders a find bar.
             // The preview sheet publishes a model so zoom/paging/copy/page-link reach it (W26.previewzoom),

@@ -520,6 +520,8 @@ struct PDFPaneView: NSViewRepresentable {
     /// Quarter turns clockwise the reader gave this page (W40.reader-view-rotate). The parent puts the turn in the
     /// pane's `.id`, so a turn builds a fresh view, as a page turn does.
     var turns: Int = 0
+    /// Draw the page inverted, `DarkPageImages` (W40.reader-image-invert); the image pane only.
+    var inverted = false
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
@@ -549,8 +551,8 @@ struct PDFPaneView: NSViewRepresentable {
         view.displayMode = .singlePage
         view.displaysPageBreaks = false
         view.autoScales = true
-        view.backgroundColor = Self.paneBackground
         controller.pdfView = view
+        applyInversion(to: view)
         if !id.isEmpty { view.setAccessibilityIdentifier(id) }
         NotificationCenter.default.addObserver(context.coordinator,
                                                selector: #selector(Coordinator.scaleChanged(_:)),
@@ -567,6 +569,7 @@ struct PDFPaneView: NSViewRepresentable {
 
     func updateNSView(_ view: PDFView, context: Context) {
         controller.pdfView = view
+        applyInversion(to: view)
         if view.document?.page(at: 0)?.string != page?.string {
             loadPage(into: view)   // safety net for any reuse
         } else if let placeholder, let image = placeholder.image {
@@ -578,6 +581,15 @@ struct PDFPaneView: NSViewRepresentable {
     static func dismantleNSView(_ nsView: PDFView, coordinator: Coordinator) {
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewScaleChanged, object: nsView)
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewSelectionChanged, object: nsView)
+    }
+
+    /// The filter turns the grey behind the page too, so while it is on the pane is given white, which it draws as
+    /// the darkest grey whatever the appearance; and the page's shadow, which would turn into a glow, is dropped.
+    private func applyInversion(to view: PDFView) {
+        DarkPageImages.apply(inverted, to: view)
+        let background = inverted ? NSColor.white : Self.paneBackground
+        if view.backgroundColor != background { view.backgroundColor = background }
+        if view.pageShadowsEnabled == inverted { view.pageShadowsEnabled = !inverted }
     }
 
     private func loadPage(into view: PDFView) {

@@ -20,6 +20,7 @@ struct DocumentWindowView: View {
     @AppStorage("ar.doc.infoWidth") private var infoWidth = 380.0
     @AppStorage("ar.doc.infoVisible") private var infoVisible = false
     @AppStorage("ar.doc.thumbnailsVisible") private var thumbnailsVisible = false
+    @AppStorage("ar.doc.invertImages") private var invertImages = false
     @State private var fraction: CGFloat = 0.667   // left pane share; default ⅔
     @FocusState private var findFocused: Bool
     @State private var didConfigureWindow = false
@@ -71,6 +72,7 @@ struct DocumentWindowView: View {
         .focusedSceneValue(\.documentTagActions, DocumentTagActions(router: router, viewer: model))
         .onChange(of: model.showingTagEditor) { _, visible in infoVisible = visible }
         .onChange(of: model.showingThumbnails) { _, visible in thumbnailsVisible = visible }
+        .onChange(of: model.invertingImages) { _, on in invertImages = on }
         .onChange(of: findFocused) { model.findFieldFocused = findFocused }
         .onReceive(linkContext.$target.combineLatest(linkContext.$jpegPartnerIndex)) { target, index in
             model.updateArchiveContext(target: target, index: index)
@@ -78,6 +80,7 @@ struct DocumentWindowView: View {
         .onAppear {
             model.showingTagEditor = infoVisible
             model.showingThumbnails = thumbnailsVisible
+            model.invertingImages = invertImages
             fraction = defaultFraction
             if let selection { model.load(selection) }
             prefetchImagePages()
@@ -133,7 +136,8 @@ struct DocumentWindowView: View {
                     // multi-page document rebuilds the panes too.
                     PDFPaneView(page: model.displayedImagePage, controller: model.leftController,
                                 id: "ar.doc.imagePane", reference: model.imagePage,
-                                placeholder: model.isShowingJPEG ? nil : imagePlaceholder, turns: model.imageTurns)
+                                placeholder: model.isShowingJPEG ? nil : imagePlaceholder, turns: model.imageTurns,
+                                inverted: model.invertingImages)
                         .id(model.imagePaneIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
@@ -276,6 +280,7 @@ struct DocumentWindowView: View {
             Divider()
 
             PageViewButtons(model: model, idPrefix: "ar.doc")
+            InvertImagesToggle(model: model, idPrefix: "ar.doc")
 
             if !model.showingAllPages {
                 imageSourceSwitch

@@ -68,7 +68,8 @@ struct DocumentPageOverview: View {
             } else {
                 PageThumbnailCell(path: cell.path, pageIndex: pageIndex, turns: turns, label: "PDF page \(number)",
                                   selected: current && number == model.focusedPageNumber,
-                                  height: 220, maxPixel: 520, identifier: "\(idPrefix).pageTile.\(file + 1).\(number)",
+                                  height: 220, maxPixel: 520, inverted: model.invertingImages,
+                                  identifier: "\(idPrefix).pageTile.\(file + 1).\(number)",
                                   accessibilityLabel: several ? "\(name), PDF page \(number)" : "PDF page \(number)") {
                     model.openTiledPage(file: file, page: number)
                     opened()
@@ -172,7 +173,7 @@ struct PageThumbnailSidebar: View {
         return PageThumbnailCell(path: path, pageIndex: pageIndex,
                                  turns: model.pageTurns.turns(path: path, page: pageIndex), label: "\(pair + 1)",
                                  selected: file == model.index && pair == model.pair && !model.showingAllPages,
-                                 height: 150, maxPixel: 340, identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
+                                 height: 150, maxPixel: 340, inverted: model.invertingImages, identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
                                  accessibilityLabel: "Page \(pair + 1) of file \(file + 1)") {
             model.openThumbnail(file: file, pair: pair)
         }

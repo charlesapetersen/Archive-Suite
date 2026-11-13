@@ -80,6 +80,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     // Preview turns a page with ⌘L / ⌘R, which are Focus Tag Filter and Mark Read here, so the turn adds ⌃
     // (W40.reader-view-rotate).
     case rotateLeft, rotateRight, resetRotation
+    // A dark view of the page images, the file untouched (W40.reader-image-invert)
+    case invertImages
     // The document window's own controls
     case resetZoom, endFind
     // The preview sheet's own buttons
@@ -169,6 +171,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return "Rotate Left"
         case .rotateRight: return "Rotate Right"
         case .resetRotation: return "Reset Rotation"
+        case .invertImages: return "Invert Image Colors"
         case .showThumbnails: return "Show Thumbnails"
         case .contactSheet: return "Contact Sheet"
         case .copyImage: return "Copy Image"
@@ -249,6 +252,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return CommandKey("l", [.command, .control])
         case .rotateRight: return CommandKey("r", [.command, .control])
         case .resetRotation: return nil
+        case .invertImages: return CommandKey("i", [.command, .control])
         case .showThumbnails: return CommandKey("2", [.command, .option])
         case .contactSheet: return CommandKey("6", [.command, .option])
         case .copyImage: return nil
@@ -287,6 +291,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rotateLeft: return "Turn the image page a quarter turn left, in this view only — the file is not changed"
         case .rotateRight: return "Turn the image page a quarter turn right, in this view only — the file is not changed"
         case .resetRotation: return "Show the image page as it is in the file"
+        case .invertImages: return "Draw the page images dark, with light ink, to cut the white — the file is not changed"
         case .showThumbnails: return "Show or hide a thumbnail of each scan of the open files beside the page"
         case .contactSheet: return "Show every PDF page of the open files as a numbered tile"
         case .copyImage: return "Copy the image page as it is shown, turned as the viewer turns it"

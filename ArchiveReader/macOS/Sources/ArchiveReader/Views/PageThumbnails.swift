@@ -129,13 +129,16 @@ struct PageThumbnailLabel: View {
     let selected: Bool
     let finished: Bool
     let height: CGFloat
+    /// Drawn dark, as the image pane is under Invert Image Colors (W40.reader-image-invert).
+    var inverted = false
 
     var body: some View {
         VStack(spacing: 4) {
             ZStack {
                 if let image {
-                    Image(decorative: image.cgImage, scale: 1).resizable().aspectRatio(image.aspect, contentMode: .fit)
-                        .background(Color.white)
+                    Image(decorative: inverted ? DarkPageImages.darkened(image.cgImage) : image.cgImage, scale: 1)
+                        .resizable().aspectRatio(image.aspect, contentMode: .fit)
+                        .background(inverted ? Color(white: Double(DarkPageImages.darkest)) : Color.white)
                         .shadow(color: .black.opacity(0.25), radius: 1.5, y: 0.5)
                 } else if finished {
                     Image(systemName: "doc.questionmark").font(.title2).foregroundStyle(.secondary)
@@ -164,6 +167,7 @@ struct PageThumbnailCell: View {
     let selected: Bool
     let height: CGFloat
     let maxPixel: CGFloat
+    var inverted = false
     let identifier: String
     let accessibilityLabel: String
     let open: () -> Void
@@ -172,7 +176,8 @@ struct PageThumbnailCell: View {
 
     var body: some View {
         Button(action: open) {
-            PageThumbnailLabel(image: image, label: label, selected: selected, finished: finished, height: height)
+            PageThumbnailLabel(image: image, label: label, selected: selected, finished: finished, height: height,
+                               inverted: inverted)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
