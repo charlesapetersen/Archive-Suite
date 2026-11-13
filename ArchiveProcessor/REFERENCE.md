@@ -439,15 +439,19 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                W46.settings-solver, replacing W41.app-seg-default's Gemini rule);
                                `SegmentationOptions` decodes the bundled `segbench-results/options.json`
                                (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check.
-  WindowSegmenter.swift        Port of the bench: 7/3 windows, reply parser, per-voter combine, min/mean rules, the
-                               concurrent runner (retry once; gaps no answer covered → flagged at 0; usage limit →
-                               stop keeping answered windows, resumable).
+  WindowSegmenter.swift        Port of the bench: 7/3 windows, reply parser, per-voter combine, min/mean rules and the
+                               2B's disagreement rule (W46.seg-review-rule), the concurrent runner (each voter's own
+                               page size; a local voter one window at a time; retry once; gaps no answer covered →
+                               flagged at 0; usage limit → stop keeping answered windows, resumable).
   WindowPrompts.swift          Prompts w1/g1, verbatim from the bench (the test compares the rendering byte for byte).
   WindowTransports.swift       API (Anthropic/Gemini/OpenAI, injectable HTTP seam), `claude -p` (temp dir of page
                                files), and per-provider routing.
   LocalSegmenter.swift         The `local` approach (W41.app-local-seg): the corpus-trained Qwen3.5 2B through mlx-vlm
                                on this Mac, no key; `LocalWindowTransport` (1,024 px, thinking off, one server check
-                               before the first window, one window at a time), the chooser's Mac and memory notes.
+                               before the first window, one window at a time), the chooser's Mac and memory notes, the
+                               zero-shot note and manuscript warning. Beside an online partner (`spec(for:partner:)`,
+                               `DefaultsKeys.localSegmenterPartner`, Gemini or Claude) only the gaps the two disagree
+                               on are flagged (note 07 §3 "Review rule").
                                Its options.json row: `method_openrouter.py option-local-seg`.
   SegmentationEngineTestDriver.swift   $0 headless self-test (`SEGMENTATION_ENGINE_TEST=1`,
                                `scripts/test-segmentation-engine.sh`): reproduces the bench's verdict on every gap

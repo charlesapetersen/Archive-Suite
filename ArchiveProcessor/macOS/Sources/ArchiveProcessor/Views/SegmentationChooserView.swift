@@ -140,14 +140,18 @@ struct LocalPartnerControls: View {
             let providers = SegmentationRow.providers(p, options: options)
             return !providers.isEmpty && providers.allSatisfy(routes.canRun)
         }
-        if !runnable.isEmpty || !partnerRaw.isEmpty {
-            Picker(selection: $partnerRaw) {
+        // An unknown or unmeasured saved value reads as none (`storedLocalPartner`), and the menu says so.
+        let saved = SegmentationApproach(rawValue: partnerRaw)
+            .flatMap { SegmentationOptions.partnerApproaches.contains($0) ? $0 : nil }
+        let selection = Binding(get: { saved?.rawValue ?? "" }, set: { partnerRaw = $0 })
+        if !runnable.isEmpty || saved != nil {
+            Picker(selection: selection) {
                 Text("No second model").tag("")
                 ForEach(runnable, id: \.self) { p in
                     Text(options?.approach(p)?.label ?? p.rawValue).tag(p.rawValue)
                 }
                 // A saved partner whose key has gone stays shown, so the run's stop is not a surprise.
-                if let saved = SegmentationApproach(rawValue: partnerRaw), !runnable.contains(saved) {
+                if let saved, !runnable.contains(saved) {
                     Text("\(options?.approach(saved)?.label ?? saved.rawValue) (unavailable)").tag(saved.rawValue)
                 }
             } label: {

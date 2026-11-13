@@ -334,6 +334,25 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(waitUntil { !self.element("ap.sheet").exists }, "Done closes the sheet")
     }
 
+    /// W46.seg-review-rule: with the model on this Mac chosen, Process Files offers "Check it against" an online
+    /// model. This guest has no key, so a saved Gemini partner is listed as unavailable beside "No second model",
+    /// and the chooser says the second model is what the run needs (both set in the launch's argument domain).
+    func testLocalSegmenterOffersAnOnlinePartner() throws {
+        relaunch(extra: ["-segmentationApproach", "local", "-localSegmenterPartner", "gemini"])
+        let partner = element("ap.segmentation.local.partner")
+        XCTAssertTrue(partner.waitForExistence(timeout: 10), "the model on this Mac offers a second model to check against")
+        partner.click()
+        for title in ["No second model", "Gemini only (unavailable)"] {
+            XCTAssertTrue(app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", title)).firstMatch
+                .waitForExistence(timeout: 5), "the partner menu lists \(title)")
+        }
+        app.typeKey(.escape, modifierFlags: [])
+        let why = element("ap.segmentation.unavailable")
+        XCTAssertTrue(why.waitForExistence(timeout: 5), "a partner that cannot run says why")
+        XCTAssertTrue(renderedText(of: why).contains("second model"), "the reason names the second model: \(renderedText(of: why))")
+        attachScreenshot("processor-segmentation-local-partner")
+    }
+
     /// W46.settings-range-view: choosing on the Range tab writes the card's choice. The scratch collection overrides
     /// the dating card with a route that cannot run here (no key), so the card is Custom; the range's row for the
     /// app's own pick goes back to it, and the card is no longer Custom. (With no key and this guest's memory, no

@@ -175,7 +175,7 @@ struct SegmentationRow: Equatable, Sendable {
             return SegmentationRow(
                 approach: approach, label: "\(label), checked against \(other.label)", pageCount: n,
                 rightWithNoChecking: fig.pagesExactNoReview.map { "about \(percent($0)) of pages" },
-                toCheck: "only the boundaries where the two disagree: about 1 to 17 in every 100 pages on the seven "
+                toCheck: "only the boundaries where the two disagree (or one gave no answer): about 1 to 17 in every 100 pages on the seven "
                     + "boxes measured",
                 rightAfterChecking: "not measured for the pair",
                 unshownErrors: "not measured for the pair; where both are wrong together nothing is flagged",
@@ -185,7 +185,7 @@ struct SegmentationRow: Equatable, Sendable {
                 footnote: footnote,
                 unavailableReason: why.isEmpty ? nil : why.joined(separator: " "),
                 missingKeys: missingKeys + other.missingKeys,
-                notes: LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac, partner: other.label))
+                notes: LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac, partner: other.label) + other.notes)
         }
 
         return SegmentationRow(

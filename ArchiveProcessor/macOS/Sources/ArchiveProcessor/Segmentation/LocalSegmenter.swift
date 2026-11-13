@@ -76,7 +76,7 @@ enum LocalSegmenter {
         out.append(manuscriptWarning)
         if let partner {
             out.append("Checked against \(partner): you check only the boundaries where the two disagree. On the boxes "
-                       + "measured this found more errors per check than the model's own doubts.")
+                       + "measured this did as well as the model's own doubts or better, and much better on some.")
         } else {
             out.append("On its own its doubts are no guide, so it asks you to check most boundaries."
                        + (onlineReachable ? " With your key, an online model does better; or keep this one and check it "
