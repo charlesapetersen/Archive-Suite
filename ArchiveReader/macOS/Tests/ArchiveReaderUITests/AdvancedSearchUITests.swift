@@ -84,6 +84,78 @@ final class AdvancedSearchUITests: FixtureUITestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// W40.reader-smart-folder-update (owner, 2026-11-13): Advanced Search opened inside a smart folder offers
+    /// Save to "<name>", which asks, then replaces that folder's rules rather than making a second folder.
+    func testChangedRulesSaveBackToTheSmartFolder() throws {
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        waitForRows(minimum: 2, timeout: 15)
+        deleteSmartFolders()
+        let all = rowCount
+        let advanced = app.buttons["ar.filter.advanced"]
+        let count = app.staticTexts["ar.advanced.count"]
+        let fields = app.popUpButtons.matching(identifier: "ar.advanced.rule.field")
+        let ops = app.popUpButtons.matching(identifier: "ar.advanced.rule.op")
+        let text = app.textFields.matching(identifier: "ar.advanced.rule.text").firstMatch
+
+        // A smart folder: File name does not contain "00001".
+        advanced.click()
+        XCTAssertTrue(count.waitForExistence(timeout: 5), "the form opens")
+        fields.element(boundBy: 0).click()
+        app.menuItems["File name"].click()
+        ops.element(boundBy: 0).click()
+        app.menuItems["does not contain"].click()
+        XCTAssertTrue(text.waitForExistence(timeout: 3))
+        text.click()
+        text.typeText("00001")
+        XCTAssertTrue(waitFor(count, toRead: "\(all - 1) documents match"))
+        XCTAssertFalse(app.buttons["ar.advanced.saveTo"].exists, "outside a smart folder there is nothing to save to")
+        app.buttons["ar.advanced.saveAs"].click()
+        let name = app.textFields["ar.advanced.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.click()
+        name.typeText(folderName)
+        app.buttons["ar.advanced.saveNamed"].click()
+        XCTAssertTrue(smartFolder().waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForRowCount(all - 1))
+
+        // Inside it, the form offers Save to the folder, once a rule has changed.
+        advanced.click()
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        let saveTo = app.buttons["ar.advanced.saveTo"]
+        XCTAssertTrue(saveTo.exists, "inside a smart folder the form offers Save to it")
+        XCTAssertEqual(saveTo.label, "Save to \u{201c}\(folderName)\u{201d}")
+        XCTAssertFalse(saveTo.isEnabled, "nothing has changed yet")
+        XCTAssertEqual(app.buttons["ar.advanced.saveAs"].label, "Save as New Smart Folder…")
+        ops.element(boundBy: 0).click()
+        app.menuItems["contains"].click()
+        XCTAssertTrue(waitFor(count, toRead: "1 document matches"), "the changed rule is counted")
+        XCTAssertTrue(saveTo.isEnabled)
+        _ = captureScreenshot("w40-smart-folder-save-to")
+        saveTo.click()
+        let replace = app.buttons.matching(NSPredicate(format: "identifier == %@ OR title == %@",
+                                                       "ar.advanced.saveTo.replace", "Replace")).firstMatch
+        XCTAssertTrue(replace.waitForExistence(timeout: 3), "Save to asks before it replaces the rules")
+        _ = captureScreenshot("w40-smart-folder-save-to-ask")
+        replace.click()
+        XCTAssertFalse(count.waitForExistence(timeout: 1), "saving closes the form")
+        XCTAssertTrue(waitForRowCount(1), "the folder shows its new rules")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "ar.sidebar.smart")
+            .matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", folderName, folderName)).count,
+                       1, "no second smart folder")
+
+        // The sidebar folder holds the new rule.
+        smartFolder().rightClick()
+        let edit = app.menuItems.matching(NSPredicate(format: "title == %@", "Edit Smart Folder…"))
+            .allElementsBoundByIndex.first { $0.isHittable }
+        try XCTUnwrap(edit, "Edit Smart Folder… is still offered").click()
+        XCTAssertTrue(count.waitForExistence(timeout: 5))
+        XCTAssertEqual(fields.element(boundBy: 0).value as? String, "File name")
+        XCTAssertEqual(ops.element(boundBy: 0).value as? String, "contains", "the saved rule is the changed one")
+        XCTAssertEqual(text.value as? String, "00001")
+        _ = captureScreenshot("w40-smart-folder-saved-rules")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     /// W40.reader-quality-levels (owner, 2026-11-13: "we only have 1-3, no?"): a Quality row offers Q1, Q2, Q3
     /// and none, the levels the suite writes, and no 4 or 5.
     func testQualityRowOffersTheSuitesLevels() throws {

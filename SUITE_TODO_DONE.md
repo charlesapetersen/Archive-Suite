@@ -15828,3 +15828,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   inactive), the Reader unit bundle (858, 0 failures), and in the Tart VM `AdvancedSearchUITests` (new
   `testQualityRowOffersTheSuitesLevels`: four boxes, Q1 Q2 Q3 none). No new warnings. Bench cache: nothing written.
   <!-- /W40.reader-quality-levels -->
+- [x] **W40.reader-smart-folder-update — save changed search rules back to the smart folder they came from** · §Archive Reader — the owner's notes of 2026-11-13 · SHIPPED 2026-11-13
+  Owner, 2026-11-13: "If the user changes the advanced search criteria in smart folder, there should be an option to
+  save the new search criteria as the saved criteria for the smart folder." Advanced Search opened inside a saved
+  smart folder now remembers it (`AdvancedSearchRequest.origin`, set by `NavigationModel.openAdvancedSearch` from
+  `savedScope`) and starts from the folder's rules as saved, AND the filter bar and Find, so a folder rule outside
+  the current root survives a save back. The form offers Save to "<name>" (enabled once the rules differ) beside
+  Save as New Smart Folder… and Search; filter-bar refinements on a smart folder offer Save to "<name>" beside
+  Save as Smart Folder (`canSaveFiltersToScope` / `saveFiltersToScope`). Both go through
+  `NavigationModel.saveToSmartFolder`, which replaces the rules, keeps the name and place, shows the folder with
+  the user filters cleared (they are its own rules now), and does nothing but say so when the folder was deleted
+  meanwhile. Edit Smart Folder… is unchanged. **Asks rather than undo** (`SmartFolderReplace`): the store keeps no
+  history, and the window's undo stack is the text fields' (`TextUndoGuard`), so an undo entry would sit among
+  typing steps; the question names the folder and says the old rules are not kept. No migration: nothing stored
+  changed shape.
+  Verified: new `SmartFolderUpdateTests` (origin only for a saved scope, saved rules incl. an out-of-root folder
+  rule, replace without a second folder, filter fold-in and clear, unsaved search and Edit Smart Folder carry no
+  origin, a deleted folder is not recreated), with `AdvancedSearchScopeTests`, `AdvancedSearchManyRulesTests`,
+  `FilterBarLayoutTests` green; in the Tart VM all five `AdvancedSearchUITests` pass, incl. the new
+  `testChangedRulesSaveBackToTheSmartFolder` (save as folder, change the operator, Save to, Replace, one row and
+  one folder, Edit Smart Folder… shows the changed rule); screenshots `w40-smart-folder-save-to*` read. No new
+  warnings. Bench cache: nothing written.
+  <!-- /W40.reader-smart-folder-update -->
