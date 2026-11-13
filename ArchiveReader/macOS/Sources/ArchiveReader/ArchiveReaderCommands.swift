@@ -147,6 +147,18 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(tagSheetNav == nil)
         }
 
+        // Go — Back and Forward, as in Finder and Preview (W40.reader-back-forward). A viewer in front (a document
+        // window, or the preview sheet over the navigation window) steps through its page jumps; the navigation
+        // window alone, through the folders it has shown.
+        CommandMenu("Go") {
+            Button(ReaderCommand.goBack.title) { if let doc { doc.goBack() } else { nav?.goBack() } }
+                .keyboardShortcut(.goBack)
+                .disabled(!(doc.map(\.canGoBack) ?? nav?.canGoBack ?? false))
+            Button(ReaderCommand.goForward.title) { if let doc { doc.goForward() } else { nav?.goForward() } }
+                .keyboardShortcut(.goForward)
+                .disabled(!(doc.map(\.canGoForward) ?? nav?.canGoForward ?? false))
+        }
+
         // Selection (nav window)
         CommandMenu("Selection") {
             Button(ReaderCommand.open.title) { openSelection?() }
@@ -169,7 +181,7 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(noSelection)
             Divider()
             // G4 keyboard triage. Bare ] / [ also work when the list has key focus (text-field-safe);
-            // the ⌘ accelerators are the discoverable menu equivalents.
+            // the ⌥⌘ accelerators are the discoverable menu equivalents (⌘] / ⌘[ are Go ▸ Forward / Back).
             Button(ReaderCommand.nextUnread.title) { nav?.selectNextUnread() }
                 .keyboardShortcut(.nextUnread).disabled(nav == nil)
             Button(ReaderCommand.previousUnread.title) { nav?.selectPreviousUnread() }

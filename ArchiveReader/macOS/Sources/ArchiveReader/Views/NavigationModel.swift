@@ -521,6 +521,8 @@ final class NavigationModel: ObservableObject {
     /// Enter a smart-folder scope: the saved search becomes the visible universe; user filters reset.
     /// `saved` false is an Advanced Search run without saving; one with no active rule leaves the scope.
     func applyScope(_ search: SavedSearch, saved: Bool = true) {
+        let leaving = visit
+        defer { recordMove(leaving: leaving) }
         guard saved || search.search.isActive else { exitScope(); clearUserFilters(); return }
         setScope(search, saved: saved, announce: true)
         clearUserFilters(recompute: false)
@@ -1046,6 +1048,7 @@ final class NavigationModel: ObservableObject {
         checkSelectionEnds()
         persistViewState()
         reapplyPendingTopRow()
+        reapplyVisitSelection()
     }
 
     /// Whether a row is listed. The base scope (smart folder) is the visible universe; the user filter layers on
@@ -1113,6 +1116,8 @@ final class NavigationModel: ObservableObject {
 
     /// A chip's ✕: turn that one filter or search off, leaving the rest.
     func removeFilter(_ facet: FilterFacet) {
+        let leaving = visit   // the smart folder's chip leaves it, a move Back returns from
+        defer { recordMove(leaving: leaving) }
         switch facet {
         case .smartFolder:
             exitScope()
@@ -1810,11 +1815,97 @@ final class NavigationModel: ObservableObject {
     /// the clicked row while the list + status bar stayed on the old scope. Recompute here is the
     /// deterministic path; the `.onChange` still covers filter-bar edits made from their own closures.
     func setFolderScope(_ path: String?) {
+        let leaving = visit
+        defer { recordMove(leaving: leaving) }
         let scopeWasActive = scope != nil
         if scopeWasActive { exitScope() }
         guard scopeWasActive || filter.pathPrefix != path else { return }
         filter.pathPrefix = path
         recompute()
+    }
+
+    // MARK: Back and Forward (W40.reader-back-forward)
+
+    /// What the navigation window shows, for Go ▸ Back and Forward: a folder (nil is All Files), a saved smart
+    /// folder, or an Advanced Search run without saving.
+    enum Place: Equatable {
+        case folder(String?)
+        case smartFolder(UUID)
+        case search(SavedSearch)
+    }
+
+    /// A place and the rows selected there when it was left, which a return selects again, as Finder does.
+    struct Visit {
+        let place: Place
+        let selection: Set<ArchiveFile.ID>
+    }
+
+    /// The folders, smart folders and searches this window has shown. A move is recorded by `setFolderScope`,
+    /// `applyScope` and the smart folder chip's ✕, which every way of choosing a place goes through; a smart
+    /// folder's edit or rename, its deletion and a new archive folder are not moves.
+    @Published private(set) var placeHistory = NavigationHistory<Visit>()
+    /// A return's selection still waiting for rows a smart folder's text rules have not answered yet.
+    private var pendingVisitSelection: (place: Place, ids: Set<ArchiveFile.ID>, applied: Set<ArchiveFile.ID>)?
+    private var travelling = false
+
+    var currentPlace: Place {
+        guard let scope else { return .folder(filter.pathPrefix) }
+        return scopeIsSaved ? .smartFolder(scope.id) : .search(scope)
+    }
+
+    private var visit: Visit { Visit(place: currentPlace, selection: selection) }
+
+    var canGoBack: Bool { placeHistory.back.contains(where: placeExists) }
+    var canGoForward: Bool { placeHistory.forward.contains(where: placeExists) }
+
+    func goBack() {
+        guard let to = placeHistory.goBack(from: visit, isAvailable: placeExists) else { return }
+        travel(to)
+    }
+
+    func goForward() {
+        guard let to = placeHistory.goForward(from: visit, isAvailable: placeExists) else { return }
+        travel(to)
+    }
+
+    /// A smart folder deleted since it was shown is skipped.
+    private func placeExists(_ visit: Visit) -> Bool {
+        guard case .smartFolder(let id) = visit.place else { return true }
+        return savedSearches.searches.contains { $0.id == id }
+    }
+
+    private func recordMove(leaving: Visit) {
+        guard !travelling, leaving.place != currentPlace else { return }
+        placeHistory.record(leaving: leaving)
+        pendingVisitSelection = nil
+    }
+
+    private func travel(_ to: Visit) {
+        pendingVisitSelection = nil
+        travelling = true
+        switch to.place {
+        case .folder(let path): setFolderScope(path)
+        case .smartFolder(let id):
+            if let search = savedSearches.searches.first(where: { $0.id == id }) { applyScope(search) }
+        case .search(let search): applyScope(search, saved: false)
+        }
+        travelling = false
+        pendingVisitSelection = (to.place, to.selection, selection)
+        reapplyVisitSelection()
+    }
+
+    /// Select the returned-to place's rows that are listed. Rows a smart folder's text rules bring in later are
+    /// added as they arrive, until the user changes the selection or the place.
+    private func reapplyVisitSelection() {
+        guard let pending = pendingVisitSelection else { return }
+        guard pending.place == currentPlace, selection == pending.applied else { pendingVisitSelection = nil; return }
+        let listed = pending.ids.isEmpty ? [] : pending.ids.intersection(displayed.lazy.map(\.id))
+        if listed == pending.ids { pendingVisitSelection = nil }
+        guard listed != selection else { return }
+        let firstNew = displayed.first { listed.contains($0.id) && !selection.contains($0.id) }
+        selection = listed
+        pendingVisitSelection?.applied = listed
+        if let firstNew { requestScroll(to: firstNew.id) }
     }
 
     // MARK: Deep-link reveal (archivereader://reveal)
@@ -2017,8 +2108,10 @@ final class NavigationModel: ObservableObject {
             // Scan the root we ADOPTED, which is not necessarily the URL that was picked: a symlinked
             // pick is adopted as its target, because a security-scoped bookmark cannot open a link.
             guard let adopted = rootStore.root else { return }
-            // A scope from the old root can't apply to a new one.
+            // A scope from the old root can't apply to a new one, nor can its folders' Back and Forward.
             exitScope()
+            placeHistory.clear()
+            pendingVisitSelection = nil
             indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
             filter.pathPrefix = nil
             filterSearchText = filter.searchText   // sync debounced field

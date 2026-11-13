@@ -93,6 +93,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     case showThumbnails, contactSheet
     // The image page's right-click menu, beside Reveal in Finder (W40.reader-image-context-menu)
     case copyImage
+    // Go ▸ Back and Forward: page jumps in a viewer, folders in the navigation window (W40.reader-back-forward)
+    case goBack, goForward
 
     var context: CommandContext {
         switch self {
@@ -175,6 +177,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .showThumbnails: return "Show Thumbnails"
         case .contactSheet: return "Contact Sheet"
         case .copyImage: return "Copy Image"
+        case .goBack: return "Back"
+        case .goForward: return "Forward"
         }
     }
 
@@ -214,8 +218,10 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .copyLinks: return CommandKey("c", [.command, .option])
         case .copyArchiveLinks: return CommandKey("l", [.command, .shift])
         case .selectRun: return nil
-        case .nextUnread: return CommandKey("]")
-        case .previousUnread: return CommandKey("[")
+        // ⌘] / ⌘[ are Back and Forward, as in Finder and Preview (W40.reader-back-forward); the bare ] / [ in
+        // the list stay Next / Previous Unread.
+        case .nextUnread: return CommandKey("]", [.command, .option])
+        case .previousUnread: return CommandKey("[", [.command, .option])
         case .markRead: return CommandKey("r")
         case .markUnread: return CommandKey("u")
         case .markReadAndNext: return CommandKey("m", [.command, .shift])
@@ -256,6 +262,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .showThumbnails: return CommandKey("2", [.command, .option])
         case .contactSheet: return CommandKey("6", [.command, .option])
         case .copyImage: return nil
+        case .goBack: return CommandKey("[")
+        case .goForward: return CommandKey("]")
         }
     }
 
@@ -295,6 +303,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .showThumbnails: return "Show or hide a thumbnail of each scan of the open files beside the page"
         case .contactSheet: return "Show every PDF page of the open files as a numbered tile"
         case .copyImage: return "Copy the image page as it is shown, turned as the viewer turns it"
+        case .goBack: return "Go back to the folder you were looking at before"
+        case .goForward: return "Go forward to the folder you went back from"
         case .previewPreviousFile: return "Previous file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewNextFile: return "Next file in the list (\(glyph); ⇧\(glyph) adds it to the selection)"
         case .previewPreviousPage: return "Previous page in the selection"

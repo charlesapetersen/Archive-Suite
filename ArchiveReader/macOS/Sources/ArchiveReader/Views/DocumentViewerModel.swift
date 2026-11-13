@@ -117,6 +117,8 @@ final class DocumentViewerModel: ObservableObject {
     /// A tile names a physical PDF page of one of the open files. A page past the end of its file changes nothing.
     func openTiledPage(file: Int, page: Int) {
         guard urls.indices.contains(file), page >= 1 else { return }
+        let leaving = currentPlace
+        defer { recordJump(leaving: leaving) }
         if file != index {
             // Until its count is read, a file shows its first page alone, which can be opened.
             guard page <= (pageCounts.count(urls[file].path) ?? 1) else { return }
@@ -133,6 +135,8 @@ final class DocumentViewerModel: ObservableObject {
     /// A thumbnail names a page pair (its image page) of one of the open files.
     func openThumbnail(file: Int, pair target: Int) {
         guard urls.indices.contains(file), target >= 0 else { return }
+        let leaving = currentPlace
+        defer { recordJump(leaving: leaving) }
         showingAllPages = false
         prepareFindForManualCycle()
         if file != index { index = file }    // didSet → loadCurrent() → pair 0
@@ -219,9 +223,57 @@ final class DocumentViewerModel: ObservableObject {
     enum Pane: Sendable, Equatable { case left, right }
     @Published var focusedPane: Pane = .left
 
+    // MARK: Back and Forward (W40.reader-back-forward)
+
+    /// A page on view, for Go ▸ Back and Forward: the file and its page pair.
+    struct Place: Equatable, Sendable {
+        let path: String
+        let pair: Int
+    }
+
+    /// This window's page jumps: a thumbnail or contact-sheet tile, a find hit. Stepping a page at a time with
+    /// Previous / Next is not a jump, as in Preview.
+    @Published private(set) var pageHistory = NavigationHistory<Place>()
+
+    var currentPlace: Place? {
+        urls.indices.contains(index) ? Place(path: urls[index].path, pair: pair) : nil
+    }
+
+    var canGoBack: Bool { pageHistory.back.contains(where: isOpen) }
+    var canGoForward: Bool { pageHistory.forward.contains(where: isOpen) }
+
+    func goBack() {
+        guard let here = currentPlace, let place = pageHistory.goBack(from: here, isAvailable: isOpen) else { return }
+        show(place)
+    }
+
+    func goForward() {
+        guard let here = currentPlace, let place = pageHistory.goForward(from: here, isAvailable: isOpen) else { return }
+        show(place)
+    }
+
+    private func isOpen(_ place: Place) -> Bool { urls.contains { $0.path == place.path } }
+
+    private func show(_ place: Place) {
+        guard let file = urls.firstIndex(where: { $0.path == place.path }) else { return }
+        showingAllPages = false
+        prepareFindForManualCycle()
+        if file != index { index = file }    // didSet → loadCurrent() → pair 0
+        setPair(place.pair)
+    }
+
+    /// A jump moved the view from `leaving`; a jump to the page already on view is not one.
+    private func recordJump(leaving: Place?) {
+        guard let leaving, leaving != currentPlace else { return }
+        pageHistory.record(leaving: leaving)
+    }
+
     /// `showing` opens on that file of the selection, if it is one (W40.reader-selection-current); else the first.
     func load(_ selection: DocumentSelection, showing path: String? = nil) {
         urls = selection.filePaths.map { URL(fileURLWithPath: $0) }
+        // The preview sheet loads each new selection: places in files that are no longer open are forgotten.
+        let open = Set(selection.filePaths)
+        pageHistory.removeAll { !open.contains($0.path) }
         pageCounts.retain(selection.filePaths)
         pinsJPEGPartnerFromLink = selection.pinsJPEGPartner
         linkedJPEGRelativePath = selection.jpegRelativePath
@@ -655,6 +707,8 @@ final class DocumentViewerModel: ObservableObject {
     /// `pair`/`index` so the pane rebuild re-applies it (via `applyToView` → `applyFind`) with no timing
     /// race — the pane's `.id(pageIdentity)` covers a pair change exactly as it covers a document change.
     private func applyCurrentMatch() {
+        let leaving = currentPlace
+        defer { recordJump(leaving: leaving) }
         guard let loc = findNavigator.current else {
             // No current match (empty query or zero matches): clear the current selection but still push
             // the query so any incidental matches on the shown pages stay highlighted.

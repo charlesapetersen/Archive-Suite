@@ -707,6 +707,18 @@ struct NavigationWindowView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        // Back and Forward through the folders shown, as in Finder (W40.reader-back-forward). The keys are the
+        // Go menu's.
+        ToolbarItemGroup(placement: .navigation) {
+            Button { model.goBack() } label: { Label(ReaderCommand.goBack.title, systemImage: "chevron.left") }
+                .disabled(!model.canGoBack)
+                .help(ReaderCommand.goBack.help)
+                .accessibilityIdentifier("ar.toolbar.back")
+            Button { model.goForward() } label: { Label(ReaderCommand.goForward.title, systemImage: "chevron.right") }
+                .disabled(!model.canGoForward)
+                .help(ReaderCommand.goForward.help)
+                .accessibilityIdentifier("ar.toolbar.forward")
+        }
         ToolbarItemGroup {
             Button { showingSidebar.toggle() } label: {
                 Label("Sidebar", systemImage: "sidebar.left")

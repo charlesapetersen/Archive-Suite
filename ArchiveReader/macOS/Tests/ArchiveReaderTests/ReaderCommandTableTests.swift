@@ -46,7 +46,7 @@ final class ReaderCommandTableTests: XCTestCase {
             RunLoop.main.run(until: Date().addingTimeInterval(0.05))
         }
         let bar = try XCTUnwrap(NSApp.mainMenu)
-        let ownMenus: Set<String> = ["Selection", "Tags", "Sort & Filter", "Document"]
+        let ownMenus: Set<String> = ["Go", "Selection", "Tags", "Sort & Filter", "Document"]
         let menuCommands = ReaderCommand.allCases.filter { $0.context == .menuBar && !$0.reserved }
         var matched = 0
         for top in bar.items {
