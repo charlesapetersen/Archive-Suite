@@ -392,7 +392,8 @@ struct FacetState: Equatable, CustomStringConvertible {
     }
 
     func randomEdit(_ rng: inout FuzzRNG) -> TagEditOp {
-        switch rng.int(0...8) {
+        switch rng.int(0...9) {
+        case 9: return .setDate(rng.chance(0.8) ? FuzzTokens.archiveDate(&rng) : nil)
         case 0: return .setYear(rng.chance(0.8) ? rng.int(100...2099) : nil)
         case 1: return .setMonth(rng.chance(0.8) ? rng.int(1...12) : nil)
         case 2: return .setDay(rng.chance(0.8) ? rng.int(1...31) : nil)
@@ -414,6 +415,9 @@ struct FacetState: Equatable, CustomStringConvertible {
         case .setYear(let y): year = y; decade = nil   // Year supersedes Decade
         case .setMonth(let m): month = m
         case .setDay(let d): day = d
+        case .setDate(let d):   // the own date as one value: all four facets at once
+            if let d, d.precision == .decade { (year, month, day, decade) = (nil, nil, nil, d.year) }
+            else { (year, month, day, decade) = (d?.year, d?.month, d?.day, nil) }
         case .setQuality(let q): quality = q
         case .setDateUncertain(let on): dateUncertain = on
         case .setItemType(let t): itemType = t

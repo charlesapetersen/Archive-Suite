@@ -219,7 +219,10 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   year range and a new Advanced Search date row test the own date; the sent-with date is a level below, searched
   when asked ("Also match sent-with dates", or the row's role). A role missing from a saved filter or row reads
   as `either`, what it meant when saved. A typed date field uses ArchiveCore `DateFieldEntry`, the suite's one
-  date field (the Inspector's adoption is W40.fix-reader-date-fields).
+  date field. The Inspector has one such field for the own date and one for the Sent-with date
+  (`Core/InspectorDateEntry.swift`; the own date is written by `TagEditOp.setDate`, all four facet tokens in one
+  write and one undo step). A field shows its date in words with no leading zero (`12 March 1958`); the written
+  tags keep the SPEC's tokens (`03 March`). Sent with is folded, open when the selection has one.
 - **v1 stays sandboxed to one granted root.** Whole-Mac search is an unbuilt feature with a real cost (new code:
   walk N roots, merge, define exclusions; `FileAccessProvider` was never written) — **not** an entitlement or
   config toggle (corrected 2026-08-07, `W26.docs`; history in REFERENCE.md).

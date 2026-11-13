@@ -131,7 +131,7 @@ final class ViewerUITests: FixtureUITestCase {
         let viewer = app.windows.matching(NSPredicate(format: "title != %@", "Archive Reader")).firstMatch
         XCTAssertTrue(viewer.waitForExistence(timeout: 10))
         pressKey("i", modifiers: [.command, .option])
-        let year = viewer.textFields["ar.tagEditor.year"]
+        let year = viewer.textFields["ar.tagEditor.date"]
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(viewer.sheets.count, 0)
         let firstYear = year.value as? String

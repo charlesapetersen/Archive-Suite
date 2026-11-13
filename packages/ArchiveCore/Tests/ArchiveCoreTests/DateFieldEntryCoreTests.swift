@@ -25,6 +25,9 @@ final class DateFieldEntryCoreTests: XCTestCase {
     func testEmptyClearsAndUnreadableKeeps() {
         XCTAssertEqual(written("").0, .write(nil))
         XCTAssertEqual(written("68").0, .keep, "a two-digit year is not guessed")
+        // W40.fix-reader-date-fields review: a month written as 0 was read as no month, dropping a typed day.
+        for text in ["1968-00", "1968-00-12", "0/1968"] { XCTAssertEqual(written(text).0, .keep, text) }
+        XCTAssertEqual(written("1968-1-12").0, .write("1968-1-12"))
         XCTAssertNotNil(GregorianDay.daysInMonth(year: 1968, month: 2))
         XCTAssertFalse(GregorianDay.isValidDay(year: 2026, month: 2, day: 31))
     }

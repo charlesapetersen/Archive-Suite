@@ -179,6 +179,10 @@ public enum DateFieldEntry {
         }
 
         if words.isEmpty {
+            // A month written as 0 is not "no month": `1958-00-12` would drop its day without a word.
+            if values.count >= 2, values[isYear(0) ? 1 : 0] == 0 {
+                return .unreadable("There is no month 0 — write the month as a word or a number from 1.")
+            }
             switch values.count {
             case 1 where isYear(0): return make(values[0])
             case 2 where isYear(0): return make(values[0], values[1])

@@ -6,7 +6,7 @@ final class NavigationUITests: FixtureUITestCase {
 
     /// The inspector is modeless: browsing and filtering remain available while it stays open.
     func testInspectorFollowsSelectionAndOptionCommandIToggles() throws {
-        let year = app.textFields["ar.tagEditor.year"]
+        let year = app.textFields["ar.tagEditor.date"]
         // Visibility is deliberately remembered between app launches; normalize it for this test.
         if app.buttons["ar.tagEditor.done"].exists {
             app.typeKey("i", modifierFlags: [.command, .option])
@@ -45,7 +45,7 @@ final class NavigationUITests: FixtureUITestCase {
     func testInspectorShowsWhatProducedTheCollection() throws {
         waitForRows(minimum: 5, timeout: 10)
         let record = app.descendants(matching: .any)["ar.collectionRecord"]
-        let year = app.textFields["ar.tagEditor.year"]
+        let year = app.textFields["ar.tagEditor.date"]
         if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
         let table = app.tables["ar.table"]
         visiblePoint(of: table.tableRows.element(boundBy: 0)).click()
@@ -83,7 +83,7 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(waitForRowCount(1))
         clickRow(0)
         toolbarButton("ar.toolbar.editTags").click()
-        let year = app.textFields["ar.tagEditor.year"]
+        let year = app.textFields["ar.tagEditor.date"]
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         year.click()
         pressKey("a", modifiers: .command)
@@ -106,7 +106,7 @@ final class NavigationUITests: FixtureUITestCase {
         app.typeKey("i", modifierFlags: [.command, .option])
         XCTAssertTrue(year.waitForExistence(timeout: 5))
         XCTAssertEqual(year.value as? String, "invalid", "hiding must retain the invalid draft")
-        XCTAssertTrue(app.staticTexts["Use a year from 100 to 9999"].exists)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@", "is not a month name", "is not a month name")).firstMatch.exists)
         XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["842"], excluding: ["1962", "invalid"]))
         captureScreenshot("w40-inspector-invalid-draft")
         year.click()
@@ -781,6 +781,11 @@ final class NavigationUITests: FixtureUITestCase {
 
         toolbarButton("ar.toolbar.editTags").click()
         let field = app.textFields["ar.tagEditor.sentWith"]
+        // W40.fix-reader-date-fields: folded under the own date while the document has none.
+        let toggle = app.buttons["ar.tagEditor.sentWithToggle"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Inspector should offer a Sent-with date")
+        XCTAssertFalse(field.exists, "Sent with is folded for a document without one")
+        toggle.click()
         XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")
         field.click()
         XCTAssertFalse(app.buttons["Set"].exists || app.buttons["Clear"].exists
