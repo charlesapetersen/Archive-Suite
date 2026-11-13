@@ -228,7 +228,7 @@ fault_mrc_refuses() {
     [ "$(basename "$f")" = "App.swift" ] && continue
     sources+=("$f")
   done
-  if ! swiftc -O -o "$SB/score-mrc" -target "$(uname -m)-apple-macos13.0" \
+  if ! swiftc -O -o "$SB/score-mrc" -target "$(uname -m)-apple-macos14.0" \
        "${sources[@]}" "$SB/h/main.swift" >"$SB/build.log" 2>&1; then
     bad "score-mrc builds" "$(grep -m1 'error:' "$SB/build.log" || echo 'see build.log')"
     return
@@ -359,7 +359,7 @@ fault_mrc_refuses() {
 # real Vision recognition for the inverse row.
 fault_argv_writers() {
   local name target
-  target="$(uname -m)-apple-macos13.0"
+  target="$(uname -m)-apple-macos14.0"
   sandbox
 
   # Real PDFs to point them at. `make-plate-fixtures` is standalone (AppKit only)
@@ -638,7 +638,7 @@ fault_argv_writers() {
 # not in the pre-commit hook, so a red row here refuses no commit.
 fault_text_voids() {
   local name target out rc
-  target="$(uname -m)-apple-macos13.0"
+  target="$(uname -m)-apple-macos14.0"
   sandbox
 
   # Built in the sandbox against `Sources/`, the way `mrc_refuses` builds `score-mrc`:
@@ -866,7 +866,7 @@ PY
 # watching is not that it refuses bad input but that **its self-test is in front of every
 # sweep and pins production's caps rather than its own model of them**. Rows 3 and 4 are
 # that claim, and they are why this case is worth its build time: row 4 sabotages
-# `Sources/Flattener.swift` and requires the TOOL to notice.
+# `Sources/VisionOCRKit/Flattener.swift` and requires the TOOL to notice.
 #
 # ⛔ Exit 5 has NO row and cannot get one from here. It fires when a page reads `diverges`
 # while `largestImage` found nothing, which means the census's model of the dictionary
@@ -878,7 +878,7 @@ PY
 # pre-existing and equally unwatched.
 fault_drawn_census() {
   local name target out rc tool fields f
-  target="$(uname -m)-apple-macos13.0"
+  target="$(uname -m)-apple-macos14.0"
   sandbox
 
   # One page: the page's own dictionary holds both the image and a BARE form that draws it,
@@ -1001,7 +1001,7 @@ PY
   mkdir -p "$SB/psrc" && cp "$SB"/Sources/*.swift "$SB/psrc/" && rm -f "$SB/psrc/App.swift"
   sed -i '' 's|            guard depth < 4 else { return }|            guard depth < 5 else { return }|' \
       "$SB/psrc/Flattener.swift"
-  if cmp -s "$SB/psrc/Flattener.swift" "$SB/Sources/Flattener.swift"; then
+  if cmp -s "$SB/psrc/Flattener.swift" "$SB/Sources/VisionOCRKit/Flattener.swift"; then
     bad "the largestImage cap sabotage applies" "the depth < 4 guard was not found"
     return
   fi
@@ -1076,7 +1076,7 @@ PY
 # is the right direction — but row A is what names the cause.
 fault_shape_dump() {
   local name target out rc
-  target="$(uname -m)-apple-macos13.0"
+  target="$(uname -m)-apple-macos14.0"
   sandbox
 
   # Built in the sandbox against `Sources/`, exactly as `text_voids` builds its own

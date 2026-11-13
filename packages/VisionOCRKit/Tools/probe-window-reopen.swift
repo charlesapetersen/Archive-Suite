@@ -20,7 +20,7 @@
 // kept in step with `AppDelegate.showMainWindow`.
 //
 //   swiftc -parse-as-library -module-name reopenprobe -o /tmp/reopen \
-//     -target "$(uname -m)-apple-macos13.0" Tools/probe-window-reopen.swift
+//     -target "$(uname -m)-apple-macos14.0" Tools/probe-window-reopen.swift
 //   /tmp/reopen            # exit 0 = recoverable, 1 = not
 //
 // Output goes to stderr: stdout is block-buffered and `exit` swallows it.

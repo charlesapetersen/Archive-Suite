@@ -811,7 +811,7 @@ enum Annotations {
     /// `Process` for the whole batch — measured, 200 documents held **204 open file
     /// descriptors** against 4, exactly linear, and Foundation's ceiling is around 2,560.
     /// The library this feature exists to sweep is roughly 16,000 documents, so it would
-    /// have died about an eighth of the way in. `Sources/Model.swift` carries the same
+    /// have died about an eighth of the way in. `Sources/VisionOCRKit/Model.swift` carries the same
     /// warning a few hundred lines above the call site, about one child per *page*.
     ///
     /// `RunControl.adopting` remembers one process and releases it on the way out, which

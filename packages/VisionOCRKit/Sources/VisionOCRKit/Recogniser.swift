@@ -43,7 +43,7 @@ import CoreML
 /// Their per-word geometry — `VNRecognizedText.boundingBox(for:)` over
 /// whitespace-separated tokens — is the capability this app's text layer would
 /// want next, and is not reachable through the CLI's output at all.
-enum Recogniser {
+public enum Recogniser {
 
     /// Recognition's own failures, kept apart from `SearchableWriter`'s so a
     /// cancellation is never mistaken for a broken file.
@@ -81,7 +81,7 @@ enum Recogniser {
     /// revision 3; letting a future macOS pick a newer one would silently make
     /// the baseline describe a different recogniser. Raise it deliberately, with
     /// a corpus run, or not at all.
-    static let revision = VNRecognizeTextRequestRevision3
+    public static let revision = VNRecognizeTextRequestRevision3
 
     /// The languages this Mac supports, in Vision's own priority order.
     ///
@@ -964,7 +964,7 @@ enum Recogniser {
     /// whether it was stopped (by its guard or its time bound), which the caller takes to mean
     /// the rest of the document is not worth the reader's time: it passes that reason back as
     /// `modelStopped` for every later page, whose reader, of either kind, is then not tried.
-    static func recognisePage(at image: URL, settings: Prefs.Snapshot, modelStopped: String? = nil,
+    public static func recognisePage(at image: URL, settings: Prefs.Snapshot, modelStopped: String? = nil,
                               isCancelled: () -> Bool = { false },
                               onModelFallback: (_ why: String, _ stopped: Bool) -> Void)
         throws -> [SearchableWriter.Observation]? {
@@ -1423,7 +1423,7 @@ enum Recogniser {
     /// every child the leader of its own group, so a helper stopped by the app (cancel,
     /// or its stall bound) would leave its reader running, 3.4 GB of it. The helper's
     /// SIGTERM handler kills this group, and a pointer is what a handler may read.
-    static let readerGroup: UnsafeMutablePointer<pid_t> = {
+    public static let readerGroup: UnsafeMutablePointer<pid_t> = {
         let p = UnsafeMutablePointer<pid_t>.allocate(capacity: 1)
         p.pointee = 0
         return p
@@ -4917,7 +4917,7 @@ enum Recogniser {
     /// never read from `UserDefaults`: the helper is a different process with
     /// its own (empty) preferences domain, and reading them there would make
     /// the result depend on something the caller cannot see.
-    static func helperSettings(from arguments: [String]) -> Prefs.Snapshot? {
+    public static func helperSettings(from arguments: [String]) -> Prefs.Snapshot? {
         guard arguments.count % 2 == 0 else { return nil }
         var values: [String: String] = [:]
         for pair in stride(from: 0, to: arguments.count, by: 2) {
@@ -4977,10 +4977,16 @@ enum Recogniser {
     }
 
     /// One page's worth of the helper's output, and the app's input.
-    struct HelperPage: Codable {
+    public struct HelperPage: Codable {
         let observations: [SearchableWriter.Observation]
         /// Why a shipped model reader left this page Vision's reading (`recognisePage(at:)`).
         var modelFallback: String? = nil
+
+        /// Public for the helper, which is its own module in the package (W42.int-s1).
+        public init(observations: [SearchableWriter.Observation], modelFallback: String? = nil) {
+            self.observations = observations
+            self.modelFallback = modelFallback
+        }
     }
 
     /// Why a helper run was abandoned. Every case falls back to in-process
@@ -4994,7 +5000,7 @@ enum Recogniser {
     /// is not one of these, so the single number in the message pointed the
     /// reader at a list that could not contain it. Knowing the list is what lets
     /// the message tell the two apart.
-    enum HelperExit: Int32 {
+    public enum HelperExit: Int32 {
         case badArguments = 2
         case unreadableManifest = 3
         case unreadablePage = 4
@@ -5772,7 +5778,15 @@ enum ModelRuntime {
         if let override = environment["VISIONOCR_READER_SCRIPT"], !override.isEmpty {
             return URL(fileURLWithPath: override)
         }
-        return Bundle.main.resourceURL?.appendingPathComponent("read-model.py")
+        let bundled = Bundle.main.resourceURL?.appendingPathComponent("read-model.py")
+        #if SWIFT_PACKAGE
+        // Built as VisionOCRKit, the script is a package resource; an app that copies it into its
+        // own Resources, as Vision OCR's build.sh does, still wins.
+        if let bundled, FileManager.default.fileExists(atPath: bundled.path) { return bundled }
+        return Bundle.module.url(forResource: "read-model", withExtension: "py") ?? bundled
+        #else
+        return bundled
+        #endif
     }
 
     struct Command: Equatable {
@@ -6167,5 +6181,18 @@ enum LayoutModel {
                          x0: (d.x0 - Double(box.left)) / box.scale, y0: (d.y0 - Double(box.top)) / box.scale,
                          x1: (d.x1 - Double(box.left)) / box.scale, y1: (d.y1 - Double(box.top)) / box.scale) }
         return crops(found, pageWidth: w, pageHeight: h)
+    }
+}
+
+extension Recogniser {
+    /// `Japanese — ja-JP`. The code stays visible because it is what is stored,
+    /// what the command preview shows and what a bug report will quote.
+    /// (Was `SettingsView.languageLabel`; moved into the engine with W42.int-s1 so the checks build
+    /// against the package, which carries no screens.)
+    static func languageLabel(_ code: String) -> String {
+        let name = Locale.current.localizedString(forIdentifier: code)
+            ?? Locale.current.localizedString(forLanguageCode: String(code.prefix(2)))
+        guard let name, !name.isEmpty else { return code }
+        return "\(name) — \(code)"
     }
 }

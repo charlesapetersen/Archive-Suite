@@ -12,8 +12,8 @@
 // agreement over two populations.
 //
 //   mkdir -p /tmp/h && cp Tools/score-illumination.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/illum -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/illum -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/illum scanned testdocs/*/*.pdf
 //   tr '\n' '\0' < list.txt | xargs -0 /tmp/illum handheld
 //

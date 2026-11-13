@@ -6,7 +6,7 @@ import Foundation
 /// The image-layer flags (--image-quality, --image-page-dpi,
 /// --image-downsample-dpi) only affect *image* inputs and --roi needs a visual
 /// picker to be usable, so they're deliberately left out.
-enum Prefs {
+public enum Prefs {
     /// Where every setting is read and written. The app leaves it at `.standard`,
     /// its own domain, which `@AppStorage` in the views also uses.
     ///
@@ -793,7 +793,7 @@ enum Prefs {
     /// JSON into the `.txt` path `uniqueOutputs` had already reserved.
     ///
     /// Snapshot it once, pass it down.
-    struct Snapshot: Sendable {
+    public struct Snapshot: Sendable {
         var mode: Mode
         var textFormat: TextFormat
         var besideOriginal: Bool

@@ -39,8 +39,8 @@
 // not a copy of them, because T15 is what a drifting copy costs.
 //
 //   mkdir -p /tmp/d && cp Tools/score-drawn-images.swift /tmp/d/main.swift
-//   swiftc -O -o /tmp/drawn -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/d/main.swift
+//   swiftc -O -o /tmp/drawn -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/d/main.swift
 //   /tmp/drawn testdocs/*/*.pdf > drawn.tsv
 //
 // Rows stream in **input order**, one document at a time, because the census's own diff
@@ -357,7 +357,7 @@ func row(_ fields: [String]) {
 //
 // ⛔ **The four sabotages this table was watched failing against, 2026-08-26, every one
 // predicted by count before the run.** Two in the census (12 failing checks and 1) and --
-// the ones that matter -- **two in `Sources/Flattener.swift` itself**: loosening
+// the ones that matter -- **two in `Sources/VisionOCRKit/Flattener.swift` itself**: loosening
 // `largestImage`'s `depth < 4` reds **exactly one** row (p5's largestImage answer, nothing
 // -> 1200) and loosening `drawnLargestImage`'s `s.depth < 3` reds **exactly three** (p5,
 // p6 and p8's drawn answers), both at exit 4. So this table pins PRODUCTION's two caps and

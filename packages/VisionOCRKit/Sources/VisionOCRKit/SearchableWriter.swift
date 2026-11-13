@@ -19,7 +19,7 @@ import PDFKit
 ///
 /// Vision itself is not the problem — it returns whole lines with correct
 /// spacing, which is why `mac-ocr --format text` reads perfectly.
-enum SearchableWriter {
+public enum SearchableWriter {
 
     /// Where the baseline sits inside Vision's box, as a fraction of its height
     /// measured up from the bottom.
@@ -151,7 +151,7 @@ enum SearchableWriter {
     /// that round trip are one declaration rather than two that agree today.
     /// `Codable`'s synthesis is what keeps them in step: a field added here
     /// appears on both sides or on neither.
-    struct Observation: Codable {
+    public struct Observation: Codable {
         let boundingBox: BoundingBox
         let text: String
         let confidence: Double

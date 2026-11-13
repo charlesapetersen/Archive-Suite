@@ -210,8 +210,8 @@
 // BUGS.md C28 `##### The two control bands, READ`.
 //
 //   mkdir -p /tmp/h && cp Tools/score-text-route.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-text-route -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-text-route -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-text-route "<pdf>" [page…]        # 1-indexed; default: a spread
 //   INKBAR=0.08 /tmp/score-text-route "<pdf>"    # + the priced columns; inkOut in [0.045,0.08)
 //   INKBAR=0.08 INKDUMP=/tmp/look /tmp/score-text-route "<pdf>" 4

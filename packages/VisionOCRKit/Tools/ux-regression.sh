@@ -223,10 +223,10 @@ W="${OUT:-$(mktemp -d /tmp/ux-regression.XXXXXX)}"
 mkdir -p "$W/in" "$W/pub" "$W/score" "$W/g" "$W/h"
 cp "$ROOT/Tools/score-gate.swift" "$W/g/main.swift"
 cp "$ROOT/Tools/ux-harness.swift" "$W/h/main.swift"
-( cd "$ROOT" && T="$(uname -m)-apple-macos13.0" &&
-  swiftc -O -o "$W/gate" -target "$T" $(ls Sources/*.swift | grep -v App.swift) "$W/g/main.swift" &&
+( cd "$ROOT" && T="$(uname -m)-apple-macos14.0" &&
+  swiftc -O -o "$W/gate" -target "$T" $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) "$W/g/main.swift" &&
   swiftc -O -o "$W/visionocr-recognise" -target "$T" \
-      Sources/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift Helper/main.swift &&
+      Sources/VisionOCRKit/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift Helper/main.swift &&
   swiftc -O -o "$W/ux" "$W/h/main.swift" ) > "$W/build.log" 2>&1 ||
     { echo "ux-regression: the tools do not build, see $W/build.log"; exit 2; }
 

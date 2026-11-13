@@ -50,8 +50,8 @@
 // for the single big JPEG that mixed pages currently get.
 //
 //   mkdir -p /tmp/h && cp Tools/score-mrc.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-mrc -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-mrc -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-mrc testdocs/*/*.pdf
 //
 // Per picture page: what the app ships today, what the three layers cost, which

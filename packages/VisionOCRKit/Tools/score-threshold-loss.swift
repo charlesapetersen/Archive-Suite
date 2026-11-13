@@ -61,7 +61,7 @@
 //     between the two gets a row here for a decision production never takes. No corpus
 //     page is affected — the largest page in the 233-document corpus is **64.84 MP**,
 //     measured, and recorded beside `maximumColourMRCPageMegapixels` in
-//     `Sources/Flattener.swift`. ⛔ **The margin on the layering bound is 1.54x, which is
+//     `Sources/VisionOCRKit/Flattener.swift`. ⛔ **The margin on the layering bound is 1.54x, which is
 //     not "room to spare".**
 //     ⛔ **This line quoted `cells` as a pixel count, 16.87x low, and C27's own review
 //     caught it on 2026-08-26 — in the file that PRINTS the column.** It said *"the
@@ -77,8 +77,8 @@
 //     to one clause, both about which number it was reading.
 //
 //   mkdir -p /tmp/h && cp Tools/score-threshold-loss.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-threshold-loss -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-threshold-loss -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-threshold-loss testdocs/*/*.pdf
 //   /tmp/score-threshold-loss --pages 41,78 "book.pdf"
 //

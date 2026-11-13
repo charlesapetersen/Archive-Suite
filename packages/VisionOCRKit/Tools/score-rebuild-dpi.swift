@@ -35,8 +35,8 @@
 // `useHelper` stays false (its default).
 //
 //   mkdir -p /tmp/rd && cp Tools/score-rebuild-dpi.swift /tmp/rd/main.swift
-//   swiftc -O -o /tmp/score-rebuild-dpi -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/rd/main.swift
+//   swiftc -O -o /tmp/score-rebuild-dpi -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/rd/main.swift
 //   /tmp/score-rebuild-dpi "testdocs/journalArticle/Batzell - Free Labor….pdf" 22
 //   /tmp/score-rebuild-dpi book.pdf 22 96 150     # extra candidates, appended
 //

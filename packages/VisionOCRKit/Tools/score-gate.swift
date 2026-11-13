@@ -7,10 +7,10 @@
 // 1.9.0 both shipped without it, and the run that finally happened found R38.
 //
 //   mkdir -p /tmp/h && cp Tools/score-gate.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/gate -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
-//   swiftc -O -o /tmp/visionocr-recognise -target "$(uname -m)-apple-macos13.0" \
-//     Sources/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift \
+//   swiftc -O -o /tmp/gate -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/visionocr-recognise -target "$(uname -m)-apple-macos14.0" \
+//     Sources/VisionOCRKit/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift \
 //     Helper/main.swift
 //   VISIONOCR_HELPER=/tmp/visionocr-recognise /tmp/gate testdocs /tmp/gateout
 //

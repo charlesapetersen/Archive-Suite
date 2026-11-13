@@ -171,8 +171,8 @@
 // Usage:
 //
 //   mkdir -p /tmp/h && cp Tools/score-shape-term.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-shape-term -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-shape-term -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-shape-term --self-test
 //   /tmp/score-shape-term "<pdf>" [page…]              # 1-indexed; default: a spread
 //   SHAPEDUMP=/tmp/look /tmp/score-shape-term "<pdf>" 3

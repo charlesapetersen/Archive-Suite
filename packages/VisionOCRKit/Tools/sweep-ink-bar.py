@@ -94,7 +94,7 @@ This runs `score-text-route`, whose defaults land in a different domain, and it
 calls `Prefs.register(migrate: false)`, which registers rather than persists. So
 there is no prefs collision to serialise, and holding the lock for 3-4 hours
 would block every commit hook in that window. `Prefs.register`'s own doc comment
-in `Sources/Prefs.swift` says the registration is in-memory and writes nothing
+in `Sources/VisionOCRKit/Prefs.swift` says the registration is in-memory and writes nothing
 when `migrate` is false, and `Snapshot.current()` is reads only — read, not
 assumed. ⚠️ NOT measured by running a suite alongside the sweep; the CPU
 contention is real and will make a concurrent suite slower.
@@ -630,8 +630,8 @@ def sweep(args):
             f"no executable at {args.binary}. Build it first:\n"
             "  mkdir -p /tmp/h && cp Tools/score-text-route.swift /tmp/h/main.swift\n"
             "  swiftc -O -o /tmp/score-text-route "
-            "-target \"$(uname -m)-apple-macos13.0\" \\\n"
-            "    $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift")
+            "-target \"$(uname -m)-apple-macos14.0\" \\\n"
+            "    $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift")
     docs = corpus_documents(args.corpus)
     # An `auto/` worktree has no `testdocs/` — it is 1.2 GB and uncommitted — and
     # `<repo>/testdocs` is this tool's DEFAULT corpus, so without this the headline

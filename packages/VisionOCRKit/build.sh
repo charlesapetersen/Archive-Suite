@@ -46,9 +46,9 @@ if [ "$UNIVERSAL" = 1 ]; then
     echo "    $slice"
     swiftc -O \
       -parse-as-library \
-      -target "$slice-apple-macos13.0" \
+      -target "$slice-apple-macos14.0" \
       -o "$BUILD_DIR/$APP_NAME.$slice" \
-      Sources/*.swift
+      Sources/VisionOCRKit/*.swift App/*.swift
     SLICES+=("$BUILD_DIR/$APP_NAME.$slice")
   done
   lipo -create "${SLICES[@]}" -output "$BIN"
@@ -67,9 +67,9 @@ else
   echo "==> Compiling ($ARCH)"
   swiftc -O \
     -parse-as-library \
-    -target "$ARCH-apple-macos13.0" \
+    -target "$ARCH-apple-macos14.0" \
     -o "$BIN" \
-    Sources/*.swift
+    Sources/VisionOCRKit/*.swift App/*.swift
 fi
 
 # The recognition helper (R40). Vision does not parallelise across concurrent
@@ -77,15 +77,15 @@ fi
 # more than one core by using more than one process. This is that process: it
 # takes page bitmaps the app rendered and hands back observations.
 #
-# It compiles the app's own Sources/Recogniser.swift, deliberately. The corpus
+# It compiles the app's own Sources/VisionOCRKit/Recogniser.swift, deliberately. The corpus
 # baseline depends on the helper and the app recognising identically, and the
 # only way to guarantee that is for there to be one implementation. The file
 # list is the transitive closure Recogniser needs and nothing more — no views,
 # no model, so no SwiftUI in a command-line binary.
 HELPER_NAME="visionocr-recognise"
 HELPER_SOURCES=(
-  Sources/Prefs.swift Sources/Runner.swift Sources/Recogniser.swift
-  Sources/SearchableWriter.swift Sources/Flattener.swift Sources/JBIG2.swift
+  Sources/VisionOCRKit/Prefs.swift Sources/VisionOCRKit/Runner.swift Sources/VisionOCRKit/Recogniser.swift
+  Sources/VisionOCRKit/SearchableWriter.swift Sources/VisionOCRKit/Flattener.swift Sources/VisionOCRKit/JBIG2.swift
   Helper/main.swift
 )
 HELPER="$APP/Contents/Resources/$HELPER_NAME"
@@ -93,7 +93,7 @@ if [ "$UNIVERSAL" = 1 ]; then
   echo "==> Compiling the recognition helper (universal: arm64 + x86_64)"
   HELPER_SLICES=()
   for slice in arm64 x86_64; do
-    swiftc -O -target "$slice-apple-macos13.0" \
+    swiftc -O -target "$slice-apple-macos14.0" \
       -o "$BUILD_DIR/$HELPER_NAME.$slice" "${HELPER_SOURCES[@]}"
     HELPER_SLICES+=("$BUILD_DIR/$HELPER_NAME.$slice")
   done
@@ -101,10 +101,10 @@ if [ "$UNIVERSAL" = 1 ]; then
   rm -f "${HELPER_SLICES[@]}"
 else
   echo "==> Compiling the recognition helper ($ARCH)"
-  swiftc -O -target "$ARCH-apple-macos13.0" -o "$HELPER" "${HELPER_SOURCES[@]}"
+  swiftc -O -target "$ARCH-apple-macos14.0" -o "$HELPER" "${HELPER_SOURCES[@]}"
 fi
 
-cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp App/Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 echo "==> Making icon"
@@ -121,17 +121,17 @@ fi
 # in Contents/Resources, bundled precisely so that using this app did not mean
 # installing Homebrew, then Node, then an npm package, in a Terminal.
 #
-# It is gone. Recognition calls Vision directly (Sources/Recogniser.swift), so
+# It is gone. Recognition calls Vision directly (Sources/VisionOCRKit/Recogniser.swift), so
 # there is nothing to bundle, nothing to find, and nothing to keep in step with
 # a corpus baseline. The MIT licence still travels with the app because three of
 # the request's options were got right by reading mac-ocr's source — see the
 # credit in Recogniser.swift.
-if [ -f "Resources/mac-ocr-LICENSE" ]; then
-  cp "Resources/mac-ocr-LICENSE" "$APP/Contents/Resources/mac-ocr-LICENSE"
+if [ -f "Sources/VisionOCRKit/Resources/mac-ocr-LICENSE" ]; then
+  cp "Sources/VisionOCRKit/Resources/mac-ocr-LICENSE" "$APP/Contents/Resources/mac-ocr-LICENSE"
 fi
 
 # The shipped model reader's script, run by the downloaded runtime (ModelRuntime, BUGS.md C57).
-cp Resources/read-model.py "$APP/Contents/Resources/read-model.py"
+cp Sources/VisionOCRKit/Resources/read-model.py "$APP/Contents/Resources/read-model.py"
 
 # Optional in a way mac-ocr is not: without them the app writes Flate-compressed
 # pages, which work identically and are about three times the size. Bundling

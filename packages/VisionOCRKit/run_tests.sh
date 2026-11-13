@@ -20,7 +20,7 @@ mkdir -p build
 # not into the suite — the checks would go green over code they had never seen.
 # App.swift stays out because its @main collides with Tests/main.swift.
 SOURCES=()
-for f in Sources/*.swift; do
+for f in Sources/VisionOCRKit/*.swift App/*.swift; do
   [ "$(basename "$f")" = "App.swift" ] && continue
   SOURCES+=("$f")
 done
@@ -39,7 +39,7 @@ done
 # is "the hostile conversions do not take the process down": these checks pin GUARDS THAT PREVENT a trap,
 # they do not assert that one happens. So under `-Ounchecked` a regression that removed a guard would
 # WRAP SILENTLY instead of trapping and that check would pass VACUOUSLY — the failure mode is a green
-# suite, not a red one. `-Ounchecked` also deletes `Sources/JBIG2.swift:235`'s `precondition`.
+# suite, not a red one. `-Ounchecked` also deletes `Sources/VisionOCRKit/JBIG2.swift:235`'s `precondition`.
 # ⛔ AND NEVER `-wmo`, which is the obvious next "make it faster" step. `swiftc -O` here emits
 # `-primary-file` per source (verified with `-driver-print-jobs`), i.e. NO whole-module optimization, and
 # that is the only thing stopping `Tests/main.swift` from inlining `Sources/` bodies. Add `-wmo` and those
@@ -49,13 +49,13 @@ done
 # inequality between TWO SEPARATELY COMPILED binaries, whose inlining decisions differ. Verified safe
 # rather than assumed: Swift enables no fast-math, and an FMA detector returns bit-identical results at
 # `-Onone`, `-O` and `-Ounchecked` on Apple Swift 6.3.3. Suite was 1,247/1,247 with no skips under `-O`.
-TARGET="$(uname -m)-apple-macos13.0"
+TARGET="$(uname -m)-apple-macos14.0"
 TESTS_FLAGS=(-O -target "$TARGET")
 HELPER_FLAGS=(-O -target "$TARGET")
 PLATES_FLAGS=(-target "$TARGET")
 # The recognition helper's sources: Recogniser's own closure, as build.sh builds it.
-HELPER_SOURCES=(Sources/Prefs.swift Sources/Runner.swift Sources/Recogniser.swift
-  Sources/SearchableWriter.swift Sources/Flattener.swift Sources/JBIG2.swift Helper/main.swift)
+HELPER_SOURCES=(Sources/VisionOCRKit/Prefs.swift Sources/VisionOCRKit/Runner.swift Sources/VisionOCRKit/Recogniser.swift
+  Sources/VisionOCRKit/SearchableWriter.swift Sources/VisionOCRKit/Flattener.swift Sources/VisionOCRKit/JBIG2.swift Helper/main.swift)
 
 # ── The compiled-binary cache and the green stamp (Agent Manager EFFICIENCY-PLAN rounds 1-2) ──────────
 # CACHE. Each of the three binaries is keyed by the sha-256 of everything that goes into compiling it: the
@@ -68,7 +68,7 @@ HELPER_SOURCES=(Sources/Prefs.swift Sources/Runner.swift Sources/Recogniser.swif
 # VISIONOCR_TEST_CACHE=off compiles every time and writes nothing.
 #
 # STAMP (owner, 2026-10-07: "Yes, with a 24-hour limit"). A run whose exact inputs — the three keys above,
-# every Sources/*.swift (the suite reads some of them at run time), this script, the jbig2 and qpdf found in
+# every Sources/VisionOCRKit/*.swift App/*.swift (the suite reads some of them at run time), this script, the jbig2 and qpdf found in
 # the places Runner searches (see _tools), and the macOS build — passed within the last 24 hours is not run again. It
 # prints "run_tests: skipped: identical inputs passed at <time>" and exits 0; it never prints a pass count,
 # so it cannot be read as a fresh run. Only a run that exits 0 with its inputs unchanged writes a stamp; a
@@ -151,7 +151,7 @@ _tools() {
 TOOLS_SEEN=""
 stamp_key() {
   { printf 'stamp format 1\n%s %s %s\n' "$(key_tests)" "$(key_helper)" "$(key_plates)"
-    shasum -a 256 Sources/*.swift run_tests.sh; printf '%s\n%s\n' "$TOOLS_SEEN" "$TOOLCHAIN"; } | _sha
+    shasum -a 256 Sources/VisionOCRKit/*.swift App/*.swift run_tests.sh; printf '%s\n%s\n' "$TOOLS_SEEN" "$TOOLCHAIN"; } | _sha
 }
 
 SKEY=""

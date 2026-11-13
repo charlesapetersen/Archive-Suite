@@ -13,11 +13,11 @@ directory:
 
 ```sh
 mkdir -p /tmp/h && cp Tools/score-corpus.swift /tmp/h/main.swift
-swiftc -O -o /tmp/score -target "$(uname -m)-apple-macos13.0" \
-  $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+swiftc -O -o /tmp/score -target "$(uname -m)-apple-macos14.0" \
+  $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 ```
 
-`$(ls Sources/*.swift | grep -v App.swift)` rather than a hand-kept list, because **the
+`$(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift)` rather than a hand-kept list, because **the
 enumerated version drifted four times and each drift cost someone a debugging session**:
 `Recogniser.swift` (R40), `RunReport.swift` and `Updater.swift` (1.10.0), and
 `Annotations.swift` (the annotation transplant). `App.swift` is the only exclusion — its
@@ -32,9 +32,9 @@ source before the code. Three sources were added since this command was written
 (`Recogniser` for R40, `RunReport` and `Updater` for 1.10.0, `Annotations` for the
 annotation transplant) and each broke it.
 
-`Sources/App.swift` stays out — its `@main` collides with the tool's top-level code.
+`App/App.swift` stays out — its `@main` collides with the tool's top-level code.
 The small `pdf-*` utilities need less: `pdf-extract-pages.swift` compiles alone, and
-the ones that call `Flattener` need `Sources/SearchableWriter.swift` with it.
+the ones that call `Flattener` need `Sources/VisionOCRKit/SearchableWriter.swift` with it.
 
 ## Checking they all still build
 

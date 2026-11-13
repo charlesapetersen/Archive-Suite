@@ -27,8 +27,8 @@
 // direction, so the errors did not cancel).
 //
 //   mkdir -p /tmp/h && cp Tools/score-routing-census.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/census -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/census -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/census testdocs/*/*.pdf > before.tsv
 //   … change the detector …
 //   /tmp/census testdocs/*/*.pdf > after.tsv

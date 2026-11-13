@@ -79,7 +79,7 @@ def build_classifier():
         for f in os.listdir(os.path.join(REPO, "Sources"))
         if f.endswith(".swift") and f != "App.swift")
     arch = subprocess.run(["uname", "-m"], capture_output=True, text=True).stdout.strip()
-    cmd = ["swiftc", "-O", "-o", out, "-target", f"{arch}-apple-macos13.0"] \
+    cmd = ["swiftc", "-O", "-o", out, "-target", f"{arch}-apple-macos14.0"] \
         + sources + [os.path.join(work, "main.swift")]
     r = subprocess.run(cmd, capture_output=True, text=True)
     if r.returncode != 0:

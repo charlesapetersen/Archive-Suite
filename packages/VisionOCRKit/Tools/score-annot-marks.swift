@@ -34,7 +34,7 @@
 // population.
 //
 // ⛔ **WHAT IT MEASURES IS ELIGIBILITY AT THREE SEAMS, NOT "THIS DOCUMENT WILL SPLICE".**
-// The production condition is `Sources/Model.swift:2300-2305`:
+// The production condition is `Sources/VisionOCRKit/Model.swift:2300-2305`:
 //
 //   if wantJBIG2, encoded.count == expected,
 //      encoded.count == bitmaps.count,
@@ -105,8 +105,8 @@
 // USAGE
 //
 //   mkdir -p /tmp/h && cp Tools/score-annot-marks.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-annot-marks -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-annot-marks -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-annot-marks --self-test
 //   /tmp/score-annot-marks "<pdf>" ["<pdf>" …]
 //   PASSWORD=… /tmp/score-annot-marks "<pdf>"     # one password for every file given

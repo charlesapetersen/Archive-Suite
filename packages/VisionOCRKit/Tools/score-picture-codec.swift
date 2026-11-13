@@ -16,7 +16,7 @@
 // because `Flattener` has no JPEG 2000 route and should not grow one.
 //
 //   swiftc -O -o build/score-picture-codec \
-//     $(ls Sources/*.swift | grep -v App.swift) Tools/score-picture-codec.swift
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) Tools/score-picture-codec.swift
 //   build/score-picture-codec testdocs/**/*.pdf
 //
 // Per picture page it prints the JPEG size and PSNR, then the same for each

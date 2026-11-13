@@ -1,3 +1,6 @@
+#if SWIFT_PACKAGE
+@testable import VisionOCRKit
+#endif
 import AppKit
 import Foundation
 import CoreText
@@ -416,9 +419,12 @@ do {
     // The checks above see only the store itself; one call site left on `.standard`
     // would read and write the shared file again. `@AppStorage` is the views' own.
     var offenders: [String] = []
-    for name in ((try? FileManager.default.contentsOfDirectory(atPath: "Sources")) ?? []).sorted()
-    where name.hasSuffix(".swift") {
-        let text = (try? String(contentsOfFile: "Sources/" + name, encoding: .utf8)) ?? ""
+    // The engine is in Sources/VisionOCRKit and the app's screens in App (W42.int-s1); both count.
+    let sourceFiles = ["Sources/VisionOCRKit", "App"].flatMap { dir in
+        ((try? FileManager.default.contentsOfDirectory(atPath: dir)) ?? []).map { dir + "/" + $0 }
+    }
+    for name in sourceFiles.sorted() where name.hasSuffix(".swift") {
+        let text = (try? String(contentsOfFile: name, encoding: .utf8)) ?? ""
         for line in text.components(separatedBy: "\n") {
             let code = line.components(separatedBy: "//")[0]
             if code.range(of: #"\.standard\b"#, options: .regularExpression) != nil
@@ -428,7 +434,7 @@ do {
         }
     }
     check("nothing in Sources reads or writes settings around Prefs.store",
-          offenders == ["Prefs.swift: nonisolated(unsafe) static var store: UserDefaults = .standard"],
+          offenders == ["Sources/VisionOCRKit/Prefs.swift: nonisolated(unsafe) static var store: UserDefaults = .standard"],
           offenders.joined(separator: " | "))
     Prefs.store.removeObject(forKey: sentinel)
 }
@@ -882,7 +888,7 @@ do {
 
     // The text route has to *use* it. A bare `report(.failed, error…)` in that
     // branch is the defect, and it is one line, so nothing else would notice.
-    let modelSource = (try? String(contentsOfFile: "Sources/Model.swift",
+    let modelSource = (try? String(contentsOfFile: "Sources/VisionOCRKit/Model.swift",
                                    encoding: .utf8)) ?? ""
     check("the text route maps its error through outcome(for:cancelled:)",
           modelSource.contains("Self.outcome(for: error,"),
@@ -1515,7 +1521,7 @@ do {
     // that no longer matches its control sends the user looking for a setting that
     // is not there, and nothing else would notice: the summary would still read
     // perfectly well.
-    let panelSource = (try? String(contentsOfFile: "Sources/SettingsView.swift",
+    let panelSource = (try? String(contentsOfFile: "App/SettingsView.swift",
                                    encoding: .utf8)) ?? ""
     let absent = Prefs.Preset.settingLabels.values
         .filter { !panelSource.contains($0) }.sorted()
@@ -12932,7 +12938,7 @@ do {
               && AR.falcon.missing(.other, environment: bare) == ["the shared reading software", "Falcon-OCR"]
               && AR.paddle.missing(.other, environment: bare) == ["the shared reading software", "PaddleOCR-VL", "the helper that finds columns"],
           "\(AR.falcon.missing(.other, environment: bare)) \(AR.paddle.missing(.other, environment: bare))")
-    let panel = (try? String(contentsOfFile: "Sources/SettingsView.swift", encoding: .utf8)) ?? ""
+    let panel = (try? String(contentsOfFile: "App/SettingsView.swift", encoding: .utf8)) ?? ""
     check("the settings panel shows the accurate mode",
           panel.contains("accurateSection\n") && panel.contains("@AppStorage(Prefs.accurateMode)"),
           panel.isEmpty ? "could not read SettingsView.swift" : "not shown")
@@ -13487,7 +13493,7 @@ do {
 
     // The panel: one place starts a download, inside the confirmation, and the page-kind
     // picker is built from the ready readers. The picker that downloaded on choosing is gone.
-    let panel = (try? String(contentsOfFile: "Sources/SettingsView.swift", encoding: .utf8)) ?? ""
+    let panel = (try? String(contentsOfFile: "App/SettingsView.swift", encoding: .utf8)) ?? ""
     let starts = panel.components(separatedBy: "downloads.start(").count - 1
     let alert = panel.range(of: ".alert(confirming").map { a in
         panel[a.upperBound...].range(of: "} message:").map { panel[a.upperBound..<$0.lowerBound] } } ?? nil
@@ -15711,7 +15717,7 @@ do {
           probe.missing.count == 1, probe.missing.joined(separator: " | "))
     try? FileManager.default.removeItem(at: synthetic)
 
-    for file in ["Sources/ContentView.swift", "Sources/SettingsView.swift"] {
+    for file in ["App/ContentView.swift", "App/SettingsView.swift"] {
         let r = controlsMissingNames(file)
         check("\((file as NSString).lastPathComponent) has controls of this shape to check",
               r.labelled + r.missing.count >= 3,
@@ -15797,7 +15803,7 @@ do {
           twins.named == 3, "\(twins.named) distinct names")
     try? FileManager.default.removeItem(at: twinned)
 
-    for file in ["Sources/ContentView.swift", "Sources/SettingsView.swift"] {
+    for file in ["App/ContentView.swift", "App/SettingsView.swift"] {
         let d = duplicateControlNames(file)
         check("\((file as NSString).lastPathComponent) has named controls to check",
               d.named >= 3, "\(d.named) named")
@@ -20869,7 +20875,7 @@ do {
         // second opinion. A source check, because the alternative is instantiating
         // a SwiftUI view: what it holds is that the control is inside the guard,
         // which is the whole of the defect.
-        let panel = (try? String(contentsOfFile: "Sources/SettingsView.swift",
+        let panel = (try? String(contentsOfFile: "App/SettingsView.swift",
                                  encoding: .utf8)) ?? ""
         check("the panel draws the toggle under the model's own predicate",
               panel.contains("OCRModel.warnsAboutDigitalText(mode: mode, "
@@ -21178,13 +21184,13 @@ do {
                 && Recogniser.unsupportedLanguages(in: "  ,  ", fast: false).isEmpty)
 
         check("the picker labels a code with its language name",
-              SettingsView.languageLabel("ja-JP").contains("ja-JP")
-                && SettingsView.languageLabel("ja-JP").count > "ja-JP".count,
-              SettingsView.languageLabel("ja-JP"))
+              Recogniser.languageLabel("ja-JP").contains("ja-JP")
+                && Recogniser.languageLabel("ja-JP").count > "ja-JP".count,
+              Recogniser.languageLabel("ja-JP"))
         check("…and an unknown code still labels as itself",
-              SettingsView.languageLabel("zz") == "zz"
-                || SettingsView.languageLabel("zz").contains("zz"),
-              SettingsView.languageLabel("zz"))
+              Recogniser.languageLabel("zz") == "zz"
+                || Recogniser.languageLabel("zz").contains("zz"),
+              Recogniser.languageLabel("zz"))
         // A11.7, as above: the figure the skipping branch reports, verified here.
         check("the skip census figure for the language block is still right",
               checks - checksBeforeLanguageBlock + 1 == 12,
@@ -23360,7 +23366,7 @@ do {
         // first version of this compared allKeys against a hand-copied
         // duplicate of allKeys, so adding a key and forgetting both places
         // passed — it asserted that two copies of the same mistake agreed (U26).
-        let source = (try? String(contentsOfFile: "Sources/Prefs.swift", encoding: .utf8)) ?? ""
+        let source = (try? String(contentsOfFile: "Sources/VisionOCRKit/Prefs.swift", encoding: .utf8)) ?? ""
         let pattern = #"static let ([A-Za-z]+)\s*=\s*"([A-Za-z]+)""#
         let re = try! NSRegularExpression(pattern: pattern)
         var declared: [String: String] = [:]     // swift name -> key string
@@ -23688,7 +23694,7 @@ do {
     check("…and the DPI setting, which is the half that actually works",
           message.contains("Reading detail"), message)
     // Both names must be the ones the panel shows, or the remedy points nowhere.
-    let shown = (try? String(contentsOfFile: "Sources/SettingsView.swift", encoding: .utf8)) ?? ""
+    let shown = (try? String(contentsOfFile: "App/SettingsView.swift", encoding: .utf8)) ?? ""
     check("…and both names are labels the settings panel shows",
           shown.contains("\"Replace old selectable text") && shown.contains("\"Reading detail\""), "")
     check("…and says Automatic is not good enough, since that is the default",

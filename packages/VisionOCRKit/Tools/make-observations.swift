@@ -38,7 +38,7 @@ import Foundation
 // image, not a copy of the one the product made. Every C30 instrument is built on
 // it, which is why the correction is here and not only in the register.
 // ⚠️ The line numbers above are a gate and a hand-off, not the recognition itself;
-// `Sources/Recogniser.swift`'s `extract` doc comment carries the same correction
+// `Sources/VisionOCRKit/Recogniser.swift`'s `extract` doc comment carries the same correction
 // closer to the code, and was the sibling this one's own sweep missed.
 //
 // The probes only decode `page`, `text` and `boundingBox`; the extra keys are

@@ -53,7 +53,7 @@
 // only here, it has been measured on the easy geometry.
 //
 //   mkdir -p /tmp/h && cp Tools/make-plate-fixtures.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/plates -target "$(uname -m)-apple-macos13.0" /tmp/h/main.swift
+//   swiftc -O -o /tmp/plates -target "$(uname -m)-apple-macos14.0" /tmp/h/main.swift
 //   /tmp/plates <output-directory>
 import AppKit
 import CoreGraphics

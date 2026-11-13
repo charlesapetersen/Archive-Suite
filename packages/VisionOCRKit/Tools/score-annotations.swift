@@ -18,8 +18,8 @@
 // place; a stamp whose appearance stream failed to carry is a footprint of zero.
 //
 //   mkdir -p /tmp/h && cp Tools/score-annotations.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-annotations -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-annotations -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-annotations <original.pdf> <rebuilt-and-annotated.pdf>
 //
 // Exit 0 if every mark agrees within tolerance, 1 if any does not, 2 for bad usage.

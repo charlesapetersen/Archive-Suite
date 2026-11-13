@@ -79,10 +79,10 @@ if [ -z "$GREEN" ]; then
     GREEN="$W/green"; mkdir -p "$W/g"
     cp "$O/1954 - Why.pdf" "$O/1951 - Briefer Book Notes.pdf" "$O/$HUG.pdf" "$W/in/"
     cp "$ROOT/Tools/score-gate.swift" "$W/g/main.swift"
-    ( cd "$ROOT" && swiftc -O -o "$W/gate" -target "$(uname -m)-apple-macos13.0" \
-        $(ls Sources/*.swift | grep -v App.swift) "$W/g/main.swift" &&
-      swiftc -O -o "$W/visionocr-recognise" -target "$(uname -m)-apple-macos13.0" \
-        Sources/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift Helper/main.swift ) \
+    ( cd "$ROOT" && swiftc -O -o "$W/gate" -target "$(uname -m)-apple-macos14.0" \
+        $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) "$W/g/main.swift" &&
+      swiftc -O -o "$W/visionocr-recognise" -target "$(uname -m)-apple-macos14.0" \
+        Sources/VisionOCRKit/{Prefs,Runner,Recogniser,SearchableWriter,Flattener,JBIG2}.swift Helper/main.swift ) \
         > "$W/build.log" 2>&1 || { echo "ux-harness-selftest: the gate does not build, see $W/build.log"; exit 1; }
     VISIONOCR_HELPER="$W/visionocr-recognise" "$W/gate" "$W/in" "$GREEN" > "$W/gate.log" 2>&1
 fi

@@ -17,7 +17,7 @@
 //
 // ⛔ **THE SIBLING, because "no existing instrument can see this" would be FALSE** — found
 // by the adversarial review of this file's own first draft, which had claimed exactly that
-// (CONTRIBUTING 4b). `Flattener.inkOutsideText` (`Sources/Flattener.swift:1707`) already
+// (CONTRIBUTING 4b). `Flattener.inkOutsideText` (`Sources/VisionOCRKit/Flattener.swift:1707`) already
 // answers a version of the one-line summary at the top, and two committed tools print it:
 // `score-shape-term`'s `inkPx`/`outPx`/`inkOut`/`lineN` and `score-text-route`'s `inkOut`.
 // It is **strictly stronger than this tool on the x axis** — a pixel measure, not a row
@@ -42,7 +42,7 @@
 //
 // ⛔ **It recognises the REBUILT BITMAP, not a re-render**, which is the first bullet of
 // that same section and the thing every earlier C30 instrument got wrong. Production
-// recognises `Flattener.flatten`'s bitmaps (`Sources/Model.swift:1971`, `:2059`);
+// recognises `Flattener.flatten`'s bitmaps (`Sources/VisionOCRKit/Model.swift:1971`, `:2059`);
 // `Recogniser.extract` — which `Tools/make-observations` calls, and therefore every
 // artefact in `$STATE/c30-instrument/` — recognises `Recogniser.render`'s plain render of
 // the source page. Same geometry, different pixels, measured on C30's page 5. So this tool
@@ -165,8 +165,8 @@
 // ## Building and running
 //
 //   mkdir -p /tmp/h && cp Tools/score-text-voids.swift /tmp/h/main.swift
-//   swiftc -O -o /tmp/score-text-voids -target "$(uname -m)-apple-macos13.0" \
-//     $(ls Sources/*.swift | grep -v App.swift) /tmp/h/main.swift
+//   swiftc -O -o /tmp/score-text-voids -target "$(uname -m)-apple-macos14.0" \
+//     $(ls Sources/VisionOCRKit/*.swift App/*.swift | grep -v App.swift) /tmp/h/main.swift
 //   /tmp/score-text-voids --self-test
 //   /tmp/score-text-voids "<pdf>" [page…]        # 1-indexed; default: a spread of 12
 //   VOIDMININCH=0.10 /tmp/score-text-voids "<pdf>" 1
@@ -210,7 +210,7 @@
 //     the commit that added this mode, which is why it is here and not in a footnote.
 //   * ⚠️ **"Differing only in how many requests" is not true at every SETTING.**
 //     `makeRequest` sets `minimumTextHeight` as a fraction of the image
-//     (`Sources/Recogniser.swift:423`), so with `minTextHeightOn` the two arms differ by an
+//     (`Sources/VisionOCRKit/Recogniser.swift:423`), so with `minTextHeightOn` the two arms differ by an
 //     n-fold effective glyph floor as well. It defaults off, so the committed artefact is
 //     unaffected — but a run with it on is measuring two things.
 //   * **It is not the fix.** The fix is `Recogniser.recognisePage` (2026-09-25), whose
@@ -305,8 +305,8 @@ func inkedRows(_ grey: [UInt8], width w: Int, height h: Int,
 func pixelBoxes(_ boxes: [SearchableWriter.BoundingBox], height h: Int)
     -> [(top: Double, bottom: Double)] {
     // `SearchableWriter.BoundingBox` is normalised to the page with a TOP-LEFT origin
-    // (`Sources/SearchableWriter.swift:157`, flipped out of Vision's frame at
-    // `Sources/Recogniser.swift:471-479`), so no second flip belongs here.
+    // (`Sources/VisionOCRKit/SearchableWriter.swift:157`, flipped out of Vision's frame at
+    // `Sources/VisionOCRKit/Recogniser.swift:471-479`), so no second flip belongs here.
     boxes.map { (top: $0.y * Double(h), bottom: ($0.y + $0.height) * Double(h)) }
 }
 
@@ -476,7 +476,7 @@ func bandRect(top: Int, height: Int, width: Int) -> CGRect {
 ///
 /// The box arrives normalised to the BAND — Vision normalises to whatever image it was
 /// handed — with a top-left origin, because `Recogniser.recognise` has already flipped it
-/// (`Sources/Recogniser.swift:471-479`). So only y and height move, and both scale by the
+/// (`Sources/VisionOCRKit/Recogniser.swift:471-479`). So only y and height move, and both scale by the
 /// band's share of the sheet. Group 13 pins it through `pixelBoxes`.
 func remapped(_ box: SearchableWriter.BoundingBox,
               bandTop: Int, bandHeight: Int,

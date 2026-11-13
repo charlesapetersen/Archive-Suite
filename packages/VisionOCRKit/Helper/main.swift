@@ -1,3 +1,6 @@
+#if SWIFT_PACKAGE
+import VisionOCRKit
+#endif
 import Foundation
 import Vision
 import CoreGraphics

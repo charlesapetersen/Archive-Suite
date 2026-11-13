@@ -1058,7 +1058,7 @@ OPERATORS = [
     # all — and that walk reads `/Resources` whether or not the form is drawn, so the first
     # measurement does not carry over to it. Either way pages 11-14 of `shared-resources.pdf`
     # are what can kill these; both mutants were added 2026-08-23 with those pages.
-    # ✅ Both `find` strings were checked UNIQUE in `Sources/Flattener.swift` by hand, so
+    # ✅ Both `find` strings were checked UNIQUE in `Sources/VisionOCRKit/Flattener.swift` by hand, so
     # neither will be reported NOT-APPLIED (T7's lesson, recorded at `run`'s `hits != 1`) —
     # `--self-test` never touches OPERATORS, so nothing automated asserts that.
     # ✅ BOTH RUN through this tool 2026-08-25 and both `killed` — 227 s by SIX objecting

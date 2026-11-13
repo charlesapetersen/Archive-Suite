@@ -70,16 +70,16 @@ fi
 # run_tests.sh: a hand-written list goes stale and the check then passes over code
 # it has never seen. App.swift's @main collides with a tool's top-level code.
 SOURCES=()
-for f in Sources/*.swift; do
+for f in Sources/VisionOCRKit/*.swift App/*.swift; do
   [ "$(basename "$f")" = "App.swift" ] && continue
   SOURCES+=("$f")
 done
 if [ "${#SOURCES[@]}" -eq 0 ]; then
-  echo "check-tools-compile: no Sources/*.swift found — wrong directory?" >&2
+  echo "check-tools-compile: no Sources/VisionOCRKit/*.swift App/*.swift found — wrong directory?" >&2
   exit 1
 fi
 
-TARGET="$(uname -m)-apple-macos13.0"
+TARGET="$(uname -m)-apple-macos14.0"
 WORK=$(mktemp -d -t vrg-toolcheck)
 trap 'rm -rf "$WORK"' EXIT
 
