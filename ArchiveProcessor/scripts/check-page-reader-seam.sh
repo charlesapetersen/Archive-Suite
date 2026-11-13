@@ -9,7 +9,9 @@ seam="OCR/PageReaders.swift"
 files=$(find . -name '*.swift' ! -name '*TestDriver.swift' ! -name '*Contract.swift' ! -path "./$seam" | sort)
 # A call of a client's ocr (not its definition), or a page-reading client made outside the seam: VisionClient and
 # the direct-provider clients are page readers only, so constructing one anywhere else reads around the protocol.
-hits=$(grep -nE '\.ocr\(|(^|[^A-Za-z])(VisionClient|AnthropicClient|GeminiClient|MistralClient)\(' $files \
+# `x.ocr` with or without its call (a method reference; not the `.ocr` phase case or an `ap.ocr.` identifier), and an
+# unqualified `ocr(imageURL:` (a call from inside an extension of a client).
+hits=$(grep -nE '[A-Za-z0-9_)]\.ocr([^A-Za-z0-9_.]|$)|^\s*\.ocr\(|(^|[^.A-Za-z_])ocr\(imageURL:|(^|[^A-Za-z])(VisionClient|AnthropicClient|GeminiClient|MistralClient)\(' $files \
        | grep -vE '^\./[^:]+:[0-9]+:\s*(///|//)' | grep -v 'func ocr(' || true)
 status=0
 if [ -n "$hits" ]; then
@@ -17,10 +19,12 @@ if [ -n "$hits" ]; then
     echo "$hits" | sed 's/^/  /'
     status=1
 fi
-# Every LLMProvider case has its reader: the factory's switch must name each one.
+# Every LLMProvider case has its reader. The compiler already holds the switch exhaustive; this also catches a
+# `default:` added to it, which would let a new provider fall to another's reader.
 cases=$(sed -n '/^enum LLMProvider/,/^}/p' Models/ProviderModels.swift | grep -oE '^    case [a-zA-Z]+' | awk '{print $2}')
 for c in $cases; do
     grep -qE "case \.$c[:,]" "$seam" || { echo "FAIL LLMProvider.$c has no reader in $seam"; status=1; }
 done
+grep -qE '^\s*default\s*:' "$seam" && { echo "FAIL a default: in $seam lets a provider skip its own reader"; status=1; }
 [ $status = 0 ] && echo "PASS every page reading goes through PageReaders ($(echo "$cases" | wc -l | tr -d ' ') providers)"
 exit $status

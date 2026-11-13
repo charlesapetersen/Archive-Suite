@@ -306,7 +306,7 @@ extension OpenAICompatibleClient {
     static func openRouter(model: LLMModel, apiKey: String) -> OpenAICompatibleClient? {
         guard let route = OpenRouterRoute.forModel(model.id) else { return nil }
         return OpenAICompatibleClient(baseURL: openRouterBaseURL, apiKey: apiKey, modelID: route.model.id,
-                                      openRouterRoute: route)
+                                      openRouterRoute: route.ceiling(model))
     }
 
     /// OpenRouter's in-body error codes: a provider failure or timeout (502, 503, 408) reads as 503, the code the
@@ -338,12 +338,10 @@ extension OpenAICompatibleClient {
         }
     }
 
-    /// The ceiling is the price the estimate used: OpenRouter's listed one once read (W42.int-s2), else the bench's.
     static func openRouterProviderField(_ route: OpenRouterRoute) -> [String: Any] {
-        let priced = OpenRouterPrices.priced(route)
-        return ["order": [route.providerTag],
-                "allow_fallbacks": false,
-                "quantizations": [route.precision],
-                "max_price": ["prompt": priced.inputCostPer1M, "completion": priced.outputCostPer1M]]
+        ["order": [route.providerTag],
+         "allow_fallbacks": false,
+         "quantizations": [route.precision],
+         "max_price": ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]]
     }
 }

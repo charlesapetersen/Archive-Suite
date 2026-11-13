@@ -90,7 +90,7 @@ enum OCRRefusalFallback {
     /// Qwen3.6 27B goes through its pinned OpenRouter route (chutes fp8, reasoning off), the one the panel scored.
     static var keyedModels: [LLMModel] {
         [LLMModel.anthropicModels[0],
-         OpenRouterRoute.forModel(openRouterReaderID)?.model ?? LLMModel.openrouterModels[0],
+         OpenRouterRoute.forModel(openRouterReaderID).map { OpenRouterPrices.priced($0) } ?? LLMModel.openrouterModels[0],
          LLMModel.openaiModels.first { $0.id == "gpt-5.4-mini" } ?? LLMModel.openaiModels[0],
          LLMModel.mistralModels[0]]
     }

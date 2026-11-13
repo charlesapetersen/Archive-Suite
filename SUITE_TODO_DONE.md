@@ -15675,3 +15675,34 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   **Picks and defaults that move.** The tie, by the owner's construction (twice the larger offset range, a route with none taking the largest), is 10.4 points, not 4.2 (`SettingsSolver.segmentationTie`). Under it: a Gemini key on a 16 GB Mac picks the free Mac 2B (79.7%) over Gemini (87.6-87.9%); both plans pick Claude alone over the mix (89.1 against 90.3%); Anthropic, OpenAI and OpenRouter keys without Gemini preselect GLM (83.0%) over ChatGPT (90.3%). D5 (Claude plan and a Gemini key) still picks the plan; an 8 GB Mac with a Gemini key picks the text alone, which now leads the image window. Asked of the owner in the Daemon Report (keep the construction or change it). 07-segmentation.md §3/§4/§6/§9, 13-profile-tests.md, settings-routes.json, the settings-design prototype, and the solver, sheet, chooser and OpenRouter test drivers follow; settings_routes.py --check passes; test-settings-*, test-segmentation-*, test-openrouter ALL PASS; build clean.
   **Not rescored:** seg-date-model-frozen/-final have no generator (pre-test freezes, already on the pre-2026-10-31 truth); ocr_logprob's seg_gaps still scores unsure gaps (a known latent gap, now including RG165's two). ArchiveOCRBench rebuilt; its published copy is behind. **Bench cache:** kept `seg-check-time/truth-before-owner-fixes/` (the pre-fold CSVs and truth.json, the record of what changed); nothing rebuildable was made.
   <!-- /W46.seg-truth-owner-fixes -->
+- [x] **W42.int-s2 — one way to read a page, OpenRouter as a provider [L]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) · SHIPPED 2026-11-13 (lane: processor) (uses: build,paid) (blocked-on: W42.int-s1) — Stage 2: a `PageReader` protocol in the package and a provider adapter in the Processor; Vision always first for the geometry; every local model, paid provider, the gateway and the subscription tools behind it; OpenRouter as a first-class provider with the models endpoint's prices and the pinned upstream provider per model. Done when every `switch provider` site reads through the protocol, every provider's journey gives the same text on the smoke images, a check goes red if a provider skips the protocol, and an OpenRouter model reads the smoke images with its cost from the endpoint (a few cents, stated first).
+  **Shipped 2026-11-13** (checkpoints 1-2, then this commit). `PageReader` (`packages/VisionOCRKit/Sources/VisionOCRKit/
+  PageReader.swift`): input `PageReaderInput` (image, Vision's lines, previous text/image, prompt, scale; named so because
+  the Processor already has a `PageInput`), output `PageReading` (text, words with boxes where given, seconds, dollars,
+  memory, the app's `OCRResult` as detail). The Processor links VisionOCRKit; every client (Anthropic, Gemini, Mistral,
+  OpenAI-compatible for OpenAI/OpenRouter/the gateway and local models, Local Agent for the subscription tools, Vision)
+  conforms in `OCR/PageReaders.swift`, and `PageReaders.reader` is the one place that picks a reader (Local Agent, then
+  gateway, then provider). Through it: `performOCRCall` (Process Files, Live Capture, retries, diagnostics), the
+  refusal and cascade second readers, the cascade's Vision word count, the key wizard's sample read. Not page readings,
+  so not through it: batch submission/poll, text-only completions (tagging, classification, segmentation windows), the
+  rotation vote, the cost/settings switches. Deviation: Vision's lines are in the input but the run does not fill them
+  yet (Vision does not run first on every page); Stage 5's placement is the first reader that uses them.
+  Proof: `scripts/test-page-reader.sh` (48 checks, $0, no wire): the 16 journeys (each LLMProvider, the gateway, the Local
+  Agent fake CLI, Vision for real, on the two live-openrouter smoke pages) equal `scripts/page-reader-journeys.golden`,
+  recorded in checkpoint 1 BEFORE the protocol existed; `scripts/check-page-reader-seam.sh` fails on a client `ocr` call
+  or reference, a split-line `.ocr(`, a page-reading client built outside the seam, a provider missing from the factory
+  or a `default:` in it (each shown red on a probe file). OpenRouter was already a provider (W41.app-openrouter); new:
+  `OCR/OpenRouterPrices.swift` reads `GET /models/<id>/endpoints` (no key) when the Settings note for an OpenRouter model
+  shows, daily, failures wait an hour, no retries; only the pinned tag's single row (bare provider tags: the one row at the
+  pinned precision; ambiguous, non-finite, zero or over 3x the bench refused), stored in UserDefaults (invisible to the
+  standard domain while a test seam is active). Model list, estimate and Settings note use it; `max_price` is the run's
+  model's price (`OpenRouterRoute.ceiling`), segmentation keeps the bench's. Live: `scripts/live-page-reader.sh --paid`
+  stated $0.0031 for 2 pages at deepinfra/fp8's listed $0.20/$0.88 before calling, Qwen3-VL 235B read both pages word for
+  word through `PageReaders.reader` (3-5 s each, $0.00157 each priced); OpenRouter's key counter showed $0.00000 8 s
+  later (it lags; real spend under a cent). Run twice: item spent under $0.01. Tier-2-style adversarial review (opus): no
+  HIGH, refactor drift none; its 4 MEDIUM fixed (ceiling could rise after the estimate; refusal estimate at the bench
+  price; a hanging listing stalled run starts, so the run-start read was dropped; row match could take a sibling or the
+  first of two) and LOW 5-6 fixed (price bound, seam holes). test-openrouter 201, -ocr-refusal 49, -ocr-cascade 68,
+  -ocr-page-kind 60, -local-models 115, -localagent 23, -provider-errors 40, -institutional-compute-import 45: all pass.
+  No bench-cache scratch made (mktemp only). Not in the health gate.
+  <!-- /W42.int-s2 -->

@@ -332,6 +332,15 @@ existing scratch, key-free, no-network execution remains unchanged.
   Process Files pipeline (`ProcessFilesTestDriver`, `PROCESSFILES_PROVIDER=OpenRouter`); asserts success, the PDF
   header naming the pinned route, and Finder tags. Without `--paid` it prints the estimate. `test-segmentation-proof.sh
   --paid --runs glm:key` is the segmentation counterpart (~$0.02; checks only Z.AI answered).
+- **`test-page-reader.sh`** — W42.int-s2: every provider's journey (`performOCRCall` for each `LLMProvider`, the
+  gateway and the Local Agent fake CLI; Apple Vision for real) on the two smoke pages must equal
+  `scripts/page-reader-journeys.golden`, recorded before the `PageReader` protocol existed (re-record with `--record`
+  only for a deliberate text change). Also each reader's route, timing and page price, the factory's precedence, no
+  reader for an unpinned OpenRouter model, OpenRouter listing parsing (the pinned upstream's row only) and the refresh
+  into a scratch defaults suite, then `check-page-reader-seam.sh`. `PAGEREADER_TEST`, no wire, $0.
+- **`live-page-reader.sh`** — PAID (about $0.003): reads OpenRouter's listing, states the cost of two pages at
+  Qwen3-VL 235B's listed price before calling, reads the smoke pages through `PageReaders.reader`, and reports text,
+  seconds, dollars and the key counter's spend. Without `--paid` it prints the bound.
 - **`test-ocr-refusal.sh`** — W41.app-ocr-default: the default Gemini model and its prices, and the second
   reader for pages Gemini refuses, through the real `performOCRCall` over an injected transport: refusal codes
   that reach the second route and those that never do, the `secondReader` record and PDF header, fail-loud with

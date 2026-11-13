@@ -512,6 +512,19 @@ struct OpenRouterRoute: Sendable, Equatable {
 
     static func forModel(_ id: String) -> OpenRouterRoute? { catalog.first { $0.model.id == id } }
 
+    /// This route with its price ceiling at `model`'s prices: the run's model, priced when its estimate was made
+    /// (OpenRouter's listing once read, W42.int-s2, else the bench's), so `max_price` is the price the user saw, even
+    /// if the listing is read again during the run. Everything else stays the catalog's.
+    func ceiling(_ model: LLMModel) -> OpenRouterRoute {
+        guard model.id == self.model.id else { return self }
+        let m = self.model
+        return OpenRouterRoute(
+            model: LLMModel(id: m.id, displayName: m.displayName, provider: m.provider, supportsThinking: m.supportsThinking,
+                            returnsMd: m.returnsMd, inputCostPer1M: model.inputCostPer1M,
+                            outputCostPer1M: model.outputCostPer1M, batchDiscount: m.batchDiscount),
+            providerTag: providerTag, precision: precision, reasoning: reasoning, measured: measured)
+    }
+
     /// Under the Settings model picker: where the model runs, so the user knows the price and the precision.
     var settingsNote: String {
         let provider = providerTag.split(separator: "/").first.map(String.init) ?? providerTag

@@ -191,6 +191,15 @@ enum PageReaderTestDriver {
         check("3 another model's listing gives no price", OpenRouterPrices.parse(Data(glmListing.utf8), route: route) == nil)
         let free = listing.replacingOccurrences(of: "0.00000022", with: "0")
         check("3 a zero price is not a price", OpenRouterPrices.parse(Data(free.utf8), route: route) == nil)
+        let dear = listing.replacingOccurrences(of: "0.00000022", with: "0.0000007")   // 3.5x the bench's 0.20
+        check("3 a price over 3x the bench's is not taken", OpenRouterPrices.parse(Data(dear.utf8), route: route) == nil)
+        let sibling = listing.replacingOccurrences(of: #""tag":"deepinfra/fp8""#, with: #""tag":"deepinfra/turbo""#)
+        check("3 a pinned tag with a precision never falls to a sibling",
+              OpenRouterPrices.parse(Data(sibling.utf8), route: route) == nil)
+        let twoZ = glmListing.replacingOccurrences(of: #""tag":"z-ai/bf16","quantization":"bf16""#,
+                                                   with: #""tag":"z-ai/fast","quantization":"fp8""#)
+        check("3 two rows of the provider at the precision: no price",
+              OpenRouterPrices.parse(Data(twoZ.utf8), route: glm) == nil)
 
         check("3 no listing read: the bench's price", OpenRouterPrices.priced(route, [:]) == route.model)
         if let price {
@@ -200,6 +209,14 @@ enum PageReaderTestDriver {
             let bench = CostEstimator.secondReaderPageCost(model: route.model, imageScale: 1)
             let listed = CostEstimator.secondReaderPageCost(model: priced, imageScale: 1)
             check("3 the estimate follows the listing", listed > bench, "listed \(listed) bench \(bench)")
+            // The ceiling is the run's model's price, whatever the listing says later.
+            let field = { (m: LLMModel) -> [String: Double] in
+                (OpenAICompatibleClient.openRouter(model: m, apiKey: "k")?.openRouterRoute)
+                    .map { OpenAICompatibleClient.openRouterProviderField($0)["max_price"] as? [String: Double] ?? [:] } ?? [:] }
+            check("3 the ceiling is the priced model's", field(priced) == ["prompt": 0.22, "completion": 0.9],
+                  "\(field(priced))")
+            check("3 a bench-priced run keeps the bench ceiling", field(route.model) == ["prompt": 0.20, "completion": 0.88],
+                  "\(field(route.model))")
         }
 
         // End to end through the seam, in a scratch suite so the app's own stored prices are untouched.
@@ -215,8 +232,12 @@ enum PageReaderTestDriver {
               stored.count == 2 && report.filter { $0.contains("the bench's price stays") }.count
                 == OpenRouterRoute.catalog.count - 2, report.joined(separator: "; "))
         let again = await OpenRouterPrices.refreshIfStale(defaults: scratch)
-        check("3 a fresh price is not read again", !again.contains { $0.hasPrefix(route.model.id) },
-              again.joined(separator: "; "))
+        check("3 a second read within the hour asks nothing", again.isEmpty, again.joined(separator: "; "))
+        scratch.set(Date(timeIntervalSinceNow: -2 * OpenRouterPrices.retryAfter), forKey: OpenRouterPrices.attemptKey)
+        let later = await OpenRouterPrices.refreshIfStale(defaults: scratch)
+        check("3 after the hour, only the routes without a fresh price are read",
+              later.count == OpenRouterRoute.catalog.count - 2 && !later.contains { $0.hasPrefix(route.model.id) },
+              later.joined(separator: "; "))
         current.listings = [:]
     }
 

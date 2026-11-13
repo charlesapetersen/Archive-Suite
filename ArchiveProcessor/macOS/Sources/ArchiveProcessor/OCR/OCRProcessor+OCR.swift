@@ -1315,10 +1315,6 @@ extension OCRProcessor {
         segmentationContext: SegmentationContext,
         runConfig: SessionProcessingConfig? = nil
     ) async {
-        // W42.int-s2: the request's price ceiling follows OpenRouter's listing; read it if a day old.
-        if provider == .openrouter, runConfig?.gateway == nil, runConfig?.localAgent == nil {
-            await OpenRouterPrices.refreshIfStale()
-        }
         if segmentationContext.previousTextCharCount == 0 {
             // No dependency on prior OCR text — can run in parallel
             await performOCRParallel(

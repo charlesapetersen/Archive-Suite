@@ -33,6 +33,12 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **Built-in models** are the REFERENCE.md §LLM Provider & Model Selection lists (`Models/ProviderModels.swift`);
   don't silently add others to them. OpenRouter's are exactly `OpenRouterRoute.catalog`, each pinned as benched (`provider.order`,
   `allow_fallbacks: false`, `quantizations`, `max_price`, temp 0), no custom models; a model outside it gets no client, so no call goes unpinned.
+  Their prices are OpenRouter's listing for the pinned upstream only (`OCR/OpenRouterPrices.swift`, read when the
+  Settings note for an OpenRouter model shows, at most daily), else the bench's; `max_price` is the run's model's price,
+  the one its estimate showed (`OpenRouterRoute.ceiling`). Segmentation's OpenRouter voter keeps the bench's.
+- **One way to read a page** (W42.int-s2): every client is a VisionOCRKit `PageReader`, and `PageReaders.reader`
+  (`OCR/PageReaders.swift`) is the only place that picks one (Local Agent, then gateway, then provider). Never call a
+  client's `ocr` elsewhere: `scripts/check-page-reader-seam.sh` fails on it, and on a provider with no reader.
 - **Apple Vision** is additive, never the default. Its optional text-only judgement call goes to a **direct** LLM
   with the extracted text only — no image bytes, image URL, gateway or Local Agent. With judgement off, Vision is
   fully offline (No tagging / Copy source tags only).

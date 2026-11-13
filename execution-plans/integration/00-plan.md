@@ -141,6 +141,12 @@ against the package, passes its suite (proof that nothing was lost in the move).
 
 ### Stage 2 — one way to read a page
 
+**Shipped 2026-11-13 (`W42.int-s2`).** The protocol is `PageReader` in VisionOCRKit; the Processor's clients conform in
+`OCR/PageReaders.swift`. OpenRouter was already a provider (W41.app-openrouter, custom base URL not needed); this stage
+added its listed prices. Vision's lines are in the protocol's input but the run does not fill them yet: placement
+(Stage 5) is the first reader that uses them. Batch submission, text-only completions and the rotation vote are not
+page readings and keep their own request builders.
+
 A `PageReader` protocol in the package, and a provider adapter in Archive Processor. A reading takes the page image
 and Vision's lines (Vision always runs first; it is free and gives the geometry) and returns the words in reading
 order with positions where the reader has them, plus the seconds it took, the dollars it cost and the memory it
