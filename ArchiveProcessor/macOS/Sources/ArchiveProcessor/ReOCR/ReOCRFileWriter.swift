@@ -29,7 +29,8 @@ struct ReOCRFileWriter {
     /// `<Processor Application Support>/ImproveOCR/Versions`.
     let versionsRoot: URL
 
-    enum Phase: String, Codable, Sendable { case prepared, acceptReady, published }
+    /// `rejected` is the person's verdict on a prepared operation: nothing was published and nothing will be.
+    enum Phase: String, Codable, Sendable { case prepared, acceptReady, published, rejected }
 
     /// A time as the file system keeps it, to the nanosecond.
     struct Stamp: Codable, Equatable, Sendable {
@@ -126,7 +127,9 @@ struct ReOCRFileWriter {
         var made: (Snapshot, Metadata, String)?
         var failure: Error?
         var coordError: NSError?
+        let backupPath = dir.appendingPathComponent("original.pdf").path
         NSFileCoordinator().coordinate(readingItemAt: Self.fresh(target), options: [], error: &coordError) { url in
+            var madeDirectory = false
             do {
                 let path = url.path
                 let snap = try Self.snapshot(path)
@@ -141,7 +144,8 @@ struct ReOCRFileWriter {
                 }
                 try Self.makePrivateDirectory(versionsRoot)
                 try Self.makePrivateDirectory(dir)
-                let backup = dir.appendingPathComponent("original.pdf").path
+                madeDirectory = true
+                let backup = backupPath
                 guard copyfile(path, backup, nil, copyfile_flags_t(COPYFILE_ALL | COPYFILE_EXCL | COPYFILE_NOFOLLOW)) == 0 else {
                     throw Failure.backupFailed(String(cString: strerror(errno)))
                 }
@@ -155,7 +159,11 @@ struct ReOCRFileWriter {
                 try Self.sync(backup)
                 try Self.syncDirectory(dir.path)
                 made = (snap, meta, path)
-            } catch { failure = error }
+            } catch {
+                failure = error
+                // Nothing was journaled and the original was only read: a half-made copy is removed, not left behind.
+                if madeDirectory { unlink(backupPath); rmdir(dir.path) }
+            }
         }
         if let coordError { throw Failure.coordination(coordError.localizedDescription) }
         if let failure { throw failure }
@@ -267,6 +275,17 @@ struct ReOCRFileWriter {
         return result
     }
 
+    // MARK: Reject
+
+    /// Records a rejected or cancelled review. The file is not touched; the kept copy stays until the person removes it
+    /// in the history, as every version does.
+    func reject(_ op: Operation) throws {
+        var journal = try read(op.journal.operationID)
+        guard journal.phase == .prepared else { throw Failure.journal("the operation is \(journal.phase.rawValue), not prepared") }
+        journal.phase = .rejected
+        try write(journal)
+    }
+
     // MARK: Recover
 
     enum Recovery: Hashable, Sendable {
@@ -277,6 +296,7 @@ struct ReOCRFileWriter {
         /// What is live cannot be explained by this operation, or the kept original is damaged. Nothing was touched.
         case conflict(UUID, String)
         case alreadyPublished(UUID)
+        case rejected(UUID)
     }
 
     /// Settles every journal under `versionsRoot` by what is on disk. Run at launch, under the flag lock once it
@@ -290,6 +310,8 @@ struct ReOCRFileWriter {
                 return .conflict(id, "the kept original is missing or damaged")
             }
             switch journal.phase {
+            case .rejected:
+                return .rejected(id)
             case .published:
                 // The displaced original, if a crash came between the record and its removal. Anything else there is
                 // someone's file: left alone and reported.

@@ -98,6 +98,7 @@ struct ContentView: View {
             ReOCRIncrementalWriterTestDriver.runIfRequested() // $0 W44 Improve OCR writer on the pinned PDFium, scratch only
             ReOCRFileWriterTestDriver.runIfRequested()       // $0 W44 Improve OCR publication + crash recovery, scratch only
             ReOCRPairsTestDriver.runIfRequested()            // $0 W44 Improve OCR pair validation + replacement pages, scratch only
+            ReOCRJobTestDriver.runIfRequested()              // $0 W44 Improve OCR one file's run with a fake reader, scratch only
             SettingsLayersTestDriver.runIfRequested()        // $0 W46 settings layers + the collection's document, scratch only
             SettingsInterviewsTestDriver.runIfRequested()    // $0 W46 the general and the collection interviews, scratch only
             SegmentationReviewTestDriver.runIfRequested()    // $0 W36 flagged-boundary review + window stage
