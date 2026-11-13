@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ArchiveCore
+import ArchiveCoreUI
 
 /// The file-navigation window — a Finder-Smart-Folder-like browser over the tagged corpus.
 struct NavigationWindowView: View {
@@ -523,7 +524,10 @@ struct NavigationWindowView: View {
                 .accessibilityHidden(true)
             FlowLayout(spacing: 6) {
                 ForEach(chips) { chip in
-                    ActiveFilterChipView(chip: chip) { model.removeFilter(chip.facet) }
+                    ActiveFilterChipView(label: chip.label, phrase: chip.phrase,
+                                         identifier: chip.accessibilityIdentifier) {
+                        model.removeFilter(chip.facet)
+                    }
                 }
             }
         }
@@ -912,31 +916,6 @@ private extension View {
     }
 }
 
-/// One filter or search in effect (W40.fix-reader-filter-bar). The whole chip is its ✕, one control for the
-/// keyboard and VoiceOver as for the mouse.
-private struct ActiveFilterChipView: View {
-    let chip: ActiveFilterChip
-    let remove: () -> Void
-    var body: some View {
-        Button(action: remove) {
-            HStack(spacing: 4) {
-                Text(chip.label).lineLimit(1).truncationMode(.middle)
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-            }
-            .font(.callout)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.45)))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: 320)
-        .help("In effect: \(chip.phrase). Click to remove it.")
-        .accessibilityLabel("Remove \(chip.label)")
-        .accessibilityIdentifier(chip.accessibilityIdentifier)
-    }
-}
-
 /// A small library-health readout (data-quality counts). The two counts that have a list filter carry a Show
 /// button for it; the filter bar shows those filters only while they are on (W40.fix-reader-health-counts).
 struct DataQualityView: View {
@@ -980,46 +959,6 @@ struct DataQualityView: View {
         HStack {
             Text(label); Spacer()
             Text("\(value)").foregroundStyle(warn ? .orange : .secondary).monospacedDigit()
-        }
-    }
-}
-
-/// A simple wrapping flow layout (left-aligned, wraps to the next row when the width is exceeded).
-/// Used by the tag cloud (word-cloud) and the inline tag-editor popover (removable chips).
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
-        let maxW = proposal.width ?? .infinity
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
-        for v in subviews {
-            let s = Self.size(of: v, within: maxW)
-            if x > 0, x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
-            x += s.width + spacing
-            rowH = max(rowH, s.height)
-        }
-        return CGSize(width: maxW.isFinite ? maxW : x, height: y + rowH)
-    }
-
-    /// A subview's own width, or the row's width when that is less. Measured at its ideal size alone, a tag wider
-    /// than the tag cloud ran past the panel's edge and was cut without an ellipsis (W40.fix-reader-tagcloud-width);
-    /// offered the row's width instead, its text wraps or truncates as the subview says.
-    static func size(of v: LayoutSubview, within maxW: CGFloat) -> CGSize {
-        let ideal = v.sizeThatFits(.unspecified)
-        guard maxW.isFinite, ideal.width > maxW else { return ideal }
-        let fitted = v.sizeThatFits(ProposedViewSize(width: maxW, height: nil))
-        return CGSize(width: min(fitted.width, maxW), height: fitted.height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
-        let maxW = bounds.width
-        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
-        for v in subviews {
-            let s = Self.size(of: v, within: maxW)
-            if x > 0, x + s.width > maxW { x = 0; y += rowH + spacing; rowH = 0 }
-            v.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), anchor: .topLeading, proposal: ProposedViewSize(s))
-            x += s.width + spacing
-            rowH = max(rowH, s.height)
         }
     }
 }

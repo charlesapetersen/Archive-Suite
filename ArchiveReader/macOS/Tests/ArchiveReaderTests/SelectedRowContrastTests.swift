@@ -2,6 +2,7 @@ import AppKit
 import ArchiveCore
 import XCTest
 @testable import ArchiveReader
+import ArchiveCoreUI
 
 /// W40.fix-reader-selected-row-contrast: on a selected row the Read column's accent-blue "Unread" and the pale
 /// tag chips merged into the selection highlight (worst in dark). The layout guard cannot see colour, so this

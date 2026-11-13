@@ -1,6 +1,8 @@
 import AppKit
 
-/// The File tags chips as the Reader draws them (W40.fix-reader-selected-row-contrast).
+/// The tag chips as the suite draws them in a list: the Reader's File tags column (W40.fix-reader-selected-row-contrast)
+/// and Notes' Tags column, whose chips are these (W40.suite-reader-notes-consistency). `TagChip` is the SwiftUI chip
+/// drawn to the same metrics, for a tag bar or a filter field.
 ///
 /// `NSTokenField` fills its tokens with a tint of the accent colour. On a selected, emphasized row that is the
 /// colour of the row itself, so the chips all but vanished (worst in dark), and none of the field's four token
@@ -8,39 +10,39 @@ import AppKit
 /// itself: filled on an ordinary row, outlined and lettered in the selected-row text colour on an emphasized one.
 /// The geometry is the same in both states, so selecting a row never moves a chip or changes the row's height.
 /// The native field editor still draws the tokens while one is being edited (`WrappingTokenField`).
-enum TagChips {
-    struct Chip: Equatable {
-        let title: String
+public enum TagChips {
+    public struct Chip: Equatable {
+        public let title: String
         /// In a top-down coordinate space whose origin is the field's top-left corner.
-        let frame: CGRect
+        public let frame: CGRect
     }
 
-    struct Layout: Equatable {
-        let chips: [Chip]
+    public struct Layout: Equatable {
+        public let chips: [Chip]
         /// The height the chips need, insets included; one line when there are none (the placeholder's).
-        let height: CGFloat
+        public let height: CGFloat
     }
 
     // The metrics follow the font, so the list text size setting scales the chips with the text, and they are
     // those of a native rounded token (about a point size of padding each side, half of one between tokens), so
     // a one-line row keeps the height it had and the chips wrap where the tokens wrap
     // (`SelectedRowContrastTests` holds the heights within a point).
-    static let lineGap: CGFloat = 2
-    static let verticalInset: CGFloat = 0
-    static let leadingInset: CGFloat = 1
-    static let cornerRadius: CGFloat = 4
+    public static let lineGap: CGFloat = 2
+    public static let verticalInset: CGFloat = 0
+    public static let leadingInset: CGFloat = 1
+    public static let cornerRadius: CGFloat = 4
 
-    static func chipHeight(for font: NSFont) -> CGFloat {
+    public static func chipHeight(for font: NSFont) -> CGFloat {
         ceil(font.ascender - font.descender) + 1
     }
 
-    static func horizontalPadding(for font: NSFont) -> CGFloat { ceil(font.pointSize) }
+    public static func horizontalPadding(for font: NSFont) -> CGFloat { ceil(font.pointSize) }
 
-    static func chipGap(for font: NSFont) -> CGFloat { ceil(font.pointSize / 2) }
+    public static func chipGap(for font: NSFont) -> CGFloat { ceil(font.pointSize / 2) }
 
     /// Flows the chips left to right, wrapping at `width`. A chip wider than the field is clamped to it and its
     /// title truncated when drawn. `lineHeight` is the chips' height; the field passes one line of native tokens.
-    static func layout(_ titles: [String], font: NSFont, width: CGFloat, lineHeight: CGFloat? = nil) -> Layout {
+    public static func layout(_ titles: [String], font: NSFont, width: CGFloat, lineHeight: CGFloat? = nil) -> Layout {
         let height = lineHeight ?? chipHeight(for: font)
         let padding = horizontalPadding(for: font)
         let gap = chipGap(for: font)
@@ -62,10 +64,10 @@ enum TagChips {
     }
 
     /// The fill of a chip on an ordinary row: the accent, tinted like the native token.
-    static var fill: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.3) }
+    public static var fill: NSColor { NSColor.controlAccentColor.withAlphaComponent(0.3) }
 
     /// Draws `layout` into the current graphics context of a view with `bounds`, flipped or not.
-    static func draw(_ layout: Layout, in bounds: CGRect, flipped: Bool, font: NSFont, emphasized: Bool) {
+    public static func draw(_ layout: Layout, in bounds: CGRect, flipped: Bool, font: NSFont, emphasized: Bool) {
         let ink: NSColor = emphasized ? .alternateSelectedControlTextColor : .labelColor
         let padding = horizontalPadding(for: font)
         for chip in layout.chips {
@@ -92,7 +94,7 @@ enum TagChips {
     }
 
     /// The field's placeholder, on the first chip line, in the placeholder colour of the row's state.
-    static func drawPlaceholder(_ text: String, in bounds: CGRect, flipped: Bool, font: NSFont, emphasized: Bool,
+    public static func drawPlaceholder(_ text: String, in bounds: CGRect, flipped: Bool, font: NSFont, emphasized: Bool,
                                 lineHeight: CGFloat? = nil) {
         let color: NSColor = emphasized
             ? NSColor.alternateSelectedControlTextColor.withAlphaComponent(0.7)
@@ -108,7 +110,7 @@ enum TagChips {
                    options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
     }
 
-    static func attributedTitle(_ title: String, font: NSFont, color: NSColor) -> NSAttributedString {
+    public static func attributedTitle(_ title: String, font: NSFont, color: NSColor) -> NSAttributedString {
         let style = NSMutableParagraphStyle()
         style.lineBreakMode = .byTruncatingTail
         return NSAttributedString(string: title, attributes: [

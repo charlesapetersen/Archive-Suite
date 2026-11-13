@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import XCTest
 @testable import ArchiveReader
+import ArchiveCoreUI
 
 /// W40.fix-reader-narrow-window — the filter bar's row math (`FilterBarLayout.rows`). The bar used to be an
 /// `HStack` whose minimum was the sum of its controls, wider than the window's content column at 900 pt.

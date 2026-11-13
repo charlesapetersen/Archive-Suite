@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The navigation window's filter bar: one row when its controls fit, more when they do not
-/// (W40.fix-reader-narrow-window).
+/// The filter bar's controls, in both the Reader's navigation window and Notes' list (W40.suite-reader-notes-consistency):
+/// one row when they fit, more when they do not (W40.fix-reader-narrow-window).
 ///
 /// It was an `HStack`, whose minimum width is the sum of its controls' minimums. At the window's 900-pt
 /// minimum with the sidebar showing, that sum (plus the needs-attention toggle, plus "Save as Smart Folder"
@@ -19,30 +19,38 @@ import SwiftUI
 /// break on the minimums; a row's spare width then goes to its controls in order, first up to each one's
 /// ideal and then up to its maximum (its width when offered unlimited room, the fields' `maxWidth`). A
 /// subview marked `.filterBarTrailing()` sits at its row's right edge (the old bar's `Spacer`).
-struct FilterBarLayout: Layout {
-    var spacing: CGFloat = 12
-    var rowSpacing: CGFloat = 6
+public struct FilterBarLayout: Layout {
+    public var spacing: CGFloat = 12
+    public var rowSpacing: CGFloat = 6
 
-    struct Item: Equatable {
-        var min: CGFloat
-        var ideal: CGFloat
-        var max: CGFloat
-        var trailing = false
+    public init(spacing: CGFloat = 12, rowSpacing: CGFloat = 6) {
+        self.spacing = spacing; self.rowSpacing = rowSpacing
+    }
 
-        init(min: CGFloat, ideal: CGFloat, max: CGFloat? = nil, trailing: Bool = false) {
+    public struct Item: Equatable {
+        public var min: CGFloat
+        public var ideal: CGFloat
+        public var max: CGFloat
+        public var trailing = false
+
+        public init(min: CGFloat, ideal: CGFloat, max: CGFloat? = nil, trailing: Bool = false) {
             self.min = min; self.ideal = Swift.max(min, ideal); self.max = Swift.max(self.ideal, max ?? ideal)
             self.trailing = trailing
         }
     }
 
-    struct Placed: Equatable {
-        var index: Int
-        var x: CGFloat
-        var width: CGFloat
+    public struct Placed: Equatable {
+        public var index: Int
+        public var x: CGFloat
+        public var width: CGFloat
+
+        public init(index: Int, x: CGFloat, width: CGFloat) {
+            self.index = index; self.x = x; self.width = width
+        }
     }
 
     /// The rows for `items` in `width`: which subview goes where, and how wide. Pure, so it is unit-tested.
-    static func rows(_ items: [Item], width: CGFloat, spacing: CGFloat) -> [[Placed]] {
+    public static func rows(_ items: [Item], width: CGFloat, spacing: CGFloat) -> [[Placed]] {
         var rows: [[Int]] = [[]]
         var used: CGFloat = 0
         for (i, item) in items.enumerated() {
@@ -95,7 +103,7 @@ struct FilterBarLayout: Layout {
         return (rows, heights)
     }
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+    public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
         let all = items(subviews)
         let oneRow = all.reduce(0) { $0 + $1.ideal } + spacing * CGFloat(max(0, all.count - 1))
         // It fills the width it is offered, as the old bar's `Spacer` made it. Offered nothing (the window asking
@@ -108,7 +116,7 @@ struct FilterBarLayout: Layout {
         return CGSize(width: width, height: height)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+    public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
         let (rows, heights) = layout(subviews, width: bounds.width)
         var y = bounds.minY
         for (row, height) in zip(rows, heights) {
@@ -127,5 +135,5 @@ private struct FilterBarTrailing: LayoutValueKey {
 
 extension View {
     /// Pin this filter-bar control to the right edge of its row (see `FilterBarLayout`).
-    func filterBarTrailing() -> some View { layoutValue(key: FilterBarTrailing.self, value: true) }
+    public func filterBarTrailing() -> some View { layoutValue(key: FilterBarTrailing.self, value: true) }
 }

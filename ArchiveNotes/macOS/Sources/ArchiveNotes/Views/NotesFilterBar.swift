@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import ArchiveCoreUI
 
 /// The item-list filter bar (06-viewers §4, W6-S4). Binds a per-window `NotesNavigationModel` and
 /// surfaces the kind segmented control, a keyword search field (drives FTS — bm25 relevance,
@@ -141,7 +142,10 @@ struct NotesFilterBar: View {
                 .accessibilityHidden(true)
             FlowLayout(spacing: 6, lineSpacing: 4) {
                 ForEach(chips) { chip in
-                    NotesActiveFilterChipView(chip: chip) { nav.removeFilter(chip.facet) }
+                    ActiveFilterChipView(label: chip.label, phrase: chip.phrase,
+                                         identifier: chip.accessibilityIdentifier) {
+                        nav.removeFilter(chip.facet)
+                    }
                     if chip.facet == .advancedSearch {
                         Button("Edit\u{2026}") { nav.openAdvancedSearch() }
                             .controlSize(.small)
@@ -261,30 +265,5 @@ struct NotesFilterBar: View {
                 }
             }
         )
-    }
-}
-
-/// One filter or search in effect. The whole chip is its ✕, one control for the keyboard and VoiceOver as for the
-/// mouse; drawn as the Reader's `ActiveFilterChipView`.
-private struct NotesActiveFilterChipView: View {
-    let chip: NotesActiveFilterChip
-    let remove: () -> Void
-    var body: some View {
-        Button(action: remove) {
-            HStack(spacing: 4) {
-                Text(chip.label).lineLimit(1).truncationMode(.middle)
-                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-            }
-            .font(.callout)
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-            .overlay(Capsule().strokeBorder(Color.accentColor.opacity(0.45)))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: 320)
-        .help("In effect: \(chip.phrase). Click to remove it.")
-        .accessibilityLabel("Remove \(chip.label)")
-        .accessibilityIdentifier(chip.accessibilityIdentifier)
     }
 }
