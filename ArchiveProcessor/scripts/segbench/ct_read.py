@@ -6,6 +6,7 @@
     python3 ct_read.py trees                 # the Route B name patterns on ct_trees.json and the owner's tree
     heavy-run.py run -- python3 ct_read.py corpus-lines   # Vision lines on every Red marker's JPEG original
     python3 ct_read.py corpus                # carry-forward and Purple's meaning, measured on the corpus
+    python3 ct_read.py gateway --model luna-gw   # W47.ct-read-paid: the gateway arm, real money, under PAID_CAP
     python3 ct_read.py report                # segbench-results/ct-read.md from the four steps' JSON
 
 The truth is W47.ct-truth-final's `pool-jpeg/final/truth.jsonl` (196 photos), less 8026393c1fcf, which the owner's
@@ -20,6 +21,12 @@ Routes: Apple Vision (accurate, language correction, the app's settings; the tru
 written here, and Gemma 3 12B on this Mac, which drafted nothing, read with a prompt whose examples are invented.
 The corpus PDFs' ABBYY text layer is not a route (owner, 2026-10-30: no arm takes it as input), although the
 item's text, filed on 2026-10-21, named it. No plan-route arm (root CLAUDE.md).
+
+W47.ct-read-paid adds the gateway arm: GPT 5.6 Luna through the Stanford AI API gateway, the cheapest gateway vision
+model the bench has used ($0.20 / $1.20 a million tokens against Gemini 3.7 Flash's $0.75 / $3.75), and one that
+drafted none of the truth, so it is scored on every cell like Gemma. Same upright photo, same invented-example prompt,
+temperature 0, low reasoning. Real money on the PTA: every call is in CACHE/gateway-calls.jsonl before its reply is
+used, and PAID_CAP ($0.50, the item's ceiling, under the $7 rule) stops the run before a call could pass it.
 """
 import argparse
 import collections
@@ -50,6 +57,12 @@ SEED = 4702
 MAX_TOKENS = 640
 
 MODELS = {"gemma3-12b-mlx4": ("mlx-community/gemma-3-12b-it-4bit", "Gemma 3 12B, 4-bit MLX")}
+# W47.ct-read-paid: key -> (gateway model id, name, $ per million tokens in and out, the bench's list figures)
+PAID = {"luna-gw": ("gpt-5.6-luna", "GPT 5.6 Luna (Stanford gateway, low reasoning)", (0.20, 1.20))}
+PAID_CAP = 0.50                 # the item's total, every paid key together
+PAID_MAX_TOKENS = 4096          # reasoning comes first; a small cap returns no text
+PAID_WORST_IN = 6000            # a photo's prompt tokens, generously: the cap check's worst case
+PAID_LEDGER = os.path.join(CACHE, "gateway-calls.jsonl")
 
 # The final prompt's rules with every example invented (the item: "read with a prompt whose examples are invented").
 # The truth build's examples came from real labels, which is why the drafters' `prompt_example` cells are left out.
@@ -144,6 +157,93 @@ def cmd_collect(a):
         with open(os.path.join(out, mid + ".json"), "w", encoding="utf-8") as fh:
             json.dump(rec, fh, ensure_ascii=False)
         print(f"[{k}/{len(todo)}] {mid} {rec['wall_s']}s {'ok' if rec['parsed'] else 'unparsed'}", flush=True)
+
+
+# --- W47.ct-read-paid: the gateway arm ------------------------------------------------------------------------------
+
+def paid_ledger():
+    return jsonl(PAID_LEDGER) if os.path.exists(PAID_LEDGER) else []
+
+
+def paid_cost(key, usage):
+    price = PAID[key][2]
+    return ((usage.get("prompt_tokens") or 0) * price[0] + (usage.get("completion_tokens") or 0) * price[1]) / 1e6
+
+
+def paid_spent():
+    """What every paid call so far counts against PAID_CAP: the larger of the token estimate and the gateway's own
+    figure, per call (gateway_gemini.charge)."""
+    import gateway_gemini as G
+    return sum(G.charge(x) for x in paid_ledger())
+
+
+def cmd_gateway(a):
+    """One blind reading per truth photo through the gateway. The ledger line is written before the reply is used;
+    the cap check reserves a worst-case call for every one in flight, so the cap holds with four at once."""
+    import base64
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import gateway_gemini as G
+    model, name, price = PAID[a.model]
+    out = draft_dir(a.model)
+    os.makedirs(out, exist_ok=True)
+    todo = [r["id"] for r in truth() if os.path.exists(page_of(r["id"]))
+            and not os.path.exists(os.path.join(out, r["id"] + ".json"))][: a.limit or None]
+    worst = (PAID_WORST_IN * price[0] + PAID_MAX_TOKENS * price[1]) / 1e6
+    lock = threading.Lock()
+    state = {"in_flight": 0, "stopped": None}
+    print(f"{a.model}: {len(todo)} photos to read; ${paid_spent():.4f} spent of ${PAID_CAP:.2f}", flush=True)
+
+    def one(mid):
+        with lock:
+            if state["stopped"]:
+                return mid, state["stopped"]
+            spent = paid_spent()
+            if spent + worst * (state["in_flight"] + 1) > PAID_CAP:
+                state["stopped"] = f"cap: ${spent:.4f} spent of ${PAID_CAP:.2f}"
+                return mid, state["stopped"]
+            state["in_flight"] += 1
+        try:
+            with open(page_of(mid), "rb") as fh:
+                img = fh.read()
+            body = {"model": model, "temperature": 0, "max_tokens": PAID_MAX_TOKENS, "reasoning_effort": "low",
+                    "messages": [{"role": "user", "content": [
+                        {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(img).decode()}},
+                        {"type": "text", "text": PROMPT}]}]}
+            t = time.time()
+            for attempt in range(3):
+                r = G.request("/chat/completions", body)
+                if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                    time.sleep(10 * (attempt + 1))
+                    continue
+                break
+            got = r.json() if r.headers.get("content-type", "").startswith("application/json") else {"raw": r.text[:2000]}
+            usage = got.get("usage") or {}
+            rec = G.with_gateway_cost({"key": a.model, "id": mid, "http": r.status_code, "t": t,
+                                       "wall_s": round(time.time() - t, 2), "model": got.get("model"), "usage": usage,
+                                       "cost": round(paid_cost(a.model, usage), 6)}, r)
+            with lock:
+                with open(PAID_LEDGER, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(rec) + "\n")
+        finally:
+            with lock:
+                state["in_flight"] -= 1
+        choice = (got.get("choices") or [{}])[0]
+        raw = (choice.get("message") or {}).get("content") if r.status_code == 200 else None
+        if not raw:
+            return mid, f"http {r.status_code} {choice.get('finish_reason')} {json.dumps(got)[:200]}"
+        d = {"id": mid, "raw": raw, "parsed": parse(raw), "wall_s": rec["wall_s"],
+             "tokens": [usage.get("prompt_tokens"), usage.get("completion_tokens")], "finish": choice.get("finish_reason")}
+        with open(os.path.join(out, mid + ".json"), "w", encoding="utf-8") as fh:
+            json.dump(d, fh, ensure_ascii=False)
+        return mid, "ok" if d["parsed"] else "unparsed"
+
+    with ThreadPoolExecutor(4) as ex:
+        res = list(ex.map(one, todo))
+    bad = [(m, s) for m, s in res if s != "ok"]
+    led = paid_ledger()
+    print(f"{len(res) - len(bad)}/{len(res)} parsed; ${paid_spent():.4f} charged in all ({G.billed_note(led)}); "
+          f"not ok: {bad[:10]}")
 
 
 def parse(raw):
@@ -246,8 +346,11 @@ def vision_read(lines, colour):
 
 DRAFTERS = CT.READERS
 OWNER_SRC = set(CT.OWNER_FINAL)
-NAMES = {**CT.NAMES, "vision": "Apple Vision (accurate) + parser", **{k: v[1] for k, v in MODELS.items()}}
-ROUTES = ["vision", *MODELS, *DRAFTERS]
+NAMES = {**CT.NAMES, "vision": "Apple Vision (accurate) + parser", **{k: v[1] for k, v in MODELS.items()},
+         **{k: v[1] for k, v in PAID.items()}}
+# a paid arm is scored once it has read (W47.ct-read-paid); until then the scores are the free routes'
+PAID_RUN = [k for k in PAID if os.path.isdir(draft_dir(k)) and any(n.endswith(".json") for n in os.listdir(draft_dir(k)))]
+ROUTES = ["vision", *MODELS, *PAID_RUN, *DRAFTERS]
 SCORED = ["kind", *FIELDS]
 
 
@@ -270,7 +373,7 @@ def drafter_reading(mid, key):
 def reading(r, route):
     if route == "vision":
         return vision_read(lines_of(r["id"]), r["colour"])
-    if route in MODELS:
+    if route in MODELS or route in PAID:
         p = os.path.join(draft_dir(route), r["id"] + ".json")
         return (json.load(open(p, encoding="utf-8")).get("parsed") or None) if os.path.exists(p) else "missing"
     return drafter_reading(r["id"], route)
@@ -388,6 +491,28 @@ def cmd_score(a):
         for f in SCORED:
             sel = [x for x in keep if x[1] == f and x[2] == "owner" and f not in x[0]["prompt_example"]]
             res["gaps_owner"][d][f] = paired_gap(sel, d, next(iter(MODELS)), reads)
+    # W47.ct-read-paid: the gateway arm against the two free routes on every cell, and against Gemini 3.7 Flash (a
+    # drafter) on the owner's cells less Gemini's prompt examples, the only cells where Gemini may be scored
+    gem, gemini = next(iter(MODELS)), CT.GATEWAY
+    res["gaps_paid"], res["paid"] = {}, {}
+    for k in PAID_RUN:
+        res["gaps_paid"][k] = {f: {"vision": paired_gap([x for x in base if x[1] == f], k, "vision", reads),
+                                   gem: paired_gap([x for x in base if x[1] == f], k, gem, reads),
+                                   gemini: paired_gap([x for x in keep if x[1] == f and x[2] == "owner"
+                                                       and f not in x[0]["prompt_example"]], k, gemini, reads)}
+                               for f in SCORED}
+        led = [x for x in paid_ledger() if x.get("key") == k]
+        import gateway_gemini as G
+        w = sorted(x["wall_s"] for x in led if x.get("http") == 200)
+        b = G.billed(led)
+        res["paid"][k] = {"calls": len(led), "ok": len(w), "charged": b["charged"], "estimate": b["estimate"],
+                          "gateway": b["gateway"], "gateway_calls": b["gateway_calls"],
+                          "per_photo": round(b["charged"] / len(w), 6) if w else None,
+                          "median_s": w[len(w) // 2] if w else None,
+                          "prompt_tokens_median": sorted((x["usage"].get("prompt_tokens") or 0) for x in led
+                                                         if x.get("http") == 200)[len(w) // 2] if w else None,
+                          "completion_tokens_median": sorted((x["usage"].get("completion_tokens") or 0) for x in led
+                                                             if x.get("http") == 200)[len(w) // 2] if w else None}
     # time per photo for the local readers
     res["speed"] = {}
     for k in MODELS:
@@ -828,6 +953,31 @@ def cmd_report(a):
         r1, r2 = S["routes"]["vision"][f].get("rule"), S["routes"][gem][f].get("rule")
         if r1 or r2:
             L.append(f"| {CT.LABELS.get(f, f)} | {cell(r1)} | {cell(r2)} |")
+    for k in PAID_RUN:
+        pd, gp = S["paid"][k], S["gaps_paid"][k]
+        def gs(x):
+            return "–" if not x else f"{100 * x['gap']:+.0f} ({100 * x['ci'][0]:+.0f} to {100 * x['ci'][1]:+.0f})"
+        L += ["", f"## Per field: the gateway arm, {NAMES[k]} (W47.ct-read-paid)", "",
+              f"{NAMES[k]} drafted none of the truth, so like {NAMES[gem]} it is scored on the owner's and the "
+              "unanimous cells, with the same prompt (invented examples) on the same upright photos. "
+              f"{pd['ok']} of {pd['calls']} calls answered; ${pd['charged']:.4f} charged in all, real money on the "
+              f"gateway (the larger of the token estimate at ${PAID[k][2][0]:.2f} / ${PAID[k][2][1]:.2f} a million "
+              f"tokens and the gateway's own figure, which it gave on {pd['gateway_calls']} calls). The gaps are this "
+              "arm less each other route on the same cells (95% bootstrap over photos).", "",
+              f"| field | {NAMES[k]} | right of filled | filled when empty | less Vision | less {NAMES[gem]} |",
+              "|---|---|---|---|---|---|"]
+        for f in SCORED:
+            t = S["routes"][k][f].get("scored")
+            fe = ("–", "–") if not t else (f"{t['filled_right']}/{t['filled']}", f"{t['false_fill']}/{t['empty']}")
+            L.append(f"| {CT.LABELS.get(f, f)} | {cell(t)} | {fe[0]} | {fe[1]} | {gs(gp[f]['vision'])} | "
+                     f"{gs(gp[f][gem])} |")
+        L += ["", f"On the owner's cells, {NAMES[k]} less {NAMES[CT.GATEWAY]} (a drafter, so only there, less its "
+              "prompt's example fields): " + "; ".join(f"{CT.LABELS.get(f, f).lower()} {gs(gp[f][CT.GATEWAY])}"
+                                                      for f in SCORED) + "."]
+        rr = [(f, S["routes"][k][f].get("rule")) for f in SCORED if S["routes"][k][f].get("rule")]
+        if rr:
+            L += ["", "On the rule-settled cells, apart: " + "; ".join(f"{CT.LABELS.get(f, f).lower()} {cell(t)}"
+                                                                     for f, t in rr) + "."]
     L += ["", "## Per field: the owner's own cells, every route", "",
           "The cells the three drafters split on, which the owner ruled: the hard cells. Every route on the same "
           "cells, less each row's prompt-example fields for the drafters.", "",
@@ -905,6 +1055,13 @@ def cmd_report(a):
     if gsp:
         L.append(f"- {NAMES[gem]}: median {gsp['median_s']} s a photo (mean {gsp['mean_s']}), peak "
                  f"{gsp['peak_gb']} GB; the corpus's markers in about {n_marks * gsp['mean_s'] / 3600:.1f} hours; $0.")
+    for k in PAID_RUN:
+        pd = S["paid"][k]
+        if pd["per_photo"]:
+            L.append(f"- {NAMES[k]}: ${pd['per_photo']:.5f} a photo charged on its {pd['ok']} truth photos (median "
+                     f"{pd['prompt_tokens_median']:,} tokens in, {pd['completion_tokens_median']:,} out, reasoning "
+                     f"included; median {pd['median_s']} s a call, four at once), so about "
+                     f"${n_marks * pd['per_photo']:.2f} for the corpus's markers.")
     L += [f"- Gemini 3.7 Flash through the gateway (the truth's third reader, for W47.ct-read-paid's price): "
           f"$0.0023 a photo measured on the truth build's 215 calls, so about ${n_marks * 0.0023:.0f} for the "
           "corpus: over the $7 line, so a full backfill read asks the owner first.", "",
@@ -1003,10 +1160,13 @@ def main():
     c = sub.add_parser("collect")
     c.add_argument("--model", required=True, choices=sorted(MODELS))
     c.add_argument("--limit", type=int, default=0)
+    g = sub.add_parser("gateway")
+    g.add_argument("--model", required=True, choices=sorted(PAID))
+    g.add_argument("--limit", type=int, default=0)
     for name in ("score", "trees", "corpus-lines", "corpus", "report"):
         sub.add_parser(name)
     a = ap.parse_args()
-    {"collect": cmd_collect, "score": cmd_score, "trees": cmd_trees, "corpus-lines": cmd_corpus_lines,
+    {"collect": cmd_collect, "gateway": cmd_gateway, "score": cmd_score, "trees": cmd_trees, "corpus-lines": cmd_corpus_lines,
      "corpus": cmd_corpus, "report": cmd_report}[a.cmd](a)
 
 
