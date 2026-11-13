@@ -214,14 +214,17 @@ enum SettingsSolverTestDriver {
         check("D1 reading cites its pair", d1.pick("reading", "all")?.gap?.citation.contains("owner96/all/answered") == true)
         eq("D1 handwritten: Gemini 3.8 Flash", pick(d1, "reading", "handwritten"), "gemini3.8-flash")
         check("D1 no cascade beats Gemini 3.8 Flash", !pick(d1, "reading").hasPrefix("casc-"))
-        eq("D1 segmentation: Gemini 3.8 Flash", pick(d1, "segmentation"), "gemini3.8-flash")
-        // W46.seg-text-tier-app: the text-only tier ties it for half the price, but is the user's choice only.
-        check("D1 the text-only tier is the user's choice only",
-              table.stage("segmentation")?.route("gemini3.8-flash-text")?.userChoiceOnly == true)
-        var textChosen = SettingsAnswers()
-        textChosen.onlyRoutes["segmentation"] = ["gemini3.8-flash-text"]
-        eq("D1 the text-only tier runs when the user chooses it", pick(solve("D1-text", gem, textChosen), "segmentation"),
-           "gemini3.8-flash-text")
+        // W46.seg-text-tier-default (owner, 2026-11-13): the text-only window ties the image window under the 4.2-point
+        // floor for half the price, so the tie rule picks it; the image window is there for a user who chooses it.
+        eq("D1 segmentation: Gemini 3.8 Flash on the text alone", pick(d1, "segmentation"), "gemini3.8-flash-text")
+        check("D1 segmentation: the text alone ties the image window and is cheaper",
+              d1.pick("segmentation", "all")?.reason.contains("ties the best usable route, gemini3.8-flash (") == true
+                  && d1.pick("segmentation", "all")?.reason.contains("cheaper") == true,
+              d1.pick("segmentation", "all")?.reason ?? "no pick")
+        var imageChosen = SettingsAnswers()
+        imageChosen.onlyRoutes["segmentation"] = ["gemini3.8-flash"]
+        eq("D1 the image window runs when the user chooses it", pick(solve("D1-image", gem, imageChosen), "segmentation"),
+           "gemini3.8-flash")
         eq("D1 names: the entity feature's own prompt", pick(d1, "entities", "correspondence-typed"),
            "gemini-entity-feature")
         check("D1 names: the tagging call's rows are history, not offered",

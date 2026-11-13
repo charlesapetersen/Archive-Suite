@@ -100,6 +100,16 @@ enum SegmentationChooserTestDriver {
               "\(String(describing: text.apiDollars)) against \(String(describing: gemini.apiDollars))")
         check("2 gemini-text names the model its figures were measured on",
               text.notes.count == 1 && text.notes[0].contains("Gemini 3.7 Flash"), "\(text.notes)")
+        // W46.seg-text-tier-default: the chooser says why the text alone is picked and what the images buy.
+        let textNote = SegmentationRow.geminiTierNote(.geminiText, options: options) ?? ""
+        let imageNote = SegmentationRow.geminiTierNote(.gemini, options: options) ?? ""
+        check("2 gemini-text says why it is the pick and what the images buy",
+              textNote.hasPrefix("When Gemini is the only key, the app picks this one")
+                  && textNote.contains("about 4 fewer boundaries to check in every 100 pages, at about twice the price"), textNote)
+        check("2 gemini says what the images buy over the text alone",
+              imageNote.contains("about 4 fewer boundaries to check in every 100 pages, at about twice the price")
+                  && imageNote.contains("picks the cheaper text alone"), imageNote)
+        check("2 no tier note on another approach", SegmentationRow.geminiTierNote(.openai, options: options) == nil)
         eq("2 gemini-text needs a Gemini key", row(.geminiText, 1000, .none).unavailableReason, "Needs a Gemini API key.")
         // Since the truth rescore (W46.seg-truth-rescore) ChatGPT has no unflagged error, and Gemini on g2 none either.
         eq("2 zero is not a promise", row(.openai, 1000).unshownErrors, "none in 363 test pages")
@@ -326,19 +336,20 @@ enum SegmentationChooserTestDriver {
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
         // The settings solver's pick (W46.settings-solver): ChatGPT by key leads at 90.9% unchecked, beyond the 3.2
-        // floor over Claude's 85.5%; with Gemini's key alone, Gemini 3.8 Flash.
+        // floor over Claude's 85.5%; with Gemini's key alone, Gemini 3.8 Flash on the text alone, which ties it with the
+        // images for half the price (W46.seg-text-tier-default).
         check("6 no Gemini key, nothing saved: saves the solver's pick",
               SegmentationApproach.preselect(noGemini, defaults: d))
         eq("6 no Gemini key, nothing saved: openai", SegmentationApproach.stored(d), .openai)
         d.removeObject(forKey: key)
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
-        eq("6 Gemini key, nothing saved: gemini", SegmentationApproach.stored(d), .gemini)
+        eq("6 Gemini key, nothing saved: gemini-text", SegmentationApproach.stored(d), .geminiText)
         d.removeObject(forKey: key)
         var gemCLI = gemOnly
         gemCLI.hasClaudeCLI = true
         SegmentationApproach.preselect(gemCLI, defaults: d)
-        eq("6 Gemini key and an installed claude: Gemini (claude's sign-in is unknown)", SegmentationApproach.stored(d),
-           .gemini)
+        eq("6 Gemini key and an installed claude: Gemini on the text alone (claude's sign-in is unknown)",
+           SegmentationApproach.stored(d), .geminiText)
         d.removeObject(forKey: key)
         check("6 an installed claude alone: saves nothing",
               !SegmentationApproach.preselect(SegmentationRoutes(hasClaudeCLI: true), defaults: d))

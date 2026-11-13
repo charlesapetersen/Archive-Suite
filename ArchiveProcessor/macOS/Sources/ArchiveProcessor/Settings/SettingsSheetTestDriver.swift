@@ -126,7 +126,24 @@ enum SettingsSheetTestDriver {
                                    (.batchCeilingUSD, .double(10)), (.staysOnMac, .bool(false)),
                                    (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)))])
         let paid = sheet("gemini", general: gem)
+        // W46.seg-text-tier-default: the text-only window ties the image window for half the price and is the pick; the
+        // card says why and what the image window buys, and offers it beside the pick.
         if let s = card(paid, "segmentation") {
+            check("3 a Gemini key: the text-only window is the segmentation pick", s.routeID == "gemini3.8-flash-text",
+                  s.routeID ?? "nil")
+            check("3 the pick says it ties and is cheaper, and what the image window buys",
+                  s.why.contains("cheaper") && s.why.contains("Gemini 3.8 Flash") && s.why.contains("about 4 fewer boundaries")
+                      && s.why.contains("more per 1,000 pages") && s.why.contains("Use instead"), s.why)
+            let image = s.alternatives.first { $0.id == "gemini3.8-flash" }
+            check("3 the image window is an alternative, a tie with the pick, its checks beside its price",
+                  image.map { $0.figure.contains("a tie with the pick") && $0.cost.contains("$")
+                      && $0.cost.contains("about 25 boundaries to check in 100 pages") } == true,
+                  image.map { "\($0.figure), \($0.cost)" } ?? s.alternatives.map(\.id).joined(separator: ", "))
+            check("3 the image window can be chosen", s.options.contains { $0.id == "gemini3.8-flash" && $0.blocked == nil })
+        } else { check("3 segmentation card", false) }
+        let paidImage = sheet("gemini-image", general: gem,
+                              collection: layer(.collection, [(SettingsSheetModel.overrideKey("segmentation"), .string("gemini3.8-flash"))]))
+        if let s = card(paidImage, "segmentation") {
             if s.routeID == "gemini3.8-flash" {
                 check("3 Gemini 3.8's segmentation card labels its figures as 3.7's", s.labels.contains { $0.contains("Gemini 3.7") })
                 check("3 Gemini 3.8's magazine figure ranks", s.parts.first { $0.id == "magazine" }?.label2 == nil)
@@ -136,16 +153,15 @@ enum SettingsSheetTestDriver {
                       s.labels.contains { $0.contains("88.8% to 89.1%") && $0.contains("three test runs of Gemini 3.7")
                           && $0.contains("single run") }, s.labels.joined(separator: " | "))
                 check("3 Gemini's card carries no 2B label", !s.labels.contains { $0.contains("zero-shot") })
-                // W46.seg-text-tier-app: the text-only tier is offered beside the pick, its checks beside its price.
+                check("3 a chosen image window keeps no tie sentence of the app's pick", !s.why.contains("fewer boundaries"), s.why)
                 let text = s.alternatives.first { $0.id == "gemini3.8-flash-text" }
                 check("3 the text-only tier is an alternative with its checks beside its price",
                       text.map { $0.cost.contains("$") && $0.cost.contains("about 29 boundaries to check in 100 pages") } == true,
                       text.map { "\($0.figure), \($0.cost)" } ?? s.alternatives.map(\.id).joined(separator: ", "))
-                check("3 the text-only tier can be chosen", s.options.contains { $0.id == "gemini3.8-flash-text" && $0.blocked == nil })
             } else {
                 lines.append("SKIP 3 Gemini segmentation labels: the pick is \(s.routeID ?? "nil")")
             }
-        }
+        } else { check("3 chosen image-window segmentation card", false) }
         if let r = card(paid, "reading") {
             check("3 a paid pick names its cost", r.cost.contains("$") || r.cost.hasPrefix("free"), r.cost)
             check("3 a reading pick the app runs can be applied", r.routeID == "gemini3.8-flash" ? r.apply == .reading(appRoute: "gemini|gemini-3.8-flash") : true)

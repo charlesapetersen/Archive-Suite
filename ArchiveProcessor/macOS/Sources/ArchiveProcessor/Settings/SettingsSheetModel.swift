@@ -532,6 +532,14 @@ struct SettingsSheetModel {
         if stage.id == "segmentation", route?.family == .manual {
             why = "Nothing that proposes where documents begin can run here, so you check every place yourself."
         }
+        // A cheaper segmentation pick that won a tie: what the dearer route it tied buys (W46.seg-text-tier-default).
+        if stage.id == "segmentation", let r = route, let reason = lead?.reason, reason.contains(" ties "),
+           let m = reason.firstMatch(of: #/ties the best usable route, (\S+) \(/#), let b = stage.route(String(m.1)),
+           let pc = r.figure("test-boxes.checks_per_100"), let bc = b.figure("test-boxes.checks_per_100"), bc < pc {
+            let more = solver.usdPer1000(b, stage: stage.id) - solver.usdPer1000(r, stage: stage.id)
+            why += " \(words.display(stage.id, b)) asks you to check about \(String(format: "%.0f", pc - bc)) fewer boundaries in "
+                + "100 pages for \(words.money(more)) more per 1,000 pages; “Use instead…” switches to it."
+        }
         var appPick: String?
         if let custom {
             let appLead = app.picks.first { $0.stage == stage.id && $0.part == leadPart }

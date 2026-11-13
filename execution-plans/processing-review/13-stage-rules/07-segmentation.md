@@ -44,6 +44,9 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   ranges are wider (g2: Stanton 2.9, RG165 6.9 points), so a per-box comparison would need its own floor.
   The floor is in pages exact; a gap-accuracy difference has no measured floor, so there the paired interval
   decides (seg-boxes-score.md Noise). Error counts differ by one or two within noise (options.md Reading).
+  The rule applies to the text-only window too (owner, 2026-11-13, W46.seg-text-tier-default): with a Gemini key,
+  `gemini3.8-flash-text` (87.3%, 29.2 checks per 100 pages, $1.68) ties Gemini 3.8 Flash with the images (88.8%,
+  25.3, $3.61) and is the pick; the image window stays offered for a user who wants fewer checks.
 - **Kind rules.** Kinds the bench scores apart are boxes, not document kinds (12-settings-design.md §3.9):
   `test-boxes` (typed letters, Stanton and RG165), `letters` (Sasha, typed and handwritten, the one box no student
   trained on), `magazine` (Illustrated Review, articles within issues), `clippings-mixed` (SC0122, the review's
@@ -146,7 +149,7 @@ segment figures conditional on each route's call at unsure gaps.
  "time":{"per_unit_s":1.53,"per_window_s":4.6,"measured":false,"measured_on":"Gemini 3.7's text-only gateway window call on g1, lent to 3.8 on g2t (not timed on 3.8); 6.7 s with images","derived":"seconds a seven-page window call over 3, a window every 3 pages at stride 3","source":{"file":"seg-window-gateway.md","route":"k7-t","attribute":"mean seconds","value":"4.6"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
  "caveats":["the app sends prompt g2 without the page images (g2t) to 3.8; every figure and the level (0.950) are Gemini 3.7 Flash's text-only g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-text-tier-app.md)","more boundaries to check than with the images (29.2 per 100 pages against 25.3) for about half the price","introductory price to 31 Dec 2026, then double (options.md's Gemini rates)","one run, window offset 0; the TABME figure is the text-only window on g1"],
- "kind_rules":[],"fallback":"manual","conditions":["the user's choice only: it ties Gemini 3.8 Flash with the images under the 4.2-point floor for half the price, so the tie rule would make it the default; whether it may is the owner's call (W46.seg-text-tier-app)"]},
+ "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"claude-sonnet5.5","name":"Claude Sonnet 5.5 (key or Claude plan)","family":"plan","app_route":"anthropic|claude-sonnet-5-5","status":"shipped","needs":{"key":["anthropic"],"plan":["claude"],"cluster":false,"mac_gb":0,"gpus":0},
  "figures":{"test-boxes":{"value":85.5,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"pages in an exact document, no checking","value":"85.5%"}},

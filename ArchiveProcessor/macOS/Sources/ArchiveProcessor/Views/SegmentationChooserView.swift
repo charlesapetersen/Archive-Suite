@@ -100,6 +100,13 @@ struct SegmentationChooserView: View {
                             .controlSize(.small)
                     }
                 }
+                // Why the text alone is the pick with a Gemini key, and what the images buy (W46.seg-text-tier-default).
+                if row.canRun, let options, let note = SegmentationRow.geminiTierNote(approach, options: options) {
+                    Text(note)
+                        .font(.caption).foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ap.segmentation.tierNote")
+                }
             } else {
                 Text("The segmentation figures are missing from this build; only Full manual is offered.")
                     .font(.caption2).foregroundStyle(.primary)

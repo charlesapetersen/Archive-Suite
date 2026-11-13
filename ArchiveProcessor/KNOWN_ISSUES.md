@@ -2,6 +2,16 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W46.seg-text-tier-default, 2026-11-13): the default Gemini segmenter reads no picture, so a page with no OCR text gives it nothing
+
+When Gemini is the only key, the solver now picks Gemini 3.8 Flash on the windows' OCR text alone (`gemini-text`), which
+ties the image window under the 4.2-point floor at about half the price (owner, 2026-11-13). Its windows are built from
+each page's OCR result (`OCRProcessor+WindowSegmentation.swift`, `jobs[i].result?.text ?? ""`), so a page whose OCR
+failed, or that holds no text (a photograph, a blank back), reaches it as an empty page. The image window had the
+picture to go on; this one does not, and nothing flags the gaps beside such a page. The measured figures (87.3% exact,
+29.2 checks per 100 pages) are on test boxes whose pages were all read. Choosing Gemini with the images in the chooser
+or on the settings sheet avoids it. Follow-up: `W46.seg-text-tier-blank` (flag the gaps beside a page with no text).
+
 ## ⚠️ LIMITATION (W46.date-route, 2026-11-13): what the dating route does not yet cover
 
 - **Live Capture and the manual auto-date take the route with less context (W46.date-route-other-paths).** Live Capture

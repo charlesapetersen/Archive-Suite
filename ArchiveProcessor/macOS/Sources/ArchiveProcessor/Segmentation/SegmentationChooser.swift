@@ -204,6 +204,25 @@ struct SegmentationRow: Equatable, Sendable {
                                                                      }) : []))
     }
 
+    /// Why the text-only Gemini window is the pick when Gemini is the only key, and what the image window buys over it:
+    /// the two tie under the settings solver's 4.2-point floor, so the cheaper one is picked (owner,
+    /// W46.seg-text-tier-default). The price is a ratio, which the 2027 doubling of both leaves as it is.
+    static func geminiTierNote(_ approach: SegmentationApproach, options: SegmentationOptions) -> String? {
+        guard approach == .gemini || approach == .geminiText,
+              let text = options.approach(.geminiText), let image = options.approach(.gemini), text.available, image.available,
+              let tf = text.figures?.test, let gf = image.figures?.test,
+              let tc = text.cost?.total.listUSDPer1000Pages, let gc = image.cost?.total.listUSDPer1000Pages,
+              gf.flaggedPer100Pages < tf.flaggedPer100Pages, tc > 0, gc / tc >= 1.5 else { return nil }
+        let ratio = Int((gc / tc).rounded())
+        let buys = String(format: "about %.0f fewer boundaries to check in every 100 pages", tf.flaggedPer100Pages - gf.flaggedPer100Pages)
+            + ", at about " + (ratio == 2 ? "twice" : "\(ratio) times") + " the price"
+        return approach == .geminiText
+            ? "When Gemini is the only key, the app picks this one: it is as good as Gemini with the images within the "
+                + "measurements' margin of error, for about half the price. Gemini with the images leaves \(buys)."
+            : "Against Gemini on the text alone, the images leave \(buys). The two are as good within the measurements' "
+                + "margin of error, so when Gemini is the only key the app picks the cheaper text alone."
+    }
+
     static func all(options: SegmentationOptions, pageCount: Int, routes: SegmentationRoutes,
                     today: Date = Date()) -> [SegmentationRow] {
         SegmentationApproach.allCases.map {

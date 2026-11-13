@@ -8574,9 +8574,7 @@
      ],
      "kind_rules": [],
      "fallback": "manual",
-     "conditions": [
-      "the user's choice only: it ties Gemini 3.8 Flash with the images under the 4.2-point floor for half the price, so the tie rule would make it the default; whether it may is the owner's call (W46.seg-text-tier-app)"
-     ]
+     "conditions": []
     },
     {
      "id": "claude-sonnet5.5",
