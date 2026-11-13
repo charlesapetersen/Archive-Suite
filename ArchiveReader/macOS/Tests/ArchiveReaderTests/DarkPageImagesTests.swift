@@ -81,7 +81,11 @@ final class DarkPageImagesTests: XCTestCase {
         let on = try XCTUnwrap(controller.pdfView, "the pane should have made its PDFView")
         XCTAssertEqual(on.contentFilters.count, 1, "the pane is filtered")
         XCTAssertEqual(on.contentFilters.first?.name, "CIColorCubeWithColorSpace")
-        XCTAssertEqual(on.backgroundColor, .white, "white behind the page draws as the darkest grey")
+        XCTAssertEqual(on.backgroundColor, PDFPaneView.invertedPaneBackground)
+        let behind = DarkPageImages.map(0.62, 0.62, 0.62).0, whitePage = DarkPageImages.map(1, 1, 1).0
+        let greyPage = DarkPageImages.map(0.72, 0.71, 0.68).0
+        XCTAssertGreaterThan(behind, greyPage + 0.05, "the pane draws lighter than an inverted page, so its edge shows")
+        XCTAssertGreaterThan(behind, whitePage + 0.15)
         XCTAssertFalse(on.pageShadowsEnabled)
 
         host.rootView = PDFPaneView(page: page, controller: controller, inverted: false)

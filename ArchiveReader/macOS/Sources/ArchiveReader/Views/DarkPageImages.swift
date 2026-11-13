@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import CoreImage
 
-/// Document ▸ Invert Image Colors (W40.reader-image-invert, owner 2026-11-13: "make images readable while reducing the
+/// View ▸ Invert Image Colors (W40.reader-image-invert, owner 2026-11-13: "make images readable while reducing the
 /// amount of white"). A view of the page images only: the file is never changed, and Copy Image still copies the scan.
 ///
 /// The look was chosen on corpus pages (typed, ditto, handwritten, a cover with a seal), against a plain dimmed view.
@@ -61,7 +61,11 @@ enum DarkPageImages {
     }
 
     @MainActor private static let context = CIContext(options: [.cacheIntermediates: false])
-    @MainActor private static let rendered = NSCache<CGImage, CGImage>()
+    @MainActor private static let rendered: NSCache<CGImage, CGImage> = {
+        let cache = NSCache<CGImage, CGImage>()
+        cache.countLimit = 400   // a contact sheet of a long run of files, and no more
+        return cache
+    }()
 
     /// The same look drawn into a bitmap, for the page tiles; kept per picture, so a redraw does not render it again.
     @MainActor static func darkened(_ image: CGImage) -> CGImage {

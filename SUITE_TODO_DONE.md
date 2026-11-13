@@ -15771,3 +15771,22 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Tier-2 review (Opus, adversarial): no defect; took its one suggestion (make `texts` required). KNOWN_ISSUES
   LIMITATION W46.seg-text-tier-default marked mitigated. Bench cache: nothing used. $0, no model call.
   <!-- /W46.seg-text-tier-blank -->
+- [x] **W40.reader-image-invert — an inverted or dark view of page images, to cut the white [S-M]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Owner, 2026-11-13: "Invert colors option for images in Reader, or just dark mode for images — somehow make it possible to make images readable while reducing the amount of white." SHIPPED 2026-11-13.
+  View ▸ Invert Image Colors (⌃⌘I, a checked item) and a toolbar button in the document window and the preview sheet
+  draw the image page (PDF image or JPEG original) and the thumbnail and contact-sheet tiles dark; the OCR text page is
+  unchanged. Each window remembers it (`ar.doc.invertImages`, `ar.preview.invertImages`), as it does the thumbnails.
+  Display only: a Core Animation filter on the image pane's PDFView (`DarkPageImages`), so the file, Copy Image and
+  the selection's text are untouched; the tiles draw a filtered bitmap (cached, 400 at most).
+  Chosen by trying both on corpus pages (read-only renders in /tmp: a typed page, a purple ditto syllabus, a
+  typed table, a printed cover with a seal): a dimmed view (×0.5 after levels) keeps the look but halves the contrast
+  and leaves the paper the brightest thing on screen; the inversion reads better, paper near black and ink near
+  white. Three details make it work: it is done on sRGB values through `CIColorCubeWithColorSpace` (Core Image's
+  linear light turned the photographed pages' 0.7 grey paper into a light grey, measured: a page's mean went 0.63 to
+  0.81 under a plain `CIColorInvert`); the hue is kept (only the HSL lightness turns, so ditto ink stays purple);
+  and 0.22…0.78 is stretched first and the result kept in 0.10…0.88, since the scans' paper is grey, not white. The
+  pane's backdrop is given a grey that draws about 0.32, lighter than any inverted page, so the page edge shows.
+  Verified: `DarkPageImagesTests` (the mapping, the filter on a scan-like picture, the pane switching its filter on
+  and off in place, a tile render guard), the whole Reader unit bundle; `InvertImagesUITests` in the Tart VM reads
+  the composited window (image pane brightness 0.91 plain, 0.19 inverted; preview 1.00 to 0.10; remembered on
+  reopening; the toolbar button turns it off), with `PageViewsUITests` green beside it. Bench cache: nothing written.
+  <!-- /W40.reader-image-invert -->

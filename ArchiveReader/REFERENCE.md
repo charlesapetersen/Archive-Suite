@@ -316,6 +316,14 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
   Upright (four turns, or Reset Rotation) deletes the row. Each row is a page the Processor left sideways
   (`W46.rotation-default`), so `PageTurnStore.turnedPages()` can later serve as rotation truth. Unit-test and
   fixture launches keep turns in memory only.
+- `⌃⌘I` View ▸ Invert Image Colors, with a toolbar button in the document window and the preview sheet
+  (`W40.reader-image-invert`): the image page, PDF or JPEG original, and the thumbnail and contact-sheet tiles are
+  drawn dark, the paper near black and the ink near white; the OCR text page is not changed. A smart invert on sRGB
+  values with levels first (`DarkPageImages`: 0.22…0.78 stretched, the lightness turned with the hue kept, the result
+  held in 0.10…0.88), chosen over a dimmed view on corpus pages because dimming halves the contrast and leaves the
+  paper the brightest thing on screen. The pane is a Core Animation filter on its PDFView, so the file, Copy Image and
+  the selection's text are untouched; the tiles draw a filtered bitmap. Each window remembers it, as it does the
+  thumbnails (`ar.doc.invertImages`, `ar.preview.invertImages`).
 - `⌘C` copy verbatim — the standard **Edit ▸ Copy**, from whichever pane holds the selection (plain text;
   disabled with nothing selected; a focused text field such as the find bar copies its own text) · `⇧⌘C`
   Edit ▸ Copy Cleaned for Prose (intelligent; Copy Link(s) uses `⌥⌘C`); it also starts a
@@ -585,6 +593,8 @@ Views/
                               (highlight-all + next/prev ⌘G/⇧⌘G + "N of M" across open docs).
   PDFPaneView.swift           Read-only single-page PDFView + PDFPaneController (zoom/focus/selection; find
                               highlight reapplied on rebuild, like zoom; a view turn on its page copy).
+  DarkPageImages.swift        View ▸ Invert Image Colors (W40.reader-image-invert): the sRGB colour cube, put on
+                              the image pane as a layer filter and drawn into the tiles' bitmaps.
   (Core/)DocumentFind.swift   Pure FindNavigator (match list + wrap cursor) + DocumentFindScanner (per-pane
                               findString counts). Backs the ⌘F in-viewer find; unit-tested (DocumentFindTests).
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.

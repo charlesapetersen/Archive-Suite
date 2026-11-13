@@ -583,11 +583,16 @@ struct PDFPaneView: NSViewRepresentable {
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewSelectionChanged, object: nsView)
     }
 
-    /// The filter turns the grey behind the page too, so while it is on the pane is given white, which it draws as
-    /// the darkest grey whatever the appearance; and the page's shadow, which would turn into a glow, is dropped.
+    /// The grey behind an inverted page, before the filter turns it: it draws as about 0.32, a little lighter than
+    /// any inverted page (white paper draws 0.10, a photographed page's grey paper about 0.24), so the page's edge
+    /// shows in either appearance, as the light pane's grey shows a white page's.
+    static let invertedPaneBackground = NSColor(srgbRed: 0.62, green: 0.62, blue: 0.62, alpha: 1)
+
+    /// The filter turns the grey behind the page too, so while it is on the pane is given its own grey; and the
+    /// page's shadow, which would turn into a glow, is dropped.
     private func applyInversion(to view: PDFView) {
         DarkPageImages.apply(inverted, to: view)
-        let background = inverted ? NSColor.white : Self.paneBackground
+        let background = inverted ? Self.invertedPaneBackground : Self.paneBackground
         if view.backgroundColor != background { view.backgroundColor = background }
         if view.pageShadowsEnabled == inverted { view.pageShadowsEnabled = !inverted }
     }

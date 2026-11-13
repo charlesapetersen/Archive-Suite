@@ -71,7 +71,7 @@ final class DocumentViewerModel: ObservableObject {
     /// The thumbnail sidebar is showing beside the reading panes. Unlike the contact sheet it stays up while
     /// the reader moves around; the window remembers it.
     @Published var showingThumbnails = false
-    /// Document ▸ Invert Image Colors (W40.reader-image-invert): the image page and the page tiles are drawn dark,
+    /// View ▸ Invert Image Colors (W40.reader-image-invert): the image page and the page tiles are drawn dark,
     /// `DarkPageImages`; the file is untouched. The window remembers it, as it does the thumbnails.
     @Published var invertingImages = false
     /// The page counts of the open files, for the page views.
