@@ -11,6 +11,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import signal
 from pathlib import Path
 import subprocess
@@ -28,6 +29,9 @@ REAL_POPEN = subprocess.Popen
 spec = importlib.util.spec_from_file_location("supervisor_under_proof", SOURCE / "worker-supervisor.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+
+# Host commands the daemon shell reaches by bare name: never the real ones from a test.
+HOST_STUBS = ("osascript", "launchctl", "security", "caffeinate")
 
 
 class Child:
@@ -364,13 +368,7 @@ class Proof(unittest.TestCase):
         subprocess.run(git + ["commit", "-qm", "scratch baseline"], check=True, capture_output=True)
         installed = self.root / "installed daemon.sh"
         installed.write_bytes(self.script.read_bytes())
-        binaries = self.root / "refresh fixture bin"
-        binaries.mkdir()
-        for name in ("security", "caffeinate"):
-            command = binaries / name
-            command.write_text("#!/bin/sh\nexit 0\n")
-            command.chmod(0o755)
-        env.update(PATH=str(binaries)+os.pathsep+env['PATH'], AUTONOMOUS_LABEL="proverefresh", XPC_SERVICE_NAME="com.proverefresh.autonomous",
+        env.update(AUTONOMOUS_LABEL="proverefresh", XPC_SERVICE_NAME="com.proverefresh.autonomous",
                    AUTONOMOUS_GATE_EVERY="0", AUTONOMOUS_DOC_PREGATE="0", AUTONOMOUS_MINFREE_MB="1",
                    AUTONOMOUS_COMPACTOR=str(self.root / "absent compactor"))
         self.env = env
@@ -486,10 +484,29 @@ class Proof(unittest.TestCase):
         (self.state / "resume-prompt.txt").write_text("scratch prompt")
         (self.state / "codex-preamble.txt").write_text("scratch codex preamble")
         subprocess.run(["git", "init", "-q", str(self.repo)], check=True, capture_output=True)
+        # W40.test-real-notifications: the shell's park path calls bare osascript (a real Notification Centre
+        # post) and launchctl bootout (of the real job when the label is the default), and its startup calls
+        # security and caffeinate. Stubs that record their argv go first on PATH for every shell this file
+        # starts; the cleanup proves each name still resolves to its stub, so no real one can be reached.
+        host_bin = self.root / "host stub bin"
+        host_bin.mkdir(exist_ok=True)
+        self.host_calls = self.root / "host stub calls.log"
+        for name in HOST_STUBS:
+            command = host_bin / name
+            command.write_text('#!/bin/sh\nprintf "%s|" "$(basename "$0")" "$@" >> "' + str(self.host_calls)
+                               + '"; echo >> "' + str(self.host_calls) + '"\nexit 0\n')
+            command.chmod(0o755)
+        self.env = dict(self.env, PATH=str(host_bin) + os.pathsep + self.env["PATH"])
+        self.addCleanup(self.assert_host_stubbed, self.env["PATH"], self.root)
         return dict(self.env, HOME=str(home), AUTONOMOUS_REPO=str(self.repo), AUTONOMOUS_PLAN=str(self.plan),
                     AUTONOMOUS_STATE=str(self.state), AUTONOMOUS_CLAIMS_CMD=str(SOURCE / "worker-state.py"),
                     AUTONOMOUS_CLAUDE=str(fake_cli), AUTONOMOUS_CODEX=str(fake_cli),
                     AUTONOMOUS_WORKER_CHILD="1", AUTONOMOUS_WORKER_ID="worker-1", AUTONOMOUS_AGENT="claude")
+
+    def assert_host_stubbed(self, path, root):
+        for name in HOST_STUBS:
+            found = shutil.which(name, path=path)
+            self.assertTrue(found and Path(found).parent.parent == root, f"{name} reaches {found}")
 
     def test_actual_child_startup_preserves_all_retry_counters(self):
         env = self.shell_env()
@@ -590,10 +607,6 @@ class Proof(unittest.TestCase):
         sha = subprocess.check_output(["git", "-C", str(self.repo), "rev-parse", "HEAD"], text=True).strip()
         fixture_bin = self.root / "fixture bin"
         fixture_bin.mkdir()
-        for name in ("caffeinate", "security"):
-            command = fixture_bin / name
-            command.write_text("#!/bin/sh\nexit 0\n")
-            command.chmod(0o755)
         no_usage = fixture_bin / "no usage"
         no_usage.write_text("#!/bin/sh\nexit 3\n")
         no_usage.chmod(0o755)
@@ -641,6 +654,7 @@ raise SystemExit(p.run())
                    PROOF_SUPERVISOR=str(SOURCE / "worker-supervisor.py"), PROOF_SHELL=str(self.script))
         env.pop("AUTONOMOUS_WORKER_CHILD", None)
         env.pop("AUTONOMOUS_WORKER_ID", None)
+        self.assert_host_stubbed(env["PATH"], self.root)
         with (self.root / "functional.log").open("w") as output:
             child = subprocess.Popen([sys.executable, str(wrapper)], env=env, stdout=output, stderr=output,
                                      start_new_session=True)
@@ -659,6 +673,10 @@ raise SystemExit(p.run())
                     if module.coord.session_live(record):
                         os.killpg(record['sid'], signal.SIGTERM)
         self.assertEqual(code, 0, (self.root / "functional.log").read_text())
+        # A clean run posts nothing; a park would have, and the stub caught it rather than Notification Centre.
+        calls = self.host_calls.read_text() if self.host_calls.exists() else ""
+        self.assertNotIn("osascript|", calls)
+        self.assertNotIn("launchctl|", calls)
         a = json.loads((self.state / "A.started").read_text())
         b = json.loads((self.state / "B.started").read_text())
         self.assertGreaterEqual(b['start']-a['start'], 60)
