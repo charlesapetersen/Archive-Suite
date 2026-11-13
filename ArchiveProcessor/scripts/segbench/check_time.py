@@ -153,6 +153,29 @@ def dwell(run):
     return stay, end - start
 
 
+def cmd_retruth(_a):
+    """truth.json's labels and unsure gaps again from the boxes' current truth (after a fold), the pack unchanged."""
+    import rescore
+    rescore.no_network()
+    rec = json.loads(TRUTH.read_text())
+    now = {}
+    for name in BOXES:
+        col, gaps = flagged(name, rec["level"])
+        for i, proposal, _, _, t, unsure in gaps:
+            now[f"{name} {col.pages[i].n}|{col.pages[i + 1].n}"] = (proposal, t, unsure)
+    if set(now) != {t["key"] for t in rec["items"]}:
+        raise SystemExit("the flagged gaps differ from the pack's; this is a new pack, not a retruth")
+    moved = []
+    for t in rec["items"]:
+        proposal, truth, unsure = now[t["key"]]
+        assert proposal == t["proposal"], t["key"]
+        if (t["truth"], t["unsure"]) != (truth, unsure):
+            moved.append(t["key"])
+        t["truth"], t["unsure"] = truth, unsure
+    TRUTH.write_text(json.dumps(rec, indent=1) + "\n")
+    print(f"{len(moved)} gaps changed: {moved}")
+
+
 def mean_ci(xs, reps=10000, seed=46):
     rnd = random.Random(seed)
     ms = sorted(statistics.fmean(rnd.choices(xs, k=len(xs))) for _ in range(reps))
@@ -245,6 +268,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("pack").set_defaults(fn=cmd_pack)
+    sub.add_parser("retruth").set_defaults(fn=cmd_retruth)
     s = sub.add_parser("score")
     s.add_argument("run")
     s.add_argument("--notes")
