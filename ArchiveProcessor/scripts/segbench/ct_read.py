@@ -184,6 +184,7 @@ def cmd_gateway(a):
     import threading
     from concurrent.futures import ThreadPoolExecutor
     import gateway_gemini as G
+    import requests
     model, name, price = PAID[a.model]
     out = draft_dir(a.model)
     os.makedirs(out, exist_ok=True)
@@ -212,7 +213,13 @@ def cmd_gateway(a):
                         {"type": "text", "text": PROMPT}]}]}
             t = time.time()
             for attempt in range(3):
-                r = G.request("/chat/completions", body)
+                try:
+                    r = G.request("/chat/completions", body)
+                except requests.exceptions.ConnectionError:   # a dropped send: retried like a 5xx
+                    if attempt == 2:
+                        raise
+                    time.sleep(10 * (attempt + 1))
+                    continue
                 if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
                     time.sleep(10 * (attempt + 1))
                     continue
@@ -1083,30 +1090,37 @@ def cmd_report(a):
         red_turns = {k: n for k, n in C["turns"].items() if k.startswith("Red ") and k != "Red None"}
         red_read, red_other = sum(red_turns.values()), sum(n for k, n in red_turns.items() if k != "Red 0")
         L += ["## What it recommends, per field (for W47.ct-design-ok)", "",
-              "Free routes only; W47.ct-read-paid adds the gateway arm before the design review. On the hard cells "
-              "the owner ruled, Gemini 3.7 Flash is ahead of every free route on almost every field, but those are "
-              "the cells where the drafters split, and choosing them favours the strongest drafter rather than "
-              "handicapping it. The paid arm (W47.ct-read-paid) confirms it on the owner's cells (FLD-9), not on the "
-              f"whole set: Gemini 3.7 co-drafted the {S['cells'].get('readers', 0):,} unanimous cells, so a whole-set "
-              "figure for it would be "
-              "agreement with itself.", "",
+              "The free routes and the gateway arm, GPT 5.6 Luna (W47.ct-read-paid), which drafted none of the truth "
+              "and so is scored on every cell. Luna's figures below are this one pass (2026-11-13). On the hard cells "
+              "the owner ruled, Gemini 3.7 Flash is ahead of every other route on most fields, Luna included, but "
+              "those are the cells where the drafters split, and choosing them favours the strongest drafter rather "
+              "than handicapping it. Its lead there is confirmed on the owner's cells (FLD-9), not on the whole set: "
+              f"Gemini 3.7 co-drafted the {S['cells'].get('readers', 0):,} unanimous cells, so a whole-set figure "
+              "for it would be agreement with itself.", "",
               f"- **What the photo is:** the marker's colour (the Box or Folder button), right on {kind['right']} of "
-              f"{kind['n']}; no reader is needed, and Gemma's own call is worse.",
+              f"{kind['n']}; no reader is needed, and Gemma's and Luna's own calls are worse.",
               "- **Container and folder number:** Vision + parser. It ties Gemma on both, takes a fraction of the "
               f"time, and on a box photo the box number it gives is right {vp['right']} of {vp['given']} times. It "
-              "misses about a quarter of the box numbers that are there, so the capture card asks when it reads none.",
-              "- **Repository, collection title, collection number, date:** Gemma 3 12B, ahead of Vision + parser on "
-              "each with an interval above zero, but still wrong or empty on a third to a half of the filled cells: "
-              "proposed values the user confirms once per run, not facts.",
-              "- **Series, series title:** Vision + parser; they are anchored by their keyword, and Gemma's "
-              "difference is a tie.",
-              f"- **Accession:** not a tie: Gemma less Vision is {acc_gs}, an interval clear of zero. But Vision's "
-              f"lead comes from leaving the field empty: it reads {acc_v['filled_right']} of the {acc_v['filled']} "
-              "accessions present, the same pattern as the fields below, while Gemma fills an accession where there is "
-              f"none ({acc_g['false_fill']} of {acc_g['empty']}).",
-              "- **Collection subtitle, box title, other identifying marks, folder title:** no free route reads them. "
-              "Vision's high accuracy on the first three comes from leaving them empty, and Gemma fills them where "
-              "there is nothing. Leave them to the user, or to the paid arm if it reads them.",
+              "misses about a quarter of the box numbers that are there, so the capture card asks when it reads none. "
+              "Luna reads more of them (container 115 of 137 present against Vision's 98, a gap of +9, +3 to +16), "
+              "so a gateway read is a candidate for the photos where Vision reads no number; folder number is a tie.",
+              "- **Repository, collection title, collection number, date:** with the gateway, Luna: ahead of Vision + "
+              "parser on each with an interval above zero, and of Gemma on collection title (+13, +5 to +20); on "
+              "repository and date its lead over Gemma is +6 with a lower bound at zero, and collection number is a "
+              "tie. Without it, Gemma 3 12B. Either is still wrong or empty on a quarter to a third of the filled "
+              "cells (Luna) or a third to a half (Gemma): proposed values the user confirms once per run, not facts.",
+              "- **Series, series title:** Vision + parser; they are anchored by their keyword; Gemma's difference is "
+              "a tie and Luna's is three points with a lower bound at zero.",
+              f"- **Accession:** Luna, with the gateway: it reads 8 of the 12 accessions present and fills none of "
+              "the 179 empty cells (+3 over Vision, +1 to +6; +9 over Gemma). Without it, Vision + parser, though "
+              f"Gemma's gap below Vision, {acc_gs}, comes only from the fact that Vision leaves the field empty: it reads "
+              f"{acc_v['filled_right']} of the {acc_v['filled']} accessions present, the same pattern as the fields "
+              f"below, while Gemma fills an accession where there is none ({acc_g['false_fill']} of {acc_g['empty']}).",
+              "- **Collection subtitle, box title, other identifying marks, folder title:** no route reads them, Luna "
+              "included. Vision's high accuracy on the first three comes from leaving them empty; Gemma and Luna fill "
+              "them where there is nothing (Luna: box title 13 of 133 empty cells, other marks 25 of 114) and read few "
+              "of those present (box title 8 of 24, folder title 11 of 87, other marks 5 of 38). Leave them to the "
+              "user.",
               "- **Route B:** the name patterns cover every convention the plan names; the owner's informal names need "
               "the once-per-root level-map sheet, as designed.",
               f"- **Carry-forward:** box photos come in no fixed order. {pc(low)} of the steps between box photos go to "
@@ -1123,7 +1137,8 @@ def cmd_report(a):
               "a document page. Purple can be taken as a folder start, with \"No Folder\" sheets recognised by their "
               "text.",
               "- **The corpus's markers:** Vision + parser reads them all in minutes for $0, Gemma in most of a day for "
-              "$0; Gemini would cost about $10, over the $7 line.", ""]
+              "$0; Luna about $3.67 through the gateway (its larger, token-estimate charge; the gateway's own figure "
+              "was half that), under the $7 line; Gemini would cost about $10, over it.", ""]
     L += ["## Measurement card", "",
           "- **Truth:** W47.ct-truth-final's: the owner's answers on three sheets and his notes, his rules applied to "
           "the readers' readings (reported apart), and for the rest the three drafters unanimous. Drafters are scored "
@@ -1136,7 +1151,9 @@ def cmd_report(a):
           "photos left out, 43 of them Red, toward little-changed PDFs. The sample is not weighted to the corpus, so "
           "a figure is the sample's.",
           "- **Comparison:** every route on the same upright photos; Vision lines are the truth build's (the reread "
-          "photos' own lines for the 15 reread). Same cells for every paired gap.",
+          "photos' own lines for the 15 reread). Same cells for every paired gap. The gateway arm (GPT 5.6 Luna, "
+          "W47.ct-read-paid) used the same invented-example prompt as Gemma at temperature 0 and low reasoning, on "
+          "all 195 photos; it spent $0.08 by the gateway's own figure ($0.16 counted against its $0.50 cap).",
           "- **Noise:** one pass at temperature 0; Wilson intervals on each figure, bootstrap intervals over photos "
           "on each gap; no rerun floor was measured, so a gap near zero is a tie.",
           "- **Scope:** the routes on this sample of one researcher's photos; the tree patterns on a synthetic set "
