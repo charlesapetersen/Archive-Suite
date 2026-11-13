@@ -284,7 +284,7 @@ enum DateRoute {
 
     // MARK: The trace reply (parse_trace)
 
-    struct Trace: Equatable, Sendable {
+    struct Trace: Equatable, Sendable, Codable {
         var parsed = false
         var year: Int? = nil
         var lo: Int? = nil
@@ -460,7 +460,7 @@ enum DateRoute {
     private static let dateRx = rx(#"\b(1[5-9]\d\d|20\d\d)\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|"#
                                    + #"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.? \d{1,2}\b"#, true)
 
-    struct Check: Equatable, Sendable {
+    struct Check: Equatable, Sendable, Codable {
         /// "valid", "unsupported" or "none".
         let verdict: String
         let reason: String
@@ -506,7 +506,7 @@ enum DateRoute {
         + #""document_date": {"year": 1968, "month": 3, "quote": "<the quote it comes from>"}}"# + "\n"
         + "Use null for an unknown month or year, and \"document_date\": null if the pages do not show the document's own date."
 
-    struct PageDate: Equatable, Sendable {
+    struct PageDate: Equatable, Sendable, Codable {
         let quote: String
         let page: Int?
         let place: String
@@ -516,7 +516,7 @@ enum DateRoute {
         let written: Bool
     }
 
-    struct ImageReading: Equatable, Sendable {
+    struct ImageReading: Equatable, Sendable, Codable {
         var ok = false
         var docYear: Int? = nil
         var docMonth: Int? = nil
@@ -622,7 +622,7 @@ enum DateRoute {
         case text, image, estimate, inherited, none
     }
 
-    struct Decision: Equatable, Sendable {
+    struct Decision: Equatable, Sendable, Codable {
         var year: Int?
         var month: Int?
         var dateUncertain: Bool

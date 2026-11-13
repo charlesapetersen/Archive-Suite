@@ -1183,10 +1183,19 @@ final class LiveCaptureProcessor: ObservableObject {
         var tags = humanOnly
             ? GeneratedTags(subjectTags: mac?.subjects ?? [])
             : await computeTags(group: group, segment: segment, mac: mac, config: config)
+        // B8: a Clear during the tagging call ends here, before the names and dating calls below spend anything or
+        // re-read the settings of a session that is gone (W46.date-route-other-paths).
+        guard clearGeneration == startedGeneration else { return }
         // W46.ent-feature-live — the names call after the tagging call, on the tagging reply's `format`. The B8 guard
         // below covers this await too: nothing between here and it touches session state.
         let entities = humanOnly ? nil
             : await liveEntities(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
+        guard clearGeneration == startedGeneration else { return }
+        // W46.date-route-other-paths — the dating route replaces the tagging call's date, as in Process Files, on a
+        // document the tagging call dated here and whose phone (or Mac card) gives no year. Same B8 cover as above.
+        let dating = humanOnly ? nil
+            : await liveDating(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
+        dating?.apply(to: &tags)
         // Phone's in-the-room date wins (Mac override beats the phone value).
         if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
         if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
@@ -1233,7 +1242,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
                                    localAgentModelName: localAgentModelName, stagingDir: stagingDir, writeJSON: writeJSON,
-                                   jsonTags: jsonTags, entities: entities, texts: texts,
+                                   jsonTags: jsonTags, entities: entities, dating: dating, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1265,7 +1274,7 @@ final class LiveCaptureProcessor: ObservableObject {
             groupId: groupId, type: gType, order: gOrder,
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
-            writeJSON: writeJSON, jsonTags: jsonTags, entities: entities, texts: texts,
+            writeJSON: writeJSON, jsonTags: jsonTags, entities: entities, dating: dating, texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
             exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1378,6 +1387,15 @@ final class LiveCaptureProcessor: ObservableObject {
         return GeneratedTags()   // manual mode, no Mac subjects → date/quality only
     }
 
+    /// The resolved settings the names policy and the dating route read, loaded once per session config.
+    private func liveSettings(_ config: SessionProcessingConfig) -> [String: ResolvedSetting] {
+        if entitySettings == nil {
+            entitySettings = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID(),
+                                                                processing: [:]).values
+        }
+        return entitySettings ?? [:]
+    }
+
     /// W46.ent-feature-live — the document's names for its sidecar's `entities` object, on the policy Process Files
     /// follows (`EntityRunPolicy`, `OCRProcessor.performTaggingPhase`): only a document the tagging call tagged here
     /// (automatic mode, not Mac-tagged, not a box or folder), only with sidecars on (they are the names' only output),
@@ -1388,19 +1406,31 @@ final class LiveCaptureProcessor: ObservableObject {
                               config: SessionProcessingConfig) async -> EntityResult? {
         guard group.type == .document, config.enableSegmentJSON, config.taggingMode == .automatic,
               (mac?.subjects ?? []).isEmpty, tags.format != nil else { return nil }
-        if entitySettings == nil {
-            entitySettings = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID(),
-                                                                processing: [:]).values
-        }
         var inputs = EntityRunPolicy.inputs(
             results: results.map { Self.ocrFailed($0) ? nil : $0 }, runProvider: config.provider.rawValue,
-            settings: entitySettings ?? [:], provider: config.textProvider, model: config.textModel,
+            settings: liveSettings(config), provider: config.textProvider, model: config.textModel,
             gateway: config.textGateway, localAgent: config.textLocalAgent)
         inputs.format = tags.format
         guard case .run(let run) = EntityRunPolicy.decide(inputs) else { return nil }
         return await EntityExtractor.extract(text: segment.combinedText, decision: run, provider: config.textProvider,
                                              model: config.textModel, apiKey: config.textAPIKey,
                                              gatewayConfig: config.textGateway)
+    }
+
+    /// W46.date-route-other-paths — the dating route for a document the tagging call dated here (automatic mode, not
+    /// Mac-tagged, a reply that is not a failure), on the route Process Files follows (`DateRoute.run`): its own text,
+    /// its first page images at their run rotation, and no neighbours, as the Live tagging call sends none. None when
+    /// the phone or the Mac card gives a year, since that wins anyway, or when the document has no text.
+    private func liveDating(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult], tags: GeneratedTags,
+                            mac: MacSegmentTags?, config: SessionProcessingConfig) async -> DateRoute.Decision? {
+        guard group.type == .document, config.taggingMode == .automatic, (mac?.subjects ?? []).isEmpty,
+              !tags.ocrFailed, (mac?.year ?? group.year) == nil, !segment.combinedText.isEmpty else { return nil }
+        let imageEveryDocument = liveSettings(config)[SettingsKey.dateImageEveryDocument.rawValue]?.value.bool ?? false
+        let pages = zip(segment.pdfURLs, results).prefix(DateRoute.imagePages).map { (url: $0, rotation: $1.rotationDegrees) }
+        let backend = DateRoute.Backend(provider: config.textProvider, model: config.textModel, apiKey: config.textAPIKey,
+                                        gateway: config.textGateway, localAgent: config.textLocalAgent)
+        return await DateRoute.run(DateRoute.Input(text: DateRoute.ownText(segment), near: [], pages: Array(pages)),
+                                   backend: backend, imageEveryDocument: imageEveryDocument)
     }
 
     // MARK: - Off-main file writing (nonisolated static; only touches the filesystem)
@@ -1438,6 +1468,9 @@ final class LiveCaptureProcessor: ObservableObject {
         /// W46.ent-feature-live — the names written into the sidecar, kept so a regenerated sidecar carries them
         /// without a second call. nil when the feature did not run (and in a manifest written before it).
         let entities: EntityResult?
+        /// W46.date-route-other-paths — the dating route's decision, kept so a regenerated segment writes the same
+        /// sidecar `dating` object and header line without a second call. nil when the route did not run.
+        let dating: DateRoute.Decision?
         let texts: [String]
         let boxLabelText: String?
         let outputImageFile: Bool
@@ -1453,7 +1486,8 @@ final class LiveCaptureProcessor: ObservableObject {
         init(groupId: String, type: CaptureGroupType, order: Int,
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
              localAgentDisplayName: String?, localAgentModelName: String?,
-             writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil, texts: [String],
+             writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil,
+             dating: DateRoute.Decision? = nil, texts: [String],
              boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
@@ -1462,7 +1496,7 @@ final class LiveCaptureProcessor: ObservableObject {
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName
             self.localAgentDisplayName = localAgentDisplayName; self.localAgentModelName = localAgentModelName
-            self.writeJSON = writeJSON; self.jsonTags = jsonTags; self.entities = entities
+            self.writeJSON = writeJSON; self.jsonTags = jsonTags; self.entities = entities; self.dating = dating
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
             self.taggingMode = taggingMode
@@ -1474,7 +1508,8 @@ final class LiveCaptureProcessor: ObservableObject {
         groupId: String, type: CaptureGroupType, collectionKey: String, order: Int,
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         localAgentDisplayName: String?, localAgentModelName: String?,
-        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil, texts: [String],
+        stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil,
+        dating: DateRoute.Decision? = nil, texts: [String],
         boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
@@ -1494,8 +1529,11 @@ final class LiveCaptureProcessor: ObservableObject {
         // W37.dual-date — Live Capture computes the tags BEFORE rendering, so its documents' text pages
         // can carry the source-date header lines (repeated on every page of the unit). Documents in
         // real-tagging modes only: a no-tagging / copy-source run writes no generated date anywhere.
-        let sourceDates: PDFSourceDates? = (type == .document && taggingMode.stampsUnread)
+        var sourceDates: PDFSourceDates? = (type == .document && taggingMode.stampsUnread)
             ? EnclosureDates.pdfSourceDates(for: jsonTags) : nil
+        // W46.date-route-header — the evidence of a non-explicit year, on the same pages as the dates (a year implies
+        // the document-date line, so there is a header to carry it).
+        if sourceDates != nil, let evidence = dating?.headerEvidence { sourceDates?.dateEvidence = evidence }
 
         for page in pages {
             // W40.fix-processor-failed-ocr-filed-image-only — a document page whose OCR FAILED (`ocrFailed`:
@@ -1558,7 +1596,7 @@ final class LiveCaptureProcessor: ObservableObject {
         if writeJSON, type == .document, let firstPDF = pdfURLs.first {
             let jurl = firstPDF.deletingPathExtension().appendingPathExtension("json")
             writeSegmentJSON(pageURLs: pages.map { $0.sourceURL }, texts: texts, tags: jsonTags,
-                             entities: entities?.sidecarObject, to: jurl)
+                             entities: entities?.sidecarObject, dating: dating?.sidecarObject(), to: jurl)
             if fm.fileExists(atPath: jurl.path) { jsonURL = jurl }   // only record it if it actually wrote
         }
 
@@ -1656,9 +1694,10 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Writes the metadata sidecar (OCR body + fields) via the shared `SegmentJSONBuilder`. This path
     /// is documents-only, so it passes no box/folder label format override.
     nonisolated private static func writeSegmentJSON(pageURLs: [URL], texts: [String], tags: GeneratedTags,
-                                                     entities: [String: Any]? = nil, to jsonURL: URL) {
+                                                     entities: [String: Any]? = nil, dating: [String: Any]? = nil,
+                                                     to jsonURL: URL) {
         guard let data = SegmentJSONBuilder.buildData(fileURLs: pageURLs, texts: texts, tags: tags,
-                                                      entities: entities) else { return }
+                                                      entities: entities, dating: dating) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
 
@@ -2032,7 +2071,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                            localAgentDisplayName: seg.localAgentDisplayName,
                                            localAgentModelName: seg.localAgentModelName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
-                                           entities: seg.entities,
+                                           entities: seg.entities, dating: seg.dating,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
@@ -2776,6 +2815,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// finalized segment retained for regeneration.
     func _entityTestSetSettings(_ values: [String: ResolvedSetting]) { entitySettings = values }
     func _entityTestRetainedEntities(_ groupId: String) -> EntityResult? { retained[groupId]?.entities }
+    /// Test-only ($0, W46.date-route-other-paths): the dating decision a finalized segment retained for regeneration.
+    func _datingTestRetained(_ groupId: String) -> DateRoute.Decision? { retained[groupId]?.dating }
 #endif
 
     /// Test-only (W3.cap-r6): THE straggler. Appends a staged segment exactly as `finalizeSegment` does, so

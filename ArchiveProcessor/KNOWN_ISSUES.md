@@ -4,8 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## ⚠️ LIMITATION (W46.date-route, 2026-11-13): what the dating route does not yet cover
 
-- **Process Files only.** Live Capture and the manual sheet's auto-date still take the tagging call's date, which
-  always writes a year (`W46.date-route-other-paths`).
+- **Live Capture and the manual auto-date take the route with less context (W46.date-route-other-paths).** Live Capture
+  and the manual segment card send no neighbours (Live's tagging call sends none, and the card's neighbours are not
+  drawn yet), so a document with no year of its own and none on its page image gets no year there rather than an
+  estimate. The tagging sheet's prefetch sends the neighbours, but an enclosure on it does not take its cover's year
+  (step 3a): its `Sent With` comes from the cover as before, and its sidecar may say `class: none`. A Live document whose
+  phone (or Mac card) gives a month but no year keeps that month over the route's, while the evidence quotes the page's
+  own date. A rotation-review regeneration in Live Capture reuses the first decision, with no second call, so a page
+  first read sideways keeps an image pass that found nothing. The sidecar's `dating` object and the header line are
+  written on a manual card only while it still holds the date the route filled; a date the user typed carries none.
 - **The image pass runs only through a remote gateway** (Gemini 3.7 Flash, the measured route). On a direct key,
   OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
   estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`

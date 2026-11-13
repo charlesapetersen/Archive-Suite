@@ -18,6 +18,9 @@ import PDFKit
 ///   3. End to end through `performTaggingPhase` on scratch outputs: a remote gateway (the measured route, image pass on
 ///      the no-year documents only, then on every document with the switch on) and a direct key (no image pass).
 ///   4. W46.date-route-header: the `Date evidence:` header line, the rewrite of a generated PDF and its safe replace.
+///   5. W46.date-route-other-paths: the manual tagging sheet's auto-date and the manual segment card take the route.
+///   6. W46.date-route-other-paths: Live Capture's automatic tagging takes the route through the real ingest → finalize
+///      path with the $0 OCR stand-in; the staging manifest keeps the decision for a regeneration.
 private extension DateRoute.Decision {
     func with(measured: Bool) -> Self { var d = self; d.measured = measured; d.route = "r"; return d }
 }
@@ -51,6 +54,7 @@ enum DateRouteTestDriver {
         decision()
         headerLine()
         await endToEnd()
+        await liveCapture()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
         let text = lines.joined(separator: "\n") + "\n"
         if let out = env["DATE_ROUTE_TEST_OUT"] {
@@ -595,6 +599,201 @@ enum DateRouteTestDriver {
                                       outputDirectory: tmp, enableSegmentJSON: false)
         check("3 sidecars off: the tags still dated by the route, no sidecar", applied(off, oFiles[0]).contains("1947")
               && !fm.fileExists(atPath: oOut["DOCA"]!.path))
+
+        // 5. The manual tagging sheet's auto-date: the route on each card (no tagging call, no date-only prompt).
+        wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
+        let (sheet, sFiles, sOut) = processor(gateway: gw, out: "sheet")
+        let sheetRun = Task {
+            await sheet.performManualTaggingPhase(mode: .autoDate, provider: .gemini, model: route.model,
+                                                  thinkingLevel: nil, apiKey: "", outputDirectory: tmp,
+                                                  enableSegmentJSON: true)
+        }
+        var filled = false
+        for _ in 0..<400 {
+            if sheet.awaitingManualTagging, sheet.manualTagSegments.count == 5,
+               sheet.manualTagSegments.allSatisfy({ !$0.dateLoading }) { filled = true; break }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+        check("5 sheet: every card dated by the route once, no tagging call",
+              filled && wire.tagging == 0 && wire.trace.sorted() == markers.sorted(), "\(filled) \(wire.tagging) \(wire.trace)")
+        check("5 sheet: the image pass on the cards whose text has no year (B C D E)",
+              wire.images.map { $0.first ?? 0 }.sorted() == [120, 130, 140, 150], "\(wire.images)")
+        let cards = sheet.manualTagSegments
+        if cards.count == 5 {
+            check("5 sheet A: its text year and its dated form's month, no day, no flag",
+                  cards[0].year == "1947" && cards[0].month == "03 March" && cards[0].day.isEmpty && !cards[0].dateUncertain,
+                  "\(cards[0].year) \(cards[0].month) \(cards[0].day)")
+            check("5 sheet B: the page image's 1961, no flag", cards[2].year == "1961" && !cards[2].dateUncertain)
+            check("5 sheet C: the neighbour's 1947, Date Uncertain, no month",
+                  cards[3].year == "1947" && cards[3].month.isEmpty && cards[3].dateUncertain)
+            check("5 sheet D: no year without evidence (the old prompt always wrote one), Date Uncertain",
+                  cards[4].year.isEmpty && cards[4].dateUncertain)
+        } else {
+            check("5 sheet: five cards", false, "\(cards.count)")
+        }
+        // The user retypes C's year: the date is theirs, so it carries none of the route's evidence.
+        if sheet.manualTagSegments.count == 5 { sheet.manualTagSegments[3].year = "1948" }
+        sheet.finishManualTagging()
+        await sheetRun.value
+        let sa = json(sOut["DOCA"])["dating"] as? [String: Any] ?? [:]
+        let sb = json(sOut["DOCB"])["dating"] as? [String: Any] ?? [:]
+        check("5 sheet: the kept dates' sidecars carry the route's dating object (A text, B image, D none)",
+              sa["class"] as? String == "text" && sb["class"] as? String == "image"
+              && (json(sOut["DOCD"])["dating"] as? [String: Any])?["class"] as? String == "none", "\(sa) \(sb)")
+        check("5 sheet B: the header line names the image evidence",
+              header(sOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"",
+              "\(String(describing: header(sOut, "DOCB")?.header?.dateEvidence))")
+        let sc = applied(sheet, sFiles[3])
+        check("5 sheet C, retyped: the user's 1948, no dating object, no evidence line",
+              sc.contains("1948") && !sc.contains("1947") && json(sOut["DOCC"])["dating"] == nil
+              && header(sOut, "DOCC")?.header != nil && header(sOut, "DOCC")?.header?.dateEvidence == nil, "\(sc)")
+
+        // 5. The manual segment card's auto-date: the route on the card's pages, with no neighbours drawn yet.
+        wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
+        let (card, cardFiles, _) = processor(gateway: gw, out: "card")
+        card.manualSegAutoDate = true
+        card.manualSegModel = route.model
+        card.manualSegProvider = .gemini
+        card.manualSegApiKey = ""
+        card.manualSegImages = cardFiles.enumerated().map {
+            ManualSegImage(fileIndex: $0, url: $1, rotationDegrees: 0, kind: .document)
+        }
+        await card.fetchManualSegDate(forIndices: [2])
+        check("5 card B: the page image's 1961 through the route, no tagging call",
+              card.manualSegDraftTags.year == "1961" && !card.manualSegDraftTags.dateUncertain
+              && card.manualSegDraftTags.standingDating?.evidenceClass == .image
+              && wire.tagging == 0 && wire.trace == ["DOCB"] && wire.images.count == 1, "\(wire.trace) \(wire.images)")
+        card.manualSegDraftTags = SegmentTagData()
+        await card.fetchManualSegDate(forIndices: [3])
+        check("5 card C: an estimate with no neighbour to check it against writes no year, Date Uncertain",
+              card.manualSegDraftTags.year.isEmpty && card.manualSegDraftTags.dateUncertain
+              && card.manualSegDraftTags.standingDating?.evidenceClass == DateRoute.EvidenceClass.none)
+        card.manualSegDraftTags.year = "1950"
+        check("5 card: a typed date carries none of the route's evidence", card.manualSegDraftTags.standingDating == nil)
+    }
+
+    // MARK: 6. Live Capture
+
+    private static func liveCapture() async {
+        let fm = FileManager.default
+        guard !(ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"] ?? "").isEmpty else {
+            check("6 Live Capture runs against a scratch backup root (never the operator's)", false)
+            return
+        }
+        guard let route = OpenRouterRoute.catalog.first else { check("6 an OpenRouter route", false); return }
+        let wire = Wire()
+        install(wire)
+        defer { NetworkSession.testTransport = nil; LiveCaptureProcessor._recoveryTestOCRStub = nil }
+        guard NetworkSession.testTransportIsActive else {
+            check("6 the injected transport is active", false, "stopping before any request")
+            return
+        }
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APDateLive-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: tmp) }
+        try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
+
+        // A, its year in the text · B, no year in the text, dated on the page image · C, no year, an estimate that cites
+        // a neighbour Live never sends · D, a phone year. Every tagging reply names a year; each page's width names it.
+        let docs: [(gid: String, text: String, width: Int, phoneYear: Int?)] = [
+            ("A", "DOCA Washington\nMarch 3, 1947\nDear Mr. Hale:", 110, nil), ("B", "DOCB MEMORANDUM\nTo: Files", 120, nil),
+            ("C", "DOCC Note to the files", 130, nil), ("D", "DOCD Another note", 140, 1933)]
+        let anyYear = #"{"year": "1950", "month": "05 May", "day": "Day 9", "date_uncertain": false, "format": "memo"}"#
+        wire.taggingReply = Dictionary(uniqueKeysWithValues: markers.map { ($0, anyYear) })
+        wire.traceReply = [
+            "DOCA": #"{"year": 1947, "lo": 1947, "hi": 1947, "date_uncertain": false, "evidence": {"neighbour": "self", "quote": "March 3, 1947"}}"#,
+            "DOCB": #"{"year": 1947, "lo": 1946, "hi": 1948, "date_uncertain": true, "evidence": {"neighbour": "P1", "quote": "March 3, 1947"}}"#,
+            "DOCC": #"{"year": 1947, "lo": 1946, "hi": 1949, "date_uncertain": true, "evidence": {"neighbour": "P1", "quote": "March 3, 1947"}}"#,
+        ]
+        wire.imageReply = [120: #"{"dates": [{"quote": "RECEIVED APR 4 1961", "page": 1, "where": "stamp", "kind": "stamped", "year": 1961}, {"quote": "March 30, 1961", "page": 1, "where": "dateline", "kind": "typed", "year": 1961, "month": 3}], "document_date": {"year": 1961, "month": 3, "quote": "March 30, 1961"}}"#]
+
+        func settle(_ cond: () -> Bool) async -> Bool {
+            for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
+            return cond()
+        }
+        func json(_ u: URL?) -> [String: Any] {
+            guard let u, let d = try? Data(contentsOf: u),
+                  let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
+            return o
+        }
+        let gw = GatewayConfig(baseURL: "https://gateway.test/v1", modelID: "some-tagging-model", displayName: "Gateway")
+        let cfg = SessionProcessingConfig(
+            provider: .gemini, model: route.model, thinkingLevel: .low, apiKey: "",
+            taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+            outputDirectory: tmp.appendingPathComponent("out", isDirectory: true),
+            customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: gw,
+            outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
+        let staging = tmp.appendingPathComponent("APStaging-date", isDirectory: true)
+        try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
+        let s = CaptureSession()
+        s._recoveryTestBeginLive(config: cfg, stagingDir: staging)
+        s.liveProcessor._entityTestSetSettings([:])
+        for (i, d) in docs.enumerated() {
+            let page = tmp.appendingPathComponent("page-\(d.gid).jpg")
+            writeJPEG(page, width: d.width)
+            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: d.text, classification: nil, errorMessage: nil,
+                                                                  errorCode: nil)
+            _ = s.ingest(jpeg: (try? Data(contentsOf: page)) ?? Data(), groupId: d.gid, seq: i + 1, type: .document,
+                         quality: nil, year: d.phoneYear, month: nil, deviceName: "TestPhone")
+        }
+        LiveCaptureProcessor._recoveryTestOCRStub = nil
+        for d in docs { s.liveProcessor.segmentResolved(groupId: d.gid) }
+        let all = await settle { s.liveProcessor.staged.count == docs.count }
+        check("6 Live: every document stages", all, "\(s.liveProcessor.staged.count)")
+        func staged(_ gid: String) -> LiveCaptureProcessor.StagedSegment? { s.liveProcessor.staged.first { $0.groupId == gid } }
+        func dating(_ gid: String) -> [String: Any]? { json(staged(gid)?.jsonURL)["dating"] as? [String: Any] }
+        func tags(_ gid: String) -> [String] { staged(gid)?.pdfURLs.first.flatMap { try? MacOSTagger.readTags(from: $0) } ?? [] }
+        func evidence(_ gid: String) -> String? {
+            guard let pdf = staged(gid)?.pdfURLs.first, let doc = PDFDocument(url: pdf), let page = doc.page(at: 1) else { return nil }
+            return PDFHeaderParser.parse(page).header?.dateEvidence
+        }
+
+        check("6 Live: tagged four times, dated three (not D, whose phone year wins)",
+              wire.tagging == 4 && wire.trace.sorted() == ["DOCA", "DOCB", "DOCC"], "\(wire.tagging) \(wire.trace)")
+        check("6 Live: the image pass on B and C only, as the measured model",
+              wire.images.map { $0.first ?? 0 }.sorted() == [120, 130] && wire.models.contains(DateRoute.gatewayModel),
+              "\(wire.images)")
+        let a = tags("A")
+        check("6 Live A: its text year, no Date Uncertain; the sidecar's dating object says text",
+              a.contains("1947") && !a.contains("1950") && !a.contains("Date Uncertain") && dating("A")?["class"] as? String == "text",
+              "\(a)")
+        let b = tags("B")
+        check("6 Live B: the page image's 1961 and month, not the tagging call's 1950; its stamp a second-role date",
+              b.contains("1961") && b.contains("03 March") && !b.contains("1950") && !b.contains("Date Uncertain")
+              && (dating("B")?["second_role_dates"] as? [[String: Any]])?.first?["quote"] as? String == "RECEIVED APR 4 1961",
+              "\(b)")
+        check("6 Live B: the staged PDF's header names the image evidence",
+              evidence("B") == "image; page 1; dateline; \"March 30, 1961\"", "\(String(describing: evidence("B")))")
+        let c = tags("C")
+        check("6 Live C: an estimate with no neighbour sent writes no year (not the tagging call's 1950), Date Uncertain",
+              !c.contains("1947") && !c.contains("1950") && c.contains("Date Uncertain")
+              && dating("C")?["class"] as? String == "none" && evidence("C") == nil, "\(c)")
+        let d = tags("D")
+        check("6 Live D: the phone's 1933, no dating object", d.contains("1933") && !d.contains("1950")
+              && dating("D") == nil && json(staged("D")?.jsonURL)["subjects"] != nil, "\(d)")
+
+        // The staging manifest keeps the decision, so a relaunch's rotation review regenerates it without a call.
+        let kept = s.liveProcessor._datingTestRetained("B")
+        let reloaded = CaptureSession()
+        reloaded.liveProcessor._recoveryTestLoadManifest(stagingDir: staging, config: cfg)
+        check("6 Live: the staging manifest round-trips the decision", kept?.evidenceClass == .image
+              && reloaded.liveProcessor._datingTestRetained("B") == kept
+              && reloaded.liveProcessor._datingTestRetained("D") == nil)
+        let calls = wire.lock.withLock { wire.trace.count + wire.images.count }
+        let before = (dating("B") ?? [:]) as NSDictionary
+        if let src = s.photos.first(where: { $0.groupId == "B" })?.url {
+            s.liveProcessor.rotationReviewPages = [
+                LiveCaptureProcessor.RotationReviewPage(groupId: "B", pageIndex: 0, order: 2, sourceURL: src, rotationDegrees: 90)
+            ]
+            s.liveProcessor.applyRotationReviewAndFinalize()
+            let done = await settle { !s.liveProcessor.isFinalizing }
+            check("6 Live: the regenerated B keeps its dating object and header line, no second call",
+                  done && ((dating("B") ?? [:]) as NSDictionary) == before
+                  && evidence("B") == "image; page 1; dateline; \"March 30, 1961\""
+                  && wire.lock.withLock { wire.trace.count + wire.images.count } == calls,
+                  "\(String(describing: dating("B")))")
+        } else {
+            check("6 Live: B's source page is on disk", false)
+        }
     }
 }
 #endif

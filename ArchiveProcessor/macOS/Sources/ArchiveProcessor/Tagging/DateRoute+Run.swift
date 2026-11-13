@@ -71,6 +71,20 @@ extension DateRoute {
         return d
     }
 
+    /// W46.date-route-other-paths — what the route put in a manual card's date field (the tagging sheet's auto-date
+    /// and the manual segment card): the decision, and the fields and flag it filled. Its evidence is written only while
+    /// the card still holds exactly that date; a date the user typed or changed is theirs, and carries none.
+    struct CardFill {
+        let decision: Decision
+        let fields: TypedDateTags.Components
+        let dateUncertain: Bool
+
+        /// The decision, when the card still holds what the route filled.
+        func standing(fields: TypedDateTags.Components, dateUncertain: Bool) -> Decision? {
+            fields == self.fields && dateUncertain == self.dateUncertain ? decision : nil
+        }
+    }
+
     /// The trace call and whether the measured route answered it. On a remote gateway, the measured request
     /// (`date_route_pipeline.trace_body`); a gateway that does not serve that model (or fails) is asked again on its
     /// own model, as every other backend is: the run's own text route, which no bench measured for this prompt.
@@ -140,6 +154,13 @@ extension DateRoute.Decision {
         if taggerYear == String(year), tags.month != nil { return }   // the tagging call's own month and day stand
         tags.month = month.flatMap { GeneratedTags.monthTag($0) }
         tags.day = nil
+    }
+
+    /// The date fields alone, for a manual card's auto-date (no tagging call's month and day to keep).
+    var dateTags: GeneratedTags {
+        var t = GeneratedTags()
+        apply(to: &t)
+        return t
     }
 
     /// Step 3a: an established enclosure with no explicit date of its own takes its cover's year, always with

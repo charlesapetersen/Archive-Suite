@@ -77,6 +77,8 @@ struct SegmentTagData {
     /// "1958-03-12", "1950s"); empty = none. An invalid value is never written.
     var sentWith: String = ""
     var sentWithUncertain: Bool = false
+    /// W46.date-route-other-paths — what the dating route filled the date with (autoDate), for the sidecar and header.
+    var datingFill: DateRoute.CardFill? = nil
 
     /// False while `sentWith` holds text that is not a valid date (the card refuses to save).
     var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
@@ -96,6 +98,16 @@ struct SegmentTagData {
     mutating func setDate(fromReply reply: GeneratedTags) {
         if let d = TypedDateTags.date(year: reply.year, month: reply.month, day: reply.day) { ownDate = d; return }
         (year, month, day) = (reply.year ?? "", reply.month ?? "", reply.day ?? "")
+    }
+    /// Fill the date from the dating route's decision and remember what it filled.
+    mutating func setDate(fromRoute decision: DateRoute.Decision) {
+        setDate(fromReply: decision.dateTags)
+        dateUncertain = decision.dateUncertain
+        datingFill = DateRoute.CardFill(decision: decision, fields: dateComponents, dateUncertain: dateUncertain)
+    }
+    /// The route's decision while the card still holds the date it filled.
+    var standingDating: DateRoute.Decision? {
+        datingFill?.standing(fields: dateComponents, dateUncertain: dateUncertain)
     }
 }
 
@@ -124,6 +136,8 @@ struct ManualTagSegment: Identifiable {
     /// Explicit covering-letter date (wire value); empty = take it from the relation's cover, if any.
     var sentWith: String = ""
     var sentWithUncertain: Bool = false
+    /// W46.date-route-other-paths — what the dating route filled the date with, for the sidecar and header.
+    var datingFill: DateRoute.CardFill? = nil
 
     /// False while `sentWith` holds text that is not a valid date (the sheet refuses to advance).
     var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
@@ -143,5 +157,15 @@ struct ManualTagSegment: Identifiable {
     mutating func setDate(fromReply reply: GeneratedTags) {
         if let d = TypedDateTags.date(year: reply.year, month: reply.month, day: reply.day) { ownDate = d; return }
         (year, month, day) = (reply.year ?? "", reply.month ?? "", reply.day ?? "")
+    }
+    /// Fill the date from the dating route's decision and remember what it filled.
+    mutating func setDate(fromRoute decision: DateRoute.Decision) {
+        setDate(fromReply: decision.dateTags)
+        dateUncertain = decision.dateUncertain
+        datingFill = DateRoute.CardFill(decision: decision, fields: dateComponents, dateUncertain: dateUncertain)
+    }
+    /// The route's decision while the card still holds the date it filled.
+    var standingDating: DateRoute.Decision? {
+        datingFill?.standing(fields: dateComponents, dateUncertain: dateUncertain)
     }
 }

@@ -611,10 +611,15 @@ extension OCRProcessor {
             // The late Live-Capture boundary runs after this phase. Save the manual decision into
             // its aligned handoff array so it cannot re-apply the incoming phone P value afterwards.
             recordManualQualityIntent(m.quality, for: seg.pdfURLs)
+            // W46.date-route-other-paths: the route's evidence, while the card still holds the date it filled.
+            let dating = m.standingDating
 
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = tags
                 if let outputPDF = outputURLMap[sourceURL] {
+                    if let dating {
+                        writeDateEvidence(dating.headerEvidence, to: outputPDF, source: sourceURL, runConfig: runConfig)
+                    }
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     tagOutput(tags, at: outputPDF, source: sourceURL, stampUnread: stampUnread)
                 }
@@ -624,7 +629,7 @@ extension OCRProcessor {
             }
             if enableSegmentJSON {
                 writeSegmentJSON(segment: seg, tags: tags, outputDirectory: outputDirectory,
-                                 enclosureOf: enclosureOfName)
+                                 enclosureOf: enclosureOfName, dating: dating?.sidecarObject())
             }
         }
     }
@@ -635,10 +640,11 @@ extension OCRProcessor {
         model: LLMModel,
         apiKey: String
     ) async {
-        let generator = TagGenerator()
         // Gather segments still needing a date (main actor); skip already-dated ones (incl. Live
-        // Capture pre-fills).
-        var work: [(idx: Int, segment: DocumentSegment, nearby: [DocumentSegment])] = []
+        // Capture pre-fills). W46.date-route-other-paths: each one's dating-route input, as Process Files reads it
+        // (its own text, the neighbouring documents, its first page images); nil for a document with no text.
+        let jobBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
+        var work: [(idx: Int, input: DateRoute.Input?)] = []
         for idx in manualTagSegments.indices {
             let segIndex = manualTagSegments[idx].segmentIndex
             guard segIndex < segments.count else { continue }
@@ -646,55 +652,47 @@ extension OCRProcessor {
                 manualTagSegments[idx].dateLoading = false
                 continue
             }
-            let nearby = Array(
-                segments[max(0, segIndex - 3)..<segIndex]
-                + segments[min(segIndex + 1, segments.count)..<min(segIndex + 4, segments.count)]
-            )
-            work.append((idx, segments[segIndex], nearby))
+            work.append((idx, datingInput(for: segIndex, in: segments, jobBySource: jobBySource)))
         }
         guard !work.isEmpty else { return }
-        let gateway = currentGateway
-        let localAgent = currentLocalAgent
+        let backend = DateRoute.Backend(provider: provider, model: model, apiKey: apiKey, gateway: currentGateway,
+                                        localAgent: currentLocalAgent)
+        let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
+            .value.bool ?? false
         let maxConcurrent = min(6, work.count)
+        // A document with no text gets no dating call: no year, Date Uncertain (as before the route).
+        let task: @Sendable ((idx: Int, input: DateRoute.Input?)) async -> (Int, DateRoute.Decision?) = { w in
+            guard let input = w.input else { return (w.idx, nil) }
+            return (w.idx, await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument))
+        }
 
-        // Fetch dates concurrently (bounded), skipping thinking, and apply each result on the main
-        // actor as it arrives (only filling fields the user hasn't already set).
-        await withTaskGroup(of: (Int, GeneratedTags).self) { group in
+        // Date concurrently (bounded) and apply each result on the main actor as it arrives (only filling fields
+        // the user hasn't already set).
+        await withTaskGroup(of: (Int, DateRoute.Decision?).self) { group in
             var next = 0
             while next < maxConcurrent {
                 let w = work[next]
-                group.addTask {
-                    let date = await generator.generateDateOnly(
-                        for: w.segment, nearbySegments: w.nearby,
-                        provider: provider, model: model, thinkingLevel: nil,
-                        apiKey: apiKey, gatewayConfig: gateway, localAgent: localAgent
-                    )
-                    return (w.idx, date)
-                }
+                group.addTask { await task(w) }
                 next += 1
             }
-            for await (idx, date) in group {
+            for await (idx, decision) in group {
                 if Task.isCancelled { break }
                 if idx < manualTagSegments.count {
                     // W40.processor-date-field: one typed field, so the estimate fills it only while nothing has
                     // been typed there — never a month or day beside a year the user typed meanwhile.
                     if manualTagSegments[idx].dateComponents == TypedDateTags.Components(),
                        !manualTagSegments[idx].dateTextUnreadable {
-                        manualTagSegments[idx].setDate(fromReply: date)
-                        manualTagSegments[idx].dateUncertain = date.dateUncertain
+                        if let decision {
+                            manualTagSegments[idx].setDate(fromRoute: decision)
+                        } else {
+                            manualTagSegments[idx].dateUncertain = true
+                        }
                     }
                     manualTagSegments[idx].dateLoading = false
                 }
                 if next < work.count {
                     let w = work[next]
-                    group.addTask {
-                        let date = await generator.generateDateOnly(
-                            for: w.segment, nearbySegments: w.nearby,
-                            provider: provider, model: model, thinkingLevel: nil,
-                            apiKey: apiKey, gatewayConfig: gateway, localAgent: localAgent
-                        )
-                        return (w.idx, date)
-                    }
+                    group.addTask { await task(w) }
                     next += 1
                 }
             }
@@ -887,10 +885,15 @@ extension OCRProcessor {
             // Only an actually completed manual card supersedes the phone input. A defensively
             // defaulted segment has no human quality decision and keeps the imported rating.
             if manualData != nil { recordManualQualityIntent(data.quality, for: seg.pdfURLs) }
+            // W46.date-route-other-paths: the route's evidence, while the card still holds the date it filled.
+            let dating = data.standingDating
 
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = gtags
                 if let outputPDF = outputURLMap[sourceURL] {
+                    if let dating {
+                        writeDateEvidence(dating.headerEvidence, to: outputPDF, source: sourceURL, runConfig: runConfig)
+                    }
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
                 }
@@ -899,7 +902,8 @@ extension OCRProcessor {
                 }
             }
             if enableSegmentJSON {
-                writeSegmentJSON(segment: seg, tags: gtags, outputDirectory: outputDirectory)
+                writeSegmentJSON(segment: seg, tags: gtags, outputDirectory: outputDirectory,
+                                 dating: dating?.sidecarObject())
             }
         }
     }
@@ -1009,30 +1013,42 @@ extension OCRProcessor {
 
         var urls: [URL] = []
         var texts: [String] = []
+        var pages: [(url: URL, rotation: Int)] = []
         for i in indices where i >= 0 && i < manualSegImages.count && manualSegImages[i].kind == .document {
             let url = manualSegImages[i].url
             urls.append(url)
             texts.append(jobs.first { $0.sourceURL == url }?.result?.text ?? "")
+            pages.append((url, manualSegImages[i].rotationDegrees))
         }
         guard !urls.isEmpty else { return }
 
-        manualSegDateFetching = true
+        // W46.date-route-other-paths: the dating route on the card's pages (its own text and first page images, the
+        // rotation the user set); no neighbours, since the documents around it are not drawn yet. No text, no call.
         let segment = DocumentSegment(pdfURLs: urls, texts: texts)
-        let date = await TagGenerator().generateDateOnly(
-            for: segment, nearbySegments: [],
-            provider: manualSegProvider, model: model,
-            thinkingLevel: manualSegThinking, apiKey: manualSegApiKey,
-            gatewayConfig: currentGateway
-        )
-        manualSegDateFetching = false
+        var decision: DateRoute.Decision? = nil
+        if !segment.combinedText.isEmpty {
+            manualSegDateFetching = true
+            let backend = DateRoute.Backend(provider: manualSegProvider, model: model, apiKey: manualSegApiKey,
+                                            gateway: currentGateway, localAgent: currentLocalAgent)
+            let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
+                .value.bool ?? false
+            decision = await DateRoute.run(
+                DateRoute.Input(text: DateRoute.ownText(segment), near: [],
+                                pages: Array(pages.prefix(DateRoute.imagePages))),
+                backend: backend, imageEveryDocument: imageEveryDocument)
+            manualSegDateFetching = false
+        }
 
         guard !Task.isCancelled else { return }
         // W40.processor-date-field: the date is one typed field, so the reply fills it only while nothing has been
         // typed there — never a month or day beside a year the user typed meanwhile.
         guard manualSegDraftTags.dateComponents == TypedDateTags.Components(),
               !manualSegDraftTags.dateTextUnreadable else { return }
-        manualSegDraftTags.setDate(fromReply: date)
-        manualSegDraftTags.dateUncertain = date.dateUncertain
+        if let decision {
+            manualSegDraftTags.setDate(fromRoute: decision)
+        } else {
+            manualSegDraftTags.dateUncertain = true
+        }
     }
     func performTaggingPhase(
         provider: LLMProvider,

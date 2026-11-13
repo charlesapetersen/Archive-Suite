@@ -265,35 +265,11 @@ You are shown the SAME scanned document in four different rotations, labeled A, 
 
 ---
 
-## 7. Date-Only Tagging Prompt
+## 7. Date-Only Tagging Prompt (retired)
 
-**Source:** `TagGenerator.swift` — `generateDateOnly(for:...)`
-
-Used by the auto-date manual tagging mode — cheaper than the full tagging prompt (no subject/format/author fields).
-
-```
-You are a date-extraction assistant for a historical archive.
-
-OCR text of a document:
----
-{document text, first 3000 chars}
----
-
-Nearby documents for date-estimation context (use only if this document's date is unclear):
----
-{context text from up to 3 nearby segments, first 300 chars each, or "(none)"}
----
-
-Respond with ONLY a valid JSON object in this exact format:
-{ "year": "1987", "month": "03 March", "day": "Day 15", "date_uncertain": false }
-
-Rules:
-- "year": 4-digit year string. ALWAYS provide a year — if not stated, estimate from nearby documents or contextual clues. Never null.
-- "month": format "MM MonthName" (e.g. "03 March"). Provide ONLY if the month is explicitly stated in THIS document. NEVER infer or estimate the month from context or nearby documents. Return null otherwise.
-- "day": format "Day D" (e.g. "Day 15"), or null if not determinable
-- "date_uncertain": true if the year cannot be determined from the document itself (even if estimated from context)
-- Respond with ONLY the JSON object. No commentary.
-```
+Retired by W46.date-route-other-paths (2026-11-13): the auto-date manual tagging sheet and the manual segment card now
+date through the dating route (§9), so no path writes a year without evidence. The old prompt is in git history
+(`TagGenerator.generateDateOnly`).
 
 ---
 
@@ -333,7 +309,8 @@ Rules:
 **Source:** `DateRoute.swift` — `traceTemplate`, `tracePrompt(text:near:)`, `imagePrompt` (W46.date-route)
 
 A dedicated dating call after the tagging call, on every document with text (never a box or folder label, nor a
-document whose Live Capture phone date wins). Its reply replaces the tagging call's date by the route of
+document whose Live Capture phone or Mac-card year wins), in Process Files, Live Capture's automatic tagging and the manual auto-date
+(the tagging sheet's prefetch and the manual segment card, W46.date-route-other-paths). Its reply replaces the tagging call's date by the route of
 `execution-plans/processing-review/13-stage-rules/08-dating.md` §3: a year a rule candidate in the document's own text
 carries is explicit (no `Date Uncertain`, though the reply's own `date_uncertain` may add it, owner 2026-11-12); a year
 taken from a neighbour is written only when its quote passes `DateRoute.evidenceCheck`, always with `Date Uncertain`;

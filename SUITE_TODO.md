@@ -579,7 +579,6 @@ now takes the rule table as its source.
 
 
 
-- [ ] **`W46.date-route-other-paths` — the dating route in Live Capture and the manual auto-date [S-M · Tier-2]** (lane: processor) (uses: build) — filed by W46.date-route, 2026-11-13. W46.date-route runs in Process Files' `performTaggingPhase` only. Live Capture (`LiveCaptureProcessor`, where a phone date still wins) and the manual tagging sheet's auto-date prefetch (`TagGenerator.generateDateOnly`, its own date-only prompt) still take the tagging call's date, which always writes a year. Route both through `DateRoute.run` and its `dating` sidecar object (the Live staging manifest keeps it, as W46.ent-feature-live kept the names), so every path writes no year without evidence.
 
 - [ ] **`W46.date-route-image-routes` — the dating image pass beyond the gateway [S-M]** (lane: processor) (uses: build) — filed by W46.date-route, 2026-11-13. Step 2 runs only through a remote gateway, as Gemini 3.7 Flash, the route W46.date-route-pipeline measured; on a direct key, OpenRouter, a Local Agent or a model on this Mac it is skipped and the sidecar says so (`image_pass`: no measured image route). 08-dating.md §9 and call 7.5: the Mac's Qwen3-VL 8B image pass at 16 GB once its quotes are shown to improve the year (item 8.1's 27B half, W46.date-route-pipeline-27b, is the nearest measure), and Gemini 3.8 on a direct key once measured on the 122. Add each route only with its measured row.
 

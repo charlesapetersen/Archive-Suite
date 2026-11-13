@@ -14,7 +14,7 @@ def swift_prompt():
     by date_tagging's placeholders (the subject rule by the literal of its empty-vocabulary branch)."""
     with open(D.SWIFT, encoding="utf-8") as fh:
         src = fh.read()
-    body = src[src.index("func generateTags("):src.index("func generateDateOnly(")]
+    body = src[src.index("func generateTags("):src.index("func callLLM(")]
     starts = [m.end() for m in re.finditer(r'let prompt = """\n', body)]
     assert len(starts) == 1, "generateTags must hold exactly one prompt literal"
     end = body.index('\n        """', starts[0])
