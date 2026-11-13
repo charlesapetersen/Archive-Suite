@@ -194,6 +194,8 @@ struct ImproveOCRView: View {
         }
         .padding(20)
         .frame(minWidth: 760, minHeight: 560)
+        // A container, so the identifier names the dialog without overriding its controls' own.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ap.reocr.dialog")
     }
 

@@ -130,7 +130,7 @@ final class ProcessorUITests: XCTestCase {
     /// folder connected in this fresh VM, a Run that says why it is not offered. No OCR, no network, no write.
     func testImproveOCRDialogListsTheFileTheKindAndTheReaders() throws {
         relaunch(extra: ["-APUITestSyntheticSuitePair"])
-        XCTAssertTrue(element("ap.ocr.dropZone").waitForExistence(timeout: 10), "the Process Files window is up")
+        XCTAssertTrue(element("ap.ocr.start").waitForExistence(timeout: 10), "the Process Files window is up with the file")
         XCTAssertTrue(app.menuBars.menuItems["Improve OCR…"].exists, "the Processing menu lists Improve OCR…")
         app.typeKey("i", modifierFlags: [.command, .shift])
         let dialog = element("ap.reocr.dialog")
@@ -139,9 +139,8 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(element("ap.reocr.kind.Letter 1952.pdf").exists, "the file has a Kind picker")
         let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'ap.reocr.row.typewritten.'"))
         XCTAssertGreaterThan(rows.count, 0, "the header's Kind (typewritten) has ranked readers")
-        let blocker = element("ap.reocr.blocker")
-        XCTAssertTrue(blocker.exists, "Run says why it is not offered")
-        XCTAssertTrue(renderedText(of: blocker).contains("shared folder"), "without a connected shared folder: \(renderedText(of: blocker))")
+        let why = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'needs its shared folder' OR value CONTAINS 'needs its shared folder'"))
+        XCTAssertTrue(why.firstMatch.waitForExistence(timeout: 5), "Run says why it is not offered: the shared folder is not connected")
         XCTAssertFalse(element("ap.reocr.run").isEnabled, "Run is not offered until the folder is connected")
         attachScreenshot("processor-improve-ocr-dialog")
         app.typeKey(.escape, modifierFlags: [])
