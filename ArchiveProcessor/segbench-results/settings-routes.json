@@ -37,7 +37,7 @@
   },
   "segmentation": {
    "metric": "pages_exact",
-   "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g1 2.1, so 4.2 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
+   "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g2 5.2, so 10.4 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
    "source": "seg-g2-offsets.md §Reading; seg-boxes-score.md §Paired differences"
   },
   "dating": {
@@ -8151,27 +8151,27 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 88.8,
+       "value": 87.6,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Gemini only",
         "attribute": "pages in an exact document, no checking",
-        "value": "88.8%"
+        "value": "87.6%"
        }
       },
       "test-boxes.offset_range": {
-       "value": 0.3,
-       "low": 88.8,
-       "high": 89.1,
+       "value": 5.2,
+       "low": 84.8,
+       "high": 90.0,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "seg-g2-offsets.md",
         "route": "Gemini 3.7",
         "attribute": "spread of pages exact, no checking, over window offsets 0, 1 and 2",
-        "value": "0.3 points"
+        "value": "5.2 points"
        }
       },
       "test-boxes.checks_per_100": {
@@ -8289,27 +8289,27 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 85.2,
+       "value": 89.1,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "seg-boxes-score.md",
         "route": "3.7, offset 0",
-        "attribute": "pages in an exact document, no checking (range 83.0-85.2%)",
-        "value": "85.2%"
+        "attribute": "pages in an exact document, no checking (range 87.0-89.4%)",
+        "value": "89.1%"
        }
       },
       "test-boxes.offset_range": {
-       "value": 2.1,
-       "low": 83.0,
-       "high": 85.2,
+       "value": 2.4,
+       "low": 87.0,
+       "high": 89.4,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "seg-boxes-score.md",
         "route": "Gemini 3.7",
         "attribute": "window offsets move no-check exact pages",
-        "value": "2.1 points"
+        "value": "2.4 points"
        }
       },
       "test-boxes.checks_per_100": {
@@ -8324,14 +8324,14 @@
        }
       },
       "test-boxes.after_checking": {
-       "value": 98.5,
+       "value": 97.0,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "seg-boxes-score.md",
-        "route": "3.7, every offset",
-        "attribute": "pages right after checking",
-        "value": "98.5%"
+        "route": "3.7, offset 0",
+        "attribute": "pages right after checking (range 97.0-98.5%)",
+        "value": "97.0%"
        }
       },
       "letters.gap_acc": {
@@ -8471,14 +8471,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 87.3,
+       "value": 87.9,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Gemini only, text alone (budget)",
         "attribute": "pages in an exact document, no checking",
-        "value": "87.3%"
+        "value": "87.9%"
        }
       },
       "test-boxes.checks_per_100": {
@@ -8597,14 +8597,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 85.5,
+       "value": 89.1,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Claude only",
         "attribute": "pages in an exact document, no checking",
-        "value": "85.5%"
+        "value": "89.1%"
        }
       },
       "test-boxes.checks_per_100": {
@@ -8619,25 +8619,25 @@
        }
       },
       "test-boxes.after_checking": {
-       "value": 97.3,
+       "value": 98.5,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Claude only",
         "attribute": "pages right after checking",
-        "value": "97.3%"
+        "value": "98.5%"
        }
       },
       "test-boxes.unflagged_per_500": {
-       "value": 4.1,
+       "value": 1.4,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Claude only",
         "attribute": "unflagged errors per 500 pages (count)",
-        "value": "4.1 (3)"
+        "value": "1.4 (1)"
        }
       },
       "manuscripts-public": {
@@ -8721,14 +8721,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 90.9,
+       "value": 90.3,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "ChatGPT only",
         "attribute": "pages in an exact document, no checking",
-        "value": "90.9%"
+        "value": "90.3%"
        }
       },
       "test-boxes.checks_per_100": {
@@ -8806,14 +8806,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 90.9,
+       "value": 90.3,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Claude and ChatGPT together",
         "attribute": "pages in an exact document, no checking",
-        "value": "90.9%"
+        "value": "90.3%"
        }
       },
       "test-boxes.checks_per_100": {
@@ -8828,25 +8828,25 @@
        }
       },
       "test-boxes.after_checking": {
-       "value": 97.3,
+       "value": 98.5,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Claude and ChatGPT together",
         "attribute": "pages right after checking",
-        "value": "97.3%"
+        "value": "98.5%"
        }
       },
       "test-boxes.unflagged_per_500": {
-       "value": 4.1,
+       "value": 1.4,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Claude and ChatGPT together",
         "attribute": "unflagged errors per 500 pages (count)",
-        "value": "4.1 (3)"
+        "value": "1.4 (1)"
        }
       }
      },
@@ -8900,14 +8900,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 80.6,
+       "value": 83.0,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "GLM-5.3 Flash only (budget)",
         "attribute": "pages in an exact document, no checking",
-        "value": "80.6%"
+        "value": "83.0%"
        }
       },
       "test-boxes.checks_per_100": {
@@ -9005,14 +9005,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 80.3,
+       "value": 79.7,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "options.md",
         "route": "Corpus-trained Qwen3.5 2B on this Mac (no key)",
         "attribute": "pages in an exact document, no checking (bf16 on FarmShare)",
-        "value": "80.3%"
+        "value": "79.7%"
        }
       },
       "test-boxes.checks_per_100": {
@@ -9190,14 +9190,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 80.3,
+       "value": 79.7,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "seg-scorers.md",
         "route": "window-or-fs-seg-2b",
         "attribute": "pages exact, locked test boxes",
-        "value": "80.3%"
+        "value": "79.7%"
        }
       },
       "letters.gap_acc": {
@@ -9278,14 +9278,14 @@
      },
      "figures": {
       "test-boxes": {
-       "value": 80.0,
+       "value": 83.0,
        "n": 363,
        "truth": "owner-test",
        "source": {
         "file": "seg-students.md",
         "route": "Qwen3.5 4B, fine-tuned, test pooled",
         "attribute": "no checking",
-        "value": "80.0%"
+        "value": "83.0%"
        }
       },
       "letters.gap_acc": {
@@ -9352,7 +9352,7 @@
       "source": null
      },
      "caveats": [
-      "ties the 2B on test (80.0 against 80.3%, seg-students.md); under it on Sasha gaps (80.0 against 89.1%, seg-boxes-score.md)"
+      "ties the 2B on test (83.0 against 79.7%, seg-students.md; rescored 2026-11-13, W46.seg-truth-owner-fixes); under it on Sasha gaps (80.0 against 89.1%, seg-boxes-score.md)"
      ],
      "kind_rules": [
       "manuscripts: warning"

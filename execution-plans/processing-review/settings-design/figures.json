@@ -3,7 +3,7 @@
  "table_built": "2026-11-13",
  "noise": {
   "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
-  "seg_rerun_pages_exact_points": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g1 2.1, so 4.2 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
+  "seg_rerun_pages_exact_points": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g2 5.2, so 10.4 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
   "truth_note": "The 96's truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner; close rows among those families are provisional. Ties: on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3 (ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair)."
  },
  "ocr": [
@@ -1633,7 +1633,7 @@
    "peak_gb": 0,
    "note": "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key); the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 88.8-89.1% no checking, 25.3-29.2 checks per 100 pages, 100.0% after checking and no unflagged error (seg-g2-offsets.md); 3.7's range on g1 at this level is 83.0-85.2%",
    "source": "settings-routes.json, stage segmentation, row gemini3.8-flash",
-   "nocheck": 88.8,
+   "nocheck": 87.6,
    "checks_per_100": 25.3,
    "after": 100.0,
    "unflagged_per_500": 0.0
@@ -1654,9 +1654,9 @@
    "peak_gb": 0,
    "note": "g1 figures at 0.965, the level fitted for 3.8 on g1 (P7-4); fitted on 3.7's own g2 answers the level is also 0.965 (seg-magazine-rule-app.md); the app has no gateway route; its range is shown on the 3.8 card labelled as 3.7's, and Sasha's lead over the 2B stands on this card only (14-owner-calls.md call 8)",
    "source": "settings-routes.json, stage segmentation, row gemini3.7-flash-gateway",
-   "nocheck": 85.2,
+   "nocheck": 89.1,
    "checks_per_100": 25.9,
-   "after": 98.5,
+   "after": 97.0,
    "unflagged_per_500": null
   },
   {
@@ -1675,7 +1675,7 @@
    "peak_gb": 0,
    "note": "the app sends prompt g2 without the page images (g2t) to 3.8; every figure and the level (0.950) are Gemini 3.7 Flash's text-only g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-text-tier-app.md); more boundaries to check than with the images (29.2 per 100 pages against 25.3) for about half the price",
    "source": "settings-routes.json, stage segmentation, row gemini3.8-flash-text",
-   "nocheck": 87.3,
+   "nocheck": 87.9,
    "checks_per_100": 29.2,
    "after": 98.5,
    "unflagged_per_500": 1.4
@@ -1699,10 +1699,10 @@
    "peak_gb": 0,
    "note": "on the plan, no money; about 5% of a five-hour window per 100 pages (figures.json note, usage.md); not scored on the three locked boxes",
    "source": "settings-routes.json, stage segmentation, row claude-sonnet5.5",
-   "nocheck": 85.5,
+   "nocheck": 89.1,
    "checks_per_100": 10.2,
-   "after": 97.3,
-   "unflagged_per_500": 4.1
+   "after": 98.5,
+   "unflagged_per_500": 1.4
   },
   {
    "id": "chatgpt-gpt6.1-sol",
@@ -1723,7 +1723,7 @@
    "peak_gb": 0,
    "note": "its confidence flags nearly every gap (0.990 level); Dean, Herrnstein, RG165, Stanton only; Lincoln and CREST not collected (owner dropped the arm)",
    "source": "settings-routes.json, stage segmentation, row chatgpt-gpt6.1-sol",
-   "nocheck": 90.9,
+   "nocheck": 90.3,
    "checks_per_100": 79.1,
    "after": 100.0,
    "unflagged_per_500": null
@@ -1745,10 +1745,10 @@
    "peak_gb": 0,
    "note": "no locked-box or public-box figure; the mix adds little over Claude alone: the models err alike (options.md Reading)",
    "source": "settings-routes.json, stage segmentation, row mix-claude-chatgpt",
-   "nocheck": 90.9,
+   "nocheck": 90.3,
    "checks_per_100": 10.2,
-   "after": 97.3,
-   "unflagged_per_500": 4.1
+   "after": 98.5,
+   "unflagged_per_500": 1.4
   },
   {
    "id": "glm5.3-flash",
@@ -1766,7 +1766,7 @@
    "peak_gb": 0,
    "note": "Lincoln failed validation twice, no score (seg-lincoln-gateway.md); figures.json gives a $0.46 batch price that options.md does not (item 4)",
    "source": "settings-routes.json, stage segmentation, row glm5.3-flash",
-   "nocheck": 80.6,
+   "nocheck": 83.0,
    "checks_per_100": 33.1,
    "after": 97.0,
    "unflagged_per_500": 4.1
@@ -1785,7 +1785,7 @@
    "peak_gb": 4.4,
    "note": "test-box, Lincoln, CREST and TABME figures are the bf16 2B on FarmShare; the 8-bit build ran on dev boxes and the locked boxes only; its own confidence is close to random on hard boxes (seg-adapt-curve.md)",
    "source": "settings-routes.json, stage segmentation, row seg-qwen3.5-2b-8bit",
-   "nocheck": 80.3,
+   "nocheck": 79.7,
    "checks_per_100": 78.8,
    "after": 98.8,
    "unflagged_per_500": 1.4

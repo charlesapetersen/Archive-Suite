@@ -72,10 +72,10 @@ enum SegmentationChooserTestDriver {
         // 2. Figures.
         let footnote = "Measured once on two boxes (363 pages) of one archive, 11 Oct 2026. Your material may differ."
         let claude = row(.claude, 1000)
-        eq("2 claude no checking", claude.rightWithNoChecking, "about 85% of pages")
+        eq("2 claude no checking", claude.rightWithNoChecking, "about 89% of pages")
         eq("2 claude to check @1000", claude.toCheck, "about 102 boundaries to check")
-        eq("2 claude after checking", claude.rightAfterChecking, "about 97% of pages")
-        eq("2 claude unshown", claude.unshownErrors, "about 1 in 120 pages")
+        eq("2 claude after checking", claude.rightAfterChecking, "about 98% of pages")
+        eq("2 claude unshown", claude.unshownErrors, "about 1 in 360 pages")
         eq("2 footnote", claude.footnote, footnote)
         eq("2 claude to check @363", row(.claude, 363).toCheck, "about 37 boundaries to check")
         eq("2 claude to check @1 (at least 1)", row(.claude, 1).toCheck, "about 1 boundary to check")
@@ -83,7 +83,7 @@ enum SegmentationChooserTestDriver {
 
         let gemini = row(.gemini, 1000)
         // W46.seg-magazine-rule-app: Gemini's figures are Gemini 3.7 Flash's on prompt g2, and the row says so.
-        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 89% of pages")
+        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 88% of pages")
         eq("2 gemini to check", gemini.toCheck, "about 253 boundaries to check")
         eq("2 gemini after checking", gemini.rightAfterChecking, "about 100% of pages")
         eq("2 gemini unshown", gemini.unshownErrors, "none in 363 test pages")
@@ -91,7 +91,7 @@ enum SegmentationChooserTestDriver {
               gemini.notes.count == 1 && gemini.notes[0].contains("Gemini 3.7 Flash"), "\(gemini.notes)")
         // W46.seg-text-tier-app: the text-only tier, its checks beside its price, labelled as 3.7's.
         let text = row(.geminiText, 1000)
-        eq("2 gemini-text no checking", text.rightWithNoChecking, "about 87% of pages")
+        eq("2 gemini-text no checking", text.rightWithNoChecking, "about 88% of pages")
         eq("2 gemini-text to check", text.toCheck, "about 292 boundaries to check")
         eq("2 gemini-text after checking", text.rightAfterChecking, "about 98% of pages")
         eq("2 gemini-text unshown", text.unshownErrors, "about 1 in 360 pages")
@@ -115,10 +115,10 @@ enum SegmentationChooserTestDriver {
         eq("2 zero is not a promise", row(.openai, 1000).unshownErrors, "none in 363 test pages")
 
         let mix = row(.mix, 1000)
-        eq("2 mix no checking", mix.rightWithNoChecking, "about 91% of pages")
+        eq("2 mix no checking", mix.rightWithNoChecking, "about 90% of pages")
         eq("2 mix to check", mix.toCheck, "about 102 boundaries to check")
-        eq("2 mix after checking", mix.rightAfterChecking, "about 97% of pages")
-        eq("2 mix unshown", mix.unshownErrors, "about 1 in 120 pages")
+        eq("2 mix after checking", mix.rightAfterChecking, "about 98% of pages")
+        eq("2 mix unshown", mix.unshownErrors, "about 1 in 360 pages")
 
         let manual = row(.manual, 1000, .none)
         eq("2 manual proposes nothing", manual.rightWithNoChecking, nil)
@@ -335,12 +335,13 @@ enum SegmentationChooserTestDriver {
         check("6 no key, nothing saved: saves nothing",
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
-        // The settings solver's pick (W46.settings-solver): ChatGPT by key leads at 90.9% unchecked, beyond the 3.2
-        // floor over Claude's 85.5%; with Gemini's key alone, Gemini 3.8 Flash on the text alone, which ties it with the
-        // images for half the price (W46.seg-text-tier-default).
+        // The settings solver's pick (W46.settings-solver): since the owner's truth corrections
+        // (W46.seg-truth-owner-fixes) GLM-5.3 Flash's 83.0% ties ChatGPT's 90.3% under the 10.4-point floor and is the
+        // cheapest key route (Claude's sign-in is unknown); with Gemini's key alone, Gemini 3.8 Flash on the text alone,
+        // which ties it with the images for half the price (W46.seg-text-tier-default).
         check("6 no Gemini key, nothing saved: saves the solver's pick",
               SegmentationApproach.preselect(noGemini, defaults: d))
-        eq("6 no Gemini key, nothing saved: openai", SegmentationApproach.stored(d), .openai)
+        eq("6 no Gemini key, nothing saved: glm", SegmentationApproach.stored(d), .glm)
         d.removeObject(forKey: key)
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini-text", SegmentationApproach.stored(d), .geminiText)

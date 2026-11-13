@@ -37,23 +37,23 @@ Made by `scripts/segbench/rescore.py` (owner, public, report) from the response 
 
 | source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| window-cues-codex | window, subscription | 90.9% | 0.941 | 0.025 | 0.025 | 0.943 | 0.955 | 0.987 | 0.921 | 60.0% | 3.0 |
-| window-gemini-3.8-flash-low | window, Gemini API | 87.3% | 0.915 | 0.036 | 0.036 | 0.915 | 0.929 | 0.986 | 0.888 | 53.3% | 4.1 |
-| window-claude | window, subscription | 85.5% | 0.896 | 0.044 | 0.044 | 0.909 | 0.925 | 0.982 | 0.871 | 53.3% | 4.1 |
-| window-or-gpt5.6-luna | window, OpenRouter | 83.0% | 0.877 | 0.053 | 0.053 | 0.886 | 0.902 | 0.982 | 0.848 | 53.3% | 5.5 |
-| whole-gemini | whole folder, Gemini API | 82.7% | 0.909 | 0.039 | 0.039 | 0.909 | 0.925 | 0.983 | 0.877 | 53.3% | 5.2 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 81.5% | 0.840 | 0.069 | 0.069 | 0.847 | 0.862 | 0.983 | 0.817 | 46.7% | 7.4 |
-| window-or-glm5.3-flash | window, OpenRouter | 80.6% | 0.882 | 0.050 | 0.050 | 0.902 | 0.918 | 0.983 | 0.856 | 46.7% | 4.7 |
-| window-or-fs-seg-2b | window, FarmShare | 80.3% | 0.827 | 0.075 | 0.075 | 0.825 | 0.842 | 0.980 | 0.791 | 60.0% | 7.7 |
-| window-or-fs-seg-4b | window, FarmShare | 80.0% | 0.852 | 0.064 | 0.064 | 0.852 | 0.867 | 0.982 | 0.816 | 40.0% | 7.2 |
-| spring-v1 | spring 2026 Gemini (own photo labels) | 78.5% | 0.890 | 0.053 | 0.053 | 0.890 | 0.904 | 0.984 | 0.851 | 33.3% | 6.1 |
-| window-or-qwen3.5-flash | window, OpenRouter | 76.1% | 0.857 | 0.061 | 0.061 | 0.858 | 0.879 | 0.975 | 0.805 | 46.7% | 7.2 |
-| spring-baseline | spring 2026 Gemini (own photo labels) | 57.0% | 0.820 | 0.116 | 0.116 | 0.806 | 0.842 | 0.957 | 0.703 | 0.0% | 12.4 |
-| spring-v2 | spring 2026 Gemini (own photo labels) | 55.8% | 0.755 | 0.144 | 0.144 | 0.764 | 0.793 | 0.963 | 0.675 | 6.7% | 13.8 |
-| rule-cues | baseline | 33.6% | 0.311 | 0.319 | 0.319 | 0.467 | 0.499 | 0.936 | 0.398 | 20.0% | 31.1 |
-| rule-cues-sketch | baseline | 22.4% | 0.096 | 0.449 | 0.449 | 0.314 | 0.317 | 0.989 | 0.308 | 13.3% | 45.7 |
-| all-new | baseline | 20.9% | 0.000 | 0.507 | 0.507 | 0.289 | 0.289 | 1.000 | 0.289 | 13.3% | 50.4 |
-| no-boundaries | baseline | 8.5% | 0.000 | 0.366 | 0.366 | 0.073 | 0.086 | 0.844 | 0.049 | 26.7% | 68.0 |
+| window-cues-codex | window, subscription | 90.3% | 0.941 | 0.025 | 0.025 | 0.954 | 0.969 | 0.985 | 0.920 | 73.3% | 2.5 |
+| window-or-gpt5.6-luna | window, OpenRouter | 90.3% | 0.915 | 0.036 | 0.036 | 0.924 | 0.936 | 0.988 | 0.902 | 73.3% | 3.6 |
+| window-gemini-3.8-flash-low | window, Gemini API | 90.0% | 0.928 | 0.030 | 0.030 | 0.929 | 0.942 | 0.986 | 0.901 | 73.3% | 3.3 |
+| window-claude | window, subscription | 89.1% | 0.921 | 0.033 | 0.033 | 0.929 | 0.945 | 0.983 | 0.897 | 80.0% | 3.6 |
+| whole-gemini | whole folder, Gemini API | 85.8% | 0.921 | 0.033 | 0.033 | 0.930 | 0.945 | 0.984 | 0.897 | 73.3% | 4.1 |
+| window-or-fs-seg-4b | window, FarmShare | 83.0% | 0.864 | 0.058 | 0.058 | 0.864 | 0.879 | 0.982 | 0.834 | 60.0% | 6.6 |
+| window-or-glm5.3-flash | window, OpenRouter | 83.0% | 0.908 | 0.039 | 0.039 | 0.927 | 0.945 | 0.981 | 0.883 | 66.7% | 4.7 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 81.5% | 0.839 | 0.069 | 0.069 | 0.853 | 0.867 | 0.983 | 0.822 | 53.3% | 7.4 |
+| window-or-qwen3.5-flash | window, OpenRouter | 81.5% | 0.889 | 0.047 | 0.047 | 0.897 | 0.915 | 0.980 | 0.854 | 60.0% | 5.5 |
+| window-or-fs-seg-2b | window, FarmShare | 79.7% | 0.839 | 0.069 | 0.069 | 0.840 | 0.861 | 0.976 | 0.796 | 66.7% | 7.4 |
+| spring-v1 | spring 2026 Gemini (own photo labels) | 79.1% | 0.889 | 0.053 | 0.053 | 0.887 | 0.897 | 0.988 | 0.850 | 46.7% | 6.1 |
+| spring-v2 | spring 2026 Gemini (own photo labels) | 59.1% | 0.779 | 0.133 | 0.133 | 0.778 | 0.799 | 0.974 | 0.700 | 6.7% | 13.2 |
+| spring-baseline | spring 2026 Gemini (own photo labels) | 58.2% | 0.839 | 0.108 | 0.108 | 0.828 | 0.867 | 0.956 | 0.726 | 0.0% | 12.4 |
+| rule-cues | baseline | 32.7% | 0.315 | 0.316 | 0.316 | 0.457 | 0.489 | 0.934 | 0.388 | 20.0% | 31.4 |
+| rule-cues-sketch | baseline | 21.8% | 0.094 | 0.452 | 0.452 | 0.306 | 0.309 | 0.989 | 0.300 | 13.3% | 46.0 |
+| all-new | baseline | 20.3% | 0.000 | 0.510 | 0.510 | 0.282 | 0.282 | 1.000 | 0.282 | 13.3% | 50.7 |
+| no-boundaries | baseline | 8.5% | 0.000 | 0.357 | 0.357 | 0.076 | 0.088 | 0.865 | 0.050 | 26.7% | 68.6 |
 
 ## Lincoln (261 pages, 80 documents as stored, 78-81 with its 3 unsure gaps either way)
 
@@ -99,12 +99,12 @@ Pages in an exact document gives a page no credit unless its whole document is r
 | Herrnstein | window-or-fs-seg-4b | 91.2% | 0.972 | +6.0 pts | 0.951 | 3.0 |
 | Herrnstein | window-or-fs-seg-2b | 88.4% | 0.956 | +7.2 pts | 0.939 | 3.5 |
 | Herrnstein | window-or-fs-qwen3.5-27b | 91.7% | 0.949 | +3.2 pts | 0.902 | 4.0 |
-| Stanton | window-or-fs-seg-4b | 80.2% | 0.843 | +4.1 pts | 0.841 | 8.4 |
-| Stanton | window-or-fs-seg-2b | 75.3% | 0.797 | +4.4 pts | 0.791 | 10.4 |
-| Stanton | window-or-fs-qwen3.5-27b | 79.8% | 0.830 | +3.2 pts | 0.816 | 9.2 |
-| RG165 | window-or-fs-seg-4b | 79.3% | 0.885 | +9.2 pts | 0.876 | 4.4 |
-| RG165 | window-or-fs-seg-2b | 94.3% | 0.929 | -1.3 pts | 0.938 | 1.8 |
-| RG165 | window-or-fs-qwen3.5-27b | 86.2% | 0.907 | +4.5 pts | 0.908 | 3.5 |
+| Stanton | window-or-fs-seg-4b | 79.8% | 0.834 | +3.5 pts | 0.833 | 8.8 |
+| Stanton | window-or-fs-seg-2b | 74.9% | 0.803 | +5.4 pts | 0.799 | 10.4 |
+| Stanton | window-or-fs-qwen3.5-27b | 80.2% | 0.825 | +2.2 pts | 0.808 | 9.6 |
+| RG165 | window-or-fs-seg-4b | 92.0% | 0.976 | +5.6 pts | 0.967 | 1.8 |
+| RG165 | window-or-fs-seg-2b | 93.1% | 0.979 | +4.8 pts | 0.967 | 0.9 |
+| RG165 | window-or-fs-qwen3.5-27b | 85.1% | 0.956 | +10.5 pts | 0.936 | 2.7 |
 | Lincoln | window-or-fs-seg-4b | 49.8% | 0.669 | +17.1 pts | 0.742 | 12.3 |
 | Lincoln | window-or-fs-seg-2b | 35.6% | 0.529 | +17.3 pts | 0.640 | 17.2 |
 | Lincoln | window-or-fs-qwen3.5-27b | 40.6% | 0.571 | +16.5 pts | 0.677 | 15.7 |
@@ -169,7 +169,7 @@ Development boxes, the oracle count (pooled):
 
 ## Sources with an incomplete cache somewhere
 
-Not collected on every box (each box lists only what it holds): whole-gemini (Lincoln, CREST), whole-gemini-c10 (Stanton, RG165, Lincoln, CREST), window-claude (Lincoln, CREST), window-cues-claude (Herrnstein, Stanton, RG165), window-cues-claude-cue (Deaver, Herrnstein, Stanton, RG165, CREST), window-cues-codex (Lincoln, CREST), window-cues-codex-cue (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-cues-opus (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.1-flash-lite-minimal (Stanton, RG165, Lincoln, CREST), window-gemini-3.5-flash-lite-minimal (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-high (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-low (Lincoln, CREST), window-local-gemma4-12b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3-vl-8b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3.5-4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-seg-2b (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit-mac-r8 (Lincoln, CREST), window-local-seg-4b (Stanton, RG165, Lincoln, CREST), window-local-seg-4b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-date-2b-8bit (Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-2b (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-4b (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-4b-pilot (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-date-2b (Dean, Deaver, Herrnstein, Stanton, RG165), window-or-gemini3.1-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemini3.5-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-26b-a4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-31b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-glm5.3-flash (Lincoln, CREST), window-or-gpt5.4-mini (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.4-nano (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.6-luna (Lincoln, CREST), window-or-llama4-maverick (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-mistral-small (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-122b-a10b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-27b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-flash (Lincoln, CREST), window-or-qwen3.6-35b-a3b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-35b-a3b-fp4 (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-flash (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST).
+Not collected on every box (each box lists only what it holds): whole-gemini (Lincoln, CREST), whole-gemini-c10 (Stanton, RG165, Lincoln, CREST), window-claude (Lincoln, CREST), window-cues-claude (Herrnstein, Stanton, RG165), window-cues-claude-cue (Deaver, Herrnstein, Stanton, RG165, CREST), window-cues-codex (Lincoln, CREST), window-cues-codex-cue (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-cues-opus (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.1-flash-lite-minimal (Stanton, RG165, Lincoln, CREST), window-gemini-3.5-flash-lite-minimal (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-high (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-gemini-3.8-flash-low (Lincoln, CREST), window-local-gemma4-12b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3-vl-8b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-qwen3.5-4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-seg-2b (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-2b-8bit-mac-r8 (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-local-seg-4b (Stanton, RG165, Lincoln, CREST), window-local-seg-4b-8bit (Stanton, RG165, Lincoln, CREST), window-local-seg-date-2b-8bit (Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-2b (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-fs-qwen3.5-4b (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-4b-pilot (Stanton, RG165, Lincoln, CREST), window-or-fs-seg-date-2b (Dean, Deaver, Herrnstein, Stanton, RG165), window-or-gemini3.1-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemini3.5-flash-lite (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-26b-a4b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gemma4-31b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-glm5.3-flash (Lincoln, CREST), window-or-gpt5.4-mini (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.4-nano (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-gpt5.6-luna (Lincoln, CREST), window-or-llama4-maverick (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-mistral-small (Dean, Deaver, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-122b-a10b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-27b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.5-flash (Lincoln, CREST), window-or-qwen3.6-35b-a3b (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-35b-a3b-fp4 (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST), window-or-qwen3.6-flash (Dean, Herrnstein, Stanton, RG165, Lincoln, CREST).
 
 ## Measurement card
 

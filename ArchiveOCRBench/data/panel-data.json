@@ -4022,17 +4022,17 @@
   },
   {
    "name": "Claude only",
-   "nocheck": 85.5,
+   "nocheck": 89.1,
    "checks": 10.2,
-   "after": 97.3,
-   "unflagged": 3,
+   "after": 98.5,
+   "unflagged": 1,
    "std": 16.93,
    "batch": 8.47,
    "source": "options.md"
   },
   {
    "name": "Gemini only (3.8 sends g2; figures are Gemini 3.7 Flash's g2, gateway)",
-   "nocheck": 88.8,
+   "nocheck": 87.6,
    "checks": 25.3,
    "after": 100.0,
    "unflagged": 0,
@@ -4040,13 +4040,13 @@
    "batch": 1.81,
    "source": "options.md",
    "range": [
-    88.8,
-    89.1
+    84.8,
+    90.0
    ]
   },
   {
    "name": "ChatGPT only",
-   "nocheck": 90.9,
+   "nocheck": 90.3,
    "checks": 79.1,
    "after": 100.0,
    "unflagged": 0,
@@ -4056,17 +4056,17 @@
   },
   {
    "name": "Claude and ChatGPT together",
-   "nocheck": 90.9,
+   "nocheck": 90.3,
    "checks": 10.2,
-   "after": 97.3,
-   "unflagged": 3,
+   "after": 98.5,
+   "unflagged": 1,
    "std": 31.44,
    "batch": 15.72,
    "source": "options.md"
   },
   {
    "name": "GLM-5.3 Flash only (budget)",
-   "nocheck": 80.6,
+   "nocheck": 83.0,
    "checks": 33.1,
    "after": 97.0,
    "unflagged": 3,
@@ -4076,7 +4076,7 @@
   },
   {
    "name": "Corpus-trained Qwen3.5 2B on this Mac (no key) (scored at full precision on FarmShare)",
-   "nocheck": 80.3,
+   "nocheck": 79.7,
    "checks": 78.8,
    "after": 98.8,
    "unflagged": 1,
@@ -4087,7 +4087,7 @@
   },
   {
    "name": "Gemini only, text alone (budget) (3.8 sends it; figures are Gemini 3.7 Flash's, gateway)",
-   "nocheck": 87.3,
+   "nocheck": 87.9,
    "checks": 29.2,
    "after": 98.5,
    "unflagged": 1,
@@ -4097,7 +4097,7 @@
   },
   {
    "name": "GPT-5.6 Luna",
-   "nocheck": 83.0,
+   "nocheck": 90.3,
    "after": 100.0,
    "checks": 86.2,
    "unflagged": 0,
@@ -4107,7 +4107,7 @@
   },
   {
    "name": "Qwen3.5 Flash",
-   "nocheck": 76.1,
+   "nocheck": 81.5,
    "after": 100.0,
    "checks": 55.9,
    "unflagged": 0,
@@ -4128,7 +4128,7 @@
   },
   {
    "name": "Qwen3.5 4B, fine-tuned (trained on the corpus; FarmShare figures)",
-   "nocheck": 80.0,
+   "nocheck": 83.0,
    "after": 98.8,
    "checks": 79.9,
    "unflagged": 1,
@@ -4139,7 +4139,7 @@
   },
   {
    "name": "doc-split-v1 zero-shot (open, Mac CPU; not in the app)",
-   "nocheck": 18.8,
+   "nocheck": 17.6,
    "checks": 83.2,
    "after": 100.0,
    "unflagged": 0,
@@ -4150,7 +4150,7 @@
   },
   {
    "name": "doc-split-v1 refit on the development boxes (open, Mac CPU; not in the app)",
-   "nocheck": 29.1,
+   "nocheck": 28.2,
    "checks": 86.8,
    "after": 100.0,
    "unflagged": 0,
@@ -4161,7 +4161,7 @@
   },
   {
    "name": "Gemini only, text alone at the image level, <= 0.965 (3.7 Flash, gateway)",
-   "nocheck": 87.3,
+   "nocheck": 87.9,
    "checks": 38.3,
    "after": 98.5,
    "unflagged": 1,
@@ -29167,11 +29167,11 @@
       "pages": 363,
       "gaps": 315,
       "flagged": 94,
-      "pages_exact_no_review": 0.8515151515151516,
+      "pages_exact_no_review": 0.8909090909090909,
       "flagged_per_100_pages": 25.895316804407713,
-      "pages_exact_after_review": 0.9848484848484849,
-      "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 2.7548209366391183,
+      "pages_exact_after_review": 0.9696969696969697,
+      "unflagged_errors": 3,
+      "unflagged_errors_per_500_pages": 4.132231404958677,
       "usd_per_1000_pages": 3.5857727272727273,
       "usd_settled_per_1000_pages": 3.5857727272727273
      },
@@ -29180,17 +29180,17 @@
        "pages": 250,
        "gaps": 238,
        "flagged": 85,
-       "pages_exact_no_review": 0.8436213991769548,
+       "pages_exact_no_review": 0.8518518518518519,
        "flagged_per_100_pages": 34.0,
-       "pages_exact_after_review": 0.9794238683127572,
-       "unflagged_errors": 2,
-       "unflagged_errors_per_500_pages": 4.0
+       "pages_exact_after_review": 0.9588477366255144,
+       "unflagged_errors": 3,
+       "unflagged_errors_per_500_pages": 6.0
       },
       "RG165": {
        "pages": 113,
        "gaps": 77,
        "flagged": 9,
-       "pages_exact_no_review": 0.8735632183908046,
+       "pages_exact_no_review": 1.0,
        "flagged_per_100_pages": 7.964601769911504,
        "pages_exact_after_review": 1.0,
        "unflagged_errors": 0,
@@ -29217,6 +29217,12 @@
      "unflagged_gaps": {
       "Stanton": [
        {
+        "gap": "26|27",
+        "said": "new",
+        "truth": "continue",
+        "confidence": 0.985
+       },
+       {
         "gap": "101|102",
         "said": "continue",
         "truth": "new",
@@ -29237,7 +29243,7 @@
       "pages": 363,
       "gaps": 315,
       "flagged": 96,
-      "pages_exact_no_review": 0.8303030303030303,
+      "pages_exact_no_review": 0.8939393939393939,
       "flagged_per_100_pages": 26.446280991735538,
       "pages_exact_after_review": 0.9848484848484849,
       "unflagged_errors": 2,
@@ -29250,7 +29256,7 @@
        "pages": 250,
        "gaps": 238,
        "flagged": 86,
-       "pages_exact_no_review": 0.8148148148148148,
+       "pages_exact_no_review": 0.8559670781893004,
        "flagged_per_100_pages": 34.4,
        "pages_exact_after_review": 0.9794238683127572,
        "unflagged_errors": 2,
@@ -29260,7 +29266,7 @@
        "pages": 113,
        "gaps": 77,
        "flagged": 10,
-       "pages_exact_no_review": 0.8735632183908046,
+       "pages_exact_no_review": 1.0,
        "flagged_per_100_pages": 8.849557522123893,
        "pages_exact_after_review": 1.0,
        "unflagged_errors": 0,
@@ -29307,11 +29313,11 @@
       "pages": 363,
       "gaps": 315,
       "flagged": 99,
-      "pages_exact_no_review": 0.8424242424242424,
+      "pages_exact_no_review": 0.8696969696969697,
       "flagged_per_100_pages": 27.272727272727273,
-      "pages_exact_after_review": 0.9848484848484849,
-      "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 2.7548209366391183,
+      "pages_exact_after_review": 0.9696969696969697,
+      "unflagged_errors": 3,
+      "unflagged_errors_per_500_pages": 4.132231404958677,
       "usd_per_1000_pages": 3.56175,
       "usd_settled_per_1000_pages": 3.56175
      },
@@ -29320,17 +29326,17 @@
        "pages": 250,
        "gaps": 238,
        "flagged": 91,
-       "pages_exact_no_review": 0.831275720164609,
+       "pages_exact_no_review": 0.823045267489712,
        "flagged_per_100_pages": 36.4,
-       "pages_exact_after_review": 0.9794238683127572,
-       "unflagged_errors": 2,
-       "unflagged_errors_per_500_pages": 4.0
+       "pages_exact_after_review": 0.9588477366255144,
+       "unflagged_errors": 3,
+       "unflagged_errors_per_500_pages": 6.0
       },
       "RG165": {
        "pages": 113,
        "gaps": 77,
        "flagged": 8,
-       "pages_exact_no_review": 0.8735632183908046,
+       "pages_exact_no_review": 1.0,
        "flagged_per_100_pages": 7.079646017699115,
        "pages_exact_after_review": 1.0,
        "unflagged_errors": 0,
@@ -29357,6 +29363,12 @@
      "unflagged_gaps": {
       "Stanton": [
        {
+        "gap": "26|27",
+        "said": "new",
+        "truth": "continue",
+        "confidence": 0.98
+       },
+       {
         "gap": "101|102",
         "said": "continue",
         "truth": "new",
@@ -29377,11 +29389,11 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 88,
-    "pages_exact_no_review": 0.8727272727272727,
+    "pages_exact_no_review": 0.9,
     "flagged_per_100_pages": 24.242424242424242,
-    "pages_exact_after_review": 0.9848484848484849,
-    "unflagged_errors": 2,
-    "unflagged_errors_per_500_pages": 2.7548209366391183,
+    "pages_exact_after_review": 0.9696969696969697,
+    "unflagged_errors": 3,
+    "unflagged_errors_per_500_pages": 4.132231404958677,
     "usd_per_1000_pages": 3.6108848468271337
    },
    "gemini38_o0_by_box": {
@@ -29389,17 +29401,17 @@
      "pages": 250,
      "gaps": 238,
      "flagged": 77,
-     "pages_exact_no_review": 0.8724279835390947,
+     "pages_exact_no_review": 0.8641975308641975,
      "flagged_per_100_pages": 30.8,
-     "pages_exact_after_review": 0.9794238683127572,
-     "unflagged_errors": 2,
-     "unflagged_errors_per_500_pages": 4.0
+     "pages_exact_after_review": 0.9588477366255144,
+     "unflagged_errors": 3,
+     "unflagged_errors_per_500_pages": 6.0
     },
     "RG165": {
      "pages": 113,
      "gaps": 77,
      "flagged": 11,
-     "pages_exact_no_review": 0.8735632183908046,
+     "pages_exact_no_review": 1.0,
      "flagged_per_100_pages": 9.734513274336283,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
@@ -29408,6 +29420,12 @@
    },
    "gemini38_o0_unflagged_gaps": {
     "Stanton": [
+     {
+      "gap": "26|27",
+      "said": "new",
+      "truth": "continue",
+      "confidence": 0.98
+     },
      {
       "gap": "101|102",
       "said": "continue",
@@ -29424,7 +29442,7 @@
     "RG165": []
    }
   },
-  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 83.0%\u201385.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured. Its two unflagged errors are Stanton 101|102 and 102|103 at every offset and for 3.8: the newsletter gaps the owner re-ruled on 2026-10-31 under the article-within-issue rule, which every cloud route merges with or without the magazine rule (only Gemini's g1 carries it) and only the 2B trained on the owner's corpus splits; prompt g2, which states the article-within-issue rule, splits both on Gemini 3.7 (seg-magazine-rule.md)."
+  "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 87.0%\u201389.4% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured."
  },
  "seg_magazine_rule": {
   "source": "seg-magazine-rule.md",
@@ -29464,17 +29482,17 @@
     "pages": 363,
     "gaps": 315,
     "flagged": 94,
-    "pages_exact_no_review": 0.8515151515151516,
+    "pages_exact_no_review": 0.8909090909090909,
     "flagged_per_100_pages": 25.895316804407713,
-    "pages_exact_after_review": 0.9848484848484849,
-    "unflagged_errors": 2,
-    "unflagged_errors_per_500_pages": 2.7548209366391183
+    "pages_exact_after_review": 0.9696969696969697,
+    "unflagged_errors": 3,
+    "unflagged_errors_per_500_pages": 4.132231404958677
    },
    "g2": {
     "pages": 363,
     "gaps": 315,
     "flagged": 92,
-    "pages_exact_no_review": 0.8878787878787879,
+    "pages_exact_no_review": 0.8757575757575757,
     "flagged_per_100_pages": 25.34435261707989,
     "pages_exact_after_review": 1.0,
     "unflagged_errors": 0,
@@ -29484,11 +29502,11 @@
   "test_paired": {
    "pair": "g2 vs g1",
    "scope": "Stanton+RG165",
-   "gaps": 315,
-   "only first right": 6,
-   "only second right": 3,
-   "difference points": 0.9523809523809523,
-   "sign test p": 0.5078125
+   "gaps": 313,
+   "only first right": 4,
+   "only second right": 5,
+   "difference points": -0.3194888178913738,
+   "sign test p": 1.0
   },
   "verdict": {
    "review_better": true,

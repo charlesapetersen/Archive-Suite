@@ -181,10 +181,10 @@ struct SettingsSolver {
     static let readingHandsFloor = 0.60
     /// Segmentation, built as reading's is: twice the larger window-offset range of the two routes compared, in
     /// pooled test-box pages exact (`test-boxes.offset_range`), a route with no range taking the largest measured.
-    /// Measured: Gemini 3.7 on g2 0.3 points, on g1 2.1 (`seg-g2-offsets.md`, `seg-boxes-score.md`); no other route
-    /// has one, so every pair the table holds is twice 2.1 (W46.seg-g2-offsets; 07-segmentation.md §3). The test
-    /// driver checks this against the table.
-    static let segmentationTie = 4.2
+    /// Measured: Gemini 3.7 on g2 5.2 points, on g1 2.4 (`seg-g2-offsets.md`, `seg-boxes-score.md`, on the truth the
+    /// owner corrected on 2026-11-13, W46.seg-truth-owner-fixes); no other route has one, so every pair the table
+    /// holds is twice 5.2 (W46.seg-g2-offsets; 07-segmentation.md §3). The test driver checks this against the table.
+    static let segmentationTie = 10.4
     /// Dating: the rerun floor is the same year on 94% (85/90) of documents between identical runs, read as a gap of
     /// up to 6 points of exact year; reading the rate as points is the note's [I] (08-dating.md §3).
     static let datingTie = 6.0

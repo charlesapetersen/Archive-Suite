@@ -75,16 +75,16 @@ Checks to 98%: the least-confident gaps checked first, per 100 pages. The cloud 
 | Herrnstein | Gemini 3.8 Flash low | 91.2% | 5 | 2 | 92/94 | 0.954 | 6.0 |
 | Herrnstein | doc-split-v1, zero-shot | 37.6% | 9 | 32 | 62/94 | 0.612 | 63.0 |
 | Herrnstein | doc-split-v1, dev refit | 61.3% | 27 | 5 | 89/94 | 0.654 | 61.0 |
-| Stanton | trained Qwen3.5 2B (FarmShare) | 75.3% | 21 | 4 | 105/109 | 0.797 | 76.0 |
-| Stanton | Qwen3.5 27B teacher | 79.8% | 19 | 3 | 106/109 | 0.830 | 51.2 |
-| Stanton | Gemini 3.8 Flash low | 87.2% | 6 | 4 | 105/109 | 0.918 | 50.0 |
-| Stanton | doc-split-v1, zero-shot | 10.3% | 11 | 75 | 34/109 | 0.232 | 88.8 |
-| Stanton | doc-split-v1, dev refit | 22.6% | 50 | 24 | 85/109 | 0.422 | 88.8 |
-| RG165 | trained Qwen3.5 2B (FarmShare) | 94.3% | 1 | 1 | 22/23 | 0.929 | 54.0 |
-| RG165 | Qwen3.5 27B teacher | 86.2% | 2 | 1 | 22/23 | 0.907 | 18.6 |
-| RG165 | Gemini 3.8 Flash low | 87.4% | 1 | 2 | 21/23 | 0.908 | 9.7 |
-| RG165 | doc-split-v1, zero-shot | 42.5% | 6 | 9 | 14/23 | 0.622 | 26.5 |
-| RG165 | doc-split-v1, dev refit | 47.1% | 13 | 0 | 23/23 | 0.730 | 52.2 |
+| Stanton | trained Qwen3.5 2B (FarmShare) | 74.9% | 21 | 3 | 105/108 | 0.803 | 76.0 |
+| Stanton | Qwen3.5 27B teacher | 80.2% | 20 | 3 | 105/108 | 0.825 | 51.2 |
+| Stanton | Gemini 3.8 Flash low | 86.4% | 7 | 4 | 104/108 | 0.909 | 50.0 |
+| Stanton | doc-split-v1, zero-shot | 9.9% | 13 | 76 | 32/108 | 0.223 | 88.8 |
+| Stanton | doc-split-v1, dev refit | 20.6% | 52 | 25 | 83/108 | 0.402 | 88.8 |
+| RG165 | trained Qwen3.5 2B (FarmShare) | 93.1% | 1 | 0 | 21/21 | 0.979 | 0.9 |
+| RG165 | Qwen3.5 27B teacher | 85.1% | 2 | 0 | 21/21 | 0.956 | 2.7 |
+| RG165 | Gemini 3.8 Flash low | 100.0% | 0 | 0 | 21/21 | 1.000 | 0.0 |
+| RG165 | doc-split-v1, zero-shot | 39.1% | 6 | 9 | 12/21 | 0.627 | 26.5 |
+| RG165 | doc-split-v1, dev refit | 49.4% | 13 | 0 | 21/21 | 0.723 | 52.2 |
 | Lincoln | trained Qwen3.5 2B (FarmShare) | 35.6% | 44 | 1 | 76/77 | 0.529 | 96.2 |
 | Lincoln | Qwen3.5 27B teacher | 40.6% | 40 | 0 | 77/77 | 0.571 | 99.6 |
 | Lincoln | Claude Sonnet 5.5 c1 | 90.4% | 2 | 0 | 77/77 | 0.983 | 22.6 |
@@ -104,9 +104,9 @@ The flag level is the lowest that brings every development box to 98% after chec
 
 | source | flag level | pages exact, no checking | checks per 100 pages | pages right after checking | unflagged errors per 500 pages (count) |
 |---|---|---|---|---|---|
-| trained Qwen3.5 2B (FarmShare) | <= 0.995 | 80.3% | 78.8 | 98.8% | 1.4 (1) |
-| doc-split-v1, zero-shot | <= 1.000 | 18.8% | 83.2 | 100.0% | 0.0 (0) |
-| doc-split-v1, dev refit | <= 0.997 | 29.1% | 86.8 | 100.0% | 0.0 (0) |
+| trained Qwen3.5 2B (FarmShare) | <= 0.995 | 79.7% | 78.8 | 98.8% | 1.4 (1) |
+| doc-split-v1, zero-shot | <= 1.000 | 17.6% | 83.2 | 100.0% | 0.0 (0) |
+| doc-split-v1, dev refit | <= 0.997 | 28.2% | 86.8 | 100.0% | 0.0 (0) |
 
 ## The learning curve: k labelled gaps
 
@@ -133,18 +133,18 @@ Mean over 30 random draws of k labelled gaps (10th-90th percentile of pages exac
 
 | method | k=0 | k=25 | k=50 | k=100 | k=200 |
 |---|---|---|---|---|---|
-| 2B, no refit | 10.5 err · 75.3% | 10.3 err · 77.5% [76.1%-78.7%] | 10.7 err · 78.5% [76.5%-81.1%] | 10.6 err · 82.3% [79.8%-84.8%] | 11.1 err · 93.3% [90.1%-96.7%] |
-| 2B, threshold-and-prior refit | 10.5 err · 75.3% | 8.5 err · 77.8% [76.5%-79.1%] | 8.8 err · 78.8% [77.0%-81.5%] | 8.7 err · 82.5% [79.4%-85.2%] | 8.9 err · 94.1% [91.3%-96.7%] |
-| teacher, no refit | 9.2 err · 79.8% | 9.2 err · 81.4% [79.8%-83.1%] | 9.3 err · 82.6% [81.0%-84.9%] | 9.5 err · 84.7% [81.9%-86.8%] | 9.9 err · 94.3% [91.2%-97.5%] |
-| teacher, threshold-and-prior refit | 9.2 err · 79.8% | 8.2 err · 81.9% [80.7%-83.6%] | 8.0 err · 83.1% [81.4%-85.6%] | 8.1 err · 85.5% [83.1%-87.4%] | 7.3 err · 95.5% [91.4%-98.4%] |
-| doc-split-v1, dev refit | 31.1 err · 22.6% | 30.8 err · 28.3% [25.1%-30.9%] | 31.2 err · 33.8% [30.0%-38.8%] | 31.6 err · 47.6% [42.3%-52.7%] | 31.8 err · 82.3% [74.9%-88.1%] |
-| doc-split-v1, refit on the box | 31.1 err · 22.6% | 31.1 err · 28.2% [23.0%-31.9%] | 30.5 err · 32.9% [25.9%-37.4%] | 29.8 err · 48.8% [42.3%-56.0%] | 29.0 err · 83.4% [77.0%-89.8%] |
-| 2B, no refit (first k) | 10.5 err · 75.3% | 9.4 err · 78.6% | 5.9 err · 87.2% | 6.5 err · 90.1% | 10.5 err · 95.9% |
-| 2B, threshold-and-prior refit (first k) | 10.5 err · 75.3% | 6.6 err · 81.1% | 3.7 err · 90.1% | 2.9 err · 95.1% | 2.6 err · 98.8% |
-| teacher, no refit (first k) | 9.2 err · 79.8% | 8.9 err · 81.5% | 4.3 err · 90.1% | 2.9 err · 95.1% | 2.6 err · 98.8% |
-| teacher, threshold-and-prior refit (first k) | 9.2 err · 79.8% | 7.5 err · 82.3% | 3.7 err · 91.4% | 2.2 err · 96.3% | 0.0 err · 100.0% |
-| doc-split-v1, dev refit (first k) | 31.1 err · 22.6% | 31.0 err · 30.0% | 29.8 err · 38.7% | 31.9 err · 59.7% | 26.3 err · 91.8% |
-| doc-split-v1, refit on the box (first k) | 31.1 err · 22.6% | 29.1 err · 30.9% | 30.9 err · 36.6% | 37.0 err · 55.1% | 36.8 err · 86.4% |
+| 2B, no refit | 10.1 err · 74.9% | 10.0 err · 77.2% [75.6%-79.4%] | 10.2 err · 78.4% [75.7%-81.5%] | 10.3 err · 82.2% [79.8%-86.0%] | 11.4 err · 94.1% [90.5%-96.8%] |
+| 2B, threshold-and-prior refit | 10.1 err · 74.9% | 7.4 err · 80.5% [79.0%-81.9%] | 7.5 err · 81.7% [79.8%-84.8%] | 7.1 err · 86.3% [82.7%-89.7%] | 6.8 err · 96.2% [93.4%-98.4%] |
+| teacher, no refit | 9.7 err · 80.2% | 9.7 err · 81.4% [80.2%-82.7%] | 9.6 err · 82.6% [81.0%-85.2%] | 10.0 err · 84.5% [81.9%-86.4%] | 11.1 err · 94.3% [90.9%-96.7%] |
+| teacher, threshold-and-prior refit | 9.7 err · 80.2% | 7.8 err · 84.2% [82.1%-85.6%] | 7.5 err · 85.9% [84.0%-88.1%] | 7.9 err · 87.6% [85.6%-89.8%] | 7.9 err · 96.1% [94.2%-98.4%] |
+| doc-split-v1, dev refit | 32.4 err · 20.6% | 32.1 err · 26.5% [23.4%-29.3%] | 32.2 err · 32.3% [28.0%-35.8%] | 32.5 err · 46.9% [41.8%-52.9%] | 33.2 err · 82.5% [77.5%-88.2%] |
+| doc-split-v1, refit on the box | 32.4 err · 20.6% | 33.3 err · 26.4% [20.5%-31.7%] | 32.3 err · 31.4% [24.0%-38.7%] | 30.7 err · 47.9% [40.6%-55.6%] | 31.1 err · 83.0% [76.9%-88.5%] |
+| 2B, no refit (first k) | 10.1 err · 74.9% | 9.4 err · 77.8% | 5.9 err · 88.1% | 7.2 err · 89.3% | 10.5 err · 95.9% |
+| 2B, threshold-and-prior refit (first k) | 10.1 err · 74.9% | 5.6 err · 84.0% | 3.7 err · 90.9% | 3.6 err · 94.2% | 2.6 err · 98.8% |
+| teacher, no refit (first k) | 9.7 err · 80.2% | 8.9 err · 81.9% | 4.3 err · 90.9% | 3.6 err · 94.2% | 2.6 err · 98.8% |
+| teacher, threshold-and-prior refit (first k) | 9.7 err · 80.2% | 6.6 err · 85.6% | 3.7 err · 92.2% | 2.9 err · 95.5% | 0.0 err · 100.0% |
+| doc-split-v1, dev refit (first k) | 32.4 err · 20.6% | 31.9 err · 28.0% | 29.8 err · 39.5% | 32.6 err · 58.8% | 26.3 err · 91.8% |
+| doc-split-v1, refit on the box (first k) | 32.4 err · 20.6% | 33.3 err · 28.8% | 36.2 err · 30.0% | 39.1 err · 53.1% | 39.5 err · 86.4% |
 
 ### Dean (191 gaps)
 
@@ -201,18 +201,18 @@ Mean over 30 random draws of k labelled gaps (10th-90th percentile of pages exac
 
 | method | k=0 | k=25 | k=50 |
 |---|---|---|---|
-| 2B, no refit | 2.6 err · 94.3% | 2.6 err · 96.2% [94.3%-100.0%] | 2.8 err · 97.8% [94.3%-100.0%] |
-| 2B, threshold-and-prior refit | 2.6 err · 94.3% | 2.9 err · 94.8% [90.8%-97.7%] | 3.7 err · 96.2% [93.1%-100.0%] |
-| teacher, no refit | 3.9 err · 86.2% | 3.8 err · 90.8% [86.2%-96.6%] | 4.0 err · 95.4% [88.5%-100.0%] |
-| teacher, threshold-and-prior refit | 3.9 err · 86.2% | 3.1 err · 93.5% [86.2%-97.9%] | 3.3 err · 96.2% [90.8%-100.0%] |
-| doc-split-v1, dev refit | 16.9 err · 47.1% | 16.9 err · 55.1% [50.6%-62.1%] | 15.8 err · 73.3% [59.8%-87.9%] |
-| doc-split-v1, refit on the box | 16.9 err · 47.1% | 17.1 err · 66.3% [58.5%-73.7%] | 17.4 err · 80.7% [71.3%-89.0%] |
-| 2B, no refit (first k) | 2.6 err · 94.3% | 3.8 err · 94.3% | 7.4 err · 94.3% |
-| 2B, threshold-and-prior refit (first k) | 2.6 err · 94.3% | 3.8 err · 94.3% | 7.4 err · 94.3% |
-| teacher, no refit (first k) | 3.9 err · 86.2% | 5.8 err · 86.2% | 7.4 err · 94.3% |
-| teacher, threshold-and-prior refit (first k) | 3.9 err · 86.2% | 5.8 err · 86.2% | 7.4 err · 90.8% |
-| doc-split-v1, dev refit (first k) | 16.9 err · 47.1% | 25.0 err · 47.1% | 25.9 err · 78.2% |
-| doc-split-v1, refit on the box (first k) | 16.9 err · 47.1% | 19.2 err · 63.2% | 11.1 err · 89.7% |
+| 2B, no refit | 1.3 err · 93.1% | 1.5 err · 94.7% [93.1%-100.0%] | 1.9 err · 96.8% [93.1%-100.0%] |
+| 2B, threshold-and-prior refit | 1.3 err · 93.1% | 1.5 err · 94.7% [93.1%-100.0%] | 1.9 err · 96.8% [93.1%-100.0%] |
+| teacher, no refit | 2.7 err · 85.1% | 2.9 err · 89.3% [85.1%-93.8%] | 2.7 err · 95.2% [92.0%-100.0%] |
+| teacher, threshold-and-prior refit | 2.7 err · 85.1% | 0.7 err · 97.5% [93.1%-100.0%] | 0.0 err · 100.0% [100.0%-100.0%] |
+| doc-split-v1, dev refit | 17.3 err · 49.4% | 17.5 err · 55.2% [49.4%-64.6%] | 17.7 err · 72.0% [60.6%-86.2%] |
+| doc-split-v1, refit on the box | 17.3 err · 49.4% | 18.1 err · 64.4% [56.3%-71.6%] | 18.1 err · 80.8% [74.6%-90.8%] |
+| 2B, no refit (first k) | 1.3 err · 93.1% | 2.0 err · 93.1% | 4.0 err · 93.1% |
+| 2B, threshold-and-prior refit (first k) | 1.3 err · 93.1% | 2.0 err · 93.1% | 4.0 err · 93.1% |
+| teacher, no refit (first k) | 2.7 err · 85.1% | 4.0 err · 85.1% | 4.0 err · 93.1% |
+| teacher, threshold-and-prior refit (first k) | 2.7 err · 85.1% | 4.0 err · 85.1% | 0.0 err · 100.0% |
+| doc-split-v1, dev refit (first k) | 17.3 err · 49.4% | 26.0 err · 49.4% | 28.0 err · 80.5% |
+| doc-split-v1, refit on the box (first k) | 17.3 err · 49.4% | 20.0 err · 63.2% | 12.0 err · 86.2% |
 
 ### CREST (127 gaps)
 
@@ -258,20 +258,20 @@ Pages exact after B checks per 100 pages, and the checks per 100 pages each orde
 | Herrnstein | 88.4% | 2B vs teacher | 98.3% | 98.3% | 100.0% | 5.0 | 4.5 |
 | Herrnstein | 88.4% | doc-split-v1 confidence | 90.6% | 92.3% | 95.0% | 59.0 | — |
 | Herrnstein | 88.4% | Vision kind change | 94.5% | 98.3% | 100.0% | 18.0 | — |
-| Stanton | 75.3% | random | 77.0% | 79.7% | 85.6% | 89.8 | — |
-| Stanton | 75.3% | 2B confidence | 82.7% | 84.4% | 95.1% | 76.0 | — |
-| Stanton | 75.3% | 2B vs cloud partner | 90.5% | 91.4% | 96.3% | 76.8 | 9.2 |
-| Stanton | 75.3% | 2B vs doc-split-v1 | 81.1% | 82.3% | 93.8% | 81.2 | 27.6 |
-| Stanton | 75.3% | 2B vs teacher | 86.0% | 88.9% | 96.3% | 76.8 | 6.8 |
-| Stanton | 75.3% | doc-split-v1 confidence | 78.2% | 78.2% | 83.5% | 88.0 | — |
-| Stanton | 75.3% | Vision kind change | 79.8% | 87.2% | 96.3% | 78.0 | — |
-| RG165 | 94.3% | random | 95.1% | 96.2% | 98.2% | 47.7 | — |
-| RG165 | 94.3% | 2B confidence | 94.3% | 96.6% | 96.6% | 54.0 | — |
-| RG165 | 94.3% | 2B vs cloud partner | 94.3% | 96.6% | 96.6% | 54.0 | 0.9 |
-| RG165 | 94.3% | 2B vs doc-split-v1 | 96.6% | 96.6% | 96.6% | 54.9 | 11.5 |
-| RG165 | 94.3% | 2B vs teacher | 94.3% | 96.6% | 96.6% | 54.0 | 0.9 |
-| RG165 | 94.3% | doc-split-v1 confidence | 94.3% | 94.3% | 100.0% | 44.2 | — |
-| RG165 | 94.3% | Vision kind change | 96.6% | 96.6% | 96.6% | 58.4 | — |
+| Stanton | 74.9% | random | 76.6% | 79.5% | 85.9% | 88.5 | — |
+| Stanton | 74.9% | 2B confidence | 84.8% | 84.8% | 94.2% | 76.0 | — |
+| Stanton | 74.9% | 2B vs cloud partner | 93.0% | 94.2% | 95.5% | 76.8 | 9.2 |
+| Stanton | 74.9% | 2B vs doc-split-v1 | 79.0% | 80.2% | 93.0% | 81.2 | 27.6 |
+| Stanton | 74.9% | 2B vs teacher | 88.9% | 90.1% | 95.5% | 76.8 | 6.8 |
+| Stanton | 74.9% | doc-split-v1 confidence | 77.8% | 79.0% | 83.5% | 88.0 | — |
+| Stanton | 74.9% | Vision kind change | 79.0% | 87.7% | 95.5% | 78.0 | — |
+| RG165 | 93.1% | random | 93.8% | 95.7% | 98.6% | 34.1 | — |
+| RG165 | 93.1% | 2B confidence | 100.0% | 100.0% | 100.0% | 0.9 | — |
+| RG165 | 93.1% | 2B vs cloud partner | 100.0% | 100.0% | 100.0% | 0.9 | 0.9 |
+| RG165 | 93.1% | 2B vs doc-split-v1 | 93.1% | 100.0% | 100.0% | 12.4 | 10.6 |
+| RG165 | 93.1% | 2B vs teacher | 100.0% | 100.0% | 100.0% | 1.8 | 0.9 |
+| RG165 | 93.1% | doc-split-v1 confidence | 93.1% | 93.1% | 100.0% | 48.7 | — |
+| RG165 | 93.1% | Vision kind change | 100.0% | 100.0% | 100.0% | 0.9 | — |
 | Lincoln | 35.6% | random | 40.9% | 48.8% | 64.9% | 95.1 | — |
 | Lincoln | 35.6% | 2B confidence | 54.8% | 68.2% | 83.5% | 96.2 | — |
 | Lincoln | 35.6% | 2B vs cloud partner | 66.7% | 91.6% | 91.6% | 54.8 | 17.2 |

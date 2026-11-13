@@ -214,13 +214,21 @@ enum SettingsSolverTestDriver {
         check("D1 reading cites its pair", d1.pick("reading", "all")?.gap?.citation.contains("owner96/all/answered") == true)
         eq("D1 handwritten: Gemini 3.8 Flash", pick(d1, "reading", "handwritten"), "gemini3.8-flash")
         check("D1 no cascade beats Gemini 3.8 Flash", !pick(d1, "reading").hasPrefix("casc-"))
-        // W46.seg-text-tier-default (owner, 2026-11-13): the text-only window ties the image window under the 4.2-point
-        // floor for half the price, so the tie rule picks it; the image window is there for a user who chooses it.
-        eq("D1 segmentation: Gemini 3.8 Flash on the text alone", pick(d1, "segmentation"), "gemini3.8-flash-text")
-        check("D1 segmentation: the text alone ties the image window and is cheaper",
-              d1.pick("segmentation", "all")?.reason.contains("ties the best usable route, gemini3.8-flash (") == true
-                  && d1.pick("segmentation", "all")?.reason.contains("cheaper") == true,
-              d1.pick("segmentation", "all")?.reason ?? "no pick")
+        // W46.seg-truth-owner-fixes: on the corrected truth the Mac 2B's 79.7 is 8.2 points under the text alone's 87.9,
+        // inside the 10.4 floor (twice g2's 5.2 offset range), so a tie and the free 2B wins; an 8 GB Mac cannot run it.
+        eq("D1 segmentation: the Mac 2B ties Gemini under the 10.4 floor and costs nothing", pick(d1, "segmentation"),
+           "seg-qwen3.5-2b-8bit")
+        var gem8 = mac(8)
+        gem8.keys = ["gemini"]
+        let d1s = solve("D1-8GB", gem8)
+        // W46.seg-text-tier-default (owner, 2026-11-13): the text-only window ties the image window under the floor for
+        // half the price, so the tie rule picks it; the image window is there for a user who chooses it.
+        eq("D1 segmentation on an 8 GB Mac: Gemini 3.8 Flash on the text alone", pick(d1s, "segmentation"),
+           "gemini3.8-flash-text")
+        // On the corrected truth the text alone (87.9) is ahead of the image window (87.6), so it leads outright.
+        check("D1 segmentation: the text alone is the best route the batch can use",
+              d1s.pick("segmentation", "all")?.reason.contains("is the best route this batch can use") == true,
+              d1s.pick("segmentation", "all")?.reason ?? "no pick")
         var imageChosen = SettingsAnswers()
         imageChosen.onlyRoutes["segmentation"] = ["gemini3.8-flash"]
         eq("D1 the image window runs when the user chooses it", pick(solve("D1-image", gem, imageChosen), "segmentation"),
@@ -270,17 +278,20 @@ enum SettingsSolverTestDriver {
         eq("D4 segmentation: ChatGPT", pick(d4, "segmentation"), "chatgpt-gpt6.1-sol")
         var both = mac(16)
         both.plans = ["claude", "chatgpt"]
-        eq("D4 both plans: segmentation the mix", pick(solve("D4-both", both), "segmentation"), "mix-claude-chatgpt")
+        // W46.seg-truth-owner-fixes: the mix's 90.3 is 1.2 points over Claude alone's 89.1, inside the 10.4 floor, so a
+        // tie and the one plan wins on cost.
+        eq("D4 both plans: segmentation Claude alone ties the mix", pick(solve("D4-both", both), "segmentation"),
+           "claude-sonnet5.5")
 
         // D5. A Claude plan and a Gemini key, cheapest within a point.
         var d5r = claude
         d5r.keys = ["gemini"]
         var cheap = SettingsAnswers()
         cheap.preference = .cheapestWithinPoint
-        // W46.seg-g2-offsets: Gemini's 88.8 (3.7's g2 answers, 88.8-89.1 over three window offsets) is 3.3 points
-        // over Claude's 85.5, under the 4.2 floor (twice 2.1, the larger offset range of the two: Claude has none
-        // measured and takes the largest), so a tie and the plan wins on money.
-        eq("D5 segmentation: Gemini 3.3 points ahead, under the 4.2 floor, so the plan", pick(solve("D5", d5r, cheap), "segmentation"),
+        // W46.seg-g2-offsets, rescored by W46.seg-truth-owner-fixes: Gemini's 87.6 (3.7's g2 answers, 84.8-90.0 over
+        // three window offsets) is 1.5 points under Claude's 89.1, inside the 10.4 floor (twice 5.2, the larger offset
+        // range of the two: Claude has none measured and takes the largest), so a tie and the plan wins on money.
+        eq("D5 segmentation: Gemini 1.5 points behind, inside the 10.4 floor, so the plan", pick(solve("D5", d5r, cheap), "segmentation"),
            "claude-sonnet5.5")
         let ranges = (table.stage("segmentation")?.routes ?? []).compactMap { $0.figure("test-boxes.offset_range") }
         check("segmentation floor is twice the largest measured offset range",

@@ -33,15 +33,16 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
 - **Tie rule.** A difference in pooled test-box pages exact under twice the larger window-offset range of the two
   routes compared is a tie and the cheaper route wins (12-settings-design.md §3.3; figures.json
   `noise.seg_rerun_pages_exact_points`). A route with no measured range takes the largest measured. Measured: Gemini
-  3.7 on g2 0.3 points (88.8-89.1%, seg-g2-offsets.md) and on g1 2.1 (83.0-85.2%, seg-boxes-score.md); no other route
-  has one, so every pair is held to twice 2.1, **4.2 points** (`SettingsSolver.segmentationTie`, which the solver's
+  3.7 on g2 5.2 points (84.8-90.0%, seg-g2-offsets.md) and on g1 2.4 (87.0-89.4%, seg-boxes-score.md), on the truth
+  the owner corrected on 2026-11-13 (W46.seg-truth-owner-fixes; before it g2 0.3 and g1 2.1, so 4.2 points); no other
+  route has one, so every pair is held to twice 5.2, **10.4 points** (`SettingsSolver.segmentationTie`, which the solver's
   test checks against the table's `test-boxes.offset_range` figures). This is the reading rule's construction (twice
   the larger rerun range of the two, a route without one held to its family's largest: ocr-rerun-noise.md §The tie
   rule), made the same on purpose (W46.seg-g2-offsets, P14-1): the gap between two single runs moves by up to each
   route's spread, so one range under-counts it, and the 3.2 it replaces was one range (the top of the 1.4-3.2 per-box
   floor) applied to pooled figures before any pooled range was measured. The window offset is segmentation's rerun:
   at temperature 0 the answers are fixed for fixed windows, and the offset is what a real batch varies. Per box the
-  ranges are wider (g2: Stanton 2.9, RG165 6.9 points), so a per-box comparison would need its own floor.
+  ranges are wider (g2: Stanton 4.5, RG165 6.9 points), so a per-box comparison would need its own floor.
   The floor is in pages exact; a gap-accuracy difference has no measured floor, so there the paired interval
   decides (seg-boxes-score.md Noise). Error counts differ by one or two within noise (options.md Reading).
   The rule applies to the text-only window too (owner, 2026-11-13, W46.seg-text-tier-default): with a Gemini key,
@@ -107,8 +108,8 @@ segment figures conditional on each route's call at unsure gaps.
  "memory":{"peak_gb":0,"measured_on":null,"source":null},"caveats":["checking time is one person's, timed once"],"kind_rules":[],"fallback":null,"conditions":[]},
 
 {"id":"gemini3.8-flash","name":"Gemini 3.8 Flash","family":"cloud","app_route":"gemini|gemini-3.8-flash","status":"shipped","needs":{"key":["gemini"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":88.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages in an exact document, no checking","value":"88.8%"}},
-  "test-boxes.offset_range":{"value":0.3,"low":88.8,"high":89.1,"n":363,"truth":"owner-test","source":{"file":"seg-g2-offsets.md","route":"Gemini 3.7","attribute":"spread of pages exact, no checking, over window offsets 0, 1 and 2","value":"0.3 points"}},
+ "figures":{"test-boxes":{"value":87.6,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages in an exact document, no checking","value":"87.6%"}},
+  "test-boxes.offset_range":{"value":5.2,"low":84.8,"high":90.0,"n":363,"truth":"owner-test","source":{"file":"seg-g2-offsets.md","route":"Gemini 3.7","attribute":"spread of pages exact, no checking, over window offsets 0, 1 and 2","value":"5.2 points"}},
   "test-boxes.checks_per_100":{"value":25.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"boundaries to check per 100 pages","value":"25.3"}},
   "test-boxes.after_checking":{"value":100.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"pages right after checking","value":"100.0%"}},
   "test-boxes.unflagged_per_500":{"value":0.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only","attribute":"unflagged errors per 500 pages (count)","value":"0.0 (0)"}},
@@ -121,10 +122,10 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"gemini3.7-flash-gateway","name":"Gemini 3.7 Flash (Stanford gateway)","family":"cloud","app_route":null,"status":"measured","needs":{"key":["gateway"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":85.2,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"pages in an exact document, no checking (range 83.0-85.2%)","value":"85.2%"}},
-  "test-boxes.offset_range":{"value":2.1,"low":83.0,"high":85.2,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"Gemini 3.7","attribute":"window offsets move no-check exact pages","value":"2.1 points"}},
+ "figures":{"test-boxes":{"value":89.1,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"pages in an exact document, no checking (range 87.0-89.4%)","value":"89.1%"}},
+  "test-boxes.offset_range":{"value":2.4,"low":87.0,"high":89.4,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"Gemini 3.7","attribute":"window offsets move no-check exact pages","value":"2.4 points"}},
   "test-boxes.checks_per_100":{"value":25.9,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"boundaries to check per 100 pages (range 25.9-27.3)","value":"25.9"}},
-  "test-boxes.after_checking":{"value":98.5,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, every offset","attribute":"pages right after checking","value":"98.5%"}},
+  "test-boxes.after_checking":{"value":97.0,"n":363,"truth":"owner-test","source":{"file":"seg-boxes-score.md","route":"3.7, offset 0","attribute":"pages right after checking (range 97.0-98.5%)","value":"97.0%"}},
   "letters.gap_acc":{"value":96.0,"n":175,"truth":"owner-locked","source":{"file":"seg-boxes-score.md","route":"Gemini 3.7 Flash, g1 (gateway), Sasha","attribute":"gap accuracy","value":"96.0%"}},
   "letters":{"value":82.2,"n":174,"truth":"owner-locked","source":{"file":"seg-boxes-score.md","route":"Gemini 3.7 Flash, g1 (gateway), Sasha","attribute":"pages exact","value":"82.2%"}},
   "magazine.gap_acc":{"value":71.2,"n":146,"truth":"owner-locked","source":{"file":"seg-boxes-score.md","route":"Gemini 3.7 Flash, g1, IllustratedReview","attribute":"gap accuracy","value":"71.2%"}},
@@ -139,7 +140,7 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":["magazine: g1's figure, on the old full-magazine rule, ranks nothing"],"fallback":"manual","conditions":[]},
 
 {"id":"gemini3.8-flash-text","name":"Gemini 3.8 Flash on the text alone (budget)","family":"cloud","app_route":"gemini-text|gemini-3.8-flash","status":"shipped","needs":{"key":["gemini"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":87.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only, text alone (budget)","attribute":"pages in an exact document, no checking","value":"87.3%"}},
+ "figures":{"test-boxes":{"value":87.9,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only, text alone (budget)","attribute":"pages in an exact document, no checking","value":"87.9%"}},
   "test-boxes.checks_per_100":{"value":29.2,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only, text alone (budget)","attribute":"boundaries to check per 100 pages","value":"29.2"}},
   "test-boxes.after_checking":{"value":98.5,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only, text alone (budget)","attribute":"pages right after checking","value":"98.5%"}},
   "test-boxes.unflagged_per_500":{"value":1.4,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Gemini only, text alone (budget)","attribute":"unflagged errors per 500 pages (count)","value":"1.4 (1)"}},
@@ -152,10 +153,10 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"claude-sonnet5.5","name":"Claude Sonnet 5.5 (key or Claude plan)","family":"plan","app_route":"anthropic|claude-sonnet-5-5","status":"shipped","needs":{"key":["anthropic"],"plan":["claude"],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":85.5,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"pages in an exact document, no checking","value":"85.5%"}},
+ "figures":{"test-boxes":{"value":89.1,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"pages in an exact document, no checking","value":"89.1%"}},
   "test-boxes.checks_per_100":{"value":10.2,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"boundaries to check per 100 pages","value":"10.2"}},
-  "test-boxes.after_checking":{"value":97.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"pages right after checking","value":"97.3%"}},
-  "test-boxes.unflagged_per_500":{"value":4.1,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"unflagged errors per 500 pages (count)","value":"4.1 (3)"}},
+  "test-boxes.after_checking":{"value":98.5,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"pages right after checking","value":"98.5%"}},
+  "test-boxes.unflagged_per_500":{"value":1.4,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude only","attribute":"unflagged errors per 500 pages (count)","value":"1.4 (1)"}},
   "manuscripts-public":{"value":90.4,"n":261,"truth":"lincoln-audit","source":{"file":"seg-lincoln-cloud.md","route":"Claude Sonnet 5.5, c1, plan","attribute":"pages exact","value":"90.4%"}},
   "typed-gov-public":{"value":89.1,"n":128,"truth":"crest-audit","source":{"file":"seg-lincoln-cloud.md","route":"Claude Sonnet 5.5, c1, plan","attribute":"pages exact","value":"89.1%"}}},
  "cost":{"usd_1000_list":16.93,"usd_1000_batch":8.47,"price_read":"2026-10-11","source":{"file":"options.md","route":"claude-sonnet-5-5","attribute":"list $ / batch $","value":"$16.93 / $8.47"}},
@@ -165,7 +166,7 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"chatgpt-gpt6.1-sol","name":"ChatGPT, GPT-6.1 Sol (key or plan)","family":"plan","app_route":"openai|gpt-6.1-sol","status":"shipped","needs":{"key":["openai"],"plan":["chatgpt"],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":90.9,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"ChatGPT only","attribute":"pages in an exact document, no checking","value":"90.9%"}},
+ "figures":{"test-boxes":{"value":90.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"ChatGPT only","attribute":"pages in an exact document, no checking","value":"90.3%"}},
   "test-boxes.checks_per_100":{"value":79.1,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"ChatGPT only","attribute":"boundaries to check per 100 pages","value":"79.1"}},
   "test-boxes.after_checking":{"value":100.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"ChatGPT only","attribute":"pages right after checking","value":"100.0%"}}},
  "cost":{"usd_1000_list":14.51,"usd_1000_batch":7.25,"price_read":"2026-10-11","source":{"file":"options.md","route":"gpt-6.1-sol/low","attribute":"list $ / batch $","value":"$14.51 / $7.25"}},
@@ -175,10 +176,10 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"mix-claude-chatgpt","name":"Claude and ChatGPT together","family":"plan","app_route":"mix","status":"shipped","needs":{"key":[],"plan":["claude","chatgpt"],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":90.9,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"pages in an exact document, no checking","value":"90.9%"}},
+ "figures":{"test-boxes":{"value":90.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"pages in an exact document, no checking","value":"90.3%"}},
   "test-boxes.checks_per_100":{"value":10.2,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"boundaries to check per 100 pages","value":"10.2"}},
-  "test-boxes.after_checking":{"value":97.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"pages right after checking","value":"97.3%"}},
-  "test-boxes.unflagged_per_500":{"value":4.1,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"unflagged errors per 500 pages (count)","value":"4.1 (3)"}}},
+  "test-boxes.after_checking":{"value":98.5,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"pages right after checking","value":"98.5%"}},
+  "test-boxes.unflagged_per_500":{"value":1.4,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"unflagged errors per 500 pages (count)","value":"1.4 (1)"}}},
  "cost":{"usd_1000_list":31.44,"usd_1000_batch":15.72,"price_read":"2026-10-11","source":{"file":"options.md","route":"Claude and ChatGPT together","attribute":"list $ / batch $","value":"$31.44 / $15.72"}},
  "time":{"per_unit_s":5.0,"measured":false,"measured_on":"figures.json placeholder","source":{"file":"execution-plans/processing-review/settings-design/figures.json","route":"Claude and ChatGPT together","attribute":"s_page","value":"5.0 (s_est true)"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
@@ -186,7 +187,7 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":[],"fallback":"claude-sonnet5.5","conditions":[]},
 
 {"id":"glm5.3-flash","name":"GLM-5.3 Flash (OpenRouter)","family":"cloud","app_route":"openrouter|z-ai/glm-5.3-flash","status":"shipped","needs":{"key":["openrouter"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
- "figures":{"test-boxes":{"value":80.6,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"GLM-5.3 Flash only (budget)","attribute":"pages in an exact document, no checking","value":"80.6%"}},
+ "figures":{"test-boxes":{"value":83.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"GLM-5.3 Flash only (budget)","attribute":"pages in an exact document, no checking","value":"83.0%"}},
   "test-boxes.checks_per_100":{"value":33.1,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"GLM-5.3 Flash only (budget)","attribute":"boundaries to check per 100 pages","value":"33.1"}},
   "test-boxes.after_checking":{"value":97.0,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"GLM-5.3 Flash only (budget)","attribute":"pages right after checking","value":"97.0%"}},
   "test-boxes.unflagged_per_500":{"value":4.1,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"GLM-5.3 Flash only (budget)","attribute":"unflagged errors per 500 pages (count)","value":"4.1 (3)"}},
@@ -198,7 +199,7 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":["manuscripts: no figure"],"fallback":"manual","conditions":[]},
 
 {"id":"seg-qwen3.5-2b-8bit","name":"Trained Qwen3.5 2B on this Mac (no key)","family":"mac","app_route":"local|seg-qwen3.5-2b-8bit","status":"shipped","needs":{"key":[],"plan":[],"cluster":false,"mac_gb":16,"gpus":0},
- "figures":{"test-boxes":{"value":80.3,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Corpus-trained Qwen3.5 2B on this Mac (no key)","attribute":"pages in an exact document, no checking (bf16 on FarmShare)","value":"80.3%"}},
+ "figures":{"test-boxes":{"value":79.7,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Corpus-trained Qwen3.5 2B on this Mac (no key)","attribute":"pages in an exact document, no checking (bf16 on FarmShare)","value":"79.7%"}},
   "test-boxes.checks_per_100":{"value":78.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Corpus-trained Qwen3.5 2B","attribute":"boundaries to check per 100 pages","value":"78.8"}},
   "test-boxes.after_checking":{"value":98.8,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Corpus-trained Qwen3.5 2B","attribute":"pages right after checking","value":"98.8%"}},
   "test-boxes.unflagged_per_500":{"value":1.4,"n":363,"truth":"owner-test","source":{"file":"options.md","route":"Corpus-trained Qwen3.5 2B","attribute":"unflagged errors per 500 pages (count)","value":"1.4 (1)"}},
@@ -216,7 +217,7 @@ segment figures conditional on each route's call at unsure gaps.
  "kind_rules":["manuscripts: warning, recommend a cloud voter","magazine: trained-on, ranks nothing","clippings-mixed: trained-on"],"fallback":"manual","conditions":[]},
 
 {"id":"seg-qwen3.5-2b-bf16-cluster","name":"Trained Qwen3.5 2B (your cluster)","family":"cluster","app_route":null,"status":"measured","needs":{"key":[],"plan":[],"cluster":true,"mac_gb":0,"gpus":1},
- "figures":{"test-boxes":{"value":80.3,"n":363,"truth":"owner-test","source":{"file":"seg-scorers.md","route":"window-or-fs-seg-2b","attribute":"pages exact, locked test boxes","value":"80.3%"}},
+ "figures":{"test-boxes":{"value":79.7,"n":363,"truth":"owner-test","source":{"file":"seg-scorers.md","route":"window-or-fs-seg-2b","attribute":"pages exact, locked test boxes","value":"79.7%"}},
   "letters.gap_acc":{"value":89.1,"n":175,"truth":"owner-locked, held out","source":{"file":"seg-boxes-score.md","route":"fine-tuned 2B, bf16, Sasha","attribute":"gap accuracy","value":"89.1%"}},
   "letters":{"value":46.6,"n":174,"truth":"owner-locked, held out","source":{"file":"seg-boxes-score.md","route":"fine-tuned 2B, bf16, Sasha","attribute":"pages exact","value":"46.6%"}}},
  "cost":{"usd_1000_list":0,"usd_1000_batch":0,"price_read":null,"source":{"file":"seg-students.md","route":"Qwen3.5 2B, fine-tuned","attribute":"cost paid","value":"$0.000"}},
@@ -225,14 +226,14 @@ segment figures conditional on each route's call at unsure gaps.
  "caveats":["cluster throughput, queue wait not in it"],"kind_rules":["manuscripts: warning"],"fallback":"manual","conditions":[]},
 
 {"id":"seg-qwen3.5-4b-cluster","name":"Trained Qwen3.5 4B (your cluster)","family":"cluster","app_route":null,"status":"measured","needs":{"key":[],"plan":[],"cluster":true,"mac_gb":0,"gpus":1},
- "figures":{"test-boxes":{"value":80.0,"n":363,"truth":"owner-test","source":{"file":"seg-students.md","route":"Qwen3.5 4B, fine-tuned, test pooled","attribute":"no checking","value":"80.0%"}},
+ "figures":{"test-boxes":{"value":83.0,"n":363,"truth":"owner-test","source":{"file":"seg-students.md","route":"Qwen3.5 4B, fine-tuned, test pooled","attribute":"no checking","value":"83.0%"}},
   "letters.gap_acc":{"value":80.0,"n":175,"truth":"owner-locked, held out","source":{"file":"seg-boxes-score.md","route":"fine-tuned 4B, bf16, Sasha","attribute":"gap accuracy","value":"80.0%"}},
   "manuscripts-public":{"value":49.8,"n":261,"truth":"lincoln-audit","source":{"file":"seg-lincoln-cloud.md","route":"trained Qwen3.5 4B, FarmShare","attribute":"pages exact","value":"49.8%"}},
   "tabme.boundary_f1":{"value":0.820,"n":6236,"truth":"TABME++ test split","source":{"file":"seg-tabme.md","route":"Trained 4B","attribute":"boundary F1","value":"0.820 (0.799-0.840)"}}},
  "cost":{"usd_1000_list":0,"usd_1000_batch":0,"price_read":null,"source":{"file":"seg-students.md","route":"Qwen3.5 4B, fine-tuned","attribute":"cost paid","value":"$0.000"}},
  "time":{"per_unit_s":0.3,"per_window_s":0.9,"measured":true,"measured_on":"one L40S, per window","derived":"seconds a seven-page window call over 3, a window every 3 pages at stride 3","source":{"file":"seg-window-modality.md","route":"4B","attribute":"s a window","value":"0.9"}},
  "memory":{"peak_gb":null,"measured_on":null,"source":null},
- "caveats":["ties the 2B on test (80.0 against 80.3%, seg-students.md); under it on Sasha gaps (80.0 against 89.1%, seg-boxes-score.md)"],"kind_rules":["manuscripts: warning"],"fallback":"manual","conditions":[]},
+ "caveats":["ties the 2B on test (83.0 against 79.7%, seg-students.md; rescored 2026-11-13, W46.seg-truth-owner-fixes); under it on Sasha gaps (80.0 against 89.1%, seg-boxes-score.md)"],"kind_rules":["manuscripts: warning"],"fallback":"manual","conditions":[]},
 
 {"id":"qwen3.5-27b-teacher","name":"Qwen3.5 27B (your cluster)","family":"cluster","app_route":null,"status":"measured","needs":{"key":[],"plan":[],"cluster":true,"mac_gb":0,"gpus":1},
  "figures":{"test-boxes":{"value":81.5,"n":363,"truth":"owner-test","source":{"file":"seg-teacher.md","route":"Qwen3.5 27B, test pooled","attribute":"no checking","value":"81.5%"}},
@@ -307,16 +308,20 @@ adaptation row).
 ## 6. What would change the rule
 
 - A 3.8 offsets run on the test boxes (declined for now, 14-owner-calls.md call 8): if its range moves the 3.8 pages exact more
-  than 4.2 points from 88.8% (3.7's g2 figure, the card's), the cheap-API and premium picks are rechecked. The card
-  already shows 3.7's g2 range, 88.8-89.1% over three offsets (W46.seg-g2-offsets, seg-g2-offsets.md).
+  than 10.4 points from 87.6% (3.7's g2 figure, the card's), the cheap-API and premium picks are rechecked. The card
+  already shows 3.7's g2 range, 84.8-90.0% over three offsets (W46.seg-g2-offsets, seg-g2-offsets.md; rescored on the
+  owner's 2026-11-13 corrections, W46.seg-truth-owner-fixes).
 - A measured offset range for any other route, Claude's w1 first (it waits on W46.gateway-models-ok): it replaces
-  the borrowed 2.1 for that route's pairs, and the floor becomes per pair.
+  the borrowed 5.2 for that route's pairs, and the floor becomes per pair.
 - The text-only Gemini window on the test boxes within 3.2 points of the image window, at about half the tokens
   (seg-window-gateway.md, 46% of the cost on dev): a text tier row becomes `shipped` for a budget setting.
 - W46.seg-magazine-rule-redo (done 2026-11-10, seg-magazine-rule.md): on Gemini 3.7, g2 splits Stanton 101|102 and
   102|103 and the route's unflagged count falls from 2 to 0 (pages exact 85.2% to 88.8% no checking, 98.5% to 100%
   after). The app sends it since W46.seg-magazine-rule-app (seg-magazine-rule-app.md), so Gemini 3.8's `magazine`
-  figure ranks, labelled as 3.7's; a ChatGPT figure ranks once c1 states the rule.
+  figure ranks, labelled as 3.7's; a ChatGPT figure ranks once c1 states the rule. Rescored on the owner's 2026-11-13
+  corrections (W46.seg-truth-owner-fixes): on the test boxes g1 89.1% and g2 87.6% no checking, g1 3 unflagged
+  errors (26|27 and the newsletter pair) and g2 none, the paired decisions a tie (4 against 5 gaps, sign test p 1);
+  the adoption rested on the magazine box (seg-magazine-rule.md) and stands.
 - A handwritten manuscript owner box locked and scored: the manuscript warning would then rest on owner material, not
   Lincoln, and may change kind rule (c).
 - A second material for the LoRA test with start recall held: the "measured on one material" label goes; a loss of
@@ -374,7 +379,8 @@ Every call below was decided on 2026-11-06 (14-owner-calls.md); each ends with i
 8. **The tie threshold.** The floor is a range (1.4-3.2 points a box). Applying 3.2 to pooled figures makes Claude
    plan (85.5%) tie Gemini 3.8 (87.3%) and the plan route win on cost. Options: 3.2, 1.4, or the per-box rule.
    Decided (session, section 2): 3.2, the top of the rerun floor, until a measured range exists [I]. Replaced by
-   W46.seg-g2-offsets (2026-11-13): twice the larger measured offset range, 4.2 points (section 3, Tie rule).
+   W46.seg-g2-offsets (2026-11-13): twice the larger measured offset range, 4.2 points (section 3, Tie rule); 10.4
+   points once the owner corrected the test boxes' truth the same day (W46.seg-truth-owner-fixes).
 
 ## 8. Items to file
 
@@ -449,7 +455,8 @@ is shown with "ranks nothing yet" until W46.seg-magazine-rule-redo; the 20 s che
 with a timing measure filed for an owner session after the redo; the 2B is offered to every 16 GB Mac with no key with a
 zero-shot card and the manuscript warning, and as an optional disagreement partner beside a cloud voter; the tie
 threshold is 3.2 points, the top of the rerun floor, until a measured range exists (replaced 2026-11-13 by twice the
-larger measured offset range, 4.2 points: W46.seg-g2-offsets, section 3).
+larger measured offset range, 4.2 points: W46.seg-g2-offsets, section 3; 10.4 on the owner's corrected truth,
+W46.seg-truth-owner-fixes).
 
 Files read: execution-plans/processing-review/00-plan.md (1-105), STATE.md ("Locked boxes named"); the worktree's
 13-stage-rules/00-index.md and 14-owner-calls.md; segbench-results/seg-kit-gate-sherlock.md (paired table);

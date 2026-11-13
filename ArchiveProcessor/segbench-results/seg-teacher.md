@@ -15,16 +15,16 @@ answered; 259 sent this run, Deaver's 51 from W41.farmshare-seg-run. No money.
 | Gemini 3.8 Flash (low), the bar | Deaver | 149 | 97.9% | 1 | 0.7 | 97.9% | 1 | |
 | Gemini 3.8 Flash (low), the bar | Herrnstein | 200 | 91.2% | 5 | 2.5 | 91.2% | 4 | |
 | Gemini 3.8 Flash (low), the bar | **dev pooled** | 551 | 90.7% | 8 | 1.5 | 94.2% | 9 | no |
-| Gemini 3.8 Flash (low), the bar | Stanton | 250 | 87.2% | 6 | 2.4 | 90.5% | 5 | |
-| Gemini 3.8 Flash (low), the bar | RG165 | 113 | 87.4% | 1 | 0.9 | 87.4% | 3 | |
-| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 87.3% | 7 | 1.9 | 89.7% | 8 | no |
+| Gemini 3.8 Flash (low), the bar | Stanton | 250 | 86.4% | 6 | 2.4 | 89.7% | 7 | |
+| Gemini 3.8 Flash (low), the bar | RG165 | 113 | 100.0% | 1 | 0.9 | 100.0% | 0 | |
+| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 90.0% | 7 | 1.9 | 92.4% | 7 | no |
 | Qwen3.5 27B | Dean | 202 | 84.2% | 4 | 2.0 | 86.2% | 5 | |
 | Qwen3.5 27B | Deaver | 149 | 96.5% | 5 | 3.4 | 96.5% | 2 | |
 | Qwen3.5 27B | Herrnstein | 200 | 91.7% | 4 | 2.0 | 93.4% | 6 | |
 | Qwen3.5 27B | **dev pooled** | 551 | 90.2% | 13 | 2.4 | 91.5% | 13 | no |
-| Qwen3.5 27B | Stanton | 250 | 79.8% | 7 | 2.8 | 82.3% | 17 | |
-| Qwen3.5 27B | RG165 | 113 | 86.2% | 4 | 3.5 | 97.7% | 1 | |
-| Qwen3.5 27B | **test pooled** | 363 | 81.5% | 11 | 3.0 | 86.4% | 18 | no |
+| Qwen3.5 27B | Stanton | 250 | 80.2% | 7 | 2.8 | 85.2% | 17 | |
+| Qwen3.5 27B | RG165 | 113 | 85.1% | 4 | 3.5 | 100.0% | 0 | |
+| Qwen3.5 27B | **test pooled** | 363 | 81.5% | 11 | 3.0 | 89.1% | 17 | no |
 
 ### The level fitted per model
 
@@ -33,8 +33,8 @@ the level fitted on all three, at the 99% and the 98% bars.
 
 | model | bar | dev, held out: after checking | flagged per 100 pages | level for the test boxes | test: no checking | after checking | flagged per 100 pages | unflagged errors |
 |---|---|---:|---:|---|---:|---:|---:|---:|
-| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 87.3% | 100.0% | 51.0 | 0 |
-| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 87.3% | 98.5% | 24.2 | 2 |
+| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 90.0% | 100.0% | 51.0 | 0 |
+| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 90.0% | 97.0% | 24.2 | 3 |
 | Qwen3.5 27B | 99% | 99.4% | 74.2 | flag all | 81.5% | 100.0% | 86.8 | 0 |
 | Qwen3.5 27B | 98% | 99.4% | 74.2 | flag all | 81.5% | 100.0% | 86.8 | 0 |
 

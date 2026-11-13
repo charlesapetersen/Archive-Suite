@@ -29,9 +29,9 @@ Unflagged errors: o1 Stanton 26|27 (said new, 0.985), o2 Stanton 26|27 (said new
 
 ## Reading
 
-Over three offsets g2 on Gemini 3.7 scores 84.8%–90.0% of pages in an exact document with no checking, a spread of 5.2 points (g1 on the same model and level spread 2.4, seg-boxes-score.md), 25.3–29.2 checks per 100 pages and 98.5%–100.0% after checking. Against Claude only's 89.1% (prompt w1, one offset-0 run, options.md) the low end is -4.2 points and offset 0 -1.5. The pooled spread is narrow because the boxes move apart: Stanton 84.4%–88.9%, RG165 86.2%–93.1%, so a per-box figure is far less settled than the pooled one.
+Over three offsets g2 on Gemini 3.7 scores 84.8%–90.0% of pages in an exact document with no checking, a spread of 5.2 points (g1 on the same model and level spread 2.4, seg-boxes-score.md), 25.3–29.2 checks per 100 pages and 98.5%–100.0% after checking. Against Claude only's 89.1% (prompt w1, one offset-0 run, options.md) the low end is -4.2 points and offset 0 -1.5. By box: Stanton 84.4%–88.9%, RG165 86.2%–93.1%, so a per-box figure is less settled than the pooled one.
 
-The settings layer's tie rule (07-segmentation.md §3) is now reading's construction: twice the larger offset range of the two routes compared, a route with none held to the largest measured (g1's 2.4), so 10.4 points for every pair the table holds. Gemini's -4.2-0.9 points over Claude is under it, a tie, so profile D5 (a Claude plan and a Gemini key) goes back to the plan route on money; on the 3.2 floor of one range it had passed by 0.1. Claude's w1 carries no article rule, so the gap is not like for like either way.
+The settings layer's tie rule (07-segmentation.md §3) is reading's construction: twice the larger offset range of the two routes compared, a route with none held to the largest measured (g2's 5.2), so 10.4 points for every pair the table holds. Gemini's -4.2 to +0.9 points against Claude is under it, a tie, so profile D5 (a Claude plan and a Gemini key) takes the plan route on money. Claude's w1 carries no article rule, so the gap is not like for like either way.
 
 ## Gateway
 

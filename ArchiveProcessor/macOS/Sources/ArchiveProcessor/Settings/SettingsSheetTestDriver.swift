@@ -125,15 +125,20 @@ enum SettingsSheetTestDriver {
         let gem = layer(.general, [(.keys, .strings(["gemini"])), (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
                                    (.batchCeilingUSD, .double(10)), (.staysOnMac, .bool(false)),
                                    (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)))])
-        let paid = sheet("gemini", general: gem)
+        // W46.seg-truth-owner-fixes: on a 16 GB Mac the free 2B ties Gemini under the 10.4-point floor and is the pick, so
+        // the Gemini cards are checked on an 8 GB Mac, which cannot run it.
+        check("3 a Gemini key on a 16 GB Mac: the Mac 2B is the segmentation pick",
+              card(sheet("gemini-16gb", general: gem), "segmentation")?.routeID == "seg-qwen3.5-2b-8bit")
+        let paid = sheet("gemini", general: gem, gb: 8)
         // W46.seg-text-tier-default: the text-only window ties the image window for half the price and is the pick; the
         // card says why and what the image window buys, and offers it beside the pick.
         if let s = card(paid, "segmentation") {
             check("3 a Gemini key: the text-only window is the segmentation pick", s.routeID == "gemini3.8-flash-text",
                   s.routeID ?? "nil")
-            check("3 the pick says it ties and is cheaper, and what the image window buys",
-                  s.why.contains("cheaper") && s.why.contains("Gemini 3.8 Flash") && s.why.contains("about 4 fewer boundaries")
-                      && s.why.contains("more per 1,000 pages") && s.why.contains("Use instead"), s.why)
+            // W46.seg-truth-owner-fixes: on the corrected truth the text alone (87.9) leads the image window (87.6), so
+            // the card calls it the best choice rather than a cheaper tie; the image window stays an alternative below.
+            check("3 the pick says it is the best choice, its figures Gemini 3.7's",
+                  s.why.contains("The best choice") && s.why.contains("Gemini 3.7"), s.why)
             let image = s.alternatives.first { $0.id == "gemini3.8-flash" }
             check("3 the image window is an alternative, a tie with the pick, its checks beside its price",
                   image.map { $0.figure.contains("a tie with the pick") && $0.cost.contains("$")
@@ -142,15 +147,16 @@ enum SettingsSheetTestDriver {
             check("3 the image window can be chosen", s.options.contains { $0.id == "gemini3.8-flash" && $0.blocked == nil })
         } else { check("3 segmentation card", false) }
         let paidImage = sheet("gemini-image", general: gem,
-                              collection: layer(.collection, [(SettingsSheetModel.overrideKey("segmentation"), .string("gemini3.8-flash"))]))
+                              collection: layer(.collection, [(SettingsSheetModel.overrideKey("segmentation"), .string("gemini3.8-flash"))]),
+                              gb: 8)
         if let s = card(paidImage, "segmentation") {
             if s.routeID == "gemini3.8-flash" {
                 check("3 Gemini 3.8's segmentation card labels its figures as 3.7's", s.labels.contains { $0.contains("Gemini 3.7") })
                 check("3 Gemini 3.8's magazine figure ranks", s.parts.first { $0.id == "magazine" }?.label2 == nil)
                 check("3 Gemini 3.8's segmentation card gives the range over three offsets (W46.seg-g2-offsets)",
-                      s.labels.contains { $0.contains("88.8% to 89.1%") }, s.labels.joined(separator: " | "))
+                      s.labels.contains { $0.contains("84.8% to 90.0%") }, s.labels.joined(separator: " | "))
                 check("3 the range is labelled as Gemini 3.7's runs, the 3.8 run a single one (owner's call 8)",
-                      s.labels.contains { $0.contains("88.8% to 89.1%") && $0.contains("three test runs of Gemini 3.7")
+                      s.labels.contains { $0.contains("84.8% to 90.0%") && $0.contains("three test runs of Gemini 3.7")
                           && $0.contains("single run") }, s.labels.joined(separator: " | "))
                 check("3 Gemini's card carries no 2B label", !s.labels.contains { $0.contains("zero-shot") })
                 check("3 a chosen image window keeps no tie sentence of the app's pick", !s.why.contains("fewer boundaries"), s.why)

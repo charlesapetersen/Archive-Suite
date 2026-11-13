@@ -1,6 +1,6 @@
 {
  "version": 1,
- "measured": "2026-11-13",
+ "measured": "2026-10-11",
  "item": "W36.seg-opt-measure",
  "method": "ArchiveProcessor/scripts/segbench/options.py",
  "bar_after_review": 0.98,
@@ -858,7 +858,7 @@
   }
  ],
  "openai_measured": {
-  "date": "2026-11-13",
+  "date": "2026-10-12",
   "item": "W36.seg-opt-openai",
   "freeze": "options-frozen-openai.json"
  },
@@ -872,8 +872,13 @@
   "item": "W41.seg-finetune",
   "added": "W41.app-local-seg"
  },
- "gemini_g2": {
+ "rescored": {
   "date": "2026-11-13",
+  "item": "W46.seg-truth-owner-fixes",
+  "why": "the owner corrected 8 Stanton and RG 165 gaps and left RG 165 79|80 and 99|100 unsure, judging W46.seg-check-time's differing answers with three pages either side; earlier, on 2026-10-31 (W46.seg-truth-rescore), he split Stanton 101-105's newsletter issue at 101|102 and 102|103 under the article-within-issue rule"
+ },
+ "gemini_g2": {
+  "date": "2026-11-11",
   "item": "W46.seg-magazine-rule-app",
   "level": 0.965,
   "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",

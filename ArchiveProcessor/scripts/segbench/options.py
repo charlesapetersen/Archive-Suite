@@ -862,20 +862,22 @@ def render(out: dict) -> str:
     import seg_card
     L += seg_card.card(
         truth="The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 segmentation-sheet rulings, "
-              "W46.seg-truth-rescore) and RG 165, with the truth's photo labels; neither carries an unsure gap, so "
-              "every figure here is on a fixed truth. Levels and the mix rule were frozen on the owner's development "
+              "W46.seg-truth-rescore) and RG 165, with the truth's photo labels, and the owner's 2026-11-13 "
+              "corrections (W46.seg-truth-owner-fixes: 8 gaps changed after he judged W46.seg-check-time's differing "
+              "answers with three pages either side; seg-truth-owner-fixes.json). RG 165 79|80 and 99|100 he could "
+              "not tell and are left out of every count (score.py, UNSURE GAPS); only those 12 gaps were looked at "
+              "again. Levels and the mix rule were frozen on the owner's development "
               "boxes (Dean, Deaver, Herrnstein). Gemini only is Gemini 3.7 Flash's g2 answers through the gateway, "
               "at the level fitted on its own development answers (0.965, the level 3.8 had on g1; "
-              "W46.seg-magazine-rule-app), so it has no unflagged error. Gemini 3.8 on g1, the row it replaced, had "
-              "2: Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the "
-              "article-within-issue rule. Every cloud route on its old prompt merges them (g1's rule 10 stated the "
-              "full-magazine rule; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and the 2B "
-              "trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps). Prompt g2, g1 with "
-              "rule 10 on the article-within-issue rule, splits both (seg-magazine-rule.md). ChatGPT's c1 still "
-              "carries g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). GLM-5.3 Flash's 3 are "
-              "that pair and 144|145; Claude's "
-              "3 (Stanton 124|125 and 144|145, RG 165 99|100) and the Mac 2B's 1 (a false split at Stanton 108|109) "
-              "do not include it (W46.seg-offsets-label, from the cached answers).",
+              "W46.seg-magazine-rule-app), so it has no unflagged error. Gemini 3.8 on g1, the row it replaced, has "
+              "3: Stanton 101|102 and 102|103, the newsletter gaps the owner re-ruled on 2026-10-31 under the "
+              "article-within-issue rule, and 26|27. Every cloud route on its old prompt merges the pair (g1's rule "
+              "10 stated the full-magazine rule; Claude and ChatGPT merge them flagged, GLM-5.3 Flash accepted), and "
+              "the 2B trained on the owner's corpus splits them (seg-boxes-score.json, newsletter_gaps). Prompt g2, "
+              "g1 with rule 10 on the article-within-issue rule, splits both (seg-magazine-rule.md). ChatGPT's c1 "
+              "still carries g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). GLM-5.3 Flash's 3 "
+              "are that pair and 144|145; Claude's 1 (Stanton 144|145) and the Mac 2B's 1 (a false split at Stanton "
+              "108|109) do not include it (`seg_truth_owner_fixes.py errors`, from the cached answers).",
         selection="Whole boxes chosen before these routes existed; the approaches are the ones the app offers, not "
                   "picked by their test score. Nothing was fitted, chosen or re-chosen on the test boxes.",
         comparison="Every approach on the same 363 pages and gaps, with its own flag level frozen first "
@@ -883,8 +885,9 @@ def render(out: dict) -> str:
                    "token prices.",
         noise="Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is "
               "within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the "
-              "no-review column. Gemini only's five figures are one g2 run on 3.7 with no measured window-offset "
-              "range; 3.7's range on g1 at the same level is in seg-boxes-score.md (83.0%-85.2% no checking).",
+              "no-review column. Gemini only's five figures are one g2 run on 3.7 at window offset 0; over three "
+              "offsets it scores 84.8%-90.0% no checking (seg-g2-offsets.md), and 3.7 on g1 at the same level "
+              "87.0%-89.4% (seg-boxes-score.md).",
         scope="The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material "
               "(the three locked owner boxes are scored in seg-boxes-score.md; Lincoln and CREST are not scored "
               "here), and not a forecast for a user's own corpus.")

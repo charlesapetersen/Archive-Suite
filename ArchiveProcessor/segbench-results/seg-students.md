@@ -34,34 +34,34 @@ already agreed on, not accuracy: the teacher scores 100% on it by construction, 
 | Gemini 3.8 Flash (low), the bar | Deaver | 149 | 97.9% | 1 | 0.7 | 97.9% | 1 | |
 | Gemini 3.8 Flash (low), the bar | Herrnstein | 200 | 91.2% | 5 | 2.5 | 91.2% | 4 | |
 | Gemini 3.8 Flash (low), the bar | **dev pooled** | 551 | 90.7% | 8 | 1.5 | 94.2% | 9 | no |
-| Gemini 3.8 Flash (low), the bar | Stanton | 250 | 87.2% | 6 | 2.4 | 90.5% | 5 | |
-| Gemini 3.8 Flash (low), the bar | RG165 | 113 | 87.4% | 1 | 0.9 | 87.4% | 3 | |
-| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 87.3% | 7 | 1.9 | 89.7% | 8 | no |
+| Gemini 3.8 Flash (low), the bar | Stanton | 250 | 86.4% | 6 | 2.4 | 89.7% | 7 | |
+| Gemini 3.8 Flash (low), the bar | RG165 | 113 | 100.0% | 1 | 0.9 | 100.0% | 0 | |
+| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 90.0% | 7 | 1.9 | 92.4% | 7 | no |
 | Qwen3.5 4B, fine-tuned | Dean | 202 | 85.2% | 1 | 0.5 | 85.2% | 6 | |
 | Qwen3.5 4B, fine-tuned | Deaver | 149 | 92.2% | 2 | 1.3 | 92.2% | 4 | |
 | Qwen3.5 4B, fine-tuned | Herrnstein | 200 | 91.2% | 2 | 1.0 | 91.2% | 3 | |
 | Qwen3.5 4B, fine-tuned | **dev pooled** | 551 | 89.2% | 5 | 0.9 | 89.2% | 13 | no |
-| Qwen3.5 4B, fine-tuned | Stanton | 250 | 80.2% | 14 | 5.6 | 83.5% | 14 | |
-| Qwen3.5 4B, fine-tuned | RG165 | 113 | 79.3% | 2 | 1.8 | 90.8% | 2 | |
-| Qwen3.5 4B, fine-tuned | **test pooled** | 363 | 80.0% | 16 | 4.4 | 85.5% | 16 | no |
+| Qwen3.5 4B, fine-tuned | Stanton | 250 | 79.8% | 14 | 5.6 | 86.8% | 12 | |
+| Qwen3.5 4B, fine-tuned | RG165 | 113 | 92.0% | 2 | 1.8 | 100.0% | 0 | |
+| Qwen3.5 4B, fine-tuned | **test pooled** | 363 | 83.0% | 16 | 4.4 | 90.3% | 12 | no |
 | Qwen3.5 2B, fine-tuned | Dean | 202 | 93.9% | 4 | 2.0 | 94.9% | 4 | |
 | Qwen3.5 2B, fine-tuned | Deaver | 149 | 88.7% | 7 | 4.7 | 94.3% | 3 | |
 | Qwen3.5 2B, fine-tuned | Herrnstein | 200 | 88.4% | 7 | 3.5 | 94.5% | 3 | |
 | Qwen3.5 2B, fine-tuned | **dev pooled** | 551 | 90.5% | 18 | 3.3 | 94.6% | 10 | no |
-| Qwen3.5 2B, fine-tuned | Stanton | 250 | 75.3% | 16 | 6.4 | 81.1% | 15 | |
-| Qwen3.5 2B, fine-tuned | RG165 | 113 | 94.3% | 1 | 0.9 | 94.3% | 2 | |
-| Qwen3.5 2B, fine-tuned | **test pooled** | 363 | 80.3% | 17 | 4.7 | 84.5% | 17 | no |
+| Qwen3.5 2B, fine-tuned | Stanton | 250 | 74.9% | 16 | 6.4 | 83.5% | 13 | |
+| Qwen3.5 2B, fine-tuned | RG165 | 113 | 93.1% | 1 | 0.9 | 100.0% | 0 | |
+| Qwen3.5 2B, fine-tuned | **test pooled** | 363 | 79.7% | 17 | 4.7 | 87.9% | 13 | no |
 
 ### The level fitted per model
 
 | model | bar | dev, held out: after checking | flagged per 100 pages | level for the test boxes | test: no checking | after checking | flagged per 100 pages | unflagged errors |
 |---|---|---:|---:|---|---:|---:|---:|---:|
-| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 87.3% | 100.0% | 51.0 | 0 |
-| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 87.3% | 98.5% | 24.2 | 2 |
-| Qwen3.5 4B, fine-tuned | 99% | 100.0% | 70.2 | <= 0.995 | 80.0% | 98.8% | 79.9 | 1 |
-| Qwen3.5 4B, fine-tuned | 98% | 99.4% | 55.7 | <= 0.995 | 80.0% | 98.8% | 79.9 | 1 |
-| Qwen3.5 2B, fine-tuned | 99% | 100.0% | 73.3 | <= 0.995 | 80.3% | 98.8% | 78.8 | 1 |
-| Qwen3.5 2B, fine-tuned | 98% | 100.0% | 73.3 | <= 0.995 | 80.3% | 98.8% | 78.8 | 1 |
+| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 90.0% | 100.0% | 51.0 | 0 |
+| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 90.0% | 97.0% | 24.2 | 3 |
+| Qwen3.5 4B, fine-tuned | 99% | 100.0% | 70.2 | <= 0.995 | 83.0% | 98.8% | 79.9 | 1 |
+| Qwen3.5 4B, fine-tuned | 98% | 99.4% | 55.7 | <= 0.995 | 83.0% | 98.8% | 79.9 | 1 |
+| Qwen3.5 2B, fine-tuned | 99% | 100.0% | 73.3 | <= 0.995 | 79.7% | 98.8% | 78.8 | 1 |
+| Qwen3.5 2B, fine-tuned | 98% | 100.0% | 73.3 | <= 0.995 | 79.7% | 98.8% | 78.8 | 1 |
 
 | model | pages | calls | cost paid | per 1,000 pages, standard | per 1,000 pages, batch |
 |---|---:|---:|---:|---:|---:|
