@@ -137,7 +137,7 @@ struct DocumentWindowView: View {
                     PDFPaneView(page: model.displayedImagePage, controller: model.leftController,
                                 id: "ar.doc.imagePane", reference: model.imagePage,
                                 placeholder: model.isShowingJPEG ? nil : imagePlaceholder, turns: model.imageTurns,
-                                inverted: model.invertingImages)
+                                inverted: model.invertingImages, positionKey: model.imagePositionKey)
                         .id(model.imagePaneIdentity)
                         .frame(width: leftW)
                         .overlay(focusBorder(.left))
@@ -145,7 +145,8 @@ struct DocumentWindowView: View {
                         .onChange(of: geo.size) { sizeImageBitmaps(width: leftW, height: geo.size.height) }
                     splitterHandle(total: total)          // drag gesture lives ONLY here
                     if model.hasTextPage {
-                        PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.doc.textPane")
+                        PDFPaneView(page: model.textPage, controller: model.rightController, id: "ar.doc.textPane",
+                                    positionKey: model.textPositionKey)
                             .id(model.pageIdentity)
                             .frame(maxWidth: .infinity)
                             .overlay(focusBorder(.right))

@@ -22,6 +22,14 @@ final class PDFPaneController {
     private var scaleUnit: CGFloat = 1
     /// The region on screen when the PDF / JPEG switch was used, reapplied to the other image's fresh view.
     private(set) var pendingViewport: Viewport?
+    /// Where the reader left each page, by the key the pane names it with, so paging back to a page opens on
+    /// the place last seen there (W40.reader-page-position-memory). Held for the window's life, never on disk;
+    /// a page with no entry (not seen yet, or seen fitted) opens at its top.
+    private var remembered: [String: Viewport] = [:]
+    /// The shown page's key in `remembered`; nil = this pane remembers nothing (the preview).
+    private var positionKey: String?
+    private var isShowing = false      // true while `show` lays a page out, so its scrolls are not remembered
+    private var restoringRemembered = false   // the pending region is a remembered one, not the PDF / JPEG switch's
     private var isApplying = false     // true while WE set the scale, so we don't re-record it
     private var isApplyingFind = false // true while find selects its hit, which is not the user's selection
     private var findQuery = ""         // active find query to highlight on this pane ("" = none)
@@ -132,8 +140,10 @@ final class PDFPaneController {
         if let viewport = pendingViewport, restoring { restore(viewport) } else { scrollToTop() }
         pendingViewport = nil
         // Re-highlight matches (+ re-select the current one) on the freshly-built view. The PDF / JPEG
-        // switch keeps the region the reader was looking at, so it does not scroll to the hit.
-        applyFind(scroll: !restoring)
+        // switch keeps the region the reader was looking at, so it does not scroll to the hit; a page opened
+        // on its remembered place still scrolls to a hit find has moved to, which is queued after and wins.
+        applyFind(scroll: !restoring || restoringRemembered)
+        restoringRemembered = false
     }
 
     /// Show a COPY of `page` in a throwaway one-page document (a PDFPage can belong to only one document —
@@ -143,8 +153,19 @@ final class PDFPaneController {
     /// `turns` quarter-turns the copy clockwise on top of the page's own `/Rotate` (W40.reader-view-rotate). PDFKit
     /// turns everything drawn in page space with it: the text layer and its selection, find highlights, and the
     /// overlays below. The zoom unit is measured on the unturned pages, so a turn keeps the zoom's meaning.
+    ///
+    /// `positionKey` names the page for `remembered`: the page opens on the place last seen there, unless the
+    /// PDF / JPEG switch has already noted one. Read before the document is set, as laying it out scrolls.
     func show(_ page: PDFPage?, reference: PDFPage?, placeholder: PlaceholderRequest? = nil, turns: Int = 0,
-              in view: PDFView) {
+              positionKey: String? = nil, in view: PDFView) {
+        isShowing = true
+        defer { isShowing = false }
+        self.positionKey = positionKey
+        restoringRemembered = false
+        if pendingViewport == nil, let positionKey, let place = remembered[positionKey] {
+            pendingViewport = place
+            restoringRemembered = true
+        }
         view.clearSelection()
         self.turns = Self.quarter(turns)
         findSource = (page != nil && reference != nil && page !== reference) ? reference : nil
@@ -172,13 +193,27 @@ final class PDFPaneController {
     /// on the same place: called just before the PDF / JPEG switch swaps the image. Fit-to-pane shows the
     /// whole page, so there is nothing to carry and the new image simply opens fitted.
     func captureViewport() {
-        pendingViewport = nil
-        guard let v = pdfView, savedScale != nil, !v.autoScales, let page = v.document?.page(at: 0),
-              v.bounds.width > 0, v.bounds.height > 0 else { return }
-        let centre = v.convert(CGPoint(x: v.bounds.midX, y: v.bounds.midY), to: page)
-        pendingViewport = Viewport(centre: Self.displayedFraction(of: centre, on: page, box: v.displayBox),
-                                   size: v.bounds.size)
+        pendingViewport = pdfView.flatMap(viewport(of:))
     }
+
+    /// The region `v` shows, nil while it is fitted (the whole page is in view) or has no size yet.
+    private func viewport(of v: PDFView) -> Viewport? {
+        guard savedScale != nil, !v.autoScales, let page = v.document?.page(at: 0),
+              v.bounds.width > 0, v.bounds.height > 0 else { return nil }
+        let centre = v.convert(CGPoint(x: v.bounds.midX, y: v.bounds.midY), to: page)
+        return Viewport(centre: Self.displayedFraction(of: centre, on: page, box: v.displayBox), size: v.bounds.size)
+    }
+
+    /// The pane scrolled (the reader, a zoom, or our own placing of the page): note where the shown page now
+    /// is, so paging back to it opens there. Only the pane's current view in a window counts; a view on its
+    /// way out, or a page still being laid out by `show`, would note a place the reader never saw.
+    func rememberPosition(of v: PDFView) {
+        guard let positionKey, !isShowing, v === pdfView, v.window != nil else { return }
+        remembered[positionKey] = viewport(of: v)
+    }
+
+    /// The place remembered for the page `key` names (tests).
+    func rememberedPosition(_ key: String) -> Viewport? { remembered[key] }
 
     /// Put the noted centre back in the middle of the pane at the new page's zoom. `go(to:)` places its point
     /// at the top-left, so step back half a pane; repeated on the next runloop like `scrollToTop`.
@@ -524,6 +559,9 @@ struct PDFPaneView: NSViewRepresentable {
     var turns: Int = 0
     /// Draw the page inverted, `DarkPageImages` (W40.reader-image-invert); the image pane only.
     var inverted = false
+    /// Names the page for the controller's remembered places (W40.reader-page-position-memory): paging back to
+    /// it opens where the reader left it. nil = remember nothing.
+    var positionKey: String? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(controller: controller) }
 
@@ -543,6 +581,25 @@ struct PDFPaneView: NSViewRepresentable {
             controller.recordScale()
         }
         @objc func selectionChanged(_ note: Notification) { controller.selectionChanged() }
+
+        /// The clip view whose scrolling is watched, and the pane it scrolls.
+        private weak var clip: NSClipView?
+        private weak var view: PDFView?
+        func observeScrolling(of view: PDFView) {
+            guard let clip = view.documentView?.enclosingScrollView?.contentView else { return }
+            self.clip = clip
+            self.view = view
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(scrolled(_:)),
+                                                   name: NSView.boundsDidChangeNotification, object: clip)
+        }
+        func stopObservingScrolling() {
+            guard let clip else { return }
+            NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: clip)
+        }
+        @objc func scrolled(_ note: Notification) {
+            if let view { controller.rememberPosition(of: view) }
+        }
     }
 
     func makeNSView(context: Context) -> PDFView {
@@ -563,6 +620,7 @@ struct PDFPaneView: NSViewRepresentable {
                                                selector: #selector(Coordinator.selectionChanged(_:)),
                                                name: .PDFViewSelectionChanged, object: view)
         loadPage(into: view)
+        if positionKey != nil { context.coordinator.observeScrolling(of: view) }   // after the page: its scroll view
         #if DEBUG
         view.setAccessibilityValue(String(format: "%.4f", view.scaleFactor))
         #endif
@@ -583,6 +641,7 @@ struct PDFPaneView: NSViewRepresentable {
     static func dismantleNSView(_ nsView: PDFView, coordinator: Coordinator) {
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewScaleChanged, object: nsView)
         NotificationCenter.default.removeObserver(coordinator, name: .PDFViewSelectionChanged, object: nsView)
+        coordinator.stopObservingScrolling()
     }
 
     /// The grey behind an inverted page, before the filter turns it: it draws as about 0.32, a little lighter than
@@ -600,7 +659,8 @@ struct PDFPaneView: NSViewRepresentable {
     }
 
     private func loadPage(into view: PDFView) {
-        controller.show(page, reference: reference, placeholder: placeholder, turns: turns, in: view)
+        controller.show(page, reference: reference, placeholder: placeholder, turns: turns, positionKey: positionKey,
+                        in: view)
     }
 }
 

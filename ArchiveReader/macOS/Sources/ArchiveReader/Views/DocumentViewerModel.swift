@@ -432,6 +432,11 @@ final class DocumentViewerModel: ObservableObject {
     /// that takes the carried zoom and region, rather than leaning on `updateNSView`'s text comparison
     /// (an image page and a JPEG both have no text, so it cannot tell them apart).
     var imagePaneIdentity: String { "\(pageIdentity)#\(imageSource.rawValue)#\(imageTurns)" }
+    /// The pages' names for the panes' remembered places (W40.reader-page-position-memory). By file and pair, not
+    /// `index`, which a new selection in the window renumbers. The image page's includes its turn, since a place
+    /// is held as fractions of the page as shown; not the PDF / JPEG switch, as both show the same photograph.
+    var imagePositionKey: String? { currentFilePath.map { "\($0)#\(pair)#\(imageTurns)" } }
+    var textPositionKey: String? { currentFilePath.map { "\($0)#\(pair)" } }
 
     // MARK: Rotation — a view of the page, the file untouched (W40.reader-view-rotate)
 

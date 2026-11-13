@@ -174,6 +174,83 @@ final class PDFPaneViewportTests: XCTestCase {
         XCTAssertEqual(controller.pdfView?.scaleFactor ?? 0, pdfScale, accuracy: 0.001)
     }
 
+    // MARK: paging back returns to the place left (W40.reader-page-position-memory)
+
+    /// Zoomed in, read the bottom of page A, page to B and back: B opens at its top, and A at its bottom again.
+    /// The real SwiftUI wiring, panes swapped by identity as the document window swaps them per page, in a
+    /// window never ordered onto the screen (a view with no window remembers nothing).
+    func testPagingBackReturnsToThePlaceLeft() throws {
+        let pageA = PDFPage(), pageB = PDFPage()
+        for page in [pageA, pageB] { page.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox) }
+        let controller = PDFPaneController(key: "left", persists: false)
+        let state = PagingState()
+        let host = NSHostingView(rootView: PagingHost(state: state, pages: [pageA, pageB], controller: controller))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 600, height: 500), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = host
+        host.layoutSubtreeIfNeeded(); settle()
+        for _ in 0..<8 { controller.zoomIn(); settle() }
+        let a = try XCTUnwrap(controller.pdfView)
+        XCTAssertLessThan(try centreY(of: a), 0.3, "a zoom opens the page at its top")
+        let shownA = try XCTUnwrap(a.document?.page(at: 0))
+        a.go(to: PDFDestination(page: shownA, at: CGPoint(x: 0, y: 40)))   // near the bottom edge
+        settle()
+        let bottom = try centreY(of: a)
+        XCTAssertGreaterThan(bottom, 0.7, "the test reads the bottom of the page")
+        XCTAssertEqual(try XCTUnwrap(controller.rememberedPosition("A")).centre.y, bottom, accuracy: 0.01)
+
+        state.page = 1
+        host.layoutSubtreeIfNeeded(); settle()
+        let b = try XCTUnwrap(controller.pdfView)
+        XCTAssertFalse(a === b, "each page gets a fresh view")
+        XCTAssertLessThan(try centreY(of: b), 0.3, "a page not seen yet opens at its top")
+
+        state.page = 0
+        host.layoutSubtreeIfNeeded(); settle()
+        let again = try XCTUnwrap(controller.pdfView)
+        XCTAssertFalse(again === a)
+        XCTAssertEqual(try centreY(of: again), bottom, accuracy: 0.02, "paging back opens on the place left")
+
+        state.page = 1
+        host.layoutSubtreeIfNeeded(); settle()
+        XCTAssertLessThan(try centreY(of: XCTUnwrap(controller.pdfView)), 0.3, "and B on its own, its top")
+    }
+
+    /// Fitted, the whole page is in view, so nothing is remembered; a pane with no key remembers nothing.
+    func testFittedOrUnkeyedPanesRememberNothing() throws {
+        let page = PDFPage()
+        page.setBounds(CGRect(x: 0, y: 0, width: 612, height: 792), for: .mediaBox)
+        let controller = PDFPaneController(key: "left", persists: false)
+        let view = makeView()
+        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = view
+        controller.pdfView = view
+        controller.show(page, reference: page, positionKey: "P", in: view)
+        settle()
+        controller.rememberPosition(of: view)
+        XCTAssertNil(controller.rememberedPosition("P"), "fitted")
+        view.autoScales = false
+        view.scaleFactor = 2
+        controller.recordScale()
+        settle()
+        controller.rememberPosition(of: view)
+        XCTAssertNotNil(controller.rememberedPosition("P"), "zoomed in, the place is kept")
+        controller.show(page, reference: page, in: view)
+        controller.rememberPosition(of: view)
+        XCTAssertNil(controller.rememberedPosition(""), "no key, nothing kept")
+    }
+
+    /// How far down the page the middle of the pane is, as a fraction of the page as shown.
+    private func centreY(of view: PDFView) throws -> CGFloat {
+        let page = try XCTUnwrap(view.document?.page(at: 0))
+        let centre = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: page)
+        return PDFPaneController.displayedFraction(of: centre, on: page, box: view.displayBox).y
+    }
+
     // MARK: find on the JPEG original (W40.fix-reader-find-both-panes)
 
     /// The JPEG has no text layer, so its hits come from the PDF image page it stands in for, drawn at the
@@ -280,6 +357,19 @@ final class PDFPaneViewportTests: XCTestCase {
 }
 
 private final class SwapState: ObservableObject { @Published var jpeg = false }
+
+private final class PagingState: ObservableObject { @Published var page = 0 }
+
+private struct PagingHost: View {
+    @ObservedObject var state: PagingState
+    let pages: [PDFPage]
+    let controller: PDFPaneController
+    var body: some View {
+        let key = state.page == 0 ? "A" : "B"
+        PDFPaneView(page: pages[state.page], controller: controller, positionKey: key)
+            .id(key)
+    }
+}
 
 private struct SwapHost: View {
     @ObservedObject var state: SwapState
