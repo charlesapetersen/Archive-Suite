@@ -134,6 +134,22 @@ enum ProcessorUITestConfiguration {
         return URL(fileURLWithPath: arguments[index + 1])
     }
 
+    /// W44 Improve OCR: a scratch shared support folder, already connected, in its own defaults suite, so the dialog can
+    /// run and accept in the VM without the folder panel. Never the real support folder or the app's own settings.
+    static var improveOCRSupport: (folder: URL, defaults: UserDefaults)? {
+        guard isActive, arguments.contains("-APUITestImproveOCRSupport"),
+              let defaults = UserDefaults(suiteName: "com.archiveprocessor.uitest.improveocr") else { return nil }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("archive-processor-uitest-support-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        return (folder, defaults)
+    }
+
+    /// W44 Improve OCR: a stand-in reader for the VM journey, which returns a fixed transcription. Apple Vision fails
+    /// inside the macOS 27.2 guest ("Foundation._GenericObjCError 0", measured 2026-11-12) while it reads the same
+    /// page on the host (`ReOCRJobTestDriver` case 12), so the VM test covers the dialog's run, compare and accept.
+    static var improveOCRFakeReader: Bool { isActive && arguments.contains("-APUITestImproveOCRFakeReader") }
+
     /// W44 Improve OCR: a scratch archive in this app's temporary directory (a Reader root marker and one Processor
     /// two-page file, image and text), so the dialog has a suite pair inside a root. Never a corpus file.
     private static func syntheticSuitePair() -> URL? {
@@ -144,11 +160,12 @@ enum ProcessorUITestConfiguration {
         let marker = RootMarker(guid: UUID(), name: "UI test archive", kind: .reader, createdAt: Date())
         guard let markerData = try? JSONEncoder().encode(marker),
               (try? markerData.write(to: root.appendingPathComponent(RootMarker.filename), options: .atomic)) != nil else { return nil }
-        let image = NSImage(size: NSSize(width: 300, height: 400))
+        let image = NSImage(size: NSSize(width: 1200, height: 1600))
         image.lockFocus()
         NSColor.white.setFill()
-        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 300, height: 400)).fill()
-        "A typed letter, 1952".draw(at: NSPoint(x: 20, y: 200), withAttributes: [.font: NSFont.systemFont(ofSize: 20)])
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 1200, height: 1600)).fill()
+        "A TYPED LETTER OF 1952".draw(at: NSPoint(x: 80, y: 900), withAttributes: [
+            .font: NSFont(name: "Courier", size: 64) ?? NSFont.systemFont(ofSize: 64), .foregroundColor: NSColor.black])
         image.unlockFocus()
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
               let jpeg = rep.representation(using: .jpeg, properties: [:]) else { return nil }

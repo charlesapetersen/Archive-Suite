@@ -147,6 +147,30 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(dialog.waitForNonExistence(timeout: 5), "Escape closes it")
     }
 
+    /// W44.reocr-processor, the whole journey off-screen: with a scratch shared folder connected, Run reads the page
+    /// (a DEBUG stand-in reader: Apple Vision, the only ready reader in a keyless VM, errors inside the guest, and is
+    /// proven on the host by ReOCRJobTestDriver case 12), the comparison is shown, Accept puts the new text in place, and
+    /// the dialog says so. The file is the app's own scratch archive; never the corpus. No network, $0.
+    func testImproveOCRRunsAndAccepts() throws {
+        relaunch(extra: ["-APUITestSyntheticSuitePair", "-APUITestImproveOCRSupport", "-APUITestImproveOCRFakeReader"])
+        XCTAssertTrue(element("ap.ocr.start").waitForExistence(timeout: 10), "the Process Files window is up with the file")
+        app.typeKey("i", modifierFlags: [.command, .shift])
+        XCTAssertTrue(element("ap.reocr.dialog").waitForExistence(timeout: 10), "⇧⌘I opens the Improve OCR dialog")
+        let run = element("ap.reocr.run")
+        XCTAssertTrue(run.waitForExistence(timeout: 5) && run.isEnabled, "with the folder connected and Vision ready, Run is offered")
+        XCTAssertTrue(element("ap.reocr.estimate").exists, "the estimate is shown")
+        run.click()
+        let accept = element("ap.reocr.accept")
+        XCTAssertTrue(accept.waitForExistence(timeout: 60), "the page is read and the comparison shown")
+        attachScreenshot("processor-improve-ocr-compare")
+        XCTAssertTrue(accept.isEnabled, "a full reading can be accepted")
+        accept.click()
+        let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Accepted' OR value BEGINSWITH 'Accepted'"))
+        XCTAssertTrue(done.firstMatch.waitForExistence(timeout: 30), "the dialog reports the acceptance")
+        XCTAssertFalse(run.isEnabled, "Run is not offered again over the now-stale file list")
+        attachScreenshot("processor-improve-ocr-accepted")
+    }
+
     func testInstitutionalComputingImportOffersNeutralFolderChooser() throws {
         relaunch(extra: ["-APUITestSyntheticMultiPagePDF"])
         let choose = element("ap.ocr.institutionalComputeChoose")

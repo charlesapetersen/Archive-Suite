@@ -19,13 +19,16 @@ final class ImproveOCRController: ObservableObject {
     @Published private(set) var root: ReOCRJob.Root?
     @Published private(set) var rootProblem: String?
     @Published private(set) var running = false
+    /// Run is offered once per opening: after it the file list is stale (an accepted file has a new reader); reopening
+    /// the dialog reads the files again.
+    @Published private(set) var hasRun = false
     @Published private(set) var reviews: [String: ReOCRJob.Review] = [:]
     @Published private(set) var messages: [String: String] = [:]
     @Published private(set) var recoveryNote: String?
 
     let model: ReOCRDialogModel?
     let loadProblem: String?
-    private let connection = ReOCRSupportConnection(defaults: .standard)
+    private let connection: ReOCRSupportConnection
 
     /// `<Processor Application Support>/ImproveOCR`, where kept versions and journals live.
     static var privateFolder: URL {
@@ -35,7 +38,14 @@ final class ImproveOCRController: ObservableObject {
     }
 
     init(files: [URL]) {
-        let conn = ReOCRSupportConnection(defaults: .standard)
+        var conn = ReOCRSupportConnection(defaults: .standard)
+        #if DEBUG
+        if let test = ProcessorUITestConfiguration.improveOCRSupport {
+            conn = ReOCRSupportConnection(defaults: test.defaults)
+            _ = try? conn.connect(test.folder)
+        }
+        #endif
+        connection = conn
         support = Result { try conn.resolve() }.mapError { ($0 as? ReOCRSupportConnection.Problem) ?? .unavailable("\($0)") }
         guard let table = SettingsRouteTable.bundled else {
             model = nil
@@ -119,13 +129,21 @@ final class ImproveOCRController: ObservableObject {
     }
 
     func run() {
-        guard runBlocker == nil, let model, let root, case .success(let s) = support else { return }
+        guard runBlocker == nil, !hasRun, let model, let root, case .success(let s) = support else { return }
         running = true
+        hasRun = true
         let job = job(s.url)
+        var readerFor: (ReOCRRanking.Row) -> ReOCRJob.Reader? = { row in
+            ReOCRJob.reader(for: row, apiKey: row.provider == .appleVision ? "" : (KeychainHelper.load(account: row.provider.rawValue) ?? ""))
+        }
+        #if DEBUG
+        if ProcessorUITestConfiguration.improveOCRFakeReader {
+            readerFor = { _ in { _, _, _ in OCRResult(text: "A TYPED LETTER OF 1952", classification: nil, errorMessage: nil, errorCode: nil) } }
+        }
+        #endif
+        let chooseReader = readerFor
         Task {
-            let runs = await model.run(job: job, root: root, model: LLMModel.appleVisionModels[0], readerFor: { row in
-                ReOCRJob.reader(for: row, apiKey: row.provider == .appleVision ? "" : (KeychainHelper.load(account: row.provider.rawValue) ?? ""))
-            })
+            let runs = await model.run(job: job, root: root, model: LLMModel.appleVisionModels[0], readerFor: chooseReader)
             for r in runs {
                 switch r.outcome {
                 case .success(let review):
@@ -326,7 +344,7 @@ struct ImproveOCRView: View {
             Spacer()
             Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
             Button(controller.running ? "Reading\u{2026}" : "Run") { controller.run() }
-                .disabled(controller.runBlocker != nil || controller.running || !controller.reviews.isEmpty)
+                .disabled(controller.runBlocker != nil || controller.running || controller.hasRun)
                 .accessibilityIdentifier("ap.reocr.run")
         }
     }
