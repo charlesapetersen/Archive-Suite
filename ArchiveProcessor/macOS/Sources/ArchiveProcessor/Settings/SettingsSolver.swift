@@ -708,7 +708,8 @@ struct SettingsSolver {
 
     func solveSegmentation(_ stage: SettingsRouteTable.Stage, _ state: inout SolveState) -> [SettingsPick] {
         let pages = Double(answers.pages)
-        let cands = stage.routes.filter { !$0.afterTraining }
+        let chosen = answers.onlyRoutes["segmentation"] ?? []
+        let cands = stage.routes.filter { !$0.afterTraining && (!$0.userChoiceOnly || chosen.contains($0.id)) }
             .compactMap { r in segmentationFigure(r).map { cand(r, stage: "segmentation", value: $0, units: pages) } }
         let tie = max(Self.segmentationTie, withinPoint)
         guard let ch = choose(cands, state, tie: { abs($0.value - $1.value) < tie }, prefer: { a, b in

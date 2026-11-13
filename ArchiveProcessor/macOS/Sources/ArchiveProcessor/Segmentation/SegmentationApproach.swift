@@ -17,6 +17,7 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     case mix      // the window voters combined by the rule options.json names
     case glm      // GLM-5.3 Flash through OpenRouter, the budget approach (W41.app-openrouter)
     case local    // the corpus-trained Qwen3.5 2B on this Mac through mlx-vlm, no key (W41.app-local-seg)
+    case geminiText = "gemini-text"   // Gemini 3.8 Flash on the windows' OCR text alone, the budget tier (W46.seg-text-tier-app)
 
     var id: String { rawValue }
 
@@ -62,6 +63,7 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
         case "manual": self = .manual
         case "anthropic": self = .claude
         case "gemini": self = .gemini
+        case "gemini-text": self = .geminiText
         case "openai": self = .openai
         case "mix": self = .mix
         case "openrouter": self = .glm
@@ -494,6 +496,9 @@ struct WindowVoter: Sendable, Equatable {
     /// The page images' long edge when it is not the file's window figure: the local 2B was trained and measured on
     /// 1,024 px pages (`method_local.MAX_SIDE`), the cloud voters on 1,600.
     var thumbnailLongEdgePx: Int? = nil
+    /// Whether the window's page images go with its prompt. A text-only voter sends the prompt alone, its OCR text
+    /// in it (`seg_window_gateway.py` `request`, an arm ending `-t`).
+    var sendsImages = true
 
     /// The voters the app can run. A voter in options.json that is not here (or whose prompt id differs)
     /// fails validation, so a bench change cannot silently run against the wrong prompt.
@@ -515,6 +520,10 @@ struct WindowVoter: Sendable, Equatable {
         // the request sends the repository the user's setting names (`LocalSegmenter.modelID`).
         WindowVoter(name: "window-local-seg-2b", provider: .local, modelID: LocalSegmenter.buildID,
                     thinkingLevel: nil, prompt: .c1, thumbnailLongEdgePx: 1024),
+        // W46.seg-text-tier-app: Gemini 3.8 Flash at thinking low on the OCR text alone (prompt g2t, no images), about half
+        // the price for more boundaries to check. Measured on Gemini 3.7 Flash through the gateway, as g2 is.
+        WindowVoter(name: "window-gemini-3.8-flash-low-text", provider: .gemini, modelID: "gemini-3.8-flash",
+                    thinkingLevel: "low", prompt: .g2t, sendsImages: false),
     ]
 
     struct ResolveError: Error, CustomStringConvertible {

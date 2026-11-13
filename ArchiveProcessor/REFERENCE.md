@@ -443,16 +443,18 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                and `segmentationAnswers`).
                                Self-test: `SegmentationReviewTestDriver`, `scripts/test-segmentation-review.sh`;
                                VM UITest `testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone`.
-  SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix, `DefaultsKeys.segmentationApproach`,
+  SegmentationApproach.swift   `SegmentationApproach` (manual/claude/gemini/openai/mix/glm/local/gemini-text, `DefaultsKeys.segmentationApproach`,
                                default manual; with nothing saved, the settings solver's segmentation pick is saved,
                                W46.settings-solver, replacing W41.app-seg-default's Gemini rule);
                                `SegmentationOptions` decodes the bundled `segbench-results/options.json`
-                               (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check.
+                               (window shape, rule, level, voters, figures); `WindowVoter.catalog` + prompt-id check; a voter with
+                               `sendsImages` false (gemini-text, W46.seg-text-tier-app) gets requests with no images.
   WindowSegmenter.swift        Port of the bench: 7/3 windows, reply parser, per-voter combine, min/mean rules and the
                                2B's disagreement rule (W46.seg-review-rule), the concurrent runner (each voter's own
                                page size; a local voter one window at a time; retry once; gaps no answer covered →
                                flagged at 0; usage limit → stop keeping answered windows, resumable).
-  WindowPrompts.swift          Prompts w1/g1, verbatim from the bench (the test compares the rendering byte for byte).
+  WindowPrompts.swift          Prompts w1/g2/c1, verbatim from the bench, and g2t, g2 with its image paragraph replaced
+                               (the test compares each rendering byte for byte).
   WindowTransports.swift       API (Anthropic/Gemini/OpenAI, injectable HTTP seam), `claude -p` (temp dir of page
                                files), and per-provider routing.
   LocalSegmenter.swift         The `local` approach (W41.app-local-seg): the corpus-trained Qwen3.5 2B through mlx-vlm

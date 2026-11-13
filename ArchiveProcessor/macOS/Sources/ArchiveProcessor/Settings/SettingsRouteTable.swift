@@ -250,6 +250,11 @@ struct SettingsRouteTable: Decodable, Sendable {
 
         var afterTraining: Bool { status == "after-training" }
 
+        /// A row the user may choose but the app never picks for them (the condition "the user's choice only …"): the
+        /// text-only Gemini tier ties the image window under the segmentation floor for half the price, and making it
+        /// the default is the owner's call, not the tie rule's (W46.seg-text-tier-app).
+        var userChoiceOnly: Bool { conditions.contains { $0.hasPrefix("the user's choice only") } }
+
         /// A model this Mac has to download first. The table marks the OS's own routes `built_in`; rows with no memory
         /// peak are rules over another route's output (Vision's rule dating, the text page), except the kraken
         /// specialists, which are models whose memory was not tabulated ("where installed", note 04 §9).

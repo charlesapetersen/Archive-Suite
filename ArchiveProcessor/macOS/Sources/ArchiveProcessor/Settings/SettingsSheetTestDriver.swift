@@ -136,6 +136,12 @@ enum SettingsSheetTestDriver {
                       s.labels.contains { $0.contains("88.8% to 89.1%") && $0.contains("three test runs of Gemini 3.7")
                           && $0.contains("single run") }, s.labels.joined(separator: " | "))
                 check("3 Gemini's card carries no 2B label", !s.labels.contains { $0.contains("zero-shot") })
+                // W46.seg-text-tier-app: the text-only tier is offered beside the pick, its checks beside its price.
+                let text = s.alternatives.first { $0.id == "gemini3.8-flash-text" }
+                check("3 the text-only tier is an alternative with its checks beside its price",
+                      text.map { $0.cost.contains("$") && $0.cost.contains("about 29 boundaries to check in 100 pages") } == true,
+                      text.map { "\($0.figure), \($0.cost)" } ?? s.alternatives.map(\.id).joined(separator: ", "))
+                check("3 the text-only tier can be chosen", s.options.contains { $0.id == "gemini3.8-flash-text" && $0.blocked == nil })
             } else {
                 lines.append("SKIP 3 Gemini segmentation labels: the pick is \(s.routeID ?? "nil")")
             }

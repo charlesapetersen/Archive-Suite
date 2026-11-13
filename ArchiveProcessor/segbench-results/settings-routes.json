@@ -8453,14 +8453,14 @@
      "conditions": []
     },
     {
-     "id": "gemini3.7-flash-text",
-     "name": "Gemini 3.7 Flash, text-only windows (cheaper tier lead)",
+     "id": "gemini3.8-flash-text",
+     "name": "Gemini 3.8 Flash on the text alone (budget)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "gemini-text|gemini-3.8-flash",
+     "status": "shipped",
      "needs": {
       "key": [
-       "gateway"
+       "gemini"
       ],
       "plan": [],
       "cluster": false,
@@ -8470,15 +8470,59 @@
       "built_in": false
      },
      "figures": {
+      "test-boxes": {
+       "value": 87.3,
+       "n": 363,
+       "truth": "owner-test",
+       "source": {
+        "file": "options.md",
+        "route": "Gemini only, text alone (budget)",
+        "attribute": "pages in an exact document, no checking",
+        "value": "87.3%"
+       }
+      },
+      "test-boxes.checks_per_100": {
+       "value": 29.2,
+       "n": 363,
+       "truth": "owner-test",
+       "source": {
+        "file": "options.md",
+        "route": "Gemini only, text alone (budget)",
+        "attribute": "boundaries to check per 100 pages",
+        "value": "29.2"
+       }
+      },
+      "test-boxes.after_checking": {
+       "value": 98.5,
+       "n": 363,
+       "truth": "owner-test",
+       "source": {
+        "file": "options.md",
+        "route": "Gemini only, text alone (budget)",
+        "attribute": "pages right after checking",
+        "value": "98.5%"
+       }
+      },
+      "test-boxes.unflagged_per_500": {
+       "value": 1.4,
+       "n": 363,
+       "truth": "owner-test",
+       "source": {
+        "file": "options.md",
+        "route": "Gemini only, text alone (budget)",
+        "attribute": "unflagged errors per 500 pages (count)",
+        "value": "1.4 (1)"
+       }
+      },
       "dev-boxes": {
-       "value": 89.6,
+       "value": 89.4,
        "n": 551,
        "truth": "owner-dev",
        "source": {
-        "file": "seg-window-gateway.md",
-        "route": "Gemini 3.7, text only",
-        "attribute": "pages exact, K = 7",
-        "value": "89.6% (control 92.3%, -2.7, -9.5 to +1.6)"
+        "file": "seg-text-tier-app.md",
+        "route": "text alone, held out (pooled)",
+        "attribute": "pages exact, no checking",
+        "value": "89.4%"
        }
       },
       "tabme.boundary_f1": {
@@ -8494,21 +8538,21 @@
       }
      },
      "cost": {
-      "usd_1000_list": null,
-      "usd_1000_batch": null,
-      "price_read": null,
+      "usd_1000_list": 1.68,
+      "usd_1000_batch": 0.84,
+      "price_read": "2026-10-05",
       "source": {
-       "file": "seg-window-gateway.md",
-       "route": "k7-t against k7-it",
-       "attribute": "cost for 187 windows",
-       "value": "$0.890 against $1.920"
+       "file": "options.md",
+       "route": "Gemini only, text alone (budget)",
+       "attribute": "API cost per 1,000 pages, list / batch",
+       "value": "$1.68 / $0.842"
       }
      },
      "time": {
       "per_unit_s": 1.53,
       "per_window_s": 4.6,
-      "measured": true,
-      "measured_on": "gateway, mean s a K = 7 call (6.7 with images)",
+      "measured": false,
+      "measured_on": "Gemini 3.7's text-only gateway window call on g1, lent to 3.8 on g2t (not timed on 3.8); 6.7 s with images",
       "derived": "seconds a seven-page window call over 3, a window every 3 pages at stride 3",
       "source": {
        "file": "seg-window-gateway.md",
@@ -8523,14 +8567,15 @@
       "source": null
      },
      "caveats": [
-      "not run on the test boxes; a test-box run is needed before it ships (seg-window-gateway.md)",
-      "per-1,000-page cost not tabulated",
-      "one run, no Gemini rerun floor (P10-8)"
+      "the app sends prompt g2 without the page images (g2t) to 3.8; every figure and the level (0.950) are Gemini 3.7 Flash's text-only g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-text-tier-app.md)",
+      "more boundaries to check than with the images (29.2 per 100 pages against 25.3) for about half the price",
+      "introductory price to 31 Dec 2026, then double (options.md's Gemini rates)",
+      "one run, window offset 0; the TABME figure is the text-only window on g1"
      ],
      "kind_rules": [],
-     "fallback": "gemini3.8-flash",
+     "fallback": "manual",
      "conditions": [
-      "the test-box run (item 2) before any tier is offered"
+      "the user's choice only: it ties Gemini 3.8 Flash with the images under the 4.2-point floor for half the price, so the tie rule would make it the default; whether it may is the owner's call (W46.seg-text-tier-app)"
      ]
     },
     {

@@ -40,7 +40,7 @@ enum SegmentationEngineTestDriver {
         struct Expected: Decodable {
             let gap: Int; let decision: String; let flagged: Bool; let confidence: Double; let agreed: Bool
         }
-        struct Prompts: Decodable { let texts: [String]; let w1: String; let g2: String; let c1: String }
+        struct Prompts: Decodable { let texts: [String]; let w1: String; let g2: String; let c1: String; let g2t: String }
         let box: String
         let pages: Int
         let photo_kinds: [String?]
@@ -328,6 +328,11 @@ enum SegmentationEngineTestDriver {
             for (name, ok) in await partnerChecks(options: options) { check(name, ok) }
         }
 
+        // 12. The text-only Gemini window, the budget tier (W46.seg-text-tier-app).
+        if let options {
+            for (name, ok) in await textTierChecks(options: options, fx: fx) { check(name, ok) }
+        }
+
         // Fatal: the run stops at once and no window is retried.
         if let options, let spec = try? options.spec(for: .claude) {
             final class Refusing: WindowTransport, @unchecked Sendable {
@@ -467,6 +472,64 @@ enum SegmentationEngineTestDriver {
         let p = res?.proposals ?? []
         check("partner run: only the gap where Gemini disagrees is flagged, and the 2B's continue stands",
               p.count == 15 && p.filter(\.flagged).map(\.gap) == [3] && p[3].decision == .continue)
+        return out
+    }
+
+    /// The `gemini-text` approach: its spec, its prompt as the bench renders it, and a run whose requests carry no image.
+    private static func textTierChecks(options: SegmentationOptions, fx: Fixture) async -> [(String, Bool)] {
+        var out: [(String, Bool)] = []
+        func check(_ name: String, _ ok: Bool) { out.append((name, ok)) }
+
+        let spec = try? options.spec(for: .geminiText)
+        let voter = spec?.voters.first
+        check("gemini-text: one voter, gemini-3.8-flash at thinking low, prompt g2t, no images, level 0.95",
+              spec?.voters.count == 1 && voter?.name == "window-gemini-3.8-flash-low-text"
+              && voter?.modelID == "gemini-3.8-flash" && voter?.thinkingLevel == "low" && voter?.prompt == .g2t
+              && voter?.sendsImages == false && spec?.level == 0.95 && spec?.rule == .min)
+        check("every other voter sends its images", WindowVoter.catalog.filter { !$0.sendsImages }.map(\.name)
+              == ["window-gemini-3.8-flash-low-text"])
+        let g2 = WindowPromptTemplates.g2
+        check("g2t: g2's image paragraph occurs once and is replaced",
+              g2.components(separatedBy: WindowPromptTemplates.imageParagraph).count == 2
+              && !WindowPromptTemplates.g2t.contains(WindowPromptTemplates.imageParagraph)
+              && WindowPromptTemplates.g2t.contains(WindowPromptTemplates.textParagraph))
+        let nums = Array(1...7)
+        check("prompt g2t renders as the bench's",
+              WindowPromptRenderer.render(.g2t, pageNumbers: nums, texts: fx.prompts.texts, maxText: 2500) == fx.prompts.g2t)
+        let tier = options.approach(.geminiText)?.cost?.total.listUSDPer1000Pages ?? 0
+        let full = options.approach(.gemini)?.cost?.total.listUSDPer1000Pages ?? 0
+        check("gemini-text costs about half the Gemini only approach (\(tier) against \(full))",
+              tier > 0 && full > 0 && tier / full < 0.6)
+
+        // A run: every request has the prompt alone, and the Gemini request has one part, the prompt.
+        guard let spec else { return out }
+        final class Recorder: WindowTransport, @unchecked Sendable {
+            let lock = NSLock()
+            var requests: [WindowRequest] = []
+            func send(_ r: WindowRequest) async throws -> String {
+                lock.withLock { requests.append(r) }
+                let pages = r.pageNumbers.map { #"{"page":\#($0),"kind":"document"}"# }.joined(separator: ",")
+                let gaps = zip(r.pageNumbers, r.pageNumbers.dropFirst()).map { a, b in
+                    #"{"between":[\#(a),\#(b)],"decision":"continue","cue":"c","confidence":0.9}"#
+                }.joined(separator: ",")
+                return #"{"pages":[\#(pages)],"boundaries":[\#(gaps)]}"#
+            }
+        }
+        let rec = Recorder()
+        let pages = (0..<10).map { PageInput(jpeg: Data([UInt8($0)]), text: "text \($0 + 1)") }
+        let res = try? await WindowSegmenter.instant(rec)
+            .segment(pages: pages, photoKinds: Array(repeating: nil, count: 10), approach: spec)
+        check("gemini-text run: \(rec.requests.count) windows, none with an image, each prompt naming its pages",
+              res?.proposals.count == 9 && !rec.requests.isEmpty && rec.requests.allSatisfy { r in
+                  r.images.isEmpty && r.prompt.contains("pages \(r.pageNumbers.first!) to \(r.pageNumbers.last!). The photographs are not shown")
+              })
+        if let r = rec.requests.first, let g = try? APIWindowTransport.request(r, key: "K-G") {
+            let b = (g.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]) ?? [:]
+            let parts = ((b["contents"] as? [[String: Any]])?.first?["parts"] as? [[String: Any]]) ?? []
+            check("gemini-text request: generateContent on gemini-3.8-flash with one part, the prompt",
+                  g.url?.absoluteString.hasSuffix("/models/gemini-3.8-flash:generateContent") == true
+                  && parts.count == 1 && parts[0]["text"] as? String == r.prompt && !(String(data: g.httpBody ?? Data(), encoding: .utf8) ?? "inlineData").contains("inlineData"))
+        } else { check("gemini-text request builds", false) }
         return out
     }
 

@@ -89,6 +89,18 @@ enum SegmentationChooserTestDriver {
         eq("2 gemini unshown", gemini.unshownErrors, "none in 363 test pages")
         check("2 gemini names the model its figures were measured on",
               gemini.notes.count == 1 && gemini.notes[0].contains("Gemini 3.7 Flash"), "\(gemini.notes)")
+        // W46.seg-text-tier-app: the text-only tier, its checks beside its price, labelled as 3.7's.
+        let text = row(.geminiText, 1000)
+        eq("2 gemini-text no checking", text.rightWithNoChecking, "about 87% of pages")
+        eq("2 gemini-text to check", text.toCheck, "about 292 boundaries to check")
+        eq("2 gemini-text after checking", text.rightAfterChecking, "about 98% of pages")
+        eq("2 gemini-text unshown", text.unshownErrors, "about 1 in 360 pages")
+        check("2 gemini-text costs about half of Gemini with the images",
+              (text.apiDollars ?? 0) > 1.6 && (text.apiDollars ?? 0) < 1.75 && (gemini.apiDollars ?? 0) > 3.5,
+              "\(String(describing: text.apiDollars)) against \(String(describing: gemini.apiDollars))")
+        check("2 gemini-text names the model its figures were measured on",
+              text.notes.count == 1 && text.notes[0].contains("Gemini 3.7 Flash"), "\(text.notes)")
+        eq("2 gemini-text needs a Gemini key", row(.geminiText, 1000, .none).unavailableReason, "Needs a Gemini API key.")
         // Since the truth rescore (W46.seg-truth-rescore) ChatGPT has no unflagged error, and Gemini on g2 none either.
         eq("2 zero is not a promise", row(.openai, 1000).unshownErrors, "none in 363 test pages")
 

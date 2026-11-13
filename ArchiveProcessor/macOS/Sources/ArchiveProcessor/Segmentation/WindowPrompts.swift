@@ -21,19 +21,40 @@ import Foundation
 /// the ChatGPT voter measured through Codex on the subscription): it says the images are attached and not to run
 /// commands. The app's API route attaches them inline, so the text stands as measured (`W36.seg-opt-siwc` owns the
 /// route).
+///
+/// g2t is g2 for a window sent without its images (W46.seg-text-tier-app): `seg_window_gateway.py` `request` for an
+/// arm ending `-t`, which drops the images and their "Page n:" parts and replaces g2's one paragraph about the images.
+/// It is built from g2 here, so the two cannot drift; the engine test compares it with the bench's rendering.
 enum WindowPromptID: String, Sendable {
-    case w1, g2, c1
+    case w1, g2, c1, g2t
 
     var template: String {
         switch self {
         case .w1: return WindowPromptTemplates.w1
         case .g2: return WindowPromptTemplates.g2
         case .c1: return WindowPromptTemplates.c1
+        case .g2t: return WindowPromptTemplates.g2t
         }
     }
 }
 
 enum WindowPromptTemplates {
+    /// `seg_window_gateway.py` `OLD_PARA` and `NEW_PARA`, verbatim.
+    static let imageParagraph = """
+        The
+        {k} images above are consecutive photographs from that stream, each introduced by its page number.
+        Answer from the images. The OCR text below is automatic and has errors; the image wins when they
+        disagree.
+        """
+    static let textParagraph = """
+        This
+        window holds {k} consecutive photographs from that stream, pages {a} to {b}. The photographs are not shown: answer
+        from the OCR text below alone. It is automatic and has errors.
+        """
+
+    /// g2 with its image paragraph replaced; the paragraph occurs once in g2 (the engine test checks it).
+    static let g2t = g2.replacingOccurrences(of: imageParagraph, with: textParagraph)
+
     static let w1 = #"""
 You are helping an archivist split a stream of page photographs into documents.
 

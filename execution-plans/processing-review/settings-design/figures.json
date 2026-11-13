@@ -1660,6 +1660,27 @@
    "unflagged_per_500": null
   },
   {
+   "id": "gemini3.8-flash-text",
+   "name": "Gemini 3.8 Flash on the text alone (budget)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "gemini"
+    ]
+   },
+   "usd_1000": 1.68,
+   "usd_1000_batch": 0.84,
+   "s_page": 1.53,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "the app sends prompt g2 without the page images (g2t) to 3.8; every figure and the level (0.950) are Gemini 3.7 Flash's text-only g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-text-tier-app.md); more boundaries to check than with the images (29.2 per 100 pages against 25.3) for about half the price",
+   "source": "settings-routes.json, stage segmentation, row gemini3.8-flash-text",
+   "nocheck": 87.3,
+   "checks_per_100": 29.2,
+   "after": 98.5,
+   "unflagged_per_500": 1.4
+  },
+  {
    "id": "claude-sonnet5.5",
    "name": "Claude Sonnet 5.5 (key or Claude plan)",
    "family": "plan",

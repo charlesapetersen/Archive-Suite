@@ -93,6 +93,10 @@ enum WindowPromptRenderer {
             values["files"] = nums.map { "- \(fileName($0))  (page \($0))" }.joined(separator: "\n")
         case .g2:
             values["pages"] = nums.map(String.init).joined(separator: ", ")
+        case .g2t:
+            values["pages"] = nums.map(String.init).joined(separator: ", ")
+            values["a"] = nums.first.map(String.init) ?? ""
+            values["b"] = nums.last.map(String.init) ?? ""
         case .c1:
             values["files"] = nums.map { "- \(fileName($0))  (page \($0))" }.joined(separator: "\n")
             values["pages"] = nums.map(String.init).joined(separator: ", ")
@@ -507,8 +511,10 @@ struct WindowSegmenter: Sendable {
         let prompt = WindowPromptRenderer.render(voter.prompt, pageNumbers: nums, texts: w.map { pages[$0].text },
                                                  maxText: approach.ocrTextChars)
         let edge = approach.longEdge(for: voter)
+        // A text-only voter's request has no images, so no transport can attach one (nor their "Page n:" labels).
         return WindowRequest(voter: voter, prompt: prompt,
-                             images: w.map { pages[$0].image(longEdge: edge, primary: approach.thumbnailLongEdgePx) },
+                             images: voter.sendsImages
+                                ? w.map { pages[$0].image(longEdge: edge, primary: approach.thumbnailLongEdgePx) } : [],
                              pageNumbers: nums)
     }
 

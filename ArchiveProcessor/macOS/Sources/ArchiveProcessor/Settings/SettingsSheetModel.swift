@@ -510,7 +510,11 @@ struct SettingsSheetModel {
                         : words.figure(stage.id, v) + (stage.id == "reading" ? " on your mix of pages"
                             : stage.id == "dating" ? " where the year is not in the text" : "")
                             + (tie ? " (a tie with the pick on this figure)" : ""),
-                    cost: words.per1000(solver.usdPer1000(r, stage: stage.id), unit: stage.unit) + (pace.map { ", \($0)" } ?? ""))
+                    cost: words.per1000(solver.usdPer1000(r, stage: stage.id), unit: stage.unit) + (pace.map { ", \($0)" } ?? "")
+                        // What a cheaper segmentation route costs in checking, beside its price (W46.seg-text-tier-app).
+                        + (stage.id == "segmentation" && r.family != .manual
+                            ? r.figure("test-boxes.checks_per_100").map { String(format: ", about %.0f boundaries to check in 100 pages", $0) } ?? ""
+                            : ""))
             }
         // Names on this Mac run only when names are ranked (owner call 11), which the solver applies by leaving them out.
         let namesUnranked = stage.id == "entities" && !a.priorities.contains(.names)
@@ -1301,6 +1305,7 @@ extension SegmentationApproach {
         case .mix: return "Claude and ChatGPT together"
         case .glm: return "GLM-5.3 Flash"
         case .local: return "the trained model on this Mac"
+        case .geminiText: return "Gemini 3.8 Flash on the text alone"
         }
     }
 }

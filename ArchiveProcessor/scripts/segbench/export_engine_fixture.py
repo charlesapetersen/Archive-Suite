@@ -62,7 +62,18 @@ def prompts() -> dict:
             "g2": G.PROMPTS["g2"].format(k=7, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
                                   pages=", ".join(str(n) for n in nums)),
             "c1": MWC.prompt_template("codex").format(k=7, files=files, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
-                                                      pages=", ".join(str(n) for n in nums))}
+                                                      pages=", ".join(str(n) for n in nums)),
+            # W46.seg-text-tier-app: g2 with its image paragraph replaced, as seg_window_gateway.request builds it.
+            "g2t": _text_only(G.PROMPTS["g2"].format(k=7, texts=t, gaps=gaps, max_text=W.MAX_TEXT,
+                                                     pages=", ".join(str(n) for n in nums)), nums)}
+
+
+def _text_only(prompt, nums):
+    import seg_window_gateway as SWG
+    old = SWG.OLD_PARA.format(k=len(nums))
+    if prompt.count(old) != 1:
+        raise SystemExit("the image paragraph is not unique in g2")
+    return prompt.replace(old, SWG.NEW_PARA.format(k=len(nums), a=nums[0], b=nums[-1]), 1)
 
 
 def main(argv) -> int:

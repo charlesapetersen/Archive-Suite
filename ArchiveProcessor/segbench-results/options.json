@@ -754,6 +754,107 @@
     "source": "seg-students.md \u00a7On the Mac (W41.seg-mac-model)"
    },
    "note": "W41.seg-finetune and W41.seg-mac-model (seg-students.md): trained on one owner's archives (no test-box page seen); its confidences make no useful flag, so the review asks about most gaps. A no-key, no-cost first draft whose boundaries the user skims. Scored here by `option-local-seg`."
+  },
+  {
+   "id": "gemini-text",
+   "label": "Gemini only, text alone (budget)",
+   "available": true,
+   "voters": [
+    "window-gemini-3.8-flash-low-text (Gemini 3.8 Flash, thinking low, text alone, prompt g2t)"
+   ],
+   "rule": "min",
+   "level": 0.95,
+   "flag_rule": "flag a gap whose confidence is at or below the level",
+   "figures": {
+    "test": {
+     "pages": 363,
+     "gaps": 315,
+     "flagged": 106,
+     "pages_exact_no_review": 0.8727272727272727,
+     "flagged_per_100_pages": 29.201101928374655,
+     "pages_exact_after_review": 0.9848484848484849,
+     "unflagged_errors": 1,
+     "unflagged_errors_per_500_pages": 1.3774104683195592
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 85,
+      "pages_exact_no_review": 0.8477366255144033,
+      "flagged_per_100_pages": 34.0,
+      "pages_exact_after_review": 0.9794238683127572,
+      "unflagged_errors": 1,
+      "unflagged_errors_per_500_pages": 2.0
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 21,
+      "pages_exact_no_review": 0.9425287356321839,
+      "flagged_per_100_pages": 18.58407079646018,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0
+     }
+    },
+    "dev_held_out": {
+     "pages": 551,
+     "gaps": 494,
+     "flagged": 65,
+     "pages_exact_no_review": 0.8938223938223938,
+     "flagged_per_100_pages": 11.796733212341199,
+     "pages_exact_after_review": 0.9903474903474904,
+     "unflagged_errors": 2,
+     "unflagged_errors_per_500_pages": 1.8148820326678765
+    }
+   },
+   "tokens_per_1000_pages": {
+    "G": {
+     "model": "gemini-3.8-flash",
+     "thinking": "low",
+     "boxes": [
+      "Dean",
+      "Deaver",
+      "Herrnstein",
+      "RG165",
+      "Stanton"
+     ],
+     "pages": 914,
+     "calls": 310,
+     "input_per_1000_pages": 1534869.8030634574,
+     "output_per_1000_pages": 141852.2975929978,
+     "spent_usd": 1.538352,
+     "how": "the usage the gateway returned on each window's settled call (Gemini 3.7 Flash, text alone, prompt g2), priced at Gemini 3.8 Flash's rates"
+    }
+   },
+   "cost": {
+    "per_model": {
+     "G": {
+      "list_usd_per_1000_pages": 1.6830984682713346,
+      "batch_usd_per_1000_pages": 0.8415492341356673,
+      "prices_usd_per_mtok": {
+       "in": 0.75,
+       "out": 3.75,
+       "batch_in": 0.375,
+       "batch_out": 1.875
+      },
+      "price_read": "2026-10-05",
+      "price_source": "Gemini API pricing page; introductory price to 2026-12-31, then $1.50 / $7.50",
+      "after_2026_12_31": {
+       "list_usd_per_1000_pages": 3.366196936542669,
+       "batch_usd_per_1000_pages": 1.6830984682713346
+      }
+     }
+    },
+    "total": {
+     "list_usd_per_1000_pages": 1.6830984682713346,
+     "batch_usd_per_1000_pages": 0.8415492341356673
+    }
+   },
+   "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 with the images dropped (W46.seg-text-tier-test and W46.seg-text-tier-app; the gateway does not serve 3.8)",
+   "figures_note": "These figures were measured on Gemini 3.7 Flash with the same text-only prompt; Gemini 3.8 Flash, which this approach calls, has not been measured on it.",
+   "note": "The page images are not sent: the window's OCR text alone, about half the Gemini only approach's price, for more boundaries to check (W46.seg-text-tier-test, seg-text-tier-app.md)."
   }
  ],
  "openai_measured": {
@@ -782,5 +883,12 @@
   "level": 0.965,
   "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 (W46.seg-magazine-rule-app; the gateway does not serve 3.8, and the owner declined a 3.8 run on the personal key, 2026-11-10)",
   "result": "segbench-results/seg-magazine-rule-app.md"
+ },
+ "gemini_text_measured": {
+  "date": "2026-11-13",
+  "item": "W46.seg-text-tier-app",
+  "level": 0.95,
+  "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 with the images dropped (W46.seg-text-tier-test and W46.seg-text-tier-app; the gateway does not serve 3.8)",
+  "result": "segbench-results/seg-text-tier-app.md"
  }
 }
