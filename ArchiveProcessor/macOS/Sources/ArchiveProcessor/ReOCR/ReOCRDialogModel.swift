@@ -172,6 +172,7 @@ final class ReOCRDialogModel {
         }
         var out: [FileRun] = []
         for file in files {
+            if Task.isCancelled { break }   // the dialog closed: read and pay for nothing more
             let mine = pages.filter { $0.fileID == file.id }
             guard !mine.isEmpty else { continue }
             var kinds: [Int: OCRPageKind] = [:], pageModels: [Int: LLMModel] = [:]

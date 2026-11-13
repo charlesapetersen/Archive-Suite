@@ -2,7 +2,8 @@
 
 Design delivered by W44.reocr-plan, 2026-11-07, against `1b9e5078`. The shared contract ships in
 W44.reocr-spec (2026-11-07, this commit). Implementation remains in W44.reocr-processor and
-W44.reocr-reader. Both prerequisite gates are answered:
+W44.reocr-reader. **W44.reocr-processor shipped 2026-11-12**: its contract is `SPEC/improve-ocr.md`, its limits are
+in `ArchiveProcessor/KNOWN_ISSUES.md` (W44). Both prerequisite gates are answered:
 W43.sweep-owner-ok (2026-10-21) and W46.review-done (2026-11-06). No owner choice remains here.
 Keep this plan until the two remaining items ship, then fold the implemented contract into SPEC and app
 references and delete it. No migration: there is no app-produced production material to migrate.

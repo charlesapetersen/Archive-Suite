@@ -718,12 +718,6 @@ the two apps, outlined the features, and left the design to us.
 Design shipped as W44.reocr-plan; the implementation plan is `execution-plans/reocr/00-plan.md`.
 The three remaining items follow it in order; Processor also waits for the shared settings/ranking work.
 
-- [ ] **`W44.reocr-processor` — "Improve OCR" in the Processor: the ranked choice and the rewrite [M-L · ~2-3 sessions · Tier-2]** (lane: processor) (uses: build) (blocked-on: W44.reocr-spec, W46.review-done, W46.settings-solver, W46.settings-layers, W43.app-guide-refresh, W44.reocr-processor-owner-ok). Build it as `execution-plans/reocr/00-plan.md` says.
-  - Progress notes: `execution-plans/items/W44.reocr-processor.md`. Writer backend answered 2026-11-12 (static PDFium).
-  - **The dialog** opens from the URL scheme or hand-off, from the Files tab, and from a "files flagged OCR Poor" picker over a chosen folder. It shows each file: its current reader (from the header), its kind (from the header, else the classifier on the image page), and a kind picker the user can change.
-  - **The ranked list** comes from `OCRPageGuidance` for the chosen kind and re-ranks when the kind changes. Each row shows the model's NES for that kind, its price per 1,000 pages and the estimated cost for these pages. It also says whether the model is ready (keyed, a local model on this Mac, an institutional computing run). The current reader is marked as such, and models the app cannot offer are left out. Mixed selections are grouped by kind.
-  - **The result.** Read the image pages, rewrite the text pages as specified, and show the old and new text side by side to accept or roll back. Accepting clears the flag and records the re-read.
-  - **Tests.** Scratch PDFs only. Cover a two-page file keeping its image page and tags byte for byte, a crash mid-rewrite leaving the old file intact, and a kind change re-ranking the list. Then the adversarial review.
 - [ ] **`W44.reocr-reader` — flag poor OCR in the Reader and hand it to the Processor [M · ~1-2 sessions · Tier-2]** (lane: reader) (uses: build,vm) (blocked-on: W44.reocr-processor, W46.review-done). Put it in the row menu, the document window and the menu bar with a keyboard shortcut, for one or many selected files:
   - **Flag as poor OCR, and unflag.** This writes the tag through the shared tag writer, under the Reader's file-safety Core Directive.
   - **A filter for flagged files.**

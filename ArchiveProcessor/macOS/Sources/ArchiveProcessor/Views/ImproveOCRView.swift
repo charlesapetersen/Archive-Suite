@@ -4,6 +4,26 @@ import SwiftUI
 
 // MARK: - Improve OCR: the dialog (W44.reocr-processor)
 
+/// Every Improve OCR step that changes a file or its records (recover, accept, reject, restore, remove) runs on this one
+/// serial queue, so none runs beside another: recovery never meets an accept in flight, and two clicks never race.
+enum ImproveOCRWork {
+    private static let queue = DispatchQueue(label: "com.archiveprocessor.improve-ocr.work", qos: .userInitiated)
+
+    static func perform<T: Sendable>(_ body: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { c in queue.async { c.resume(with: Result { try body() }) } }
+    }
+
+    /// Recovery once per shared folder per launch, through the queue.
+    @MainActor private static var recovered: Set<URL> = []
+    @MainActor static func recoverOnce(support: URL, job: ReOCRJob, done: (@MainActor @Sendable ([ReOCRJob.Recovered]) -> Void)? = nil) {
+        guard recovered.insert(support.standardizedFileURL).inserted else { return }
+        Task {
+            let result = (try? await perform { job.recover() }) ?? []
+            done?(result)
+        }
+    }
+}
+
 /// The files the dialog was opened for.
 struct ImproveOCRSelection: Identifiable {
     let id = UUID()
@@ -27,6 +47,9 @@ final class ImproveOCRController: ObservableObject {
     @Published private(set) var reviews: [String: ReOCRJob.Review] = [:]
     @Published private(set) var messages: [String: String] = [:]
     @Published private(set) var recoveryNote: String?
+    /// Files whose Accept or Reject is under way: both buttons are off until it finishes.
+    @Published private(set) var deciding: Set<String> = []
+    private var runTask: Task<Void, Never>?
 
     let model: ReOCRDialogModel?
     let loadProblem: String?
@@ -93,15 +116,14 @@ final class ImproveOCRController: ObservableObject {
                         support: support)
     }
 
-    /// Settles anything a crash left before new work (off the main thread: it can wait on another app's flag lock).
+    /// Settles anything a crash left before new work, once per launch and shared folder, on the serial work queue.
     private func recover(_ support: URL) {
-        let job = job(support)
-        Task.detached {
-            let done = job.recover()
-            let open = done.filter { if case .conflict = $0.writer { return true }; return $0.flag?.isFailure == true }
-            if !open.isEmpty {
-                await MainActor.run { self.recoveryNote = "\(open.count) earlier Improve OCR change\(open.count == 1 ? "" : "s") need a look." }
+        ImproveOCRWork.recoverOnce(support: support, job: job(support)) { [weak self] done in
+            let open = done.filter {
+                if case .conflict = $0.writer { return true }
+                return $0.flag?.isFailure == true || $0.receiptProblem != nil
             }
+            if !open.isEmpty { self?.recoveryNote = "\(open.count) earlier Improve OCR change\(open.count == 1 ? "" : "s") need a look." }
         }
     }
 
@@ -165,7 +187,7 @@ final class ImproveOCRController: ObservableObject {
         }
         #endif
         let chooseReader = readerFor
-        Task {
+        runTask = Task {
             let runs = await model.run(job: job, root: root, model: LLMModel.appleVisionModels[0], readerFor: chooseReader)
             for r in runs {
                 switch r.outcome {
@@ -178,38 +200,54 @@ final class ImproveOCRController: ObservableObject {
                 }
             }
             running = false
+            runTask = nil
             revision += 1
         }
     }
 
+    /// Stops a run when the dialog closes: no further page is read or paid for. A file already read stays "not
+    /// decided" in the history, its original untouched.
+    func cancel() {
+        runTask?.cancel()
+        runTask = nil
+    }
+
     func accept(_ fileID: String) {
-        guard let review = reviews[fileID], case .success(let s) = support else { return }
+        guard let review = reviews[fileID], !deciding.contains(fileID), case .success(let s) = support else { return }
+        deciding.insert(fileID)
         let job = job(s.url)
-        Task.detached {
-            let text: String
+        Task {
+            var text: String
             do {
-                let done = try job.accept(review)
+                let done = try await ImproveOCRWork.perform { try job.accept(review) }
                 switch done.flag {
                 case .cleared: text = "Accepted. The OCR Poor flag was cleared."
                 case .notFlagged: text = "Accepted."
                 case .changedSinceReview(let why): text = "Accepted. The flag was left: \(why)."
                 case .failed(let why): text = "Text accepted; the flag still needs clearing (\(why))."
                 }
+                if done.receiptProblem != nil || done.recordProblem != nil {
+                    text += " Its record for the Reader is not finished yet; it will be completed at the next launch."
+                }
             } catch { text = "Not accepted: \(error)" }
-            await MainActor.run {
-                self.messages[fileID] = text
-                self.reviews[fileID] = nil
-                self.revision += 1
-            }
+            messages[fileID] = text
+            reviews[fileID] = nil
+            deciding.remove(fileID)
+            revision += 1
         }
     }
 
     func reject(_ fileID: String) {
-        guard let review = reviews[fileID], case .success(let s) = support else { return }
-        do { try job(s.url).reject(review); messages[fileID] = "Rejected. The file is unchanged." }
-        catch { messages[fileID] = "\(error)" }
-        reviews[fileID] = nil
-        revision += 1
+        guard let review = reviews[fileID], !deciding.contains(fileID), case .success(let s) = support else { return }
+        deciding.insert(fileID)
+        let job = job(s.url)
+        Task {
+            do { try await ImproveOCRWork.perform { try job.reject(review) }; messages[fileID] = "Rejected. The file is unchanged." }
+            catch { messages[fileID] = "\(error)" }
+            reviews[fileID] = nil
+            deciding.remove(fileID)
+            revision += 1
+        }
     }
 }
 
@@ -285,18 +323,15 @@ extension ImproveOCRHooks {
         }
     }
 
-    /// Once per launch, before any new work: settle what a crash left (receipts and flags included), off the main thread.
+    /// Once per launch, before any new work: settle what a crash left (receipts and flags included), on the work queue.
     static func recoverOnce() {
-        guard !recovered else { return }
-        recovered = true
         guard case .success(let s) = Result(catching: { try ImproveOCRController.connection().resolve() }) else { return }
         let base = ImproveOCRController.privateFolder
         let job = ReOCRJob(writer: ReOCRFileWriter(versionsRoot: base.appendingPathComponent("Versions", isDirectory: true)),
                            scratch: FileManager.default.temporaryDirectory.appendingPathComponent("ImproveOCR-\(UUID().uuidString)"),
                            support: s.url)
-        Task.detached { _ = job.recover() }
+        ImproveOCRWork.recoverOnce(support: s.url, job: job)
     }
-    @MainActor private static var recovered = false
 }
 
 /// Processing ▸ Improve OCR History…: every change Improve OCR kept a copy for, newest first, with Restore for an accepted
@@ -306,6 +341,7 @@ struct ImproveOCRHistoryView: View {
     @State private var entries: [ReOCRHistory.Entry] = []
     @State private var note: String?
     @State private var confirmRemove: ReOCRHistory.Entry?
+    @State private var busy = false
 
     private var history: ReOCRHistory {
         ReOCRHistory(writer: ReOCRFileWriter(versionsRoot: ImproveOCRController.privateFolder.appendingPathComponent("Versions", isDirectory: true)))
@@ -329,10 +365,10 @@ struct ImproveOCRHistoryView: View {
                     }
                     Spacer()
                     if entry.canRestore {
-                        Button("Restore") { restore(entry) }.accessibilityIdentifier("ap.reocr.history.restore")
+                        Button("Restore") { restore(entry) }.disabled(busy).accessibilityIdentifier("ap.reocr.history.restore")
                     }
                     Button("Remove\u{2026}") { confirmRemove = entry }
-                        .disabled(!entry.canRemove)
+                        .disabled(!entry.canRemove || busy)
                         .accessibilityIdentifier("ap.reocr.history.remove")
                 }
             }
@@ -348,8 +384,10 @@ struct ImproveOCRHistoryView: View {
         .confirmationDialog("Remove the kept copy?", isPresented: Binding(get: { confirmRemove != nil }, set: { if !$0 { confirmRemove = nil } }),
                             presenting: confirmRemove) { entry in
             Button("Remove", role: .destructive) { remove(entry) }
-        } message: { _ in
-            Text("After this, this change can no longer be undone from here.")
+        } message: { entry in
+            Text(entry.state == .accepted
+                 ? "This deletes the only kept copy of \(entry.file.lastPathComponent) as it was before the change; the change can then no longer be undone."
+                 : "After this, this change can no longer be undone from here.")
         }
     }
 
@@ -372,10 +410,11 @@ struct ImproveOCRHistoryView: View {
         }
         let job = ReOCRJob(writer: history.writer, scratch: FileManager.default.temporaryDirectory.appendingPathComponent("ImproveOCR-\(UUID().uuidString)"),
                            support: s.url)
-        Task.detached {
+        busy = true
+        Task {
             let text: String
             do {
-                let r = try job.restore(entry.id)
+                let r = try await ImproveOCRWork.perform { try job.restore(entry.id) }
                 switch r.flag {
                 case .reflagged: text = "The old text is back, and so is the OCR Poor flag."
                 case .notNeeded: text = "The old text is back."
@@ -383,16 +422,20 @@ struct ImproveOCRHistoryView: View {
                 case .failed(let why): text = "The old text is back; the flag could not be put back (\(why))."
                 }
             } catch { text = "\(error)" }
-            await MainActor.run {
-                note = text
-                entries = ReOCRHistory(writer: job.writer).entries()
-            }
+            note = text
+            entries = ReOCRHistory(writer: job.writer).entries()
+            busy = false
         }
     }
 
     private func remove(_ entry: ReOCRHistory.Entry) {
-        do { try history.remove(entry.id); note = "Removed." } catch { note = "\(error)" }
-        entries = history.entries()
+        let h = history
+        busy = true
+        Task {
+            do { try await ImproveOCRWork.perform { try h.remove(entry.id) }; note = "Removed." } catch { note = "\(error)" }
+            entries = h.entries()
+            busy = false
+        }
     }
 }
 
@@ -423,6 +466,7 @@ struct ImproveOCRView: View {
         // A container, so the identifier names the dialog without overriding its controls' own.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ap.reocr.dialog")
+        .onDisappear { controller.cancel() }
     }
 
     private var connectionRow: some View {
@@ -523,10 +567,11 @@ struct ImproveOCRView: View {
                         }
                         HStack {
                             Button("Reject") { controller.reject(fileID) }
+                                .disabled(controller.deciding.contains(fileID))
                                 .accessibilityIdentifier("ap.reocr.reject")
                             Button("Accept") { controller.accept(fileID) }
                                 .keyboardShortcut(.defaultAction)
-                                .disabled(review.candidate == nil)
+                                .disabled(review.candidate == nil || controller.deciding.contains(fileID))
                                 .accessibilityIdentifier("ap.reocr.accept")
                         }
                     }

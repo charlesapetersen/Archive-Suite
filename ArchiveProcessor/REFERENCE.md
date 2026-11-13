@@ -382,6 +382,22 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                `onlyRoutes`. View: `Views/SettingsSheetView.swift`, opened from the segmentation
                                chooser and the Provider section. Self-test: `SettingsSheetTestDriver`,
                                `scripts/test-settings-sheet.sh` (words, labels, a no-bench-ids check, offscreen pages).
+ReOCR/                         W44 Improve OCR (Tier-2: it replaces archive PDFs' text pages). Contract:
+                               `SPEC/improve-ocr.md`; design: `execution-plans/reocr/00-plan.md`.
+  ReOCRPairs.swift             Positive validation of suite image/text pairs; the replacement text page (header kept).
+  ReOCRIncrementalWriter.swift The candidate: an incremental revision on the pinned static PDFium
+                               (`scripts/bootstrap-pdfium.sh`, `macOS/PDFium/module.modulemap`), proven by
+  ReOCRPreservationCheck.swift   the original-as-prefix + kept-page object-graph check.
+  ReOCRFileWriter.swift        The only content writer: backup, journal, coordinated RENAME_SWAP publish, recover.
+  ReOCRJob.swift               One file: start (prepare, read image pages, candidate), accept (receipt, reviewed-flag
+                               clear), reject, restore, recover; `reader(for:)` the chosen route only.
+  ReOCRRanking.swift           Ranked readers per Kind over the settings route table (+ ReOCRGrouping).
+  ReOCRDialogModel.swift       The dialog's state without views (Kinds, groups, choice, estimate, run).
+  ReOCRHistory·FlaggedFinder   Kept versions (restore/remove); PDFs flagged OCR Poor under a folder.
+  ImproveOCRRequestStore·Handoff  A Reader link: checked, resolved inside its root, recorded once, opens the dialog.
+  ReOCRSupportConnection.swift The saved shared-folder connection (bookmark + store ID).
+                               Self-tests: `scripts/test-reocr-{preservation,writer,filewriter,pairs,job,ranking,
+                               request-store}.sh`; VM UI: `ProcessorUITests.testImproveOCR*`.
 Segmentation/                  W36 window segmenter (not Tier-2: proposes boundaries, writes nothing). Contract:
                                `execution-plans/segmentation/04-options-build.md` Part 3 §2. `TaggingMode` says who
                                tags, `SegmentationApproach` who segments; `SegmentationPlan` joins them.
@@ -489,6 +505,7 @@ Views/                         SwiftUI (+ AppKit where needed):
   TagInputField·KeyboardTokenField.swift  Autocompleting tag entry + its AppKit keystroke field.
   ArchiveThumbnail·ZoomableImageView.swift  Thumbnail + full-image zoom viewer.
   DropReceiver.swift           Drag-and-drop file intake.
+  ImproveOCRView.swift         W44 Improve OCR dialog, its controller, the Files-tab hooks and the history sheet.
 ```
 
 **Companions** (separate build; the phone↔Mac protocol + relay object format are the only shared surface):

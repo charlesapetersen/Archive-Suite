@@ -2,6 +2,28 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W44.reocr-processor, 2026-11-12): what Improve OCR does not do yet
+
+- **Refused for in-place improvement:** encrypted or signed files, files ending in a cross-reference stream (the
+  pinned PDFium 8046d writes a revision Quartz cannot open after one; the Processor's own output uses tables), raw
+  one-page originals and any file not in suite image/text pairs, and a text page whose original filename PDFKit reads
+  back as three or more lines (Core's header parser then misses the reader line: `W44.reocr-header-longname`).
+- **Apple Vision fails inside the macOS 27.2 VM guest** ("Foundation._GenericObjCError 0") while it reads the same
+  page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision.
+- **The dialog offers Run once per opening:** after Run its file list is stale (an accepted file has a new reader);
+  reopening reads the files again.
+- **Opening the dialog on many files is slow:** it reads and validates every file, and asks the classifier about
+  header-less pages, on the main thread (500 flagged files at most from the finder); load in the background later.
+- **The Kind picker is per file:** it shows the first page's Kind and sets every page of the file, so a mixed-Kind
+  file's header Kinds are overwritten by a choice there; per-page pickers are open.
+- **Opening the dialog reads the Keychain** for each provider (to know which readers are ready), which can bring back
+  a Keychain prompt on an unseeded Mac.
+- **Release notices:** the static PDFium also carries its bundled third-party code (FreeType, libjpeg-turbo,
+  OpenJPEG, lcms2, zlib, abseil and others); their notices and the verbatim Apache-2.0 text must join
+  `ThirdParty/PDFium-LICENSE.txt` before a DMG ships.
+- **Not re-flagged:** a restore whose publication launch recovery had to finish, and an acceptance whose clear
+  finished through its own reconciled retry, leave the flag off (the safe side).
+
 ## ⚠️ LIMITATION (W40.suite-item-types, 2026-11-11): a box/folder colour changed in Settings mid-batch can leave the old colour word behind
 
 Box and Folder are item types, written as the `Box`/`Folder` tag; the Finder colour beside them is the user's
