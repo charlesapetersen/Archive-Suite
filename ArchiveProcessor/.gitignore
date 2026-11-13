@@ -36,3 +36,6 @@ Test Outputs/
 
 # iOS Drive relay OAuth client id (per builder; ArchiveCaptureiOS/Config/Drive.xcconfig)
 ArchiveCaptureiOS/Config/DriveLocal.xcconfig
+
+# The pinned static PDFium build for the Improve OCR writer (scripts/bootstrap-pdfium.sh; W44.reocr-processor)
+macOS/Vendor/

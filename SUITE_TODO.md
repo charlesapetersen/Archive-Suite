@@ -719,7 +719,7 @@ Design shipped as W44.reocr-plan; the implementation plan is `execution-plans/re
 The three remaining items follow it in order; Processor also waits for the shared settings/ranking work.
 
 - [ ] **`W44.reocr-processor` — "Improve OCR" in the Processor: the ranked choice and the rewrite [M-L · ~2-3 sessions · Tier-2]** (lane: processor) (uses: build) (blocked-on: W44.reocr-spec, W46.review-done, W46.settings-solver, W46.settings-layers, W43.app-guide-refresh, W44.reocr-processor-owner-ok). Build it as `execution-plans/reocr/00-plan.md` says.
-  - Progress notes: `execution-plans/items/W44.reocr-processor.md`. Waits on the owner's choice of writer backend (Daemon Report, 2026-11-12).
+  - Progress notes: `execution-plans/items/W44.reocr-processor.md`. Writer backend answered 2026-11-12 (static PDFium).
   - **The dialog** opens from the URL scheme or hand-off, from the Files tab, and from a "files flagged OCR Poor" picker over a chosen folder. It shows each file: its current reader (from the header), its kind (from the header, else the classifier on the image page), and a kind picker the user can change.
   - **The ranked list** comes from `OCRPageGuidance` for the chosen kind and re-ranks when the kind changes. Each row shows the model's NES for that kind, its price per 1,000 pages and the estimated cost for these pages. It also says whether the model is ready (keyed, a local model on this Mac, an institutional computing run). The current reader is marked as such, and models the app cannot offer are left out. Mixed selections are grouped by kind.
   - **The result.** Read the image pages, rewrite the text pages as specified, and show the old and new text side by side to accept or roll back. Accepting clears the flag and records the re-read.

@@ -252,6 +252,20 @@ struct PDFGenerator {
 
     // MARK: - Text Page
 
+    /// The text page alone, as a one-page PDF: what Improve OCR puts in place of an old text page
+    /// (`ReOCRIncrementalWriter`), made exactly as `generate` makes it. Nil when PDFKit cannot serialize it.
+    func textPageData(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
+                      gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
+                      localAgentModelName: String? = nil, textColumns: Int = 1,
+                      sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) -> Data? {
+        let doc = PDFDocument()
+        doc.insert(makeTextPage(result: result, model: model, originalFileName: originalFileName,
+                                gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
+                                localAgentModelName: localAgentModelName, textColumns: textColumns,
+                                sourceDates: sourceDates, pageKind: pageKind), at: 0)
+        return doc.dataRepresentation()
+    }
+
     private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
                               gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                               localAgentModelName: String? = nil, textColumns: Int = 1,

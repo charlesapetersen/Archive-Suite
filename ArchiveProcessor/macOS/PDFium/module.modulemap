@@ -1,0 +1,11 @@
+// The pinned static PDFium build (scripts/bootstrap-pdfium.sh puts it in ../Vendor/pdfium), for the byte-preserving
+// Improve OCR writer only (W44.reocr-processor). Linked statically: see project.yml.
+module CPDFium [system] {
+    header "../Vendor/pdfium/include/fpdfview.h"
+    header "../Vendor/pdfium/include/fpdf_edit.h"
+    header "../Vendor/pdfium/include/fpdf_ppo.h"
+    header "../Vendor/pdfium/include/fpdf_save.h"
+    header "../Vendor/pdfium/include/fpdf_signature.h"
+    link "c++"
+    export *
+}

@@ -396,6 +396,11 @@ gen_project() {
     xcodegen generate --spec "$REPO/$SPEC_REL" >/dev/null
     PROJ_REWRITTEN=1   # uncached: always a new bundle, so a kept guest must not read it (it restarts)
   fi
+  if [ "$APP" = processor ]; then
+    # The Processor links a pinned static PDFium from a gitignored folder of this checkout (W44.reocr-processor).
+    # The guest has no copy of the zip, so install it here; the guest's pre-build phase then only checks its hash.
+    "$REPO/ArchiveProcessor/scripts/bootstrap-pdfium.sh" || die "the pinned PDFium is not installed (see its message)."
+  fi
   if [ "$NOTES_INTEGRATIONS" = 1 ]; then
     log "xcodegen generate (reader, for the integration journey)…"
     xcodegen generate --spec "$REPO/$(archive_app_field reader spec)" >/dev/null

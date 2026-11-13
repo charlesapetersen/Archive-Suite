@@ -13,7 +13,8 @@ import Foundation
 ///    encoded bytes and dictionary, with the page-tree link `/Parent` the only key left out. A later revision that
 ///    overrides an original object therefore fails even though the prefix is intact;
 /// 4. the same pages report the same boxes and rotation and render to the same pixels;
-/// 5. the catalog is unchanged apart from its `/Pages` link.
+/// 5. the catalog is unchanged apart from its `/Pages` link, and the document information dictionary is unchanged
+///    apart from `/Producer` naming the editor.
 ///
 /// The pages being replaced are checked by the caller against the new text. Empty `problems` means the candidate
 /// may go to review; any problem stops publication.
@@ -37,6 +38,22 @@ enum ReOCRPreservationCheck {
             if let diff = compare.dictionaries(ca, cb, path: "catalog", skip: ["Pages"]) { out.append(diff) }
         } else {
             out.append("the catalog cannot be read")
+        }
+        // The document information dictionary (title, author, dates) is not the revision's to change either, with one
+        // measured exception: PDFium's page import sets `/Producer` to "PDFium" whenever it adds a page (2026-11-12,
+        // pdfium-lib 8046d), as an editor that saves a file does. That value, and only it, is allowed.
+        switch (oldDoc.info, newDoc.info) {
+        case (nil, nil): break
+        case let (ia?, ib?):
+            var compare = GraphCompare()
+            if let diff = compare.dictionaries(ia, ib, path: "document information", skip: ["Producer"]) {
+                out.append(diff)
+            }
+            let pa = Self.text(ia, "Producer"), pb = Self.text(ib, "Producer")
+            if pa != pb && pb != Data(Self.editorProducer.utf8) {
+                out.append("document information/Producer: changed to something other than \(Self.editorProducer)")
+            }
+        default: out.append("the document information dictionary was added or removed")
         }
         let count = oldDoc.numberOfPages
         if let bad = replacing.first(where: { $0 < 0 || $0 >= count }) {
@@ -67,6 +84,32 @@ enum ReOCRPreservationCheck {
             if render(a) != render(b) { out.append("page \(i + 1): it renders differently") }
         }
         return out
+    }
+
+    /// Whether `got` is the page `want`, moved: the same graph apart from the page-tree link, the same effective
+    /// inheritable attributes wherever they are held, the same boxes, rotation and pixels. For a replaced page, which
+    /// comes from another document; nil when it is the same.
+    static func samePage(_ want: CGPDFPage, _ got: CGPDFPage, path: String) -> String? {
+        guard let da = want.dictionary, let db = got.dictionary else { return "\(path): cannot be read" }
+        var compare = GraphCompare()
+        if let diff = compare.dictionaries(da, db, path: path, skip: Set(GraphCompare.inheritable)) { return diff }
+        if let diff = compare.effective(da, db, path: path) { return diff }
+        for box in [CGPDFBox.mediaBox, .cropBox, .bleedBox, .trimBox, .artBox]
+        where want.getBoxRect(box) != got.getBoxRect(box) {
+            return "\(path): its \(box) differs"
+        }
+        if want.rotationAngle != got.rotationAngle { return "\(path): its rotation differs" }
+        if render(want) != render(got) { return "\(path): it renders differently" }
+        return nil
+    }
+
+    /// The one value a revision may give the information dictionary's `/Producer` (see `problems`).
+    static let editorProducer = "PDFium"
+
+    private static func text(_ d: CGPDFDictionaryRef, _ key: String) -> Data? {
+        var s: CGPDFStringRef?
+        guard CGPDFDictionaryGetString(d, key, &s), let s, let p = CGPDFStringGetBytePtr(s) else { return nil }
+        return Data(bytes: p, count: CGPDFStringGetLength(s))
     }
 
     static func document(_ data: Data) -> CGPDFDocument? {
@@ -192,6 +235,23 @@ enum ReOCRPreservationCheck {
                 case let (x?, y?):
                     if let d = objects(x, y, path: "\(path) (inherited)/\(key)", depth: 1) { return d }
                 default: return "\(path): its inherited \(key) changed"
+                }
+            }
+            return nil
+        }
+
+        /// Each inheritable key's effective value, the page's own or else its nearest ancestor's, compared whether it
+        /// is held by the page or inherited: a page moved into another tree may carry what it used to inherit.
+        mutating func effective(_ a: CGPDFDictionaryRef, _ b: CGPDFDictionaryRef, path: String) -> String? {
+            for key in Self.inheritable {
+                var own: CGPDFObjectRef?
+                let oa = CGPDFDictionaryGetObject(a, key, &own) ? own : ancestorValue(a, key)
+                let ob = CGPDFDictionaryGetObject(b, key, &own) ? own : ancestorValue(b, key)
+                switch (oa, ob) {
+                case (nil, nil): continue
+                case let (x?, y?):
+                    if let d = objects(x, y, path: "\(path)/\(key)", depth: 1) { return d }
+                default: return "\(path): its \(key) changed"
                 }
             }
             return nil
