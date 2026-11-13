@@ -295,7 +295,8 @@ the files read [?]; research-licensed readers such as Churro-3B appear on R7 (`1
 section plus a manifest field (`licence`) the app shows on the range point; a README section only. Recommendation:
 both, so the range view can show it; the wording is the owner's. Decided (session, section 2): both, the wording the
 owner's at ship time. Shipped (W46.kit-licence-statement, 2026-11-13): the kit README's "Licences", a `licence`
-field in each after-training row and in `archive-seg-manifest.json`; the kraken port is Apache-2.0 (its Zenodo record).
+field in each after-training row and in `archive-seg-manifest.json`; the kraken port is Apache-2.0 (its Zenodo record). The owner kept the drafted wording
+(walkthrough 2026-11-13).
 
 **7.4 The handwriting fine-tune's place: how many corrected lines before it is offered.** Measured on one hand: 20 lines
 -0.14, 40 lines -0.32 (ties), 80 lines +1.12 (+0.31 to +1.91), 160 lines +2.50 (+1.70 to +3.24), 240 lines a tie with 160
