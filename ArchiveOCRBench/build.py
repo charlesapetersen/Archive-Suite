@@ -1542,7 +1542,8 @@ def main():
              "vision_reread": vision_reread(), "vision_unfiltered": vision_unfiltered(), "rotation": rotation(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
              "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "dewarp_real5": dewarp_real5(), "logprob": logprob(), "postcorrect": postcorrect()}
-    page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, separators=(",", ":")))
+    # indent=0: one value per line, so a grep over site/ prints a matching line, not the whole ~1 MB blob
+    page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, indent=0, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}
 
     stale = [p for p, text in outputs.items() if not p.exists() or p.read_text() != text]
