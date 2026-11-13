@@ -131,33 +131,12 @@ struct DocumentSegmenter {
 /// date (a neighbour's date is never borrowed).
 enum EnclosureDates {
 
-    /// The item's own date as one `ArchiveDate`, from the GeneratedTags date strings: Year "1958" or a
-    /// decade "1950s"; Month "03 March" (or anything `GeneratedTags.monthNumber` accepts); Day "Day 12".
-    /// A day without a month is ignored, exactly as `GeneratedTags.machineDate` ignores it. `nil` when
-    /// there is no year, the tags are OCR-failed, or a present component does not parse / does not form
-    /// a real date (e.g. Feb 30) — a disputed cover date is left for review, not silently truncated.
-    /// A decade never takes a month/day.
+    /// The item's own date as one `ArchiveDate`, from the GeneratedTags date strings (`TypedDateTags.date`).
+    /// `nil` when there is no year, the tags are OCR-failed, or a present component does not parse / does not
+    /// form a real date (e.g. Feb 30) — a disputed cover date is left for review, not silently truncated.
     static func ownDate(of tags: GeneratedTags) -> ArchiveDate? {
         guard !tags.ocrFailed else { return nil }
-        guard let rawYear = tags.year?.trimmingCharacters(in: .whitespaces), !rawYear.isEmpty else { return nil }
-        let monthText = tags.month?.trimmingCharacters(in: .whitespaces) ?? ""
-        let dayText = tags.day?.trimmingCharacters(in: .whitespaces) ?? ""
-
-        if rawYear.hasSuffix("s") {
-            guard monthText.isEmpty, dayText.isEmpty else { return nil }
-            return ArchiveDate.parse(wireValue: rawYear).flatMap { $0.precision == .decade ? $0 : nil }
-        }
-        // Reuse the strict wire grammar for the year (3–4 digits, no leading zero).
-        guard let yearOnly = ArchiveDate.parse(wireValue: rawYear), yearOnly.precision == .year else { return nil }
-        guard !monthText.isEmpty else { return yearOnly }
-
-        guard let month = GeneratedTags.monthNumber(from: monthText) else { return nil }
-        var day: Int? = nil
-        if !dayText.isEmpty {
-            guard let d = GeneratedTags.dayNumber(from: dayText) else { return nil }
-            day = d
-        }
-        return ArchiveDate(year: yearOnly.year, month: month, day: day)
+        return TypedDateTags.date(year: tags.year, month: tags.month, day: tags.day)
     }
 
     /// Set (or clear) `tags.sentWith` / `sentWithUncertain` from the covering letter's final tags.

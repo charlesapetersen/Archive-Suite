@@ -16,10 +16,11 @@ struct ManualTaggingSheet: View {
 
     private var count: Int { processor.manualTagSegments.count }
     private var isLast: Bool { processor.currentManualIndex >= count - 1 }
-    /// W37: the current card's Sent-with text is empty or a valid date (Next/Finish refuse otherwise).
-    private var currentSentWithValid: Bool {
+    /// W37: the current card's dates can be saved — no unreadable typed date, no invalid Sent-with value
+    /// (Next/Finish refuse otherwise).
+    private var currentDatesValid: Bool {
         guard processor.currentManualIndex < count else { return true }
-        return processor.manualTagSegments[processor.currentManualIndex].sentWithIsValid
+        return processor.manualTagSegments[processor.currentManualIndex].datesAreValid
     }
     private var currentImages: [ManualTagImage] {
         guard processor.currentManualIndex < count else { return [] }
@@ -70,7 +71,7 @@ struct ManualTaggingSheet: View {
                     .disabled(processor.currentManualIndex == 0)
                 Spacer()
                 Button(isLast ? "Finish" : "Next") { processor.advanceManualSegment() }
-                    .disabled(!currentSentWithValid)
+                    .disabled(!currentDatesValid)
                     .prominentButtonStyle()
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: [])
@@ -164,48 +165,48 @@ struct ManualTagSegmentView: View {
                     }
                 }
 
-                // Date
+                // Date (W40.processor-date-field): the own date in one typed field, the covering letter's a level below.
                 GroupBox("Date") {
-                    HStack(alignment: .bottom, spacing: 12) {
-                        dateField("Year", text: $segment.year, width: 70, prompt: "1968 or 1970s")
-                        dateField("Month", text: $segment.month, width: 130, prompt: "03 March")
-                        dateField("Day", text: $segment.day, width: 90, prompt: "Day 15")
-                        Toggle("Date uncertain", isOn: $segment.dateUncertain)
-                        if segment.dateLoading {
-                            ProgressView().scaleEffect(0.6)
-                            Text("estimating…").font(.caption2).foregroundStyle(.primary)
-                        }
-                        Spacer()
-                    }
-                    .padding(6)
-                }
-
-                // W37.dual-date — the covering letter's date, for an enclosure with its own date.
-                GroupBox("Sent with (covering letter's date)") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if let cover = segment.enclosureCoverName, segment.enclosureOfSegmentIndex != nil {
-                            HStack(spacing: 8) {
-                                Image(systemName: "paperclip")
-                                Text("Proposed: enclosure sent with the letter starting “\(cover)”.")
-                                    .font(.caption)
-                                Button("Not an enclosure") {
-                                    segment.enclosureOfSegmentIndex = nil
-                                    segment.enclosureCoverName = nil
-                                }
-                                .controlSize(.small)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 12) {
+                            TypedDateField(label: "Date", date: $segment.ownDate,
+                                           unreadable: $segment.dateTextUnreadable,
+                                           fallbackText: TypedDateTags.rawText(segment.dateComponents),
+                                           accessibilityID: "ap.date.own")
+                            Toggle("Date uncertain", isOn: $segment.dateUncertain)
+                                .padding(.top, 14)
+                            if segment.dateLoading {
+                                ProgressView().scaleEffect(0.6)
+                                Text("estimating…").font(.caption2).foregroundStyle(.primary)
+                                    .padding(.top, 14)
                             }
-                        }
-                        HStack(alignment: .bottom, spacing: 12) {
-                            dateField("Sent with", text: $segment.sentWith, width: 120, prompt: "1958-03-12")
-                            Toggle("Sent with date uncertain", isOn: $segment.sentWithUncertain)
                             Spacer()
                         }
-                        SentWithHint(text: segment.sentWith,
-                                     fallback: segment.enclosureOfSegmentIndex != nil
-                                        ? "Empty: the covering letter's own date is used (none if it is undated)."
-                                        : "Optional. 1958, 1958-03, 1958-03-12 or 1950s.")
+                        // W37.dual-date — the covering letter's date, for an enclosure with its own date.
+                        SentWithDateSection(
+                            sentWith: $segment.sentWith, uncertain: $segment.sentWithUncertain,
+                            unreadable: $segment.sentWithTextUnreadable,
+                            emptyMeaning: segment.enclosureOfSegmentIndex != nil
+                                ? "Empty: the covering letter's own date is used (none if it is undated)."
+                                : "Leave it empty for an item that was not enclosed with a letter.",
+                            startsExpanded: segment.enclosureOfSegmentIndex != nil
+                        ) {
+                            if let cover = segment.enclosureCoverName, segment.enclosureOfSegmentIndex != nil {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "paperclip")
+                                    Text("Proposed: enclosure sent with the letter starting “\(cover)”.")
+                                        .font(.caption)
+                                    Button("Not an enclosure") {
+                                        segment.enclosureOfSegmentIndex = nil
+                                        segment.enclosureCoverName = nil
+                                    }
+                                    .controlSize(.small)
+                                }
+                            }
+                        }
                     }
                     .padding(6)
+                    .id(segment.id)   // a new segment seeds its own fields
                 }
 
                 // Subjects
@@ -234,36 +235,6 @@ struct ManualTagSegmentView: View {
                 focused ? Color.accentColor : (img.isContext ? Color.orange.opacity(0.6) : Color.secondary.opacity(0.2)),
                 style: StrokeStyle(lineWidth: focused ? 3 : (img.isContext ? 2 : 1), dash: img.isContext && !focused ? [6] : [])
             )
-    }
-
-    private func dateField(_ label: String, text: Binding<String>, width: CGFloat, prompt: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.caption2).foregroundStyle(.primary)
-            TextField(prompt, text: text)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: width)
-        }
-    }
-}
-
-/// W37.dual-date — the validation line under a Sent-with field: the parsed date, a clear error for an
-/// invalid entry (which is never written), or a hint when empty.
-struct SentWithHint: View {
-    let text: String
-    let fallback: String
-
-    var body: some View {
-        switch EnclosureDates.parseManual(text) {
-        case .empty:
-            Text(fallback).font(.caption2).foregroundStyle(.primary)
-        case .valid(let date):
-            Text("Sent with: \(date.display)").font(.caption2).foregroundStyle(.primary)
-        case .invalid:
-            Label("Not a valid date — use 1958, 1958-03, 1958-03-12 or 1950s. It will not be saved.",
-                  systemImage: "exclamationmark.triangle.fill")
-                .font(.caption2)
-                .foregroundStyle(.red)
-        }
     }
 }
 

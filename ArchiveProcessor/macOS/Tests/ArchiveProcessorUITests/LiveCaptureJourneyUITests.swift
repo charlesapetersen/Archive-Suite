@@ -209,8 +209,8 @@ final class LiveCaptureJourneyUITests: XCTestCase {
                 app.typeText(subject)
                 app.typeKey(.return, modifierFlags: [])
                 if let year {
-                    let field = app.textFields["YYYY"]
-                    XCTAssertTrue(field.exists, "the card's Year field")
+                    let field = app.textFields["ap.date.own"]
+                    XCTAssertTrue(field.exists, "the card's Date field")
                     field.click()
                     field.typeKey("a", modifierFlags: .command)
                     field.typeText(year)

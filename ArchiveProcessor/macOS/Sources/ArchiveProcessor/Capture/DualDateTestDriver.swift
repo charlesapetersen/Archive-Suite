@@ -368,6 +368,90 @@ enum DualDateTestDriver {
             check("Processor tag writes leave PDF bytes intact", try Data(contentsOf: pdfURL) == before)
         } catch { check("Processor Poor tag contract", false) }
 
+        // --- 8. The typed date fields (W40.processor-date-field): typed text → the same tags as before. ---
+        func typed(_ text: String) -> ArchiveDate? {
+            if case .date(let d, _) = DateFieldEntry.archiveDate(text) { return d }
+            return nil
+        }
+        /// Typed text through the draft the cards bind (`SegmentTagData.ownDate`) to the tags it writes.
+        func tagsTyped(_ text: String, sentWith: String = "") -> [String] {
+            var draft = SegmentTagData()
+            draft.ownDate = typed(text)
+            draft.sentWith = typed(sentWith)?.wireValue ?? ""
+            var g = GeneratedTags(year: draft.year.isEmpty ? nil : draft.year,
+                                  month: draft.month.isEmpty ? nil : draft.month,
+                                  day: draft.day.isEmpty ? nil : draft.day)
+            EnclosureDates.resolveManual(entry: draft.sentWith, uncertain: false, cover: nil, into: &g)
+            return g.allTags
+        }
+        check("typed 1968 → the Year tag", tagsTyped("1968") == ["1968"])
+        check("typed 1960s → the decade tag", tagsTyped("1960s") == ["1960s"])
+        check("typed March 1968 → Year + Month", tagsTyped("March 1968") == ["1968", "03 March"])
+        check("typed 1968-03-12 → Year + Month + Day", tagsTyped("1968-03-12") == ["1968", "03 March", "Day 12"])
+        check("typed 12 Mar 1968 → the same", tagsTyped("12 Mar 1968") == ["1968", "03 March", "Day 12"])
+        check("an impossible typed day is dropped to its month", tagsTyped("31 February 1968") == ["1968", "02 February"])
+        check("typed Sent with → its token after the own date",
+              tagsTyped("1957", sentWith: "March 1958") == ["1957", "Sent With 1958-03"])
+        check("typed Sent with a decade", tagsTyped("", sentWith: "1950s") == ["Sent With 1950s"])
+        let typedParsed = DocumentTags.parse(raw: tagsTyped("12 March 1968", sentWith: "1958-03-12"), labelNumber: nil)
+        check("the written tags read back as the SPEC's facets",
+              typedParsed.year == 1968 && typedParsed.month?.number == 3 && typedParsed.day == 12
+              && typedParsed.sentWith?.wireValue == "1958-03-12" && typedParsed.subjects.isEmpty)
+        check("a typed decade reads back as the decade facet",
+              DocumentTags.parse(raw: tagsTyped("1960s"), labelNumber: nil).decade == 1960)
+        for wire in ["1958", "1950s", "1958-03", "1958-03-12"] {
+            let d = ArchiveDate.parse(wireValue: wire)
+            let c = TypedDateTags.components(d)
+            check("\(wire): seed text → components → date round-trips",
+                  typed(wire) == d && TypedDateTags.date(year: c.year, month: c.month, day: c.day) == d)
+        }
+        var cleared = SegmentTagData(year: "1968", month: "03 March", day: "Day 12")
+        cleared.ownDate = nil
+        check("an emptied field clears Year, Month and Day", cleared.dateComponents == TypedDateTags.Components())
+        var decadeOver = SegmentTagData(year: "1968", month: "03 March", day: "Day 12")
+        decadeOver.ownDate = typed("1960s")
+        check("a coarser typed date drops the old month and day", decadeOver.dateComponents == .init(year: "1960s"))
+        check("stored strings that name no date are shown, not hidden",
+              TypedDateTags.date(year: "circa 1968", month: "", day: "") == nil
+              && TypedDateTags.rawText(.init(year: "circa 1968", month: " ", day: "")) == "circa 1968")
+        var reply = SegmentTagData()
+        reply.setDate(fromReply: GeneratedTags(year: "1968", month: nil, day: "Day 12"))
+        check("an auto-date reply is taken as the date it names (no unseen Day beside a year)",
+              reply.dateComponents == .init(year: "1968"))
+        reply.setDate(fromReply: GeneratedTags(year: "1968", month: "March", day: "12"))
+        check("...and in the canonical tag strings", reply.dateComponents == .init(year: "1968", month: "03 March", day: "Day 12"))
+        reply.setDate(fromReply: GeneratedTags(year: "circa 1968"))
+        check("a reply that names no date is kept verbatim for the field to show",
+              reply.dateComponents == .init(year: "circa 1968") && reply.ownDate == nil)
+        var blocked = SegmentTagData()
+        blocked.dateTextUnreadable = true
+        var blockedSent = ManualTagSegment(segmentIndex: 0, images: [])
+        blockedSent.sentWithTextUnreadable = true
+        check("unreadable typed text blocks Save / Next", !blocked.datesAreValid && !blockedSent.datesAreValid
+              && SegmentTagData().datesAreValid)
+        if case .unreadable = DateFieldEntry.archiveDate("12/3/1968") {
+            check("an ambiguous all-number date is refused", true)
+        } else { check("an ambiguous all-number date is refused", false) }
+        if case .unreadable = TypedDateTags.liveCaptureReading("1960s") {
+            check("Live Capture refuses a decade (it keeps a year and month)", true)
+        } else { check("Live Capture refuses a decade (it keeps a year and month)", false) }
+        if case .date(let d, let note) = TypedDateTags.liveCaptureReading("12 March 1968") {
+            check("Live Capture keeps the year and month of a typed day, and says so",
+                  d.wireValue == "1968-03" && note?.contains("day is not kept") == true)
+        } else { check("Live Capture keeps the year and month of a typed day, and says so", false) }
+        if case .date(let d, nil) = TypedDateTags.liveCaptureReading("1968") {
+            check("Live Capture takes a year", d.year == 1968 && d.month == nil)
+        } else { check("Live Capture takes a year", false) }
+        // The written tags on a scratch PDF (never the corpus), read back.
+        let typedPDF = tmp.appendingPathComponent("typed.pdf")
+        writeOnePagePDF(typedPDF)
+        do {
+            let written = tagsTyped("12 March 1968", sentWith: "1950s")
+            try MacOSTagger.applyTags(written, to: typedPDF, stampUnread: false)
+            check("typed-date tags land on a scratch PDF as written",
+                  multisetEqual(try MacOSTagger.readTags(from: typedPDF), written))
+        } catch { check("typed-date tags land on a scratch PDF as written", false) }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["DUAL_DATE_TEST_OUT"]

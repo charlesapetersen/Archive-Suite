@@ -1071,15 +1071,15 @@ private struct SegmentTagCard: View {
     @State private var input: String = ""
     @State private var suggestions: [String] = []
     @State private var highlighted: Int = -1     // -1 = typed text is the candidate; ≥0 = a suggestion
-    @State private var yearText: String = ""
-    @State private var month: Int? = nil
+    /// The segment's date, typed in one field (W40.processor-date-field); Live Capture keeps a year and a month.
+    @State private var date: ArchiveDate? = nil
+    @State private var dateFallback = ""
+    @State private var dateUnreadable = false
     @State private var quality = 0
     /// W23.m7: Save/Skip only resolve the card once the decision is durably in the session manifest. When
     /// the write fails the session rolls its state back — the card stays up with everything typed still
     /// here — so the operator needs to be TOLD, not left tapping a button that appears to do nothing.
     @State private var persistFailure: String? = nil
-
-    private let monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1100,22 +1100,14 @@ private struct SegmentTagCard: View {
 
             subjectsSection
 
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Year").font(.caption).foregroundStyle(.primary)
-                    TextField("YYYY", text: $yearText)
-                        .frame(width: 70)
-                        .onChange(of: yearText) { _, v in yearText = String(v.filter(\.isNumber).prefix(4)) }
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Month").font(.caption).foregroundStyle(.primary)
-                    Picker("", selection: $month) {
-                        Text("—").tag(Int?.none)
-                        ForEach(1...12, id: \.self) { m in Text(monthNames[m - 1]).tag(Int?.some(m)) }
-                    }.labelsHidden().frame(width: 90)
-                }
+            HStack(alignment: .top, spacing: 16) {
+                TypedDateField(label: "Date", date: $date, unreadable: $dateUnreadable,
+                               fallbackText: dateFallback, read: TypedDateTags.liveCaptureReading,
+                               placeholder: "e.g. 1968 or March 1968", width: 200,
+                               accessibilityID: "ap.date.own")
                 QualityPicker(quality: $quality)
                     .frame(width: 150)
+                    .padding(.top, 14)
                 Spacer()
             }
 
@@ -1135,6 +1127,7 @@ private struct SegmentTagCard: View {
                 Button("Skip") { skip() }
                 Spacer()
                 Button("Save ▸") { save() }
+                    .disabled(dateUnreadable)
                     .prominentButtonStyle()
             }
         }
@@ -1145,8 +1138,10 @@ private struct SegmentTagCard: View {
             persistFailure = nil   // reset with the other fields, so one card's failure can't haunt the next
             let existing = session.macTags[group.id]
             subjects = existing?.subjects ?? []
-            yearText = (existing?.year ?? group.year).map(String.init) ?? ""
-            month = existing?.month ?? group.month
+            let year = existing?.year ?? group.year
+            let month = existing?.month ?? group.month
+            date = year.flatMap { y in month.flatMap { ArchiveDate(year: y, month: $0) } ?? ArchiveDate(year: y) }
+            dateFallback = date == nil ? [year, month].compactMap { $0.map(String.init) }.joined(separator: "-") : ""
             quality = existing?.quality ?? DocumentTags.parseQuality(group.quality ?? "") ?? 0
         }
     }
@@ -1255,7 +1250,7 @@ private struct SegmentTagCard: View {
 
     private func onTab() -> Bool {
         if let c = tabCandidate() { commit(c); return true }
-        return false                        // empty field → let focus move to Year
+        return false                        // empty field → let focus move to Date
     }
 
     private func deletePrevious() -> Bool {
@@ -1273,8 +1268,9 @@ private struct SegmentTagCard: View {
 
     private func save() {
         persistFailure = nil
+        guard !dateUnreadable else { return }   // the field says why; an unread date is never saved as none
         let durable = session.applyMacTags(groupId: group.id, subjects: subjects,
-                                           quality: quality, year: Int(yearText), month: month)
+                                           quality: quality, year: date?.year, month: date?.month)
         if !durable { persistFailure = CaptureSession.tagDecisionNotDurableMessage }
     }
 

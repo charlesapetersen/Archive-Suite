@@ -321,7 +321,6 @@ private struct ManualSegTagCard: View {
     @State private var input = ""
     @State private var suggestions: [String] = []
     @State private var highlighted = -1
-    @FocusState private var yearFocused: Bool
 
     private var subjects: Binding<[String]> {
         Binding(get: { processor.manualSegDraftTags.subjectTags },
@@ -350,29 +349,22 @@ private struct ManualSegTagCard: View {
                 }
             }
 
-            // Date first — the user reviews/enters the date (Year is focused on open) before subjects.
+            // Date first — the user reviews/enters the date (the Date field is focused on open) before subjects. One typed
+            // field (W40.processor-date-field), the covering letter's date a level below it.
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Year").font(.caption2).foregroundStyle(.primary)
-                    TextField("1968 or 1970s", text: $processor.manualSegDraftTags.year)
-                        .textFieldStyle(.roundedBorder).frame(width: 90)
-                        .focused($yearFocused)
-                }
-                MonthField(month: $processor.manualSegDraftTags.month)
-                DayField(day: $processor.manualSegDraftTags.day)
+                TypedDateField(label: "Date", date: $processor.manualSegDraftTags.ownDate,
+                               unreadable: $processor.manualSegDraftTags.dateTextUnreadable,
+                               fallbackText: TypedDateTags.rawText(processor.manualSegDraftTags.dateComponents),
+                               focusOnAppear: true, accessibilityID: "ap.date.own")
+                Toggle("Date uncertain", isOn: $processor.manualSegDraftTags.dateUncertain)
+                    .padding(.top, 14)
             }
-            Toggle("Date uncertain", isOn: $processor.manualSegDraftTags.dateUncertain)
+            .id(processor.manualSegTaggingRange)   // a new segment seeds its own field
             // W37.dual-date — the covering letter's date, for an enclosure with its own date.
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Sent with (covering letter's date)").font(.caption2).foregroundStyle(.primary)
-                    TextField("1958-03-12", text: $processor.manualSegDraftTags.sentWith)
-                        .textFieldStyle(.roundedBorder).frame(width: 120)
-                }
-                Toggle("Sent with date uncertain", isOn: $processor.manualSegDraftTags.sentWithUncertain)
-            }
-            SentWithHint(text: processor.manualSegDraftTags.sentWith,
-                         fallback: "Optional. 1958, 1958-03, 1958-03-12 or 1950s.")
+            SentWithDateSection(sentWith: $processor.manualSegDraftTags.sentWith,
+                                uncertain: $processor.manualSegDraftTags.sentWithUncertain,
+                                unreadable: $processor.manualSegDraftTags.sentWithTextUnreadable)
+                .id(processor.manualSegTaggingRange)
             if processor.manualSegAutoDate {
                 HStack(spacing: 6) {
                     if processor.manualSegDateFetching {
@@ -395,7 +387,7 @@ private struct ManualSegTagCard: View {
                 Button("◂ Back") { processor.manualSegCancelTagging() }
                 Spacer()
                 Button("Save ▸") { processor.manualSegCommitPendingSegment() }
-                    .disabled(!processor.manualSegDraftTags.sentWithIsValid)
+                    .disabled(!processor.manualSegDraftTags.datesAreValid)
                     .prominentButtonStyle()
             }
         }
@@ -405,7 +397,6 @@ private struct ManualSegTagCard: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.secondary.opacity(0.25)))
         .shadow(radius: 20)
         .padding(.vertical, 24)
-        .onAppear { yearFocused = true }   // date-first: start in the Year field, not Subjects
         .onChange(of: input) { _, _ in recompute() }
         .task(id: processor.manualSegTaggingRange) {
             await processor.fetchManualSegDate(forIndices: pageIndices)
@@ -510,112 +501,6 @@ private struct ManualSegTagCard: View {
     private func onEscape() {
         if input.isEmpty { processor.manualSegCancelTagging() }
         else { input = ""; suggestions = []; highlighted = -1 }
-    }
-}
-
-// MARK: - Month field (autocomplete; stores the canonical "MM Month" tag)
-
-/// Month entry with autocomplete: type a month name (or prefix) or a number 1–12. The stored value
-/// is always the canonical tag form, e.g. "01 January". Empty stays blank (no gray placeholder).
-private struct MonthField: View {
-    @Binding var month: String
-    @State private var text = ""
-    @FocusState private var focused: Bool
-
-    private static let names = ["January", "February", "March", "April", "May", "June",
-                                "July", "August", "September", "October", "November", "December"]
-
-    /// Months matching the current input — by leading number (1–12) or case-insensitive name prefix.
-    private var matches: [(num: Int, name: String)] {
-        let q = text.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return [] }
-        if let n = Int(q) { return (1...12).contains(n) ? [(n, Self.names[n - 1])] : [] }
-        return Self.names.enumerated()
-            .filter { $0.element.lowercased().hasPrefix(q) }
-            .map { (num: $0.offset + 1, name: $0.element) }
-    }
-
-    private func canonical(_ num: Int, _ name: String) -> String { String(format: "%02d %@", num, name) }
-
-    private func accept(_ m: (num: Int, name: String)) {
-        month = canonical(m.num, m.name)
-        text = month
-        focused = false
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Month").font(.caption2).foregroundStyle(.primary)
-            TextField("", text: $text)
-                .textFieldStyle(.roundedBorder).frame(width: 118)
-                .focused($focused)
-                .onSubmit { if let first = matches.first { accept(first) } }
-                .onChange(of: text) { _, v in
-                    // Resolve the model live so a "type then Save" (no blur) still commits the canonical
-                    // month. Ambiguous input (e.g. "j") waits for a pick / Return / blur.
-                    let q = v.trimmingCharacters(in: .whitespaces)
-                    if q.isEmpty { month = "" }
-                    else if matches.count == 1 { month = canonical(matches[0].num, matches[0].name) }
-                }
-                .onChange(of: focused) { _, isFocused in
-                    guard !isFocused else { return }
-                    // Finalize on blur: resolve to a canonical month, clear if empty, else revert.
-                    if let first = matches.first { month = canonical(first.num, first.name); text = month }
-                    else if text.trimmingCharacters(in: .whitespaces).isEmpty { month = ""; text = "" }
-                    else { text = month }
-                }
-                .overlay(alignment: .topLeading) {
-                    if focused, text != month, !matches.isEmpty {
-                        suggestionList.offset(y: 26)
-                    }
-                }
-        }
-        .onAppear { text = month }
-        .onChange(of: month) { _, m in if !focused { text = m } }
-    }
-
-    private var suggestionList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(matches.prefix(6), id: \.num) { m in
-                Text(canonical(m.num, m.name))
-                    .font(.caption)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 3).padding(.horizontal, 8)
-                    .contentShape(Rectangle())
-                    .onTapGesture { accept(m) }
-            }
-        }
-        .frame(width: 130)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color(nsColor: .controlBackgroundColor)))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25)))
-        .shadow(radius: 4)
-        .zIndex(1)
-    }
-}
-
-// MARK: - Day field (digits only; stores the "Day N" tag)
-
-/// Day entry that accepts only digits, stored as the canonical tag form "Day 15". Empty stays blank.
-private struct DayField: View {
-    @Binding var day: String
-    @State private var digits = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("Day").font(.caption2).foregroundStyle(.primary)
-            TextField("", text: $digits)
-                .textFieldStyle(.roundedBorder).frame(width: 78)
-                .onChange(of: digits) { _, v in
-                    let filtered = v.filter(\.isNumber)
-                    if filtered != v { digits = filtered; return }   // strip non-digits (retriggers)
-                    day = filtered.isEmpty ? "" : "Day \(filtered)"
-                }
-        }
-        .onAppear { digits = day.filter(\.isNumber) }
-        .onChange(of: day) { _, d in
-            let filtered = d.filter(\.isNumber)
-            if filtered != digits { digits = filtered }   // sync when auto-filled externally
-        }
     }
 }
 

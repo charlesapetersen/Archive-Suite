@@ -676,10 +676,13 @@ extension OCRProcessor {
             for await (idx, date) in group {
                 if Task.isCancelled { break }
                 if idx < manualTagSegments.count {
-                    if manualTagSegments[idx].year.isEmpty { manualTagSegments[idx].year = date.year ?? "" }
-                    if manualTagSegments[idx].month.isEmpty { manualTagSegments[idx].month = date.month ?? "" }
-                    if manualTagSegments[idx].day.isEmpty { manualTagSegments[idx].day = date.day ?? "" }
-                    manualTagSegments[idx].dateUncertain = date.dateUncertain
+                    // W40.processor-date-field: one typed field, so the estimate fills it only while nothing has
+                    // been typed there — never a month or day beside a year the user typed meanwhile.
+                    if manualTagSegments[idx].dateComponents == TypedDateTags.Components(),
+                       !manualTagSegments[idx].dateTextUnreadable {
+                        manualTagSegments[idx].setDate(fromReply: date)
+                        manualTagSegments[idx].dateUncertain = date.dateUncertain
+                    }
                     manualTagSegments[idx].dateLoading = false
                 }
                 if next < work.count {
@@ -702,7 +705,7 @@ extension OCRProcessor {
     /// so an invalid value can never be carried to the write.
     func advanceManualSegment() {
         if currentManualIndex < manualTagSegments.count,
-           !manualTagSegments[currentManualIndex].sentWithIsValid { return }
+           !manualTagSegments[currentManualIndex].datesAreValid { return }
         if currentManualIndex < manualTagSegments.count - 1 {
             currentManualIndex += 1
         } else {
@@ -973,8 +976,9 @@ extension OCRProcessor {
     /// Commit the pending segment with the drafted tags — its document pages are consumed (drop out).
     func manualSegCommitPendingSegment() {
         guard let range = manualSegTaggingRange else { return }
-        // W37: never commit an invalid Sent-with value (the card shows the error and disables Save).
-        guard manualSegDraftTags.sentWithIsValid else { return }
+        // W37: never commit an invalid Sent-with value, nor (W40.processor-date-field) a typed date that cannot be
+        // read (the card shows the error and disables Save).
+        guard manualSegDraftTags.datesAreValid else { return }
         let indices = range.filter { manualSegImages[$0].kind == .document && !manualSegRemoved.contains($0) }
         manualSegTaggingRange = nil
         manualSegDateFetching = false
@@ -1023,9 +1027,11 @@ extension OCRProcessor {
         manualSegDateFetching = false
 
         guard !Task.isCancelled else { return }
-        if manualSegDraftTags.year.isEmpty { manualSegDraftTags.year = date.year ?? "" }
-        if manualSegDraftTags.month.isEmpty { manualSegDraftTags.month = date.month ?? "" }
-        if manualSegDraftTags.day.isEmpty { manualSegDraftTags.day = date.day ?? "" }
+        // W40.processor-date-field: the date is one typed field, so the reply fills it only while nothing has been
+        // typed there — never a month or day beside a year the user typed meanwhile.
+        guard manualSegDraftTags.dateComponents == TypedDateTags.Components(),
+              !manualSegDraftTags.dateTextUnreadable else { return }
+        manualSegDraftTags.setDate(fromReply: date)
         manualSegDraftTags.dateUncertain = date.dateUncertain
     }
     func performTaggingPhase(

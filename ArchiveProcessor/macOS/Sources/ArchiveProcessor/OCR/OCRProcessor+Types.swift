@@ -1,4 +1,5 @@
 import Foundation
+import ArchiveCore
 import UserNotifications
 
 // MARK: - Collection Review Item
@@ -79,6 +80,23 @@ struct SegmentTagData {
 
     /// False while `sentWith` holds text that is not a valid date (the card refuses to save).
     var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
+    /// W40.processor-date-field — set by the card's typed fields while their text cannot be read as a date.
+    var dateTextUnreadable = false
+    var sentWithTextUnreadable = false
+    /// Both dates can be saved as they stand (the card refuses to save otherwise).
+    var datesAreValid: Bool { sentWithIsValid && !dateTextUnreadable && !sentWithTextUnreadable }
+    /// The own date the Year / Month / Day strings name, for the typed Date field; setting it rewrites all three.
+    var ownDate: ArchiveDate? {
+        get { TypedDateTags.date(year: year, month: month, day: day) }
+        set { (year, month, day) = TypedDateTags.components(newValue).tuple }
+    }
+    var dateComponents: TypedDateTags.Components { .init(year: year, month: month, day: day) }
+    /// Take an auto-date reply: as the date it names when it names one, so what is written is what the field shows
+    /// (no unseen Day beside a year), else verbatim, so the field shows the reply for fixing.
+    mutating func setDate(fromReply reply: GeneratedTags) {
+        if let d = TypedDateTags.date(year: reply.year, month: reply.month, day: reply.day) { ownDate = d; return }
+        (year, month, day) = (reply.year ?? "", reply.month ?? "", reply.day ?? "")
+    }
 }
 
 /// One document segment presented for manual/human tagging (feature 6).
@@ -109,4 +127,21 @@ struct ManualTagSegment: Identifiable {
 
     /// False while `sentWith` holds text that is not a valid date (the sheet refuses to advance).
     var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
+    /// W40.processor-date-field — set by the sheet's typed fields while their text cannot be read as a date.
+    var dateTextUnreadable = false
+    var sentWithTextUnreadable = false
+    /// Both dates can be saved as they stand (the sheet refuses to advance otherwise).
+    var datesAreValid: Bool { sentWithIsValid && !dateTextUnreadable && !sentWithTextUnreadable }
+    /// The own date the Year / Month / Day strings name, for the typed Date field; setting it rewrites all three.
+    var ownDate: ArchiveDate? {
+        get { TypedDateTags.date(year: year, month: month, day: day) }
+        set { (year, month, day) = TypedDateTags.components(newValue).tuple }
+    }
+    var dateComponents: TypedDateTags.Components { .init(year: year, month: month, day: day) }
+    /// Take an auto-date reply: as the date it names when it names one, so what is written is what the field shows
+    /// (no unseen Day beside a year), else verbatim, so the field shows the reply for fixing.
+    mutating func setDate(fromReply reply: GeneratedTags) {
+        if let d = TypedDateTags.date(year: reply.year, month: reply.month, day: reply.day) { ownDate = d; return }
+        (year, month, day) = (reply.year ?? "", reply.month ?? "", reply.day ?? "")
+    }
 }

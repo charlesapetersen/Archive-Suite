@@ -352,6 +352,44 @@ public enum DateFieldEntry {
         return (text(s.fields, precision: precision, calendar: s.calendar), s.calendar)
     }
 
+    // MARK: A date written as tags (W40.processor-date-field)
+
+    /// What a typed field gives an app that writes the date as tags, as the Processor does: one whole
+    /// `ArchiveDate`, or why nothing is written. Gregorian, as the tag format is.
+    public enum Reading: Equatable {
+        case empty
+        /// `note` says what was dropped: a day the month cannot have (`impossibleDayNote`).
+        case date(ArchiveDate, note: String?)
+        /// Nothing is written; the text says why.
+        case unreadable(String)
+    }
+
+    /// Read a typed date as the tag format holds it. The text rules are `parse`'s; an impossible day is
+    /// coarsened to its month with a note, never clamped; a year outside the tag format's 100…9999 is refused.
+    public static func archiveDate(_ text: String) -> Reading {
+        switch parse(text) {
+        case .empty: return .empty
+        case .unreadable(let why): return .unreadable(why)
+        case .date(let f, let precision):
+            let range = "Write a year from 100 to 9999."
+            guard let y = year(f.yearText) else { return .unreadable(range) }
+            switch precision {
+            case .decade:
+                return ArchiveDate(decade: (y / 10) * 10).map { .date($0, note: nil) } ?? .unreadable(range)
+            case .year:
+                return ArchiveDate(year: y).map { .date($0, note: nil) } ?? .unreadable(range)
+            case .month, .day:
+                if precision == .day,
+                   let d = acceptedDay(yearText: f.yearText, month: f.month, dayText: f.dayText),
+                   let date = ArchiveDate(year: y, month: f.month, day: d) {
+                    return .date(date, note: nil)
+                }
+                guard let date = ArchiveDate(year: y, month: f.month) else { return .unreadable(range) }
+                return .date(date, note: impossibleDayNote(yearText: f.yearText, month: f.month, dayText: f.dayText))
+            }
+        }
+    }
+
     // MARK: The list's Date cell (W40.notes-detail-layout)
 
     /// What a date typed into the list's Date cell does: the inspector's field rules, in one step.
