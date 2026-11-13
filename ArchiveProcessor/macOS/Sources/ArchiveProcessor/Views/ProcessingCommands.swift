@@ -29,6 +29,9 @@ extension Notification.Name {
     static let chooseOutputFolderRequested = Notification.Name("ChooseOutputFolderRequested")
     /// Posted from Processing ▸ Improve OCR… (⇧⌘I); `OCRView` opens the Improve OCR dialog for its PDFs (W44).
     static let improveOCRRequested = Notification.Name("ImproveOCRRequested")
+    /// Posted by `ContentView.onOpenURL` with an `archiveprocessor://improve-ocr` link from the Reader (W44); `OCRView`
+    /// resolves it (`ImproveOCRHandoff`) and opens the dialog, which only ever opens: nothing runs from a link.
+    static let improveOCRHandoff = Notification.Name("ImproveOCRHandoff")
 }
 
 /// Whether a text field / field editor currently holds keyboard focus. Global shortcuts stand down when

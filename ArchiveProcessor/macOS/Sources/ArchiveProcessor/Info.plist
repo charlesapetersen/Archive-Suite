@@ -32,6 +32,17 @@
 	<array>
 		<string>_archivecap._tcp</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.archiveprocessor.improve-ocr</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>archiveprocessor</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

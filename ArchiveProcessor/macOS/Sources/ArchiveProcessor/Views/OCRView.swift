@@ -96,6 +96,7 @@ struct OCRView: View {
     @State private var collectionInterview: CollectionInterviewView.Target?
     /// W44 Improve OCR: the files the dialog is open for.
     @State private var improveOCR: ImproveOCRSelection?
+    @State private var improveOCRMessage: String?
 
     @AppStorage(DefaultsKeys.keychainExplained) private var keychainExplained: Bool = false
 
@@ -423,12 +424,8 @@ struct OCRView: View {
             guard !SheetGuard.sheetIsUp else { return }
             chooseOutputDirectory()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .improveOCRRequested)) { _ in
-            guard !SheetGuard.sheetIsUp, !isInReviewMode, !processor.isProcessing else { return }
-            let pdfs = droppedFiles.filter { $0.pathExtension.lowercased() == "pdf" }
-            guard !pdfs.isEmpty else { return }
-            improveOCR = ImproveOCRSelection(files: pdfs)
-        }
+        .modifier(ImproveOCRHooks(selection: $improveOCR, message: $improveOCRMessage, files: droppedFiles,
+                                  canOpen: !isInReviewMode && !processor.isProcessing))
         .onChange(of: scenePhase) { _, phase in
             // Returning from the Settings window: pick up any changed key / output folder. (The model is
             // no longer re-synced here — it is read live from `ModelSelectionStore`, which also covers the
@@ -439,9 +436,6 @@ struct OCRView: View {
             if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
             }
-        }
-        .sheet(item: $improveOCR) { selection in
-            ImproveOCRView(files: selection.files)
         }
         .sheet(item: $collectionInterview) { target in
             CollectionInterviewView(target: target, photos: droppedFiles) { collectionInterview = nil }

@@ -25,6 +25,8 @@ import PDFKit
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
 ///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
+///   14. A Reader hand-off resolves only files inside the named archive (saved grant, else the person's choice,
+///       checked against the root marker), comes up once, and not at all without the shared folder.
 ///   13. The dialog's model: Kind groups, a Kind change re-ranks, the estimate, Run's blocker, per-Kind readers and models.
 ///   12. A real reader on this Mac (Apple Vision, $0) through the row factory reads the page and is named in the header.
 ///   11. The saved support connection resolves, follows a moved folder, refuses a different store, forgets on disconnect.
@@ -589,6 +591,59 @@ enum ReOCRJobTestDriver {
                 } else {
                     check("13 with every key, a ready reader exists for each Kind", false, m.runBlocker ?? "")
                 }
+            }
+
+            // 14. A hand-off from the Reader: it only resolves files inside the named archive, once.
+            do {
+                let suite = "ImproveOCR.handoff.\(UUID().uuidString)"
+                guard let defaults = UserDefaults(suiteName: suite) else { check("14 a scratch defaults suite", false); return }
+                defer { defaults.removePersistentDomain(forName: suite) }
+                let archiveDir = try folder("handoff-archive")
+                let guid = UUID()
+                try JSONEncoder().encode(RootMarker(guid: guid, name: "scratch", kind: .reader, createdAt: Date()))
+                    .write(to: archiveDir.appendingPathComponent(RootMarker.filename))
+                _ = try file(archiveDir, pairs: 1)
+                let letter = archiveDir.appendingPathComponent("Letter.pdf")
+                let conn = ReOCRSupportConnection(defaults: defaults)
+                _ = try conn.connect(try folder("handoff-support"))
+                func isMessage(_ o: ImproveOCRHandoff.Outcome, _ needle: String = "") -> Bool {
+                    if case .message(let m) = o { return needle.isEmpty || m.contains(needle) }
+                    return false
+                }
+                let link = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
+                var asked = 0
+                // The person cancels the folder panel: nothing comes up, and the request is not used up.
+                let cancelled = ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in nil })
+                check("14 a cancelled panel brings nothing up", isMessage(cancelled, "not available"), "\(cancelled)")
+                let first = ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return archiveDir })
+                check("14 the same link, sent again after the cancel, brings up the dialog for its file", first == .open([letter]), "\(first)")
+                check("14 the person was asked for the archive once", asked == 1)
+                let again = ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
+                check("14 the same link does not come up twice", isMessage(again, "already"), "\(again)")
+                let second = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
+                let viaGrant = ImproveOCRHandoff.handle(second, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
+                // The grant resolves through /private/var, the same folder as /var: compare resolved paths.
+                func same(_ o: ImproveOCRHandoff.Outcome) -> Bool {
+                    if case .open(let urls) = o { return urls.map { $0.resolvingSymlinksInPath().path } == [letter.resolvingSymlinksInPath().path] }
+                    return false
+                }
+                check("14 the saved grant is used next time, without asking", same(viaGrant) && asked == 1, "\(viaGrant)")
+                let other = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: UUID(), relativePaths: ["Letter.pdf"]).url()
+                let wrong = ImproveOCRHandoff.handle(other, connection: conn, defaults: defaults, chooseRoot: { _ in archiveDir })
+                check("14 a folder with another root marker is refused", isMessage(wrong), "\(wrong)")
+                let outside = try folder("handoff-outside")
+                try FileManager.default.createSymbolicLink(at: archiveDir.appendingPathComponent("Escape.pdf"),
+                                                           withDestinationURL: outside.appendingPathComponent("x.pdf"))
+                let escape = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Escape.pdf"]).url()
+                check("14 a link out of the archive is refused",
+                      isMessage(ImproveOCRHandoff.handle(escape, connection: conn, defaults: defaults, chooseRoot: { _ in nil })))
+                let noneSuite = suite + ".none"
+                guard let noneDefaults = UserDefaults(suiteName: noneSuite) else { return }
+                defer { noneDefaults.removePersistentDomain(forName: noneSuite) }
+                let third = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
+                check("14 without the shared folder nothing comes up",
+                      isMessage(ImproveOCRHandoff.handle(third, connection: ReOCRSupportConnection(defaults: noneDefaults),
+                                                         defaults: defaults, chooseRoot: { _ in nil }), "shared folder"))
             }
 
             // 7. A rotated image page.

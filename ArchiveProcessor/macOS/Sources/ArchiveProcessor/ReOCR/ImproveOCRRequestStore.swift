@@ -47,13 +47,16 @@ struct ImproveOCRRequestStore {
     static let requestsFolder = "Requests"
     static let consumedFolder = "Consumed"
 
-    func receive(_ request: ImproveOCRRequest, now: Date = Date()) -> Outcome {
+    /// `consumes: false` checks without recording the ID, so a request that cannot be shown yet (no archive, a
+    /// dialog already up) stays pending; the caller then records it with `markOpened` just before showing it.
+    func receive(_ request: ImproveOCRRequest, now: Date = Date(), consumes: Bool = true) -> Outcome {
         let id = request.requestID
+        func record() -> Outcome? { consumes ? consume(id) : (isConsumed(id) ? .alreadyOpened(id) : nil) }
         switch request {
         case .inline(_, let root, let paths):
             // A staged manifest under the same ID is a conflicting second form of one request.
             if manifestExists(id) { return .refused("this request names its files twice, in the link and in a manifest") }
-            if let o = consume(id) { return o }
+            if let o = record() { return o }
             return .open(Resolved(requestID: id, rootGUID: root, rootPathHint: nil, entries: paths.map {
                 Entry(relativePath: $0, pairIndices: nil, expectedFileNumber: nil, expectedByteCount: nil, expectedSHA256: nil)
             }))
@@ -73,7 +76,7 @@ struct ImproveOCRRequestStore {
             } catch {
                 return .refused("the request's list of files is not valid (\(error))")
             }
-            if let o = consume(id) { return o }
+            if let o = record() { return o }
             return .open(Resolved(requestID: id, rootGUID: manifest.rootGUID, rootPathHint: manifest.rootPathHint,
                                   entries: manifest.entries.map {
                 Entry(relativePath: $0.relativePath, pairIndices: $0.pairIndices.map { Array(Set($0)).sorted() },
@@ -83,6 +86,10 @@ struct ImproveOCRRequestStore {
     }
 
     // MARK: Consumed IDs
+
+    /// Records a request checked with `receive(consumes: false)` as opened; nil when this call recorded it, else the
+    /// outcome to show instead (another link with the same ID got there first).
+    func markOpened(_ id: UUID) -> Outcome? { consume(id) }
 
     private func consumedURL(_ id: UUID) -> URL {
         privateState.appendingPathComponent(Self.consumedFolder, isDirectory: true)

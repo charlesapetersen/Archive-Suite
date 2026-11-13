@@ -37,14 +37,20 @@ final class ImproveOCRController: ObservableObject {
             .appendingPathComponent("ImproveOCR", isDirectory: true)
     }
 
-    init(files: [URL]) {
-        var conn = ReOCRSupportConnection(defaults: .standard)
+    /// The Processor's saved support connection (in the UI suite, a scratch folder in its own defaults suite).
+    static func connection() -> ReOCRSupportConnection {
         #if DEBUG
         if let test = ProcessorUITestConfiguration.improveOCRSupport {
-            conn = ReOCRSupportConnection(defaults: test.defaults)
-            _ = try? conn.connect(test.folder)
+            let conn = ReOCRSupportConnection(defaults: test.defaults)
+            _ = try? conn.connect(test.folder)   // this launch's own scratch folder, never an earlier run's
+            return conn
         }
         #endif
+        return ReOCRSupportConnection(defaults: .standard)
+    }
+
+    init(files: [URL]) {
+        let conn = Self.connection()
         connection = conn
         support = Result { try conn.resolve() }.mapError { ($0 as? ReOCRSupportConnection.Problem) ?? .unavailable("\($0)") }
         guard let table = SettingsRouteTable.bundled else {
@@ -187,6 +193,50 @@ final class ImproveOCRController: ObservableObject {
         catch { messages[fileID] = "\(error)" }
         reviews[fileID] = nil
         revision += 1
+    }
+}
+
+/// The Files tab's Improve OCR entry points, kept out of its long body: the menu command (for its PDFs), a hand-off
+/// link from the Reader (`ImproveOCRHandoff`; a message instead when it cannot open), and the sheet.
+struct ImproveOCRHooks: ViewModifier {
+    @Binding var selection: ImproveOCRSelection?
+    @Binding var message: String?
+    let files: [URL]
+    let canOpen: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .improveOCRRequested)) { _ in
+                guard canOpen, !SheetGuard.sheetIsUp else { return }
+                let pdfs = files.filter { $0.pathExtension.lowercased() == "pdf" }
+                if !pdfs.isEmpty { selection = ImproveOCRSelection(files: pdfs) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .improveOCRHandoff)) { _ in takePending() }
+            .onAppear { takePending() }
+            .sheet(item: $selection) { ImproveOCRView(files: $0.files) }
+            .alert("Improve OCR", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
+                Button("OK") { message = nil }
+            } message: {
+                Text(message ?? "")
+            }
+    }
+}
+
+extension ImproveOCRHooks {
+    /// A waiting link, taken only when the dialog can show (the same guards as the menu command); otherwise the person
+    /// is told, and the request is not recorded, so sending it again works.
+    func takePending() {
+        guard let url = ImproveOCRHandoff.pending else { return }
+        guard canOpen, selection == nil, !SheetGuard.sheetIsUp else {
+            ImproveOCRHandoff.pending = nil
+            message = "The Processor is busy. The request was not used: send it again from the Reader when the current run or dialog is finished."
+            return
+        }
+        ImproveOCRHandoff.pending = nil
+        switch ImproveOCRHandoff.handle(url, connection: ImproveOCRController.connection()) {
+        case .open(let found): selection = ImproveOCRSelection(files: found)
+        case .message(let text): message = text
+        }
     }
 }
 

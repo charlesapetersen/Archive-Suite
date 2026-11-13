@@ -1,3 +1,4 @@
+import ArchiveCore
 import SwiftUI
 
 struct ContentView: View {
@@ -116,6 +117,13 @@ struct ContentView: View {
             }
         }
 #endif
+        .onOpenURL { url in
+            // W44: a hand-off from the Reader only opens the Improve OCR dialog, on the Process Files tab.
+            guard url.scheme == ImproveOCRRequest.scheme else { return }
+            ImproveOCRHandoff.pending = url
+            mode = .files
+            DispatchQueue.main.async { NotificationCenter.default.post(name: .improveOCRHandoff, object: nil) }
+        }
         .sheet(isPresented: $showKeyOnboarding) {
             ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
         }
