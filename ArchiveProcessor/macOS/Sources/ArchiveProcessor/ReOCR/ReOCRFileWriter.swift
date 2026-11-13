@@ -376,6 +376,13 @@ struct ReOCRFileWriter {
         versionsRoot.appendingPathComponent(id.uuidString, isDirectory: true).appendingPathComponent("journal.json")
     }
 
+    func readRecord<T: Decodable>(_ type: T.Type, named name: String, for id: UUID) throws -> T {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let url = versionsRoot.appendingPathComponent(id.uuidString, isDirectory: true).appendingPathComponent(name)
+        do { return try decoder.decode(type, from: Data(contentsOf: url)) } catch { throw Failure.journal("\(name): \(error)") }
+    }
+
     func read(_ id: UUID) throws -> Journal {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -386,13 +393,22 @@ struct ReOCRFileWriter {
     /// A new journal file each time, synced, then renamed over the old one and the folder synced: a crash leaves the
     /// old phase or the new, never a torn file.
     private func write(_ journal: Journal) throws {
+        try writeRecord(journal, named: "journal.json", for: journal.operationID)
+    }
+
+    /// Another record kept beside an operation's journal (the job's own record), written the same way: a new file,
+    /// synced, renamed over the old, the folder synced.
+    func writeRecord<T: Encodable>(_ value: T, named name: String, for id: UUID) throws {
+        // A plain file name in the operation's folder; the journal itself only through `write(_ journal:)`.
+        guard !name.contains("/"), name != "..", name != ".", name != "original.pdf",
+              name != "journal.json" || value is Journal else { throw Failure.journal("not a record name: \(name)") }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-        let url = journalURL(journal.operationID)
+        let url = versionsRoot.appendingPathComponent(id.uuidString, isDirectory: true).appendingPathComponent(name)
         let temp = url.path + ".\(UUID().uuidString).tmp"
         do {
-            try Self.writeExclusive(temp, encoder.encode(journal))
+            try Self.writeExclusive(temp, encoder.encode(value))
             guard rename(temp, url.path) == 0 else { throw Failure.journal(String(cString: strerror(errno))) }
             try Self.syncDirectory(url.deletingLastPathComponent().path)
         } catch {

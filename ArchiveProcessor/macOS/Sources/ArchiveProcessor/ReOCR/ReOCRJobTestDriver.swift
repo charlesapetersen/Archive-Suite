@@ -24,6 +24,7 @@ import PDFKit
 ///   8. After publication the receipt is written and the reviewed `OCR Poor` generation cleared, other tags kept; a
 ///      flag set again during the read, or another app's unfinished action, leaves the flag; an unflagged file has
 ///      nothing to clear; a file outside its root is refused.
+///   9. After a crash past the swap, launch recovery publishes, writes the receipt and clears the flag, once.
 @MainActor
 enum ReOCRJobTestDriver {
     private static var didRun = false
@@ -370,6 +371,40 @@ enum ReOCRJobTestDriver {
                 let other = try folder("other-root")
                 do { _ = try await job(d).start(file: f, root: archive(other), model: model, read: reader.read); check("8 a file outside its root is refused", false) }
                 catch { check("8 a file outside its root is refused", (error as? ImproveOCRFlagStore.StoreError) == .notInRoot && reader.calls.isEmpty, "\(error)") }
+            }
+
+            // 9. Launch recovery finishes a publication a crash cut short: the receipt and the flag.
+            do {
+                let d = try folder("recover"), f = try file(d, pairs: 1), j = job(d), reader = FakeReader()
+                try tag(f, ["OCR Poor", "Q3"])
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                _ = try? j.writer.accept(review.operation, candidate: review.candidate ?? Data(),
+                                         faults: { if $0 == .afterSwap { throw ReOCRFileWriter.InjectedCrash() } })
+                let id = review.operation.journal.operationID
+                check("9 the crash left no receipt", !FileManager.default.fileExists(atPath: ImproveOCRReceipt.url(for: id, in: j.support).path))
+                let r = j.recover()
+                check("9 recovery publishes, writes the receipt and clears the flag",
+                      r.count == 1 && r[0].writer == .published(id) && r[0].receiptProblem == nil && r[0].flag == .cleared, "\(r)")
+                check("9 the tags are right after recovery", tags(f) == ["Q3"], "\(tags(f))")
+                check("9 the receipt is there", (try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: id, in: j.support)))?.afterSHA256
+                      == (try? j.writer.read(id))?.candidateSHA256)
+                let again = j.recover()
+                check("9 a second recovery changes nothing", again.count == 1 && again[0].writer == .alreadyPublished(id)
+                      && again[0].flag == .cleared && tags(f) == ["Q3"], "\(again)")
+                let record = try? j.writer.readRecord(ReOCRJob.Record.self, named: ReOCRJob.Record.file, for: id)
+                check("9 the job's record is settled", record?.receiptWritten == true && record?.flag == .cleared)
+                // Put back in Finder after the clear; a record that lost its outcome must not clear it again.
+                try tag(f, ["Q3", "OCR Poor"])
+                if var unsettled = record {
+                    unsettled.flag = nil
+                    try j.writer.writeRecord(unsettled, named: ReOCRJob.Record.file, for: id)
+                }
+                let third = j.recover()
+                check("9 a flag put back after the clear is not cleared again",
+                      { if case .changedSinceReview = third.first?.flag { return true }; return false }() && tags(f).contains("OCR Poor"),
+                      "\(third) \(tags(f))")
+                check("9 the journal cannot be overwritten as a record",
+                      (try? j.writer.writeRecord(["x": 1], named: "journal.json", for: id)) == nil)
             }
 
             // 7. A rotated image page.

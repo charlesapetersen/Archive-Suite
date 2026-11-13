@@ -107,10 +107,13 @@ struct ReOCRJob {
         guard !selected.isEmpty else { throw Failure.nothingSelected }
 
         let op = try writer.prepare(target: file)
+        let record = Record(operationID: op.journal.operationID, key: key, reviewedGeneration: reviewed.generation,
+                            flaggedAtReview: flaggedAtReview, textPages: selected.map(\.textIndex))
         var results: [PairResult] = []
         var replacements: [Int: Data] = [:]
         let original: Data
         do {
+            try writer.writeRecord(record, named: Record.file, for: op.journal.operationID)
             // From here, the verified copy: the bytes the journal's snapshot names, checked again by digest.
             original = try Data(contentsOf: writer.backupURL(op.journal.operationID))
             guard ReOCRFileWriter.hex(SHA256.hash(data: original)) == op.journal.original.sha256,
@@ -158,20 +161,39 @@ struct ReOCRJob {
         }
     }
 
-    enum FlagOutcome: Equatable, Sendable {
+    /// What the job keeps beside the operation's journal (`job.json`): enough to finish the receipt and the flag after
+    /// a relaunch, and for restore. Written after `prepare`, updated after each step.
+    struct Record: Codable, Equatable, Sendable {
+        let operationID: UUID
+        let key: ImproveOCRFlagStore.FileKey
+        let reviewedGeneration: UUID?
+        let flaggedAtReview: Bool
+        let textPages: [Int]
+        var receiptWritten = false
+        /// Nil until a clear was tried; `failed` is retried by `recover`, the others are settled.
+        var flag: FlagOutcome?
+
+        static let file = "job.json"
+    }
+
+    enum FlagOutcome: Codable, Equatable, Sendable {
         case cleared
         /// The file was not flagged when reviewed and is not now: nothing to clear.
         case notFlagged
         /// Someone flagged or unflagged it since the review, or their action is unfinished: left for the person.
         case changedSinceReview(String)
         case failed(String)
+
+        var isFailure: Bool { if case .failed = self { true } else { false } }
     }
 
     struct Accepted: Sendable {
         let journal: ReOCRFileWriter.Journal
-        /// Nil when written; else why not (the text is in place regardless; `writeReceipt` retries).
+        /// Nil when written; else why not (the text is in place regardless; `recover` retries).
         let receiptProblem: String?
         let flag: FlagOutcome
+        /// Nil when the job's record was updated; else a later `recover` may repeat a settled step's check.
+        let recordProblem: String?
     }
 
     /// Publishes, then records the receipt, then clears the reviewed flag. The publication throws: before the swap the
@@ -182,16 +204,65 @@ struct ReOCRJob {
         guard let candidate = review.candidate else { throw Failure.noCandidate }
         try flags.checkSuitable()
         let journal = try writer.accept(review.operation, candidate: candidate)
-        var receiptProblem: String?
-        do { try writeReceipt(review, journal) } catch { receiptProblem = "\(error)" }
-        return Accepted(journal: journal, receiptProblem: receiptProblem, flag: clearFlag(review, journal))
+        let fallback = Record(operationID: journal.operationID, key: review.key, reviewedGeneration: review.reviewedGeneration,
+                              flaggedAtReview: review.flaggedAtReview, textPages: review.results.map(\.pair.textIndex))
+        let done = finish(journal, fallback: fallback)
+        return Accepted(journal: journal, receiptProblem: done.receiptProblem, flag: done.flag, recordProblem: done.recordProblem)
     }
 
-    func writeReceipt(_ review: Review, _ journal: ReOCRFileWriter.Journal) throws {
+    /// The steps after a publication, from the job's record: the receipt if not yet written, then the flag unless it
+    /// is settled. Records each outcome. Used by `accept` and by `recover` after a relaunch.
+    private func finish(_ journal: ReOCRFileWriter.Journal, fallback: Record? = nil)
+        -> (receiptProblem: String?, flag: FlagOutcome, recordProblem: String?) {
+        let id = journal.operationID
+        guard var record = (try? writer.readRecord(Record.self, named: Record.file, for: id)) ?? fallback else {
+            return ("the job's record cannot be read", .failed("the job's record cannot be read"), "the job's record cannot be read")
+        }
+        var receiptProblem: String?
+        if !record.receiptWritten {
+            do {
+                try writeReceipt(record, journal)
+                record.receiptWritten = true
+            } catch { receiptProblem = "\(error)" }
+        }
+        let flag: FlagOutcome
+        if let settled = record.flag, !settled.isFailure { flag = settled } else { flag = clearFlag(record, journal) }
+        record.flag = flag
+        var recordProblem: String?
+        do { try writer.writeRecord(record, named: Record.file, for: id) } catch { recordProblem = "\(error)" }
+        return (receiptProblem, flag, recordProblem)
+    }
+
+    func writeReceipt(_ record: Record, _ journal: ReOCRFileWriter.Journal) throws {
         guard journal.phase == .published, let after = journal.candidateSHA256 else { throw Failure.noCandidate }
-        try ImproveOCRReceipt(operationID: journal.operationID, key: review.key,
-                              textPages: review.results.map(\.pair.textIndex), beforeSHA256: journal.original.sha256,
-                              afterSHA256: after, outcome: .published).write(to: support)
+        try ImproveOCRReceipt(operationID: journal.operationID, key: record.key, textPages: record.textPages,
+                              beforeSHA256: journal.original.sha256, afterSHA256: after, outcome: .published).write(to: support)
+    }
+
+    struct Recovered: Equatable, Sendable {
+        let operationID: UUID
+        let writer: ReOCRFileWriter.Recovery
+        /// For a published operation: whether its receipt is now written, and its flag's outcome.
+        let receiptProblem: String?
+        let flag: FlagOutcome?
+    }
+
+    /// At launch, before any new work: settles every operation's journal (`ReOCRFileWriter.recover`) and, for each
+    /// one published, finishes its receipt and its flag from the job's record.
+    func recover() -> [Recovered] {
+        writer.recover().map { r -> Recovered in
+            let id: UUID
+            switch r {
+            case .published(let i), .alreadyPublished(let i): id = i
+            case .notPublished(let i), .conflict(let i, _), .rejected(let i):
+                return Recovered(operationID: i, writer: r, receiptProblem: nil, flag: nil)
+            }
+            guard let journal = try? writer.read(id), journal.phase == .published else {
+                return Recovered(operationID: id, writer: r, receiptProblem: "the journal cannot be read", flag: nil)
+            }
+            let done = finish(journal)
+            return Recovered(operationID: id, writer: r, receiptProblem: done.receiptProblem, flag: done.flag)
+        }
     }
 
     /// Clears `OCR Poor` from the published file, but only the generation the review saw: under the file's flag lock,
@@ -201,7 +272,12 @@ struct ReOCRJob {
     /// A retry after this operation's own failed or interrupted clear is recognised by the operation ID its intent and
     /// event carry, so it is not mistaken for someone else's change.
     func clearFlag(_ review: Review, _ journal: ReOCRFileWriter.Journal) -> FlagOutcome {
-        let file = review.operation.target
+        clearFlag(Record(operationID: journal.operationID, key: review.key, reviewedGeneration: review.reviewedGeneration,
+                         flaggedAtReview: review.flaggedAtReview, textPages: review.results.map(\.pair.textIndex)), journal)
+    }
+
+    func clearFlag(_ review: Record, _ journal: ReOCRFileWriter.Journal) -> FlagOutcome {
+        let file = URL(fileURLWithPath: journal.targetPath)
         let op = journal.operationID
         do {
             return try flags.withLock(review.key, app: Self.app) { l -> FlagOutcome in
@@ -212,7 +288,12 @@ struct ReOCRJob {
                     now = try l.state()
                 }
                 if now.isPending { return .changedSinceReview("another action on this file has not finished") }
-                let ownEarlierAttempt = now.lastOperationID == op
+                // This operation's own earlier attempt that did not finish the clear (reconciled after a failure, or
+                // read back still flagged). A finished clear of ours followed by a flag now means someone put it back.
+                let ownEarlierAttempt = now.lastOperationID == op && (now.lastOrigin == .reconciled || now.flagged == true)
+                if now.lastOperationID == op, now.lastOrigin == .acceptedClear, now.flagged == false {
+                    return Self.isFlagged(file) == false ? .cleared : .changedSinceReview("the flag was set again after it was cleared")
+                }
                 guard now.generation == review.reviewedGeneration || ownEarlierAttempt else {
                     return .changedSinceReview("the file was flagged or unflagged again while it was being read")
                 }
