@@ -150,18 +150,23 @@ enum OutputFileSafety {
     }
 
     /// W46.date-route-header — replace a generated output's bytes in place, never a file that aliases its source. The
-    /// new bytes go to a hidden sibling first and are read back byte for byte; the output's extended attributes (its
-    /// Finder tags) are copied onto it; then one `rename(2)` swaps it in, so the output is the old file or the new one,
-    /// never partial. Any failure before the swap removes only the sibling and leaves the output untouched.
+    /// new bytes go to a hidden sibling first, are read back byte for byte and flushed to the disk; the output's
+    /// extended attributes (its Finder tags) are copied onto it and read back; then one `rename(2)` swaps it in, so the
+    /// output is the old file or the new one, never partial. Any failure before the swap removes only the sibling and
+    /// leaves the output untouched.
     static func replaceGeneratedOutput(_ outputURL: URL, for sourceURL: URL, with data: Data,
                                        fileManager: FileManager = .default) throws {
         guard !isSameFile(outputURL, sourceURL) else { throw ReplaceError.aliasesSource }
         guard fileManager.fileExists(atPath: outputURL.path) else { throw ReplaceError.missing }
         let temp = outputURL.deletingLastPathComponent()
-            .appendingPathComponent(".\(outputURL.lastPathComponent).\(UUID().uuidString).tmp")
+            .appendingPathComponent(".archiveprocessor-\(UUID().uuidString).tmp")   // short: a long output name still fits
         do {
             try data.write(to: temp, options: .withoutOverwriting)
             guard (try? Data(contentsOf: temp)) == data else { throw ReplaceError.notVerified }
+            let handle = try FileHandle(forUpdating: temp)
+            let flushed = fcntl(handle.fileDescriptor, F_FULLFSYNC) == 0
+            try handle.close()
+            guard flushed else { throw ReplaceError.notVerified }
             try copyExtendedAttributes(from: outputURL, to: temp)
             guard rename(temp.path, outputURL.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
@@ -172,7 +177,11 @@ enum OutputFileSafety {
         }
     }
 
-    /// Every extended attribute of `source`, set on `destination` (which has none of its own: it was just written).
+    /// Attributes macOS keeps itself (a process may not set them, and a new file gets its own): never copied.
+    static let systemAttributes: Set<String> = ["com.apple.provenance", "com.apple.quarantine", "com.apple.macl",
+                                                "com.apple.rootless"]
+
+    /// Every extended attribute of `source` but the system's own, set on `destination` and read back equal.
     static func copyExtendedAttributes(from source: URL, to destination: URL) throws {
         func fail() -> Error { POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         let size = listxattr(source.path, nil, 0, XATTR_NOFOLLOW)
@@ -181,12 +190,16 @@ enum OutputFileSafety {
         var names = [CChar](repeating: 0, count: size)
         guard listxattr(source.path, &names, size, XATTR_NOFOLLOW) == size else { throw fail() }
         let list = names.split(separator: 0).map { String(decoding: $0.map { UInt8(bitPattern: $0) }, as: UTF8.self) }
-        for name in list {
+        for name in list where !systemAttributes.contains(name) {
             let length = getxattr(source.path, name, nil, 0, 0, XATTR_NOFOLLOW)
             guard length >= 0 else { throw fail() }
             var value = [UInt8](repeating: 0, count: length)
             guard getxattr(source.path, name, &value, length, 0, XATTR_NOFOLLOW) == length,
                   setxattr(destination.path, name, value, length, 0, XATTR_NOFOLLOW) == 0 else { throw fail() }
+            var back = [UInt8](repeating: 0, count: length)
+            guard getxattr(destination.path, name, &back, length, 0, XATTR_NOFOLLOW) == length, back == value else {
+                throw ReplaceError.notVerified
+            }
         }
     }
 

@@ -10,7 +10,14 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
   estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`
   (`W46.date-route-image-routes`).
-- **The evidence is in the sidecar's `dating` object, not yet in the PDF header** (`W46.date-route-header`).
+- **The PDF header's `Date evidence:` line (W46.date-route-header) is written on one-pair outputs only.** A Re-OCR
+  multi-page output (several pairs in one file) and any output whose text page does not read back cleanly (a wrapped
+  filename PDFKit splits differently, a page whose text is not the run's) are left as they are, logged, with the
+  evidence in the sidecar alone. The rewrite lays the text page out with the run's current text-column setting: a
+  setting changed between the OCR and a resumed tagging pass changes the page's columns (the check ignores layout).
+  It runs on the main actor, one text page per document with a non-explicit year. A later manual year edit in review
+  leaves the line as it was (an output-time snapshot, like the source-date lines; the tags are authoritative), and a
+  rotation or retry that regenerates a page drops it until the run is tagged again.
 - **A reclassification after tagging** refreshes `Sent With` (W37) but not an enclosure's inherited own year: an
   enclosure that stops being one keeps its cover's year, still marked `Date Uncertain`, and a page newly marked an
   enclosure does not inherit, until the run is tagged again.

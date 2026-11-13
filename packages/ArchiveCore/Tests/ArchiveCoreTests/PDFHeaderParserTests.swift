@@ -210,7 +210,7 @@ final class PDFHeaderParserTests: XCTestCase {
         Classification: Document Start
         Kind: typewritten
         Document date: 1957
-        Date evidence: estimate from scan_000.pdf; quote "May 3, 1957"; 90% interval 1956-1958
+        Date evidence: estimate; from scan_000.pdf; "May 3, 1957"; 90% interval 1956-1958
 
         Report on the harbour works.
         """
@@ -220,16 +220,16 @@ final class PDFHeaderParserTests: XCTestCase {
         XCTAssertEqual(parsed.header?.kind, .typewritten)
         XCTAssertEqual(parsed.header?.documentDate, "1957")
         XCTAssertEqual(parsed.header?.dateEvidence,
-                       "estimate from scan_000.pdf; quote \"May 3, 1957\"; 90% interval 1956-1958")
+                       "estimate; from scan_000.pdf; \"May 3, 1957\"; 90% interval 1956-1958")
     }
 
     func testDateEvidenceAloneWithoutSeparatorIsHeader() {
         // PDFKit drops the blank separator from a real page: the line is still consumed, never body.
         let pageText = "Extracted text.\nscan_001.jpg\nAnthropic \u{00B7} Claude \u{00B7} 6 October 2026\n"
-            + "Kind: printed\nDate evidence: inherited from cover.pdf\nDear Sir,"
+            + "Kind: printed\nDate evidence: inherited; from cover.pdf\nDear Sir,"
         let parsed = PDFHeaderParser.parse(pageText)
         XCTAssertEqual(parsed.body, "Dear Sir,")
-        XCTAssertEqual(parsed.header?.dateEvidence, "inherited from cover.pdf")
+        XCTAssertEqual(parsed.header?.dateEvidence, "inherited; from cover.pdf")
         XCTAssertNil(parsed.header?.classification)
     }
 

@@ -51,8 +51,14 @@ extension PDFGenerator {
         out.insert(page, at: 1)
         guard let data = out.dataRepresentation() else { return .skipped("the new page was not made") }
         // It must read back as the old page did, with only the evidence changed.
-        guard let made = PDFDocument(data: data), made.pageCount == 2, let madeText = made.page(at: 1) else {
+        guard let made = PDFDocument(data: data), made.pageCount == 2, let madeImage = made.page(at: 0),
+              let madeText = made.page(at: 1) else {
             return .skipped("the new file does not read back")
+        }
+        // The image page is the one PDFKit copies in a merge too; it must keep its size, turn and any text.
+        guard madeImage.bounds(for: .mediaBox) == image.bounds(for: .mediaBox), madeImage.rotation == image.rotation,
+              (madeImage.string ?? "") == (image.string ?? "") else {
+            return .skipped("the image page does not read back")
         }
         let back = PDFHeaderParser.parse(madeText)
         var expected = old

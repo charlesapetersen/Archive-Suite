@@ -218,6 +218,7 @@ Classification: <value>        ← OPTIONAL segmentation value; absent when unkn
 Kind: <kind>                   ← OPTIONAL: handwritten, typewritten, printed or forms; absent when unknown
 Document date: <display>       ← OPTIONAL (W37); the document's OWN date, e.g. "Nov 3, 1957"
 Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e.g. "Mar 12, 1958"
+Date evidence: <evidence>      ← OPTIONAL (W46.date-route-header); what a non-explicit document year rests on
                                ← blank line
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
@@ -256,7 +257,7 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
   call is implied on routes that have no classification; they leave Kind absent. No migration is written
   because there is no app-produced production material to migrate.
 - **One structured header parse.** Core `PDFHeaderParser.parse` drives stripping, classification,
-  provenance, Kind and source-date extraction together. On unrotated text pages, PDFKit selections
+  provenance, Kind, source-date and date-evidence extraction together. On unrotated text pages, PDFKit selections
   recover physical header-line order (its `page.string` can group short lines across wide provenance).
   Strip only the header selections' exact character ranges from the original string; keep body order
   and `fullBody` unchanged. Rotated pages or unavailable/invalid selections use conservative string
@@ -289,6 +290,23 @@ Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e
   fresh Finder tags remain authoritative. Exact case-sensitive prefixes, after Classification/Kind,
   consumed only within the same ordered header block. Written only where dates are known at render
   time (Live Capture); Process Files does not rewrite finished PDFs to add them.
+- **Date evidence (W46.date-route-header; owner call 9, 2026-11-06).** The evidence behind a NON-explicit document
+  year: one line, exact case-sensitive prefix `Date evidence: `, after the source-date lines in the same ordered
+  header block (a source-date line after it starts the body). Written only for a year read off the page image,
+  estimated from a neighbour, or inherited from the covering letter; never for an explicit year in the document's
+  own text, nor when there is no year. The value is `; `-separated parts, class first:
+  `image; page <n>; <place>; "<quote>"`, `estimate; from <file>; line <n>; "<quote>"; 90% interval <lo>-<hi>`,
+  `inherited; from <file>` (parts absent when unknown). The interval appears only where the route measured it
+  (the gateway's Gemini 3.7 Flash). Control characters and runs of white space become one space, the middle dot a
+  comma, the quote is cut to 60 characters with `…`, and the line is fitted to one physical line, so it never
+  holds the provenance separator nor wraps into the body. It goes with the Finder-tag year (an output-time
+  snapshot; the tags stay authoritative) and with the sidecar's `dating` object, which carries the same evidence
+  in full. Process Files writes it after its dating route, before the tags: the text page of a one-pair output is
+  laid out again from its own header lines read back verbatim and the run's OCR text, the image page kept, and the
+  result is used only when it reads back with every other header line and the body unchanged; it replaces the
+  output through a verified sibling write and one rename, never a file that aliases its source. An output of more
+  than one pair, or one that does not read back cleanly, is left as it is. Improve OCR keeps the line. No
+  migration is written because there is nothing to migrate.
 - **Per-page metadata and mixed summaries.** `ExtractedContent.textPages` records zero-based physical
   text slots 1, 3, 5… with optional `PDFPageHeader`. Missing headers stay represented. Kind and full
   provenance summaries are unknown when all slots are unknown, uniform only when every slot agrees,
