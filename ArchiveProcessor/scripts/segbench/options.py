@@ -769,7 +769,17 @@ def render(out: dict) -> str:
                   f"{g['replaces']['test']['flagged_per_100_pages']:.1f} checks per 100 pages, "
                   f"{E.pct(g['replaces']['test']['pages_exact_after_review'])} after checking and "
                   f"{g['replaces']['test']['unflagged_errors']} unflagged errors. Its token and price row below is "
-                  "3.8's, measured on g1."]
+                  "3.8's, measured on g1."
+              + ("" if not g.get("offsets") else
+                 " The row is one run at window offset 0; over offsets 0, 1 and 2 "
+                 f"({g['offsets']['result']}) the same route scores "
+                 + ", ".join(f"{fm(lo)}–{fm(hi)} {name}" for (lo, hi), fm, name in (
+                     (g["offsets"]["range"]["pages_exact_no_review"], E.pct, "no checking"),
+                     (g["offsets"]["range"]["flagged_per_100_pages"], lambda x: f"{x:.1f}", "checks per 100 pages"),
+                     (g["offsets"]["range"]["pages_exact_after_review"], E.pct, "after checking"),
+                     (g["offsets"]["range"]["unflagged_errors_per_500_pages"], lambda x: f"{x:.1f}",
+                      "unflagged errors per 500 pages")))
+                 + ".")]
     L += ["", "## Held out on the development boxes (each box at the level fitted on the other two)", "",
           "| approach | rule, level for the test | no checking | to check per 100 pages | after checking | "
           "unflagged per 500 pages |", "|---|---|---:|---:|---:|---:|"]

@@ -311,8 +311,11 @@ def segmentation(op):
     # W46.seg-magazine-rule-app: the app's Gemini voter sends g2, and options.md's row is Gemini 3.7 Flash's g2 answers
     # through the gateway at a level fitted on them. The other reports' "Gemini 3.8 Flash" rows are 3.8 on g1, which
     # options.json keeps as the row it replaced; they are checked against that.
-    replaced = next(a for a in json.loads((RESULTS / "options.json").read_text())["approaches"]
-                    if a["id"] == "gemini").get("replaces")
+    gem_row = next(a for a in json.loads((RESULTS / "options.json").read_text())["approaches"] if a["id"] == "gemini")
+    replaced = gem_row.get("replaces")
+    # W46.seg-g2-offsets: the shown figure is one offset; the point carries its range over three window offsets.
+    if gem_row.get("offsets"):
+        gemini["range"] = [round(100 * v, 1) for v in gem_row["offsets"]["range"]["pages_exact_no_review"]]
     if replaced:
         gemini["name"] = "Gemini only (3.8 sends g2; figures are Gemini 3.7 Flash's g2, gateway)"
         t = replaced["test"]
