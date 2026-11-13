@@ -558,6 +558,11 @@ enum ReOCRJobTestDriver {
                 res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
                 let m = ReOCRDialogModel(files: [typed, unknown, raw], table: table, pairs: OCRPairMatrix.bundled,
                                          resources: res, staysOnMac: false)
+                let three = try file(try folder("dialog-three"), pairs: 3)
+                let picked = ReOCRDialogModel(files: [three], selectedPairs: [three: [1, 7]], table: table, pairs: OCRPairMatrix.bundled,
+                                              resources: res, staysOnMac: false)
+                check("13 the Reader's chosen pairs are the only pages offered (one past the end ignored)",
+                      picked.pages.map(\.pairIndex) == [3], "\(picked.pages.map(\.pairIndex))")
                 check("13 every file is listed, the raw one refused", m.files.count == 3
                       && { if case .failure = m.files[2].eligibility { return true }; return false }())
                 check("13 the header's Kind is used, the unknown page waits", m.groups.map(\.kind) == [.typewritten, nil], "\(m.groups.map(\.kind))")
@@ -634,7 +639,7 @@ enum ReOCRJobTestDriver {
                 let viaGrant = ImproveOCRHandoff.handle(second, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
                 // The grant resolves through /private/var, the same folder as /var: compare resolved paths.
                 func same(_ o: ImproveOCRHandoff.Outcome) -> Bool {
-                    if case .open(let urls) = o { return urls.map { $0.resolvingSymlinksInPath().path } == [letter.resolvingSymlinksInPath().path] }
+                    if case .open(let urls, _) = o { return urls.map { $0.resolvingSymlinksInPath().path } == [letter.resolvingSymlinksInPath().path] }
                     return false
                 }
                 check("14 the saved grant is used next time, without asking", same(viaGrant) && asked == 1, "\(viaGrant)")

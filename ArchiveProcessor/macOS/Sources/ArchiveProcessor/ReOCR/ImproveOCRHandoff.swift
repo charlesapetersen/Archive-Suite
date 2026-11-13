@@ -12,7 +12,8 @@ import Foundation
 @MainActor
 enum ImproveOCRHandoff {
     enum Outcome: Equatable {
-        case open([URL])
+        /// The files, and for a file the Reader named pairs for, those pairs (0-based image/text pairs).
+        case open([URL], pairs: [URL: [Int]] = [:])
         /// Shown to the person instead of the dialog.
         case message(String)
     }
@@ -40,6 +41,7 @@ enum ImproveOCRHandoff {
                 return .message("The archive this request names is not available to the Processor.")
             }
             var files: [URL] = []
+            var pairs: [URL: [Int]] = [:]
             for entry in resolved.entries {
                 let file = root.appendingPathComponent(entry.relativePath)
                 // Inside the root after links are resolved, a regular file, and the file the Reader saw.
@@ -58,6 +60,7 @@ enum ImproveOCRHandoff {
                     return .message("\(entry.relativePath) changed since it was selected; select it again in the Reader.")
                 }
                 files.append(file)
+                if let chosen = entry.pairIndices { pairs[file] = chosen }
             }
             guard !files.isEmpty else { return .message("The request names no files.") }
             // Only now, with everything in hand, is the request recorded as opened.
@@ -65,7 +68,7 @@ enum ImproveOCRHandoff {
                 if case .alreadyOpened = used { return .message("This Improve OCR request was opened already.") }
                 return .message("This Improve OCR request cannot be recorded: \(used).")
             }
-            return .open(files)
+            return .open(files, pairs: pairs)
         }
     }
 

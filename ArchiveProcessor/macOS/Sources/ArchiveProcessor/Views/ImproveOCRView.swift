@@ -8,6 +8,8 @@ import SwiftUI
 struct ImproveOCRSelection: Identifiable {
     let id = UUID()
     let files: [URL]
+    /// Pairs the Reader chose, by file (0-based); a file not here offers all its pairs.
+    var pairs: [URL: [Int]] = [:]
 }
 
 /// The dialog's controller: the headless `ReOCRDialogModel` plus what only the app has (the support connection, the
@@ -56,7 +58,7 @@ final class ImproveOCRController: ObservableObject {
         return ReOCRSupportConnection(defaults: .standard)
     }
 
-    init(files: [URL]) {
+    init(files: [URL], pairs selectedPairs: [URL: [Int]] = [:]) {
         let conn = Self.connection()
         connection = conn
         support = Result { try conn.resolve() }.mapError { ($0 as? ReOCRSupportConnection.Problem) ?? .unavailable("\($0)") }
@@ -68,7 +70,8 @@ final class ImproveOCRController: ObservableObject {
         var resources = SettingsResources(macMemoryGB: Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824)
         resources.keys = Set(LLMProvider.allCases.filter { $0 != .appleVision && KeychainHelper.load(account: $0.rawValue) != nil }
             .map { $0.rawValue.lowercased() })
-        model = ReOCRDialogModel(files: files, table: table, pairs: OCRPairMatrix.bundled, resources: resources, staysOnMac: false)
+        model = ReOCRDialogModel(files: files, selectedPairs: selectedPairs, table: table, pairs: OCRPairMatrix.bundled,
+                                 resources: resources, staysOnMac: false)
         loadProblem = nil
         root = Self.findRoot(for: files)
         if root == nil { rootProblem = "these files are not inside one archive folder with a suite root marker" }
@@ -227,8 +230,8 @@ struct ImproveOCRHooks: ViewModifier {
                 if !pdfs.isEmpty { selection = ImproveOCRSelection(files: pdfs) }
             }
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRHandoff)) { _ in takePending() }
-            .onAppear { takePending() }
-            .sheet(item: $selection) { ImproveOCRView(files: $0.files) }
+            .onAppear { Self.recoverOnce(); takePending() }
+            .sheet(item: $selection) { ImproveOCRView(files: $0.files, pairs: $0.pairs) }
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRHistoryRequested)) { _ in
                 guard canOpen, selection == nil, !SheetGuard.sheetIsUp else { return }
                 showsHistory = true
@@ -277,10 +280,23 @@ extension ImproveOCRHooks {
         }
         ImproveOCRHandoff.pending = nil
         switch ImproveOCRHandoff.handle(url, connection: ImproveOCRController.connection()) {
-        case .open(let found): selection = ImproveOCRSelection(files: found)
+        case .open(let found, let pairs): selection = ImproveOCRSelection(files: found, pairs: pairs)
         case .message(let text): message = text
         }
     }
+
+    /// Once per launch, before any new work: settle what a crash left (receipts and flags included), off the main thread.
+    static func recoverOnce() {
+        guard !recovered else { return }
+        recovered = true
+        guard case .success(let s) = Result(catching: { try ImproveOCRController.connection().resolve() }) else { return }
+        let base = ImproveOCRController.privateFolder
+        let job = ReOCRJob(writer: ReOCRFileWriter(versionsRoot: base.appendingPathComponent("Versions", isDirectory: true)),
+                           scratch: FileManager.default.temporaryDirectory.appendingPathComponent("ImproveOCR-\(UUID().uuidString)"),
+                           support: s.url)
+        Task.detached { _ = job.recover() }
+    }
+    @MainActor private static var recovered = false
 }
 
 /// Processing ▸ Improve OCR History…: every change Improve OCR kept a copy for, newest first, with Restore for an accepted
@@ -384,7 +400,9 @@ struct ImproveOCRView: View {
     @StateObject private var controller: ImproveOCRController
     @Environment(\.dismiss) private var dismiss
 
-    init(files: [URL]) { _controller = StateObject(wrappedValue: ImproveOCRController(files: files)) }
+    init(files: [URL], pairs: [URL: [Int]] = [:]) {
+        _controller = StateObject(wrappedValue: ImproveOCRController(files: files, pairs: pairs))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

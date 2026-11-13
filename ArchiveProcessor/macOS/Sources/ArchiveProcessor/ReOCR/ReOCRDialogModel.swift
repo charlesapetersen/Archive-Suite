@@ -36,7 +36,10 @@ final class ReOCRDialogModel {
     let resources: SettingsResources
     let staysOnMac: Bool
 
-    init(files urls: [URL], table: SettingsRouteTable, pairs: OCRPairMatrix?, resources: SettingsResources, staysOnMac: Bool) {
+    /// `selectedPairs` keeps, for a file the Reader named pairs for, only those pairs (0-based); a pair past the end of
+    /// the file is ignored.
+    init(files urls: [URL], selectedPairs: [URL: [Int]] = [:], table: SettingsRouteTable, pairs: OCRPairMatrix?,
+         resources: SettingsResources, staysOnMac: Bool) {
         self.table = table
         self.pairs = pairs
         self.resources = resources
@@ -46,7 +49,8 @@ final class ReOCRDialogModel {
             let eligibility = ReOCRPairs.validate(data)
             let found = (try? eligibility.get()) ?? []
             files.append(FileEntry(id: url.path, url: url, eligibility: eligibility, currentReader: found.first?.header.provenance))
-            for pair in found {
+            let wanted = selectedPairs[url].map { Set($0.map { $0 * 2 + 1 }) }
+            for pair in found where wanted?.contains(pair.textIndex) ?? true {
                 pages.append(ReOCRPageChoice(fileID: url.path, pairIndex: pair.textIndex, kind: pair.header.kind,
                                              origin: pair.header.kind == nil ? nil : .header, confidence: nil))
             }
