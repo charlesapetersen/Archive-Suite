@@ -379,5 +379,36 @@ extension OCRProcessor {
                 + flaggedGapItems.map { $0.answer?.rawValue ?? "-" }.joined(separator: ",")
         }
     }
+
+    /// UI test only (`-APUITestManualSegTag`, W40.processor-date-field): the manual segment card shown for the first
+    /// of two synthetic pages in this app's own temporary directory. No run, OCR, model call or output is involved:
+    /// the saved segment's date strings are shown in `uiTestFlaggedResult`, and nothing is written to any file.
+    func _uiTestShowManualSegTag() {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("APUITestManualSeg-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        manualSegImages = (0...1).map { n in
+            let url = dir.appendingPathComponent("page-\(n + 1).png")
+            let image = NSImage(size: NSSize(width: 300, height: 400), flipped: false) { r in
+                NSColor.white.setFill(); r.fill()
+                ("Synthetic page \(n + 1)" as NSString).draw(at: NSPoint(x: 40, y: 200),
+                                                              withAttributes: [.font: NSFont.systemFont(ofSize: 28)])
+                return true
+            }
+            if let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?.write(to: url)
+            }
+            return ManualSegImage(fileIndex: n, url: url, rotationDegrees: 0, kind: .document)
+        }
+        manualSegFocus = 0
+        awaitingManualSegTag = true
+        manualSegEndAndTag()
+        Task { @MainActor in
+            while manualSegCompleted.isEmpty { try? await Task.sleep(nanoseconds: 200_000_000) }
+            let t = manualSegCompleted[0].tags
+            uiTestFlaggedResult = "segtag date=\(t.year)|\(t.month)|\(t.day) sentWith=\(t.sentWith)"
+                + " uncertain=\(t.dateUncertain)"
+        }
+    }
 }
 #endif

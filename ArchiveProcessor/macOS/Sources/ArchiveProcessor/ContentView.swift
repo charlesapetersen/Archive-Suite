@@ -58,6 +58,9 @@ struct ContentView: View {
             if ProcessorUITestConfiguration.showsFlaggedReview {
                 processor._uiTestShowFlaggedReview()
             }
+            if ProcessorUITestConfiguration.showsManualSegTag {
+                processor._uiTestShowManualSegTag()
+            }
 #endif
 #if DEBUG
             // W40.a5: the env-gated drivers are Debug-only; a Release build carries none of them.

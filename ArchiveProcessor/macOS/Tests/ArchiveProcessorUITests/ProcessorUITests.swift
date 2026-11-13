@@ -228,6 +228,62 @@ final class ProcessorUITests: XCTestCase {
                       "the answers come back in gap order: \(renderedText(of: result))")
     }
 
+    /// W40.processor-date-field: the manual segment card types its date in one Date field, by the suite's rules, with
+    /// Sent with folded below; text that cannot be read keeps Save disabled; what is saved is the same Year / Month /
+    /// Day strings and Sent-with wire value as before. Synthetic pages, no run behind it, nothing written to a file.
+    func testManualSegmentCardTypesOneDateWithSentWithBelow() throws {
+        relaunch(extra: ["-APUITestManualSegTag"])
+
+        let date = element("ap.date.own")
+        XCTAssertTrue(date.waitForExistence(timeout: 15), "the manual segment card must show one Date field")
+        XCTAssertFalse(app.textFields["1968 or 1970s"].exists, "the old Year field is gone")
+        let save = app.buttons["Save ▸"]
+        XCTAssertTrue(save.exists, "the card's Save button")
+        func type(_ field: XCUIElement, _ text: String) {
+            field.click()
+            field.typeKey("a", modifierFlags: .command)
+            field.typeText(text)
+        }
+
+        type(date, "12/3/1968")
+        XCTAssertTrue(element("ap.date.own.unreadable").waitForExistence(timeout: 5),
+                      "an all-number date that is not year-first is refused, and the field says why")
+        XCTAssertFalse(save.isEnabled, "Save waits while the Date text cannot be read")
+
+        type(date, "31 February 1968")
+        XCTAssertTrue(element("ap.date.own.dayWarning").waitForExistence(timeout: 5),
+                      "an impossible day is dropped to its month, and said")
+        XCTAssertTrue(save.isEnabled, "a month is a date that can be saved")
+
+        type(date, "12 March 1968")
+        XCTAssertTrue(waitUntil { self.renderedText(of: self.element("ap.date.own.reads")).contains("Mar 12, 1968") },
+                      "the field says the date it read")
+
+        // The disclosure is one AX element whose label is the heading (measured in the macOS 27.2 VM); its centre is the
+        // heading, a button that opens and closes it as the chevron does.
+        let heading = app.disclosureTriangles.matching(NSPredicate(format: "label BEGINSWITH 'Sent with a letter'")).firstMatch
+        if !heading.exists { print("[w40pdf] card tree:\n\(app.windows.firstMatch.debugDescription)") }
+        XCTAssertTrue(heading.exists, "Sent with is a level below Date")
+        XCTAssertFalse(element("ap.date.sentWith").exists, "Sent with is folded away when the item has none")
+        heading.click()
+        let sentWith = element("ap.date.sentWith")
+        if !sentWith.waitForExistence(timeout: 5) {
+            print("[w40pdf] after click value=\(String(describing: heading.value)) tree:\n\(app.windows.firstMatch.debugDescription)")
+            attachScreenshot("processor-manual-segment-card-sentwith-click")
+        }
+        XCTAssertTrue(sentWith.exists, "unfolding shows the Sent-with field")
+        type(sentWith, "March 1958")
+        XCTAssertTrue(waitUntil { self.renderedText(of: heading).contains("Mar 1958") },
+                      "the folded heading names the Sent-with date")
+        attachScreenshot("processor-manual-segment-card-date")
+
+        save.click()
+        let result = element("ap.uitest.flaggedResult")
+        XCTAssertTrue(result.waitForExistence(timeout: 10), "Save must commit the segment")
+        XCTAssertTrue(renderedText(of: result).contains("segtag date=1968|03 March|Day 12 sentWith=1958-03"),
+                      "the saved strings are the tag format's: \(renderedText(of: result))")
+    }
+
     /// W36.seg-opt-proof, moved by W46.settings-sheet: the Segmentation chooser in Process Files offers every
     /// approach, and its figures, cost and the other choices are on the settings sheet it opens: one card per stage
     /// with what a better figure would need and an override, and a tab of the stages that are rules.

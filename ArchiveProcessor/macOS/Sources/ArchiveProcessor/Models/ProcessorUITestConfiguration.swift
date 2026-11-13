@@ -44,6 +44,10 @@ enum ProcessorUITestConfiguration {
     static var showsFlaggedReview: Bool {
         isActive && arguments.contains("-APUITestFlaggedReview")
     }
+    /// The manual segment card over two synthetic pages (W40.processor-date-field); the saved draft is shown.
+    static var showsManualSegTag: Bool {
+        isActive && arguments.contains("-APUITestManualSegTag")
+    }
     /// Shows the Interrupted Run box for a synthetic record (W40.fix-processor-resume-run-key):
     /// `-APUITestPendingRun localAgent` or `-APUITestPendingRun <provider rawValue>`. Nothing is written to the
     /// pending-run file, so Resume Run finds no record and does nothing; the test reads only the box.

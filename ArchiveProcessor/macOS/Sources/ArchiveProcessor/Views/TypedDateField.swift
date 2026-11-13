@@ -131,12 +131,16 @@ struct SentWithDateSection<Proposal: View>: View {
             }
             .padding(.top, 4)
         } label: {
-            Text(date.wrappedValue.map { "Sent with a letter: \($0.display)" } ?? "Sent with a letter")
-                .font(.caption)
-                .help("The date of the letter this item was sent with, for an item that came enclosed with one")
-                .accessibilityIdentifier("ap.date.sentWith.heading")
+            // The heading opens and closes it too, not only the chevron.
+            Button { expanded.toggle() } label: {
+                Text(date.wrappedValue.map { "Sent with a letter: \($0.display)" } ?? "Sent with a letter")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .help("The date of the letter this item was sent with, for an item that came enclosed with one")
+            .accessibilityIdentifier("ap.date.sentWith.heading")
         }
-        .accessibilityIdentifier("ap.date.sentWith.disclosure")
+        // No identifier on the group: SwiftUI stamps it on every child, hiding the field's own.
         .onAppear { expanded = startsExpanded || !sentWith.isEmpty || unreadable }
     }
 }

@@ -144,7 +144,7 @@ Common document types: newspaper articles, magazine articles, letters, memos, re
 Applied using macOS filesystem tags (via `xattr` / NSFileManager / `tag` CLI or similar).
 
 **Date tags (most important)**
-1. Year tag: e.g., `1968` — or a whole **decade** `1970s` (typed verbatim into the manual Year field;
+1. Year tag: e.g., `1968` — or a whole **decade** `1970s` (typed by hand into a manual card's Date field;
    the LLM tagger never emits it; written unchanged by `GeneratedTags.allTags`/`MacOSTagger`).
 2. Month tag: e.g., `03 March` (format: `MM Month`)
 - If date cannot be determined: estimate year from surrounding documents; never estimate month; always add tag `Date Uncertain`

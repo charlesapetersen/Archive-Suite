@@ -75,9 +75,12 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   a change to what is written updates that SPEC and the Reader together (Tier-2).
 - **Segmentation** is inferred: a box photo → new box, a folder photo → new folder; document heuristics in
   REFERENCE.md §Document Segmentation.
-- **Date tags (most important):** year `1968` or decade `1970s` (manual Year field only; the LLM never emits it; written verbatim);
+- **Date tags (most important):** year `1968` or decade `1970s` (a decade only typed by hand; the LLM never emits it; written verbatim);
   month `MM Month`. Date undetermined: estimate the year from surrounding documents, **never estimate the month**,
   always add `Date Uncertain`.
+- **Typing a date (W40.processor-date-field):** each card has one Date field (`Views/TypedDateField.swift`, read by
+  ArchiveCore `DateFieldEntry.archiveDate`, the suite's one date field), stored as the same Year/Month/Day strings
+  (`Tagging/TypedDateTags.swift`); Sent with is folded below it. Unreadable text disables Save. Live Capture keeps a year and month.
 - **Subjects:** 2–6 per document, general but not too general. Box photos → `Red`; folder photos → `Purple`.
 - **`Unread`**: every output (PDF **and** any exported original) gets it, applied **last**, only in real-tagging
   modes (`.automatic`/`.autoDate`/`.human`), never "No tagging" or "Copy source tags"; via the **required**
