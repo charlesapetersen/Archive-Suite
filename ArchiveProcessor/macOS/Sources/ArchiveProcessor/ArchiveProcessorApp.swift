@@ -13,6 +13,7 @@ struct ArchiveProcessorApp: App {
         MainActor.assumeIsolated {
             appearanceForced = UITestAppearance.applyIfRequested()   // layout guard light/dark (W40.e9)
             TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
+            ProcessorUITestConfiguration.installScratchCollectionSettings()   // the range view's click check
         }
 #endif
         // The Appearance setting (W48.appearance-processor), before the first window; a UI test's forced mode wins.

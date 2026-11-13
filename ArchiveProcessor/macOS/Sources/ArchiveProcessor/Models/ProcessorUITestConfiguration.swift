@@ -114,6 +114,16 @@ enum ProcessorUITestConfiguration {
         }
     }
 
+    /// `-APUITestRankNames` (W46.settings-range-view): the scratch output folder's collection ranks every step, names
+    /// included, so Apple's built-in name finder can run and the settings sheet's range tab has a route to choose in
+    /// a setup where every other route needs a key or a download. Written by the sheet's own writer into the test's
+    /// disposable output folder only.
+    @MainActor static func installScratchCollectionSettings() {
+        guard isActive, arguments.contains("-APUITestRankNames"), let folder = outputDirectory else { return }
+        _ = SettingsSheetWriter(store: .shared, folder: folder)
+            .set(.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)), doc: nil)
+    }
+
     /// A headless driver launch (`ARCHIVEPROC_HEADLESS=1`, the gate's recovery and retry-backend checks) must not
     /// restore the window state an earlier run saved. When that state names the main window, SwiftUI's restorer
     /// returns no window and AppKit then opens no default one, so `ContentView.onAppear` never runs and no driver

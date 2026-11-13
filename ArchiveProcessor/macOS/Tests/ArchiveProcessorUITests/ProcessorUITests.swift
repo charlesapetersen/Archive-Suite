@@ -255,8 +255,8 @@ final class ProcessorUITests: XCTestCase {
                       "each card says what a better figure would need")
         attachScreenshot("processor-settings-sheet-choices")
 
-        // W46.settings-range-view: the Range tab, one chart per stage; a row's Choose sets the card's override, and the
-        // card's way back clears it.
+        // W46.settings-range-view: the Range tab, one chart per stage (choosing from it:
+        // testRangeChoosingSetsTheCardsOverrideAndTheWayBack).
         let range = app.sheets.firstMatch.radioButtons["Range"]
         XCTAssertTrue(range.waitForExistence(timeout: 5), "the sheet has a Range tab")
         range.click()
@@ -265,27 +265,6 @@ final class ProcessorUITests: XCTestCase {
         }
         XCTAssertTrue(element("ap.sheet.range.reading.chart").exists, "the reading chart is drawn")
         attachScreenshot("processor-settings-sheet-range")
-        // The first route any stage's table offers (in this test's setup the Mac readers need a download, so the
-        // reading table may offer none); its id names the stage: ap.sheet.range.<stage>.choose.<route>.
-        let choose = app.descendants(matching: .button)
-            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier CONTAINS %@", "ap.sheet.range.", ".choose."))
-            .firstMatch
-        XCTAssertTrue(choose.waitForExistence(timeout: 5), "a range table offers another route to choose")
-        let stage = choose.identifier.components(separatedBy: ".").dropFirst(3).first ?? ""
-        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
-        for _ in 0..<30 where !choose.isHittable {
-            scroll.scroll(byDeltaX: 0, deltaY: -300)
-        }
-        choose.click()
-        app.sheets.firstMatch.radioButtons["Choices"].click()
-        let back = element("ap.sheet.reset.\(stage)")
-        XCTAssertTrue(back.waitForExistence(timeout: 5), "choosing from the range marks the \(stage) card Custom, with a way back")
-        for _ in 0..<30 where !back.isHittable {
-            scroll.scroll(byDeltaX: 0, deltaY: -300)
-        }
-        back.click()
-        XCTAssertTrue(waitUntil { !back.exists }, "the way back returns the \(stage) card to the app's pick")
-        scroll.scroll(byDeltaX: 0, deltaY: 20000)
 
         let rules = app.sheets.firstMatch.radioButtons["Rules"]
         XCTAssertTrue(rules.waitForExistence(timeout: 5), "the sheet has a Rules tab")
@@ -297,6 +276,39 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-settings-sheet-rules")
         element("ap.sheet.done").click()
         XCTAssertTrue(waitUntil { !self.element("ap.sheet").exists }, "Done closes the sheet")
+    }
+
+    /// W46.settings-range-view: a row's Choose on the Range tab sets that stage's override (the card turns Custom, with
+    /// a way back), and the way back clears it. Names are ranked in the scratch collection so Apple's built-in name
+    /// finder can run; every other route here needs a key or a download.
+    func testRangeChoosingSetsTheCardsOverrideAndTheWayBack() throws {
+        relaunch(extra: ["-APUITestRankNames"])
+        let sheetButton = element("ap.segmentation.openSettingsSheet")
+        XCTAssertTrue(sheetButton.waitForExistence(timeout: 10), "the chooser opens the settings sheet")
+        sheetButton.click()
+        XCTAssertTrue(element("ap.sheet").waitForExistence(timeout: 10), "the settings sheet appears")
+        app.sheets.firstMatch.radioButtons["Range"].click()
+        let choose = app.descendants(matching: .button)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@ AND identifier CONTAINS %@", "ap.sheet.range.", ".choose."))
+            .firstMatch
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "a range table offers another route to choose")
+        // ap.sheet.range.<stage>.choose.<route>
+        let stage = choose.identifier.components(separatedBy: ".").dropFirst(3).first ?? ""
+        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
+        for _ in 0..<40 where !choose.isHittable {
+            scroll.scroll(byDeltaX: 0, deltaY: -300)
+        }
+        choose.click()
+        app.sheets.firstMatch.radioButtons["Choices"].click()
+        let back = element("ap.sheet.reset.\(stage)")
+        XCTAssertTrue(back.waitForExistence(timeout: 5), "choosing from the range marks the \(stage) card Custom, with a way back")
+        attachScreenshot("processor-settings-sheet-range-chosen")
+        for _ in 0..<40 where !back.isHittable {
+            scroll.scroll(byDeltaX: 0, deltaY: -300)
+        }
+        back.click()
+        XCTAssertTrue(waitUntil { !back.exists }, "the way back returns the \(stage) card to the app's pick")
+        element("ap.sheet.done").click()
     }
 
     private func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {

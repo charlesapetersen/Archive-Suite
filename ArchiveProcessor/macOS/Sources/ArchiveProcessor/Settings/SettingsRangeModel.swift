@@ -225,13 +225,14 @@ extension SettingsSheetModel {
             }
         }
         let custom = card.isCustom
+        let several = picked.count > 1
         let figureWord: (Double) -> String = { y in words.figure(stage.id, y / scale) }
         let points = charted.map { b in
             let name = words.display(stage.id, b.route)
             // The family, unless the name already says where it runs.
             var tip = (name.contains("(") ? name : "\(name) (\(words.family(b.route.family)))") + ": \(figureWord(b.y!))"
                 + (stage.id == "reading" ? " on your mix of pages" : "") + "; \(priceText(b.route, b.x))."
-            let part = picked.contains(b.route.id) && b.route.id != card.routeID
+            let part = picked.contains(b.route.id) && (b.route.id != card.routeID || several)
             if part { tip += " Chosen for part of this step." }
             if let w = b.why {
                 tip += (b.state == .unusable ? " Cannot be used here: "
@@ -254,35 +255,47 @@ extension SettingsSheetModel {
                 let r = b.route
                 let name = words.display(stage.id, r)
                 let batch = b.x * units / 1000
-                let part = picked.contains(r.id) && r.id != card.routeID
+                let part = picked.contains(r.id) && (r.id != card.routeID || several)
+                let choosable = choosableIDs.contains(r.id) && r.id != card.routeID
                 return SettingsRangeChart.Row(
                     id: r.id, name: name,
-                    familyWord: r.id == "none" ? "nothing runs" : name.contains("(") ? "" : words.family(r.family),
+                    familyWord: r.id == "none" ? "nothing runs" : name.contains("(") ? ""
+                        : words.family(r.family).replacingOccurrences(of: " (shared research computers)", with: ""),
                     figures: Self.rangeFigures(stage, r, y: b.y.map { $0 / scale }, words: words),
                     publicFigure: stage.id == "reading" ? Self.rangePublic(r, picks: s.picks, answers: a, words: words) : nil,
                     listPrice: priceText(r, b.x),
                     batchCost: priceText(r, b.x) == "no price listed" ? "its cost for this batch is not known"
                         : batch < 0.005 ? "nothing to pay for this batch" : "about \(words.money(batch)) for this batch",
                     time: r.family == .manual ? "only your own checking time"
-                        : b.ownHours <= 0 ? "its time not measured" : "about \(words.hours(b.ownHours)) on its own"
+                        : b.ownHours <= 0 ? "its time not measured" : "about \(words.hours(b.ownHours)) for this step alone"
                             + (r.time?["measured"] == .bool(true) ? "" : " (an estimate)"),
-                    canUse: b.state == .usable ? "you can use this"
+                    canUse: b.state == .usable
+                        ? (choosable || picked.contains(r.id) || (custom && r.id == appPick) ? "you can use this"
+                            : "shown for comparison: it is not offered as the choice for this whole step")
                         : b.state == .outsideLimits
                             ? (part ? "for all of this step, outside your limits: " : "outside your limits: ") + (b.why ?? "")
                         : "cannot be used here: \(b.why ?? "")",
                     state: b.state, picked: picked.contains(r.id), pickedPart: part,
                     appPick: custom && r.id == appPick,
-                    choosable: choosableIDs.contains(r.id) && r.id != card.routeID)
+                    choosable: choosable)
             }
 
         // Several routes chosen together (a reader per kind, a program per dating step): where they sit together.
         var together: SettingsRangeChart.Together?
         if picked.count > 1, let base = cmp.base {
             let usd = s.picks.filter { $0.stage == stage.id }.reduce(0) { $0 + $1.usd }
-            together = .init(x: max(0, usd) / units * 1000, y: base * scale,
-                             text: "Your choices together: \(figureWord(base * scale))"
-                                + (stage.id == "reading" ? " on your mix of pages" : "")
-                                + (usd < 0.005 ? ", free." : String(format: ", about $%.2f per 1,000 \(unitWord).", usd / units * 1000)))
+            var text = "Your choices together: \(figureWord(base * scale))"
+                + (stage.id == "reading" ? " on your mix of pages" : "")
+                + (usd < 0.005 ? ", free." : String(format: ", about $%.2f per 1,000 \(unitWord).", usd / units * 1000))
+            if let top = points.filter({ $0.state == .usable }).max(by: { $0.y < $1.y }), top.y > base * scale + 1e-9 {
+                let gap = top.y - base * scale
+                text += gap < Self.tieFloor(stage.id) * scale
+                    ? String(format: " \(top.name) alone scores %.1f higher, which is within what the measurements can tell "
+                             + "apart, so the app counts it as a tie and keeps its choice by its own rule.", gap)
+                    : String(format: " \(top.name) alone scores %.1f higher; “Use for all of this step” on its row would use it "
+                             + "for every page.", gap)
+            }
+            together = .init(x: max(0, usd) / units * 1000, y: base * scale, text: text)
         }
 
         let kit = Self.rangeKit(stage.id, solution: s, answers: a, base: cmp.base, words: words)
@@ -309,9 +322,10 @@ extension SettingsSheetModel {
             + (overnight ? "overnight batch price where a service has one, else the list price" : "list price")
             + ", on a scale where each step multiplies the price; choices that cost you nothing (this Mac, a plan or "
             + "cluster you have) sit in the green band at the left, spread out only so they can be told apart; a plan you do "
-            + "not have sits at its price with a key. Up: "
-            + "\(yLabel). Filled marks you can use; hollow ones you cannot here (point at one to see why); faded ones you "
-            + "can use but they break your limits. A ring marks what is chosen now. The dashed line joins the choices "
+            + "not have sits at its price with a key, or in the band when it has none. Up: "
+            + "\(yLabel). Filled marks you can use; hollow ones you cannot use here (point at one to see why); faded ones you "
+            + "can use but they break your limits (the most to spend, the red line, or your time: \(words.hours(a.hours)) for "
+            + "the whole batch). A ring marks what is chosen now. The dashed line joins the choices "
             + "within your limits that no other choice within them beats on both price and figure. Click a mark, or a "
             + "row below, to choose it. “This batch” is the \(SettingsSheetModel.count(Int(units), String(unitWord.dropLast()))) "
             + "the figures are for" + (stage.unit == "documents" ? " (about 3 pages each)" : "") + "."

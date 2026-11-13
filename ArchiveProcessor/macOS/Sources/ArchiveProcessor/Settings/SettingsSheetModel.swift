@@ -1111,7 +1111,7 @@ struct SettingsSheetWords {
     func reason(_ r: String) -> String {
         if r == "not in this comparison" { return "you chose another option for this step" }
         if r == "this batch stays on the Mac" {
-            return "it sends pages off this Mac (online or to a cluster), and you chose to keep them on this Mac"
+            return "it sends pages off this Mac, online or to a cluster, and you chose to keep them on this Mac"
         }
         if r == "ties the pick and costs more or is slower" { return "no better within the bench's margin of error, and costs more or is slower" }
         if r.hasPrefix("waits for: ") { return "not ready in the app yet" }
