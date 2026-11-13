@@ -13,7 +13,9 @@
   "creates": [
     "$FS_ROOT/seg-adapt-replay-20261113",
     "$GROUP_HOME/$USER/archive-suite/sherlock-results/seg-adapt-replay-20261113",
-    "$GROUP_HOME/$USER/envs/peft-overlay"
+    "$GROUP_HOME/$USER/envs/peft-overlay",
+    "$SCRATCH/cache/pip",
+    "$FS_ROOT/hf/hub/models--Qwen--Qwen3.5-2B"
   ],
   "provenance": [],
   "requires": [
