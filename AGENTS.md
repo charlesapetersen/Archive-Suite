@@ -24,7 +24,7 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
 - **Stay in your lane.** A change scoped to one app touches only that subdir. Loading the *other* app is
   almost always unnecessary (see the token‑efficiency directive in [`CLAUDE.md`](CLAUDE.md)).
 - **Never** write to a real corpus during dev/test (copy to scratchpad); **never** add a tag‑write call
-  outside Reader's audited `TagWriter`, or any move/rename/delete/content‑write call anywhere.
+  outside `ArchiveCore.CoordinatedTagWriter` (Reader's `TagWriter` routes to it), or any move/rename/delete/content‑write call anywhere.
 - **Done = code + docs in the *same commit*.** Ship a `SUITE_TODO.md` item → flip its checkbox (cite the
   commit); fix/find a bug → update `KNOWN_ISSUES.md`; ship an `execution-plans/` plan → delete it.
   `SUITE_TODO.md` is the tracker of record — an unattended run reconciles it *before ending*, never leaning

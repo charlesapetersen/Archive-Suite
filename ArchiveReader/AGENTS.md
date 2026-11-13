@@ -21,7 +21,9 @@ isolates DerivedData (not the shared user-level Clang cache) — treat it as "se
 worktree."
 
 ## THE non-negotiable rule (this app writes to irreplaceable data)
-- **Only `Core/TagWriter.swift` may write tags.** No other file may import or call a tag-write API
+- **Only `ArchiveCore.CoordinatedTagWriter` may write tags**: the permitted surface is three exact lines in
+  `ArchiveCore/Tags/TagWrite.swift`. Reader's `Core/TagWriter.swift` is the delta adapter every Reader tag edit
+  goes through, and it calls no write API itself. No other file may import or call a tag-write API
   (`setResourceValue(s)`, `setxattr`, …). **No file, not even `TagWriter`, may call a move / rename /
   delete / trash / content-write API** (`FileManager.removeItem/moveItem/trashItem/…`,
   `PDFDocument.write`, `Data.write`, `FileHandle` writes). A CI-style lint enforces this; the lint is

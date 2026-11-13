@@ -239,8 +239,8 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   `W46.nice-to-have` (`(blocked-on: W46.nice-to-have)`; `SUITE_TODO.md` §"Nice-to-have, end of project"), which the
   owner opens once the useful work is done. A cluster-only reader counts as useful now: many users of the kit will
   have a cluster like Sherlock.
-- ⏸ **Paid hosted benchmarking is on hold (owner, 2026-10-17).** Open-weight models first; paid hosted bench runs wait
-  for `W43.sweep` at the end of the queue, behind a full price estimate. A session that defers a paid run adds a line to
+- **Paid hosted benchmarking:** open-weight models first; a paid hosted bench run goes behind a full price estimate
+  and the $7 rule. A session that defers a paid run adds a line to
   [`execution-plans/paid-runs-deferred.md`](execution-plans/paid-runs-deferred.md) in the same commit, so none is lost.
 - ⛔ **Tier‑2 review, scratch‑only tests and no‑force git discipline all stand.** "No production data" means **no
   compatibility burden** — not less care, and it skips no gate.
