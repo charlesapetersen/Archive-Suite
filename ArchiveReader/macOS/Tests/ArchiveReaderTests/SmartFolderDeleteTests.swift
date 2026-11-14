@@ -106,6 +106,7 @@ final class SmartFolderDeleteTests: XCTestCase {
         let other = try XCTUnwrap(model.savedSearches.add(name: "Unread", search: unread()))
         _ = await waitUntil { model.smartFolderCounts.count == 2 }
         model.applyScope(try XCTUnwrap(model.savedSearches.searches.first { $0.id == open }))
+        await model.listPresented()   // built off the main actor at this size (W40.fix-reader-scope-exit-main)
         XCTAssertEqual(model.displayed.count, 500, "precondition: the folder is open")
         let backBefore = model.placeHistory.back.count
         try? await Task.sleep(nanoseconds: 200_000_000)

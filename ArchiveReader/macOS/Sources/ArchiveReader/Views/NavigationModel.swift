@@ -526,7 +526,7 @@ final class NavigationModel: ObservableObject {
         guard saved || search.search.isActive else { exitScope(); clearUserFilters(); return }
         setScope(search, saved: saved, announce: true)
         clearUserFilters(recompute: false)
-        recompute()
+        recomputeInBackground()
     }
 
     /// Open the Advanced Search form on what the list shows now (the scope, the filter bar and Find, as rules),
@@ -1052,6 +1052,8 @@ final class NavigationModel: ObservableObject {
     /// main thread 1.2 s in Debug (W40.fix-reader-smart-folder-delete). The list shows the old rows until it is
     /// presented. Any recompute meanwhile supersedes it; so does a library change, whose own rebuild presents,
     /// since no row patch applies to a list that is not presented yet.
+    /// Choosing a folder, a smart folder or All Files, and a chip's ✕, build this way too
+    /// (W40.fix-reader-scope-exit-main).
     private func recomputeInBackground() {
         guard library.files.count >= 1_000 else { recompute(); return }
         viewRevision &+= 1
@@ -1059,7 +1061,8 @@ final class NavigationModel: ObservableObject {
         let view = viewRevision, filesRevision = library.filesRevision
         let input = presentationInput(library.files)
         presentedFilesRevision = nil
-        Task { [weak self] in
+        listBuildPending = true
+        listBuild = Task { [weak self] in
             let result = await Task.detached(priority: .userInitiated) {
                 ReaderStages.measure("presentation.build (background)") { input.build() }
             }.value
@@ -1068,12 +1071,25 @@ final class NavigationModel: ObservableObject {
         }
     }
 
+    /// The background build in flight, if any; `listBuildPending` until a list is presented.
+    private var listBuild: Task<Void, Never>?
+    private var listBuildPending = false
+
+    /// Returns once the list asked for is presented: a background build's, or a rebuild that superseded it.
+    /// For tests that read `displayed` straight after a scope change.
+    func listPresented(timeout: TimeInterval = 30) async {
+        await listBuild?.value
+        let deadline = Date().addingTimeInterval(timeout)
+        while listBuildPending, Date() < deadline { try? await Task.sleep(nanoseconds: 5_000_000) }
+    }
+
     /// The `library.filesRevision` that `displayed` was built from, so a row patch knows whether its change
     /// set starts where the list stands (W40.fix-reader-change-incremental).
     private var presentedFilesRevision: UInt64?
 
     private func present(_ result: LibraryPresentation, marks: SortMarks, filesRevision: UInt64) {
         presentedFilesRevision = filesRevision
+        listBuildPending = false
         if result.ambiguousCount != ambiguousDateCount { ambiguousDateCount = result.ambiguousCount }
         let causes = result.displayed.isEmpty ? emptyCauses(in: result.universe) : []
         if causes != emptyListCauses { emptyListCauses = causes }
@@ -1084,7 +1100,11 @@ final class NavigationModel: ObservableObject {
         displayedOrderGeneration += 1
         _tagCloudCache = nil
         duplicatedNames = result.duplicatedNames
+        let selectedBefore = selection
         ReaderStages.measure("model.pruneSelection") { pruneSelectionToDisplayed() }
+        // Pruning is the list's own change, not the user's: a selection being restored by Back survives it, as
+        // it must when the returned-to list arrives after the move (W40.fix-reader-scope-exit-main).
+        if pendingVisitSelection?.applied == selectedBefore { pendingVisitSelection?.applied = selection }
         refreshSelectionCache()
         checkSelectionEnds()
         persistViewState()
@@ -1172,7 +1192,7 @@ final class NavigationModel: ObservableObject {
         default:
             filter = filter.removing(facet)
         }
-        recompute()
+        recomputeInBackground()
     }
 
     /// The marks `displayed` was sorted with, so the selection cache sorts the same way without rebuilding them on
@@ -1862,7 +1882,7 @@ final class NavigationModel: ObservableObject {
         if scopeWasActive { exitScope() }
         guard scopeWasActive || filter.pathPrefix != path else { return }
         filter.pathPrefix = path
-        recompute()
+        recomputeInBackground()
     }
 
     // MARK: Back and Forward (W40.reader-back-forward)
@@ -1938,7 +1958,7 @@ final class NavigationModel: ObservableObject {
     /// Select the returned-to place's rows that are listed. Rows a smart folder's text rules bring in later are
     /// added as they arrive, until the user changes the selection or the place.
     private func reapplyVisitSelection() {
-        guard let pending = pendingVisitSelection else { return }
+        guard let pending = pendingVisitSelection, !listBuildPending else { return }   // the list is the place left
         guard pending.place == currentPlace, selection == pending.applied else { pendingVisitSelection = nil; return }
         let listed = pending.ids.isEmpty ? [] : pending.ids.intersection(displayed.lazy.map(\.id))
         if listed == pending.ids { pendingVisitSelection = nil }
