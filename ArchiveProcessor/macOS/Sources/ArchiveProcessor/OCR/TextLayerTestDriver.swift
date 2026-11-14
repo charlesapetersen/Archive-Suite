@@ -154,9 +154,22 @@ enum TextLayerTestDriver {
                     try? FileManager.default.copyItem(at: out, to: URL(fileURLWithPath: keep).appendingPathComponent("plain.pdf"))
                 }
                 let source = (try? Data(contentsOf: jpeg)) ?? Data()
-                lines.append("NOTE plain output embeds the source JPEG's bytes: \(doc.page(at: 0).map(jpegStreams)?.contains(source) == true)")
+                check("6 the plain output embeds the source JPEG's bytes", doc.page(at: 0).map(jpegStreams)?.contains(source) == true)
+                archivalChecks("plain output", out)
             }
         }
+        // 6. PDF/A-2b (step 4): every output, merged documents too. veraPDF itself runs in test-text-layer.sh.
+        let layered = dir.appendingPathComponent("jpeg.pdf")
+        archivalChecks("layered output", layered)
+        let merged = dir.appendingPathComponent("merged.pdf")
+        do {
+            try PDFGenerator().mergeDocumentPDFs(sourcePDFs: [layered, layered], outputURL: merged)
+            check("6 the merged document has every page", PDFDocument(url: merged)?.pageCount == 4)
+            archivalChecks("merged document", merged)
+            if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                try? FileManager.default.copyItem(at: merged, to: URL(fileURLWithPath: keep).appendingPathComponent("merged.pdf"))
+            }
+        } catch { check("6 the merged document is written", false, "\(error)") }
         // 5. Improve OCR: the image page's layer follows the new reading (step 3b).
         await improveChecks(dir: dir, jpeg: jpeg, reading: reading)
 
@@ -187,6 +200,10 @@ enum TextLayerTestDriver {
             let candidate = try ReOCRIncrementalWriter.candidate(original: original,
                                                                  replacements: [pair.imageIndex: remade, pair.textIndex: text])
             let doc = PDFDocument(data: candidate)
+            // Kept for test-text-layer.sh's veraPDF run: a revision with both pages replaced is still PDF/A-2b.
+            if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                try? candidate.write(to: URL(fileURLWithPath: keep).appendingPathComponent("revised.pdf"))
+            }
             check("5 the incremental revision takes both pages and keeps the original as its prefix",
                   candidate.starts(with: original) && doc?.pageCount == 2
                   && doc?.page(at: 0)?.string?.contains("MEMORANDA") == true)
@@ -259,6 +276,28 @@ enum TextLayerTestDriver {
     }
 
     /// The raw bytes of every DCT-encoded image on `page`, its form XObjects' included.
+    /// What `PDFGenerator.writeArchival` and `ArchivalFinish` promise of a written file, read from its bytes.
+    private static func archivalChecks(_ name: String, _ url: URL) {
+        guard let data = try? Data(contentsOf: url), let doc = CGDataProvider(data: data as CFData).flatMap(CGPDFDocument.init),
+              let catalog = doc.catalog else { check("6 \(name) opens", false); return }
+        var stream: CGPDFStreamRef?, intents: CGPDFArrayRef?
+        var xmp = ""
+        var unfiltered = false
+        if CGPDFDictionaryGetStream(catalog, "Metadata", &stream), let stream {
+            var format = CGPDFDataFormat.raw
+            xmp = (CGPDFStreamCopyData(stream, &format) as Data?).map { String(decoding: $0, as: UTF8.self) } ?? ""
+            var filter: CGPDFObjectRef?
+            unfiltered = CGPDFStreamGetDictionary(stream).map { !CGPDFDictionaryGetObject($0, "Filter", &filter) } ?? false
+        }
+        check("6 \(name) declares PDF/A-2b", xmp.contains("<pdfaid:part>2</pdfaid:part>")
+              && xmp.contains("<pdfaid:conformance>B</pdfaid:conformance>")
+              && CGPDFDictionaryGetArray(catalog, "OutputIntents", &intents), String(xmp.prefix(80)))
+        check("6 \(name) keeps its XMP unfiltered (PDFium's revision rewrites it)", unfiltered)
+        let text = String(decoding: data, as: UTF8.self)
+        check("6 \(name) interpolates no image", !text.contains("/Interpolate"))
+        check("6 \(name) lists no unwritten object", !text.contains("0000000000 00000 n"))
+    }
+
     private static func jpegStreams(_ page: PDFPage) -> [Data] {
         guard let dict = page.pageRef?.dictionary else { return [] }
         var out: [Data] = []

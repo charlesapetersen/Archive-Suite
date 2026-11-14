@@ -4,6 +4,8 @@
 # no network), and reads the PDFs back through PDFKit. Never the corpus, no window.
 #
 #   scripts/test-text-layer.sh        (TEXTLAYER_TEST_KEEP=<dir> keeps the layered PDFs there)
+#
+# When veraPDF is installed (/opt/homebrew/bin/verapdf), every kept output is validated as PDF/A-2b too (W42.int-s5).
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -17,8 +19,10 @@ fi
 work=$(mktemp -d)
 report="$work/result.txt"
 log="$work/app.log"
+keep="${TEXTLAYER_TEST_KEEP:-$work/keep}"
+mkdir -p "$keep"
 env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
-    TEXTLAYER_TEST=1 TEXTLAYER_TEST_OUT="$report" ${TEXTLAYER_TEST_KEEP:+TEXTLAYER_TEST_KEEP="$TEXTLAYER_TEST_KEEP"} "$bin" >"$log" 2>&1 &
+    TEXTLAYER_TEST=1 TEXTLAYER_TEST_OUT="$report" TEXTLAYER_TEST_KEEP="$keep" "$bin" >"$log" 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
 
@@ -32,4 +36,18 @@ if [ ! -f "$report" ]; then
     exit 1
 fi
 cat "$report"
-grep -q '^ALL PASS$' "$report"
+status=0
+grep -q '^ALL PASS$' "$report" || status=1
+verapdf=/opt/homebrew/bin/verapdf
+if [ -x "$verapdf" ]; then
+    for pdf in "$keep"/*.pdf; do
+        if "$verapdf" --flavour 2b "$pdf" 2>/dev/null | grep -q 'isCompliant="true"'; then
+            echo "PASS veraPDF: $(basename "$pdf") is PDF/A-2b"
+        else
+            echo "FAIL veraPDF: $(basename "$pdf") is not PDF/A-2b"; status=1
+        fi
+    done
+else
+    echo "NOTE veraPDF not installed: PDF/A-2b not validated"
+fi
+exit $status

@@ -2,7 +2,7 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## ⚠️ LIMITATION (W42.int-s5, checkpoints 1-3, 2026-11-13): what the image page's searchable layer does not yet do
+## ⚠️ LIMITATION (W42.int-s5, checkpoints 1-5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
 
 New output puts an invisible text layer on the image page of print pages (`OCR/TextLayerRule.swift`,
 VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or more level (`OCR/ReadingCopy.swift`,
@@ -12,6 +12,11 @@ switch `straightenReadingCopy`); the text page stays. Still open inside W42.int-
   Processor's letter page, has its own crop box or annotations, or a remade page would not render exactly as it does.
   Elsewhere the layer follows the new reading (`SPEC/improve-ocr.md` §5). A page kept this way is not named in the
   review, and the review shows only the text diff: it does not say the image page's invisible layer changes too.
+  The remade page carries no `/Rotate` of its own (Quartz writes none), so under a page tree that passes a turn down
+  its revision is refused by the preservation check and the old layer stays.
+- **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
+  about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
+  media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither.
 - **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
   Live Capture and the multi-page PDF path drop the outcome.
 - **Handwriting gets no layer**: the hand placer (kraken blla lines with CTC alignment) is not in the app, so the

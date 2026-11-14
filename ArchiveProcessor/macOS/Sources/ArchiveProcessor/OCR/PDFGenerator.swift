@@ -107,10 +107,70 @@ struct PDFGenerator {
                                     textColumns: textColumns, sourceDates: sourceDates, pageKind: pageKind)
         pdfDocument.insert(textPage, at: pdfDocument.pageCount)
 
-        guard pdfDocument.write(to: outputURL) else {
+        try Self.writeArchival(pdfDocument, to: outputURL)
+        return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened)
+    }
+
+    // MARK: - PDF/A output (W42.int-s5)
+
+    /// Writes `document`'s pages to `url` as one PDF/A-2b file, through CoreGraphics' own PDF/A writer
+    /// (`kCGPDFContextCreatePDFA`: XMP `pdfaid` part 2, conformance B, an sRGB output intent). Not
+    /// `PDFDocument.write`, which re-emits the page image with `/Interpolate true` (PDF/A-2 6.2.8) and so can never
+    /// conform. Each page is drawn from its own content, so a JPEG embedded via DCTDecode keeps its bytes and the
+    /// invisible layer stays text. Read back before it is written: bytes that do not open with every page throw.
+    /// Written atomically, as PDFKit's write replaced the file: a regenerated output never stands half-written, and it
+    /// does not keep the old file's Finder tags (the regenerations re-apply them).
+    static func writeArchival(_ document: PDFDocument, to url: URL) throws {
+        guard let data = archivalData(document) else { throw PDFError.writeFailed }
+        do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
+    }
+
+    /// `writeArchival` into memory, also for the image page Improve OCR puts into an output (`remadeImagePageData`): it
+    /// is drawn as the output's own pages are, so it renders as they do.
+    static func archivalData(_ document: PDFDocument) -> Data? {
+        let data = NSMutableData()
+        guard let consumer = CGDataConsumer(data: data as CFMutableData),
+              let pages = try? drawArchival(document, into: consumer) else { return nil }
+        let out = ArchivalFinish.finished(data as Data)
+        guard let provider = CGDataProvider(data: out as CFData), CGPDFDocument(provider)?.numberOfPages == pages else {
+            return nil
+        }
+        return out
+    }
+
+    /// Draws every page of `document` into one PDF/A context on `consumer`; returns how many.
+    private static func drawArchival(_ document: PDFDocument, into consumer: CGDataConsumer) throws -> Int {
+        guard document.pageCount > 0 else { throw PDFError.writeFailed }
+        // A page with no content of its own (the bare `PDFPage()` the text and placeholder pages fall back to) is a blank
+        // letter page, as PDFKit wrote it.
+        let pages = (0..<document.pageCount).map { document.page(at: $0)?.pageRef }
+        let letter = CGRect(x: 0, y: 0, width: 612, height: 792)
+        var firstBox = pages[0].map(drawnBox(of:)) ?? letter
+        let info: [CFString: Any] = [kCGPDFContextCreatePDFA: true, kCGPDFContextCreator: "Archive Processor"]
+        guard let context = CGContext(consumer: consumer, mediaBox: &firstBox, info as CFDictionary) else {
             throw PDFError.writeFailed
         }
-        return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened)
+        for page in pages {
+            var box = page.map(drawnBox(of:)) ?? letter
+            let boxData = withUnsafeBytes(of: &box) { Data($0) } as CFData
+            context.beginPDFPage([kCGPDFContextMediaBox: boxData] as CFDictionary)
+            guard let page else { context.endPDFPage(); continue }
+            context.saveGState()
+            // The page's own transform, so a /Rotate or an offset media box comes out as the page showed.
+            context.concatenate(page.getDrawingTransform(.mediaBox, rect: box, rotate: 0, preserveAspectRatio: true))
+            context.drawPDFPage(page)
+            context.restoreGState()
+            context.endPDFPage()
+        }
+        context.closePDF()
+        return pages.count
+    }
+
+    /// The page as drawn, at the origin: its media box, turned by its /Rotate.
+    private static func drawnBox(of page: CGPDFPage) -> CGRect {
+        let media = page.getBoxRect(.mediaBox)
+        let quarter = ((page.rotationAngle % 360) + 360) % 360 % 180 != 0
+        return CGRect(x: 0, y: 0, width: quarter ? media.height : media.width, height: quarter ? media.width : media.height)
     }
 
     // MARK: - Searchable layer (W42.int-s5)
@@ -145,11 +205,11 @@ struct PDFGenerator {
         var unstraightened = options
         unstraightened.straighten = false
         let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: unstraightened)
-        // Through PDFKit either way, as `generate` writes the page, so a page with no layer is drawn as new output is.
+        // Through the output's own writer either way, so a page with no layer is drawn as new output is.
         guard let page = layered.page ?? PDFDocument(data: image.pdf)?.page(at: 0) else { return nil }
         let doc = PDFDocument()
         doc.insert(page, at: 0)
-        guard let data = doc.dataRepresentation() else { return nil }
+        guard let data = Self.archivalData(doc) else { return nil }
         return (data, layered.outcome)
     }
 
@@ -416,6 +476,8 @@ struct PDFGenerator {
                                 gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
                                 localAgentModelName: localAgentModelName, textColumns: textColumns,
                                 sourceDates: sourceDates, pageKind: pageKind), at: 0)
+        // PDFKit, not `archivalData`: PDFKit writes the page's own `/Rotate 0`, so the page shows upright in a file whose
+        // page tree passes a turn down to its pages, and a page with no image has nothing PDFKit's write breaks PDF/A on.
         return doc.dataRepresentation()
     }
 
@@ -707,7 +769,7 @@ struct PDFGenerator {
         }
 
         guard merged.pageCount > 0 else { throw PDFError.writeFailed }
-        guard merged.write(to: outputURL) else { throw PDFError.writeFailed }
+        try Self.writeArchival(merged, to: outputURL)
     }
 }
 

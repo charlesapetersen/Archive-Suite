@@ -198,6 +198,9 @@ Processor emits **one PDF per input image**, same base filename (`PDFGenerator`)
   so a consumer's copy/find must work on whichever pane holds the selection.
 - **Page 2** — the OCR text as **real selectable text**, on a single dynamically-tall page (no
   overflow to page 3).
+- **The file is PDF/A-2b** (W42.int-s5, `PDFGenerator.writeArchival`, merged documents too): XMP `pdfaid` part 2,
+  conformance B, an sRGB output intent, the XMP stored unfiltered. Nothing in the suite reads the declaration; a
+  consumer must not depend on it beyond what PDF/A-2b promises.
 
 > **Interleaved multi-page variant.** A single output PDF may **alternate image, OCR-text, image,
 > OCR-text, …** — each source page contributing its image page followed by its page-2-format OCR-text
