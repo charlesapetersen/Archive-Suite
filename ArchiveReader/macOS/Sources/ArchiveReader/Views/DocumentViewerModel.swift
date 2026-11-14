@@ -22,7 +22,12 @@ final class DocumentViewerModel: ObservableObject {
     /// receipt); part of the panes' identity, so a reload builds fresh views on the new pages.
     @Published private(set) var contentRevision = 0
     private var replacedObserver: AnyCancellable?
-    @Published private(set) var current: PDFDocument?
+    @Published private(set) var current: PDFDocument? {
+        didSet { pagePairs = DocumentPagePairs(document: current) }
+    }
+    /// Which page of `current` is which (`DocumentPagePairs`): read once per document, from its XMP when it has
+    /// searchable pages (W42.int-s5-searchable), so a searchable page is never shown as another page's text.
+    private(set) var pagePairs = DocumentPagePairs.empty
     @Published private(set) var loadError: String?
     @Published private(set) var jpegPartnerPage: PDFPage?
     @Published private(set) var jpegPartnerRelativePath: String?
@@ -400,10 +405,10 @@ final class DocumentViewerModel: ObservableObject {
     }
 
     /// How many image/OCR-text page pairs the loaded document has (1 for a standard 2-page archival PDF).
-    var pairCount: Int { DocumentPagePairs.pairCount(pageCount: current?.pageCount ?? 0) }
+    var pairCount: Int { pagePairs.count }
 
     /// Left pane = the current pair's image page. Present for any non-empty PDF.
-    var imagePage: PDFPage? { page(at: DocumentPagePairs.imagePageIndex(pair: pair)) }
+    var imagePage: PDFPage? { page(at: pagePairs.imagePageIndex(pair: pair)) }
     /// The left pane switches to the linked full-resolution image while the PDF remains loaded for its
     /// OCR text pages, navigation, and page-level citations.
     var displayedImagePage: PDFPage? { imageSource == .jpeg ? jpegPartnerPage : imagePage }
@@ -411,7 +416,7 @@ final class DocumentViewerModel: ObservableObject {
     var isShowingJPEG: Bool { imageSource == .jpeg }
     /// Right pane = the current pair's OCR text page, when the pair has one (a trailing odd image page
     /// has none).
-    var textPage: PDFPage? { page(at: DocumentPagePairs.textPageIndex(pair: pair)) }
+    var textPage: PDFPage? { pagePairs.textPageIndex(pair: pair).flatMap { page(at: $0) } }
     var hasTextPage: Bool { textPage != nil }
 
     /// W44.reocr-reader: who read this pair's text page and its Kind, from the page's own header
@@ -419,7 +424,8 @@ final class DocumentViewerModel: ObservableObject {
     var textPageReading: String? {
         let key = pageIdentity
         if let cached = readingCache, cached.key == key { return cached.value }
-        let header = textPage.map { PDFHeaderParser.parse($0).header } ?? nil
+        // A searchable page has no text page; its header is in the document's XMP (W42.int-s5-searchable).
+        let header = textPage.map { PDFHeaderParser.parse($0).header } ?? carriedHeader(at: pagePairs.imagePageIndex(pair: pair))
         var parts: [String] = []
         if let p = header?.provenance { parts += [p.provider, p.model] }
         if let k = header?.kind { parts.append(k.displayName) }
@@ -428,6 +434,15 @@ final class DocumentViewerModel: ObservableObject {
         return value
     }
     private var readingCache: (key: String, value: String?)?
+
+    /// The XMP's header for a searchable page of `current` (`PDFHeaderCarrier`); nil for any other page.
+    private func carriedHeader(at pageIndex: Int) -> PDFPageHeader? {
+        guard let doc = current, let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:)),
+              carried.count == doc.pageCount, carried.indices.contains(pageIndex), let text = carried[pageIndex] else {
+            return nil
+        }
+        return PDFHeaderParser.parse(text).header
+    }
 
     /// The file's contents were replaced (an Improve OCR receipt): load it again from the disk, on the same
     /// pair where it still exists. Any other window's file is left alone.
@@ -497,7 +512,7 @@ final class DocumentViewerModel: ObservableObject {
     /// turned. The image pane's identity includes it, so a turn builds a fresh view.
     var imageTurns: Int {
         guard let path = currentFilePath, imagePage != nil else { return 0 }
-        return pageTurns.turns(path: path, page: DocumentPagePairs.imagePageIndex(pair: pair))
+        return pageTurns.turns(path: path, page: pagePairs.imagePageIndex(pair: pair))
     }
     /// An image page is on screen, so there is something to turn.
     var canRotate: Bool { imagePage != nil && !showingAllPages }
@@ -511,7 +526,7 @@ final class DocumentViewerModel: ObservableObject {
         guard canRotate, let path = currentFilePath else { return }
         objectWillChange.send()
         leftController.clearSelection()   // a selection's place on screen moves with the page; start clean
-        pageTurns.set(turns, path: path, page: DocumentPagePairs.imagePageIndex(pair: pair))
+        pageTurns.set(turns, path: path, page: pagePairs.imagePageIndex(pair: pair))
     }
 
     /// The text extracted from the current pair's image page, when that pair has no OCR text page (a
@@ -756,10 +771,10 @@ final class DocumentViewerModel: ObservableObject {
     /// with no OCR text page, or a document that failed to load), so the number always names a page the
     /// document plausibly has rather than one past its end.
     var focusedPageNumber: Int {
-        guard focusedPane == .right, textPage != nil else {
-            return DocumentPagePairs.imagePageIndex(pair: pair) + 1
+        guard focusedPane == .right, textPage != nil, let text = pagePairs.textPageIndex(pair: pair) else {
+            return pagePairs.imagePageIndex(pair: pair) + 1
         }
-        return DocumentPagePairs.textPageIndex(pair: pair) + 1
+        return text + 1
     }
 
     /// Move the panes to a **1-based PDF page number** (what a durable page link carries) and put the
@@ -770,10 +785,10 @@ final class DocumentViewerModel: ObservableObject {
     func goToPDFPage(_ page: Int) {
         showingAllPages = false
         let pageIndex = max(0, page - 1)
-        setPair(DocumentPagePairs.pair(ofPageIndex: pageIndex))
+        setPair(pagePairs.pair(ofPageIndex: pageIndex))
         // Set after `setPair` — which pulls focus off a text pane that doesn't exist — and re-check
         // `textPage`, which is a function of the pair we just moved to.
-        focusedPane = (!DocumentPagePairs.isImagePage(pageIndex) && textPage != nil) ? .right : .left
+        focusedPane = (!pagePairs.isImagePage(pageIndex) && textPage != nil) ? .right : .left
     }
 
     /// Build the pasteboard item for a page link to the page on screen, without touching the pasteboard
@@ -856,7 +871,7 @@ final class DocumentViewerModel: ObservableObject {
             if let page = outgoing.page, let partner = outgoing.partner { neighbours.keep(jpeg: page, partner) }
         }
         ReaderStages.measure("viewer.loadDocument") { loadDocument(url) }
-        if let current { pageCounts.set(current.pageCount, for: url.path) }
+        if let current { pageCounts.set(current.pageCount, pairs: pagePairs, for: url.path) }
         ReaderStages.measure("viewer.jpegPartner") { refreshJPEGPartner() }
         prepareNeighbours()
     }

@@ -122,25 +122,46 @@ final class DocumentFindTests: XCTestCase {
     // MARK: DocumentPagePairs — the interleaved image/OCR-text page-pair arithmetic (W23.m2)
 
     func testPairCountRoundsUpSoATrailingScanIsNotLost() {
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 0), 0)
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 1), 1)   // image only, no OCR page
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 2), 1)   // the standard archival PDF
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 3), 2)   // merged: 2-page doc + bare scan
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 4), 2)
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: 9), 5)
-        XCTAssertEqual(DocumentPagePairs.pairCount(pageCount: -1), 0, "a negative count must not go negative")
+        XCTAssertEqual(DocumentPagePairs(pageCount: 0).count, 0)
+        XCTAssertEqual(DocumentPagePairs(pageCount: 1).count, 1)   // image only, no OCR page
+        XCTAssertEqual(DocumentPagePairs(pageCount: 2).count, 1)   // the standard archival PDF
+        XCTAssertEqual(DocumentPagePairs(pageCount: 3).count, 2)   // merged: 2-page doc + bare scan
+        XCTAssertEqual(DocumentPagePairs(pageCount: 4).count, 2)
+        XCTAssertEqual(DocumentPagePairs(pageCount: 9).count, 5)
+        XCTAssertEqual(DocumentPagePairs(pageCount: -1).count, 0, "a negative count must not go negative")
+        XCTAssertNil(DocumentPagePairs(pageCount: 3).textPageIndex(pair: 1), "the trailing scan has no text page")
     }
 
     func testPageIndexMappingIsSelfConsistent() {
+        let pairs = DocumentPagePairs(pageCount: 12)
         for pair in 0..<6 {
-            let image = DocumentPagePairs.imagePageIndex(pair: pair)
-            let text = DocumentPagePairs.textPageIndex(pair: pair)
+            let image = pairs.imagePageIndex(pair: pair)
+            let text = pairs.textPageIndex(pair: pair)
             XCTAssertEqual(text, image + 1)
-            XCTAssertTrue(DocumentPagePairs.isImagePage(image))
-            XCTAssertFalse(DocumentPagePairs.isImagePage(text))
-            XCTAssertEqual(DocumentPagePairs.pair(ofPageIndex: image), pair)
-            XCTAssertEqual(DocumentPagePairs.pair(ofPageIndex: text), pair)
+            XCTAssertTrue(pairs.isImagePage(image))
+            XCTAssertFalse(pairs.isImagePage(image + 1))
+            XCTAssertEqual(pairs.pair(ofPageIndex: image), pair)
+            XCTAssertEqual(pairs.pair(ofPageIndex: image + 1), pair)
         }
+    }
+
+    /// W42.int-s5-searchable: a searchable page is a pair alone, so the pairs after it are not shifted by one.
+    func testSearchablePagesArePairsAlone() {
+        let pairs = DocumentPagePairs(roles: [.searchable, .image, .text, .searchable, .image])
+        XCTAssertEqual(pairs.count, 4)
+        XCTAssertEqual((0..<4).map { pairs.imagePageIndex(pair: $0) }, [0, 1, 3, 4])
+        XCTAssertEqual((0..<4).map { pairs.textPageIndex(pair: $0) }, [nil, 2, nil, nil])
+        XCTAssertEqual((0..<5).map { pairs.pair(ofPageIndex: $0) }, [0, 1, 1, 2, 3])
+        XCTAssertEqual((0..<5).map { pairs.isImagePage($0) }, [true, true, false, true, true])
+    }
+
+    func testFindBucketsASearchableFileByItsOwnPairs() {
+        let header = "Extracted text.\nmemo.jpg\nApple Vision \u{00B7} macOS Vision \u{00B7} 13 November 2026\nKind: printed"
+        let doc = PDFDocument(data: TestPDFBuilder.textPDFData(pages: ["Alpha one", "Alpha scan", "Extracted text.\nAlpha two Alpha"],
+                                                               carried: [header, nil, nil]))!
+        let counts = DocumentFindScanner.pairMatchCounts(in: doc, query: "alpha")
+        XCTAssertEqual(counts.map(\.left), [1, 1])
+        XCTAssertEqual(counts.map(\.right), [0, 2])
     }
 
     // MARK: DocumentFindScanner — matches bucketed per pair (page 2p → left, page 2p+1 → right)

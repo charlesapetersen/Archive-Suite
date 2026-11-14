@@ -114,6 +114,11 @@ public enum PDFPageRole: String, Sendable, Equatable {
         return roles(carried: carried, pageCount: document.pageCount)
     }
 
+    public static func roles(of document: CGPDFDocument) -> [PDFPageRole] {
+        guard let carried = PDFHeaderCarrier.pages(of: document) else { return pairs(document.numberOfPages) }
+        return roles(carried: carried, pageCount: document.numberOfPages)
+    }
+
     public static func roles(carried: [String?], pageCount: Int) -> [PDFPageRole] {
         guard carried.count == pageCount else { return pairs(pageCount) }
         var roles: [PDFPageRole] = []

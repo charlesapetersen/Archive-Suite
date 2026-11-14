@@ -142,7 +142,7 @@ struct PreviewSheet: View {
     /// The prerendered bitmap of the image page shown, or a request still waiting for one.
     private var imagePlaceholder: PlaceholderRequest? {
         guard let path = model.currentFilePath else { return nil }
-        let pageIndex = DocumentPagePairs.imagePageIndex(pair: model.pair)
+        let pageIndex = model.pagePairs.imagePageIndex(pair: model.pair)
         _ = prefetcher.generation   // re-read when a bitmap lands
         return PlaceholderRequest(key: PlaceholderRequest.key(path: path, pageIndex: pageIndex),
                                   image: prefetcher.image(path: path, pageIndex: pageIndex)?.image)

@@ -46,6 +46,13 @@ enum PageThumbnails {
         }
     }
 
+    /// What each page of the file is (`PDFPageRole`, one per page); nil when it cannot be read.
+    nonisolated static func pageRoles(path: String) async -> [PDFPageRole]? {
+        CorpusWalker.withDatalessMaterializationDisabled {
+            CGPDFDocument(URL(fileURLWithPath: path) as CFURL).map { PDFPageRole.roles(of: $0) }
+        }
+    }
+
     /// `stat(2)`, not `URL.resourceValues`, which caches on a reused URL and would miss a re-OCR.
     nonisolated private static func modificationDate(_ path: String) -> Date? {
         var info = stat()
@@ -96,18 +103,27 @@ struct PageImage: @unchecked Sendable {
 @MainActor
 final class OpenFilePageCounts: ObservableObject {
     @Published private(set) var counts: [String: Int] = [:]
+    /// Which page of each file is which (`DocumentPagePairs`), read with its count (W42.int-s5-searchable).
+    @Published private(set) var layouts: [String: DocumentPagePairs] = [:]
     private var asked: Set<String> = []
 
     func count(_ path: String) -> Int? { counts[path] }
 
-    func set(_ count: Int, for path: String) {
+    /// The file's pairs; until it has been read, what its count (or its first page) says as pairs alone.
+    func pairs(_ path: String) -> DocumentPagePairs {
+        layouts[path] ?? DocumentPagePairs(pageCount: counts[path] ?? 1)
+    }
+
+    func set(_ count: Int, pairs: DocumentPagePairs? = nil, for path: String) {
         if counts[path] != count { counts[path] = count }
+        if let pairs, layouts[path] != pairs { layouts[path] = pairs }
     }
 
     /// Keep only the files now open, so browsing many selections never grows the table.
     func retain(_ paths: [String]) {
         let keep = Set(paths)
         if counts.keys.contains(where: { !keep.contains($0) }) { counts = counts.filter { keep.contains($0.key) } }
+        if layouts.keys.contains(where: { !keep.contains($0) }) { layouts = layouts.filter { keep.contains($0.key) } }
         asked.formIntersection(keep)
     }
 
@@ -115,9 +131,12 @@ final class OpenFilePageCounts: ObservableObject {
     func request(_ path: String) async {
         guard counts[path] == nil, !asked.contains(path) else { return }
         asked.insert(path)
-        let count = await PageThumbnails.pageCount(path: path) ?? 0
+        let roles = await PageThumbnails.pageRoles(path: path)
         // A file the viewer let go of while its count was read stays out.
-        if counts[path] == nil, asked.contains(path) { counts[path] = count }
+        if counts[path] == nil, asked.contains(path) {
+            counts[path] = roles?.count ?? 0
+            if let roles { layouts[path] = DocumentPagePairs(roles: roles) }
+        }
     }
 }
 

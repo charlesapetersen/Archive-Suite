@@ -285,12 +285,36 @@ final class DocumentViewerPagePairTests: XCTestCase {
         let url = try writeInterleaved(scans: 3, named: "link.pdf")
         let model = load([url])
         // 1-based PDF page of the image page of the displayed pair: pair 0 → 1, pair 1 → 3, pair 2 → 5.
-        XCTAssertEqual(DocumentPagePairs.imagePageIndex(pair: model.pair) + 1, 1)
+        XCTAssertEqual(model.pagePairs.imagePageIndex(pair: model.pair) + 1, 1)
         model.next()
-        XCTAssertEqual(DocumentPagePairs.imagePageIndex(pair: model.pair) + 1, 3,
+        XCTAssertEqual(model.pagePairs.imagePageIndex(pair: model.pair) + 1, 3,
                        "a link copied on pair 1 must not claim page 1")
         model.next()
-        XCTAssertEqual(DocumentPagePairs.imagePageIndex(pair: model.pair) + 1, 5)
+        XCTAssertEqual(model.pagePairs.imagePageIndex(pair: model.pair) + 1, 5)
+    }
+
+    /// W42.int-s5-searchable: a file whose first page is searchable (its header in the XMP) and whose second source
+    /// page is a pair. The searchable page shows its own text on the right and its header's reader; the pair after it
+    /// is not shifted by one, and a page link names the page on screen.
+    func testSearchablePageIsAPairAloneInTheViewer() throws {
+        let header = "Extracted text.\nmemo.jpg\nApple Vision \u{00B7} macOS Vision \u{00B7} 13 November 2026\nKind: printed"
+        let url = try scratchDir().appendingPathComponent("searchable.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["SEARCHABLE page layer", "SCAN 2 image page", "Extracted text.\nOCR body of scan 2"],
+                                           carried: [header, nil, nil], to: url))
+        let model = load([url])
+        XCTAssertEqual(model.pairCount, 2)
+        XCTAssertNil(model.textPage, "a searchable page has no text page")
+        XCTAssertTrue(model.embeddedText?.contains("SEARCHABLE") == true, "its layer is the text shown")
+        XCTAssertEqual(model.textPageReading, "Apple Vision · macOS Vision · Printed")
+        model.next()
+        XCTAssertTrue(model.imagePage?.string?.contains("SCAN 2") == true, "the pair after it is not shifted")
+        XCTAssertTrue(model.textPage?.string?.contains("scan 2") == true)
+        model.goToPDFPage(3)
+        XCTAssertEqual(model.pair, 1)
+        XCTAssertEqual(model.focusedPageNumber, 3)
+        model.goToPDFPage(1)
+        XCTAssertEqual(model.pair, 0)
+        XCTAssertEqual(model.focusedPageNumber, 1)
     }
 
     // MARK: it actually DRAWS (pixels, not just a non-nil PDFPage)

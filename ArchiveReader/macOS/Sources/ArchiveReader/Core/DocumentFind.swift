@@ -87,7 +87,8 @@ enum DocumentFindScanner {
     /// scans of a merged document unfindable even though the viewer can now navigate to them.
     /// Empty array for an empty query or an empty document.
     static func pairMatchCounts(in document: PDFDocument, query: String) -> [(left: Int, right: Int)] {
-        let pairs = DocumentPagePairs.pairCount(pageCount: document.pageCount)
+        let layout = DocumentPagePairs(document: document)
+        let pairs = layout.count
         guard !query.isEmpty, pairs > 0 else { return [] }
         var counts = [(left: Int, right: Int)](repeating: (0, 0), count: pairs)
         for selection in document.findString(query, withOptions: [.caseInsensitive]) {
@@ -95,9 +96,9 @@ enum DocumentFindScanner {
             let pageIndex = document.index(for: page)
             // `index(for:)` answers NSNotFound for a page that isn't in this document; the bounds check
             // below rejects that (and any future surprise) rather than trusting the arithmetic.
-            let pair = DocumentPagePairs.pair(ofPageIndex: pageIndex)
+            let pair = layout.pair(ofPageIndex: pageIndex)
             guard pageIndex >= 0, counts.indices.contains(pair) else { continue }
-            if DocumentPagePairs.isImagePage(pageIndex) { counts[pair].left += 1 } else { counts[pair].right += 1 }
+            if layout.isImagePage(pageIndex) { counts[pair].left += 1 } else { counts[pair].right += 1 }
         }
         return counts
     }

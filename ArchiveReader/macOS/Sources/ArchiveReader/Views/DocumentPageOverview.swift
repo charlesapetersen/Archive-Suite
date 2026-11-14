@@ -49,7 +49,7 @@ struct DocumentPageOverview: View {
     private func tile(_ cell: ContactSheetCell, name: String, fileCount: Int) -> some View {
         let file = cell.slot.file, pageIndex = cell.slot.index, number = pageIndex + 1
         let several = fileCount > 1, current = file == model.index
-        let turns = DocumentPagePairs.isImagePage(pageIndex) ? model.pageTurns.turns(path: cell.path, page: pageIndex) : 0
+        let turns = pages.pairs(cell.path).isImagePage(pageIndex) ? model.pageTurns.turns(path: cell.path, page: pageIndex) : 0
         return VStack(spacing: 4) {
             if several {
                 // Every tile keeps the heading's line so the rows stay level; only a file's first page fills it.
@@ -161,7 +161,7 @@ struct PageThumbnailSidebar: View {
             Label("Cannot be opened", systemImage: "exclamationmark.triangle").font(.caption)
                 .foregroundStyle(.secondary)
         }
-        ForEach(PageSlot.slots(file: file, count: count.map { DocumentPagePairs.pairCount(pageCount: $0) } ?? 1),
+        ForEach(PageSlot.slots(file: file, count: count.map { _ in pages.pairs(path).count } ?? 1),
                 id: \.self) { slot in
             thumbnail(file: file, path: path, pair: slot.index)
                 .task(id: path) { if slot.index == 0 { await pages.request(path) } }
@@ -169,7 +169,7 @@ struct PageThumbnailSidebar: View {
     }
 
     private func thumbnail(file: Int, path: String, pair: Int) -> some View {
-        let pageIndex = DocumentPagePairs.imagePageIndex(pair: pair)
+        let pageIndex = pages.pairs(path).imagePageIndex(pair: pair)
         return PageThumbnailCell(path: path, pageIndex: pageIndex,
                                  turns: model.pageTurns.turns(path: path, page: pageIndex), label: "\(pair + 1)",
                                  selected: file == model.index && pair == model.pair && !model.showingAllPages,

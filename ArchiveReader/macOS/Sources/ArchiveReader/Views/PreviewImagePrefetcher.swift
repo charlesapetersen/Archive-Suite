@@ -100,7 +100,7 @@ final class PreviewImagePrefetcher: ObservableObject {
         var seen = Set<Key>()
         wanted = paths.compactMap { path in
             guard let stamp = FileStamp.of(path) else { return nil }
-            let key = Key(path: path, pageIndex: DocumentPagePairs.imagePageIndex(pair: 0), stamp: stamp)
+            let key = Key(path: path, pageIndex: 0, stamp: stamp)
             return seen.insert(key).inserted ? key : nil
         }
         // What is asked for and already drawn is the most recently wanted, so a bitmap landing next evicts
