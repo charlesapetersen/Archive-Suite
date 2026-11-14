@@ -16000,3 +16000,24 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   copies and the measurement's outputs (int-s5-searchable, 91 MB) went to the Trash; nothing kept,
   measure-output.sh remakes them from the read-only HEIC originals.
   <!-- /W42.int-s5-searchable -->
+- [x] **W40.fix-reader-table-apply-at-size — showing a new 116k-row list holds the main thread ~420 ms in the table [S-M]** · §Archive Reader — the owner's notes of 2026-11-13 — SHIPPED 2026-11-13
+  (f7d39ad8 and the completing commit). The list table's diffable data source copied and hashed every URL id into a
+  snapshot and diffed it against the last one, for an apply that was never animated. The Coordinator is now the table's
+  plain data source (numberOfRows, viewFor, rowViewForRow, sortDescriptorsDidChange; `SortableDiffableDataSource` is
+  gone) and a new list reloads, which asks only for the rows on screen; the rows that stay are found again by id as
+  before (`rowByID`, `keepPlace`, `syncSelection`). The id→row dictionary is made in the model's background build
+  (`NavigationModel.displayedRowIndex`, valid while `displayedOrderGeneration` stands; first row wins), and elsewhere
+  with one hash per row (`ArchiveFile.rowIndex`). Measured, -O, `ReaderChainAtSizeTests` at 115,999 rows, before and
+  after in this session with the same emulation (its table now in a window never shown, laid out after each change, so
+  main-busy counts the cells a reload makes there): the chip's ✕ main-busy median 753 → 375 ms, All Files 769 → 372 ms,
+  deleting the open smart folder 709 → 365 ms, a folder 378 → 368 ms; the table's showRows 657 → 27 ms. (Before runs
+  were higher than this morning's 442 ms on the same lane; only same-session runs are compared.) `TableApplyAtSizeTests`,
+  now timing the layout too and checking every visible row shows the file listed under it: All Files back from a third
+  509-520 → 298-331 ms, every row moved 600 → 293-340 ms. What is left is AppKit laying out the visible cells, ~230-260
+  ms, ~108 ms of it the Quality column's popups (`testWhatEachColumnCosts`): filed `W40.fix-reader-quality-popups`.
+  Rebuilding their items once, the tooltip and a cached intrinsic size were measured and changed nothing, so none
+  shipped. Adversarial review (Opus): no defect; two stale docs (ArchiveReader CLAUDE.md, REFERENCE.md) fixed; its one
+  suspicion, row heights re-estimated after a reload, waits on the VM. Whole Reader unit bundle green (889, 6 skipped),
+  no new warnings. VM: three runs failed before any test, the VM's package resolution reset by github.com; filed
+  `W40.reader-table-reload-vm`. Bench cache: nothing written; the chain clones were made and deleted by the harness.
+  <!-- /W40.fix-reader-table-apply-at-size -->
