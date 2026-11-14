@@ -90,6 +90,16 @@ date-added times (the inode and change time do change), and keeps a verified cop
 person removes it in the Processor's history. Encrypted, signed, cross-reference-stream, raw one-page and
 non-suite-structured files are refused for in-place improvement.
 
+The revision replaces each improved text page and, beside it, its image page when that page's searchable layer
+(W42.int-s5; [`tag-format.md`](tag-format.md) §2-page PDF structure, page 1) would otherwise keep the earlier
+reading: the image page is remade from its own embedded JPEG with a layer placed as new output places it (the new
+reading aligned onto Vision's lines, Vision's own words where it does not align, or no layer), never straightened
+again. The preservation check does not compare a replaced page with the original, so the remade page is used only
+when it embeds the original's JPEG byte for byte and renders exactly as the original does; an image page that had no
+text and gets none, one whose JPEG is not what it shows, one that is not the Processor's letter page, or one with its
+own crop box or annotations is kept with its old layer. The receipt still lists the text pages only (the Reader
+re-extracts the whole file either way).
+
 ## 6. Why it is built this way (design record)
 
 Folded from the design plan when the Reader side shipped (W44.reocr-plan, 2026-11-07; the plan is in git history).

@@ -2,13 +2,16 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## ⚠️ LIMITATION (W42.int-s5, checkpoints 1-2, 2026-11-13): what the image page's searchable layer does not yet do
+## ⚠️ LIMITATION (W42.int-s5, checkpoints 1-3, 2026-11-13): what the image page's searchable layer does not yet do
 
 New output puts an invisible text layer on the image page of print pages (`OCR/TextLayerRule.swift`,
 VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or more level (`OCR/ReadingCopy.swift`,
 switch `straightenReadingCopy`); the text page stays. Still open inside W42.int-s5 (`execution-plans/items/W42.int-s5.md`):
-- **Improve OCR keeps the old layer.** It replaces the text page only, so after a re-read the image page still holds
-  the earlier reader's words (or Vision's) beside the new text page; find, copy and the Reader's index see both.
+- **Improve OCR keeps the old layer only where it cannot remake the image page** (`ReOCRJob.remadeImagePage`): when
+  the page's own JPEG is not what it shows (a CMYK or turned image, a page Improve OCR renders) or the page is not the
+  Processor's letter page, has its own crop box or annotations, or a remade page would not render exactly as it does.
+  Elsewhere the layer follows the new reading (`SPEC/improve-ocr.md` §5). A page kept this way is not named in the
+  review, and the review shows only the text diff: it does not say the image page's invisible layer changes too.
 - **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
   Live Capture and the multi-page PDF path drop the outcome.
 - **Handwriting gets no layer**: the hand placer (kraken blla lines with CTC alignment) is not in the app, so the

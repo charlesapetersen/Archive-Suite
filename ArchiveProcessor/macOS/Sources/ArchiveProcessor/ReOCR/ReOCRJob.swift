@@ -141,6 +141,10 @@ struct ReOCRJob {
                                                               localAgentDisplayName: localAgentDisplayName,
                                                               localAgentModelName: localAgentModelName)
                     replacements[pair.textIndex] = page
+                    // W42.int-s5: the image page's searchable layer follows the new reading, or the old one would stay.
+                    if let image = await Self.remadeImagePage(original, pair: pair, reading: reading, kind: kind) {
+                        replacements[pair.imageIndex] = image
+                    }
                     // The Kind actually written, which falls back to the reader's own when none was chosen.
                     let written = PDFDocument(data: page)?.page(at: 0).flatMap { PDFHeaderParser.parse($0).header?.kind }
                     results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(reading.text ?? "")))
@@ -157,7 +161,8 @@ struct ReOCRJob {
             Review(operation: op, key: key, reviewedGeneration: reviewed.generation, flaggedAtReview: flaggedAtReview,
                    results: results, candidate: candidate, candidateProblem: problem)
         }
-        guard replacements.count == selected.count else { return review(nil, nil) }
+        // Every selected text page replaced (an image page beside one is extra, W42.int-s5).
+        guard Set(selected.map(\.textIndex)).isSubset(of: replacements.keys) else { return review(nil, nil) }
         do {
             return review(try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements), nil)
         } catch {
@@ -508,6 +513,37 @@ struct ReOCRJob {
 
     func reject(_ review: Review) throws {
         try writer.reject(review.operation)
+    }
+
+    // MARK: The image page's layer (W42.int-s5)
+
+    /// The pair's image page remade with a searchable layer of `reading` (`PDFGenerator.remadeImagePageData`), to
+    /// replace it beside the new text page; nil to leave the page as it is. The preservation check does not compare a
+    /// replaced page with the original, so this is the guard that the person sees the same page: the remade page must
+    /// embed exactly the original's JPEG bytes and render, pixel for pixel, as the original does (the layer paints
+    /// nothing). Left: a page with no text that would get none, a page whose own JPEG is not what it shows
+    /// (`embeddedJPEG`), a page not the Processor's letter size, one with a crop box of its own or annotations (the
+    /// remade page would drop them), and any remade page that fails either check. A page left keeps its old layer
+    /// (`KNOWN_ISSUES.md`). Off the main actor: the layer reads the page with Vision.
+    static func remadeImagePage(_ pdf: Data, pair: ReOCRPairs.Pair, reading: OCRResult, kind: OCRPageKind?) async -> Data? {
+        await Task.detached(priority: .userInitiated) { () -> Data? in
+            guard let jpeg = embeddedJPEG(pdf, pageIndex: pair.imageIndex),
+                  let doc = ReOCRPreservationCheck.document(pdf), let page = doc.page(at: pair.imageIndex + 1),
+                  page.getBoxRect(.mediaBox).size == CGSize(width: 612, height: 792),
+                  page.getBoxRect(.cropBox) == page.getBoxRect(.mediaBox), let dict = page.dictionary else { return nil }
+            var annots: CGPDFArrayRef?
+            if CGPDFDictionaryGetArray(dict, "Annots", &annots) { return nil }
+            let hadText = !(PDFDocument(data: pdf)?.page(at: pair.imageIndex)?.string ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            guard let made = PDFGenerator().remadeImagePageData(jpeg: jpeg, result: reading, pageKind: kind,
+                                                                options: .standard) else { return nil }
+            if made.layer.route == .textPage && !hadText { return nil }
+            guard embeddedJPEG(made.pdf, pageIndex: 0) == jpeg,
+                  let madeDoc = ReOCRPreservationCheck.document(made.pdf), let madePage = madeDoc.page(at: 1),
+                  let before = ReOCRPreservationCheck.render(page), let after = ReOCRPreservationCheck.render(madePage),
+                  before == after else { return nil }
+            return made.pdf
+        }.value
     }
 
     // MARK: Image input

@@ -154,10 +154,58 @@ enum TextLayerTestDriver {
                 lines.append("NOTE plain output embeds the source JPEG's bytes: \(doc.page(at: 0).map(jpegStreams)?.contains(source) == true)")
             }
         }
+        // 5. Improve OCR: the image page's layer follows the new reading (step 3b).
+        await improveChecks(dir: dir, jpeg: jpeg, reading: reading)
+
         // An unknown kind whose reading aligns is placed.
         let unknown = dir.appendingPathComponent("unknown.pdf")
         let u = await write(jpeg, reading: reading, kind: nil, rotation: 0, to: unknown)
         check("3 unknown kind, aligned reading: placed", u?.layer.route == .visionLinesAligned, "\(String(describing: u?.layer))")
+    }
+
+    private static func improveChecks(dir: URL, jpeg: URL, reading: String) async {
+        guard let original = try? Data(contentsOf: dir.appendingPathComponent("jpeg.pdf")),
+              case .success(let pairs) = ReOCRPairs.validate(original), let pair = pairs.first else {
+            check("5 the layered output is an Improve OCR pair", false); return
+        }
+        let source = (try? Data(contentsOf: jpeg)) ?? Data()
+        let model = LLMModel.appleVisionModels[0]
+        let newText = reading.replacingOccurrences(of: "MEMORANDUM", with: "MEMORANDA")
+        let newReading = OCRResult(text: newText, classification: nil, rotationDegrees: 0, errorMessage: nil, errorCode: nil)
+        guard let remade = await ReOCRJob.remadeImagePage(original, pair: pair, reading: newReading, kind: .typewritten) else {
+            check("5 the image page is remade beside a re-read", false); return
+        }
+        let layer = PDFDocument(data: remade)?.page(at: 0)?.string ?? ""
+        check("5 the remade layer holds the new reading", layer.contains("MEMORANDA") && !layer.contains("MEMORANDUM"),
+              String(layer.prefix(40)))
+        check("5 the remade page embeds the same JPEG bytes", ReOCRJob.embeddedJPEG(remade, pageIndex: 0) == source)
+        do {
+            let text = try ReOCRPairs.replacementPage(for: pair, result: newReading, model: model, kind: .typewritten)
+            let candidate = try ReOCRIncrementalWriter.candidate(original: original,
+                                                                 replacements: [pair.imageIndex: remade, pair.textIndex: text])
+            let doc = PDFDocument(data: candidate)
+            check("5 the incremental revision takes both pages and keeps the original as its prefix",
+                  candidate.starts(with: original) && doc?.pageCount == 2
+                  && doc?.page(at: 0)?.string?.contains("MEMORANDA") == true)
+        } catch { check("5 the incremental revision takes both pages", false, "\(error)") }
+        let hand = await ReOCRJob.remadeImagePage(original, pair: pair, reading: newReading, kind: .handwritten)
+        let handText = hand.flatMap { PDFDocument(data: $0)?.page(at: 0)?.string ?? "" }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        check("5 a re-read that gets no layer drops the old one", handText?.isEmpty == true, String(describing: handText))
+        if let doc = PDFDocument(data: original), let first = doc.page(at: 0) {
+            first.setBounds(CGRect(x: 20, y: 20, width: 500, height: 700), for: .cropBox)
+            if let cropped = doc.dataRepresentation(), case .success(let cp) = ReOCRPairs.validate(cropped), let c = cp.first {
+                let kept = await ReOCRJob.remadeImagePage(cropped, pair: c, reading: newReading, kind: .typewritten)
+                check("5 an image page with its own crop box is kept (a remade page would show more)", kept == nil)
+            } else { check("5 a cropped original for Improve OCR", false) }
+        }
+        let plainURL = dir.appendingPathComponent("plain-improve.pdf")
+        if await write(jpeg, reading: reading, kind: .typewritten, rotation: 0, to: plainURL, options: nil) != nil,
+           let plain = try? Data(contentsOf: plainURL), case .success(let plainPairs) = ReOCRPairs.validate(plain),
+           let p = plainPairs.first {
+            let left = await ReOCRJob.remadeImagePage(plain, pair: p, reading: newReading, kind: .handwritten)
+            check("5 a page with no layer that gets none is left as it is", left == nil)
+        } else { check("5 a plain output for Improve OCR", false) }
     }
 
     private static func ruleChecks() {
