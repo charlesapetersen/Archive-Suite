@@ -1,4 +1,5 @@
 import Foundation
+import VisionOCRKit
 
 // MARK: - The settings sheet, shape A (W46.settings-sheet)
 
@@ -117,8 +118,10 @@ struct SettingsSheetModel {
         let label: String
         let isOn: Bool
         let source: String
-        /// Said when the run does not yet follow the switch.
+        /// Said when the run does not yet follow the switch, or what it still needs.
         let note: String?
+        /// The hand placement switch, while the placer is not downloaded: the row offers the download.
+        var offersHandDownload = false
     }
 
     struct RuleStage: Identifiable {
@@ -838,7 +841,10 @@ struct SettingsSheetModel {
             guard let sw = rule.switchSetting, let key = Self.switchKey(sw.id) else { return nil }
             let resolved = resolver.resolve(key)
             return SwitchRow(id: sw.id, key: key, label: Self.switchLabel(key) ?? sw.label, isOn: resolved.value.bool ?? sw.defaultValue,
-                             source: Self.sourceWords(resolved), note: Self.switchPending.contains(key) ? Self.pendingNote : nil)
+                             source: Self.sourceWords(resolved),
+                             note: Self.switchPending.contains(key) ? Self.pendingNote
+                                 : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote : nil,
+                             offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled())
         }
         return RuleStage(id: stage.id, title: Words.ruleTitle(stage.id), text: Words.ruleText(stage.id),
                          switches: switches,
@@ -846,9 +852,14 @@ struct SettingsSheetModel {
                          source: stage.note)
     }
 
-    /// Switches the run does not read yet. Straightening is followed (W42.int-s5, `PDFGenerator.TextLayerOptions`); the
-    /// hand placement switch waits for the hand placer, which W42.int-s5-hands brings into the app.
-    static let switchPending: Set<SettingsKey> = [.placeHandOnImage]
+    /// Switches the run does not read yet: none. Straightening (W42.int-s5) and hand placement (W42.int-s5-hands) are
+    /// both followed through `PDFGenerator.TextLayerOptions`.
+    static let switchPending: Set<SettingsKey> = []
+    /// Said on the hand placement switch until the placer is downloaded: nothing is fetched at install.
+    static var handDownloadNote: String {
+        "Needs the handwriting placer, a \(HandPlacer.downloadMB) MB download (about 1 GB installed); until it is "
+            + "downloaded, handwritten pages get a separate text page."
+    }
     static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
 
     static func switchLabel(_ key: SettingsKey) -> String? {

@@ -16041,3 +16041,32 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   80-row restore-scroll corpus has no wrapped rows, so this run neither confirms nor rules it out. The Daemon Report's
   2026-11-13 VM-network entry is therefore resolved for now. No app change. Bench cache: nothing written.
   <!-- /W40.reader-table-reload-vm -->
+- [x] **W42.int-s5-hands — the hand placer in the app: handwriting on the image page [L · Tier-2]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) — SHIPPED 2026-11-13
+  (checkpoint 1 and the completing commit). Handwritten, mixed and register pages now get a placed layer on the image
+  page: VisionOCRKit `HandPlacer` runs `Resources/place-hands.py` (W46.place-hands' `hand-blla-ctc`: kraken 7.1.1 blla
+  lines, McCATMuS recognising each once, the reading matched one-to-one and over up to 8 lines, CTC forced alignment,
+  the surer matcher kept) in its own download, `ModelDownloads.Item.hands` (Python 3.12.13, kraken and torch pinned to
+  the lab venv, McCATMuS CC BY 4.0; `ops/make-hands-runtime.sh`; 287 MB, 1.0 GB installed), fetched only when the user
+  asks (settings sheet, "Download the handwriting placer", `Views/HandPlacerDownloadRow.swift`). It holds every
+  model-reader slot, runs under ModelGuard's stops with a 10 GB footprint cap and 600 s a page. `TextLayerRule` sends a
+  hand page to it when the switch is on, the placer is downloaded and the reader keeps lines (`reflows`: Infinity-
+  Parser, LightOnOCR, PaddleOCR-VL, Xiaomi-OCR by name, the page's reader or the run's own); `PDFGenerator` lays its
+  lines (route `hand-blla-ctc`) or keeps the text page under the 0.67 gate, named with the confidence; the searchable
+  form and Improve OCR go the same way. `switchPending` is empty. Parity with the bench
+  (`scripts/segbench/place_hands_kit_parity.py`, six owner pages, the saved qwen3.6-27b hypotheses): the same lines,
+  matcher and gate side on all six, confidence within 0.007. Measured in the app (`scripts/measure-hands.sh`, new;
+  `HandLayerMeasureTestDriver`; $0) after installing the archive through the app's own download path from a local
+  source: 21 owner hand pages (qwen3.6-27b readings) and 3 public NMAAHC ledger pages (Apple Vision readings): 21
+  placed, 3 to the text page by the gate (p094 0.27, 00156 0.63, 00221 0.66); every output two pages, the text page
+  second, read back through PDFKit; the image page's words all the reading's, 77-100% of the reading found on it; the
+  layer lines on Vision's lines of the rendered page 77-100% a page; 99 checks, ALL PASS. 13.6-31.8 s a page (median
+  18.2; the first page of a launch 64 s, torch imported cold), physical
+  footprint 4.6-6.8 GB (the first run's 6 GB cap stopped 4 pages; it is 10 GB now). The gate reads the reading copy,
+  not the original: 20 of 21 owner pages on the bench's side of it, p096 placed at 0.72 where the bench had 0.57.
+  Tier-2 review (Opus): no HIGH; fixed the run's model reaching the reflow rule, a sweep that could wreck another
+  download's staging, the measurement's missing geometry check and test 7's install-dependent expectation. Limits in
+  ArchiveProcessor/KNOWN_ISSUES.md §W42.int-s5-hands; publishing `hands.tgz` to the models-1 release is the owner's
+  (`W42.int-s5-hands-publish`). Bench cache: the measurement's copies, outputs and scratch model home (int-s5-hands)
+  went to the Trash; kept: the built archive in the autonomous state's `model-files/hands-build/`, which the publish
+  step uploads (its hash is the one the app pins).
+  <!-- /W42.int-s5-hands -->

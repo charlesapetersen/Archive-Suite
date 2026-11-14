@@ -301,6 +301,7 @@ struct SettingsSheetPage: View {
                             }
                         }
                         .accessibilityIdentifier("ap.sheet.switch.\(sw.id)")
+                        if sw.offersHandDownload { HandPlacerDownloadRow() }
                     }
                     DisclosureGroup("The rules in detail") {
                         VStack(alignment: .leading, spacing: 3) {

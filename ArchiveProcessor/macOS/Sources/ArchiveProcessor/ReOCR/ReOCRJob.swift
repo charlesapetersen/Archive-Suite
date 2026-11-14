@@ -142,7 +142,8 @@ struct ReOCRJob {
                                                               localAgentModelName: localAgentModelName)
                     replacements[pair.textIndex] = page
                     // W42.int-s5: the image page's searchable layer follows the new reading, or the old one would stay.
-                    if let image = await Self.remadeImagePage(original, pair: pair, reading: reading, kind: kind) {
+                    if let image = await Self.remadeImagePage(original, pair: pair, reading: reading, kind: kind,
+                                                              model: pageModels[pair.textIndex] ?? model) {
                         replacements[pair.imageIndex] = image
                     }
                     // The Kind actually written, which falls back to the reader's own when none was chosen.
@@ -525,7 +526,8 @@ struct ReOCRJob {
     /// (`embeddedJPEG`), a page not the Processor's letter size, one with a crop box of its own or annotations (the
     /// remade page would drop them), and any remade page that fails either check. A page left keeps its old layer
     /// (`KNOWN_ISSUES.md`). Off the main actor: the layer reads the page with Vision.
-    static func remadeImagePage(_ pdf: Data, pair: ReOCRPairs.Pair, reading: OCRResult, kind: OCRPageKind?) async -> Data? {
+    static func remadeImagePage(_ pdf: Data, pair: ReOCRPairs.Pair, reading: OCRResult, kind: OCRPageKind?,
+                                model: LLMModel? = nil) async -> Data? {
         await Task.detached(priority: .userInitiated) { () -> Data? in
             guard let jpeg = embeddedJPEG(pdf, pageIndex: pair.imageIndex),
                   let doc = ReOCRPreservationCheck.document(pdf), let page = doc.page(at: pair.imageIndex + 1),
@@ -535,8 +537,8 @@ struct ReOCRJob {
             if CGPDFDictionaryGetArray(dict, "Annots", &annots) { return nil }
             let hadText = !(PDFDocument(data: pdf)?.page(at: pair.imageIndex)?.string ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            guard let made = PDFGenerator().remadeImagePageData(jpeg: jpeg, result: reading, pageKind: kind,
-                                                                options: .standard) else { return nil }
+            guard let made = PDFGenerator().remadeImagePageData(jpeg: jpeg, result: reading, pageKind: kind, options: .standard,
+                                                                runReader: TextLayerRule.runReader(model: model)) else { return nil }
             if made.layer.route == .textPage && !hadText { return nil }
             guard embeddedJPEG(made.pdf, pageIndex: 0) == jpeg,
                   let madeDoc = ReOCRPreservationCheck.document(made.pdf), let madePage = madeDoc.page(at: 1),

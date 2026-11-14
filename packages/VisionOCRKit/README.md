@@ -9,6 +9,7 @@ measurement records, bug register and planning documents stay in that repository
 | Path | What it is |
 |---|---|
 | `Sources/VisionOCRKit/` | The library target; `Resources/read-model.py` is the local-model reader script |
+| `Sources/VisionOCRKit/HandPlacer.swift` | The hand placer (W42.int-s5-hands): `Resources/place-hands.py` (kraken blla lines, McCATMuS CTC alignment) run in its own download, `ModelDownloads.Item.hands`, which `ops/make-hands-runtime.sh` builds |
 | `Sources/VisionOCRKit/PageReader.swift` | The `PageReader` protocol every reader of a page sits behind (W42.int-s2); Archive Processor's clients conform in its `OCR/PageReaders.swift` |
 | `Helper/` | `visionocr-recognise`, the executable product that runs Vision in more processes |
 | `Tests/main.swift` | Vision OCR's suite, as the `visionocr-checks` executable target |

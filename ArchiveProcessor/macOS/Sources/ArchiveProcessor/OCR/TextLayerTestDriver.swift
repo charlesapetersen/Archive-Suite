@@ -10,8 +10,8 @@ import VisionOCRKit
 /// in normal use). Run by `scripts/test-text-layer.sh`. Pages are drawn here, in a scratch folder; never the corpus.
 ///
 /// What has to be true:
-///   1. The rule (`TextLayerRule`): print kinds are placed, handwritten and mixed pages get the text page alone (the
-///      hand placer is not in the app yet), an unknown kind is placed only when the reading aligns, and a reading in
+///   1. The rule (`TextLayerRule`): print kinds are placed, handwritten and mixed pages go to the hand placer once it
+///      is downloaded (the text page alone before, with the switch off, or for a reader that reflows), an unknown kind is placed only when the reading aligns, and a reading in
 ///      a right-to-left script or in CJK or Thai gets no layer.
 ///   2. Each output still has its two pages, the text page first line `Extracted text.`, and the image page's text,
 ///      read back through PDFKit, holds the reading: a selection over each drawn line returns that line's words, in
@@ -240,8 +240,9 @@ enum TextLayerTestDriver {
         // Handwriting: the reading as an unplaced layer, named for the run report.
         let hand = dir.appendingPathComponent("searchable-hand.pdf")
         let h = await write(reading, kind: .handwritten, name: "hand.jpg", to: hand)
-        check("7 hand: the searchable form, unplaced", h?.form == .searchable && h?.layer.route == .unplaced
-              && h?.layer.reason == TextLayerRule.handwritingReason, "\(String(describing: h))")
+        check("7 hand: the searchable form, unplaced (or placed, once the placer is downloaded)", h?.form == .searchable
+              && (h?.layer.route == .unplaced || (HandPlacer.isInstalled() && h?.layer.route == .handBllaCtc))
+              && (HandPlacer.isInstalled() || h?.layer.reason == TextLayerRule.notDownloadedReason), "\(String(describing: h))")
         let handText = PDFDocument(url: hand)?.page(at: 0)?.string ?? ""
         check("7 hand: one page holding every word", PDFDocument(url: hand)?.pageCount == 1 && words.allSatisfy { handText.contains($0) })
 
@@ -368,15 +369,32 @@ enum TextLayerTestDriver {
     }
 
     private static func ruleChecks() {
-        func d(_ k: PageKindName?, _ r: String? = "a letter", hand: Bool = true) -> TextLayerRule.Decision {
-            TextLayerRule.decide(kind: k, reading: r, placeHandOnImage: hand)
+        func d(_ k: PageKindName?, _ r: String? = "a letter", hand: Bool = true, installed: Bool = false,
+               model: String? = nil) -> TextLayerRule.Decision {
+            TextLayerRule.decide(kind: k, reading: r, placeHandOnImage: hand, readerModel: model, handPlacerInstalled: installed)
         }
-        check("1 registers: text page", d(.registers) == .textPage(TextLayerRule.handwritingReason))
+        check("1 registers, placer not downloaded: text page", d(.registers) == .textPage(TextLayerRule.notDownloadedReason))
+        for k in [PageKindName.handwritten, .mixed, .registers] {
+            check("1 \(k.rawValue), placer downloaded: the hand placer", d(k, installed: true) == .placeHands)
+        }
+        check("1 handwritten read by a reflowing reader: text page",
+              d(.handwritten, installed: true, model: "LightOnOCR-3-4B") == .textPage(TextLayerRule.reflowReason("LightOnOCR-3-4B")))
+        check("1 handwritten read by a line-keeping reader: the hand placer",
+              d(.handwritten, installed: true, model: "Qwen/Qwen3.6-27B-FP8") == .placeHands
+              && d(.handwritten, installed: true, model: "Gemini 3.8 Flash") == .placeHands)
+        check("1 the reflowing readers, every build", ["Infinity-Parser2-Pro", "lightonocr-3-1b", "PaddleOCR-VL 1.6 4bit",
+              "XiaomiMiMo/Xiaomi-OCR-0"].allSatisfy(TextLayerRule.reflows) && !TextLayerRule.reflows("qwen3.6-27b"))
+        check("1 handwritten with no reading: text page", d(.handwritten, nil, installed: true) == .textPage(TextLayerRule.noReadingReason))
+        check("1 handwritten, switch off, placer downloaded: text page",
+              d(.handwritten, hand: false, installed: true) == .textPage(TextLayerRule.switchOffReason))
+        check("1 the gate is 0.67 and names the confidence", HandPlacer.gate == 0.67
+              && TextLayerRule.gateReason(0.612).contains("0.61") && TextLayerRule.gateReason(0.612).contains("0.67"))
+        check("1 hand placement is no longer pending on the sheet", !SettingsSheetModel.switchPending.contains(.placeHandOnImage))
         for k in [PageKindName.typewritten, .printed, .forms, .newspapers, .clippings] {
             check("1 \(k.rawValue) placed", d(k) == .place(requireAligned: false))
         }
-        check("1 handwritten: text page", d(.handwritten) == .textPage(TextLayerRule.handwritingReason))
-        check("1 mixed: text page", d(.mixed) == .textPage(TextLayerRule.handwritingReason))
+        check("1 handwritten, placer not downloaded: text page", d(.handwritten) == .textPage(TextLayerRule.notDownloadedReason))
+        check("1 mixed, placer not downloaded: text page", d(.mixed) == .textPage(TextLayerRule.notDownloadedReason))
         check("1 handwritten, switch off: text page", d(.handwritten, hand: false) == .textPage(TextLayerRule.switchOffReason))
         check("1 unknown kind: placed only when aligned", d(nil) == .place(requireAligned: true))
         check("1 Arabic: text page", { if case .textPage = d(.printed, "مرحبا بالعالم هذه رسالة") { return true }; return false }())

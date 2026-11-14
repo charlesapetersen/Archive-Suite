@@ -93,6 +93,7 @@ struct PDFGenerator {
                                  localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind)
 
         var straightened: Double?
+        let runReader = TextLayerRule.runReader(model: model, gateway: gatewayDisplayName, localAgent: localAgentModelName)
         if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB,
                                          straighten: textLayer?.straighten == true),
            let plain = PDFDocument(data: image.pdf)?.page(at: 0) {
@@ -104,11 +105,14 @@ struct PDFGenerator {
                     switch OutputForm.searchableRefusal(reading: result.text) {
                     case let why?: formFallback = why
                     case nil:
-                        let s = searchableImagePage(image, result: result, pageKind: pageKind, options: textLayer)
+                        let s = searchableImagePage(image, result: result, pageKind: pageKind, options: textLayer,
+                                                    runReader: runReader)
                         if s.page != nil { layered = s; form = .searchable } else { formFallback = s.outcome.reason }
                     }
                 }
-                if layered == nil { layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer) }
+                if layered == nil {
+                    layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer, runReader: runReader)
+                }
                 if let layered {
                     layer = layered.outcome
                     if let p = layered.page { page = p }
@@ -244,8 +248,8 @@ struct PDFGenerator {
     /// Improve OCR puts in place of an image page whose text it replaces (`ReOCRJob.remadeImagePage`). The JPEG is
     /// embedded byte for byte (a JPEG that the fast path would re-encode gives nil), never straightened again. `layer`
     /// says whether the page got one; a page that gets none is the plain image page. Off the main thread only.
-    func remadeImagePageData(jpeg: Data, result: OCRResult, pageKind: OCRPageKind?,
-                             options: TextLayerOptions) -> (pdf: Data, layer: TextLayerOutcome)? {
+    func remadeImagePageData(jpeg: Data, result: OCRResult, pageKind: OCRPageKind?, options: TextLayerOptions,
+                             runReader: String? = nil) -> (pdf: Data, layer: TextLayerOutcome)? {
         guard !Thread.isMainThread else { return nil }
         let fm = FileManager.default
         let url = fm.temporaryDirectory.appendingPathComponent("ap-remade-" + UUID().uuidString + ".jpg")
@@ -254,7 +258,7 @@ struct PDFGenerator {
               let image = makeImagePageData(imageURL: url, straighten: false) else { return nil }
         var unstraightened = options
         unstraightened.straighten = false
-        let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: unstraightened)
+        let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: unstraightened, runReader: runReader)
         // Through the output's own writer either way, so a page with no layer is drawn as new output is.
         guard let page = layered.page ?? PDFDocument(data: image.pdf)?.page(at: 0) else { return nil }
         let doc = PDFDocument()
@@ -266,12 +270,15 @@ struct PDFGenerator {
     /// The image page with its searchable layer, or nil (and why) when it gets none. Never worse than the plain page:
     /// any failure keeps the image page without a layer, and the text page carries the text either way.
     private func layeredImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
-                                  options: TextLayerOptions) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+                                  options: TextLayerOptions, runReader: String?) -> (page: PDFPage?, outcome: TextLayerOutcome) {
         let kind = TextLayerRule.kind(explicit: pageKind, result: result)
         let reading = result.text.flatMap { $0.isEmpty ? nil : $0 }
         let requireAligned: Bool
-        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage) {
+        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage,
+                                    readerModel: TextLayerRule.readerModel(of: result, run: runReader),
+                                    handPlacerInstalled: HandPlacer.isInstalled()) {
         case .textPage(let why): return (nil, .textPage(why))
+        case .placeHands: return handLayeredPage(image, reading: reading ?? "")
         case .place(let r): requireAligned = r
         }
         // The engine's Vision reading stalls on the main thread (W42.int-s3); a caller there gets no layer.
@@ -308,12 +315,30 @@ struct PDFGenerator {
     /// image, so the page stays searchable and the run report can name it. Nil page (and why) only when no layer could be
     /// written at all; the caller then writes the pair.
     private func searchableImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
-                                     options: TextLayerOptions) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+                                     options: TextLayerOptions, runReader: String?) -> (page: PDFPage?, outcome: TextLayerOutcome) {
         let kind = TextLayerRule.kind(explicit: pageKind, result: result)
         let reading = result.text ?? ""
         var why: String
-        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage) {
+        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage,
+                                    readerModel: TextLayerRule.readerModel(of: result, run: runReader),
+                                    handPlacerInstalled: HandPlacer.isInstalled()) {
         case .textPage(let reason): why = reason
+        case .placeHands:
+            // As for print: the placed layer only when it holds every word of the reading (the placer leaves a reading
+            // line it cannot match off the image) and the writer placed every line; otherwise the reading unplaced.
+            let hand = handPlacement(image, reading: reading)
+            switch hand {
+            case .failure(let failure): why = failure.reason
+            case .success(let placed):
+                why = TextLayerRule.gateReason(placed.confidence)
+                if placed.passesGate {
+                    why = "some of the reading's words are not on the handwriting placer's lines"
+                    if let written = writeLayer(image, lines: placed.lines), written.unplaced == 0,
+                       OutputForm.holds(written.page.string ?? "", every: reading) {
+                        return (written.page, Self.handOutcome(placed, reason: nil, unplaced: 0))
+                    }
+                }
+            }
         case .place:
             why = "the reading did not align with Vision's lines"
             if Thread.isMainThread { why = "written on the main thread" }
@@ -336,6 +361,42 @@ struct PDFGenerator {
             return (nil, .textPage("the reading could not be written as a layer"))
         }
         return (written.page, TextLayerOutcome(route: .unplaced, reason: why, lines: lines.count, unplaced: written.unplaced))
+    }
+
+    /// W42.int-s5-hands — a handwritten page's layer from the hand placer: its lines when the page passes the gate
+    /// (`HandPlacer.gate`), else the text page alone, named with the confidence. Never worse than the plain page.
+    private func handLayeredPage(_ image: ImagePageData, reading: String) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+        switch handPlacement(image, reading: reading) {
+        case .failure(let failure): return (nil, .textPage(failure.reason))
+        case .success(let placed):
+            guard placed.passesGate else {
+                return (nil, Self.handOutcome(placed, reason: TextLayerRule.gateReason(placed.confidence), unplaced: 0))
+            }
+            guard let written = writeLayer(image, lines: placed.lines) else {
+                return (nil, .textPage("the layer could not be written"))
+            }
+            return (written.page, Self.handOutcome(placed, reason: nil, unplaced: written.unplaced))
+        }
+    }
+
+    private struct HandFailure: Error { let reason: String }
+
+    /// The hand placer run on the image page as drawn, or why it could not run.
+    private func handPlacement(_ image: ImagePageData, reading: String) -> Result<HandPlacer.Placement, HandFailure> {
+        guard !Thread.isMainThread else { return .failure(HandFailure(reason: "written on the main thread")) }
+        guard let cg = image.decoded(), cg.width > 0 else {
+            return .failure(HandFailure(reason: "the image could not be decoded for the handwriting placer"))
+        }
+        do { return .success(try HandPlacer.place(image: cg, reading: reading)) } catch {
+            return .failure(HandFailure(reason: "handwriting: \(error.localizedDescription)"))
+        }
+    }
+
+    /// A hand placement's outcome: placed (`reason` nil) or sent to the text page by the gate.
+    private static func handOutcome(_ placed: HandPlacer.Placement, reason: String?, unplaced: Int) -> TextLayerOutcome {
+        TextLayerOutcome(route: reason == nil ? .handBllaCtc : .textPage, reason: reason,
+                         lines: reason == nil ? placed.lines.lines.count : 0, unplaced: unplaced,
+                         handConfidence: placed.confidence, handSeconds: placed.seconds, handPeakMB: placed.peakMB)
     }
 
     /// The image page with `lines` written over it as its invisible layer, read back into memory; nil on any failure.

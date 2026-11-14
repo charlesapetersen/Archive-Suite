@@ -21,12 +21,38 @@ written where the `searchableFor` setting names the input's format and the page'
   as they drop the layer outcome.
 - **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing).
 
+## ⚠️ LIMITATION (W42.int-s5-hands, 2026-11-13): what the hand placer does not yet do
+
+Handwritten, mixed and register pages get the placed layer when the "Place handwritten text on the page image" switch
+is on and the handwriting placer is downloaded: VisionOCRKit `HandPlacer` runs kraken blla and McCATMuS (CTC forced
+alignment, `place-hands.py`) in its own process, and a page under the 0.67 confidence gate keeps the text page alone.
+Measured with `scripts/measure-hands.sh` on 21 owner hand pages (qwen3.6-27b readings) and 3 public ledger pages
+(Apple Vision readings): 21 placed, 3 to the text page by the gate. Open:
+- **The download is not published yet.** The app pins `hands.tgz` (286,946,670 B, sha256 `f835149b…`) at the
+  `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the handwriting
+  placer" fails until the owner uploads the archive kept in the autonomous state's `model-files/hands-build/`
+  (`W42.int-s5-hands-publish`). Until then every hand page gets the text page, as before, and says why.
+- **Time and memory:** 13.6-31.8 s a page in the app, median 18.2 (blla on the CPU about 6-9 s, imports and model loads
+  3-5 s, every page in a fresh process; the first page of a launch 64 s, torch imported cold), physical footprint 4.6-6.8 GB a page; the placer's cap is 10 GB (`HandPlacer.memoryGB`) and
+  it holds every model-reader slot, so hand pages run one at a time and never beside a model reader. A 16 GB Mac, not
+  an 8 GB one (`place-hands-cost.md`).
+- **The gate reads the reading copy, not the camera original.** The placer runs on the image page as written (the 2 MB
+  JPEG copy, straightened when it slopes), where the bench measured the originals: on 5 of 21 owner pages the
+  confidence rose (p031 0.70 to 0.89, p096 0.57 to 0.72), and p096 is placed where the bench gated it (20 of 21 on the
+  same side). The 0.67 gate was fitted on the originals; its refit waits on more hand truth (`05-placement.md` §6).
+- **Cancelling a run does not stop a page's placer**: it finishes its page (up to 600 s) or its wait for a slot.
+- **The reflow rule is by name**: a reader whose model name holds Infinity-Parser, LightOnOCR, PaddleOCR-VL or
+  Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught.
+- **Accented readings align worse**: McCATMuS is an NFD model and the reading is not normalised to NFD (as on the
+  bench), so a precomposed accent scores 0 and lowers the page's confidence.
+
 ## ⚠️ LIMITATION (W42.int-s5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
 
 New output puts an invisible text layer on the image page of print pages (`OCR/TextLayerRule.swift`,
 VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or more level (`OCR/ReadingCopy.swift`,
 switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text page stays. W42.int-s5 shipped
-2026-11-13; the searchable (layer-only) form is `W42.int-s5-searchable` and the hand placer `W42.int-s5-hands`. Open:
+2026-11-13; the searchable (layer-only) form is `W42.int-s5-searchable` and the hand placer `W42.int-s5-hands` (its
+limits in their own section). Open:
 - **Improve OCR keeps the old layer only where it cannot remake the image page** (`ReOCRJob.remadeImagePage`): when
   the page's own JPEG is not what it shows (a CMYK or turned image, a page Improve OCR renders) or the page is not the
   Processor's letter page, has its own crop box or annotations, or a remade page would not render exactly as it does.
@@ -39,8 +65,6 @@ switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text p
   media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither.
 - **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
   Live Capture and the multi-page PDF path drop the outcome.
-- **Handwriting gets no layer**: the hand placer (kraken blla lines with CTC alignment) is not in the app, so the
-  `placeHandOnImage` switch is not followed yet (the settings sheet still says so): `W42.int-s5-hands`.
 - **Output is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
   the image page is the 2 MB JPEG copy and Vision OCR's searchable PDF compresses the page (JBIG2). The searchable form

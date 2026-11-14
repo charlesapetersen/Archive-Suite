@@ -7,8 +7,8 @@
 // It runs in its own download (`ModelDownloads.Item.hands`, `Hands/` under the model home): a Python with kraken and
 // PyTorch, nothing at install, fetched when the user asks (`download`). Like a model reader it runs as a separate
 // process holding every reader slot (so it never shares the Mac's memory with a reader), under `ModelGuard`'s limits,
-// stopped past `seconds`. Measured on the owner's hand pages: 13-27 s and 2.8-3.5 GB a page on the CPU
-// (W42.int-s5-hands, `scripts/segbench/place_hands_kit_parity.py`).
+// stopped past `seconds`. Measured in the app on 24 hand pages: 15-31 s a page on the CPU, physical footprint up to
+// about 6.2 GB (W42.int-s5-hands, `ArchiveProcessor/scripts/measure-hands.sh`).
 
 import CoreGraphics
 import Foundation
@@ -20,6 +20,10 @@ public enum HandPlacer {
     public static let gate = 0.67
     /// A page's limit, the model readers' 540 s and a margin for loading.
     static let seconds: Double = 600
+    /// The footprint cap, the placer's own: its physical footprint passed 6 GB on 4 of 24 smoke pages (W42.int-s5-hands;
+    /// resident size said 3.3-4.2 GB), over the 4 GB `Prefs.defaultModelMemoryGB` gives a Mac under 16 GB. The route
+    /// fits 16 GB, not 8 (`place-hands-cost.md`); the memory-pressure and swap stops still guard a small Mac.
+    public static let memoryGB: Double = 10
 
     /// A page's placement: the lines to write, and what decided them.
     public struct Placement: @unchecked Sendable {
@@ -32,7 +36,8 @@ public enum HandPlacer {
         /// Lines blla found, and the reading's own.
         public let detected: Int
         public let readingLines: Int
-        /// Seconds the whole run took, and its process's peak resident memory in MB.
+        /// Seconds the whole run took, and its process's peak memory in MB: the larger of its resident size and the
+        /// physical footprint sampled while it ran.
         public let seconds: Double
         public let peakMB: Int
         /// Whether the layer is laid (`gate`): a page under it, or with no line placed, gets the text page.
@@ -66,8 +71,9 @@ public enum HandPlacer {
     public static func download(environment: [String: String] = ProcessInfo.processInfo.environment,
                                 progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
         let plan = ModelDownloads.Item.hands.plan
+        // No `ModelDownloads.sweep` here: a reader's download may be staging beside this one (the review of
+        // W42.int-s5-hands); a staging folder a crash leaves is swept by the host's next reader download.
         let home = ModelRuntime.home(environment)
-        ModelDownloads.sweep(home: home)
         let total = Double(max(plan.bytes, 1))
         try await ModelDownloads.install(plan, home: home, source: .current(environment)) { progress(Double($0) / total) }
     }
@@ -118,7 +124,7 @@ public enum HandPlacer {
     // MARK: - Placing a page
 
     /// Places `reading` on `image` (the page as the layer will sit on it). Synchronous and seconds a page: call it off
-    /// the main thread. `memoryGB` caps the process's footprint (`Prefs.defaultModelMemoryGB()` when nil).
+    /// the main thread. `memoryGB` caps the process's footprint (`memoryGB` below when nil).
     public static func place(image: CGImage, reading: String, memoryGB: Double? = nil,
                              environment: [String: String] = ProcessInfo.processInfo.environment,
                              isCancelled: () -> Bool = { false }) throws -> Placement {
@@ -138,13 +144,13 @@ public enum HandPlacer {
         try Data(reading.utf8).write(to: readingURL)
         let command = try command(image: imageURL, reading: readingURL, out: out, environment: environment)
         let started = Date()
-        try run(command, memoryGB: memoryGB ?? Prefs.defaultModelMemoryGB(), isCancelled: isCancelled)
+        let footprintMB = try run(command, memoryGB: memoryGB ?? Self.memoryGB, isCancelled: isCancelled)
         guard let data = try? Data(contentsOf: out) else { throw Failure.failed("the handwriting placer wrote nothing") }
-        return try decode(data, seconds: Date().timeIntervalSince(started))
+        return try decode(data, seconds: Date().timeIntervalSince(started), footprintMB: footprintMB)
     }
 
     /// The script's JSON as a placement.
-    static func decode(_ data: Data, seconds: Double) throws -> Placement {
+    static func decode(_ data: Data, seconds: Double, footprintMB: Int = 0) throws -> Placement {
         struct Line: Decodable { let text: String; let box: [Double] }
         struct Out: Decodable {
             let lines: [Line]; let confidence: Double; let span: Int; let detected: Int
@@ -160,11 +166,12 @@ public enum HandPlacer {
         }
         return Placement(lines: TextLayer.lines(lines), confidence: o.confidence.isFinite ? o.confidence : 0, span: o.span,
                          detected: o.detected, readingLines: o.reading_lines, seconds: seconds,
-                         peakMB: Int(o.peak_rss / 1_048_576))
+                         peakMB: max(Int(o.peak_rss / 1_048_576), footprintMB))
     }
 
-    /// Runs the placer alone among the model readers, under their memory guard and `seconds`.
-    private static func run(_ command: Command, memoryGB: Double, isCancelled: () -> Bool) throws {
+    /// Runs the placer alone among the model readers, under their memory guard and `seconds`; returns the largest
+    /// physical footprint sampled, in MB.
+    private static func run(_ command: Command, memoryGB: Double, isCancelled: () -> Bool) throws -> Int {
         let locks: [Int32]
         do { locks = try Recogniser.takeReaderSlot(1, isCancelled: isCancelled) } catch {
             throw Failure.failed("the handwriting placer could not start: \(error.localizedDescription)")
@@ -188,6 +195,7 @@ public enum HandPlacer {
         let group = Runner.processGroup(of: process)
         let deadline = Date().addingTimeInterval(seconds)
         var sampled = Date.distantPast
+        var peak = 0
         while process.isRunning {
             if isCancelled() {
                 Runner.stop(process, knownGroup: group)
@@ -200,6 +208,7 @@ public enum HandPlacer {
             if Date().timeIntervalSince(sampled) >= ModelGuard.every {
                 sampled = Date()
                 let footprint = ModelGuard.footprintMB(leader: process.processIdentifier, group: group)
+                peak = max(peak, footprint)
                 if let why = ModelGuard.verdict(footprintMB: footprint, capMB: capMB, pressure: ModelGuard.pressure(),
                                                 swapGrowthMB: ModelGuard.swapUsedMB() - swap0) {
                     Runner.stop(process, knownGroup: group)
@@ -211,5 +220,6 @@ public enum HandPlacer {
         guard process.terminationReason == .exit, process.terminationStatus == 0 else {
             throw Failure.failed("the handwriting placer stopped with status \(process.terminationStatus)")
         }
+        return peak
     }
 }
