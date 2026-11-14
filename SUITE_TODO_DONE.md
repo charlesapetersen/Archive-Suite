@@ -16070,3 +16070,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   went to the Trash; kept: the built archive in the autonomous state's `model-files/hands-build/`, which the publish
   step uploads (its hash is the one the app pins).
   <!-- /W42.int-s5-hands -->
+- [x] **W46.date-route-pipeline-27b — the restated dating route on the 27B [S]** · §Document processing review — W46 · SHIPPED 2026-11-13
+  (lane: segbench) (cluster: sherlock). Filed by W46.date-route-pipeline. The pack (362 trace-neigh prompts, 189 image
+  requests; the 27B's 118 earlier image replies on W46.date-image's documents reused) was frozen and its jobs written
+  in checkpoint abe05ced (`sherlock/date-route-27b/`, manifest `sherlock/packs/W46.date-route-pipeline-27b.json`); the
+  owner's session ran Sherlock batch 20261112-071750 (stage job 52063412, GPU job 52063413, 24 min: trace 354 calls in
+  306.5 s, image 181 in 844.9 s, both 8-request pilots clean; 550 replies stopped, 1 at the 512-token cap) and
+  collected it. `date_route_pipeline.py collect`, then `score`: on the 27B the route gets 37.4% (34/91) where the year
+  is not in the own text (Gemini 58.2%, 22 right only on Gemini and 3 only on the 27B, sign test p 0.0002), 96.3%
+  (131/136) in text; 166 explicit text years 84.3% exact, 9 image 77.8%, 35 checked estimates 51.4%, 17 with no year;
+  undated false years 17.8% (16/90) under section 3, 12.2% with the flag rule; checker 226 valid / 44 unsupported, 15
+  right years refused, 37 wrong accepted; about 2.35 GPU-s a document; no money. The 27B's raw trace year is right on
+  43 of 91 against Gemini's 56, and the checker refuses more of its replies. Fixed in `score`: the undated set's
+  model-scored false years were judged by the scored model's own image reply, which the 27B route never sent where the
+  text has a candidate, so 52 of its 56 explicit years counted false (44.4%); every model is now judged by the Gemini
+  image pass, as the report says (Gemini's figures unchanged). Row `qwen3.6-27b-route` in
+  `13-stage-rules/08-dating.md` section 4 and F-1; settings-routes.json, figures.json and prototype.html rebuilt;
+  test-settings-routes, -solver and -sheet ALL PASS. No ArchiveOCRBench change (dating is not an OCR or segmentation
+  result). Bench cache: the export `date-route-pipeline/sherlock-pack` (270 MB, rebuildable) went to the Trash; kept
+  `answers-27b.jsonl` and the rows files beside Gemini's replies, which a rescore reads; the hand-over artifact
+  `~/.local/state/archive-autonomous/artifacts/date-route-27b-20261112` (the returned replies and job logs) is left for
+  the walkthrough's disk step.
+  <!-- /W46.date-route-pipeline-27b -->

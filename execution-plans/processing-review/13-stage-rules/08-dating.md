@@ -244,6 +244,21 @@ JPEG original) or `reread-107` (the 107 whose year neither the ABBYY nor the Vis
   "memory": null,
   "caveats": ["Vision-defined sets on 272 of the owner's 300 (JPEG original needed), not the ABBYY-defined 131", "gateway 3.7; 3.8 on a direct key unmeasured", "step 3 (inheritance) not measured", "false years 15.6% under section 3's step 1; 5.6% if the model's own flag may add Date Uncertain to an explicit text year (owner gate W46.date-route-owner-ok)", "one run; the rerun floor is a 94% same-year rate"],
   "kind_rules": [], "fallback": "no year, Date Uncertain", "conditions": ["replaces the hand-summed one-shot plus image figure (F-1)"]},
+ {"id": "qwen3.6-27b-route", "name": "Qwen3.6 27B, the restated route: text, image pass where the text has no year, checked neighbour estimate (your cluster)", "family": "cluster",
+  "app_route": null, "status": "measured", "step": [1, 2, 4],
+  "needs": {"key": [], "plan": [], "cluster": true, "mac_gb": 0, "gpus": 1},
+  "figures": {
+   "in_text": {"value": 96.3, "n": 136, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "in text (Vision-defined)", "value": "96.3% (131/136)"}},
+   "not_in_text": {"value": 37.4, "n": 91, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "not in text (Vision text and image pass)", "value": "37.4% (34/91)"}},
+   "undated_false_year": {"value": 17.8, "n": 90, "truth": "owner-ruled where ruled, else the Gemini image pass", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "false-year rate", "value": "17.8% (16/90)"}},
+   "du_certain_flagged": {"value": 10.1, "n": 179, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "certain years flagged", "value": "10.1% (18/179)"}},
+   "du_uncertain_unflagged": {"value": 45.2, "n": 31, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "uncertain years unflagged", "value": "45.2% (14/31)"}},
+   "evidence_valid": {"value": "226 / 44", "n": 270, "truth": "evidence_check", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "valid / unsupported", "value": "226 / 44"}}},
+  "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": null},
+  "time": {"per_unit_s": 2.35, "measured": true, "measured_on": "Sherlock, one GPU, vLLM batched: 306.5 s for 354 trace calls and 844.9 s for 181 image calls (job 52063413), at the route's 362 trace and 115 image calls on 362 documents; model load not counted", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Qwen3.6 27B (Sherlock)", "attribute": "Time (the 27B)", "value": "about 2.35 GPU-s a document"}},
+  "memory": null,
+  "caveats": ["behind Gemini's route by 19 documents of 91 not in text (22 right only on Gemini, 3 only on the 27B, sign test p 0.0002)", "Vision-defined sets on 272 of the owner's 300, as the Gemini row", "118 image replies reused from W46.date-image's run (other server flags, same FP8 model and prompt)", "step 3 (inheritance) not measured", "false years 17.8% under section 3's step 1; 12.2% if the model's own flag may add Date Uncertain to an explicit text year (owner gate W46.date-route-owner-ok)", "one run; the rerun floor is a 94% same-year rate"],
+  "kind_rules": [], "fallback": "no year, Date Uncertain", "conditions": ["the cluster profile's dating route as one pipeline, beside the step rows qwen3.6-27b-trace-neigh-vision and qwen3.6-27b-image"]},
  {"id": "none", "name": "No dating", "family": "manual", "app_route": null, "status": "shipped", "step": [],
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},
   "figures": {}, "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": null},
@@ -263,8 +278,9 @@ string figure values ("86 / 45", "7 of 12", "96.9% coverage, 4.5 y") and `memory
 
 - **F-1, figures.json's combined row.** `gemini-oneshot-image` repeated the one-shot's year figures and added $2.8 to
   $4.07 by hand. Replaced by the measured `gemini3.7-flash-route` (W46.date-route-pipeline, 2026-11-12,
-  `date-route-pipeline.md`): 58.2% not in text, 96.3% in text, $3.11 per 1,000. The 27B's combined row is
-  W46.date-route-pipeline-27b (Sherlock).
+  `date-route-pipeline.md`): 58.2% not in text, 96.3% in text, $3.11 per 1,000. The 27B's combined row is the measured
+  `qwen3.6-27b-route` (W46.date-route-pipeline-27b, 2026-11-13): 37.4% not in text, 96.3% in text, 17.8% false years
+  on the undated 90; behind Gemini's route on the same documents (p 0.0002).
 - **F-2.** `cluster-27b-image`'s "not in text 39.0" and `mac-8b-image`'s "16.0" are document-year exact on the 122, not
   the 131; relabelled `unprinted_122_doc_year`. **F-3.** `mac-2b`'s peak 2.7 GB is the build size; the measured peak is
   3.784 GB (`date-model.md`). **F-4.** `uncertain_marked 88` is plain agreement on owner-uncertain documents; replaced by

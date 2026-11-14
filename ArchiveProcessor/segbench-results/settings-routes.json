@@ -10739,6 +10739,126 @@
      ]
     },
     {
+     "id": "qwen3.6-27b-route",
+     "name": "Qwen3.6 27B, the restated route: text, image pass where the text has no year, checked neighbour estimate (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "in_text": {
+       "value": 96.3,
+       "n": 136,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Qwen3.6 27B (Sherlock)",
+        "attribute": "in text (Vision-defined)",
+        "value": "96.3% (131/136)"
+       }
+      },
+      "not_in_text": {
+       "value": 37.4,
+       "n": 91,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Qwen3.6 27B (Sherlock)",
+        "attribute": "not in text (Vision text and image pass)",
+        "value": "37.4% (34/91)"
+       }
+      },
+      "undated_false_year": {
+       "value": 17.8,
+       "n": 90,
+       "truth": "owner-ruled where ruled, else the Gemini image pass",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Qwen3.6 27B (Sherlock)",
+        "attribute": "false-year rate",
+        "value": "17.8% (16/90)"
+       }
+      },
+      "du_certain_flagged": {
+       "value": 10.1,
+       "n": 179,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Qwen3.6 27B (Sherlock)",
+        "attribute": "certain years flagged",
+        "value": "10.1% (18/179)"
+       }
+      },
+      "du_uncertain_unflagged": {
+       "value": 45.2,
+       "n": 31,
+       "truth": "owner-tags",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Qwen3.6 27B (Sherlock)",
+        "attribute": "uncertain years unflagged",
+        "value": "45.2% (14/31)"
+       }
+      },
+      "evidence_valid": {
+       "value": "226 / 44",
+       "n": 270,
+       "truth": "evidence_check",
+       "source": {
+        "file": "segbench-results/date-route-pipeline.md",
+        "route": "Qwen3.6 27B (Sherlock)",
+        "attribute": "valid / unsupported",
+        "value": "226 / 44"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "usd_1000_batch": 0.0,
+      "price_read": null,
+      "source": null
+     },
+     "time": {
+      "per_unit_s": 2.35,
+      "measured": true,
+      "measured_on": "Sherlock, one GPU, vLLM batched: 306.5 s for 354 trace calls and 844.9 s for 181 image calls (job 52063413), at the route's 362 trace and 115 image calls on 362 documents; model load not counted",
+      "source": {
+       "file": "segbench-results/date-route-pipeline.md",
+       "route": "Qwen3.6 27B (Sherlock)",
+       "attribute": "Time (the 27B)",
+       "value": "about 2.35 GPU-s a document"
+      }
+     },
+     "memory": null,
+     "caveats": [
+      "behind Gemini's route by 19 documents of 91 not in text (22 right only on Gemini, 3 only on the 27B, sign test p 0.0002)",
+      "Vision-defined sets on 272 of the owner's 300, as the Gemini row",
+      "118 image replies reused from W46.date-image's run (other server flags, same FP8 model and prompt)",
+      "step 3 (inheritance) not measured",
+      "false years 17.8% under section 3's step 1; 12.2% if the model's own flag may add Date Uncertain to an explicit text year (owner gate W46.date-route-owner-ok)",
+      "one run; the rerun floor is a 94% same-year rate"
+     ],
+     "kind_rules": [],
+     "fallback": "no year, Date Uncertain",
+     "conditions": [
+      "the cluster profile's dating route as one pipeline, beside the step rows qwen3.6-27b-trace-neigh-vision and qwen3.6-27b-image"
+     ],
+     "step": [
+      1,
+      2,
+      4
+     ]
+    },
+    {
      "id": "none",
      "name": "No dating",
      "family": "manual",

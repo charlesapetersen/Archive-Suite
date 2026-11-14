@@ -2028,6 +2028,29 @@
    "image_pass_finds": null
   },
   {
+   "id": "qwen3.6-27b-route",
+   "name": "Qwen3.6 27B, the restated route: text, image pass where the text has no year, checked neighbour estimate (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": 0.0,
+   "s_doc": 2.35,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "behind Gemini's route by 19 documents of 91 not in text (22 right only on Gemini, 3 only on the 27B, sign test p 0.0002); Vision-defined sets on 272 of the owner's 300, as the Gemini row",
+   "source": "settings-routes.json, stage dating, row qwen3.6-27b-route",
+   "year": {
+    "in text": 96.3,
+    "not in text": 37.4
+   },
+   "pool_weighted": null,
+   "uncertain_marked": 54.8,
+   "false_year_undated": 17.8,
+   "image_pass_finds": null
+  },
+  {
    "id": "none",
    "name": "No dating",
    "family": "manual",

@@ -594,7 +594,6 @@ now takes the rule table as its source.
 
 
 
-- [ ] **`W46.date-route-pipeline-27b` — the restated dating route on the 27B [S]** (lane: segbench) (uses: light) (cluster: sherlock) — W46.date-route-pipeline measured the route on Gemini 3.7 (`segbench-results/date-route-pipeline.md`) and exported the 27B's pack (`date_route_pipeline.py export`: 362 trace-neigh prompts for the old kit's text mode, 189 image requests in date_image's pack form, the 27B's 118 earlier image replies reused). Write the job and submit scripts and the manifest, dry-run on the Mac, hand over; on return `score` adds the 27B's rows and checker counts beside Gemini's, and its combined row goes in `13-stage-rules/08-dating.md` section 4. Notes and the size review: `execution-plans/items/W46.date-route-pipeline-27b.md`.
 - [ ] **`W46.date-route-pipeline-8b` — the restated dating route with the Mac's Qwen3-VL 8B image pass [S]** (lane: segbench) (uses: light,model:10) (blocked-on: W46.date-route-pipeline-27b) — filed by W46.date-route-image-routes, 2026-11-13. Call 7.5 adds the 8B image pass at 16 GB only once its quotes are shown to improve the year. Run `date_route_pipeline.py`'s step 2 with the 8B (4-bit MLX, 1,400 px, under the heavy lock) on the same Vision-defined sets, $0, and score it beside Gemini 3.7's and the 27B's rows; its combined row goes in `13-stage-rules/08-dating.md` section 4. If the 27B's quotes do not improve the year, record that the 8B (the weaker reader) is not run and close this as not needed.
 
 

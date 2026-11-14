@@ -782,8 +782,9 @@ def score_model(model, ts, gem_image):
             parsed = DI.read(im)
             r["intext_image"] = {"ok": ok, "own": own_y, "stamps": sum(1 for x in parsed["dates"] if x["written"] and (
                 x["where"] == "stamp" or x["kind"] == "stamped"))}
-        if d["set"] == "undated" and im is not None:
-            r["page_own"] = DU.own_date(im)[1]
+        if d["set"] == "undated":     # judged by Gemini's reading whatever the model scored; its own image was not
+            g = gem_image.get(d["id"])  # sent where the text has a candidate
+            r["page_own"] = DU.own_date(g)[1] if g is not None else None
         rows.append(r)
     return rows or None
 
@@ -872,6 +873,26 @@ def intext_image(rows):
             "stamp_dates": sum(r["intext_image"]["stamps"] > 0 for r in rows)}
 
 
+def sherlock_time(S):
+    """The 27B's GPU seconds a document from the job log's run summaries (the arms after their 8-request pilots), at
+    the route's call mix; the committed result's figure when the hand-over has been cleaned away."""
+    runs = []
+    for f in sorted((PACK / "scratch" / "logs").glob("gpu-*.out")) if PACK.is_dir() else []:
+        for l in open(f, encoding="utf-8"):
+            if l.startswith("{") and '"requests"' in l:
+                r = json.loads(l)
+                if r["requests"] > 8:
+                    runs.append(r)
+    if len(runs) != 2:
+        old = load(RESULTS_JSON)
+        return (old or {}).get("sherlock_time")
+    tr, im = runs
+    c, n = S["calls"], S["documents"] or 1
+    s_doc = (c["trace"] * tr["wall_s"] / tr["sent"] + c["image"] * im["wall_s"] / im["sent"]) / n
+    return {"job": tr["job"], "trace": {k: tr[k] for k in ("sent", "wall_s")}, "image": {k: im[k] for k in ("sent", "wall_s")},
+            "calls": c, "documents": n, "s_doc": round(s_doc, 2)}
+
+
 def route_calls(rows):
     return {"trace": sum(1 for r in rows), "image": sum(1 for r in rows if r["image_sent"])}
 
@@ -904,17 +925,18 @@ def per_1000(S, cost):
 def cmd_score(a):
     ts = targets()
     gem_image = {}
-    for d in ts:
-        if d["set"] == "owner":
-            gem_image[d["id"]] = load(image_dest(d))
+    for d in ts:       # the Gemini image pass, sent on every document: the strata and the undated set's page reading
+        gem_image[d["id"]] = load(image_dest(d))
     out = {"sets": dict(collections.Counter(d["set"] for d in ts)),
            "readable": dict(collections.Counter(d["set"] for d in ts if readable(d))), "models": {}}
     timing = ledger(CACHE / "timing.jsonl")
     out["vision"] = timing[-1] if timing else None
+    by_model = {}
     for model in (GEMINI, QWEN):
         rows = score_model(model, ts, gem_image)
         if rows is None:
             continue
+        by_model[model] = rows
         S = summarise(model, rows, ts)
         alt = [{**r, **r["self_only"], "image_sent": r["image_sent"]} for r in rows]
         A = summarise(model, alt, ts)
@@ -942,6 +964,16 @@ def cmd_score(a):
         out["models"][model] = S
         with open(CACHE / f"rows-{model}.jsonl", "w", encoding="utf-8") as fh:
             fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
+    if len(by_model) == 2:          # the two routes on the same owner documents, Gemini as a, the 27B as b
+        q = {r["id"]: r["year"] for r in by_model[QWEN]}
+        both = [{**r, "qwen_year": q[r["id"]]} for r in by_model[GEMINI] if r["set"] == "owner"
+                and r["truth_y"] is not None and r["id"] in q]
+        out["paired_models"] = {"not_in_text": paired([r for r in both if r.get("stratum") in ("on the page",
+                                                                                               "not on the page")],
+                                                      "year", "qwen_year"),
+                                "all_owner": paired(both, "year", "qwen_year")}
+    if QWEN in out["models"]:
+        out["sherlock_time"] = sherlock_time(out["models"][QWEN])
     RESULTS_JSON.write_text(json.dumps(out, indent=1) + "\n")
     write_md(out)
     print(json.dumps({m: {"not_in_text": s["not_in_text"], "by_class": s["by_class"]} for m, s in out["models"].items()},
@@ -1095,6 +1127,13 @@ def write_md(out):
               f"{c['billed_note']}). Per 1,000 documents of the owner's mix, one trace call each and the image pass on "
               f"{100 * p['image_share']:.0f}% of them: about ${p['usd']:.2f} and {p['seconds']:,} s of calls in sequence. "
               f"This item spent ${c['item_spent']:.2f}.", ""]
+    t = out.get("sherlock_time")
+    if t:
+        L += ["## Time (the 27B)", "",
+              f"Sherlock job {t['job']}, one GPU, vLLM batched (model load not counted): trace {t['trace']['sent']} calls "
+              f"in {t['trace']['wall_s']} s, image {t['image']['sent']} calls in {t['image']['wall_s']} s (the rest "
+              f"reused). At the route's {t['calls']['trace']} trace and {t['calls']['image']} image calls on "
+              f"{t['documents']} documents, about {t['s_doc']} GPU-s a document. No money.", ""]
     v = out.get("vision")
     if v:
         L += [f"Vision: {v['read_now']} pages read now in {v['read_s']} s on macOS {v['os']} "
@@ -1102,19 +1141,21 @@ def write_md(out):
     L += card(
         "the owner's date tags on his 300 (year, and Date Uncertain for the two flag rates); for the undated set, his "
         "page-date rulings on the documents he ruled and the Gemini image pass's own reading on the rest, the latter "
-        "the scored model's own reader and reported apart. The tag differs from the page for 4 of 26 own-page cases "
+        "Gemini's own reader on its rows and another model's reading on the 27B's, reported apart. The tag differs from the page for 4 of 26 own-page cases "
         "(date-truth-sets.md), so a route quoting the page can score wrong against the tag.",
         "the owner's 300 as date_tagging drew them and the undated 100 as W46.date-undated drew them, never by a tested "
         "route or the ABBYY text; documents whose first page has no confirmed JPEG original are left out (the app would "
         "have its own photo). The strata come from the app's own Vision text and the Gemini image pass, so \"on the "
         "page\" is defined by the Gemini reader that one route uses as its step 2.",
         "every route on the same documents, the same Vision text, the same prompts and images; the step-2 effect is "
-        "paired on the same trace replies. The older step rows were on ABBYY-defined sets and corpus text and are not "
+        "paired on the same trace replies, and Gemini against the 27B on the same documents. The older step rows were on ABBYY-defined sets and corpus text and are not "
         "compared figure for figure.",
-        "one run (temperature 0, reasoning low); the dating rerun floor is a same-year rate of 94% (85/90) between two "
+        "one run each (temperature 0; Gemini at reasoning low, the 27B with thinking off); the dating rerun floor is a same-year rate of 94% (85/90) between two "
         "identical runs (date-undated.md), so a gap of a few points between routes is inside it. Wilson intervals on "
-        "single rates; the step-2 gap by an exact sign test on its discordant pairs.",
-        "Gemini 3.7 on the gateway (3.8 on a direct key is unmeasured here); inheritance (step 3) is not measured; "
+        "single rates; the step-2 gap and the model gap by an exact sign test on their discordant pairs.",
+        "Gemini 3.7 on the gateway (3.8 on a direct key is unmeasured here); the 27B is Qwen3.6-27B-FP8 on vLLM "
+        "(Sherlock batch 20261112), its 118 image replies on W46.date-image's documents reused from that run, which "
+        "used other server flags on the same model and prompt; inheritance (step 3) is not measured; "
         "the checker counts are off its writing set but on one prompt; the false-year rate is a share of the "
         "collection-balanced undated sample, not a corpus rate (P3-1).")
     RESULTS.write_text(keep_card(RESULTS, "\n".join(L) + "\n"))
@@ -1163,7 +1204,29 @@ def findings(out):
             "dates for the sidecar). Sending it everywhere would cost the image call on every document.",
             f"- **Cost and time:** about ${cost['usd']:.2f} per 1,000 documents of the owner's mix at 3.8's list price "
             f"as a ceiling, and {cost['seconds'] / 1000:.1f} s of calls a document in sequence (one trace call each, the "
-            f"image pass on {100 * cost['image_share']:.0f}% of them).", ""]
+            f"image pass on {100 * cost['image_share']:.0f}% of them)."] + findings_27b(out) + [""]
+
+
+def findings_27b(out):
+    """The 27B's route beside Gemini's, once its Sherlock answers are scored."""
+    S, G, P = out["models"].get(QWEN), out["models"].get(GEMINI), out.get("paired_models")
+    if not S or not P:
+        return []
+    b, c, u, F, k = S["by_stratum"], S["by_class"], S["undated"], S["flag_demotes"], S["checker"]["counts"]
+    n, a = P["not_in_text"], P["all_owner"]
+    return [f"- **The route on the 27B (Sherlock): {pc(S['not_in_text'])} where the year is not in the own text, "
+            f"{pc(b['in text']['exact'])} where it is**, against Gemini's {n['a_exact']}/{n['n']} on the same "
+            f"documents ({n['a_only']} right only on Gemini, {n['b_only']} only on the 27B, sign test p {n['sign_p']}; "
+            f"all owner documents {a['a_exact']} against {a['b_exact']} of {a['n']}, p {a['sign_p']}). It loses on the "
+            f"page ({pc(b['on the page']['exact'])}) and off it ({pc(b['not on the page']['exact'])}): "
+            f"{c['estimate']['n']} checked neighbour estimates ({pc(c['estimate']['exact'])} exact) against Gemini's "
+            f"{G['by_class']['estimate']['n']}, and {c['none']['n']} documents with no year written against "
+            f"{G['by_class']['none']['n']}. Its trace replies are weaker and the checker refuses more of them "
+            f"({k.get('valid', 0)} valid, {k.get('unsupported', 0)} unsupported; {k.get('right years refused', 0)} right "
+            f"years refused, {k.get('wrong years accepted', 0)} wrong accepted). Undated: {pc(u['false_year'])} false "
+            f"years under section 3, {pc(F['undated']['false_year'])} with the flag rule; Date Uncertain on certain "
+            f"years {pc(S['du_vs_owner']['certain_flagged'])}, left off uncertain ones "
+            f"{pc(S['du_vs_owner']['uncertain_unflagged'])}."]
 
 
 def main():
