@@ -2,11 +2,12 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## ⚠️ LIMITATION (W42.int-s5, checkpoints 1-5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
+## ⚠️ LIMITATION (W42.int-s5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
 
 New output puts an invisible text layer on the image page of print pages (`OCR/TextLayerRule.swift`,
 VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or more level (`OCR/ReadingCopy.swift`,
-switch `straightenReadingCopy`); the text page stays. Still open inside W42.int-s5 (`execution-plans/items/W42.int-s5.md`):
+switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text page stays. W42.int-s5 shipped
+2026-11-13; the searchable (layer-only) form is `W42.int-s5-searchable` and the hand placer `W42.int-s5-hands`. Open:
 - **Improve OCR keeps the old layer only where it cannot remake the image page** (`ReOCRJob.remadeImagePage`): when
   the page's own JPEG is not what it shows (a CMYK or turned image, a page Improve OCR renders) or the page is not the
   Processor's letter page, has its own crop box or annotations, or a remade page would not render exactly as it does.
@@ -20,7 +21,11 @@ switch `straightenReadingCopy`); the text page stays. Still open inside W42.int-
 - **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
   Live Capture and the multi-page PDF path drop the outcome.
 - **Handwriting gets no layer**: the hand placer (kraken blla lines with CTC alignment) is not in the app, so the
-  `placeHandOnImage` switch is not followed yet (the settings sheet still says so).
+  `placeHandOnImage` switch is not followed yet (the settings sheet still says so): `W42.int-s5-hands`.
+- **Output is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
+  UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
+  the image page is the 2 MB JPEG copy and Vision OCR's searchable PDF compresses the page (JBIG2). Only the
+  image-plus-text form exists; the searchable form is `W42.int-s5-searchable`.
 - **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
   "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
   the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the

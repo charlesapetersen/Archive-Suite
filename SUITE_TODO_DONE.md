@@ -15910,3 +15910,33 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Follow-up filed: `W40.fix-reader-scope-exit-main` (the chip, a folder click and All Files still build on main; the
   table's showRows at 116k rows). Bench cache: nothing written; the chain clone is made and deleted by the harness.
   <!-- /W40.fix-reader-smart-folder-delete -->
+- [x] **W42.int-s5 — output: the searchable PDF and image-plus-text [M · Tier-2]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) — SHIPPED 2026-11-13
+  (e647df1f, 8edb82d5, 17e47e95, 2b36e1a0, 81695d80 and the completing commit). Image-plus-text output now carries an
+  invisible layer on the image page of print pages: VisionOCRKit `TextLayer` (the engine's Vision lines, the reader's
+  words aligned onto them, the lab writer), the app's rule in `OCR/TextLayerRule.swift` (print kinds placed; hand and
+  mixed pages, RTL/CJK/Thai readings the text page alone; an unknown kind placed only when the reading aligns).
+  Straightening (`OCR/ReadingCopy.swift`, `straightenReadingCopy`, on by default): a median Vision line slope of 1 degree
+  or more turns the page level on a canvas that holds it, no crop; both switches are read from the run's frozen
+  settings by every writer, resumed runs included. Improve OCR remakes the image page's layer beside each text page it
+  replaces (`ReOCRJob.remadeImagePage`, pixel-for-pixel and same-JPEG guards; SPEC/improve-ocr.md §5). The run log
+  names pages left without a layer (Process Files). Every output and merged document is PDF/A-2b
+  (`PDFGenerator.writeArchival`: Quartz's `kCGPDFContextCreatePDFA` instead of `PDFDocument.write`, whose
+  `/Interpolate true` failed 6.2.8; `OCR/ArchivalFinish.swift` frees an object Quartz lists at offset 0 and stores the
+  XMP unfiltered, because PDFium's revision rewrote compressed XMP without its /Filter); SPEC/tag-format.md says so.
+  Measured (`scripts/measure-output.sh`, new; Apple Vision readings, $0) on the drawn memo and UIUC 00149, 00156 (red
+  stamp) and 00233 (bound, curved): every form (layer, layer unstraightened, no layer) reads back with two pages, the
+  text page second, layer text selectable where placed, Finder tags present, and the merged document in order; all 13
+  outputs pass veraPDF 1.30 --flavour 2b (2u fails only the declared letter). Sizes, image-plus-text with layer against
+  Vision OCR 1.16.0's searchable PDF of the same file (`visionocr-pdf`, new VisionOCRKit tool, its defaults): memo
+  152.5 KB / 16.1 KB; 00149 2,121 KB / 525 KB; 00156 2,267 KB / 874 KB; 00233 2,109 KB / 122 KB. The layer adds
+  13-18 KB a page; a page with no layer is 139.6 KB / 2,154 / 2,250 / 2,142 KB. Time a page: 2.3-3.5 s with the layer
+  (Vision runs again at output), 0.2 s without; Vision OCR 12.7-48.6 s. Straightened: 00149 by 3.4 degrees, 00233 by
+  1.4. Tests: `scripts/test-text-layer.sh` (sections 1-6, veraPDF on every kept output and an Improve OCR revision) and
+  the six Improve OCR suites, merge-safety, dual-date, page-kind, date-route, tag-warning, recovery. Tier-2 reviews
+  (Opus) at each checkpoint; no HIGH left open. Split off as their own items (the item was larger than its M, Daemon
+  Report 2026-11-13): `W42.int-s5-searchable` (the layer-only form and Vision OCR's compression, after the page-2
+  header's carrier, a SPEC change in both apps; W42.int-s7 now waits on it) and `W42.int-s5-hands` (the hand placer;
+  `placeHandOnImage` stays pending on the settings sheet; W46.kit-hands waits on it). Limits in
+  ArchiveProcessor/KNOWN_ISSUES.md §W42.int-s5. Bench cache: the measurement's copies of the three UIUC pages and its
+  outputs (int-s5-smoke, int-s5-measure.*, 35 MB) went to the Trash; nothing kept, measure-output.sh remakes them.
+  <!-- /W42.int-s5 -->

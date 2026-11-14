@@ -90,6 +90,7 @@ struct ContentView: View {
             PageReaderTestDriver.runIfRequested()             // $0 W42 one way to read a page, no wire
             PageReaderLiveDriver.runIfRequested()             // PAID W42 OpenRouter smoke read (env + key gated)
             TextLayerTestDriver.runIfRequested()              // $0 W42 the image page's searchable layer, scratch only
+            OutputMeasureTestDriver.runIfRequested()          // $0 W42 the output forms measured on a scratch smoke set
             ProviderErrorTestDriver.runIfRequested()         // $0 W40 a 402 reads as credit/billing, not a rate limit
             LocalModelsTestDriver.runIfRequested()           // $0 W41 local open-weight model route, no wire
             OCRPageGuidanceTestDriver.runIfRequested()       // $0 W41 picker note: which model reads which pages

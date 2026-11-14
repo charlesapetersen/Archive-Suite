@@ -338,6 +338,11 @@ existing scratch, key-free, no-network execution remains unchanged.
   only for a deliberate text change). Also each reader's route, timing and page price, the factory's precedence, no
   reader for an unpinned OpenRouter model, OpenRouter listing parsing (the pinned upstream's row only) and the refresh
   into a scratch defaults suite, then `check-page-reader-seam.sh`. `PAGEREADER_TEST`, no wire, $0.
+- **`measure-output.sh <in-dir> <out-dir>`** — W42.int-s5: each image in a scratch folder (never the corpus) and a
+  drawn memo page, read by Apple Vision and written as image-plus-text with the layer, with it unstraightened and with
+  none; each read back through PDFKit with Finder tags, the layered ones merged; then Vision OCR 1.16.0's searchable
+  PDF of the same files (`packages/VisionOCRKit` product `visionocr-pdf`, built `-c release -Xswiftc -enable-testing`)
+  for the size baseline, and veraPDF PDF/A-2b on every output. $0, no network; takes the heavy lock.
 - **`live-page-reader.sh`** — PAID (about $0.003): reads OpenRouter's listing, states the cost of two pages at
   Qwen3-VL 235B's listed price before calling, reads the smoke pages through `PageReaders.reader`, and reports text,
   seconds, dollars and the key counter's spend. Without `--paid` it prints the bound.

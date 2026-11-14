@@ -45,6 +45,13 @@ let package = Package(
             dependencies: ["VisionOCRKit"],
             path: "Tools/gate"
         ),
+        // Tools/pdf/main.swift: Vision OCR's searchable PDF of named files with its defaults, headless; the size
+        // baseline Archive Processor's output is measured against (W42.int-s5). Built as the checks are.
+        .executableTarget(
+            name: "visionocr-pdf",
+            dependencies: ["VisionOCRKit"],
+            path: "Tools/pdf"
+        ),
         // Runs visionocr-checks as `swift test` would see it: from the package root, with the
         // package's helper, and fails unless every check passed.
         .testTarget(

@@ -323,7 +323,7 @@ enum TextLayerTestDriver {
     static let pageW = 1200, pageH = 1550
     static func baselineY(_ i: Int) -> Int { pageH - 140 - i * 70 }
 
-    private static func drawPage(_ text: [String], to url: URL, type: String, skew: Double = 0) -> URL? {
+    static func drawPage(_ text: [String], to url: URL, type: String, skew: Double = 0) -> URL? {
         guard let ctx = CGContext(data: nil, width: pageW, height: pageH, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }

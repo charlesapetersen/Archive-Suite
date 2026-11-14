@@ -847,7 +847,7 @@ struct SettingsSheetModel {
     }
 
     /// Switches the run does not read yet. Straightening is followed (W42.int-s5, `PDFGenerator.TextLayerOptions`); the
-    /// hand placement switch waits for the hand placer, which W42.int-s5 still has to bring into the app.
+    /// hand placement switch waits for the hand placer, which W42.int-s5-hands brings into the app.
     static let switchPending: Set<SettingsKey> = [.placeHandOnImage]
     static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
 
