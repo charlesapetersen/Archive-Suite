@@ -37,7 +37,7 @@ struct SidebarView: View {
                             Button("Edit Smart Folder…") { model.editSmartFolder(s) }
                                 .accessibilityIdentifier("ar.sidebar.smart.edit")
                             Button("Rename…") { model.renamingSearch = s }
-                            Button("Delete", role: .destructive) { model.savedSearches.delete(s.id) }
+                            Button("Delete", role: .destructive) { model.deleteSmartFolder(s.id) }
                         }
                 }
                 .onMove { from, to in model.savedSearches.move(fromOffsets: from, toOffset: to) }

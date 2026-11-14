@@ -177,6 +177,24 @@ final class ReaderChainAtSizeTests: XCTestCase {
         }
     }
 
+    /// Deleting a smart folder (W40.fix-reader-smart-folder-delete): one not open costs the main thread almost
+    /// nothing, since the other folders' counts stand; the open one costs no more than leaving it by its chip.
+    /// No row is counted on the main thread either way.
+    private func assertDeleteBudget(_ runs: [String: [Chain]]) {
+        guard optimized, let other = runs["delete-other"], let open = runs["delete-open"],
+              let chip = runs["chip-exit"] else { return }
+        let otherBusy = median(other.map(\.busy)), openBusy = median(open.map(\.busy)), chipBusy = median(chip.map(\.busy))
+        print("CH budget delete: not open main-busy median \(ms(otherBusy)) (budget 16.0 ms), open \(ms(openBusy)) "
+              + "against the chip's \(ms(chipBusy)) (budget chip + 50 ms)")
+        XCTAssertLessThanOrEqual(otherBusy, 0.016, "delete a folder not open: main-busy")
+        XCTAssertLessThanOrEqual(openBusy, chipBusy + 0.050, "delete the open folder: main-busy against the chip")
+        for run in other + open {
+            XCTAssertEqual(onMain("model.countMatches.rows", run), 0, "delete: rows counted on main")
+            XCTAssertEqual(onMain("presentation.build", run), 0, "delete: the whole list built on main")
+            XCTAssertNotNil(run.visible, "delete: the change never showed")
+        }
+    }
+
     /// The file-switch budget W40.reader-scale-measure set (W40.fix-reader-viewer-switch): the next file within
     /// 100 ms main-busy with 5 open.
     private func assertViewerBudget(_ label: String, _ runs: [Chain]) {
@@ -349,6 +367,40 @@ final class ReaderChainAtSizeTests: XCTestCase {
             summarize("reader-write-\(count)", runs)
             assertChangeBudget("reader-write-\(count)", runs, busy: 0.150, visible: 0.250, excludingWriter: true)
         }
+        // ── 2b. Deleting a smart folder (W40.fix-reader-smart-folder-delete; owner, 2026-11-13: a beach ball).
+        // Leaving one by its chip's ✕ is the comparison: the delete of the open one leaves it the same way.
+        var deletes: [String: [Chain]] = [:]
+        for k in 0..<3 {
+            let other = try XCTUnwrap(navigation.savedSearches.add(name: "Delete me \(k)",
+                search: AdvancedSearch(rules: [rule(.tags, .hasAny) { $0.tags = ["Memoranda"] }])))
+            _ = await waitUntil(timeout: 120) { navigation.smartFolderCounts[other] != nil }
+            deletes["delete-other", default: []].append(await measureChain("delete a smart folder not open (run \(k + 1))",
+                trigger: { navigation.deleteSmartFolder(other) },
+                visible: { navigation.smartFolderCounts[other] == nil }))
+            XCTAssertEqual(navigation.scope?.id, box12.id, "deleting another folder leaves the open one open")
+
+            let open = try XCTUnwrap(navigation.savedSearches.add(name: "Delete me open \(k)",
+                search: AdvancedSearch(rules: [rule(.tags, .hasAny) { $0.tags = ["Box 12"] }])))
+            let saved = try XCTUnwrap(navigation.savedSearches.searches.first { $0.id == open })
+            _ = await waitUntil(timeout: 120) { navigation.smartFolderCounts[open] != nil }
+            navigation.applyScope(saved)
+            _ = await waitUntil(timeout: 30) { navigation.scope?.id == open && navigation.displayed.count < navigation.library.files.count }
+            deletes["delete-open", default: []].append(await measureChain("delete the open smart folder (run \(k + 1))",
+                trigger: { navigation.deleteSmartFolder(open) },
+                visible: { navigation.scope == nil && navigation.displayed.count == navigation.library.files.count }))
+            XCTAssertNil(navigation.scope, "deleting the open folder leaves it")
+
+            navigation.applyScope(box12)
+            _ = await waitUntil(timeout: 30) { navigation.scope?.id == box12.id && navigation.displayed.count < navigation.library.files.count }
+            deletes["chip-exit", default: []].append(await measureChain("leave a smart folder by its chip (run \(k + 1))",
+                trigger: { navigation.removeFilter(.smartFolder) },
+                visible: { navigation.scope == nil && navigation.displayed.count == navigation.library.files.count }))
+            navigation.applyScope(box12)
+            _ = await waitUntil(timeout: 30) { navigation.scope?.id == box12.id && navigation.displayed.count < navigation.library.files.count }
+        }
+        for label in ["delete-other", "delete-open", "chip-exit"] { summarize(label, deletes[label] ?? []) }
+        assertDeleteBudget(deletes)
+
         navigation.removeFilter(.smartFolder)
         _ = await waitUntil(timeout: 30) { navigation.displayed.count == navigation.library.files.count }
 

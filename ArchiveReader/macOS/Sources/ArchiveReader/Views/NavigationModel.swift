@@ -357,7 +357,7 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated {
                 guard let self else { return }
                 self.objectWillChange.send()
-                self.refreshSmartFolderCounts()
+                self.smartFoldersChanged()
                 self.reconcileScopeWithStore()
             } }
             .store(in: &cancellables)
@@ -598,6 +598,14 @@ final class NavigationModel: ObservableObject {
         return url.standardizedFileURL.path
     }
 
+    /// Delete a smart folder, from the sidebar's menu or the toolbar's Saved ▸ Delete. The open one is left first,
+    /// with the whole list built off the main actor, so neither the sidebar's selection sync nor the store's
+    /// change runs that pass on the main thread (W40.fix-reader-smart-folder-delete). Not a move for Back.
+    func deleteSmartFolder(_ id: UUID) {
+        if scopeIsSaved, scope?.id == id { exitScope(); recomputeInBackground() }
+        savedSearches.delete(id)
+    }
+
     /// Edit Smart Folder: the form, filled in with the folder's rules.
     func editSmartFolder(_ search: SavedSearch) {
         advancedSearchRequest = AdvancedSearchRequest(editing: search, search: search.search)
@@ -807,7 +815,7 @@ final class NavigationModel: ObservableObject {
             if current != scope { setScope(current, saved: true, announce: false); recompute() }
         } else {
             // The active scope's saved search was deleted — exit the scope.
-            exitScope(); recompute()
+            exitScope(); recomputeInBackground()
         }
     }
 
@@ -1025,6 +1033,25 @@ final class NavigationModel: ObservableObject {
         let input = presentationInput(library.files)
         present(ReaderStages.measure("presentation.build") { input.build() }, marks: input.marks,
                 filesRevision: library.filesRevision)
+    }
+
+    /// `recompute`, with the list built off the main actor at corpus size, where the whole-library pass held the
+    /// main thread 1.2 s in Debug (W40.fix-reader-smart-folder-delete). The list shows the old rows until it is
+    /// presented. Any recompute meanwhile supersedes it; so does a library change, whose own rebuild presents,
+    /// since no row patch applies to a list that is not presented yet.
+    private func recomputeInBackground() {
+        guard library.files.count >= 1_000 else { recompute(); return }
+        viewRevision &+= 1
+        let view = viewRevision, filesRevision = library.filesRevision
+        let input = presentationInput(library.files)
+        presentedFilesRevision = nil
+        Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                ReaderStages.measure("presentation.build (background)") { input.build() }
+            }.value
+            guard let self, self.viewRevision == view, self.library.filesRevision == filesRevision else { return }
+            self.present(result, marks: input.marks, filesRevision: filesRevision)
+        }
     }
 
     /// The `library.filesRevision` that `displayed` was built from, so a row patch knows whether its change
@@ -2025,6 +2052,19 @@ final class NavigationModel: ObservableObject {
             self.smartFolderCountsRevision = revisions.first ?? self.library.filesRevision
             self.smartFolderCountsLive = revisions.count <= 1
         }
+    }
+
+    /// The saved searches changed. A deletion, a rename or a reorder leaves every remaining folder's rules as they
+    /// were counted, so their counts stand and only the deleted ones' are dropped; anything else is recounted.
+    /// Deleting one used to recount every other folder over the whole library (W40.fix-reader-smart-folder-delete).
+    private func smartFoldersChanged() {
+        let searches = savedSearches.searches
+        guard smartFolderCountsLive,
+              searches.allSatisfy({ smartFolderBasis[$0.id]?.search == $0.search && smartFolderCounts[$0.id] != nil })
+        else { refreshSmartFolderCounts(); return }
+        let ids = Set(searches.map(\.id))
+        if smartFolderBasis.count != ids.count { smartFolderBasis = smartFolderBasis.filter { ids.contains($0.key) } }
+        if smartFolderCounts.count != ids.count { smartFolderCounts = smartFolderCounts.filter { ids.contains($0.key) } }
     }
 
     /// Move each smart folder's count by the changed rows' difference, the rows before against the rows after.

@@ -742,7 +742,7 @@ struct NavigationWindowView: View {
                     Divider()
                     Menu("Delete") {
                         ForEach(model.savedSearches.searches) { s in
-                            Button(s.name, role: .destructive) { model.savedSearches.delete(s.id) }
+                            Button(s.name, role: .destructive) { model.deleteSmartFolder(s.id) }
                         }
                     }
                 }
