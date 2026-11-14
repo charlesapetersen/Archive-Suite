@@ -16092,3 +16092,27 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `~/.local/state/archive-autonomous/artifacts/date-route-27b-20261112` (the returned replies and job logs) is left for
   the walkthrough's disk step.
   <!-- /W46.date-route-pipeline-27b -->
+- [x] **W40.fix-reader-quality-popups — the Quality column's popups are half of what showing a new list costs the main thread [S]** · §Archive Reader — the owner's notes of 2026-11-13 — SHIPPED 2026-11-13
+  (the completing commit). Each row of the Quality column was an `NSPopUpButton`, which on macOS 27 lays itself out
+  through its own SwiftUI graph, ~3 ms a row. It is now `QualityCellView` (`AppKitTableView.swift`): the value as text
+  (`Q1`…`Q3` / `None`, at the list's font size) with a popup's chevron, and a plain click opens the menu a popup
+  would (None, Q1-Q3, the value checked, placed over the cell), so only a click makes a menu. A child `Button` view is
+  the popup to accessibility (AXPopUpButton, `ar.quality.menu.<name>`, "Quality for <name>", value `Q1`…; a press
+  opens the menu on the next turn), so the cell stays the row's AXCell. A choice writes through
+  `applyEdit(.setQuality)` to the file the menu was opened on, so a reuse while the menu is open cannot retarget it;
+  ⌘/⇧/⌃-clicks and double-clicks go to the table, and `ContextMenuTableView` hands the cell a press the table would
+  otherwise take, as it does the Read cell. The one thing dropped: the popups were in the key-view loop (Tab with
+  full keyboard access); the cell is not. Measured, -O, before and after in this session: `testWhatEachColumnCosts`
+  (33 rows) Quality only 131/127 → 20/19 ms, against 13-20 ms for every other column; `ReaderChainAtSizeTests` at
+  115,999 rows, main-busy medians: the chip's ✕ 314 → 173 ms, All Files 291 → 175, deleting the open smart folder
+  286 → 172, a folder 288 → 168. New `QualityCellTests` (4: value and accessibility, the menu's items and check,
+  a choice writes the opened file and not the reused row's, modifier/double clicks and empty rows go to the table).
+  Adversarial review (Opus): no HIGH; its two MEDIUMs (the cell claimed the popup role itself, dropping the row's
+  AXCell; a VoiceOver press blocked while the menu tracked) and three LOWs (font size, chevron tint on a selected
+  row, tooltip on empty rows) fixed; menu text sits a little right of the label (cosmetic, kept). Docs:
+  ArchiveReader REFERENCE.md map, verification/reader.md R-24. VM (macOS 27.2): `testQualityControlsUseCanonicalScale` (finds the popup, value Q1, picks Q3 from its
+  menu, reads Q3 back from the scratch file), `testColumnHeadersExist`, `LayoutGuardUITests` and the Read cell's test
+  pass, 5/5; the screenshot shows `Q3` with its chevron. Whole Reader unit bundle green (893, 6 skipped), no new
+  warnings. Bench cache: nothing written;
+  the chain clones were made and deleted by the harness.
+  <!-- /W40.fix-reader-quality-popups -->

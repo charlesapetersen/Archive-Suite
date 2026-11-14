@@ -531,8 +531,9 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **Promise:** the Quality column's pop-up sets a file's Quality, through `TagWriter`.
 - **Promised in:** `CLAUDE.md` Implementation map (`AppKitTableView`); `SUITE_TODO_DONE.md` `W19.q3`;
   `SMOKE_TEST.md` §2026-08-28.
-- **Reached by:** the `NSPopUpButton` in the Quality column (`Views/AppKitTableView.swift:399-446`).
-  `qualityMenuChanged` (`:443`) calls `model.applyEdit(.setQuality(q), to: file)` (`:446`), which runs
+- **Reached by:** `QualityCellView` in the Quality column (`Views/AppKitTableView.swift`; a text cell whose click
+  opens the popup's menu, W40.fix-reader-quality-popups). A choice's `onChoose`, set in `makeQualityMenuCell`,
+  calls `model.applyEdit(.setQuality(q), to: file)` for the file the menu was opened on, which runs
   `NavigationModel.applyEdit(_:to:)` (`Views/NavigationModel.swift:1278`).
 - **Real-path test:** `ArchiveReaderUITests/NavigationUITests.testQualityControlsUseCanonicalScale` (picks Q3,
   reads `Q3` back from the scratch file).

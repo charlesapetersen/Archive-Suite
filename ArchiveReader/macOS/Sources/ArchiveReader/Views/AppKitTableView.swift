@@ -731,53 +731,14 @@ struct AppKitTableView: NSViewRepresentable {
         /// `TagWriter`.
         private func makeQualityMenuCell(tableView: NSTableView, file: ArchiveFile?) -> NSView {
             let cellID = NSUserInterfaceItemIdentifier("cell.quality")
-            let cell: NSTableCellView
-            let menu: QualityPopUpButton
-            if let reused = tableView.makeView(withIdentifier: cellID, owner: nil) as? NSTableCellView,
-               let existing = reused.subviews.compactMap({ $0 as? QualityPopUpButton }).first {
-                cell = reused
-                menu = existing
-            } else {
-                cell = NSTableCellView()
-                cell.identifier = cellID
-                menu = QualityPopUpButton(frame: .zero, pullsDown: false)
-                menu.translatesAutoresizingMaskIntoConstraints = false
-                menu.controlSize = .small
-                menu.target = self
-                menu.action = #selector(qualityMenuChanged(_:))
-                cell.addSubview(menu)
-                NSLayoutConstraint.activate([
-                    menu.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 1),
-                    menu.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -1),
-                    menu.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                ])
+            let cell = tableView.makeView(withIdentifier: cellID, owner: nil) as? QualityCellView
+                ?? QualityCellView.make(identifier: cellID)
+            cell.onChoose = { [weak self] quality, file in
+                self?.parent.model.applyEdit(.setQuality(quality), to: file)
             }
-
-            menu.removeAllItems()
-            // Item index n is quality n (0 = None), which `qualityMenuChanged` relies on.
-            for value in [nil] + QualityLevels.all.map(Optional.some) {
-                menu.addItem(withTitle: value.map { "Q\($0)" } ?? "None")
-            }
-            guard let file else {
-                menu.isEnabled = false
-                menu.file = nil
-                menu.setAccessibilityIdentifier("")
-                return cell
-            }
-
-            menu.isEnabled = true
-            menu.file = file
-            menu.selectItem(at: (file.quality ?? 0))
-            menu.toolTip = "Set this file's quality"
-            menu.setAccessibilityIdentifier("ar.quality.menu.\(file.name)")
-            menu.setAccessibilityLabel("Quality for \(file.name)")
+            cell.textField?.font = NSFont.systemFont(ofSize: currentFontSize)
+            cell.file = file
             return cell
-        }
-
-        @objc private func qualityMenuChanged(_ sender: QualityPopUpButton) {
-            guard let file = sender.file else { return }
-            let quality = sender.indexOfSelectedItem == 0 ? nil : sender.indexOfSelectedItem
-            parent.model.applyEdit(.setQuality(quality), to: file)
         }
 
         /// The Read cell's gestures write through the same `TagWriter` read-state path as ⌘R and ⌘U, for
@@ -1665,11 +1626,153 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     }
 }
 
-/// A reusable Quality popup needs the current value-object because AppKit menu targets receive only
-/// the selected control. The row's `ArchiveFile` is revalidated by `NavigationModel` before writing.
+// MARK: - Quality cell: the value as text, its menu on a click
+
+/// The Quality column's cell (W40.fix-reader-quality-popups). Each row was an `NSPopUpButton`, which on macOS 27
+/// lays itself out through its own SwiftUI graph, ~3 ms a row whatever its items, so the column cost a new list
+/// ~110 ms of main thread at 33 rows against ~18 ms for a text column. The cell shows the value as text with a
+/// popup's chevron, and a plain click opens the same menu a popup would, over the cell with the value checked, so
+/// only a click makes a menu. To accessibility its `Button` is the popup it replaces (`ar.quality.menu.<name>`, its label and
+/// value; a press opens the menu). A choice writes to the file the menu was opened on, so a row refresh that reuses
+/// the cell while the menu is open cannot retarget it; `NavigationModel.applyEdit` revalidates that file.
+///
+/// ⌘- and ⇧-clicks and double-clicks go to the table, as the Read cell's do; `ContextMenuTableView` hands the cell
+/// the press when the table would otherwise take it.
 @MainActor
-private final class QualityPopUpButton: NSPopUpButton {
-    var file: ArchiveFile?
+final class QualityCellView: NSTableCellView {
+    /// The file the row shows; nil on a row with no file, which shows nothing and leaves every click to the table.
+    var file: ArchiveFile? { didSet { refresh() } }
+    var onChoose: ((Int?, ArchiveFile) -> Void)?
+    private let chevron = NSImageView()
+    /// The popup to accessibility, filling the cell, so the cell itself stays the row's cell.
+    let button = Button()
+
+    static func make(identifier: NSUserInterfaceItemIdentifier) -> QualityCellView {
+        let cell = QualityCellView()
+        cell.identifier = identifier
+        let button = cell.button
+        button.cell = cell
+        button.translatesAutoresizingMaskIntoConstraints = false
+        cell.addSubview(button)
+        let tf = NSTextField(labelWithString: "")
+        tf.translatesAutoresizingMaskIntoConstraints = false
+        tf.lineBreakMode = .byClipping
+        tf.setAccessibilityElement(false)
+        button.addSubview(tf)
+        cell.textField = tf
+        let chevron = cell.chevron
+        chevron.translatesAutoresizingMaskIntoConstraints = false
+        chevron.image = NSImage(systemSymbolName: "chevron.up.chevron.down", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold))
+        chevron.setAccessibilityElement(false)
+        button.addSubview(chevron)
+        NSLayoutConstraint.activate([
+            button.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+            button.topAnchor.constraint(equalTo: cell.topAnchor),
+            button.bottomAnchor.constraint(equalTo: cell.bottomAnchor),
+            tf.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
+            tf.trailingAnchor.constraint(lessThanOrEqualTo: chevron.leadingAnchor, constant: -2),
+            tf.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            chevron.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
+            chevron.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+        ])
+        cell.applyChevronTint()
+        return cell
+    }
+
+    /// "Q1"…"Q3", or "None" for a file with no quality.
+    static func title(for quality: Int?) -> String { quality.map { "Q\($0)" } ?? "None" }
+
+    private func refresh() {
+        textField?.stringValue = file.map { Self.title(for: $0.quality) } ?? ""
+        chevron.isHidden = file == nil
+        toolTip = file == nil ? nil : "Set this file's quality"
+        button.setAccessibilityIdentifier(file.map { "ar.quality.menu.\($0.name)" } ?? "")
+        button.setAccessibilityLabel(file.map { "Quality for \($0.name)" })
+    }
+
+    // The label follows the row's selection by itself; the chevron's tint is set, so it is switched here.
+    override var backgroundStyle: NSView.BackgroundStyle {
+        didSet { applyChevronTint() }
+    }
+
+    private func applyChevronTint() {
+        chevron.contentTintColor = backgroundStyle == .emphasized ? .alternateSelectedControlTextColor : .secondaryLabelColor
+    }
+
+    // MARK: Accessibility: the popup it replaces
+
+    /// The view accessibility sees as the popup: its identifier, label and value, and a press that opens the menu
+    /// on the next turn, so the press returns while the menu tracks.
+    @MainActor
+    final class Button: NSView {
+        weak var cell: QualityCellView?
+        override func isAccessibilityElement() -> Bool { cell?.file != nil }
+        override func accessibilityRole() -> NSAccessibility.Role? { .popUpButton }
+        override func accessibilityValue() -> Any? { cell?.file.map { QualityCellView.title(for: $0.quality) } }
+        override func accessibilityPerformPress() -> Bool {
+            guard cell?.file != nil else { return false }
+            DispatchQueue.main.async { [weak self] in self?.cell?.openMenu() }
+            return true
+        }
+    }
+
+    // MARK: The click
+
+    /// The labels are the deepest views under the pointer; the cell takes the click itself.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return file == nil ? hit : self
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if !handleMouseDown(event) { super.mouseDown(with: event) }
+    }
+
+    /// Opens the menu for a plain single click and returns true; false when the press belongs to the table.
+    func handleMouseDown(_ event: NSEvent) -> Bool {
+        guard file != nil, event.clickCount == 1 else { return false }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.isDisjoint(with: [.command, .shift, .control]) else { return false }
+        openMenu()
+        return true
+    }
+
+    /// The menu a popup shows: None, then each level, the value checked and placed over the cell. It tracks until the
+    /// user chooses or dismisses it.
+    func openMenu() {
+        guard let menu = makeMenu() else { return }
+        let current = menu.items.first { $0.state == .on }
+        menu.minimumWidth = bounds.width
+        menu.popUp(positioning: current, at: NSPoint(x: 0, y: isFlipped ? bounds.minY : bounds.maxY), in: self)
+    }
+
+    func makeMenu() -> NSMenu? {
+        guard let file else { return nil }
+        let menu = NSMenu(title: "Quality")
+        menu.autoenablesItems = false
+        for quality in [nil] + QualityLevels.all.map(Optional.some) {
+            let item = NSMenuItem(title: Self.title(for: quality), action: #selector(choose(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = Choice(quality: quality, file: file)
+            item.state = quality == file.quality ? .on : .off
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    /// The value a menu item sets, and the file the menu was opened on.
+    private final class Choice: NSObject {
+        let quality: Int?
+        let file: ArchiveFile
+        init(quality: Int?, file: ArchiveFile) { self.quality = quality; self.file = file }
+    }
+
+    @objc private func choose(_ sender: NSMenuItem) {
+        guard let choice = sender.representedObject as? Choice else { return }
+        onChoose?(choice.quality, choice.file)
+    }
 }
 
 // MARK: - Context-menu NSTableView subclass
@@ -1699,11 +1802,17 @@ final class ContextMenuTableView: NSTableView {
 
     /// The Read cell under `event`, if the press is inside one that shows a file.
     private func readCell(at event: NSEvent) -> ReadStateCellView? {
+        guard let cell: ReadStateCellView = cell(at: event, column: "read"), cell.file != nil else { return nil }
+        return cell
+    }
+
+    /// The `Cell` in `column` under `event`, if the press is inside it.
+    private func cell<Cell: NSView>(at event: NSEvent, column id: String) -> Cell? {
         let point = convert(event.locationInWindow, from: nil)
         let (row, column) = (row(at: point), column(at: point))
-        guard row >= 0, column >= 0, tableColumns[column].identifier.rawValue == "read",
-              let cell = view(atColumn: column, row: row, makeIfNecessary: false) as? ReadStateCellView,
-              cell.file != nil, cell.bounds.contains(cell.convert(event.locationInWindow, from: nil)) else { return nil }
+        guard row >= 0, column >= 0, tableColumns[column].identifier.rawValue == id,
+              let cell = view(atColumn: column, row: row, makeIfNecessary: false) as? Cell,
+              cell.bounds.contains(cell.convert(event.locationInWindow, from: nil)) else { return nil }
         return cell
     }
 
@@ -1736,6 +1845,7 @@ final class ContextMenuTableView: NSTableView {
             readCellPress = cell
             return
         }
+        if let cell: QualityCellView = cell(at: event, column: "quality"), cell.handleMouseDown(event) { return }
         super.mouseDown(with: event)
     }
 

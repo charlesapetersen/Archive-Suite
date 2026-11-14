@@ -547,7 +547,9 @@ Views/
   AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (the Coordinator is the
                               data source; a new list reloads, and the model's background build makes
                               the id→row index): virtualized rows, 150ms-debounced filter;
-                              the Quality-column popup is the per-file Quality editor;
+                              the Quality column's QualityCellView is the per-file Quality editor (text
+                              with a chevron; a plain click opens the popup's menu, AX role popUpButton;
+                              no NSPopUpButton per row, W40.fix-reader-quality-popups);
                               the Read column's ReadStateCellView is the per-file read-state editor (a
                               click, made on release inside the cell, switches Unread↔Read once the
                               double-click interval passes; a drag writes nothing; a double-click
