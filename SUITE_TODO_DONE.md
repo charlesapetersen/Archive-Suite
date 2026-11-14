@@ -16136,3 +16136,20 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   change, since dating is not an OCR result. Bench cache: the 1,400 px thumbnails (26 MB) went to the Trash; the 8B
   replies (`date-route-pipeline/image-qwen3-vl-8b-mlx4-1400`, 244 KB) are kept, because a rescore reads them.
   <!-- /W46.date-route-pipeline-8b -->
+- [x] **W46.ent-local-shipped-prompt — the entity prompt on the Mac and cluster models over Vision text [S-M]** · §Document processing review — W46 · SHIPPED 2026-11-14
+  The shipped tagging prompt (`ent_score_paid.prompt_for("tagging", d)`, equal to `date_tagging.build_prompt` on all
+  138) over the 138 correspondence documents' Vision text, on Qwen3-VL 8B MLX 4-bit on the Mac (checkpoint 2,
+  462c8787) and Qwen3.6 27B FP8 under vLLM on Sherlock (frozen pack `ent-local-27b-20261112`, batch 20261112-071750,
+  2 jobs: a 13 s stage and a 6.6-minute GPU job, the 138 requests in about 2 minutes at 32 in flight). Script
+  `scripts/segbench/ent_local_shipped.py` (mac, pack, collect, report); report `segbench-results/ent-local-shipped.md`.
+  Owner+rule ed2 F1, sender / recipient / place · city: the 8B 0.60 / 0.61 / 0.54 · 0.68 (median 7.76 s a document on
+  the M3 Pro 18 GB, MLX peak 6.38 GB, footprint 6.98 GB); the 27B 0.66 / 0.68 / 0.56 · 0.71, all 138 replies stopped.
+  The 27B against Gemini 3.7 on the same input: sender -0.051 (-0.115 to +0.003), recipient and place ties, city
+  -0.111; against the 8B: recipient +0.073 (+0.004 to +0.148), the rest ties. On the 82, each local model ties its old
+  ABBYY-reply row on every field. `13-stage-rules/09-entities.md` §3-§9 restate both rows (no longer provisional;
+  profiles 2 and 4 now cite 0.66), settings-routes.json, figures.json and prototype.html rebuilt; test-settings-routes
+  ALL PASS. Still open, as the stage note says: the 27B on a 32 GB Mac (none at hand), so the 32/64 GB picks. No
+  ArchiveOCRBench change (entities are not an OCR result). No money. Bench cache: the replies under
+  `ent-local-shipped/` (1.1 MB, both models) are kept, because the report rescores them; the Sherlock artifact stays
+  in the engine's state.
+  <!-- /W46.ent-local-shipped-prompt -->

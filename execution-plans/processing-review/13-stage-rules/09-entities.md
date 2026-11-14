@@ -51,11 +51,11 @@ a letter; on this Mac it needs a local model and typed pages."
   names (owner, walkthrough 2026-11-13, replacing owner call 11's "extract always on a cloud route": the separate call
   costs $2.37 per 1,000 correspondence documents and nothing reads unshown names yet); on the Mac on typed and printed
   correspondence only.
-- **The provisional pick.** The Mac pick (`qwen3-vl-8b-mac`) is scored on the shipped prompt over Vision text
-  (`ent-local-shipped.md`: sender 0.60, recipient 0.61, place 0.54, n 138; on the 82, a tie with its old ABBYY-reply
-  row on every field). The cluster pick (`qwen3.6-27b`, 0.62) still rests on replies made from ABBYY text
-  (`ent-truth-owner.md`, "tagging reply, ABBYY (82)"), which the app never has (owner, 2026-10-30); it is provisional
-  until `W46.ent-local-shipped-prompt` (item 4) collects its Sherlock pack, and the solver shows it labelled so.
+- **The local picks on Vision text.** Both are scored on the shipped prompt over Vision text, n 138
+  (`ent-local-shipped.md`, W46.ent-local-shipped-prompt): the Mac pick (`qwen3-vl-8b-mac`) at sender 0.60, recipient
+  0.61, place 0.54; the cluster pick (`qwen3.6-27b`) at 0.66, 0.68, 0.56, ahead of the 8B on recipients (+0.073,
+  +0.004 to +0.148) and tied on the rest. On the 82 each ties its old ABBYY-reply row on every field. Neither is
+  provisional any longer.
 - **The prompt the figures belong to** (owner call 10). The person-only sender rule and the heading-or-address place
   rule (4cdbba41, 4374254d) move to the entity feature's own prompt, and the tagging prompt is reverted to its
   pre-November name behaviour. The `gemini-tagging-place` figures were measured with both rules in the tagging prompt,
@@ -151,18 +151,19 @@ The stage header above is kept apart from the route rows, which follow as a list
   "app_route": null, "status": "measured",
   "needs": {"key": ["openrouter"], "plan": [], "cluster": true, "mac_gb": null, "gpus": 1},
   "figures": {
-   "sender": {"value": 0.62, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3.6-27b tagging reply, ABBYY (82)", "attribute": "sender built -> owner", "value": "0.60 -> 0.62"}},
-   "recipient": {"value": 0.59, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3.6-27b tagging reply, ABBYY (82)", "attribute": "recipient", "value": "0.59 -> 0.59"}},
-   "sending_place": {"value": 0.53, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3.6-27b tagging reply, ABBYY (82)", "attribute": "owner+rule F1", "value": "0.53"}},
-   "place_city": {"value": 0.67, "n": 82, "truth": "ent-owner-rule", "source": {"file": "ent-truth-owner.md", "route": "qwen3.6-27b tagging reply, ABBYY (82)", "attribute": "owner+rule city", "value": "0.67"}},
+   "sender": {"value": 0.66, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3.6-27b tagging, Vision (138)", "attribute": "owner+rule sender", "value": "0.66"}},
+   "recipient": {"value": 0.68, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3.6-27b tagging, Vision (138)", "attribute": "owner+rule recipient", "value": "0.68"}},
+   "sending_place": {"value": 0.56, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3.6-27b tagging, Vision (138)", "attribute": "owner+rule place", "value": "0.56"}},
+   "place_city": {"value": 0.71, "n": 138, "truth": "ent-owner-rule", "source": {"file": "ent-local-shipped.md", "route": "qwen3.6-27b tagging, Vision (138)", "attribute": "owner+rule city", "value": "0.71"}},
    "handwritten_or_mixed": {"value": 0.438, "n": 22, "truth": "ent-built", "source": {"file": "ent-score.md", "route": "qwen3.6-27b", "attribute": "handwritten or mixed hand, sender / recipient / place", "value": "0.438 / 0.606 / 0.571"}},
    "g17_business_letters": {"value": 0.55, "n": 57, "truth": "G17", "source": {"file": "ent-robust.md", "route": "qwen3.6-27b", "attribute": "F1 micro (published median 0.55)", "value": "0.55"}}},
   "cost": {"usd_1000_list": 1.4, "usd_1000_batch": null, "price_read": null, "source": {"file": "settings-design/build_figures.py", "route": "qwen27b", "attribute": "usd_1000", "value": "1.4 [?]"}},
-  "time": {"per_unit_s": 5.0, "measured": false, "measured_on": "estimate; Sherlock: 26 minutes for 2,078 texts and 57 letters on one L40S (ent-robust.md)", "source": {"file": "settings-design/build_figures.py", "route": "qwen27b", "attribute": "s_doc", "value": "5.0"}},
+  "time": {"per_unit_s": 5.0, "measured": false, "measured_on": "estimate; Sherlock throughput, not a per-document time: the 138 entity requests in about 2 minutes at 32 in flight on one GPU (median 26.3 s a request in flight, ent-local-shipped.md), a 6.6-minute job with the model's load; 26 minutes for 2,078 texts and 57 letters on one L40S (ent-robust.md)", "source": {"file": "settings-design/build_figures.py", "route": "qwen27b", "attribute": "s_doc", "value": "5.0"}},
   "memory": null,
-  "caveats": ["old tagging prompt, ABBYY text, which the owner's 2026-10-30 rule bars from routes; shipped prompt unscored on this model (ent-prompt-app.md Scope)",
-   "82 documents; vs the 8B a tie (ENT-1)",
-   "a pick on ABBYY-input figures: provisional until W46.ent-local-shipped-prompt scores it on Vision text"],
+  "caveats": ["shipped tagging prompt on Vision text, 138 documents, vLLM FP8 on Sherlock (ent-local-shipped.md); against Gemini 3.7 on the same input: sender -0.051 (-0.115 to +0.003), recipient and place ties, city -0.111 (-0.168 to -0.059)",
+   "against the Mac 8B on the same input: recipient +0.073 (+0.004 to +0.148), sender, place and city ties",
+   "on the 82 the old prompt on ABBYY text also scored, a tie on every field (sender +0.039, -0.072 to +0.147)",
+   "handwritten_or_mixed is the old ABBYY reply's (ent-score.md)"],
   "kind_rules": ["handwritten: allowed (ent-robust.md: own reading 0.82 of truth-text names)"], "fallback": "none", "conditions": []},
  {"id": "qwen3-vl-8b-mac", "name": "Qwen3-VL 8B on this Mac", "family": "mac",
   "app_route": null, "status": "measured",
@@ -286,8 +287,8 @@ keys are field names (`sender`, `recipient`, `sending_place`, `place_city`) and 
 
 - A local route on this Mac that reaches the shipped tagging row's sender F1 (0.73, `ent-place-rule.md`) within the tie
   rule on the 138 would make the Mac family the default for profile 1 on typed pages.
-- The shipped prompt scored on Qwen3-VL 8B and Qwen3.6 27B on Vision text (item 4): their rows change, and a 27B row on
-  a 32 GB Mac with measured memory would add a profile-1 pick at 32 GB.
+- A 27B row on a 32 GB Mac with measured memory would add a profile-1 pick at 32 GB (item 4 scored both local models
+  on Vision text, the 27B on the cluster only).
 - A dedicated entity prompt that beats the shipped tagging call outside the tie rule on any field, with the same rules
   in both and paired on the same documents, would justify its extra call (the 3,000-character pair ties on all four,
   `ent-place-rule.md`; the 8,000-character prompt is unpaired with the shipped call).
@@ -352,7 +353,9 @@ keys are field names (`sender`, `recipient`, `sending_place`, `place_city`) and 
    (P6-3's unmet condition) as part of the entity feature's own prompt. Waits on nothing.
 4. **W46.ent-local-shipped-prompt** [M, $0 on Mac and Sherlock]: the shipped tagging prompt on Qwen3-VL 8B and Qwen3.6
    27B over the 138's Vision text, with seconds a document and peak memory on the Mac, and the 27B at 4-bit on a 32 GB
-   Mac if one is at hand. Fills the gaps: every `[?]` time and memory in §4 and the 32/64 GB picks.
+   Mac if one is at hand. Fills the gaps: every `[?]` time and memory in §4 and the 32/64 GB picks. Done 2026-11-14
+   (`ent-local-shipped.md`): both rows restated, the 8B's Mac time and memory measured; no 32 GB Mac was at hand, so
+   the 32/64 GB picks and the 27B's Mac memory stay open.
 5. **W46.ent-robust-card** [XS, offline]: a measurement card for `ent-robust.md` with the 26.6 Vision text named (P8-1).
 6. **W46.ent-feature** [M]: the sidecar fields with evidence, confidence and the "Unknown" convention, several
    recipients kept apart, inferred names marked inferred, no export format (owner call 11), the sender and place rules
@@ -375,11 +378,11 @@ Kinds: T typed or printed correspondence, H handwritten correspondence, N non-co
 - **1. 32 GB and 64 GB.** Same as 16 GB until item 4 measures the 27B on the Mac [I].
 - **1. 8 GB** (not a plan tier, a solver edge): `none`, since `qwen3.5-4b-mac` is conditioned off.
 - **2. Cheap API (OpenRouter).** T and H: `gemini-entity-feature` (sender 0.69) if Gemini is reachable on the key, as
-  the row's `needs` allows; else `qwen3.6-27b` (0.62). N: `none`.
+  the row's `needs` allows; else `qwen3.6-27b` (0.66). N: `none`.
 - **3. Premium API.** T and H: `gemini-entity-feature` (0.69 sender, $2.37 per 1,000 extra); `gemini-entity8k` (0.76)
   and `gemini-tagging-place` (0.73) are not offered by the app. A ceiling that leaves less than the feature's cost
   drops names to the profile-1 pick. **Plan only:** no plan row; fall to the profile-1 pick.
-- **4. Cluster.** T and H: `qwen3.6-27b` (0.62 sender, ABBYY-input figures, provisional until item 4), any reading
+- **4. Cluster.** T and H: `qwen3.6-27b` (0.66 sender on Vision text), any reading
   route but Vision for H. With a key as well:
   `gemini-entity-feature`.
 - **5. Plus a coding agent.** As the base profile: no kit route (the fine-tune not run, `ent-robust.md`).
@@ -395,7 +398,8 @@ names are ranked, on typed and printed correspondence, the sender never taken fr
 export format until a user asks, CMIF against CSV going to POTENTIAL_FEATURES (calls 3, 4 and 5). Walkthrough
 2026-11-13: the cloud route too runs only when names rank, and no sidecar carries the tagging call's Vision-read sender. Section 2's picks,
 open to the owner's veto: the inside-address and non-correspondence-date tests filed, offline on cached text (call 2,
-item 2). Section 3 carries these, and marks the Mac and cluster picks provisional on ABBYY-input figures until item 4.
+item 2). Section 3 carries these, and marked the Mac and cluster picks provisional on ABBYY-input figures until item 4, which has since scored both on Vision
+text (2026-11-14).
 
 Files read: execution-plans/processing-review/00-plan.md (lines 1-105);
 .worktrees/archive-suite/suite-wt-20261106-205546-44529/execution-plans/processing-review/13-stage-rules/00-index.md;

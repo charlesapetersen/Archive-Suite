@@ -2159,14 +2159,14 @@
    "s_doc": 5.0,
    "s_est": true,
    "peak_gb": 0,
-   "note": "old tagging prompt, ABBYY text, which the owner's 2026-10-30 rule bars from routes; shipped prompt unscored on this model (ent-prompt-app.md Scope); 82 documents; vs the 8B a tie (ENT-1)",
+   "note": "shipped tagging prompt on Vision text, 138 documents, vLLM FP8 on Sherlock (ent-local-shipped.md); against Gemini 3.7 on the same input: sender -0.051 (-0.115 to +0.003), recipient and place ties, city -0.111 (-0.168 to -0.059); against the Mac 8B on the same input: recipient +0.073 (+0.004 to +0.148), sender, place and city ties",
    "source": "settings-routes.json, stage entities, row qwen3.6-27b",
    "f1": {
-    "sender": 0.62,
-    "recipient": 0.59,
-    "place": 0.53
+    "sender": 0.66,
+    "recipient": 0.68,
+    "place": 0.56
    },
-   "n": 82
+   "n": 138
   },
   {
    "id": "qwen3-vl-8b-mac",

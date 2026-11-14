@@ -596,7 +596,6 @@ now takes the rule table as its source.
 
 
 
-- [ ] **`W46.ent-local-shipped-prompt` — the entity prompt on the Mac and cluster models over Vision text [S-M]** (lane: segbench) (uses: light,machine) (cluster: sherlock) — Qwen3-VL 8B on the Mac and Qwen3.6 27B on the cluster, the entity prompt over the 138's Vision text, with seconds a document and peak memory; today's Mac and cluster entity figures are the old prompt on ABBYY text (`ent-truth-owner.md`), so the rows are provisional until this lands. Notes and the size review: `execution-plans/items/W46.ent-local-shipped-prompt.md`.
 
 
 

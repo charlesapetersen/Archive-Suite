@@ -11313,47 +11313,47 @@
      },
      "figures": {
       "sender": {
-       "value": 0.62,
-       "n": 82,
+       "value": 0.66,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3.6-27b tagging reply, ABBYY (82)",
-        "attribute": "sender built -> owner",
-        "value": "0.60 -> 0.62"
+        "file": "ent-local-shipped.md",
+        "route": "qwen3.6-27b tagging, Vision (138)",
+        "attribute": "owner+rule sender",
+        "value": "0.66"
        }
       },
       "recipient": {
-       "value": 0.59,
-       "n": 82,
+       "value": 0.68,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3.6-27b tagging reply, ABBYY (82)",
-        "attribute": "recipient",
-        "value": "0.59 -> 0.59"
+        "file": "ent-local-shipped.md",
+        "route": "qwen3.6-27b tagging, Vision (138)",
+        "attribute": "owner+rule recipient",
+        "value": "0.68"
        }
       },
       "sending_place": {
-       "value": 0.53,
-       "n": 82,
+       "value": 0.56,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3.6-27b tagging reply, ABBYY (82)",
-        "attribute": "owner+rule F1",
-        "value": "0.53"
+        "file": "ent-local-shipped.md",
+        "route": "qwen3.6-27b tagging, Vision (138)",
+        "attribute": "owner+rule place",
+        "value": "0.56"
        }
       },
       "place_city": {
-       "value": 0.67,
-       "n": 82,
+       "value": 0.71,
+       "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-truth-owner.md",
-        "route": "qwen3.6-27b tagging reply, ABBYY (82)",
+        "file": "ent-local-shipped.md",
+        "route": "qwen3.6-27b tagging, Vision (138)",
         "attribute": "owner+rule city",
-        "value": "0.67"
+        "value": "0.71"
        }
       },
       "handwritten_or_mixed": {
@@ -11390,15 +11390,16 @@
      "time": {
       "per_unit_s": 5.0,
       "measured": false,
-      "measured_on": "estimate; Sherlock: 26 minutes for 2,078 texts and 57 letters on one L40S (ent-robust.md)",
+      "measured_on": "estimate; Sherlock throughput, not a per-document time: the 138 entity requests in about 2 minutes at 32 in flight on one GPU (median 26.3 s a request in flight, ent-local-shipped.md), a 6.6-minute job with the model's load; 26 minutes for 2,078 texts and 57 letters on one L40S (ent-robust.md)",
       "source": null,
       "estimate": "hand-entered in the 2026-11-04 settings prototype (build_figures.py, qwen27b: 5.0); no measuring file"
      },
      "memory": null,
      "caveats": [
-      "old tagging prompt, ABBYY text, which the owner's 2026-10-30 rule bars from routes; shipped prompt unscored on this model (ent-prompt-app.md Scope)",
-      "82 documents; vs the 8B a tie (ENT-1)",
-      "a pick on ABBYY-input figures: provisional until W46.ent-local-shipped-prompt scores it on Vision text"
+      "shipped tagging prompt on Vision text, 138 documents, vLLM FP8 on Sherlock (ent-local-shipped.md); against Gemini 3.7 on the same input: sender -0.051 (-0.115 to +0.003), recipient and place ties, city -0.111 (-0.168 to -0.059)",
+      "against the Mac 8B on the same input: recipient +0.073 (+0.004 to +0.148), sender, place and city ties",
+      "on the 82 the old prompt on ABBYY text also scored, a tie on every field (sender +0.039, -0.072 to +0.147)",
+      "handwritten_or_mixed is the old ABBYY reply's (ent-score.md)"
      ],
      "kind_rules": [
       "handwritten: allowed (ent-robust.md: own reading 0.82 of truth-text names)"
