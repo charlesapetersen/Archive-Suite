@@ -1829,6 +1829,13 @@ final class OCRModel: ObservableObject {
         /// with one file in the batch there is nothing to be parallel *with* —
         /// it would only pay Vision's ~0.20s start-up twice.
         useHelper: Bool = false,
+        /// W42.int-s5-compress (`CompressedPage`). A host app's own lines, 1-based page to
+        /// lines normalised to the page with a top-left origin: written as the layer in place
+        /// of recognition's, with no text page for any page. Nil: recognition reads the pages.
+        lines: [Int: [SearchableWriter.Observation]]? = nil,
+        /// Where a page's ink is, for the MRC layering, where `lines` are not on it (a host's
+        /// unplaced layer); same convention. Nil, or no entry for a page: its layer's lines.
+        inkBoxes: [Int: [SearchableWriter.BoundingBox]]? = nil,
         progress: @escaping (String, Double) -> Void,
         /// Called when recognition gave up on its helper process and did the
         /// document in-process instead (R40). Named for that one event rather
@@ -2242,7 +2249,9 @@ final class OCRModel: ObservableObject {
         // initialise a `let` declared outside it. Assigned exactly once.
         var byPage: [Int: [SearchableWriter.Observation]] = [:]
         var modelFellBack: [(page: Int, why: String)] = []
-        do {
+        if let lines {
+            byPage = lines
+        } else { do {
             // `adopting`, not a bare `adopt`: the helper is a child, and quitting
             // the app must not leave it running (U2). One adoption for one
             // process, released structurally on the way out — the pairing the
@@ -2266,7 +2275,7 @@ final class OCRModel: ObservableObject {
             if control.isCancelled { report(.cancelled, "Cancelled."); return }
             report(.failed, "Could not recognise the pages: \(error.localizedDescription)")
             return
-        }
+        } }
         if control.isCancelled { report(.cancelled, "Cancelled."); return }
         if !modelFellBack.isEmpty {
             let byPage = modelFellBack.sorted { $0.page < $1.page }
@@ -2282,7 +2291,8 @@ final class OCRModel: ObservableObject {
         }
         // hw-qwen. The handwritten pages whose reading goes on a page of its own, read now,
         // while the files `recognisePage(at:)` left beside the bitmaps are there.
-        let textPages = Recogniser.textPages(of: bitmaps)
+        // A host's own lines are its whole layer: it adds no text page.
+        let textPages = lines == nil ? Recogniser.textPages(of: bitmaps) : []
         // The bilevel bitmaps have been read and compressed; nothing wants them
         // again. Deliberately not the whole directory — the picture pages' JPEGs
         // sit beside them and are the streams the assembly is about to embed.
@@ -2544,7 +2554,7 @@ final class OCRModel: ObservableObject {
                         // than the truth.
                         guard case .jpeg(let existing) = encoded[index].stream,
                               let page = source.page(at: index),
-                              let boxes = byPage[index + 1]?.map({ $0.boundingBox }),
+                              let boxes = inkBoxes?[index + 1] ?? byPage[index + 1]?.map({ $0.boundingBox }),
                               !boxes.isEmpty else { continue }
                         // A2.4. `Data(contentsOf:).count` read the whole file
                         // into memory to learn its size, on the per-page path,

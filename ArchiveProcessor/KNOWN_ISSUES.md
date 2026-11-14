@@ -6,11 +6,22 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 The searchable form (one page per source page, the header in the XMP: `SPEC/tag-format.md` §"The searchable form") is
 written where the `searchableFor` setting names the input's format and the page's kind; empty by default. Open:
-- **Not compressed.** The page embeds the same JPEG as image-plus-text, so it is only the text page smaller (the run
-  of 2026-11-13 is in the item's DONE entry). Vision OCR's size comes from JBIG2/MRC written without Quartz, and every
-  writer here redraws through Quartz, which re-encodes JBIG2: `W42.int-s5-compress`.
-- **Nothing on screen sets it.** `searchableFor` is in the settings layers and their files (`SPEC/collection-settings.md`)
-  but has no control on the settings sheet or in Settings; offered with the compression (`W42.int-s5-compress`).
+- **Compressed only where `jbig2` and `qpdf` are found** (W42.int-s5-compress): the app's own Resources, then
+  /opt/homebrew/bin, /usr/local/bin, /opt/local/bin, then the login shell's PATH (VisionOCRKit `Runner.locateTool`).
+  The app does not ship them yet, so on a Mac without Homebrew's `jbig2enc` and `qpdf` every searchable page is the
+  embedded JPEG as before (about 2 MB a photographed page) and the run log says "written uncompressed: jbig2 and qpdf
+  not found". Bundling both (Apache-2.0) into the Release app is `W42.int-s5-compress-ship`.
+- **Compressing costs time**: 3 s the drawn memo, 10 s UIUC 00233, about 67 s each UIUC 00149 and 00156 (the engine's
+  rebuild and MRC layering, every page in the app's process; measured 2026-11-14, Debug build). An unplaced page also
+  runs Vision once more, to tell the layering where the words are.
+- **The compressed page is the engine's rebuild of the reading copy**, not the camera original: lossy MRC/JPEG
+  layers at the engine's defaults (`Prefs.register`: balanced photo detail), so fine tone and colour in stamps and
+  photographs are softer than in the pair's JPEG.
+- **The settings sheet chooses by kind only** (the rules tab, placement: "Every page" and one switch a kind, for any
+  input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such.
+- **Merges and date rewrites preserve compression where qpdf succeeds.** If qpdf is unavailable or refuses the
+  file, they fall back to the Quartz PDF/A writer, which can expand compressed images. A merge logs that fallback;
+  a date rewrite does not. Compression children also have no per-page timeout or connection to run cancellation.
 - **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
   (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
   image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages.
@@ -20,6 +31,15 @@ written where the `searchableFor` setting names the input's format and the page'
 - **Live Capture and the multi-page PDF path drop the run-log notes** (unplaced pages, pages written as pairs instead),
   as they drop the layer outcome.
 - **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing).
+
+## Verification baseline (2026-11-14)
+
+The compression functional checks pass, but the broader suites have existing failures: VisionOCRKit 2126/2142
+(14 accepted outline-fixture failures from W42.int-s1; preferences isolation and its nested light-tier check,
+`W42.kit-preferences-isolation`), and the latest entity figures leave solver profile E expecting Gemini while
+the solver chooses Qwen (`W46.ent-profile-e-solver`, baseline 9a79dd98). Headless script/VM sampler teardown with
+TERM blocked is queued as `W40.processor-test-term-mask` / `W40.vm-sampler-term-mask`. Exact evidence:
+`verification/evidence/processor/W42.int-s5-compress-verification.md`.
 
 ## ⚠️ LIMITATION (W42.int-s5-hands, 2026-11-13): what the hand placer does not yet do
 
@@ -65,10 +85,10 @@ limits in their own section). Open:
   media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither.
 - **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
   Live Capture and the multi-page PDF path drop the outcome.
-- **Output is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
+- **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
-  the image page is the 2 MB JPEG copy and Vision OCR's searchable PDF compresses the page (JBIG2). The searchable form
-  (W42.int-s5-searchable) drops the text page but not the JPEG; its compression is `W42.int-s5-compress`.
+  the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses
+  (W42.int-s5-compress); the pair is not.
 - **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
   "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
   the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the

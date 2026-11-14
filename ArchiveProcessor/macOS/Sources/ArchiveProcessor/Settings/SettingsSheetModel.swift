@@ -131,6 +131,36 @@ struct SettingsSheetModel {
         let switches: [SwitchRow]
         let rules: [RuleRow]
         let source: String?
+        /// W42.int-s5-compress: the searchable form's choice, on the placement stage only.
+        var forms: FormsRow? = nil
+    }
+
+    /// W42.int-s5-compress — which pages are written in the searchable form (`searchableFor`, `OutputForm.form`):
+    /// every page, or by kind, of any input format. An entry naming one format (`jpeg/printed`) is set in the settings
+    /// file only; it is kept as it is and listed.
+    struct FormsRow {
+        let entries: [String]
+        let source: String
+        /// Every page of every kind and format (`*/*`).
+        var all: Bool { entries.contains { Self.parts($0) == ["*", "*"] } }
+        /// A kind's pages of any format (`*/<kind>`), or every page.
+        func isOn(_ kind: PageKindName) -> Bool { all || entries.contains { Self.parts($0) == ["*", kind.rawValue] } }
+        /// The entries the switches do not show.
+        var others: [String] {
+            entries.filter { let p = Self.parts($0); return p.count != 2 || p[0] != "*" || (p[1] != "*" && PageKindName(rawValue: p[1]) == nil) }
+        }
+        /// The list with every page switched `on` or off; the others kept.
+        func settingAll(_ on: Bool) -> [String] { others + (on ? ["*/*"] : []) }
+        /// The list with `kind` switched `on` or off. Switching one kind off under "every page" keeps the other kinds on
+        /// (and no longer pages of no known kind, which only "every page" takes); every kind on is not "every page".
+        func setting(_ kind: PageKindName, _ on: Bool) -> [String] {
+            let kinds = PageKindName.allCases.filter { $0 == kind ? on : isOn($0) }
+            return others + kinds.map { "*/" + $0.rawValue }
+        }
+        static func parts(_ entry: String) -> [String] {
+            entry.lowercased().split(separator: "/", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+        }
     }
 
     let table: SettingsRouteTable
@@ -846,10 +876,19 @@ struct SettingsSheetModel {
                                  : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote : nil,
                              offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled())
         }
+        var forms: FormsRow?
+        if stage.id == "placement" {
+            let resolved = resolver.resolve(.searchableFor)
+            if case .strings(let list) = resolved.value {
+                forms = FormsRow(entries: list, source: Self.sourceWords(resolved))
+            } else {
+                forms = FormsRow(entries: [], source: Self.sourceWords(resolved))
+            }
+        }
         return RuleStage(id: stage.id, title: Words.ruleTitle(stage.id), text: Words.ruleText(stage.id),
                          switches: switches,
                          rules: stage.rules.map { RuleRow(id: $0.id, text: $0.text, source: $0.source) },
-                         source: stage.note)
+                         source: stage.note, forms: forms)
     }
 
     /// Switches the run does not read yet: none. Straightening (W42.int-s5) and hand placement (W42.int-s5-hands) are

@@ -240,7 +240,13 @@ layer, and **no text page**. Chosen per input format and page kind by the `searc
 - **Merges may mix the forms** (`mergeDocumentPDFs`): each source's pages in order, the merged XMP's list built from
   each source's (empty for its pair pages). A merge with no searchable page writes no list.
 - **What changes it.** The date-evidence line (W46.date-route-header) is written into the carried header, the page
-  drawn again unchanged. Improve OCR replaces text pages and refuses a file with a searchable page.
+  copied unchanged. Improve OCR replaces text pages and refuses a file with a searchable page.
+- **Compressed (W42.int-s5-compress)** where `jbig2` and `qpdf` are found: the page is the image's own area of the
+  pair's letter page, rebuilt as Vision OCR rebuilds its pages (a 1-bit JBIG2 image or MRC layers, VisionOCRKit
+  `CompressedPage`), and the file is finished without a redraw (`SearchableArchival`: qpdf copies the pages and adds
+  the XMP, unfiltered, and an sRGB output intent; no Info dictionary). Merges with a searchable page and the
+  date-evidence rewrite go the same way. Without the tools the page is written as before (the image as embedded,
+  through Quartz) and the run log says so. Readers see no difference: the roles, the list and the layer are the same.
 - Still PDF/A-2b; veraPDF validates the extension schema. No migration is written because there is nothing to migrate.
 
 **Page-2 header** (built by `PDFGenerator.makeTextPage`, lines 212–224; parsed by both

@@ -427,7 +427,8 @@ extension OCRProcessor {
                         )
                     }.value
                     recordImagePage(output.imagePage, forSource: source)
-                    recordTextLayer(output.layer, formFallback: output.formFallback, forSource: source)
+                    recordTextLayer(output.layer, formFallback: output.formFallback, compression: output.compression,
+                                    compressedNote: output.compressedNote, forSource: source)
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
                            source.lastPathComponent, error.localizedDescription)

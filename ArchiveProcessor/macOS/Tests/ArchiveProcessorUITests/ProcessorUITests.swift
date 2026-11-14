@@ -334,6 +334,35 @@ final class ProcessorUITests: XCTestCase {
             XCTAssertTrue(element("ap.sheet.rule.\(stage)").waitForExistence(timeout: 5), "the Rules tab shows \(stage)")
         }
         XCTAssertTrue(element("ap.sheet.switch.place.hand_on_image").exists, "placement's switch is visible")
+        // W42.int-s5-compress: changing a kind writes and refreshes the sheet; Every page includes unknown kinds.
+        let allForms = element("ap.sheet.forms.all")
+        let printed = element("ap.sheet.forms.printed")
+        XCTAssertTrue(allForms.waitForExistence(timeout: 5))
+        XCTAssertTrue(printed.exists)
+        let sheet = app.sheets.firstMatch
+        let scroll = sheet.scrollViews.firstMatch
+        // SwiftUI can report an offscreen checkbox as hittable. Put its actual frame inside the viewport,
+        // leaving room above it for Every page too, before synthesizing the click.
+        for _ in 0..<12 {
+            if scroll.frame.insetBy(dx: 0, dy: 90).contains(printed.frame) { break }
+            scroll.scroll(byDeltaX: 0, deltaY: printed.frame.midY > scroll.frame.midY ? -180 : 180)
+        }
+        XCTAssertTrue(scroll.frame.insetBy(dx: 0, dy: 40).contains(printed.frame),
+                      "printed \(printed.frame), viewport \(scroll.frame)")
+        if (allForms.value as? Int) == 1 { allForms.click() }
+        if (printed.value as? Int) == 1 { printed.click() }
+        printed.click()
+        attachScreenshot("processor-settings-sheet-searchable")
+        XCTAssertTrue(waitUntil { (printed.value as? Int) == 1 }, "checkbox value: \(String(describing: printed.value))")
+        XCTAssertEqual(allForms.value as? Int, 0)
+        allForms.click()
+        XCTAssertTrue(waitUntil { (allForms.value as? Int) == 1 })
+        XCTAssertEqual(printed.value as? Int, 1)
+        printed.click()
+        XCTAssertTrue(waitUntil { (printed.value as? Int) == 0 && (allForms.value as? Int) == 0 })
+        XCTAssertEqual(element("ap.sheet.forms.handwritten").value as? Int, 1)
+        allForms.click()
+        allForms.click() // restore the empty choice in this guest's scratch settings
         attachScreenshot("processor-settings-sheet-rules")
         element("ap.sheet.done").click()
         XCTAssertTrue(waitUntil { !self.element("ap.sheet").exists }, "Done closes the sheet")

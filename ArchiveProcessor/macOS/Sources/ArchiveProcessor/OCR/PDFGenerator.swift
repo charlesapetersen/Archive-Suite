@@ -55,6 +55,12 @@ struct PDFGenerator {
         var form: OutputForm = .imageAndText
         /// Why a page chosen for the searchable form was written as a pair; nil otherwise.
         var formFallback: String? = nil
+        /// W42.int-s5-compress: why a searchable page was written uncompressed (through Quartz, its image as embedded);
+        /// nil when it was compressed, or is not searchable.
+        var compression: String? = nil
+        /// What the compressor said of a compressed page, for the run log (ink outside the words stored finer or
+        /// coarser, `CompressedPage`); nil otherwise.
+        var compressedNote: String? = nil
     }
 
     @discardableResult
@@ -93,6 +99,8 @@ struct PDFGenerator {
                                  localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind)
 
         var straightened: Double?
+        // The searchable page's image and the lines its layer was written from, for its compression.
+        var searchable: (image: ImagePageData, lines: TextLayer.Lines?)?
         let runReader = TextLayerRule.runReader(model: model, gateway: gatewayDisplayName, localAgent: localAgentModelName)
         if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB,
                                          straighten: textLayer?.straighten == true),
@@ -107,7 +115,11 @@ struct PDFGenerator {
                     case nil:
                         let s = searchableImagePage(image, result: result, pageKind: pageKind, options: textLayer,
                                                     runReader: runReader)
-                        if s.page != nil { layered = s; form = .searchable } else { formFallback = s.outcome.reason }
+                        if s.page != nil {
+                            layered = (s.page, s.outcome)
+                            form = .searchable
+                            searchable = (image, s.lines)
+                        } else { formFallback = s.outcome.reason }
                     }
                 }
                 if layered == nil {
@@ -132,15 +144,68 @@ struct PDFGenerator {
 
         // The searchable form has no text page: its header goes to the XMP (`PDFHeaderCarrier`).
         var pageHeaders: [String?]?
+        var compression: String?
         if form == .searchable {
             pageHeaders = [header.carried]
+            if let searchable {
+                let written = writeCompressedSearchable(searchable.image, lines: searchable.lines,
+                                                        unplaced: layer.route == .unplaced, reading: result.text ?? "",
+                                                        header: header.carried, to: outputURL)
+                compression = written.why
+                if written.why == nil {
+                    return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened, form: form,
+                                  compressedNote: written.note)
+                }
+            }
         } else {
             pdfDocument.insert(textPage(header: header, result: result, textColumns: textColumns), at: pdfDocument.pageCount)
         }
 
         try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)
         return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened, form: form,
-                      formFallback: formFallback)
+                      formFallback: formFallback, compression: compression)
+    }
+
+    /// W42.int-s5-compress — the searchable page written to `url` as Vision OCR writes its own (`CompressedPage`: the
+    /// image rebuilt as JBIG2 or MRC layers, no Quartz in the path) with `lines` as its layer, and finished as PDF/A-2b
+    /// without a redraw (`SearchableArchival`). The page is the image's own area of the pair's letter page. An
+    /// `unplaced` layer's lines are not on the words, so the layering is told where they are by Vision's lines. `why`
+    /// nil when written (with the engine's `note` on it, if any); otherwise why not, and nothing is written (the caller
+    /// writes the page uncompressed). Off the main thread.
+    private func writeCompressedSearchable(_ image: ImagePageData, lines: TextLayer.Lines?, unplaced: Bool,
+                                           reading: String, header: String?,
+                                           to url: URL) -> (why: String?, note: String?) {
+        let missing = CompressedPage.missingTools
+        guard missing.isEmpty else { return (missing.joined(separator: " and ") + " not found", nil) }
+        guard let lines else { return ("the layer's lines were not kept", nil) }
+        guard !Thread.isMainThread else { return ("written on the main thread", nil) }
+        guard let cg = image.decoded(), cg.width > 0 else { return ("the image could not be decoded", nil) }
+        let size = CGSize(width: 612 * image.frame.width, height: 792 * image.frame.height)
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("ap-compressed-" + UUID().uuidString, isDirectory: true)
+        defer { try? fm.removeItem(at: dir) }
+        let page = dir.appendingPathComponent("page.pdf")
+        var note: String?
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            note = try CompressedPage.write(image: cg, lines: lines, ink: unplaced ? TextLayer.visionLines(of: cg) : nil,
+                                            pageSize: size, to: page).first
+        } catch { return (error.localizedDescription, nil) }
+        // The same test the uncompressed page passed: there is no text page, so the layer must lose nothing.
+        guard let doc = PDFDocument(url: page), doc.pageCount == 1, let made = doc.page(at: 0),
+              OutputForm.holds(made.string ?? "", every: reading) else {
+            return ("the compressed page does not hold every word of the reading", nil)
+        }
+        let box = made.bounds(for: .mediaBox)
+        guard abs(box.width - size.width) < 0.5, abs(box.height - size.height) < 0.5 else {
+            return ("the compressed page is not the image's size", nil)
+        }
+        do {
+            try SearchableArchival.write([page], pageHeaders: [header], to: url)
+        } catch {
+            return (error.localizedDescription, nil)
+        }
+        return (nil, note)
     }
 
     // MARK: - PDF/A output (W42.int-s5)
@@ -315,7 +380,8 @@ struct PDFGenerator {
     /// image, so the page stays searchable and the run report can name it. Nil page (and why) only when no layer could be
     /// written at all; the caller then writes the pair.
     private func searchableImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
-                                     options: TextLayerOptions, runReader: String?) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+                                     options: TextLayerOptions, runReader: String?)
+        -> (page: PDFPage?, outcome: TextLayerOutcome, lines: TextLayer.Lines?) {
         let kind = TextLayerRule.kind(explicit: pageKind, result: result)
         let reading = result.text ?? ""
         var why: String
@@ -335,7 +401,7 @@ struct PDFGenerator {
                     why = "some of the reading's words are not on the handwriting placer's lines"
                     if let written = writeLayer(image, lines: placed.lines), written.unplaced == 0,
                        OutputForm.holds(written.page.string ?? "", every: reading) {
-                        return (written.page, Self.handOutcome(placed, reason: nil, unplaced: 0))
+                        return (written.page, Self.handOutcome(placed, reason: nil, unplaced: 0), placed.lines)
                     }
                 }
             }
@@ -350,17 +416,19 @@ struct PDFGenerator {
                     if let written = writeLayer(image, lines: lines), written.unplaced == 0,
                        OutputForm.holds(written.page.string ?? "", every: reading) {
                         return (written.page, TextLayerOutcome(route: .visionLinesAligned, reason: nil,
-                                                               lines: lines.lines.count, unplaced: 0))
+                                                               lines: lines.lines.count, unplaced: 0), lines)
                     }
                     why = "some of the reading's words are not on Vision's lines"
                 }
             } else { why = "Vision found no lines" }
         }
         let lines = OutputForm.unplacedLines(reading)
-        guard !lines.isEmpty, let written = writeLayer(image, lines: TextLayer.lines(lines)) else {
-            return (nil, .textPage("the reading could not be written as a layer"))
+        let unplacedLayer = TextLayer.lines(lines)
+        guard !lines.isEmpty, let written = writeLayer(image, lines: unplacedLayer) else {
+            return (nil, .textPage("the reading could not be written as a layer"), nil)
         }
-        return (written.page, TextLayerOutcome(route: .unplaced, reason: why, lines: lines.count, unplaced: written.unplaced))
+        return (written.page, TextLayerOutcome(route: .unplaced, reason: why, lines: lines.count, unplaced: written.unplaced),
+                unplacedLayer)
     }
 
     /// W42.int-s5-hands — a handwritten page's layer from the hand placer: its lines when the page passes the gate
@@ -964,6 +1032,16 @@ struct PDFGenerator {
         let pageHeaders: [String?]? = headers.contains { $0 != nil } ? headers : nil
         // With a list, such an image would pair with the next source's page, which its own file never did: refuse.
         if pageHeaders != nil, let openImage { throw PDFError.sourceUnreadable(openImage) }
+        // W42.int-s5-compress: with searchable pages, the pages are copied as they are (`SearchableArchival`), so a
+        // compressed page stays compressed; Quartz redraws them where qpdf is missing or fails.
+        if let pageHeaders, SearchableArchival.isAvailable {
+            do {
+                try SearchableArchival.write(sourcePDFs, pageHeaders: pageHeaders, to: outputURL)
+                return
+            } catch {
+                NSLog("ArchiveProcessor: merge through qpdf failed (%@); merging through Quartz", "\(error)")
+            }
+        }
         try Self.writeArchival(merged, to: outputURL, pageHeaders: pageHeaders)
     }
 }

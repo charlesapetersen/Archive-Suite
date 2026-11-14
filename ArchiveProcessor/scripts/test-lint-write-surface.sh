@@ -159,6 +159,29 @@ fresh_tree
 expect 2 'a changed audited writeArchival line is stale and flagged as a new site' 'STALE write allowance'
 
 fresh_tree
+cat >> "$SCRATCH/$SRC/OCR/PDFGenerator.swift" <<'SWIFT'
+
+func plantedSearchableWrite(_ sources: [URL], _ output: URL) throws {
+    try SearchableArchival.write(sources, pageHeaders: [nil], to: output)
+}
+SWIFT
+expect 1 'an extra stream-preserving write inside PDFGenerator fails' 'SearchableArchival.write outside'
+
+fresh_tree
+cat > "$SCRATCH/$SRC/OCR/PlantedSearchableWrite.swift" <<'SWIFT'
+func plantedSearchableWriteElsewhere(_ sources: [URL], _ output: URL) throws {
+    try SearchableArchival.write(
+        sources, pageHeaders: [nil], to: output)
+}
+SWIFT
+expect 1 'a stream-preserving write in a new file fails' 'PlantedSearchableWrite.swift:2:'
+
+fresh_tree
+/usr/bin/perl -0pi -e 's/try SearchableArchival\.write\(\[page\], pageHeaders: \[header\], to: url\)/try SearchableArchival.write([page], pageHeaders: [header], to: changedURL)/' \
+  "$SCRATCH/$SRC/OCR/PDFGenerator.swift"
+expect 2 'a changed audited stream-preserving write is stale' 'STALE write allowance'
+
+fresh_tree
 mv "$SCRATCH/$SRC" "$SCRATCH/macOS/Sources/ArchiveProcessorMoved"
 expect 1 'a missing source root fails instead of passing vacuously' 'source root is missing'
 

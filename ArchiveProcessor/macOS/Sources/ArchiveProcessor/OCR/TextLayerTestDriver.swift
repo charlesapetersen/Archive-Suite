@@ -218,6 +218,14 @@ enum TextLayerTestDriver {
         let o = await write(reading, kind: .typewritten, name: name, to: typed, classification: .documentStart)
         check("7 print: the searchable form", o?.form == .searchable && o?.formFallback == nil, "\(String(describing: o))")
         check("7 print: placed on Vision's lines", o?.layer.route == .visionLinesAligned, "\(String(describing: o?.layer))")
+        // W42.int-s5-compress: compressed as Vision OCR compresses where its tools are found, else said why.
+        let tools = CompressedPage.missingTools.isEmpty
+        func compressed(_ url: URL) -> Bool {
+            (try? Data(contentsOf: url))?.range(of: Data("/JBIG2Decode".utf8)) != nil
+        }
+        check("7 print: compressed (JBIG2) where jbig2 and qpdf are found, else said why",
+              tools ? o?.compression == nil && compressed(typed) : o?.compression?.hasSuffix("not found") == true,
+              "\(String(describing: o?.compression))")
         if let doc = PDFDocument(url: typed), let content = PDFHeaderParser.extract(typed) {
             check("7 print: one page, no text page", doc.pageCount == 1, "\(doc.pageCount)")
             let layer = doc.page(at: 0)?.string ?? ""
@@ -245,6 +253,8 @@ enum TextLayerTestDriver {
               && (HandPlacer.isInstalled() || h?.layer.reason == TextLayerRule.notDownloadedReason), "\(String(describing: h))")
         let handText = PDFDocument(url: hand)?.page(at: 0)?.string ?? ""
         check("7 hand: one page holding every word", PDFDocument(url: hand)?.pageCount == 1 && words.allSatisfy { handText.contains($0) })
+        check("7 hand: the unplaced layer compressed too", !tools || (h?.compression == nil && compressed(hand)),
+              "\(String(describing: h?.compression))")
 
         // Words Vision never found (a note it missed): the placed layer would lose them, so the reading goes unplaced.
         let extra = dir.appendingPathComponent("searchable-extra.pdf")
@@ -279,6 +289,9 @@ enum TextLayerTestDriver {
                   PDFDocument(url: mixed).map { PDFHeaderParser.textPageHeaders($0).map { $0?.kind } }
                   == [.typewritten, .typewritten, .handwritten])
             archivalChecks("mixed merged document", mixed)
+            check("7 merge: the searchable pages stay compressed, not redrawn", !tools || (compressed(mixed)
+                  && size(mixed) <= size(typed) + size(pair) + size(hand) + 16_384),
+                  "\(size(mixed)) bytes of \(size(typed)) + \(size(pair)) + \(size(hand))")
         } catch { check("7 merge: written", false, "\(error)") }
         // A source that ends on an image with no text page, before a searchable one, would shift the pairing: refused.
         let lone = dir.appendingPathComponent("lone.pdf")
@@ -301,6 +314,8 @@ enum TextLayerTestDriver {
                   && header?.kind == .typewritten && header?.originalFilename == name, "\(String(describing: header))")
             check("7 date evidence: the page is kept", PDFDocument(url: out)?.page(at: 0)?.string == PDFDocument(url: typed)?.page(at: 0)?.string)
             archivalChecks("dated searchable output", out)
+            check("7 date evidence: still compressed, not redrawn", !tools || (compressed(out)
+                  && abs(size(out) - size(typed)) < 4_096), "\(size(out)) bytes against \(size(typed))")
             if case .unchanged = PDFGenerator().dateEvidenceRewrite(of: new, evidence: "image; page 1", body: reading, textColumns: 1) {
                 check("7 date evidence: the same line again is no change", true)
             } else { check("7 date evidence: the same line again is no change", false) }
@@ -436,7 +451,7 @@ enum TextLayerTestDriver {
     /// What `PDFGenerator.writeArchival` and `ArchivalFinish` promise of a written file, read from its bytes.
     private static func archivalChecks(_ name: String, _ url: URL) {
         guard let data = try? Data(contentsOf: url), let doc = CGDataProvider(data: data as CFData).flatMap(CGPDFDocument.init),
-              let catalog = doc.catalog else { check("6 \(name) opens", false); return }
+              doc.numberOfPages > 0, let catalog = doc.catalog else { check("6 \(name) opens", false); return }
         var stream: CGPDFStreamRef?, intents: CGPDFArrayRef?
         var xmp = ""
         var unfiltered = false
@@ -453,6 +468,30 @@ enum TextLayerTestDriver {
         let text = String(decoding: data, as: UTF8.self)
         check("6 \(name) interpolates no image", !text.contains("/Interpolate"))
         check("6 \(name) lists no unwritten object", !text.contains("0000000000 00000 n"))
+        // A readable layer and valid PDF/A do not prove the JBIG2/MRC image drew. Render the finished pages,
+        // including the mixed merge and date rewrite, through CoreGraphics with no window or model involved.
+        for index in 1...doc.numberOfPages {
+            guard let page = doc.page(at: index) else {
+                check("6 \(name) page \(index) renders", false); continue
+            }
+            var pixels = [UInt8](repeating: 255, count: 300 * 400 * 4)
+            let ink: Int? = pixels.withUnsafeMutableBytes { buffer in
+                guard let context = CGContext(data: buffer.baseAddress, width: 300, height: 400, bitsPerComponent: 8,
+                                          bytesPerRow: 300 * 4, space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+                let rect = CGRect(x: 0, y: 0, width: 300, height: 400)
+                context.setFillColor(CGColor(gray: 1, alpha: 1))
+                context.fill(rect)
+                context.concatenate(page.getDrawingTransform(.mediaBox, rect: rect, rotate: 0, preserveAspectRatio: true))
+                context.drawPDFPage(page)
+                let bytes = buffer.bindMemory(to: UInt8.self)
+                return stride(from: 0, to: bytes.count, by: 4).filter {
+                    min(bytes[$0], bytes[$0 + 1], bytes[$0 + 2]) < 220
+                }.count
+            }
+            check("6 \(name) page \(index) renders nonblank", ink.map { $0 > 100 } ?? false,
+                  "\(ink.map(String.init) ?? "no render") dark pixels")
+        }
     }
 
     private static func jpegStreams(_ page: PDFPage) -> [Data] {

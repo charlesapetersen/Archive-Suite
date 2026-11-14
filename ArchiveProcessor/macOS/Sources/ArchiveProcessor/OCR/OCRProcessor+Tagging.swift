@@ -234,8 +234,10 @@ extension OCRProcessor {
     /// "named in the run report"). Not a warning: its text is on the text page. A later write of the same output
     /// replaces the entry; a placed layer removes it.
     /// W42.int-s5-searchable: `formFallback` (a page chosen for the searchable form, written as a pair) and an unplaced
-    /// layer are named too, in their own list.
-    func recordTextLayer(_ outcome: TextLayerOutcome, formFallback: String? = nil, forSource source: URL) {
+    /// layer are named too, in their own list; W42.int-s5-compress: so is a searchable page written uncompressed
+    /// (`compression`, why), and what the compressor said of a compressed one (`compressedNote`).
+    func recordTextLayer(_ outcome: TextLayerOutcome, formFallback: String? = nil, compression: String? = nil,
+                         compressedNote: String? = nil, forSource source: URL) {
         let name = source.lastPathComponent
         textPageOnlyOutputs.removeAll { $0.name == name }
         searchableFormNotes.removeAll { $0.name == name }
@@ -244,6 +246,8 @@ extension OCRProcessor {
             searchableFormNotes.append((name, "its text is on the image but not placed on the words: \(outcome.reason ?? "unknown")"))
         }
         if let formFallback { searchableFormNotes.append((name, "written with a text page instead: \(formFallback)")) }
+        if let compression { searchableFormNotes.append((name, "written uncompressed: \(compression)")) }
+        if let compressedNote { searchableFormNotes.append((name, "compressed: \(compressedNote)")) }
     }
 
     /// The end-of-run warning text for both records, or "" when everything landed cleanly.
@@ -859,7 +863,8 @@ extension OCRProcessor {
                             )
                         }.value
                         recordImagePage(output.imagePage, forSource: source)
-                        recordTextLayer(output.layer, formFallback: output.formFallback, forSource: source)
+                        recordTextLayer(output.layer, formFallback: output.formFallback, compression: output.compression,
+                                    compressedNote: output.compressedNote, forSource: source)
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
                                source.lastPathComponent, error.localizedDescription)

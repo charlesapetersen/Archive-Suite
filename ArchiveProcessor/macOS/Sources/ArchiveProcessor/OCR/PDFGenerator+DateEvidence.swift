@@ -23,7 +23,7 @@ extension PDFGenerator {
     func dateEvidenceRewrite(of pdf: Data, evidence: String?, body: String, textColumns: Int) -> DateEvidenceRewrite {
         guard let doc = PDFDocument(data: pdf), !doc.isLocked else { return .skipped("not readable") }
         if PDFPageRole.roles(of: doc).contains(.searchable) {
-            return searchableDateEvidenceRewrite(doc, evidence: evidence, body: body)
+            return searchableDateEvidenceRewrite(doc, original: pdf, evidence: evidence, body: body)
         }
         guard doc.pageCount == 2, let image = doc.page(at: 0), let text = doc.page(at: 1) else {
             return .skipped("not one image page and one text page")
@@ -79,9 +79,10 @@ extension PDFGenerator {
         return (header, fit)
     }
 
-    /// The searchable form's rewrite: one page, its header in the XMP. The page is drawn again unchanged, so it must read
-    /// back with the same size, turn and text; the header must read back as the old one with only the evidence changed.
-    private func searchableDateEvidenceRewrite(_ doc: PDFDocument, evidence: String?, body: String) -> DateEvidenceRewrite {
+    /// The searchable form's rewrite: one page, its header in the XMP. The page is copied as it is (or, without qpdf,
+    /// drawn again unchanged), so it must read back with the same size, turn and text; the header must read back as the old one with only the evidence changed.
+    private func searchableDateEvidenceRewrite(_ doc: PDFDocument, original: Data, evidence: String?,
+                                               body: String) -> DateEvidenceRewrite {
         guard doc.pageCount == 1, let page = doc.page(at: 0),
               let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:)), carried.count == 1,
               let oldText = carried[0] else { return .skipped("not one searchable page") }
@@ -93,7 +94,7 @@ extension PDFGenerator {
         // every word of it (`searchableImagePage`).
         guard OutputForm.holds(page.string ?? "", every: body) else { return .skipped("the page's text is not this run's") }
         let header = Self.headerText(old, provenance: provenance, evidence: evidence).0
-        guard let data = Self.archivalData(doc, pageHeaders: [header]),
+        guard let data = Self.searchableRewrite(doc, original: original, pageHeaders: [header]),
               let made = PDFDocument(data: data), made.pageCount == 1, let madePage = made.page(at: 0) else {
             return .skipped("the new file does not read back")
         }
@@ -108,6 +109,21 @@ extension PDFGenerator {
             return .skipped("the new header does not read back as the old one")
         }
         return .rewrite(data)
+    }
+
+    /// W42.int-s5-compress: the page copied out of `original` (the file's bytes) as it is, with the new header
+    /// (`SearchableArchival`), so a compressed page is not redrawn and re-encoded; through Quartz where qpdf is missing
+    /// or fails.
+    private static func searchableRewrite(_ doc: PDFDocument, original pdf: Data, pageHeaders: [String?]) -> Data? {
+        if SearchableArchival.isAvailable {
+            let fm = FileManager.default
+            let url = fm.temporaryDirectory.appendingPathComponent("ap-evidence-" + UUID().uuidString + ".pdf")
+            defer { try? fm.removeItem(at: url) }
+            if (try? pdf.write(to: url)) != nil, let data = try? SearchableArchival.data([url], pageHeaders: pageHeaders) {
+                return data
+            }
+        }
+        return archivalData(doc, pageHeaders: pageHeaders)
     }
 
     /// Text with every white space removed: PDFKit's read-back changes line breaks and spacing, never the characters.

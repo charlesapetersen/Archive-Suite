@@ -87,6 +87,9 @@ enum OutputMeasureTestDriver {
                     check("\(name) searchable: the page holds every word of the reading",
                           OutputForm.holds(imageText, every: result.text ?? ""),
                           "\(written.layer.route.rawValue), missing \(OutputForm.missingWords(imageText, result.text ?? "").prefix(12))")
+                    // W42.int-s5-compress: compressed as Vision OCR compresses (its tools are on this Mac).
+                    check("\(name) searchable: compressed", written.compression == nil,
+                          written.compression ?? "")
                     searchable.append(out)
                 } else {
                     check("\(name) \(form.name): two pages, the text page second", doc.pageCount == 2

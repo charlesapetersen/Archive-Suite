@@ -70,7 +70,8 @@ struct SettingsSheetView: View {
             Divider()
             if let model {
                 ScrollView {
-                    SettingsSheetPage(model: model, tab: tab, choose: choose, apply: apply, setSwitch: setSwitch)
+                    SettingsSheetPage(model: model, tab: tab, choose: choose, apply: apply, setSwitch: setSwitch,
+                                      setStrings: setStrings)
                 }
             } else {
                 Text("The measured figures are missing from this build, so the settings sheet cannot be shown.")
@@ -130,6 +131,8 @@ struct SettingsSheetView: View {
     }
 
     private func setSwitch(_ key: SettingsKey, _ on: Bool) { take(writer.set(key, .bool(on), doc: doc)) }
+
+    private func setStrings(_ key: SettingsKey, _ list: [String]) { take(writer.set(key, .strings(list), doc: doc)) }
 
     private func take(_ outcome: SettingsSheetWriter.Outcome) {
         doc = outcome.doc
@@ -203,6 +206,7 @@ struct SettingsSheetPage: View {
     var choose: (String, String?) -> Void = { _, _ in }
     var apply: (SettingsSheetModel.Apply) -> Void = { _ in }
     var setSwitch: (SettingsKey, Bool) -> Void = { _, _ in }
+    var setStrings: (SettingsKey, [String]) -> Void = { _, _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -303,6 +307,7 @@ struct SettingsSheetPage: View {
                         .accessibilityIdentifier("ap.sheet.switch.\(sw.id)")
                         if sw.offersHandDownload { HandPlacerDownloadRow() }
                     }
+                    if let forms = stage.forms { formsRow(forms) }
                     DisclosureGroup("The rules in detail") {
                         VStack(alignment: .leading, spacing: 3) {
                             ForEach(stage.rules) { r in
@@ -321,6 +326,33 @@ struct SettingsSheetPage: View {
             }
             .accessibilityIdentifier("ap.sheet.rule.\(stage.id)")
         }
+    }
+
+    /// W42.int-s5-compress — the searchable form's switches: every page, or by kind.
+    @ViewBuilder private func formsRow(_ forms: SettingsSheetModel.FormsRow) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Write as one searchable page, with no text page").padding(.top, 4)
+            Text("Search and select the reading on the page image. If the words cannot be placed, search still works "
+                 + "but selections may not line up. Unchecked kinds keep a separate page of text after each image. "
+                 + "Searchable images use less space when the compression tools are available.")
+                .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(forms.source).font(.caption2).foregroundStyle(.secondary)
+            Toggle("Every page, pages of no known kind too", isOn: Binding(get: { forms.all },
+                                               set: { setStrings(.searchableFor, forms.settingAll($0)) }))
+                .accessibilityIdentifier("ap.sheet.forms.all")
+            ForEach(PageKindName.allCases, id: \.self) { kind in
+                Toggle(kind.label, isOn: Binding(get: { forms.isOn(kind) },
+                                                 set: { setStrings(.searchableFor, forms.setting(kind, $0)) }))
+                    .padding(.leading, 16)
+                    .accessibilityIdentifier("ap.sheet.forms.\(kind.rawValue)")
+            }
+            if !forms.others.isEmpty {
+                Text("Also set in the settings file: " + forms.others.joined(separator: ", "))
+                    .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ap.sheet.forms")
     }
 
 }

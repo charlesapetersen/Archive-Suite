@@ -81,6 +81,25 @@ enum SettingsSheetTestDriver {
         check("1 a collection's switch is read back with its source",
               off.ruleStages.first { $0.id == "reading-copy" }?.switches.first.map { !$0.isOn && $0.source.hasPrefix("set for this collection") } == true)
         check("1 the placement switch may be held by a collection", SettingsKey.placeHandOnImage.allowed(in: .collection))
+        // W42.int-s5-compress: the searchable form's control, on the placement stage only.
+        check("E placement: the searchable form's control, off by default",
+              place?.forms.map { f in !f.all && PageKindName.allCases.allSatisfy { !f.isOn($0) } } == true
+              && free.ruleStages.filter { $0.forms != nil }.map(\.id) == ["placement"])
+        let forms = SettingsSheetModel.FormsRow(entries: ["jpeg/printed", "*/handwritten"], source: "")
+        check("E forms: a kind switched on is added for any format, a format's own entry kept",
+              forms.setting(.typewritten, true) == ["jpeg/printed", "*/handwritten", "*/typewritten"]
+              && forms.isOn(.handwritten) && !forms.isOn(.printed) && forms.others == ["jpeg/printed"])
+        check("E forms: every page, and one kind off under it keeps the rest",
+              forms.settingAll(true) == ["jpeg/printed", "*/*"]
+              && SettingsSheetModel.FormsRow(entries: ["*/*"], source: "").setting(.forms, false)
+                  == PageKindName.allCases.filter { $0 != .forms }.map { "*/" + $0.rawValue }
+              && SettingsSheetModel.FormsRow(entries: ["*/*"], source: "").settingAll(false).isEmpty)
+        let chosen = sheet("searchable-on", general: SettingsLayer(kind: .general, name: "General"),
+                           collection: layer(.collection, [(.searchableFor, .strings(["*/printed"]))]))
+        check("E forms: a collection's choice is read back with its source",
+              chosen.ruleStages.first { $0.id == "placement" }?.forms.map {
+                  $0.isOn(.printed) && !$0.isOn(.handwritten) && $0.source.hasPrefix("set for this collection")
+              } == true)
         check("1 every table switch of a rule stage is stored somewhere",
               SettingsSheetModel.ruleStageIDs.compactMap { table.stage($0) }.flatMap(\.rules)
                 .compactMap(\.switchSetting).allSatisfy { SettingsSheetModel.switchKey($0.id) != nil })

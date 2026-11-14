@@ -1609,7 +1609,8 @@ extension OCRProcessor {
         // `retryOne` — which regenerates the PDF and does not re-tag it — silently clear a real warning.
         let layerOptions = textLayerOptions
         let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool?,
-                        imagePage: PDFGenerator.ImagePageOutcome?, layer: TextLayerOutcome?, formFallback: String?)
+                        imagePage: PDFGenerator.ImagePageOutcome?, layer: TextLayerOutcome?, formFallback: String?,
+                        compression: String?, compressedNote: String?)
             = await Task.detached(priority: .utility) {
             let pdfGen = PDFGenerator()
             do {
@@ -1632,11 +1633,12 @@ extension OCRProcessor {
                         appliedTags = sourceTags
                     }
                 }
-                return (true, appliedTags, tagWriteOK, output.imagePage, output.layer, output.formFallback)
+                return (true, appliedTags, tagWriteOK, output.imagePage, output.layer, output.formFallback,
+                        output.compression, output.compressedNote)
             } catch {
                 os_log(.error, "PDF write failed for %{public}@: %{public}@",
                        originalFileName, error.localizedDescription)
-                return (false, nil, nil, nil, nil, nil)
+                return (false, nil, nil, nil, nil, nil, nil, nil)
             }
         }.value
         // W16.bat9 — the same window as the sweep's loop, one frame down. The detached write above is the
@@ -1668,7 +1670,8 @@ extension OCRProcessor {
             }
             if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, forSource: sourceURL) }
             if let layer = pdfResult.layer {
-                recordTextLayer(layer, formFallback: pdfResult.formFallback, forSource: sourceURL)
+                recordTextLayer(layer, formFallback: pdfResult.formFallback, compression: pdfResult.compression,
+                                compressedNote: pdfResult.compressedNote, forSource: sourceURL)
             }
         } else {
             // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on

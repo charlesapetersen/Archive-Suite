@@ -28,6 +28,13 @@ python3 ops/autonomous/heavy-run.py run -- swift test -c release -Xswiftc -enabl
 
 `visionocr-pdf <out-dir> <file>...` (`Tools/pdf/`) makes Vision OCR 1.16.0's searchable PDF of each file with its defaults, headless, and prints bytes and seconds: the size baseline for Archive Processor's output (W42.int-s5, `ArchiveProcessor/scripts/measure-output.sh`).
 
+`CompressedPage.write(image:lines:ink:pageSize:to:)` writes one compressed searchable page with the host's own
+`TextLayer.Lines`, without recognising text. It uses the engine's registered defaults and the JBIG2/MRC route;
+`ink` supplies the actual text locations when the layer's lines are unplaced. Call it off the main thread.
+`CompressedPage.missingTools` names absent `jbig2`/`qpdf` executables, found in the host's Resources, standard
+Homebrew/MacPorts locations, then the login PATH. The caller supplies those tools and finishes PDF/A metadata;
+copy the resulting PDF streams when finishing or merging, since drawing through Quartz undoes compression.
+
 A whole-package release build needs `-Xswiftc -enable-testing`, because `visionocr-checks`, `visionocr-gate` and `visionocr-pdf` use `@testable import`; without it those targets fail with "unable to resolve Swift module dependency". The library and the helper build without it (`--product visionocr-recognise`), and so does a debug build. The `ux-regression.sh` run was not repeated after the move (owner, 2026-11-13: the suite's matching count is enough; Vision OCR's `testdocs/` corpus stays on the OneDrive backup), so `Tools/ux-regression.sh` through the package products is wired but has not been run.
 
 `-c release` matters: the suite's own notes (`run_tests.sh`) explain why `-O` is load-bearing. `run_tests.sh` and
