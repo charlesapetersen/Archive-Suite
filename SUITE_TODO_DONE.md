@@ -15885,3 +15885,28 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   selection across a blank-line gap still splits, the spacing measure, and an end-to-end PDFKit double-spaced page
   with two of six lines selected. Whole Reader unit bundle green, no new warnings. Bench cache: nothing written.
   <!-- /W40.reader-copy-clean-two-lines -->
+
+- [x] **W40.fix-reader-smart-folder-delete — deleting a smart folder hangs the Reader (beach ball) [S-M]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Owner, 2026-11-13: "Deleting a smart folder led to beach ball." SHIPPED 2026-11-13.
+  Reproduced first at corpus size: `ReaderChainAtSizeTests` §2b (115,999 rows, 10 smart folders, live FSEvents) deletes a
+  folder not open, the open one, and leaves one by its chip for comparison, three runs each. Cause, as the 2026-11-10
+  notes predicted, whole-library work on the main actor: deleting the open folder exited its scope and rebuilt the
+  whole list synchronously (`presentation.build` 1.16 s Debug), and every deletion recounted every remaining folder
+  over the whole library (2.7 s of row passes). Debug before: open 1,771 ms main-busy, longest stall 1,557 ms, settled
+  4.3 s; not open 144 ms main-busy, settled 2.8 s. Debug after: open 437 ms main-busy, longest stall 411 ms (all the
+  table's emulated showRows), settled 1.6 s; not open 0.0 ms, nothing to settle. -O after: open 388 ms (showRows 364 ms;
+  the list built off main in 111 ms), not open 0.0 ms; budgets asserted on the -O run (not open within 16 ms, the open
+  one no worse than the chip, no list build or row count on main).
+  Fix: `NavigationModel.deleteSmartFolder` (sidebar Delete and toolbar Saved ▸ Delete) leaves the open folder first with
+  `recomputeInBackground` (a detached build at >= 1,000 rows, superseded by any recompute or library change, row patches
+  held off until it presents); `smartFoldersChanged` keeps the counts of folders whose rules are as counted after a
+  deletion, rename or reorder. The Tier-2 adversarial review (Opus) found that a text-rule folder, sorted by relevance,
+  puts the sort back on leaving and the window's `onChange(of: sort)` then rebuilt the list on main: `filterOrSortChanged`
+  now skips a list already asked for with that filter and sort, which also stops the doubled build of every model change
+  that set the filter or sort and recomputed itself. Not done: the superseded background build cannot be cancelled
+  (`Input.build` has no cancellation points), so it runs out and is dropped.
+  Tests: `SmartFolderDeleteTests` (5, in memory at 1,500 rows: no recount, off-main build, relevance sort, a recompute
+  and a library change during the build), `SmartFolderDeleteUITests` in the VM (delete the open folder and one not open
+  from the sidebar; the list returns and the window answers), the touched unit suites and the whole Reader unit bundle.
+  Follow-up filed: `W40.fix-reader-scope-exit-main` (the chip, a folder click and All Files still build on main; the
+  table's showRows at 116k rows). Bench cache: nothing written; the chain clone is made and deleted by the harness.
+  <!-- /W40.fix-reader-smart-folder-delete -->
