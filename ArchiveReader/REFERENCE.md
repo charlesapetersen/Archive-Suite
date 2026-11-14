@@ -279,7 +279,10 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
   double-click or `⌘O` open in the document window (`⏎` has no handler; ledger R-35)
 - `⌃⌘P` Tags ▸ Flag as Poor OCR / Remove Poor OCR Flag (the `OCR Poor` tag, through `TagWriter`; W44.reocr-reader)
 - `⌘R` Mark Read · `⌘U` Mark Unread · `⌥⌘I` View ▸ Show/Hide Inspector (Edit Info until `W40.reader-commands-table`; `⌘I` is now free, as in Notes, where it is Italic) · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped) · `⇧⌘Z` Redo tag change (the newest undo, until a new change; `W40.fix-reader-redo`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
-- **Keyboard triage (G4):** `⌘]`/`⌘[` Next/Previous Unread · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
+- `⌘[`/`⌘]` Go ▸ Back/Forward through the folders, smart folders and unsaved Advanced Searches shown, the selection put
+  back on return, as in Finder; also the toolbar's ‹ › buttons, disabled at the ends (`W40.reader-back-forward`). A
+  smart folder's edit, rename or deletion and a new archive folder are not moves; a deleted smart folder is skipped
+- **Keyboard triage (G4):** `⌥⌘]`/`⌥⌘[` Next/Previous Unread (`⌘]`/`⌘[` until `W40.reader-back-forward`) · `⌘⇧M` Mark Read & Next Unread (mark Read via `TagWriter`,
   then jump to the next `Unread`). Focus-scoped bare-key equivalents fire only when the list has key focus
   (text-field-safe, like `Space`): `]`/`[` = next/previous unread, `\` = mark read & advance. All read-state
   mutation routes through `mark(.read)` → `TagWriter` (undoable); the next/previous math is pure (`TriageNavigation`).
@@ -298,6 +301,9 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
 *Document window* (the **focused pane** carries an accent border; click a pane or switch it with `⌘⌥←`/`⌘⌥→`)
 - `←/→/↑/↓` **pan** the focused PDF page, stopping at its edges; a fitted page stays put. In the extracted-text pane, arrows keep their native text-navigation behavior (W40.fix-reader-doc-keys-focus).
 - `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
+- `⌘[`/`⌘]` Go ▸ Back/Forward through this window's page jumps — a thumbnail or contact-sheet click, a find hit —
+  as in Preview; stepping a page is not a jump, and a new jump after Back ends the forward list. The preview sheet
+  keeps its own, forgetting places in files a new selection no longer holds (`W40.reader-back-forward`)
 - `⌘⌥←`/`⌘⌥→` focus image pane / focus text pane
 - `⌘+`/`⌘−` zoom in/out the focused pane (also `⌘=`, and `⌘↑`/`⌘↓`, answered by the panes since a menu item
   holds one shortcut) · `⌘0` fit the focused page · `⌥⌘0` reset the split to the saved default (not
@@ -503,6 +509,7 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   DocumentRuns.swift          Pure run detection (Start + Continuations) for opt-in run selection.
   TriageNavigation.swift      Pure next/previous-unread selection math (skip read, wrap/stop) for G4
                               keyboard triage; touches no file — the caller writes via TagWriter.
+  NavigationHistory.swift     Back/Forward lists (record on leaving, branch drops forward, skip gone places)
   AppSettings.swift           UserDefaults-backed option accessors the models read at point of use;
                               hidden list columns (`ar.hiddenColumns`, every column shown by default).
   DisplayCalendarPreferences.swift  W24.cal1-reader: Options ▸ Dates switch (off by default), each

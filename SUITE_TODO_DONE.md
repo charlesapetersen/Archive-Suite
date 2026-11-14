@@ -15850,3 +15850,27 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   one folder, Edit Smart Folder… shows the changed rule); screenshots `w40-smart-folder-save-to*` read. No new
   warnings. Bench cache: nothing written.
   <!-- /W40.reader-smart-folder-update -->
+- [x] **W40.reader-back-forward — Back and Forward, ⌘[ and ⌘], for pages in the viewer and for folders in the navigation window [M]** · §Archive Reader — the owner's notes of 2026-11-13 · (lane: reader) — owner, 2026-11-13 ("it should be possible to go back to the previous page being looked at", and folders as in Finder). SHIPPED 2026-11-13.
+  Go ▸ Back (⌘[) and Forward (⌘]), a new Go menu after View. One generic, UI-free `Core/NavigationHistory.swift`
+  (record the place being left; Back puts the current place on the forward list; a new jump after Back drops it;
+  places that are gone are skipped; 100 kept). **Viewer** (`DocumentViewerModel`, so the document window and the
+  preview sheet each have their own): a place is file + page pair; a jump is a thumbnail click, a contact-sheet
+  tile, or a find hit that changes the page; Previous/Next stepping is not, as in Preview. A new selection in the
+  preview sheet forgets places in files no longer open. There is no Go to Page command in the Reader, and a page
+  link opens its own window at the cited page (the window's first place, not a jump), so neither records.
+  **Navigation window** (`NavigationModel`): a place is a folder (or All Files), a saved smart folder, or an unsaved
+  Advanced Search, recorded by `setFolderScope`, `applyScope` and the smart folder chip's ✕; the selection is put
+  back on return (rows a smart folder's text rules bring in later are added as they arrive, until the user
+  changes the selection). A smart folder's edit/rename/deletion and a new archive folder are not moves; a new
+  archive folder clears the history; a deleted smart folder is skipped. Finder-style ‹ › toolbar buttons
+  (`ar.toolbar.back`/`forward`), disabled at the ends. With a viewer in front (incl. the preview sheet) the keys
+  act on its pages, else on the folders. **Keys:** Next/Previous Unread move to ⌥⌘] / ⌥⌘[; the list's bare ] / [
+  stay. REFERENCE.md keyboard map and implementation map updated.
+  Verified: new `BackForwardTests` (history ends/branch/skip/limit; viewer thumbnail+tile jumps, stepping not a
+  jump, find hit across files, pruning on a new selection; folder Back/Forward with selection restored, smart
+  folder in history then skipped once deleted; the keys) and `ReaderCommandTableTests` (Go now an own menu),
+  `PageViewsTests`, `ActiveFiltersTests` green, plus the whole unit bundle; in the Tart VM the new
+  `BackForwardUITests` (folders via ⌘[/⌘] and the toolbar buttons with the selection restored; a thumbnail jump
+  in the document window) pass, screenshots `w40-back-forward-toolbar`/`-document` read. No new warnings. Bench
+  cache: nothing written.
+  <!-- /W40.reader-back-forward -->
