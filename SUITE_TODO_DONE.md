@@ -16028,3 +16028,16 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `app.disclosureTriangles[…]` and checks the label; no app change. VM: the test passes (22.9 s). Bench cache: nothing
   written.
   <!-- /W40.fix-reader-sentwith-uitest -->
+- [x] **W40.reader-table-reload-vm — run the list's UITests in the VM against the table's plain reload [XS]** · §Archive Reader — the owner's notes of 2026-11-13 — SHIPPED 2026-11-13. Filed by W40.fix-reader-table-apply-at-size, whose VM check
+  could not run (the guest's package resolution got "Connection reset by peer" from github.com). This time the guest
+  resolved its packages and ran the named selection (Navigation, BackForward, SmartFolderDelete, ColumnHeader,
+  SelectionCurrent, RestoreScroll, TagEntry, TriageJourney, LayoutGuard): 42 tests, 0 failures, TEST SUCCEEDED in
+  1611 s of test time (1732 s with the build), no crash or hang report from a suite process. This includes
+  testSheetSetsAndClearsASentWithDate, fixed by W40.fix-reader-sentwith-uitest. Screenshots read: after the filter is
+  cleared, after a tag-cloud filter, at the triage journey's selection and after restore-scroll relaunch, the rows draw at the right
+  heights. The fixture's one wrapped-tag row (842: Medieval Records + Inspector hidden focus) keeps its two-line
+  height after the reload. Scope: the review's suspicion (rows above the viewport with wrapped tags or snippets settling
+  as the list scrolls up after a filter change) is not exercised. The GUI fixture's wrapped row is at the top, and the
+  80-row restore-scroll corpus has no wrapped rows, so this run neither confirms nor rules it out. The Daemon Report's
+  2026-11-13 VM-network entry is therefore resolved for now. No app change. Bench cache: nothing written.
+  <!-- /W40.reader-table-reload-vm -->
