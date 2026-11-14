@@ -45,6 +45,9 @@ enum ModelDownloads {
 
     enum Item: String, CaseIterable {
         case runtime, layout, falcon, paddle, lighton
+        /// The hand placer (W42.int-s5-hands, `HandPlacer`): kraken and PyTorch with blla and McCATMuS, built by
+        /// `ops/make-hands-runtime.sh`. Fetched when the host app's user asks for it, never with a reader.
+        case hands
 
         var name: String {
             switch self {
@@ -53,6 +56,7 @@ enum ModelDownloads {
             case .falcon: return Prefs.AccurateReader.falcon.name
             case .paddle: return Prefs.AccurateReader.paddle.name
             case .lighton: return Prefs.AccurateReader.lighton.name
+            case .hands: return "the handwriting placer"
             }
         }
 
@@ -66,6 +70,10 @@ enum ModelDownloads {
                 return .archive(File(path: "doclayout-yolo.tgz", bytes: 64_836_242,
                                      sha256: "61e8114f535d2961f828d80a1d9afdd9c51f253a5540bda09bd65b1363e409e6"),
                                 top: "doclayout-yolo.mlmodelc", destination: "Models/doclayout-yolo.mlmodelc")
+            case .hands:
+                return .archive(File(path: "hands.tgz", bytes: 286_946_670,
+                                     sha256: "f835149bf6f4921b28becd063953b538004f6e1247a38e3ad8e7343289dc1470"),
+                                top: "hands", destination: "Hands")
             // Only what loading reads: not the model cards, their images or their benchmark files.
             case .falcon:
                 return .hub(repo: "tiiuae/Falcon-OCR", revision: "fe757d59ecd79d4d68760162306a70a015761ad9", files: [
@@ -129,7 +137,7 @@ enum ModelDownloads {
             case .hub(_, let revision, _):
                 return FileManager.default.fileExists(atPath: url.appendingPathComponent("snapshots/\(revision)").path)
             case .archive:
-                return self == .runtime ? Runner.isRunnable(url.appendingPathComponent("bin/python3").path)
+                return self == .runtime || self == .hands ? Runner.isRunnable(url.appendingPathComponent("bin/python3").path)
                     : FileManager.default.fileExists(atPath: url.path)
             }
         }

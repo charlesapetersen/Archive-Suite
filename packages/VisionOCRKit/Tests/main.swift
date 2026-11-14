@@ -898,6 +898,58 @@ do {
 
 // MARK: - A document Vision reads nothing from says so (A13.2)
 
+// W42.int-s5-hands. The hand placer: it runs only once downloaded, hands the page and reading to its script, reads
+// back the lines that hold text and the confidence the gate is read against, and a failed run is an error, not lines.
+section("the hand placer places only when downloaded, and reads its script's lines back") {
+    let dir = tmp.appendingPathComponent("hands-\(UUID().uuidString)")
+    let home = dir.appendingPathComponent("home")
+    let bin = home.appendingPathComponent("Hands/bin"), models = home.appendingPathComponent("Hands/models")
+    try? FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
+    let script = dir.appendingPathComponent("place-hands.py")
+    try? "".write(to: script, atomically: true, encoding: .utf8)
+    let env = ["VISIONOCR_MODEL_HOME": home.path, "VISIONOCR_HANDS_SCRIPT": script.path,
+               "HOME": NSHomeDirectory(), "TMPDIR": NSTemporaryDirectory()]
+    check("the hand placer is not installed until its runtime and its model are in place",
+          !HandPlacer.isInstalled(env) && !HandPlacer.isInstalled(["VISIONOCR_MODEL_HOME": dir.appendingPathComponent("none").path]))
+    let python = bin.appendingPathComponent("python3")
+    func standIn(_ body: String) {
+        try? ("#!/bin/sh\n" + body).write(to: python, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: python.path)
+    }
+    // The script's arguments: -I <script> <image> <reading> <out> --model M --device cpu; the stand-in writes <out>.
+    let json = #"{"lines":[{"text":"Dear Sir","box":[0.1,0.2,0.5,0.04]},{"text":"","box":[0.1,0.3,0.5,0.04]},"#
+        + #"{"text":"bad box","box":[0.1,0.3,0,0.04]}],"confidence":0.81,"span":8,"detected":3,"reading_lines":1,"#
+        + #""fallback_lines":0,"seconds":{},"peak_rss":3221225472}"#
+    standIn("grep -q 'Dear Sir' \"$4\" && [ -s \"$3\" ] || exit 3\nprintf '%s' '\(json)' > \"$5\"\n")
+    try? Data().write(to: models.appendingPathComponent("McCATMuS_nfd_nofix_V1.mlmodel"))
+    check("with its runtime and model in place the hand placer counts as installed", HandPlacer.isInstalled(env))
+    let ctx = CGContext(data: nil, width: 40, height: 30, bitsPerComponent: 8, bytesPerRow: 0,
+                        space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    ctx.setFillColor(gray: 1, alpha: 1)
+    ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 30))
+    let image = ctx.makeImage()!
+    var placed: HandPlacer.Placement?
+    var failure = ""
+    DispatchQueue.global().sync {
+        do { placed = try HandPlacer.place(image: image, reading: "Dear Sir", environment: env) } catch { failure = "\(error)" }
+    }
+    check("the hand placer reads back the lines that hold text, the matcher, the confidence and the peak memory",
+          placed?.lines.lines.map(\.text) == ["Dear Sir"] && placed?.span == 8 && placed?.confidence == 0.81
+              && placed?.peakMB == 3072 && placed?.passesGate == true
+              && placed?.lines.lines.first?.box == CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.04),
+          "\(failure) \(placed?.lines.lines ?? [])")
+    let low = try? HandPlacer.decode(Data(json.replacingOccurrences(of: "0.81", with: "0.66").utf8), seconds: 1)
+    check("a page under the 0.67 gate does not pass it", low?.passesGate == false && HandPlacer.gate == 0.67)
+    standIn("exit 1\n")
+    var failed: Error?
+    DispatchQueue.global().sync {
+        do { _ = try HandPlacer.place(image: image, reading: "Dear Sir", environment: env) } catch { failed = error }
+    }
+    check("a placer that fails is an error, not an empty layer", failed != nil)
+    try? FileManager.default.removeItem(at: dir)
+}
+
 // `recogniseDocument` records `[]` for a blank page so `missingPages` can tell a
 // skip from a blank (C12), and nothing checked the other side: a document where
 // **every** page came back empty published as a success with `message=""`, zero

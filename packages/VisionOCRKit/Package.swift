@@ -21,6 +21,7 @@ let package = Package(
             path: "Sources/VisionOCRKit",
             resources: [
                 .copy("Resources/read-model.py"),
+                .copy("Resources/place-hands.py"),
                 .copy("Resources/mac-ocr-LICENSE"),
             ]
         ),
