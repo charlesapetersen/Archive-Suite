@@ -90,8 +90,8 @@ struct NavigationWindowView: View {
         .animation(.easeInOut(duration: 0.2), value: showingSidebar)
         .animation(.easeInOut(duration: 0.2), value: showingTagCloud)
         .toolbar { toolbarContent }
-        .onChange(of: model.filter) { model.recompute() }
-        .onChange(of: model.sort) { model.recompute() }
+        .onChange(of: model.filter) { model.filterOrSortChanged() }
+        .onChange(of: model.sort) { model.filterOrSortChanged() }
         .onChange(of: calendarsEnabled) { model.refreshDisplayedRows() }
         .onChange(of: model.showingEditor) { _, visible in infoVisible = visible }
         .sheet(isPresented: Binding(get: { model.renamingTag != nil },

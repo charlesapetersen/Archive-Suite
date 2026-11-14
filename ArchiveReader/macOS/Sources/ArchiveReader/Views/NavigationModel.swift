@@ -1030,9 +1030,22 @@ final class NavigationModel: ObservableObject {
 
     func recompute() {
         viewRevision &+= 1
+        builtFilterAndSort = (filter, sort)
         let input = presentationInput(library.files)
         present(ReaderStages.measure("presentation.build") { input.build() }, marks: input.marks,
                 filesRevision: library.filesRevision)
+    }
+
+    /// The filter and sort the last recompute was asked for.
+    private var builtFilterAndSort: (filter: LibraryFilter, sort: [ARSortDescriptor])?
+
+    /// The window's filter or sort changed. Most changes made in the model recompute already, so the view's
+    /// change handler ran a second whole-list build on the main thread; and leaving a smart folder sorted by
+    /// relevance puts the sort back, which undid the background build of a deletion
+    /// (W40.fix-reader-smart-folder-delete). A list already asked for with this filter and sort is not built again.
+    func filterOrSortChanged() {
+        if let built = builtFilterAndSort, built.filter == filter, built.sort == sort { return }
+        recompute()
     }
 
     /// `recompute`, with the list built off the main actor at corpus size, where the whole-library pass held the
@@ -1042,6 +1055,7 @@ final class NavigationModel: ObservableObject {
     private func recomputeInBackground() {
         guard library.files.count >= 1_000 else { recompute(); return }
         viewRevision &+= 1
+        builtFilterAndSort = (filter, sort)
         let view = viewRevision, filesRevision = library.filesRevision
         let input = presentationInput(library.files)
         presentedFilesRevision = nil

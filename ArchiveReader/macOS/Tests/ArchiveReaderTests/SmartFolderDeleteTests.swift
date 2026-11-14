@@ -127,6 +127,34 @@ final class SmartFolderDeleteTests: XCTestCase {
         await indexer.closeForTesting()
     }
 
+    /// A folder with a text rule opens sorted by relevance, and leaving it puts the sort back. The window's
+    /// change handler for the sort then ran a whole-list build on the main thread, undoing the background one.
+    func testDeletingAnOpenRelevanceSortedFolderStaysOffTheMainThread() async throws {
+        let (model, indexer) = await makeModel()
+        var text = SearchRule(field: .ocrText, op: .allWords)
+        text.text = "budget"
+        let open = try XCTUnwrap(model.savedSearches.add(name: "OCR budget", search: AdvancedSearch(rules: [text])))
+        _ = await waitUntil { model.smartFolderCounts.count == 1 }
+        model.applyScope(try XCTUnwrap(model.savedSearches.searches.first { $0.id == open }))
+        XCTAssertEqual(model.sort.first?.field, .relevance, "precondition: a text rule sorts by relevance")
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        ReaderStages.recorder.reset(recording: true)
+        model.deleteSmartFolder(open)
+        XCTAssertNotEqual(model.sort.first?.field, .relevance, "leaving it puts the sort back")
+        model.filterOrSortChanged()   // what the window's onChange(of: sort) runs
+        let arrived = await waitUntil { model.displayed.count == 1_500 }
+        XCTAssertTrue(arrived, "the list shows All Files")
+        XCTAssertEqual(stage("presentation.build", onMain: true), 0, "the sort's change builds nothing on main")
+        XCTAssertEqual(stage("presentation.build (background)", onMain: false), 1)
+
+        // A sort the list was not built with still rebuilds.
+        model.sort = [ARSortDescriptor(field: .name, ascending: false)]
+        model.filterOrSortChanged()
+        XCTAssertEqual(stage("presentation.build", onMain: true), 1, "a new sort is built")
+        await indexer.closeForTesting()
+    }
+
     func testARecomputeDuringTheBuildWins() async throws {
         let (model, indexer) = await makeModel()
         let open = try XCTUnwrap(model.savedSearches.add(name: "Box 12", search: box12()))
