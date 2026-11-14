@@ -15940,3 +15940,30 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   ArchiveProcessor/KNOWN_ISSUES.md §W42.int-s5. Bench cache: the measurement's copies of the three UIUC pages and its
   outputs (int-s5-smoke, int-s5-measure.*, 35 MB) went to the Trash; nothing kept, measure-output.sh remakes them.
   <!-- /W42.int-s5 -->
+
+- [x] **W40.fix-reader-scope-exit-main — leaving a smart folder or choosing a folder still builds the whole list on the main thread [S-M]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — Found by W40.fix-reader-smart-folder-delete. SHIPPED 2026-11-13.
+  At corpus size (>= 1,000 rows) `setFolderScope` (a sidebar folder, All Files), `applyScope` (a smart folder, an
+  Advanced Search, Back and Forward to one) and `removeFilter` (every chip's ✕) build the list off the main thread
+  through `recomputeInBackground`; the old rows stand until it is presented, and a recompute, a later click or a library
+  change meanwhile supersedes it. Back and Forward's selection waits for the list it returns to; only that first
+  presentation carries the restore through its prune of the selection. `NavigationModel.listPresented()` lets tests
+  await it. The Tier-2 adversarial review (Opus) found two defects, fixed before shipping: the OCR search's ✕ rebuilt the
+  list on main through `runFullTextSearch`'s task and again through the box's 150 ms debounce (it now resets inline, and
+  the debounce skips an empty box whose search is already reset, which also drops a redundant main-thread rebuild after
+  Clear All and a root change); and a pending restore followed every prune, so a row a filter hid could come back
+  selected (the W40.fix-reader-phantom-selection behaviour). Reviewed and sound: no caller reads `displayed` straight
+  after these calls, the pending flag cannot stick, and actions in the stale moment act on the rows on screen.
+  Measured, -O, `ReaderChainAtSizeTests` §2b/§2c at 115,999 rows: no whole-list build on main in any path (the build is
+  134-136 ms off main for All Files, 602 ms for a folder); main-busy the chip's ✕ 442 ms (was 486 ms, 1.16 s in Debug),
+  All Files 450 ms, a folder 191 ms. What is left is the table's `showRows`, 416-424 ms: `table.apply dataSource`
+  222-237 ms, `appendItems` 102-105 ms, `rowByID` 75-79 ms. `TableApplyAtSizeTests` (env-gated,
+  `TEST_RUNNER_READER_TABLE_APPLY_SIZES`) splits it by size: the diffable apply has a ~140 ms floor even at 34 rows
+  (re-making the ~27 visible rows' 351 cells, 26 ms in `makeCell`, ~85 ms with fixed row heights), and what grows with
+  the row count is `appendItems` over URL identifiers, the apply's diff over them and the `rowByID` dictionary. Filed
+  `W40.fix-reader-table-apply-at-size` for that. The `table.…` steps are now `ReaderStages` stages.
+  Tests: `ScopeExitBackgroundTests` (6, in memory at 1,500 rows), `SmartFolderDeleteTests` now awaits the presentation,
+  whole Reader unit bundle green (885, 5 skipped), no new warnings; VM: BackForward, Navigation, SmartFolderDelete and
+  AdvancedSearch UITests, 36 of 37 pass. The one failure, `testSheetSetsAndClearsASentWithDate`, fails the same way on the
+  commit before this item, so it predates it: filed `W40.fix-reader-sentwith-uitest`. Bench cache: nothing written; the
+  chain clone is made and deleted by the harness.
+  <!-- /W40.fix-reader-scope-exit-main -->
