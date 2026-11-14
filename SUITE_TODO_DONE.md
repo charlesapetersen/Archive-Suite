@@ -15967,3 +15967,36 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   commit before this item, so it predates it: filed `W40.fix-reader-sentwith-uitest`. Bench cache: nothing written; the
   chain clone is made and deleted by the harness.
   <!-- /W40.fix-reader-scope-exit-main -->
+- [x] **W42.int-s5-searchable — the searchable-PDF output form beside image-plus-text, and its header's carrier [M · Tier-2]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) — SHIPPED 2026-11-13
+  (aa374481, 55d5bfc2 and the completing commit). The page-2 header's carrier, when a page has no text page, is the
+  document's XMP: `archivesuite:pageHeaders`, one entry per physical page (a searchable page's header block exactly as a
+  text page holds it, empty for a page of a pair), declared by a PDF/A extension schema (SPEC/tag-format.md §"The
+  searchable form"; Core `PDFHeaderCarrier`, `PDFPageRole`). Not the Info dictionary: PDF/A-2 wants every Info entry
+  mirrored in XMP, and the header is per page. Measured: Quartz's PDF/A writer replaces any XMP given to
+  `addDocumentMetadata` (it keeps it without PDF/A), so `ArchivalFinish` splices the list into the XMP it already
+  rewrites and reads it back, failing the write rather than losing a header. Core's extractor reads each carried header
+  with the text page's grammar; a file with no list reads as pairs exactly as before. The Processor writes the form
+  where the new `searchableFor` setting (format/kind pairs, default empty; SPEC/collection-settings.md) picks it:
+  placed on Vision's lines only when the layer holds every word of the reading (a word hyphenated across a line counts
+  whole, as the writer joins it), else the reading's own lines unplaced (route `unplaced`); no reading, an RTL/CJK
+  reading or an image that cannot be embedded is written as a pair; the run log names both. Merges mix the forms
+  (refusing a source whose list does not fit its pages, or a lone image before a searchable page); the date-evidence
+  line is written into the carried header; Improve OCR refuses a searchable file. The Reader pairs pages by role
+  (`DocumentPagePairs` is now a value from `PDFPageRole.roles`; thumbnails and find too): a searchable page is a pair
+  alone with its layer text and its carried reader/Kind; its Kind/reader summary reads carried headers. Measured
+  (`scripts/measure-output.sh`, Apple Vision readings, $0, the memo and UIUC 00149, 00156, 00233): every form reads
+  back (searchable: one page, header from the XMP, every word of the reading on the page; 00156, the red stamp, goes
+  unplaced), Finder tags present, both merged documents in order with each page's header, all 18 outputs PDF/A-2b by
+  veraPDF 1.30. Sizes, searchable against image-plus-text with the layer and Vision OCR 1.16.0: memo 127.7 / 152.5 /
+  16.1 KB; 00149 2,090 / 2,122 / 522 KB; 00156 2,168 / 2,203 / 868 KB; 00233 2,085 / 2,112 / 101 KB; 3.1-4.1 s a page.
+  The form drops only the text page: its compression needs Vision OCR's non-Quartz path (JBIG2/MRC, a hand-written
+  image PDF, qpdf), which every app writer's Quartz redraw would undo, so it is split as `W42.int-s5-compress` (with
+  the setting's control on the settings sheet), and W42.int-s7 waits on it too. Tests: test-text-layer.sh section 7
+  (32 checks), Core PDFHeaderCarrierTests, Reader DocumentFindTests and DocumentViewerPagePairTests (43 with
+  PageViewsTests), merge-safety, multipage-reocr, date-route, reocr-pairs, settings-sheet, settings-layers, dual-date,
+  the write-surface lint and its proof. Tier-2 review (Opus) at checkpoint 1: one HIGH (a placed layer could drop
+  reading words Vision never found), two MEDIUM, three LOW, all fixed. Limits in ArchiveProcessor/KNOWN_ISSUES.md
+  §W42.int-s5-searchable. No migration is written because there is nothing to migrate. Bench cache: the three UIUC
+  copies and the measurement's outputs (int-s5-searchable, 91 MB) went to the Trash; nothing kept,
+  measure-output.sh remakes them from the read-only HEIC originals.
+  <!-- /W42.int-s5-searchable -->

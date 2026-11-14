@@ -2,6 +2,25 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W42.int-s5-searchable, 2026-11-13): what the searchable form does not yet do
+
+The searchable form (one page per source page, the header in the XMP: `SPEC/tag-format.md` §"The searchable form") is
+written where the `searchableFor` setting names the input's format and the page's kind; empty by default. Open:
+- **Not compressed.** The page embeds the same JPEG as image-plus-text, so it is only the text page smaller (the run
+  of 2026-11-13 is in the item's DONE entry). Vision OCR's size comes from JBIG2/MRC written without Quartz, and every
+  writer here redraws through Quartz, which re-encodes JBIG2: `W42.int-s5-compress`.
+- **Nothing on screen sets it.** `searchableFor` is in the settings layers and their files (`SPEC/collection-settings.md`)
+  but has no control on the settings sheet or in Settings; offered with the compression (`W42.int-s5-compress`).
+- **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
+  (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
+  image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages.
+- **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead.
+- **A file edited elsewhere can lose its headers.** A list whose count is not the page count is ignored (the file was
+  edited, so which entry is which page is unknown), and the file is then read as pairs.
+- **Live Capture and the multi-page PDF path drop the run-log notes** (unplaced pages, pages written as pairs instead),
+  as they drop the layer outcome.
+- **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing).
+
 ## ⚠️ LIMITATION (W42.int-s5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
 
 New output puts an invisible text layer on the image page of print pages (`OCR/TextLayerRule.swift`,
@@ -24,8 +43,8 @@ switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text p
   `placeHandOnImage` switch is not followed yet (the settings sheet still says so): `W42.int-s5-hands`.
 - **Output is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
-  the image page is the 2 MB JPEG copy and Vision OCR's searchable PDF compresses the page (JBIG2). Only the
-  image-plus-text form exists; the searchable form is `W42.int-s5-searchable`.
+  the image page is the 2 MB JPEG copy and Vision OCR's searchable PDF compresses the page (JBIG2). The searchable form
+  (W42.int-s5-searchable) drops the text page but not the JPEG; its compression is `W42.int-s5-compress`.
 - **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
   "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
   the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the

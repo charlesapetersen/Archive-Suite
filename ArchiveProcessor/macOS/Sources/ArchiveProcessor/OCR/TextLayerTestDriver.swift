@@ -192,6 +192,9 @@ enum TextLayerTestDriver {
         check("7 an unknown kind is not matched by a named kind",
               OutputForm.form(format: "jpeg", kind: nil, searchableFor: ["*/printed"]) == .imageAndText)
         check("7 no setting: image-plus-text", OutputForm.form(format: "jpeg", kind: .printed, searchableFor: []) == .imageAndText)
+        check("7 a word the writer joins across a line-end hyphen is held",
+              OutputForm.holds("the document is here", every: "the docu-\nment is here"))
+        check("7 a missing word is named", OutputForm.missingWords("a b", "a b c c") == ["c", "c"])
         check("7 extensions name formats", OutputForm.format(ofExtension: "JPG") == "jpeg" && OutputForm.format(ofExtension: "tif") == "tiff")
         let values = [SettingsKey.searchableFor.rawValue:
                         ResolvedSetting(value: .strings(["jpeg/typewritten"]), layer: .collection)]

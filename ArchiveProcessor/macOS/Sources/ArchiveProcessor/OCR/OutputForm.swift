@@ -48,14 +48,35 @@ enum OutputForm: String, Codable, Sendable {
 
     /// Whether `layer` (a page's text read back) holds every word of `reading`, as many times as the reading has it,
     /// compared as lower-case letters and digits: the searchable form's test that the layer lost nothing.
-    static func holds(_ layer: String, every reading: String) -> Bool {
-        func words(_ s: String) -> [String: Int] {
-            var counts: [String: Int] = [:]
-            for w in s.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }) { counts[String(w), default: 0] += 1 }
-            return counts
+    static func holds(_ layer: String, every reading: String) -> Bool { missingWords(layer, reading).isEmpty }
+
+    /// The words of `reading` that `layer` lacks (one entry per missing occurrence). A word broken by a hyphen at a line
+    /// end counts whole, as the writer joins it (`SearchableWriter.compose`, `joinHyphenated`), and in its two halves too.
+    static func missingWords(_ layer: String, _ reading: String) -> [String] {
+        func words(_ s: String) -> [String] {
+            s.lowercased().split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
         }
-        let have = words(layer)
-        return words(reading).allSatisfy { have[$0.key, default: 0] >= $0.value }
+        var have: [String: Int] = [:]
+        for w in words(layer) { have[w, default: 0] += 1 }
+        func take(_ w: String) -> Bool {
+            guard have[w, default: 0] > 0 else { return false }
+            have[w]! -= 1
+            return true
+        }
+        var lines = reading.components(separatedBy: .newlines).map {
+            (hyphenated: $0.trimmingCharacters(in: .whitespaces).hasSuffix("-"), words: words($0))
+        }
+        var missing: [String] = []
+        for i in lines.indices {
+            var ws = lines[i].words
+            if lines[i].hyphenated, i + 1 < lines.count, let last = ws.last, let next = lines[i + 1].words.first,
+               take(last + next) {
+                ws.removeLast()
+                lines[i + 1].words.removeFirst()
+            }
+            for w in ws where !take(w) { missing.append(w) }
+        }
+        return missing
     }
 
     /// The reading's lines spread down the image, full width, top to bottom, normalised with a top-left origin: an

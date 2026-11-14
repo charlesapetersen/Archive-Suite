@@ -9,7 +9,9 @@ import PDFKit
 /// three ways: image-plus-text with the layer and straightening (the default), with the layer and no straightening, and
 /// with no layer (the output before W42.int-s5). Each is read back through PDFKit (two pages, the text page's first
 /// line, text on the image page where it was placed), gets Finder tags written and read back, and the default outputs
-/// are merged into one document whose pages are checked in order. Writes into `OUTPUT_MEASURE_OUT` only.
+/// are merged into one document whose pages are checked in order. W42.int-s5-searchable adds the searchable form: one
+/// page, the header read back from the XMP, the layer holding every word of the reading; those outputs are merged too.
+/// Writes into `OUTPUT_MEASURE_OUT` only.
 @MainActor
 enum OutputMeasureTestDriver {
     private static var didRun = false
@@ -52,9 +54,11 @@ enum OutputMeasureTestDriver {
         let model = LLMModel.appleVisionModels[0]
         let forms: [(name: String, options: PDFGenerator.TextLayerOptions?)] = [
             ("layer", .standard), ("layer-unstraightened", .init(placeHandOnImage: true, straighten: false)), ("plain", nil),
+            ("searchable", .init(searchableFor: ["*/*"])),
         ]
         lines.append("MEASURE\tinput\tform\tbytes\tseconds\tlayer\tlines\tstraightened\tinput bytes")
         var merged: [URL] = []
+        var searchable: [URL] = []
         for image in inputs {
             let name = image.deletingPathExtension().lastPathComponent
             guard let result = try? await VisionClient(settings: .default).ocr(imageURL: image), result.text?.isEmpty == false else {
@@ -73,12 +77,24 @@ enum OutputMeasureTestDriver {
                 lines.append("MEASURE\t\(name)\t\(form.name)\t\(size(out))\t\(String(format: "%.1f", seconds))\t"
                              + "\(written.layer.route.rawValue)\t\(written.layer.lines)\t"
                              + "\(written.straightenedDegrees.map { String(format: "%.1f", $0) } ?? "-")\t\(size(image))")
-                check("\(name) \(form.name): two pages, the text page second", doc.pageCount == 2
-                      && doc.page(at: 1)?.string?.hasPrefix("Extracted text.") == true)
                 let imageText = (doc.page(at: 0)?.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                let placed = written.layer.route != .textPage
-                check("\(name) \(form.name): the image page's text is selectable where placed", placed == !imageText.isEmpty,
-                      "placed \(placed), \(imageText.count) characters")
+                if form.name == "searchable" {
+                    let content = PDFHeaderParser.extract(out)
+                    check("\(name) searchable: one page, its header in the XMP", written.form == .searchable && doc.pageCount == 1
+                          && content?.pageRoles == [.searchable] && content?.textPages.first?.header?.provenance != nil
+                          && content?.textPages.first?.header?.originalFilename == image.lastPathComponent,
+                          "\(written.form) \(doc.pageCount) \(String(describing: content?.pageRoles))")
+                    check("\(name) searchable: the page holds every word of the reading",
+                          OutputForm.holds(imageText, every: result.text ?? ""),
+                          "\(written.layer.route.rawValue), missing \(OutputForm.missingWords(imageText, result.text ?? "").prefix(12))")
+                    searchable.append(out)
+                } else {
+                    check("\(name) \(form.name): two pages, the text page second", doc.pageCount == 2
+                          && doc.page(at: 1)?.string?.hasPrefix("Extracted text.") == true)
+                    let placed = written.layer.route != .textPage
+                    check("\(name) \(form.name): the image page's text is selectable where placed", placed == !imageText.isEmpty,
+                          "placed \(placed), \(imageText.count) characters")
+                }
                 // Finder tags on the output, written as the app writes them and read back from a fresh URL.
                 let tagged = (try? CoordinatedTagWriter.write(out) { tags, color in (tags + ["Measure", "1958"], color) }) != nil
                 let back = (try? URL(fileURLWithPath: out.path).resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
@@ -99,6 +115,20 @@ enum OutputMeasureTestDriver {
             check("merged: every page, each pair in order", doc?.pageCount == 2 * merged.count && inOrder)
             lines.append("MEASURE\tmerged\tlayer\t\(size(document))\t-\t-\t-\t-\t\(merged.map(size).reduce(0, +))")
         } catch { check("merged written", false, "\(error)") }
+        // The searchable outputs merged: one page each, in order, each with its own header.
+        let searchableDocument = output.appendingPathComponent("merged.searchable.pdf")
+        do {
+            try PDFGenerator().mergeDocumentPDFs(sourcePDFs: searchable, outputURL: searchableDocument)
+            let doc = PDFDocument(url: searchableDocument)
+            let content = PDFHeaderParser.extract(searchableDocument)
+            let inOrder = searchable.enumerated().allSatisfy { i, url in
+                PDFDocument(url: url)?.page(at: 0)?.string == doc?.page(at: i)?.string
+                    && PDFHeaderParser.extract(url)?.textPages.first?.header == content.flatMap { $0.textPages.indices.contains(i) ? $0.textPages[i].header : nil }
+            }
+            check("merged searchable: every page in order, each with its header", doc?.pageCount == searchable.count
+                  && content?.pageRoles == Array(repeating: .searchable, count: searchable.count) && inOrder)
+            lines.append("MEASURE\tmerged\tsearchable\t\(size(searchableDocument))\t-\t-\t-\t-\t\(searchable.map(size).reduce(0, +))")
+        } catch { check("merged searchable written", false, "\(error)") }
     }
 }
 #endif
