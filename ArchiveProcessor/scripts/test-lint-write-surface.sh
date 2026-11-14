@@ -154,7 +154,7 @@ SWIFT
 expect 1 'a writeArchival call in a new source file fails (W42.int-s5)' 'PlantedArchivalWrite.swift:3:'
 
 fresh_tree
-/usr/bin/perl -0pi -e 's/try Self\.writeArchival\(merged, to: outputURL\)/try Self.writeArchival(merged, to: mergedURL)/' \
+/usr/bin/perl -0pi -e 's/try Self\.writeArchival\(merged, to: outputURL,/try Self.writeArchival(merged, to: mergedURL,/' \
   "$SCRATCH/$SRC/OCR/PDFGenerator.swift"
 expect 2 'a changed audited writeArchival line is stale and flagged as a new site' 'STALE write allowance'
 

@@ -220,6 +220,9 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     /// Dating's one switch (owner, 2026-11-12, W46.date-route-owner-ok (b)): the image pass on documents whose text
     /// already has a year, for their stamp dates. Off: step 2 runs only where the text has no year (call 7.3).
     static let dateImageEveryDocument = SettingsKey(rawValue: "dateImageEveryDocument")
+    /// Output's choice (W42.int-s5-searchable, `OutputForm.form`): the `format/kind` pairs, `*` for any, written as one
+    /// searchable page per source page with no text page. Empty: image-plus-text for every page.
+    static let searchableFor = SettingsKey(rawValue: "searchableFor")
 
     static let overridePrefix = "override."
     /// A stage card's chosen route, set when the user overrides the solver's pick.
@@ -233,7 +236,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
         .preference, .priorities, .weights, .staysOnMac, .readingFallback, .checkingMinutes, .straightenReadingCopy,
-        .placeHandOnImage, .dateImageEveryDocument,
+        .placeHandOnImage, .dateImageEveryDocument, .searchableFor,
     ]
     static let catalog: [SettingsKey] = generalOnly + anyLayer
 
@@ -272,6 +275,8 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         case .straightenReadingCopy: return .bool(true)
         case .placeHandOnImage: return .bool(true)   // the table's default (05-placement.md)
         case .dateImageEveryDocument: return .bool(false)   // owner, 2026-11-12: off unless the user turns it on
+        // The suite's contract until a user picks the other form: every page keeps its text page.
+        case .searchableFor: return .strings([])
         default: return .string("")   // an override: empty is the solver's pick
         }
     }
@@ -312,6 +317,7 @@ extension SettingsKey {
         case .straightenReadingCopy: return "Straighten the copy you read"
         case .placeHandOnImage: return "Place handwritten text on the page image"
         case .dateImageEveryDocument: return "Search the page image for dates on every document"
+        case .searchableFor: return "Pages written as one searchable page, with no text page"
         default: return rawValue
         }
     }

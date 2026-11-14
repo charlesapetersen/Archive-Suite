@@ -452,6 +452,7 @@ public enum CollectionSettingsVocabulary {
         "straightenReadingCopy": "Straighten the copy you read",
         "placeHandOnImage": "Place handwritten text on the page image",
         "dateImageEveryDocument": "Search the page image for dates on every document",
+        "searchableFor": "Pages written as one searchable page, with no text page",
     ]
 
     /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.

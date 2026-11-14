@@ -1939,7 +1939,8 @@ extension OCRProcessor {
                                               gatewayDisplayName: gatewayName,
                                               localAgentDisplayName: localAgentDisplayName,
                                               localAgentModelName: localAgentModelName,
-                                              pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions)
+                                              pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions,
+                                              sourceFormat: OutputForm.format(ofExtension: (g.fileName as NSString).pathExtension))
                             if outcome.isPlaceholder { placeholders.insert(g.outputURL) }
                         } catch {
                             failed.insert(g.outputURL)
@@ -3597,6 +3598,11 @@ extension OCRProcessor {
             lines.append("")
             lines.append("Pages with no searchable text on the image (their text is on the text page):")
             for entry in textPageOnlyOutputs { lines.append("  \u{2022} \(entry.name): \(entry.reason)") }
+        }
+        if !searchableFormNotes.isEmpty {
+            lines.append("")
+            lines.append("Pages set to be one searchable page, with no text page:")
+            for entry in searchableFormNotes { lines.append("  \u{2022} \(entry.name): \(entry.note)") }
         }
 
         let content = lines.joined(separator: "\n")

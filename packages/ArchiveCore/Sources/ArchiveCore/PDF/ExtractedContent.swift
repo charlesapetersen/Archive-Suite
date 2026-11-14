@@ -79,6 +79,8 @@ public struct ExtractedContent: Sendable {
     public var classification: String?
     public var pageCount: Int
     public var textPages: [PDFTextPageMetadata]
+    /// What each physical page is (`PDFPageRole.roles(of:)`).
+    public var pageRoles: [PDFPageRole]
 
     public var kindSummary: PDFMetadataSummary<OCRPageKind> {
         .summarize(textPages.map { $0.header?.kind })
@@ -88,12 +90,44 @@ public struct ExtractedContent: Sendable {
     }
 
     public init(fullBody: String, strippedBody: String, classification: String?, pageCount: Int,
-                textPages: [PDFTextPageMetadata] = []) {
+                textPages: [PDFTextPageMetadata] = [], pageRoles: [PDFPageRole]? = nil) {
         self.fullBody = fullBody
         self.strippedBody = strippedBody
         self.classification = classification
         self.pageCount = pageCount
         self.textPages = textPages
+        self.pageRoles = pageRoles ?? PDFPageRole.pairs(pageCount)
+    }
+}
+
+/// W42.int-s5-searchable — what one physical page of an output is. Without a carrier list (`PDFHeaderCarrier`) a file
+/// is pairs: even pages images, odd pages text. With one that has an entry for every page, a page with a header is a
+/// searchable page, and the pages without one pair up in order, image then text (an image left at the end, or before a
+/// searchable page, has no text page). A list whose count is not the page count is ignored: the file was edited.
+public enum PDFPageRole: String, Sendable, Equatable {
+    case image, text, searchable
+
+    public static func roles(of document: PDFDocument) -> [PDFPageRole] {
+        guard let carried = document.documentRef.flatMap(PDFHeaderCarrier.pages(of:)) else {
+            return pairs(document.pageCount)
+        }
+        return roles(carried: carried, pageCount: document.pageCount)
+    }
+
+    public static func roles(carried: [String?], pageCount: Int) -> [PDFPageRole] {
+        guard carried.count == pageCount else { return pairs(pageCount) }
+        var roles: [PDFPageRole] = []
+        var imageOpen = false
+        for entry in carried {
+            if entry != nil { roles.append(.searchable); imageOpen = false }
+            else if imageOpen { roles.append(.text); imageOpen = false }
+            else { roles.append(.image); imageOpen = true }
+        }
+        return roles
+    }
+
+    public static func pairs(_ pageCount: Int) -> [PDFPageRole] {
+        (0..<max(0, pageCount)).map { $0 % 2 == 0 ? .image : .text }
     }
 }
 
@@ -106,23 +140,50 @@ public enum PDFHeaderParser {
 
     public static func extract(_ url: URL) -> ExtractedContent? {
         guard let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
+        let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
+        let roles = carried.map { PDFPageRole.roles(carried: $0, pageCount: doc.pageCount) } ?? PDFPageRole.pairs(doc.pageCount)
         var texts: [String] = []
         var textPages: [PDFTextPageMetadata] = []
         var firstTextPage: ParsedPDFTextPage?
         for i in 0..<doc.pageCount {
             let text = doc.page(at: i)?.string ?? ""
-            if !text.isEmpty { texts.append(text) }
-            if i % 2 == 1 {
+            switch roles[i] {
+            case .searchable:
+                // W42.int-s5-searchable: the header is the carrier's; the page's own text is the layer, all body.
+                let header = carried?[i].flatMap { parse($0).header }
+                let headerText = header != nil ? carried?[i] ?? "" : ""
+                let page = ParsedPDFTextPage(header: header, body: text.trimmingCharacters(in: .whitespacesAndNewlines))
+                if !(headerText + text).isEmpty { texts.append([headerText, text].filter { !$0.isEmpty }.joined(separator: "\n")) }
+                textPages.append(PDFTextPageMetadata(pageIndex: i, header: header))
+                if firstTextPage == nil { firstTextPage = page }
+            case .text:
+                if !text.isEmpty { texts.append(text) }
                 let parsed = doc.page(at: i).map { parse($0) } ?? parse(text)
                 textPages.append(PDFTextPageMetadata(pageIndex: i, header: parsed.header))
-                if i == 1 { firstTextPage = parsed }
+                if firstTextPage == nil { firstTextPage = parsed }
+            case .image:
+                if !text.isEmpty { texts.append(text) }
             }
         }
         let fullBody = texts.joined(separator: "\n")
         return ExtractedContent(fullBody: fullBody,
             strippedBody: firstTextPage?.header != nil ? firstTextPage!.body : fullBody,
             classification: firstTextPage?.header?.classification, pageCount: doc.pageCount,
-            textPages: textPages)
+            textPages: textPages, pageRoles: roles)
+    }
+
+    /// The header of every text page and searchable page of `doc`, in page order (`PDFPageRole`), without the bodies:
+    /// for a caller that summarizes Kind or reader across a file.
+    public static func textPageHeaders(_ doc: PDFDocument) -> [PDFPageHeader?] {
+        let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
+        let roles = carried.map { PDFPageRole.roles(carried: $0, pageCount: doc.pageCount) } ?? PDFPageRole.pairs(doc.pageCount)
+        return roles.indices.compactMap { i -> PDFPageHeader?? in
+            switch roles[i] {
+            case .image: return nil
+            case .text: return .some(doc.page(at: i).flatMap { parse($0).header })
+            case .searchable: return .some(carried?[i].flatMap { parse($0).header })
+            }
+        }
     }
 
     /// PDFKit can group short header lines together across a wide provenance line, returning Kind

@@ -17,6 +17,9 @@ import VisionOCRKit
 ///      read back through PDFKit, holds the reading: a selection over each drawn line returns that line's words, in
 ///      order (the strict line pass, `05-placement.md` §3), on the JPEG fast path, the re-encoded path and a turned page.
 ///   3. A page the rule gives no layer, and a page written without one, have no text on the image page.
+///   7. The searchable form (W42.int-s5-searchable): one page, its header in the XMP and read back through Core, an
+///      unplaced layer where the words cannot be placed, a pair where the form cannot hold the page, merges that mix
+///      the two forms, the date-evidence line rewritten in the XMP, and Improve OCR refusing it.
 @MainActor
 enum TextLayerTestDriver {
     nonisolated static let envKey = "TEXTLAYER_TEST"
@@ -177,6 +180,139 @@ enum TextLayerTestDriver {
         let unknown = dir.appendingPathComponent("unknown.pdf")
         let u = await write(jpeg, reading: reading, kind: nil, rotation: 0, to: unknown)
         check("3 unknown kind, aligned reading: placed", u?.layer.route == .visionLinesAligned, "\(String(describing: u?.layer))")
+
+        await searchableChecks(dir: dir, jpeg: jpeg, reading: reading)
+    }
+
+    private static func searchableChecks(dir: URL, jpeg: URL, reading: String) async {
+        check("7 a matching pair picks the searchable form",
+              OutputForm.form(format: "jpeg", kind: .typewritten, searchableFor: ["*/typewritten"]) == .searchable)
+        check("7 a format alone picks it for any kind, an unknown one too",
+              OutputForm.form(format: "pdf", kind: nil, searchableFor: ["pdf/*"]) == .searchable)
+        check("7 an unknown kind is not matched by a named kind",
+              OutputForm.form(format: "jpeg", kind: nil, searchableFor: ["*/printed"]) == .imageAndText)
+        check("7 no setting: image-plus-text", OutputForm.form(format: "jpeg", kind: .printed, searchableFor: []) == .imageAndText)
+        check("7 extensions name formats", OutputForm.format(ofExtension: "JPG") == "jpeg" && OutputForm.format(ofExtension: "tif") == "tiff")
+        let values = [SettingsKey.searchableFor.rawValue:
+                        ResolvedSetting(value: .strings(["jpeg/typewritten"]), layer: .collection)]
+        check("7 the setting is read from a run's settings",
+              PDFGenerator.TextLayerOptions.from(values).searchableFor == ["jpeg/typewritten"])
+        let options = PDFGenerator.TextLayerOptions(searchableFor: ["jpeg/typewritten", "jpeg/handwritten", "jpeg/printed"])
+        let model = LLMModel.appleVisionModels[0]
+        func write(_ text: String, kind: OCRPageKind?, name: String, to out: URL,
+                   classification: DocumentClassification? = nil) async -> PDFGenerator.Output? {
+            let result = OCRResult(text: text, classification: classification, rotationDegrees: 0, errorMessage: nil, errorCode: nil)
+            return await Task.detached {
+                try? PDFGenerator().generateOutput(imageURL: jpeg, result: result, model: model, outputURL: out,
+                                                   originalFileName: name, pageKind: kind, textLayer: options)
+            }.value
+        }
+        let words = memo.flatMap { $0.split(separator: " ") }
+
+        // Placed print, with a name XML has to escape and a classification.
+        let typed = dir.appendingPathComponent("searchable.pdf")
+        let name = "memo & <copy>.jpg"
+        let o = await write(reading, kind: .typewritten, name: name, to: typed, classification: .documentStart)
+        check("7 print: the searchable form", o?.form == .searchable && o?.formFallback == nil, "\(String(describing: o))")
+        check("7 print: placed on Vision's lines", o?.layer.route == .visionLinesAligned, "\(String(describing: o?.layer))")
+        if let doc = PDFDocument(url: typed), let content = PDFHeaderParser.extract(typed) {
+            check("7 print: one page, no text page", doc.pageCount == 1, "\(doc.pageCount)")
+            let layer = doc.page(at: 0)?.string ?? ""
+            check("7 print: the page holds every word", words.allSatisfy { layer.contains($0) })
+            check("7 print: Core reads one searchable page", content.pageRoles == [.searchable], "\(content.pageRoles)")
+            let header = content.textPages.first?.header
+            check("7 print: the header is read from the XMP", content.textPages.map(\.pageIndex) == [0]
+                  && header?.kind == .typewritten && header?.provenance?.provider == "Apple Vision"
+                  && header?.originalFilename == name && header?.diagnostics.isEmpty == true, "\(String(describing: header))")
+            check("7 print: its classification", content.classification == "Document Start", "\(String(describing: content.classification))")
+            check("7 print: the body is the page's text", content.strippedBody.contains("MEMORANDUM")
+                  && !content.strippedBody.contains("Extracted text."), String(content.strippedBody.prefix(60)))
+            check("7 print: the full text holds the header too", content.fullBody.contains("Extracted text.")
+                  && content.fullBody.contains("Kind: typewritten"))
+            let processor = PDFTextExtractor.extract(from: typed)
+            check("7 print: the Processor's extractor maps it", processor.classification == .documentStart && processor.text != nil)
+            archivalChecks("searchable output", typed)
+        } else { check("7 print: written and read back", false) }
+
+        // Handwriting: the reading as an unplaced layer, named for the run report.
+        let hand = dir.appendingPathComponent("searchable-hand.pdf")
+        let h = await write(reading, kind: .handwritten, name: "hand.jpg", to: hand)
+        check("7 hand: the searchable form, unplaced", h?.form == .searchable && h?.layer.route == .unplaced
+              && h?.layer.reason == TextLayerRule.handwritingReason, "\(String(describing: h))")
+        let handText = PDFDocument(url: hand)?.page(at: 0)?.string ?? ""
+        check("7 hand: one page holding every word", PDFDocument(url: hand)?.pageCount == 1 && words.allSatisfy { handText.contains($0) })
+
+        // Words Vision never found (a note it missed): the placed layer would lose them, so the reading goes unplaced.
+        let extra = dir.appendingPathComponent("searchable-extra.pdf")
+        let fuller = reading + "\nApproved in the margin by Hollister"
+        let e = await write(fuller, kind: .typewritten, name: "extra.jpg", to: extra)
+        let extraText = PDFDocument(url: extra)?.page(at: 0)?.string ?? ""
+        check("7 a reading Vision lacks words of: unplaced, every word kept", e?.form == .searchable
+              && e?.layer.route == .unplaced && OutputForm.holds(extraText, every: fuller), "\(String(describing: e?.layer))")
+
+        // Pages the form cannot hold are written as pairs, and say why.
+        for (label, text, kind) in [("Hebrew", "שלום עולם זה מכתב ארוך מאוד על התקציב", OCRPageKind.printed),
+                                    ("no reading", "", .typewritten), ("a kind not chosen", reading, .forms)] {
+            let out = dir.appendingPathComponent("fallback-\(UUID().uuidString).pdf")
+            let f = await write(text, kind: kind, name: "x.jpg", to: out)
+            let chosen = kind != .forms
+            check("7 \(label): written as a pair", f?.form == .imageAndText && PDFDocument(url: out)?.pageCount == 2
+                  && (f?.formFallback != nil) == chosen, "\(String(describing: f))")
+        }
+
+        // A merge mixing the forms keeps every page's header where it belongs.
+        let pair = dir.appendingPathComponent("jpeg.pdf")
+        let mixed = dir.appendingPathComponent("merged-mixed.pdf")
+        do {
+            try PDFGenerator().mergeDocumentPDFs(sourcePDFs: [typed, pair, hand], outputURL: mixed)
+            let content = PDFHeaderParser.extract(mixed)
+            check("7 merge: pages in order", content?.pageRoles == [.searchable, .image, .text, .searchable],
+                  "\(String(describing: content?.pageRoles))")
+            check("7 merge: a header for each source page", content?.textPages.map(\.pageIndex) == [0, 2, 3]
+                  && content?.textPages.map { $0.header?.kind } == [.typewritten, .typewritten, .handwritten],
+                  "\(String(describing: content?.textPages))")
+            check("7 merge: the Reader's summary reads every header",
+                  PDFDocument(url: mixed).map { PDFHeaderParser.textPageHeaders($0).map { $0?.kind } }
+                  == [.typewritten, .typewritten, .handwritten])
+            archivalChecks("mixed merged document", mixed)
+        } catch { check("7 merge: written", false, "\(error)") }
+        // A source that ends on an image with no text page, before a searchable one, would shift the pairing: refused.
+        let lone = dir.appendingPathComponent("lone.pdf")
+        let loneDoc = PDFDocument()
+        loneDoc.insert(PDFPage(), at: 0)
+        try? loneDoc.dataRepresentation()?.write(to: lone)
+        let refused = (try? PDFGenerator().mergeDocumentPDFs(sourcePDFs: [lone, typed],
+                                                             outputURL: dir.appendingPathComponent("refused.pdf"))) == nil
+        check("7 merge: a lone image before a searchable page is refused", refused)
+
+        // The date-evidence line goes into the XMP; the page stays as it is.
+        if let data = try? Data(contentsOf: typed),
+           case .rewrite(let new) = PDFGenerator().dateEvidenceRewrite(of: data, evidence: "image; page 1", body: reading,
+                                                                     textColumns: 1) {
+            let out = dir.appendingPathComponent("searchable-dated.pdf")
+            try? new.write(to: out)
+            let content = PDFHeaderParser.extract(out)
+            let header = content?.textPages.first?.header
+            check("7 date evidence: read back from the XMP", header?.dateEvidence == "image; page 1"
+                  && header?.kind == .typewritten && header?.originalFilename == name, "\(String(describing: header))")
+            check("7 date evidence: the page is kept", PDFDocument(url: out)?.page(at: 0)?.string == PDFDocument(url: typed)?.page(at: 0)?.string)
+            archivalChecks("dated searchable output", out)
+            if case .unchanged = PDFGenerator().dateEvidenceRewrite(of: new, evidence: "image; page 1", body: reading, textColumns: 1) {
+                check("7 date evidence: the same line again is no change", true)
+            } else { check("7 date evidence: the same line again is no change", false) }
+        } else { check("7 date evidence: rewritten", false) }
+
+        // Improve OCR replaces text pages; a searchable page has none.
+        if let data = try? Data(contentsOf: typed), case .failure(.searchable(page: 0)) = ReOCRPairs.validate(data) {
+            check("7 Improve OCR refuses a searchable file", true)
+        } else { check("7 Improve OCR refuses a searchable file", false) }
+
+        if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+            for url in [typed, hand, mixed, dir.appendingPathComponent("searchable-dated.pdf")] {
+                try? FileManager.default.copyItem(at: url, to: URL(fileURLWithPath: keep).appendingPathComponent(url.lastPathComponent))
+            }
+        }
+        lines.append("SIZE searchable \(size(typed)) bytes, unplaced \(size(hand)) bytes")
     }
 
     private static func improveChecks(dir: URL, jpeg: URL, reading: String) async {

@@ -283,6 +283,9 @@ class OCRProcessor: ObservableObject {
     var placeholderOutputs: [String] = []
     /// W42.int-s5 — outputs whose image page carries no searchable layer, with the reason (`recordTextLayer`).
     var textPageOnlyOutputs: [(name: String, reason: String)] = []
+    /// W42.int-s5-searchable — searchable-form pages whose layer is not placed on the words, and pages chosen for that
+    /// form but written with a text page, each with why, for the run log.
+    var searchableFormNotes: [(name: String, note: String)] = []
     /// The model used for the current processing run (for PDF regeneration headers)
     var currentModel: LLMModel?
     /// Gateway configuration for the current run (nil = direct API mode)

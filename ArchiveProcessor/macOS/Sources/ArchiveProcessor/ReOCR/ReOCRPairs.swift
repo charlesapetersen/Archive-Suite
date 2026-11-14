@@ -32,6 +32,8 @@ enum ReOCRPairs {
         case noReading(page: Int, String)
         case pageNotMade(page: Int)
         case headerNotKept(page: Int, String)
+        /// W42.int-s5-searchable: Improve OCR replaces text pages, and a searchable page has none.
+        case searchable(page: Int)
 
         var description: String {
             switch self {
@@ -47,6 +49,7 @@ enum ReOCRPairs {
             case .noReading(let p, let why): "page \(p + 1) was not read: \(why)"
             case .pageNotMade(let p): "the new text page for page \(p + 1) could not be made"
             case .headerNotKept(let p, let what): "the new text page for page \(p + 1) would change its \(what)"
+            case .searchable(let p): "page \(p + 1) is a searchable page with no text page; use Reprocess to make a new file"
             }
         }
     }
@@ -55,6 +58,7 @@ enum ReOCRPairs {
         guard let doc = PDFDocument(data: data) else { return .failure(.unreadable) }
         if doc.isEncrypted || doc.isLocked { return .failure(.locked) }
         let count = doc.pageCount
+        if let p = PDFPageRole.roles(of: doc).firstIndex(of: .searchable) { return .failure(.searchable(page: p)) }
         guard count >= 2, count % 2 == 0 else { return .failure(.notPaired(pages: count)) }
         var pairs: [Pair] = []
         for imageIndex in stride(from: 0, to: count, by: 2) {

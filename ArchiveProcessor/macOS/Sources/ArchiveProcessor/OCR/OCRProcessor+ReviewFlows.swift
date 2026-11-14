@@ -422,11 +422,12 @@ extension OCRProcessor {
                             localAgentModelName: agentModel,
                             pdfImageMB: pdfSettings.pdfImageMB,
                             textColumns: pdfSettings.textColumns,
-                            textLayer: layerOptions
+                            textLayer: layerOptions,
+                            sourceFormat: OutputForm.format(ofExtension: source.pathExtension)
                         )
                     }.value
                     recordImagePage(output.imagePage, forSource: source)
-                    recordTextLayer(output.layer, forSource: source)
+                    recordTextLayer(output.layer, formFallback: output.formFallback, forSource: source)
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
                            source.lastPathComponent, error.localizedDescription)

@@ -21,9 +21,10 @@ SEP=$'\x1f'
 # rule<SEP>relative path<SEP>exact trimmed source line. Never allow a whole file: an added PDF write in
 # PDFGenerator must be re-audited just as surely as one in a new source file.
 ALLOW=(
-  # W42.int-s5: the processed output and the merged document, both through the PDF/A-2b writer.
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL)"
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(merged, to: outputURL)"
+  # W42.int-s5: the processed output and the merged document, both through the PDF/A-2b writer (W42.int-s5-searchable:
+  # with the searchable form's headers for the XMP, nil for pairs).
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(merged, to: outputURL, pageHeaders: pageHeaders)"
   # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
   # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
   "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"

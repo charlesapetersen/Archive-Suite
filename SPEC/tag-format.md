@@ -210,6 +210,39 @@ Processor emits **one PDF per input image**, same base filename (`PDFGenerator`)
 > follows the page-1/page-2 contract above, and the "consumers must not hard-assume 2 pages" clause
 > below already covers it. Consumers read OCR text off **every** text page, not just page 2.
 
+### The searchable form (W42.int-s5-searchable)
+
+The Processor's other output form: **one page per source page**, the page image with the reading as its invisible
+layer, and **no text page**. Chosen per input format and page kind by the `searchableFor` setting
+(`SPEC/collection-settings.md`); empty by default, so every page is the pair above unless a user picks this form.
+
+- **The header's carrier is the document's XMP**, not a text page and not the Info dictionary (PDF/A-2 requires
+  every Info entry to match an XMP property anyway, and the header is per page). Property `archivesuite:pageHeaders`
+  in namespace `https://github.com/charlesapetersen/Archive-Suite/ns/pdf/1.0/`, an `rdf:Seq` of Text, declared by a
+  PDF/A extension schema in the same packet. **One entry per physical page, in page order:** a searchable page's
+  header block exactly as a text page would carry it (the `Extracted text.` sentinel to its last field, LF-separated,
+  no blank separator, no body), or an **empty** entry for a page of an image-plus-text pair, whose header stays on
+  its own text page. Characters XML 1.0 cannot hold are dropped. Core `PDFHeaderCarrier` writes and reads it.
+- **Page roles** (Core `PDFPageRole.roles(of:)`): with no list, a file is pairs as before (even pages images, odd pages
+  text). With a list whose count is the page count, a page with a header is `searchable`, and the pages without one
+  pair up in order, image then text; an image left before a searchable page or at the end has no text page. A list
+  whose count differs (the file was edited) is ignored and the file is read as pairs.
+- **Reading it.** `PDFHeaderParser.extract` parses each carried header with the same grammar as a text page
+  (`parse(_ text:)`); the page's own text (its layer) is the body. `textPages` then holds every text page *and* every
+  searchable page (`pageIndex` is the physical page, so no longer only odd); `pageRoles` says which. `strippedBody`
+  and `classification` come from page 0 when it is searchable, from page 1 otherwise. `fullBody` holds each
+  searchable page's header before its text, as a text page's string holds it.
+- **The layer.** Placed on Vision's lines where the reading aligns with them (`vision-lines-aligned`); otherwise the
+  reading's own lines, unplaced, down the image (route `unplaced`: handwriting, a kind the placement rule keeps off
+  the image, a reading that does not align), and the run log names those pages. A page the form cannot hold (no
+  reading, a right-to-left, CJK or Thai reading the writer has no path for, an image that cannot be embedded) is
+  written as a pair instead, and the run log says why.
+- **Merges may mix the forms** (`mergeDocumentPDFs`): each source's pages in order, the merged XMP's list built from
+  each source's (empty for its pair pages). A merge with no searchable page writes no list.
+- **What changes it.** The date-evidence line (W46.date-route-header) is written into the carried header, the page
+  drawn again unchanged. Improve OCR replaces text pages and refuses a file with a searchable page.
+- Still PDF/A-2b; veraPDF validates the extension schema. No migration is written because there is nothing to migrate.
+
 **Page-2 header** (built by `PDFGenerator.makeTextPage`, lines 212–224; parsed by both
 Processor `OCR/PDFTextExtractor.swift` and Reader `Search/PDFTextExtractor.swift`):
 
@@ -311,7 +344,8 @@ Date evidence: <evidence>      ← OPTIONAL (W46.date-route-header); what a non-
   than one pair, or one that does not read back cleanly, is left as it is. Improve OCR keeps the line. No
   migration is written because there is nothing to migrate.
 - **Per-page metadata and mixed summaries.** `ExtractedContent.textPages` records zero-based physical
-  text slots 1, 3, 5… with optional `PDFPageHeader`. Missing headers stay represented. Kind and full
+  text slots 1, 3, 5… (in a file with searchable pages, each text page and searchable page by its `pageRoles`, §"The
+  searchable form") with optional `PDFPageHeader`. Missing headers stay represented. Kind and full
   provenance summaries are unknown when all slots are unknown, uniform only when every slot agrees,
   and mixed for differing values or a known value beside an unknown. This metadata does not prove a
   valid image/text pair. Both app extractors expose these page values. Existing `fullBody` retains

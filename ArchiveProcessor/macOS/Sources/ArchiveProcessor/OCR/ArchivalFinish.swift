@@ -1,3 +1,4 @@
+import ArchiveCore
 import CoreGraphics
 import Foundation
 
@@ -11,15 +12,20 @@ import Foundation
 ///    preservation check refuses it: "catalog/Metadata: its stream bytes changed"). The XMP is stored unfiltered, which
 ///    PDF/A-2 allows, and PDFium's rewrite of it is then the same bytes.
 ///
+/// 3. W42.int-s5-searchable: when the output has searchable pages, the XMP also carries every page's header
+///    (`PDFHeaderCarrier`), which Quartz's PDF/A writer will not keep from `addDocumentMetadata`.
+///
 /// Only Quartz's shape is touched: one `xref` table from object 0 with no `/Prev`, the last thing in the file, and a
 /// metadata stream with a direct length and only `/FlateDecode`. Anything else, or a result that does not open with the
 /// same pages and the same XMP, is returned as it came.
 enum ArchivalFinish {
     private struct Entry { var offset: Int; var generation: Int; var inUse: Bool }
 
-    static func finished(_ pdf: Data) -> Data {
+    /// `pageHeaders` (one entry per page, `PDFHeaderCarrier`) must reach the XMP: when it cannot, the result is nil, never
+    /// a searchable file whose headers are lost. Without it, the repairs are made where they can be and never fail.
+    static func finished(_ pdf: Data, pageHeaders: [String?]? = nil) -> Data? {
         let pdf = Data(pdf)   // start index 0, so offsets index it directly
-        guard let table = xrefTable(pdf) else { return pdf }
+        guard let table = xrefTable(pdf) else { return pageHeaders == nil ? pdf : nil }
         var entries = table.entries
 
         // 1. The free list: entry 0 points at the first free object, each free one at the next, the last at 0.
@@ -33,14 +39,14 @@ enum ArchivalFinish {
         // 2. The XMP, unfiltered, in place of the compressed stream; every object after it moves by the difference.
         var body = pdf[..<table.start]
         var xmp: Data?
-        if let plain = unfilteredMetadata(pdf, entries: entries) {
+        if let plain = unfilteredMetadata(pdf, entries: entries, pageHeaders: pageHeaders) {
             body = pdf[..<plain.range.lowerBound] + plain.object + pdf[plain.range.upperBound..<table.start]
             let delta = plain.object.count - plain.range.count
             for i in entries.indices where entries[i].inUse && entries[i].offset > plain.range.lowerBound {
                 entries[i].offset += delta
             }
             xmp = plain.xmp
-        }
+        } else if pageHeaders != nil { return nil }
         if unwritten.isEmpty && xmp == nil { return pdf }
 
         var out = Data(body)
@@ -58,7 +64,10 @@ enum ArchivalFinish {
         guard entries.indices.allSatisfy({ i in !entries[i].inUse
                   || (entries[i].offset < out.count && out[entries[i].offset...].starts(with: Data("\(i) 0 obj".utf8))) }),
               let before = document(pdf), let after = document(out), before.numberOfPages == after.numberOfPages,
-              xmp == nil || metadata(of: after) == xmp else { return pdf }
+              xmp == nil || metadata(of: after) == xmp else { return pageHeaders == nil ? pdf : nil }
+        if let pageHeaders, PDFHeaderCarrier.pages(of: after) != pageHeaders.map({ $0.flatMap { $0.isEmpty ? nil : $0 } }) {
+            return nil
+        }
         return out
     }
 
@@ -94,8 +103,10 @@ enum ArchivalFinish {
     }
 
     /// The catalog's metadata object rewritten unfiltered: the bytes it replaces, the new object and the XMP.
-    private static func unfilteredMetadata(_ pdf: Data, entries: [Entry]) -> (range: Range<Int>, object: Data, xmp: Data)? {
-        guard let doc = document(pdf), let xmp = metadata(of: doc), !xmp.isEmpty,
+    private static func unfilteredMetadata(_ pdf: Data, entries: [Entry],
+                                           pageHeaders: [String?]?) -> (range: Range<Int>, object: Data, xmp: Data)? {
+        guard let doc = document(pdf), let quartz = metadata(of: doc), !quartz.isEmpty,
+              let xmp = pageHeaders == nil ? quartz : PDFHeaderCarrier.adding(pages: pageHeaders ?? [], to: quartz),
               let root = firstMatch(#"/Root (\d+) 0 R"#, in: xrefTable(pdf)?.trailer ?? Data()),
               root < entries.count, entries[root].inUse,
               let rootObject = object(root, at: entries[root].offset, in: pdf),

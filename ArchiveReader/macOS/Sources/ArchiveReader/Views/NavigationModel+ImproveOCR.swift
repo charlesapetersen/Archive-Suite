@@ -274,13 +274,17 @@ struct TextPageSummary: Equatable, Sendable {
     static func read(_ url: URL) -> TextPageSummary {
         CorpusWalker.withDatalessMaterializationDisabled {
             guard let doc = PDFDocument(url: url), !doc.isLocked else { return .unknown }
-            return summarize((0..<doc.pageCount).filter { $0 % 2 == 1 }.compactMap { doc.page(at: $0) })
+            // Text pages and searchable pages alike (W42.int-s5-searchable): a searchable page's header is in the XMP.
+            return summarize(headers: PDFHeaderParser.textPageHeaders(doc))
         }
     }
 
     static func summarize(_ textPages: [PDFPage]) -> TextPageSummary {
-        let headers = textPages.map { PDFHeaderParser.parse($0).header }
-        return TextPageSummary(kind: summary(headers.map { $0?.kind }), reader: summary(headers.map { $0?.provenance }))
+        summarize(headers: textPages.map { PDFHeaderParser.parse($0).header })
+    }
+
+    static func summarize(headers: [PDFPageHeader?]) -> TextPageSummary {
+        TextPageSummary(kind: summary(headers.map { $0?.kind }), reader: summary(headers.map { $0?.provenance }))
     }
 
     /// As ArchiveCore's `ExtractedContent` summaries: unknown when no page names one, mixed when a page differs or

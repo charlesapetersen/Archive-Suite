@@ -16,12 +16,15 @@ enum TextLayerRoute: String, Codable, Sendable {
     case visionOwn = "vision-own"
     /// No layer on the image; the text page alone.
     case textPage = "text-page"
+    /// The searchable form's fallback (W42.int-s5-searchable): the reading's own lines down the image, not placed on
+    /// its words, since that form has no text page to hold the text.
+    case unplaced = "unplaced"
 }
 
 /// What one page's layer came to.
 struct TextLayerOutcome: Codable, Sendable, Equatable {
     var route: TextLayerRoute
-    /// Why a page got the text page alone; nil for a placed layer.
+    /// Why a page got the text page alone, or an unplaced layer; nil for a placed layer.
     var reason: String?
     /// The lines drawn, and how many of them the writer could not place.
     var lines: Int = 0

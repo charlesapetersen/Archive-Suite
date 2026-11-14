@@ -220,21 +220,30 @@ extension OCRProcessor {
         untaggedOutputs.removeAll { gone.contains($0) }
         placeholderOutputs.removeAll { gone.contains($0) }
         textPageOnlyOutputs.removeAll { gone.contains($0.name) }
+        searchableFormNotes.removeAll { gone.contains($0.name) }
     }
     /// Reset both records at the start of a run.
     func clearOutputWarnings() {
         untaggedOutputs = []
         placeholderOutputs = []
         textPageOnlyOutputs = []
+        searchableFormNotes = []
     }
 
     /// W42.int-s5 — a page whose image page got no searchable layer, and why, for the run log (05-placement.md §3:
     /// "named in the run report"). Not a warning: its text is on the text page. A later write of the same output
     /// replaces the entry; a placed layer removes it.
-    func recordTextLayer(_ outcome: TextLayerOutcome, forSource source: URL) {
+    /// W42.int-s5-searchable: `formFallback` (a page chosen for the searchable form, written as a pair) and an unplaced
+    /// layer are named too, in their own list.
+    func recordTextLayer(_ outcome: TextLayerOutcome, formFallback: String? = nil, forSource source: URL) {
         let name = source.lastPathComponent
         textPageOnlyOutputs.removeAll { $0.name == name }
+        searchableFormNotes.removeAll { $0.name == name }
         if outcome.route == .textPage, let reason = outcome.reason { textPageOnlyOutputs.append((name, reason)) }
+        if outcome.route == .unplaced {
+            searchableFormNotes.append((name, "its text is on the image but not placed on the words: \(outcome.reason ?? "unknown")"))
+        }
+        if let formFallback { searchableFormNotes.append((name, "written with a text page instead: \(formFallback)")) }
     }
 
     /// The end-of-run warning text for both records, or "" when everything landed cleanly.
@@ -845,11 +854,12 @@ extension OCRProcessor {
                                 localAgentModelName: agentModel,
                                 pdfImageMB: imageMB,
                                 textColumns: columns,
-                                textLayer: layerOptions
+                                textLayer: layerOptions,
+                                sourceFormat: OutputForm.format(ofExtension: source.pathExtension)
                             )
                         }.value
                         recordImagePage(output.imagePage, forSource: source)
-                        recordTextLayer(output.layer, forSource: source)
+                        recordTextLayer(output.layer, formFallback: output.formFallback, forSource: source)
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
                                source.lastPathComponent, error.localizedDescription)
@@ -1306,7 +1316,8 @@ extension OCRProcessor {
             return .skipped("no text")
         }
         // Most documents have an explicit year and no old line: settle that from the text page alone, unread bytes.
-        if evidence == nil, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2, let page = doc.page(at: 1),
+        if evidence == nil, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2,
+           PDFPageRole.roles(of: doc) == [.image, .text], let page = doc.page(at: 1),
            let header = PDFHeaderParser.parse(page).header, header.dateEvidence == nil {
             return .unchanged
         }

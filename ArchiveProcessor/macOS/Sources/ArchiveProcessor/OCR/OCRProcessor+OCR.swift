@@ -485,7 +485,7 @@ extension OCRProcessor {
                                                        gatewayDisplayName: gatewayName,
                                                        localAgentDisplayName: localAgentDisplayName,
                                                        localAgentModelName: localAgentModelName, pdfImageMB: pdfMB,
-                                                       textColumns: txtCols, textLayer: layerOptions)
+                                                       textColumns: txtCols, textLayer: layerOptions, sourceFormat: "pdf")
                         if outcome.isPlaceholder { anyPlaceholder = true }
                         perPagePDFs.append(tmp)
                     }
@@ -1609,7 +1609,7 @@ extension OCRProcessor {
         // `retryOne` — which regenerates the PDF and does not re-tag it — silently clear a real warning.
         let layerOptions = textLayerOptions
         let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool?,
-                        imagePage: PDFGenerator.ImagePageOutcome?, layer: TextLayerOutcome?)
+                        imagePage: PDFGenerator.ImagePageOutcome?, layer: TextLayerOutcome?, formFallback: String?)
             = await Task.detached(priority: .utility) {
             let pdfGen = PDFGenerator()
             do {
@@ -1619,7 +1619,8 @@ extension OCRProcessor {
                                                     gatewayDisplayName: gatewayName,
                                                     localAgentDisplayName: localAgentDisplayName,
                                                     localAgentModelName: localAgentModelName,
-                                                    pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions)
+                                                    pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions,
+                                                    sourceFormat: OutputForm.format(ofExtension: sourceURL.pathExtension))
                 var appliedTags: [String]? = nil
                 var tagWriteOK: Bool? = nil
                 if shouldPassTags {
@@ -1631,11 +1632,11 @@ extension OCRProcessor {
                         appliedTags = sourceTags
                     }
                 }
-                return (true, appliedTags, tagWriteOK, output.imagePage, output.layer)
+                return (true, appliedTags, tagWriteOK, output.imagePage, output.layer, output.formFallback)
             } catch {
                 os_log(.error, "PDF write failed for %{public}@: %{public}@",
                        originalFileName, error.localizedDescription)
-                return (false, nil, nil, nil, nil)
+                return (false, nil, nil, nil, nil, nil)
             }
         }.value
         // W16.bat9 — the same window as the sweep's loop, one frame down. The detached write above is the
@@ -1666,7 +1667,9 @@ extension OCRProcessor {
                 recordTagWrite(succeeded: tagWriteOK, forSource: sourceURL)
             }
             if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, forSource: sourceURL) }
-            if let layer = pdfResult.layer { recordTextLayer(layer, forSource: sourceURL) }
+            if let layer = pdfResult.layer {
+                recordTextLayer(layer, formFallback: pdfResult.formFallback, forSource: sourceURL)
+            }
         } else {
             // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on
             // `PDFDocument.write(to:)` returning false; a bad image yields a placeholder page instead).

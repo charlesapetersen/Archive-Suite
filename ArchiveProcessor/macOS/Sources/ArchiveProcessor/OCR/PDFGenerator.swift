@@ -51,6 +51,10 @@ struct PDFGenerator {
         var layer: TextLayerOutcome
         /// The median line slope the image page was turned level by (`ReadingCopy`); nil when it was left as it was.
         var straightenedDegrees: Double? = nil
+        /// The form written (W42.int-s5-searchable); a page the searchable form cannot hold is written as a pair.
+        var form: OutputForm = .imageAndText
+        /// Why a page chosen for the searchable form was written as a pair; nil otherwise.
+        var formFallback: String? = nil
     }
 
     @discardableResult
@@ -59,24 +63,34 @@ struct PDFGenerator {
                   localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                   pdfImageMB: Double = 0, textColumns: Int = 1,
                   sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
-                  textLayer: TextLayerOptions? = .standard) throws -> ImagePageOutcome {
+                  textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil) throws -> ImagePageOutcome {
         try generateOutput(imageURL: imageURL, result: result, model: model, outputURL: outputURL,
                            originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName,
                            localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
                            pdfImageMB: pdfImageMB, textColumns: textColumns, sourceDates: sourceDates,
-                           pageKind: pageKind, textLayer: textLayer).imagePage
+                           pageKind: pageKind, textLayer: textLayer, sourceFormat: sourceFormat).imagePage
     }
 
     /// `generate`, saying also what the image page's searchable layer came to. `textLayer` nil writes no layer.
+    /// `sourceFormat` is the input's own format (`OutputForm.format(ofExtension:)`; nil: `imageURL`'s), which with the
+    /// page's kind picks the form from `textLayer.searchableFor` (W42.int-s5-searchable).
     func generateOutput(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL,
                         originalFileName: String? = nil, gatewayDisplayName: String? = nil,
                         localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                         pdfImageMB: Double = 0, textColumns: Int = 1,
                         sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
-                        textLayer: TextLayerOptions? = .standard) throws -> Output {
+                        textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil) throws -> Output {
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
         var layer = TextLayerOutcome.textPage("no layer asked for")
+        let kind = TextLayerRule.kind(explicit: pageKind, result: result)
+        let chosen = textLayer.map { OutputForm.form(format: sourceFormat ?? OutputForm.format(ofExtension: imageURL.pathExtension),
+                                                     kind: kind, searchableFor: $0.searchableFor) } ?? .imageAndText
+        var form = OutputForm.imageAndText
+        var formFallback: String?
+        let header = headerBlock(result: result, model: model, originalFileName: originalFileName,
+                                 gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
+                                 localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind)
 
         var straightened: Double?
         if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB,
@@ -85,13 +99,25 @@ struct PDFGenerator {
             straightened = image.straightenedDegrees
             var page = plain
             if let textLayer {
-                let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer)
-                layer = layered.outcome
-                if let p = layered.page { page = p }
+                var layered: (page: PDFPage?, outcome: TextLayerOutcome)?
+                if chosen == .searchable {
+                    switch OutputForm.searchableRefusal(reading: result.text) {
+                    case let why?: formFallback = why
+                    case nil:
+                        let s = searchableImagePage(image, result: result, pageKind: pageKind, options: textLayer)
+                        if s.page != nil { layered = s; form = .searchable } else { formFallback = s.outcome.reason }
+                    }
+                }
+                if layered == nil { layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer) }
+                if let layered {
+                    layer = layered.outcome
+                    if let p = layered.page { page = p }
+                }
             }
             pdfDocument.insert(page, at: 0)
             outcome = .embedded
         } else {
+            if chosen == .searchable { formFallback = "the image could not be embedded" }
             // The source image couldn't be decoded/embedded. Insert a visible placeholder rather than
             // silently emitting a 1-page (text-only) PDF — that preserves the 2-page archival contract,
             // keeps PDFTextExtractor's pageCount>=2 heuristic valid, and surfaces the failure.
@@ -100,15 +126,17 @@ struct PDFGenerator {
             layer = .textPage("the image could not be embedded")
         }
 
-        let textPage = makeTextPage(result: result, model: model, originalFileName: originalFileName,
-                                    gatewayDisplayName: gatewayDisplayName,
-                                    localAgentDisplayName: localAgentDisplayName,
-                                    localAgentModelName: localAgentModelName,
-                                    textColumns: textColumns, sourceDates: sourceDates, pageKind: pageKind)
-        pdfDocument.insert(textPage, at: pdfDocument.pageCount)
+        // The searchable form has no text page: its header goes to the XMP (`PDFHeaderCarrier`).
+        var pageHeaders: [String?]?
+        if form == .searchable {
+            pageHeaders = [header.carried]
+        } else {
+            pdfDocument.insert(textPage(header: header, result: result, textColumns: textColumns), at: pdfDocument.pageCount)
+        }
 
-        try Self.writeArchival(pdfDocument, to: outputURL)
-        return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened)
+        try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)
+        return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened, form: form,
+                      formFallback: formFallback)
     }
 
     // MARK: - PDF/A output (W42.int-s5)
@@ -120,18 +148,20 @@ struct PDFGenerator {
     /// invisible layer stays text. Read back before it is written: bytes that do not open with every page throw.
     /// Written atomically, as PDFKit's write replaced the file: a regenerated output never stands half-written, and it
     /// does not keep the old file's Finder tags (the regenerations re-apply them).
-    static func writeArchival(_ document: PDFDocument, to url: URL) throws {
-        guard let data = archivalData(document) else { throw PDFError.writeFailed }
+    /// `pageHeaders`: one entry per page for a file with searchable pages (`PDFHeaderCarrier`), nil for pairs only.
+    static func writeArchival(_ document: PDFDocument, to url: URL, pageHeaders: [String?]? = nil) throws {
+        guard let data = archivalData(document, pageHeaders: pageHeaders) else { throw PDFError.writeFailed }
         do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
     /// `writeArchival` into memory, also for the image page Improve OCR puts into an output (`remadeImagePageData`): it
     /// is drawn as the output's own pages are, so it renders as they do.
-    static func archivalData(_ document: PDFDocument) -> Data? {
+    static func archivalData(_ document: PDFDocument, pageHeaders: [String?]? = nil) -> Data? {
+        if let pageHeaders, pageHeaders.count != document.pageCount { return nil }
         let data = NSMutableData()
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
-              let pages = try? drawArchival(document, into: consumer) else { return nil }
-        let out = ArchivalFinish.finished(data as Data)
+              let pages = try? drawArchival(document, into: consumer),
+              let out = ArchivalFinish.finished(data as Data, pageHeaders: pageHeaders) else { return nil }
         guard let provider = CGDataProvider(data: out as CFData), CGPDFDocument(provider)?.numberOfPages == pages else {
             return nil
         }
@@ -180,13 +210,33 @@ struct PDFGenerator {
     struct TextLayerOptions: Codable, Sendable, Equatable {
         var placeHandOnImage = true
         var straighten = true
+        /// W42.int-s5-searchable: the `format/kind` pairs written in the searchable form (`OutputForm.form`).
+        var searchableFor: [String] = []
         static let standard = TextLayerOptions()
 
-        /// The two switches as a run's frozen settings hold them (`ResolvedSettingsSnapshot.values`); a key absent
+        init(placeHandOnImage: Bool = true, straighten: Bool = true, searchableFor: [String] = []) {
+            self.placeHandOnImage = placeHandOnImage
+            self.straighten = straighten
+            self.searchableFor = searchableFor
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            placeHandOnImage = try c.decodeIfPresent(Bool.self, forKey: .placeHandOnImage) ?? true
+            straighten = try c.decodeIfPresent(Bool.self, forKey: .straighten) ?? true
+            searchableFor = try c.decodeIfPresent([String].self, forKey: .searchableFor) ?? []
+        }
+
+        /// The switches as a run's frozen settings hold them (`ResolvedSettingsSnapshot.values`); a key absent
         /// (no settings snapshot) is its built-in default.
         static func from(_ values: [String: ResolvedSetting]) -> TextLayerOptions {
             func flag(_ key: SettingsKey) -> Bool { values[key.rawValue]?.value.bool ?? key.defaultValue.bool ?? true }
-            return TextLayerOptions(placeHandOnImage: flag(.placeHandOnImage), straighten: flag(.straightenReadingCopy))
+            let searchable: [String]
+            if case .strings(let list)? = values[SettingsKey.searchableFor.rawValue]?.value { searchable = list }
+            else if case .strings(let list) = SettingsKey.searchableFor.defaultValue { searchable = list }
+            else { searchable = [] }
+            return TextLayerOptions(placeHandOnImage: flag(.placeHandOnImage), straighten: flag(.straightenReadingCopy),
+                                    searchableFor: searchable)
         }
     }
 
@@ -250,6 +300,57 @@ struct PDFGenerator {
         } catch {
             return (nil, .textPage("the layer could not be written: \(error.localizedDescription)"))
         }
+    }
+
+    /// W42.int-s5-searchable — the page of the searchable form: the image with the reading as its layer, since there is
+    /// no text page. Placed on Vision's lines where the reading aligns with them; otherwise (handwriting, a kind the rule
+    /// keeps off the image, a reading that does not align, Vision failing) the reading's own lines, unplaced, down the
+    /// image, so the page stays searchable and the run report can name it. Nil page (and why) only when no layer could be
+    /// written at all; the caller then writes the pair.
+    private func searchableImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
+                                     options: TextLayerOptions) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+        let kind = TextLayerRule.kind(explicit: pageKind, result: result)
+        let reading = result.text ?? ""
+        var why: String
+        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage) {
+        case .textPage(let reason): why = reason
+        case .place:
+            why = "the reading did not align with Vision's lines"
+            if Thread.isMainThread { why = "written on the main thread" }
+            else if let cg = image.decoded(), cg.width > 0, let vision = TextLayer.visionLines(of: cg), !vision.isEmpty {
+                let lines = TextLayer.aligned(vision, reading: reading, aspect: Double(cg.height) / Double(cg.width))
+                // There is no text page to keep the rest, so the placed layer is used only when it holds every word
+                // of the reading (a line Vision never found keeps nothing of it) and the writer placed every line.
+                if lines.placement == .aligned {
+                    if let written = writeLayer(image, lines: lines), written.unplaced == 0,
+                       OutputForm.holds(written.page.string ?? "", every: reading) {
+                        return (written.page, TextLayerOutcome(route: .visionLinesAligned, reason: nil,
+                                                               lines: lines.lines.count, unplaced: 0))
+                    }
+                    why = "some of the reading's words are not on Vision's lines"
+                }
+            } else { why = "Vision found no lines" }
+        }
+        let lines = OutputForm.unplacedLines(reading)
+        guard !lines.isEmpty, let written = writeLayer(image, lines: TextLayer.lines(lines)) else {
+            return (nil, .textPage("the reading could not be written as a layer"))
+        }
+        return (written.page, TextLayerOutcome(route: .unplaced, reason: why, lines: lines.count, unplaced: written.unplaced))
+    }
+
+    /// The image page with `lines` written over it as its invisible layer, read back into memory; nil on any failure.
+    private func writeLayer(_ image: ImagePageData, lines: TextLayer.Lines) -> (page: PDFPage, unplaced: Int)? {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("ap-layer-" + UUID().uuidString, isDirectory: true)
+        defer { try? fm.removeItem(at: dir) }
+        do {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            let plainURL = dir.appendingPathComponent("image.pdf"), layeredURL = dir.appendingPathComponent("layered.pdf")
+            try image.pdf.write(to: plainURL)
+            let unplaced = try TextLayer.write(imagePage: plainURL, lines: lines, imageFrame: image.frame, to: layeredURL)
+            guard let page = PDFDocument(data: try Data(contentsOf: layeredURL))?.page(at: 0) else { return nil }
+            return (page, unplaced)
+        } catch { return nil }
     }
 
     // MARK: - Image Page
@@ -485,6 +586,24 @@ struct PDFGenerator {
                               gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                               localAgentModelName: String? = nil, textColumns: Int = 1,
                               sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) -> PDFPage {
+        textPage(header: headerBlock(result: result, model: model, originalFileName: originalFileName,
+                                     gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
+                                     localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind),
+                 result: result, textColumns: textColumns)
+    }
+
+    /// A text page's header block (SPEC/tag-format.md §"Page-2 header"), ending in its blank separator, with the lines
+    /// fitted to one line each. `carried` is the same block as the searchable form's XMP carries it (`PDFHeaderCarrier`).
+    struct HeaderBlock {
+        var text: String
+        var fitRanges: [NSRange]
+        var carried: String { PDFHeaderCarrier.storable(text.trimmingCharacters(in: .newlines)) }
+    }
+
+    func headerBlock(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
+                     gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
+                     localAgentModelName: String? = nil, sourceDates: PDFSourceDates? = nil,
+                     pageKind: OCRPageKind? = nil) -> HeaderBlock {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
@@ -535,7 +654,10 @@ struct PDFGenerator {
             headerLine += "\n\(line)"
         }
         headerLine += "\n\n"
+        return HeaderBlock(text: headerLine, fitRanges: fitRanges)
+    }
 
+    private func textPage(header: HeaderBlock, result: OCRResult, textColumns: Int) -> PDFPage {
         let bodyText: String
         if let text = result.text, !text.isEmpty {
             bodyText = text
@@ -545,7 +667,7 @@ struct PDFGenerator {
             if let code = result.errorCode { msg += "\n\nError code: \(code)" }
             bodyText = msg
         }
-        return layoutTextPage(headerLine: headerLine, fitRanges: fitRanges, bodyText: bodyText, textColumns: textColumns)
+        return layoutTextPage(headerLine: header.text, fitRanges: header.fitRanges, bodyText: bodyText, textColumns: textColumns)
     }
 
     /// Lays out one text page: `headerLine` (ending in its blank separator) above `bodyText`. Each of `fitRanges`
@@ -746,30 +868,42 @@ struct PDFGenerator {
 
     // MARK: - Multi-page Document Merging
 
-    /// Merge multiple individual per-page PDFs into a single multi-page PDF.
-    /// Each source PDF has [image page, text page]. The merged PDF interleaves them:
-    /// image1, text1, image2, text2, ...
+    /// Merge multiple individual per-page PDFs into a single multi-page PDF, their pages in order: a pair's
+    /// image1, text1, image2, text2, ..., and a searchable source's one page (W42.int-s5-searchable), whose header the
+    /// merged file's XMP carries in its place (`PDFHeaderCarrier`), so a document may mix the two forms.
     /// Throws `PDFError.sourceUnreadable` if any source PDF cannot be loaded (fail-loud
     /// to prevent silent page-drop in this no-undo path).
     func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL) throws {
         let merged = PDFDocument()
         var pageIndex = 0
+        var headers: [String?] = []
+        // A source before the last that ends on an image with no text page (as before, allowed in a merge of pairs).
+        var openImage: URL?
 
-        for pdfURL in sourcePDFs {
+        for (n, pdfURL) in sourcePDFs.enumerated() {
             guard let doc = PDFDocument(url: pdfURL) else {
                 throw PDFError.sourceUnreadable(pdfURL)
             }
+            let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
+            // A list that does not fit the pages would be read as pairs and its headers lost: refuse it.
+            if let carried, carried.count != doc.pageCount { throw PDFError.sourceUnreadable(pdfURL) }
+            let roles = PDFPageRole.roles(of: doc)
+            if n < sourcePDFs.count - 1, roles.last == .image { openImage = openImage ?? pdfURL }
             for i in 0..<doc.pageCount {
                 guard let page = doc.page(at: i) else {
                     throw PDFError.sourceUnreadable(pdfURL)
                 }
                 merged.insert(page, at: pageIndex)
+                headers.append(roles[i] == .searchable ? carried?[i] ?? nil : nil)
                 pageIndex += 1
             }
         }
 
         guard merged.pageCount > 0 else { throw PDFError.writeFailed }
-        try Self.writeArchival(merged, to: outputURL)
+        let pageHeaders: [String?]? = headers.contains { $0 != nil } ? headers : nil
+        // With a list, such an image would pair with the next source's page, which its own file never did: refuse.
+        if pageHeaders != nil, let openImage { throw PDFError.sourceUnreadable(openImage) }
+        try Self.writeArchival(merged, to: outputURL, pageHeaders: pageHeaders)
     }
 }
 

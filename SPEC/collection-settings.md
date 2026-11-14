@@ -71,6 +71,7 @@ above), so a collection's mix is never read beside a project's `strata`.
 | `batchCeilingUSD`, `hours`, `checkingMinutes` | `double` | This collection's batch limits. A ceiling has effect only when the general spending habit allows money. |
 | `preference` | `string` | `bestMeasured`, `cheapestWithinPoint` or `fastestWithinPoint`. |
 | `staysOnMac`, `straightenReadingCopy`, `placeHandOnImage`, `dateImageEveryDocument` | `bool` | The switches: pages stay on this Mac, straighten the copy you read (note 01), place handwritten text on the page image (note 05; the settings sheet's rules tab), search the page image for dates on every document, not only those whose text has no year (note 08; off by default, owner 2026-11-12). |
+| `searchableFor` | `strings` | The output form (W42.int-s5-searchable): `"<format>/<kind>"` pairs written as one searchable page per source page, with no text page (`SPEC/tag-format.md` §"The searchable form"). Format: `jpeg`, `heic`, `png`, `tiff`, `pdf` or another extension, lower case; kind: `handwritten`, `typewritten`, `printed`, `forms`, `mixed`, `registers`, `newspapers`, `clippings`; `*` for any (an unknown kind matches only `*`). Empty, the default: every page is image-plus-text. |
 
 `V` is `{ "type": T, "value": … }`, with `T` one of `bool`, `int`, `double`, `string`, `strings` (a list) or `numbers`
 (a name → number map, such as the document mix in percent).
