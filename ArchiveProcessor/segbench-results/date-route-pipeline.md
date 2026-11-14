@@ -11,6 +11,7 @@ Written by `scripts/segbench/date_route_pipeline.py score`. The route of `13-sta
 - **The image pass on documents whose text has a year (item 8.2):** on 172 it finds an own date on 142; that date differs from the route's year on 11, of which 7 are the owner's year (7 wrong to right, 2 right to wrong); it quotes a stamp date on 24 (second-role dates for the sidecar). Sending it everywhere would cost the image call on every document.
 - **Cost and time:** about $3.11 per 1,000 documents of the owner's mix at 3.8's list price as a ceiling, and 5.6 s of calls a document in sequence (one trace call each, the image pass on 32% of them).
 - **The route on the 27B (Sherlock): 37.4% (34/91) where the year is not in the own text, 96.3% (131/136) where it is**, against Gemini's 53/91 on the same documents (22 right only on Gemini, 3 only on the 27B, sign test p 0.0002; all owner documents 184 against 165 of 227, p 0.0003). It loses on the page (53.3% (16/30)) and off it (29.5% (18/61)): 35 checked neighbour estimates (51.4% (18/35) exact) against Gemini's 51, and 17 documents with no year written against 6. Its trace replies are weaker and the checker refuses more of them (226 valid, 44 unsupported; 15 right years refused, 37 wrong accepted). Undated: 17.8% (16/90) false years under section 3, 12.2% (11/90) with the flag rule; Date Uncertain on certain years 10.1% (18/179), left off uncertain ones 45.2% (14/31).
+- **The Mac 8B as step 2 (W46.date-route-pipeline-8b):** Gemini 3.7 Flash's trace: 52.7% (48/91) not in text with the 8B as step 2 against 58.2% (53/91) with its own reader (0 right only with the 8B, 5 only with its own, p 0.0625); against no step 2, 48 against 48 (0 / 0, p 1.0); undated false years 15.6% (14/90); Qwen3.6 27B's trace: 33.0% (30/91) not in text with the 8B as step 2 against 37.4% (34/91) with its own reader (0 right only with the 8B, 4 only with its own, p 0.125); against no step 2, 30 against 30 (0 / 0, p 1.0); undated false years 16.7% (15/90); as a quote source on Gemini 3.7 Flash's trace 48 against 48 without step 2 (1 / 1, p 1.0), undated false years 16.7% (15/90); as a quote source on Qwen3.6 27B's trace 31 against 30 without step 2 (2 / 1, p 1.0), undated false years 17.8% (16/90). On the documents step 2 runs on it names an own date on 3 of 115, the owner's year on 1 of 55 owner documents; median 8.32 s a reply on the Mac (a ceiling), peak 6.62 GB, $0.
 
 ## Exact year by where the year is (the owner's documents)
 
@@ -20,6 +21,8 @@ Written by `scripts/segbench/date_route_pipeline.py score`. The route of `13-sta
 |---|---|---|---|---|---|---|
 | Gemini 3.7 Flash (gateway) | 96.3% (131/136) | 73.3% (22/30) | 50.8% (31/61) | 58.2% (53/91) | 48-68 | 32/91 |
 | Qwen3.6 27B (Sherlock) | 96.3% (131/136) | 53.3% (16/30) | 29.5% (18/61) | 37.4% (34/91) | 28-48 | 40/91 |
+| Gemini 3.7 trace, Mac 8B image | 96.3% (131/136) | 56.7% (17/30) | 50.8% (31/61) | 52.7% (48/91) | 43-63 | 34/91 |
+| 27B trace, Mac 8B image | 96.3% (131/136) | 40.0% (12/30) | 29.5% (18/61) | 33.0% (30/91) | 24-43 | 41/91 |
 
 ## By evidence class (the owner's documents)
 
@@ -29,6 +32,8 @@ The class is the step that wrote the year: explicit from the text or the image (
 |---|---|---|---|---|---|---|---|
 | Gemini 3.7 Flash (gateway) | 158, 88.0% (139/158) exact | 12, 83.3% (10/12) exact | 51, 68.6% (35/51) exact | 6 | 14.4% (26/181) | 37.5% (15/40) | 86.3% (44/51), 1 y |
 | Qwen3.6 27B (Sherlock) | 166, 84.3% (140/166) exact | 9, 77.8% (7/9) exact | 35, 51.4% (18/35) exact | 17 | 10.1% (18/179) | 45.2% (14/31) | 80.0% (28/35), 0 y |
+| Gemini 3.7 trace, Mac 8B image | 158, 88.0% (139/158) exact | 1, 0.0% (0/1) exact | 59, 67.8% (40/59) exact | 9 | 18.3% (33/180) | 31.6% (12/38) | 88.1% (52/59), 1 y |
+| 27B trace, Mac 8B image | 166, 84.3% (140/166) exact | 1, 0.0% (0/1) exact | 40, 52.5% (21/40) exact | 20 | 13.0% (23/177) | 43.3% (13/30) | 77.5% (31/40), 0.0 y |
 
 ## Step 1 needing a quote from the document itself (a variant, in-sample)
 
@@ -40,6 +45,10 @@ Section 3 makes a year explicit when any rule candidate in the own text carries 
 | Gemini 3.7 Flash (gateway) | a quote from self | 96.3% (131/136) | 58.2% (53/91) | 184/227; 0 / 0, p 1.0 | 52 / 31 | 13.3% (12/90) |
 | Qwen3.6 27B (Sherlock) | any own candidate (section 3) | 96.3% (131/136) | 37.4% (34/91) | 165/227 | 56 / 22 | 17.8% (16/90) |
 | Qwen3.6 27B (Sherlock) | a quote from self | 96.3% (131/136) | 37.4% (34/91) | 165/227; 0 / 0, p 1.0 | 53 / 25 | 14.4% (13/90) |
+| Gemini 3.7 trace, Mac 8B image | any own candidate (section 3) | 96.3% (131/136) | 52.7% (48/91) | 179/227 | 52 / 30 | 15.6% (14/90) |
+| Gemini 3.7 trace, Mac 8B image | a quote from self | 96.3% (131/136) | 52.7% (48/91) | 179/227; 0 / 0, p 1.0 | 49 / 33 | 13.3% (12/90) |
+| 27B trace, Mac 8B image | any own candidate (section 3) | 96.3% (131/136) | 33.0% (30/91) | 161/227 | 53 / 24 | 16.7% (15/90) |
+| 27B trace, Mac 8B image | a quote from self | 96.3% (131/136) | 33.0% (30/91) | 161/227; 0 / 0, p 1.0 | 50 / 27 | 13.3% (12/90) |
 
 ## The model's own flag on an explicit text year (a variant, in-sample)
 
@@ -51,10 +60,18 @@ Section 3 never takes Date Uncertain from the model. Here the trace reply's own 
 | Gemini 3.7 Flash (gateway), the flag demotes | 11, 5, 7 | 16.6% (30/181) | 20.0% (8/40) | 5.6% (5/90) |
 | Qwen3.6 27B (Sherlock), section 3 | – | 10.1% (18/179) | 45.2% (14/31) | 17.8% (16/90) |
 | Qwen3.6 27B (Sherlock), the flag demotes | 5, 0, 2 | 11.7% (21/179) | 38.7% (12/31) | 12.2% (11/90) |
+| Gemini 3.7 trace, Mac 8B image, section 3 | – | 18.3% (33/180) | 31.6% (12/38) | 15.6% (14/90) |
+| Gemini 3.7 trace, Mac 8B image, the flag demotes | 11, 5, 7 | 20.6% (37/180) | 13.2% (5/38) | 5.6% (5/90) |
+| 27B trace, Mac 8B image, section 3 | – | 13.0% (23/177) | 43.3% (13/30) | 16.7% (15/90) |
+| 27B trace, Mac 8B image, the flag demotes | 5, 0, 2 | 14.7% (26/177) | 36.7% (11/30) | 11.1% (10/90) |
 
 Gemini 3.7 Flash (gateway), the flag demotes: of its 5 undated false years, 2 are on documents the owner ruled (2 of 15 explicit years there) and 3 are judged by the Gemini image pass (3 of 30).
 
 Qwen3.6 27B (Sherlock), the flag demotes: of its 11 undated false years, 5 are on documents the owner ruled (5 of 18 explicit years there) and 6 are judged by the Gemini image pass (6 of 33).
+
+Gemini 3.7 trace, Mac 8B image, the flag demotes: of its 5 undated false years, 2 are on documents the owner ruled (2 of 15 explicit years there) and 3 are judged by the Gemini image pass (3 of 27).
+
+27B trace, Mac 8B image, the flag demotes: of its 10 undated false years, 5 are on documents the owner ruled (5 of 18 explicit years there) and 5 are judged by the Gemini image pass (5 of 30).
 
 ## What the image step adds (paired, not in text)
 
@@ -64,6 +81,8 @@ The same documents and trace replies, the route with and without step 2.
 |---|---|---|---|---|---|
 | Gemini 3.7 Flash (gateway) | 53/91 | 48/91 | 5 | 0 | 0.0625 |
 | Qwen3.6 27B (Sherlock) | 34/91 | 30/91 | 4 | 0 | 0.125 |
+| Gemini 3.7 trace, Mac 8B image | 48/91 | 48/91 | 0 | 0 | 1.0 |
+| 27B trace, Mac 8B image | 30/91 | 30/91 | 0 | 0 | 1.0 |
 
 ## The evidence checker on fresh replies (P13-5)
 
@@ -86,6 +105,8 @@ A false year is a year written without Date Uncertain where the document has no 
 |---|---|---|---|---|---|---|
 | Gemini 3.7 Flash (gateway) | 90 | 55 / 28 | 4 of 17 ruled explicit (20 ruled) | 10 of 38 | 15.6% (14/90) | 10-24 |
 | Qwen3.6 27B (Sherlock) | 90 | 56 / 22 | 5 of 18 ruled explicit (20 ruled) | 11 of 38 | 17.8% (16/90) | 11-27 |
+| Gemini 3.7 trace, Mac 8B image | 90 | 52 / 30 | 4 of 17 ruled explicit (20 ruled) | 10 of 35 | 15.6% (14/90) | 10-24 |
+| 27B trace, Mac 8B image | 90 | 53 / 24 | 5 of 18 ruled explicit (20 ruled) | 10 of 35 | 16.7% (15/90) | 10-26 |
 
 ## The image pass where the text has a year (item 8.2)
 
@@ -104,13 +125,39 @@ Per call, from every ledger row behind the replies used: trace 362 calls, $0.002
 
 Sherlock job 52063413, one GPU, vLLM batched (model load not counted): trace 354 calls in 306.5 s, image 181 calls in 844.9 s (the rest reused). At the route's 362 trace and 115 image calls on 362 documents, about 2.35 GPU-s a document. No money.
 
+## The Mac 8B as step 2 (W46.date-route-pipeline-8b)
+
+Qwen3-VL 8B, 4-bit MLX, at 1,400 px with thinking off, sent the image pass (the same prompt and pages) on every readable document whose own text has no year candidate; its rows above keep each model's trace replies and replace only the step-2 reader. Paired against that model's own step-2 reader on the owner's documents whose year is not in the text:
+
+| trace | with the 8B as step 2 | with its own reader | only with the 8B | only with its own | sign test p |
+|---|---|---|---|---|---|
+| Gemini 3.7 Flash (gateway) | 48/91 | 53/91 | 0 | 5 | 0.0625 |
+| Qwen3.6 27B (Sherlock) | 30/91 | 34/91 | 0 | 4 | 0.125 |
+
+The same with the 8B as a quote source, as call 7.5 (c) puts it ("the year by rule"): its own document year when it quoted it, else the single year its quoted dates name; against no step 2 on the same trace replies.
+
+| trace | not in text | against no step 2: with / without, only with / only without, p | image years, exact | false years, undated |
+|---|---|---|---|---|
+| Gemini 3.7 Flash (gateway) | 52.7% (48/91) | 48 / 48, 1 / 1, p 1.0 | 10, 70.0% (7/10) | 16.7% (15/90) |
+| Qwen3.6 27B (Sherlock) | 34.1% (31/91) | 31 / 30, 2 / 1, p 1.0 | 10, 70.0% (7/10) | 17.8% (16/90) |
+
+The three image readers on the documents step 2 runs on (both sets): how often each names a document date written in a date it quoted, and on the owner's documents how often that year is the owner's.
+
+| reader | replies | own date found | owner's year, owner documents |
+|---|---|---|---|
+| Gemini 3.7 | 115 | 23 | 13/55 |
+| Qwen3.6 27B | 115 | 20 | 10/55 |
+| Qwen3-VL 8B | 115 | 3 | 1/55 |
+
+Time on the Mac: 61 replies made now, median 8.32 s each, peak MLX memory 6.62 GB; 54 reused from W46.date-image's Mac arm (median 11.29 s there); 0 replies stopped at the 700-token cap. Measured inside an engine session, whose processes run at background priority, so the seconds are a ceiling. No money.
+
 Vision: 1972 pages read now in 378.8 s on macOS 27.2 (the rest reused from date_undated's 27.2 readings), 2495 oriented in 828.1 s.
 
 ## Measurement card
 
 - **Truth.** the owner's date tags on his 300 (year, and Date Uncertain for the two flag rates); for the undated set, his page-date rulings on the documents he ruled and the Gemini image pass's own reading on the rest, the latter Gemini's own reader on its rows and another model's reading on the 27B's, reported apart. The tag differs from the page for 4 of 26 own-page cases (date-truth-sets.md), so a route quoting the page can score wrong against the tag.
 - **Selection.** the owner's 300 as date_tagging drew them and the undated 100 as W46.date-undated drew them, never by a tested route or the ABBYY text; documents whose first page has no confirmed JPEG original are left out (the app would have its own photo). The strata come from the app's own Vision text and the Gemini image pass, so "on the page" is defined by the Gemini reader that one route uses as its step 2.
-- **Comparison.** every route on the same documents, the same Vision text, the same prompts and images; the step-2 effect is paired on the same trace replies, and Gemini against the 27B on the same documents. The older step rows were on ABBYY-defined sets and corpus text and are not compared figure for figure.
-- **Noise.** one run each (temperature 0; Gemini at reasoning low, the 27B with thinking off); the dating rerun floor is a same-year rate of 94% (85/90) between two identical runs (date-undated.md), so a gap of a few points between routes is inside it. Wilson intervals on single rates; the step-2 gap and the model gap by an exact sign test on their discordant pairs.
-- **Scope.** Gemini 3.7 on the gateway (3.8 on a direct key is unmeasured here); the 27B is Qwen3.6-27B-FP8 on vLLM (Sherlock batch 20261112), its 118 image replies on W46.date-image's documents reused from that run, which used other server flags on the same model and prompt; inheritance (step 3) is not measured; the checker counts are off its writing set but on one prompt; the false-year rate is a share of the collection-balanced undated sample, not a corpus rate (P3-1).
+- **Comparison.** every route on the same documents, the same Vision text, the same prompts and images; the step-2 effect is paired on the same trace replies, and Gemini against the 27B on the same documents; the Mac 8B replaces only the step-2 reader on each model's own trace replies, so its rows differ from them by step 2 alone. The older step rows were on ABBYY-defined sets and corpus text and are not compared figure for figure.
+- **Noise.** one run each (temperature 0; Gemini at reasoning low, the 27B and the 8B with thinking off); the dating rerun floor is a same-year rate of 94% (85/90) between two identical runs (date-undated.md), so a gap of a few points between routes is inside it. Wilson intervals on single rates; the step-2 gap and the model gap by an exact sign test on their discordant pairs.
+- **Scope.** Gemini 3.7 on the gateway (3.8 on a direct key is unmeasured here); the 27B is Qwen3.6-27B-FP8 on vLLM (Sherlock batch 20261112), its 118 image replies on W46.date-image's documents reused from that run, which used other server flags on the same model and prompt; the Mac 8B is Qwen3-VL-8B 4-bit MLX at 1,400 px, its 54 replies on W46.date-image's documents reused from that item's Mac arm (same prompt, pages and settings), its quote-source variant chosen after reading its replies (in-sample); inheritance (step 3) is not measured; the checker counts are off its writing set but on one prompt; the false-year rate is a share of the collection-balanced undated sample, not a corpus rate (P3-1).
 

@@ -171,12 +171,15 @@ JPEG original) or `reread-107` (the 107 whose year neither the ABBYY nor the Vis
   "figures": {
    "unprinted_122_doc_year": {"value": 16, "n": 122, "truth": "owner-tags", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B, 4-bit MLX (1,400 px), image", "attribute": "doc year exact", "value": "20/122 (16%)"}},
    "unprinted_122_on_page": {"value": 32, "n": 122, "truth": "owner-tags", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B, image", "attribute": "on the page", "value": "39/122 (32%)"}},
-   "owner_own_page": {"value": 59, "n": 27, "truth": "owner-ruled (date-truth-sets)", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B", "attribute": "found the owner's year on the page", "value": "16/27 (59%)"}}},
+   "owner_own_page": {"value": 59, "n": 27, "truth": "owner-ruled (date-truth-sets)", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B", "attribute": "found the owner's year on the page", "value": "16/27 (59%)"}},
+   "route_not_in_text_27b_trace": {"value": 33.0, "n": 91, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "27B trace, Mac 8B image", "attribute": "not in text, the 8B as step 2 on the 27B's trace replies", "value": "33.0% (30/91)"}},
+   "route_not_in_text_gemini_trace": {"value": 52.7, "n": 91, "truth": "owner-tags", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "Gemini 3.7 trace, Mac 8B image", "attribute": "not in text, the 8B as step 2 on Gemini's trace replies", "value": "52.7% (48/91)"}},
+   "route_undated_false_year_27b_trace": {"value": 16.7, "n": 90, "truth": "owner-ruled where ruled, else the Gemini image pass", "source": {"file": "segbench-results/date-route-pipeline.md", "route": "27B trace, Mac 8B image", "attribute": "false-year rate", "value": "16.7% (15/90)"}}},
   "cost": {"usd_1000_list": 0.0, "usd_1000_batch": 0.0, "price_read": null, "source": {"file": "segbench-results/date-image.md", "route": "open arms", "attribute": "cost", "value": "$0"}},
   "time": {"per_unit_s": 12.05, "measured": true, "measured_on": "M3 Pro 18 GB, median a document", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B, image", "attribute": "median s", "value": "12.05"}},
   "memory": {"peak_gb": 7.64, "measured_on": "M3 Pro 18 GB (OCR run)", "source": {"file": "ocr-mac-local.md", "route": "Qwen3-VL 8B 4-bit", "attribute": "MLX peak memory, GB, max", "value": "7.64"}},
-  "caveats": ["quotes the right date and picks another: use as a quote source, the year by rule", "1,400 px and 4-bit not separated (DAT-11)", "3 of 99 OCR pages looped (build_figures.py)"],
-  "kind_rules": [], "fallback": "step 4", "conditions": ["as gemini3.7-flash-image; its quotes feed the rule stage"]},
+  "caveats": ["as step 2 in the restated route it adds no year: 0 documents gained over no step 2 on either trace, and as a quote source (its single quoted year) 1 gained and 1 lost on Gemini's trace, 2 and 1 on the 27B's (W46.date-route-pipeline-8b)", "names an own date on 3 of the 115 documents step 2 runs on, where Gemini 3.7 names 23 and the 27B 20", "1,400 px and 4-bit not separated (DAT-11)", "3 of 99 OCR pages looped (build_figures.py)"],
+  "kind_rules": [], "fallback": "step 4", "conditions": ["not offered: its quotes do not improve the year as step 2 (W46.date-route-pipeline-8b; call 7.5 (c) not added)"]},
  {"id": "vision-2b-chooser-t3", "name": "Apple Vision text, rules, the trained 2B as chooser, propagation (Mac, no key)", "family": "mac",
   "app_route": null, "status": "measured", "step": [1, 4],
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 8, "gpus": 0},
@@ -280,7 +283,9 @@ string figure values ("86 / 45", "7 of 12", "96.9% coverage, 4.5 y") and `memory
   $4.07 by hand. Replaced by the measured `gemini3.7-flash-route` (W46.date-route-pipeline, 2026-11-12,
   `date-route-pipeline.md`): 58.2% not in text, 96.3% in text, $3.11 per 1,000. The 27B's combined row is the measured
   `qwen3.6-27b-route` (W46.date-route-pipeline-27b, 2026-11-13): 37.4% not in text, 96.3% in text, 17.8% false years
-  on the undated 90; behind Gemini's route on the same documents (p 0.0002).
+  on the undated 90; behind Gemini's route on the same documents (p 0.0002). The Mac 8B as step 2 on either model's
+  trace (W46.date-route-pipeline-8b, 2026-11-14) gains no document over no step 2 and loses 5 (Gemini) and 4 (27B) to
+  the model's own image reader; its figures are on the `qwen3-vl-8b-image-mac` row, which is no longer offered.
 - **F-2.** `cluster-27b-image`'s "not in text 39.0" and `mac-8b-image`'s "16.0" are document-year exact on the 122, not
   the 131; relabelled `unprinted_122_doc_year`. **F-3.** `mac-2b`'s peak 2.7 GB is the build size; the measured peak is
   3.784 GB (`date-model.md`). **F-4.** `uncertain_marked 88` is plain agreement on owner-uncertain documents; replaced by
@@ -374,7 +379,11 @@ propagation at t=3, every propagated year with `Date Uncertain` and its document
 (b) the same without the 2B (48.1%, 85.7%); (c) (a) plus the Qwen3-VL 8B image pass at 16 GB as a quote source, 12.05 s
 a document; (d) no non-explicit years at all, explicit dates only. Evidence: section 4 rows. Recommendation: (a) at 8 GB
 and up, adding (c) at 16 GB once item 8.1 shows its quotes improve the year [I]; (d) is the user's switch, not the
-default. Decided as recommended (`14-owner-calls.md` section 2).
+default. Decided as recommended (`14-owner-calls.md` section 2). Item 8.1's 8B half (W46.date-route-pipeline-8b,
+2026-11-14, `date-route-pipeline.md` §"The Mac 8B as step 2"): its quotes do not improve the year. As step 2 it gains
+no document on Gemini's or the 27B's trace replies; taken as a quote source (its own date, else its one quoted year)
+it gains 1 and loses 1 on Gemini's, gains 2 and loses 1 on the 27B's (p 1.0 both), and adds one undated false year.
+So (c) is not added: the 16 GB route is (a), with no image pass, and `qwen3-vl-8b-image-mac` is not offered.
 
 7.6 **What happens to an estimate whose evidence fails.** The owner's rule forbids writing it. Whether it is offered to
 the user as an unwritten suggestion is not settled. Evidence: 45 of 131 Gemini trace-neigh replies fail the check,
@@ -387,7 +396,8 @@ Recommendation: not shown until item 8.3 fixes the checker's false refusals [I].
 originals and macOS 27.2 Vision text: steps 1, 2 and 4 with `Date Uncertain` set by class, on Gemini 3.7 and the 27B;
 report `not_in_text` redefined from the image pass, the false-year rate on the undated 90, and cost and seconds per
 1,000. Done when the combined rows replace F-1. Waits on nothing. Done for Gemini 2026-11-12 (`date-route-pipeline.md`);
-the 27B half is W46.date-route-pipeline-27b. Under step 1 as written the undated get 15.6% false years (14/90), 5.6% if
+the 27B half is W46.date-route-pipeline-27b (done 2026-11-13); the Mac 8B as step 2 is W46.date-route-pipeline-8b
+(done 2026-11-14, no gain, call 7.5). Under step 1 as written the undated get 15.6% false years (14/90), 5.6% if
 the model's own flag may add Date Uncertain to an explicit text year: owner gate W46.date-route-owner-ok.
 8.2 `W46.date-image-intext` [S, about $0.35, I]: the image pass on the 119 in-text documents; how often it changes the
 year, finds a second-role date or adds evidence. Settles 7.3. Measured inside W46.date-route-pipeline (2026-11-12): on 172
@@ -412,7 +422,8 @@ gateway tagging call's own cost per 1,000; batch prices measured, not halved by 
 ## 9. Profile test expectations
 
 - **Laptop, 16 GB, no key:** step 1 and 4 `vision-2b-chooser-t3` (47.3 not in text, 89.9 in text, over
-  `mlx-date-2b-8bit` 38.9 with no evidence); step 2 `qwen3-vl-8b-image-mac` as quote source pending 7.5.
+  `mlx-date-2b-8bit` 38.9 with no evidence); no step 2: `qwen3-vl-8b-image-mac` is not offered, its quotes adding no
+  year (7.5, W46.date-route-pipeline-8b), so the solver flags "no image pass".
 - **Laptop, 32 GB and 64 GB:** as 16 GB until item 8.4 measures the 27B on a Mac; the solver must not borrow the
   cluster rows' figures [?].
 - **Laptop, under 8 GB:** `vision-rules-t3` (48.1, 85.7); a tie with the 2B row on `not_in_text`, broken on in-text.

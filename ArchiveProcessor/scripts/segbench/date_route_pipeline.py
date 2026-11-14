@@ -33,6 +33,8 @@ date_image already read or rendered the same way are reused from their caches, n
     python3 date_route_pipeline.py export --out DIR [--remote R]   # the same requests for the 27B on Sherlock
     python3 date_route_pipeline.py pack --src DIR    # the export as a frozen Sherlock pack (sherlock/date-route-27b/)
     python3 date_route_pipeline.py collect           # the pack's returned answers -> CACHE/answers-27b.jsonl
+    python3 ops/autonomous/heavy-run.py run -- <lab venv>/bin/python date_route_pipeline.py run8b [--limit N]
+                                                     # step 2 on the Mac's Qwen3-VL 8B (MLX, $0; -pipeline-8b)
     python3 date_route_pipeline.py score             # segbench-results/date-route-pipeline.md and .json
 
 The gateway is real money on a Stanford PTA (root CLAUDE.md): spend is counted at gateway_gemini.PRICE (3.8's list
@@ -40,7 +42,9 @@ price, a ceiling) into CACHE/calls.jsonl before a reply is used; CAP bounds the 
 and W46.date-undated already made with the same prompt, body and image bytes are reused. The 27B half runs on Sherlock
 (no engine session contacts it): `export` writes the pack, and `score` adds the 27B's rows once its answers are in
 CACHE/answers-27b.jsonl. READ ONLY on the corpus and the JPEG originals; everything written stays in the private bench
-cache. Run from scripts/segbench, with numpy and PIL (~/.local/share/visionocr-ocrlab/venv) for vision.
+cache. Run from scripts/segbench, with numpy and PIL (~/.local/share/visionocr-ocrlab/venv, the lab venv) for vision,
+and mlx_vlm from the same venv for run8b. The 8B is scored as step 2 on each model's trace replies: the 16 GB laptop's
+image pass (08-dating.md call 7.5), measured beside the two step-2 readers already in.
 """
 from __future__ import annotations
 
@@ -88,6 +92,16 @@ DIRECT_MODEL = DT.MODEL                     # gemini-3.8-flash, the app's defaul
 LEDGER38 = CACHE / "calls-38.jsonl"
 CAP38 = 1.50          # the item's total; estimate about $0.55 (about 180 image replies at $0.003)
 WORST_IMAGE_38 = (6000 * DT.PRICE_IN + DU.DI_MAX * DT.PRICE_OUT) / 1e6
+# W46.date-route-pipeline-8b: step 2 on the Mac's Qwen3-VL 8B (4-bit MLX, 1,400 px, thinking off), $0. Its replies
+# to W46.date-image's requests (the same prompt and images the Gemini and 27B step-2 replies above were made from) are
+# reused, as the 27B's were.
+QWEN8 = "qwen3-vl-8b-mlx4"
+SIDE8 = 1400
+IMAGE8 = CACHE / f"image-{QWEN8}-{SIDE8}"
+CACHED_MAC8 = DI.PACK / "mac" / f"{QWEN8}-{SIDE8}"
+ON_GEMINI8 = "gemini3.7-flash-gw+8b-image"        # Gemini's trace replies, the 8B as step 2
+ON_QWEN8 = "qwen3.6-27b+8b-image"                 # the 27B's trace replies, the 8B as step 2
+BASE8 = {ON_GEMINI8: GEMINI, ON_QWEN8: QWEN}
 _lock = threading.Lock()
 
 
@@ -508,6 +522,72 @@ def cmd_run38(a):
     print(f"{sum(bool(r.get('text')) for r in res)}/{len(res)} answered, ${spent38():.4f} spent in all", flush=True)
 
 
+def mac8_dest(d):
+    return IMAGE8 / ("image|" + d["id"] + ".json")
+
+
+def mac8_image(d):
+    """The 8B's image reply for one document: this item's, else W46.date-image's for the same request."""
+    return load(mac8_dest(d)) or load(CACHED_MAC8 / ("image|" + d["id"] + ".json"))
+
+
+def cmd_run8b(a):
+    """Step 2 on the Mac's 8B: every readable document whose own text has no year candidate (either set), images
+    shrunk to SIDE8 from the same upright 2,400 px pages, date_image's prompt, its Mac arm's settings (temperature 0,
+    DI.MAX_TOKENS, thinking off). Run under the heavy lock; each reply records its seconds and the peak MLX memory."""
+    import mlx.core as mx
+    from mlx_vlm import load as mlx_load, stream_generate
+    from mlx_vlm.prompt_utils import apply_chat_template
+    from PIL import Image
+    import date_draft as DD
+    import re
+    os.environ.setdefault("HF_HOME", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/mlx-hf"))
+    todo, missing = [], 0
+    for d in targets():
+        if not readable(d) or T.candidates(doc_of(d)["text"]) or mac8_image(d) is not None:
+            continue
+        pages = [img_path(p) for p in d["pages"][:DI.PAGES]]
+        if any(p is None for p in pages):
+            missing += 1; continue
+        todo.append((d, pages))
+    if missing:
+        raise SystemExit(f"{missing} documents lack a rendered page: run `rerender` first")
+    todo = todo[: a.limit or None]
+    print(f"{QWEN8} at {SIDE8} px: {len(todo)} requests to send", flush=True)
+    if not todo:
+        return
+    small = CACHE / f"img-{SIDE8}"
+    small.mkdir(parents=True, exist_ok=True)
+    IMAGE8.mkdir(parents=True, exist_ok=True)
+    mx.set_cache_limit(256 * 2**20)
+    model, processor = mlx_load(DD.MODELS[QWEN8][0])
+    for k, (d, pages) in enumerate(todo, 1):
+        paths = []
+        for p in pages:
+            dst = small / p.name
+            if not dst.exists():
+                with Image.open(p) as im:
+                    im = im.convert("RGB")
+                    im.thumbnail((SIDE8, SIDE8), Image.Resampling.LANCZOS)
+                    im.save(dst, "JPEG", quality=90)
+            paths.append(str(dst))
+        try:
+            chat = apply_chat_template(processor, model.config, DI.PROMPT, num_images=len(paths), enable_thinking=False)
+        except TypeError:
+            chat = apply_chat_template(processor, model.config, DI.PROMPT, num_images=len(paths))
+        start, text, last = time.time(), [], None
+        for g in stream_generate(model, processor, chat, image=paths, max_tokens=DI.MAX_TOKENS, temperature=0.0):
+            text.append(g.text)
+            last = g
+        raw = re.sub(r"<think>.*?</think>", "", "".join(text), flags=re.S)
+        gen = getattr(last, "generation_tokens", 0)
+        rec = {"id": "image|" + d["id"], "text": raw, "finish": "length" if gen >= DI.MAX_TOKENS else "stop",
+               "seconds": round(time.time() - start, 2), "tokens": [getattr(last, "prompt_tokens", 0), gen],
+               "model": QWEN8, "side": SIDE8, "peak_gb": round(mx.get_peak_memory() / 2**30, 2)}
+        mac8_dest(d).write_text(json.dumps(rec, ensure_ascii=False))
+        print(f"[{k}/{len(todo)}] {rec['id']} {rec['seconds']}s {rec['tokens']} peak {rec['peak_gb']} GB", flush=True)
+
+
 # --- the 27B pack (Sherlock) ------------------------------------------------------------------------------------
 
 def cmd_export(a):
@@ -687,6 +767,8 @@ def qwen_answers():
 
 def replies(model, d):
     """(trace raw or None, image rec or None) for one document under one model."""
+    if model in BASE8:
+        return replies(BASE8[model], d)[0], mac8_image(d)
     if model == GEMINI:
         t, im = load(trace_dest(d)), load(image_dest(d))
         return (t or {}).get("text") if t else None, im
@@ -912,6 +994,67 @@ def gemini_cost():
     return out
 
 
+def quote_year(rec):
+    """The 8B as a quote source (08-dating.md call 7.5 (c), "the year by rule"): its own document year when it quoted
+    it, else the one year its quoted dates name when they name exactly one."""
+    _, own, written = DU.own_date(rec)
+    return own if own is not None else (written[0] if len(written) == 1 else None)
+
+
+def quote_source_rows(rows, ts):
+    """The 8B rows with step 2 taking quote_year: a document with no own year candidate whose 8B quotes give a year
+    gets it as an explicit image year (no Date Uncertain), ahead of a neighbour estimate, as route() orders step 2."""
+    by_id = {d["id"]: d for d in ts}
+    out = []
+    for r in rows:
+        rec = None if r["has_candidate"] else mac8_image(by_id[r["id"]])
+        qy = quote_year(rec) if rec is not None else None
+        out.append({**r, "year": qy, "du": False, "cls": "image"} if qy is not None else dict(r))
+    return out
+
+
+def mac8_summary(ts, by_model, gem_image):
+    """The 8B as step 2: against each model's own step-2 reader on the same trace replies (not in text, paired), the
+    image readers side by side on the documents step 2 runs on, and the 8B's seconds and peak memory on the Mac."""
+    out = {"against_own_reader": {}}
+    for m8, base in BASE8.items():
+        if m8 in by_model and base in by_model:
+            y = {r["id"]: r["year"] for r in by_model[m8]}
+            nit = [{**r, "y8": y[r["id"]]} for r in by_model[base] if r["set"] == "owner" and r["truth_y"] is not None
+                   and r.get("stratum") in ("on the page", "not on the page") and r["id"] in y]
+            out["against_own_reader"][m8] = paired(nit, "y8", "year")
+    out["quote_source"] = {}
+    for m8 in BASE8:
+        if m8 in by_model:
+            Q = summarise(m8, quote_source_rows(by_model[m8], ts), ts)
+            out["quote_source"][m8] = {"not_in_text": Q["not_in_text"], "step2_paired": Q["step2_paired"],
+                                       "by_class_image": Q["by_class"]["image"], "undated": Q["undated"]}
+    q = _QWEN.get("cache") or {}
+    step2 = [d for d in ts if readable(d) and not T.candidates(doc_of(d)["text"])]
+    readers = {"Gemini 3.7": lambda d: gem_image.get(d["id"]), "Qwen3.6 27B": lambda d: q.get("image|" + d["id"]),
+               "Qwen3-VL 8B": mac8_image}
+    out["own_date_found"] = {}
+    for lab, f in readers.items():
+        recs = [(d, f(d)) for d in step2]
+        recs = [(d, r) for d, r in recs if r is not None]
+        out["own_date_found"][lab] = {"n": len(recs), "found": sum(DU.own_date(r)[1] is not None for _, r in recs),
+                                      "owner_right": sum(DU.own_date(r)[1] == (d.get("truth") or {}).get("year")
+                                                         for d, r in recs if d["set"] == "owner"
+                                                         and (d.get("truth") or {}).get("year") is not None),
+                                      "owner_n": sum(1 for d, _ in recs if d["set"] == "owner"
+                                                     and (d.get("truth") or {}).get("year") is not None)}
+    new = [load(mac8_dest(d)) for d in step2]
+    new = [r for r in new if r]
+    old = [load(CACHED_MAC8 / ("image|" + d["id"] + ".json")) for d in step2]
+    old = [r for r in old if r]
+    out["time"] = {"new": len(new), "reused": len(old),
+                   "median_s_new": round(statistics.median(r["seconds"] for r in new), 2) if new else None,
+                   "median_s_reused": round(statistics.median(r["seconds"] for r in old), 2) if old else None,
+                   "peak_gb": max((r.get("peak_gb") or 0) for r in new) if new else None,
+                   "at_cap": sum(r.get("finish") == "length" for r in new + old)}
+    return out
+
+
 def per_1000(S, cost):
     """Cost and seconds per 1,000 documents of the owner's 300 mix: one trace call each, an image call where sent."""
     n = S["documents"] or 1
@@ -932,7 +1075,7 @@ def cmd_score(a):
     timing = ledger(CACHE / "timing.jsonl")
     out["vision"] = timing[-1] if timing else None
     by_model = {}
-    for model in (GEMINI, QWEN):
+    for model in (GEMINI, QWEN, ON_GEMINI8, ON_QWEN8):
         rows = score_model(model, ts, gem_image)
         if rows is None:
             continue
@@ -964,7 +1107,7 @@ def cmd_score(a):
         out["models"][model] = S
         with open(CACHE / f"rows-{model}.jsonl", "w", encoding="utf-8") as fh:
             fh.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
-    if len(by_model) == 2:          # the two routes on the same owner documents, Gemini as a, the 27B as b
+    if GEMINI in by_model and QWEN in by_model:          # the two routes on the same owner documents, Gemini as a, the 27B as b
         q = {r["id"]: r["year"] for r in by_model[QWEN]}
         both = [{**r, "qwen_year": q[r["id"]]} for r in by_model[GEMINI] if r["set"] == "owner"
                 and r["truth_y"] is not None and r["id"] in q]
@@ -972,6 +1115,8 @@ def cmd_score(a):
                                                                                                "not on the page")],
                                                       "year", "qwen_year"),
                                 "all_owner": paired(both, "year", "qwen_year")}
+    if any(m in by_model for m in BASE8):
+        out["mac8"] = mac8_summary(ts, by_model, gem_image)
     if QWEN in out["models"]:
         out["sherlock_time"] = sherlock_time(out["models"][QWEN])
     RESULTS_JSON.write_text(json.dumps(out, indent=1) + "\n")
@@ -983,7 +1128,8 @@ def cmd_score(a):
 
 # --- the report -------------------------------------------------------------------------------------------------
 
-LABELS = {GEMINI: "Gemini 3.7 Flash (gateway)", QWEN: "Qwen3.6 27B (Sherlock)"}
+LABELS = {GEMINI: "Gemini 3.7 Flash (gateway)", QWEN: "Qwen3.6 27B (Sherlock)",
+          ON_GEMINI8: "Gemini 3.7 trace, Mac 8B image", ON_QWEN8: "27B trace, Mac 8B image"}
 
 
 def pc(f):
@@ -1087,12 +1233,16 @@ def write_md(out):
           "| route | valid | unsupported | none | right years refused | wrong years accepted | valid by form |",
           "|---|---|---|---|---|---|---|"]
     for m, S in M.items():
+        if m in BASE8:          # the same trace replies as its base row: identical by construction
+            continue
         c, by = S["checker"]["counts"], S["checker"]["by"]
         forms = ", ".join(f"{k} {by[k].get('valid', 0)} ({by[k].get('wrong accepted', 0)} wrong)"
                           for k in QUOTE_CLASSES if k in by)
         L.append(f"| {LABELS[m]} | {c.get('valid', 0)} | {c.get('unsupported', 0)} | {c.get('none', 0)} | "
                  f"{c.get('right years refused', 0)} | {c.get('wrong years accepted', 0)} | {forms} |")
     for m, S in M.items():
+        if m in BASE8:
+            continue
         refused = {k: v["right refused"] for k, v in S["checker"]["by"].items() if v.get("right refused")}
         if refused:
             L.append(f"\n{LABELS[m]}, right years refused by reason: " +
@@ -1115,6 +1265,8 @@ def write_md(out):
           "| route | documents | own date found | changes the year | of them right | wrong → right | right → wrong | a stamp date found |",
           "|---|---|---|---|---|---|---|---|"]
     for m, S in M.items():
+        if m in BASE8:          # the 8B is sent only where step 2 runs
+            continue
         x = S["intext_image"]
         L.append(f"| {LABELS[m]} | {x['n']} | {x['own_date_found']} | {x['changes_year']} | {x['change_right']} | "
                  f"{x['change_wrong_to_right']} | {x['change_right_to_wrong']} | {x['stamp_dates']} |")
@@ -1134,6 +1286,7 @@ def write_md(out):
               f"in {t['trace']['wall_s']} s, image {t['image']['sent']} calls in {t['image']['wall_s']} s (the rest "
               f"reused). At the route's {t['calls']['trace']} trace and {t['calls']['image']} image calls on "
               f"{t['documents']} documents, about {t['s_doc']} GPU-s a document. No money.", ""]
+    L += mac8_md(out)
     v = out.get("vision")
     if v:
         L += [f"Vision: {v['read_now']} pages read now in {v['read_s']} s on macOS {v['os']} "
@@ -1148,18 +1301,58 @@ def write_md(out):
         "have its own photo). The strata come from the app's own Vision text and the Gemini image pass, so \"on the "
         "page\" is defined by the Gemini reader that one route uses as its step 2.",
         "every route on the same documents, the same Vision text, the same prompts and images; the step-2 effect is "
-        "paired on the same trace replies, and Gemini against the 27B on the same documents. The older step rows were on ABBYY-defined sets and corpus text and are not "
+        "paired on the same trace replies, and Gemini against the 27B on the same documents; the Mac 8B replaces only the "
+        "step-2 reader on each model's own trace replies, so its rows differ from them by step 2 alone. The older step rows were on ABBYY-defined sets and corpus text and are not "
         "compared figure for figure.",
-        "one run each (temperature 0; Gemini at reasoning low, the 27B with thinking off); the dating rerun floor is a same-year rate of 94% (85/90) between two "
+        "one run each (temperature 0; Gemini at reasoning low, the 27B and the 8B with thinking off); the dating rerun floor is a same-year rate of 94% (85/90) between two "
         "identical runs (date-undated.md), so a gap of a few points between routes is inside it. Wilson intervals on "
         "single rates; the step-2 gap and the model gap by an exact sign test on their discordant pairs.",
         "Gemini 3.7 on the gateway (3.8 on a direct key is unmeasured here); the 27B is Qwen3.6-27B-FP8 on vLLM "
         "(Sherlock batch 20261112), its 118 image replies on W46.date-image's documents reused from that run, which "
-        "used other server flags on the same model and prompt; inheritance (step 3) is not measured; "
+        "used other server flags on the same model and prompt; the Mac 8B is Qwen3-VL-8B 4-bit MLX at 1,400 px, its 54 "
+        "replies on W46.date-image's documents reused from that item's Mac arm (same prompt, pages and settings), its "
+        "quote-source variant chosen after reading its replies (in-sample); inheritance (step 3) is not measured; "
         "the checker counts are off its writing set but on one prompt; the false-year rate is a share of the "
         "collection-balanced undated sample, not a corpus rate (P3-1).")
     RESULTS.write_text(keep_card(RESULTS, "\n".join(L) + "\n"))
     print(f"-> {RESULTS}")
+
+
+def mac8_md(out):
+    X = out.get("mac8")
+    if not X:
+        return []
+    L = ["## The Mac 8B as step 2 (W46.date-route-pipeline-8b)", "",
+         "Qwen3-VL 8B, 4-bit MLX, at 1,400 px with thinking off, sent the image pass (the same prompt and pages) on every "
+         "readable document whose own text has no year candidate; its rows above keep each model's trace replies and "
+         "replace only the step-2 reader. Paired against that model's own step-2 reader on the owner's documents whose "
+         "year is not in the text:", "",
+         "| trace | with the 8B as step 2 | with its own reader | only with the 8B | only with its own | sign test p |",
+         "|---|---|---|---|---|---|"]
+    for m8, p in X["against_own_reader"].items():
+        L.append(f"| {LABELS[BASE8[m8]]} | {p['a_exact']}/{p['n']} | {p['b_exact']}/{p['n']} | {p['a_only']} | "
+                 f"{p['b_only']} | {p['sign_p']} |")
+    L += ["", "The same with the 8B as a quote source, as call 7.5 (c) puts it (\"the year by rule\"): its own document "
+          "year when it quoted it, else the single year its quoted dates name; against no step 2 on the same trace "
+          "replies.", "",
+          "| trace | not in text | against no step 2: with / without, only with / only without, p | image years, exact | false years, undated |",
+          "|---|---|---|---|---|"]
+    for m8, Q in X.get("quote_source", {}).items():
+        p = Q["step2_paired"]
+        L.append(f"| {LABELS[BASE8[m8]]} | {pc(Q['not_in_text'])} | {p['a_exact']} / {p['b_exact']}, {p['a_only']} / "
+                 f"{p['b_only']}, p {p['sign_p']} | {Q['by_class_image']['n']}, {pc(Q['by_class_image']['exact'])} | "
+                 f"{pc(Q['undated']['false_year'])} |")
+    L += ["", "The three image readers on the documents step 2 runs on (both sets): how often each names a document "
+          "date written in a date it quoted, and on the owner's documents how often that year is the owner's.", "",
+          "| reader | replies | own date found | owner's year, owner documents |", "|---|---|---|---|"]
+    for lab, f in X["own_date_found"].items():
+        L.append(f"| {lab} | {f['n']} | {f['found']} | {f['owner_right']}/{f['owner_n']} |")
+    t = X["time"]
+    L += ["", f"Time on the Mac: {t['new']} replies made now, median {t['median_s_new']} s each, peak MLX memory "
+          f"{t['peak_gb']} GB; {t['reused']} reused from W46.date-image's Mac arm (median {t['median_s_reused']} s "
+          f"there); {t['at_cap']} replies stopped at the {DI.MAX_TOKENS}-token cap. Measured inside an engine session, "
+          "whose processes run at background priority, so the seconds are a ceiling. No money.", ""]
+    return L
 
 
 def findings(out):
@@ -1204,7 +1397,7 @@ def findings(out):
             "dates for the sidecar). Sending it everywhere would cost the image call on every document.",
             f"- **Cost and time:** about ${cost['usd']:.2f} per 1,000 documents of the owner's mix at 3.8's list price "
             f"as a ceiling, and {cost['seconds'] / 1000:.1f} s of calls a document in sequence (one trace call each, the "
-            f"image pass on {100 * cost['image_share']:.0f}% of them)."] + findings_27b(out) + [""]
+            f"image pass on {100 * cost['image_share']:.0f}% of them)."] + findings_27b(out) + findings_8b(out) + [""]
 
 
 def findings_27b(out):
@@ -1229,6 +1422,33 @@ def findings_27b(out):
             f"{pc(S['du_vs_owner']['uncertain_unflagged'])}."]
 
 
+def findings_8b(out):
+    """The Mac 8B as step 2, once its replies are scored."""
+    X, M = out.get("mac8"), out["models"]
+    if not X:
+        return []
+    L = []
+    for m8, base in BASE8.items():
+        if m8 not in M:
+            continue
+        s, p = M[m8]["step2_paired"], X["against_own_reader"].get(m8)
+        L.append(f"{LABELS[base].split(' (')[0]}'s trace: {pc(M[m8]['not_in_text'])} not in text with the 8B as step 2 "
+                 f"against {pc(M[base]['not_in_text'])} with its own reader ({p['a_only']} right only with the 8B, "
+                 f"{p['b_only']} only with its own, p {p['sign_p']}); against no step 2, {s['a_exact']} against "
+                 f"{s['b_exact']} ({s['a_only']} / {s['b_only']}, p {s['sign_p']}); undated false years "
+                 f"{pc(M[m8]['undated']['false_year'])}")
+    for m8, Q in X.get("quote_source", {}).items():
+        p = Q["step2_paired"]
+        L.append(f"as a quote source on {LABELS[BASE8[m8]].split(' (')[0]}'s trace {p['a_exact']} against "
+                 f"{p['b_exact']} without step 2 ({p['a_only']} / {p['b_only']}, p {p['sign_p']}), undated false years "
+                 f"{pc(Q['undated']['false_year'])}")
+    f, t = X["own_date_found"].get("Qwen3-VL 8B", {}), X["time"]
+    return [f"- **The Mac 8B as step 2 (W46.date-route-pipeline-8b):** " + "; ".join(L) +
+            f". On the documents step 2 runs on it names an own date on {f.get('found')} of {f.get('n')}, the owner's "
+            f"year on {f.get('owner_right')} of {f.get('owner_n')} owner documents; median {t['median_s_new']} s a "
+            f"reply on the Mac (a ceiling), peak {t['peak_gb']} GB, $0."]
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1236,6 +1456,7 @@ def main():
     v = sub.add_parser("vision"); v.add_argument("--limit", type=int, default=0)
     r = sub.add_parser("run"); r.add_argument("--limit", type=int, default=0)
     r = sub.add_parser("run38"); r.add_argument("--limit", type=int, default=0)
+    r = sub.add_parser("run8b"); r.add_argument("--limit", type=int, default=0)
     sub.add_parser("rerender")
     sub.add_parser("check")
     e = sub.add_parser("export"); e.add_argument("--out", required=True)
@@ -1244,7 +1465,7 @@ def main():
     sub.add_parser("collect")
     sub.add_parser("score")
     a = ap.parse_args()
-    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "run38": cmd_run38, "rerender": cmd_rerender, "check": cmd_check, "export": cmd_export, "pack": cmd_pack,
+    {"sample": cmd_sample, "vision": cmd_vision, "run": cmd_run, "run38": cmd_run38, "run8b": cmd_run8b, "rerender": cmd_rerender, "check": cmd_check, "export": cmd_export, "pack": cmd_pack,
      "collect": cmd_collect, "score": cmd_score}[a.cmd](a)
 
 

@@ -594,7 +594,6 @@ now takes the rule table as its source.
 
 
 
-- [ ] **`W46.date-route-pipeline-8b` — the restated dating route with the Mac's Qwen3-VL 8B image pass [S]** (lane: segbench) (uses: light,model:10) (blocked-on: W46.date-route-pipeline-27b) — filed by W46.date-route-image-routes, 2026-11-13. Call 7.5 adds the 8B image pass at 16 GB only once its quotes are shown to improve the year. Run `date_route_pipeline.py`'s step 2 with the 8B (4-bit MLX, 1,400 px, under the heavy lock) on the same Vision-defined sets, $0, and score it beside Gemini 3.7's and the 27B's rows; its combined row goes in `13-stage-rules/08-dating.md` section 4. If the 27B's quotes do not improve the year, record that the 8B (the weaker reader) is not run and close this as not needed.
 
 
 - [ ] **`W46.ent-local-shipped-prompt` — the entity prompt on the Mac and cluster models over Vision text [S-M]** (lane: segbench) (uses: light,machine) (cluster: sherlock) — Qwen3-VL 8B on the Mac and Qwen3.6 27B on the cluster, the entity prompt over the 138's Vision text, with seconds a document and peak memory; today's Mac and cluster entity figures are the old prompt on ABBYY text (`ent-truth-owner.md`), so the rows are provisional until this lands. Notes and the size review: `execution-plans/items/W46.ent-local-shipped-prompt.md`.

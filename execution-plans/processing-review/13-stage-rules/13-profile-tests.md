@@ -37,7 +37,8 @@ until names are ranked.
 - Segmentation (note 07 §9): `seg-qwen3.5-2b-8bit` (79.7% pages exact unchecked, 78.8 checks per 100 pages, 4.4 GB
   peak), zero-shot card and the manuscript warning; review by its own level (no partner).
 - Dating (note 08 §9): steps 1 and 4 `vision-2b-chooser-t3` (47.3 not in text, 89.9 in text), every propagated year
-  Date Uncertain with its source document; step 2 `qwen3-vl-8b-image-mac` pending item 8.1.
+  Date Uncertain with its source document; no step 2 (`qwen3-vl-8b-image-mac` is not offered: its quotes add no year,
+  W46.date-route-pipeline-8b).
 - Entities (note 09 §9, owner call 11): nothing unless names are ranked; when ranked, `qwen3-vl-8b-mac` on typed and
   printed correspondence over Vision text, sender hidden; `none` on handwriting and non-correspondence.
 - Placement (note 05): Vision's own lines on print; on handwriting kraken blla lines with alignment, gate 0.67, text

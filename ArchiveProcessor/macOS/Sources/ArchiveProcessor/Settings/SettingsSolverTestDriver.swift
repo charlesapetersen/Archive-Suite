@@ -93,7 +93,8 @@ enum SettingsSolverTestDriver {
         eq("B1 segmentation: the 2B", pick(b1, "segmentation"), "seg-qwen3.5-2b-8bit")
         eq("B1 dating step 1: the Vision 2B chooser", pick(b1, "dating", "step 1"), "vision-2b-chooser-t3")
         eq("B1 dating step 4: the Vision 2B chooser", pick(b1, "dating", "step 4"), "vision-2b-chooser-t3")
-        skip("B1 dating step 2 qwen3-vl-8b-image-mac", "pending item 8.1 (08-dating.md §8)")
+        eq("B1 dating step 2: no image pass (the 8B's quotes add no year, W46.date-route-pipeline-8b)",
+           pick(b1, "dating", "step 2"), "flag: no image pass; the document goes on to step 4")
         eq("B1 names ranked: typed correspondence the 8B", pick(b1, "entities", "correspondence-typed"), "qwen3-vl-8b-mac")
         eq("B1 names ranked: none on handwriting from Vision text", pick(b1, "entities", "correspondence-handwritten"), "none")
         eq("B1 names: none on non-correspondence", pick(b1, "entities", "non-correspondence"), "none")

@@ -16116,3 +16116,23 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   warnings. Bench cache: nothing written;
   the chain clones were made and deleted by the harness.
   <!-- /W40.fix-reader-quality-popups -->
+- [x] **W46.date-route-pipeline-8b — the restated dating route with the Mac's Qwen3-VL 8B image pass [S]** · §Document processing review — W46 · SHIPPED 2026-11-14
+  (lane: segbench). Filed by W46.date-route-image-routes. Run, not closed unrun: the 27B's image step went 4 up and 0
+  down and Gemini's 5 and 0 (9 and 0 pooled, p about 0.004), so the image step does help on those readers, and the 8B
+  costs $0. `date_route_pipeline.py run8b` (heavy lock, lab venv) sent the image pass to Qwen3-VL 8B 4-bit MLX at
+  1,400 px, thinking off, on the 115 readable documents with no own year candidate: 61 new replies (median 8.32 s, peak
+  6.62 GB, measured in an engine session so a ceiling) and 54 reused from W46.date-image's Mac arm (same prompt, pages,
+  settings). `score` puts the 8B as step 2 on each model's own trace replies. Result: **its quotes do not improve the
+  year.** As step 2 it gains no document over no step 2 on either trace: Gemini's trace 52.7% (48/91) not in text
+  against 58.2% with Gemini's own reader (0 and 5, p 0.0625); the 27B's 33.0% (30/91) against 37.4% (0 and 4, p 0.125).
+  It names an own date on 3 of 115 (Gemini 23, the 27B 20). Taken as a quote source (its own date, else its single
+  quoted year; in-sample) it goes 1 up and 1 down on Gemini's trace and 2 up and 1 down on the 27B's (p 1.0), and adds
+  one undated false year. Gemini's and the 27B's figures are unchanged. In `08-dating.md`, call 7.5 records that (c) is
+  not added, so the 16 GB route is (a) with no image pass. `qwen3-vl-8b-image-mac` gains the three route figures and
+  becomes "not offered", and the item-8.1, F-1 and section-9 notes are updated, as is 13-profile-tests. The solver test's
+  B1 step-2 SKIP is now a PASS ("no image pass"). settings-routes.json, figures.json and prototype.html were rebuilt, and
+  test-settings-routes, -solver and -sheet ALL PASS on a fresh Processor Debug build (the two VisionOCRKit warnings were
+  already there). This leaves W46.date-route-image-routes with no route to add beyond the gateway. No ArchiveOCRBench
+  change, since dating is not an OCR result. Bench cache: the 1,400 px thumbnails (26 MB) went to the Trash; the 8B
+  replies (`date-route-pipeline/image-qwen3-vl-8b-mlx4-1400`, 244 KB) are kept, because a rescore reads them.
+  <!-- /W46.date-route-pipeline-8b -->
