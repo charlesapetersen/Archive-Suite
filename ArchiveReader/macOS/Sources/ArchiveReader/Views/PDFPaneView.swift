@@ -364,7 +364,20 @@ final class PDFPaneController {
     func cleanedSelection(_ options: CopyTextOptions) -> String? {
         guard let sel = pdfView?.currentSelection, let s = sel.string, !s.isEmpty else { return nil }
         guard options.paragraphFromLayout else { return CopyTextCleaner.clean(s, options: options) }
-        return CopyTextCleaner.clean(s, lines: Self.layoutLines(sel), options: options)
+        return CopyTextCleaner.clean(s, lines: Self.layoutLines(sel), pageSpacing: Self.pageSpacing(sel),
+                                     options: options)
+    }
+
+    /// The usual line spacing of each page the selection is on, from all of that page's lines: a selection
+    /// of one or two lines cannot measure its own (a double-spaced page's would read as paragraph gaps).
+    static func pageSpacing(_ selection: PDFSelection) -> [Int: CGFloat] {
+        var result: [Int: CGFloat] = [:]
+        for page in selection.pages {
+            guard let doc = page.document, let all = page.selection(for: page.bounds(for: .cropBox)),
+                  let spacing = CopyTextCleaner.lineSpacing(layoutLines(all)) else { continue }
+            result[doc.index(for: page)] = spacing
+        }
+        return result
     }
 
     /// The selection's lines with their boxes on the page, for finding the paragraph breaks the OCR left

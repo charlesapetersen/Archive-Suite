@@ -15874,3 +15874,14 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   in the document window) pass, screenshots `w40-back-forward-toolbar`/`-document` read. No new warnings. Bench
   cache: nothing written.
   <!-- /W40.reader-back-forward -->
+- [x] **W40.reader-copy-clean-two-lines — Copy Cleaned for Prose splits a two-line selection on a double-spaced page into two paragraphs [S]** · §Archive Reader — the owner's notes of 2026-11-13 (lane: reader) — owner, 2026-11-13, on Wilbur Presidency papers IMG 00391 (SC064a). SHIPPED 2026-11-13.
+  Cause: `CopyTextCleaner.structure` measured line spacing only in a block of three or more lines and fell back
+  to 1.2 em for one or two, so a double-spaced typescript (23.3 pt between 9.5 pt lines) read as a paragraph gap
+  at every line. Fix: `CopyTextCleaner.lineSpacing` measures a page's usual spacing (lower median within its
+  blocks), `PDFPaneController.pageSpacing` takes it from all of each selected page's lines, and a short block uses
+  `max(page spacing, 1.2 em)`, so a single-spaced page keeps the old rule and the extracted-text pane's stand-in
+  rows (no page spacing passed) are unchanged. Tests in `CopyTextCleanerTests`: the owner's two selections as
+  fixture geometry (one paragraph with the page's spacing, the old `\n\n` without it), a single-spaced two-line
+  selection across a blank-line gap still splits, the spacing measure, and an end-to-end PDFKit double-spaced page
+  with two of six lines selected. Whole Reader unit bundle green, no new warnings. Bench cache: nothing written.
+  <!-- /W40.reader-copy-clean-two-lines -->

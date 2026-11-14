@@ -42,12 +42,15 @@ enum CopyTextCleaner {
 
     /// From the selection's lines on the page (`lines`, in reading order), when they hold the same words as
     /// `raw`, space for space; else from the text alone. (So a repair that fused or split a word is caught here:
-    /// the final guard in `assemble` sets whitespace aside.)
-    static func clean(_ raw: String, lines: [CopyTextLine], options: CopyTextOptions = .init()) -> String {
+    /// the final guard in `assemble` sets whitespace aside.) `pageSpacing` is each page's usual line spacing
+    /// (`lineSpacing` of all its lines), for a selection of too few lines to measure its own.
+    static func clean(_ raw: String, lines: [CopyTextLine], pageSpacing: [Int: CGFloat] = [:],
+                      options: CopyTextOptions = .init()) -> String {
         guard structured(options) else { return plain(raw, options: options) }
         let rows = layoutRows(lines)
         guard !rows.isEmpty, words(rows.map(\.text).joined(separator: "\n")) == words(raw),
-              let out = assemble(structure(rows, columns: true), raw: raw, options: options)
+              let out = assemble(structure(rows, columns: true, pageSpacing: pageSpacing), raw: raw,
+                                 options: options)
         else { return clean(raw, options: options) }
         return out
     }
@@ -201,13 +204,14 @@ enum CopyTextCleaner {
     /// - a **heading** is a short line (under 60% of the block's width) that starts afresh and is followed by
     ///   a fresh start, set apart by being wholly in capitals (unless most of its block is), centred, or alone
     ///   between gaps;
-    /// - a **paragraph** starts after a gap over 1.6× the block's line spacing, at a first-line indent over
+    /// - a **paragraph** starts after a gap over 1.6× the block's line spacing (a block of one or two rows takes
+    ///   its page's, from `pageSpacing`, when that is wider than 1.2 em: a double-spaced page), at a first-line indent over
     ///   1.2 em that its neighbours do not share (a quoted block is not split line by line), or after a line
     ///   stopping well short that ends a sentence (over a quarter of the width short after `.`, `!`, `?` or `:`,
     ///   or over half short unless it ends in a comma or hyphen; typed pages are ragged, so short alone is not).
     /// A line that continues a word hyphenated at the end of the line before never starts anything. A new
     /// block continues the unit before it only when its first line starts lower case.
-    static func structure(_ rows: [CopyTextLine], columns: Bool) -> [Unit] {
+    static func structure(_ rows: [CopyTextLine], columns: Bool, pageSpacing: [Int: CGFloat] = [:]) -> [Unit] {
         var units: [Unit] = []
         var open: [OpenItem] = []          // the list items open, outermost first
         var continuation: CGFloat?         // x of the current item's continuation lines
@@ -225,7 +229,7 @@ enum CopyTextCleaner {
             let em = max(median(ls.map(\.box.height)), 0.001)
             let spacings = zip(ls, ls.dropFirst()).map { $0.box.midY - $1.box.midY }
             let measuredSpacing = ls.count >= 3 ? median(spacings) : 0
-            let usual = measuredSpacing > 0 ? measuredSpacing : 1.2 * em
+            let usual = measuredSpacing > 0 ? measuredSpacing : max(pageSpacing[ls[0].page] ?? 0, 1.2 * em)
             let margins = pageMargins[ls[0].page] ?? (0, 0)
             let left = ls.count >= 3 ? percentile(ls.map(\.box.minX), 0.25) : margins.left
             let right = ls.count >= 3 ? percentile(ls.map(\.box.maxX), 0.8) : margins.right
@@ -364,6 +368,16 @@ enum CopyTextCleaner {
             }
         }
         return nil
+    }
+
+    /// The usual spacing between lines of `lines` (all of one page's, in reading order): the lower median of
+    /// the spacings within its blocks, so paragraph gaps and column changes do not count. Nil under two lines.
+    static func lineSpacing(_ lines: [CopyTextLine]) -> CGFloat? {
+        let rows = layoutRows(lines)
+        let spacings = blocks(rows, columns: true).flatMap { b in
+            zip(b, b.dropFirst()).map { rows[$0].box.midY - rows[$1].box.midY }
+        }
+        return spacings.isEmpty ? nil : median(spacings)
     }
 
     /// Splits `rows` into runs on one page (and, with `columns`, in one column): a new run starts on a new

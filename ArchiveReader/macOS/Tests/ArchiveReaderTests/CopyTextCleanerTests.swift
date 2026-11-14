@@ -106,6 +106,46 @@ final class CopyTextCleanerTests: XCTestCase {
                        "one line of text another line of text a third line of text\n\nafter a gap of a line and its last line")
     }
 
+    // MARK: - A short selection on a double-spaced page (W40.reader-copy-clean-two-lines)
+
+    /// A line of a double-spaced typescript, as on Wilbur Presidency papers IMG 00391 (SC064a): 9.5 pt tall,
+    /// 23.3 pt between lines. Geometry only; the words are stand-ins of the same shape.
+    private func typed(_ text: String, x: CGFloat = 0, width: CGFloat = 400, row: CGFloat) -> CopyTextLine {
+        CopyTextLine(text: text, box: CGRect(x: 72 + x, y: 700 - row * 23.3, width: width, height: 9.5), page: 0)
+    }
+
+    func testDoubleSpacedPageSpacingIsMeasuredFromItsLines() throws {
+        let page = (0..<8).map { typed("a line of the typescript page \($0)", row: CGFloat($0)) }
+            + [typed("after a paragraph gap", x: 40, width: 300, row: 9.5)]
+        XCTAssertEqual(try XCTUnwrap(CopyTextCleaner.lineSpacing(page)), 23.3, accuracy: 0.01)
+        XCTAssertNil(CopyTextCleaner.lineSpacing([typed("one line", row: 0)]))
+    }
+
+    func testTwoLineSelectionOnDoubleSpacedPageIsOneParagraph() {
+        let spacing = [0: CGFloat(23.3)]
+        // Selected from mid-line to a line's end, and from mid-line to a short last line.
+        let first = [typed("story to story, we must build according to our plans and", x: 120, width: 280, row: 0),
+                     typed("have our foundations firm and dependable.", width: 260, row: 1)]
+        let second = [typed("One of our greatest problems is to learn to depend", x: 60, width: 340, row: 0),
+                      typed("upon them.", width: 70, row: 1)]
+        for lines in [first, second] {
+            let raw = lines.map(\.text).joined(separator: "\n")
+            XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines, pageSpacing: spacing),
+                           lines.map(\.text).joined(separator: " "))
+            // Without the page's spacing, 1.2 em calls the double spacing a gap: the defect.
+            XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines), lines.map(\.text).joined(separator: "\n\n"))
+        }
+    }
+
+    func testTwoLineSelectionAcrossARealGapStillSplits() {
+        // Single-spaced (14 pt, 12 pt tall): the page's spacing is under 1.2 em, so 1.2 em stands, and a
+        // gap of a blank line is a paragraph break.
+        let lines = [line("the last line of one paragraph", row: 0), line("the first line of the next", row: 2)]
+        let raw = lines.map(\.text).joined(separator: "\n")
+        XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines, pageSpacing: [0: 14]),
+                       "the last line of one paragraph\n\nthe first line of the next")
+    }
+
     func testIndentedBlockIsNotSplitLineByLine() {
         let lines = [line("He wrote as follows", row: 0), line("to the Secretary", row: 1),
                      line("we cannot accept the", x: 40, width: 300, row: 2),
@@ -185,6 +225,39 @@ final class CopyTextCleanerTests: XCTestCase {
         XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines),
                        "The committee met on Tuesday and agreed the terms of the settlement in full.\n\n"
                        + "The second paragraph opens indented and continues to the end of the page here.")
+    }
+
+    /// End to end through PDFKit on a double-spaced page (10 pt type, 24 pt apart): two lines selected out of
+    /// six take the page's spacing from the pane and are copied as one paragraph (W40.reader-copy-clean-two-lines).
+    @MainActor
+    func testRealPDFTwoLineSelectionOnDoubleSpacedPage() throws {
+        let rows = ["The building of the University goes on", "story to story, and we must build to plans",
+                    "and have our foundations firm and sound.", "One of our greatest problems is to learn",
+                    "to depend upon them and on one another", "for the work that lies ahead of us all."]
+        let data = NSMutableData()
+        var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let ctx = CGContext(consumer: CGDataConsumer(data: data as CFMutableData)!, mediaBox: &box, nil)!
+        ctx.beginPDFPage(nil)
+        for (i, text) in rows.enumerated() {
+            let ctLine = CTLineCreateWithAttributedString(
+                NSAttributedString(string: text, attributes: [.font: NSFont(name: "Courier", size: 10)!]))
+            ctx.textPosition = CGPoint(x: 72, y: 700 - CGFloat(i) * 24)
+            CTLineDraw(ctLine, ctx)
+        }
+        ctx.endPDFPage()
+        ctx.closePDF()
+        let doc = try XCTUnwrap(PDFDocument(data: data as Data))
+        let page = try XCTUnwrap(doc.page(at: 0))
+        // The second and third lines (baselines 676 and 652).
+        let sel = try XCTUnwrap(page.selection(for: CGRect(x: 60, y: 648, width: 500, height: 38)))
+        let raw = try XCTUnwrap(sel.string)
+        let lines = PDFPaneController.layoutLines(sel)
+        XCTAssertEqual(lines.map(\.text).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) },
+                       Array(rows[1...2]))
+        let spacing = PDFPaneController.pageSpacing(sel)
+        XCTAssertEqual(try XCTUnwrap(spacing[0]), 24, accuracy: 0.5)
+        XCTAssertEqual(CopyTextCleaner.clean(raw, lines: lines, pageSpacing: spacing),
+                       rows[1] + " " + rows[2])
     }
 
     /// The Processor's text page: OCR lines typeset one per line, the long one wrapped by the layout, with
