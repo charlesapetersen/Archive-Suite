@@ -782,8 +782,10 @@ final class NavigationUITests: FixtureUITestCase {
         toolbarButton("ar.toolbar.editTags").click()
         let field = app.textFields["ar.tagEditor.sentWith"]
         // W40.fix-reader-date-fields: folded under the own date while the document has none.
-        let toggle = app.buttons["ar.tagEditor.sentWithToggle"]
+        // The DisclosureGroup folds the label Button into its disclosure triangle, which carries the identifier.
+        let toggle = app.disclosureTriangles["ar.tagEditor.sentWithToggle"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5), "the Inspector should offer a Sent-with date")
+        XCTAssertEqual(toggle.label, "Sent with a letter")
         XCTAssertFalse(field.exists, "Sent with is folded for a document without one")
         toggle.click()
         XCTAssertTrue(field.waitForExistence(timeout: 5), "the ⌘I sheet should offer a Sent-With field")

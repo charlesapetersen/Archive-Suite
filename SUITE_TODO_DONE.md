@@ -16021,3 +16021,10 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   no new warnings. VM: three runs failed before any test, the VM's package resolution reset by github.com; filed
   `W40.reader-table-reload-vm`. Bench cache: nothing written; the chain clones were made and deleted by the harness.
   <!-- /W40.fix-reader-table-apply-at-size -->
+- [x] **W40.fix-reader-sentwith-uitest — NavigationUITests.testSheetSetsAndClearsASentWithDate fails in the VM: no Sent-with toggle found** · §Archive Reader — the owner's notes of 2026-11-13 · SHIPPED 2026-11-13
+  The view was right, the query wrong: a VM run with an element dump showed the `DisclosureGroup` folds its label
+  Button into its disclosure triangle, exposed as `DisclosureTriangle` id `ar.tagEditor.sentWithToggle`, label "Sent
+  with a letter", value 0 (folded), which is what VoiceOver should see. The test now queries
+  `app.disclosureTriangles[…]` and checks the label; no app change. VM: the test passes (22.9 s). Bench cache: nothing
+  written.
+  <!-- /W40.fix-reader-sentwith-uitest -->
