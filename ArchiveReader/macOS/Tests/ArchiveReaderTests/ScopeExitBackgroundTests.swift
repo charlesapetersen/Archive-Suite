@@ -136,6 +136,53 @@ final class ScopeExitBackgroundTests: XCTestCase {
         await indexer.closeForTesting()
     }
 
+    /// The OCR search's ✕ reset the search through a task whose recompute rebuilt the list on main, after the
+    /// background build had started (found by the adversarial review).
+    func testTheOCRSearchChipBuildsOffTheMainThread() async {
+        let (model, indexer) = await makeModel()
+        model.fullTextQuery = "nothing here"
+        model.runFullTextSearch()
+        _ = await waitUntil { model.ftsPaths != nil }
+        XCTAssertEqual(model.displayed.count, 0, "precondition: the search hides every row")
+
+        ReaderStages.recorder.reset(recording: true)
+        model.removeFilter(.text)
+        await model.listPresented()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(stage("presentation.build", onMain: true), 0, "no whole-list build on the main thread")
+        XCTAssertEqual(stage("presentation.build (background)", onMain: false), 1)
+        XCTAssertEqual(model.displayed.count, 1_500)
+        XCTAssertNil(model.ftsPaths)
+        XCTAssertNotEqual(model.sort.first?.field, .relevance, "the sort is put back")
+        await indexer.closeForTesting()
+    }
+
+    /// Back's restore survives the prune of the list it waited for, and no later one: a row a filter then hides
+    /// is not selected again (found by the adversarial review; W40.fix-reader-phantom-selection).
+    func testAFilterAfterBackEndsTheRestore() async throws {
+        let (model, indexer) = await makeModel()
+        model.setFolderScope(folder(1))
+        await model.listPresented()
+        let unread = try XCTUnwrap(model.displayed.first { $0.readState == .unread }).id
+        let read = try XCTUnwrap(model.displayed.first { $0.readState == .read }).id
+        model.selection = [unread, read]
+        model.setFolderScope(folder(2))
+        await model.listPresented()
+        model.filter.read = .unread
+        model.recompute()
+
+        model.goBack()
+        await model.listPresented()
+        XCTAssertEqual(model.selection, [unread], "the listed half of the selection is put back")
+        model.filter.read = .read   // hides the restored row, lists the other
+        model.recompute()
+        XCTAssertFalse(model.selection.contains(read), "a row the restore never selected is not selected now")
+        model.filter.read = .all
+        model.recompute()
+        XCTAssertTrue(model.selection.isEmpty, "the restore ended when the filter changed the selection")
+        await indexer.closeForTesting()
+    }
+
     func testAChangeDuringTheBuildWins() async {
         let (model, indexer) = await makeModel()
         model.setFolderScope(folder(1))

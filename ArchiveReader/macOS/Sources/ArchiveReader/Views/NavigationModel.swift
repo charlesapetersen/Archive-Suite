@@ -305,8 +305,17 @@ final class NavigationModel: ObservableObject {
         // token inside runFullTextSearch() already handles superseded queries.
         $fullTextQuery
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
-            .sink { [weak self] _ in MainActor.assumeIsolated {
-                self?.runFullTextSearch()
+            .sink { [weak self] text in MainActor.assumeIsolated {
+                guard let self else { return }
+                // An empty box whose search is already reset (the ✕, Clear All, a root change) has nothing to
+                // rebuild; the reset's recompute put a whole-list build back on main after the ✕'s background one
+                // (W40.fix-reader-scope-exit-main). A search still running is dropped all the same.
+                if text.trimmingCharacters(in: .whitespaces).isEmpty, self.ftsPaths == nil, self.ftsRank == nil,
+                   !(self.sort.first?.field == .relevance && self.scopeRules?.rankingExpression == nil) {
+                    self.ftsGeneration += 1
+                    return
+                }
+                self.runFullTextSearch()
             } }
             .store(in: &cancellables)
         indexer.$failure
@@ -1102,9 +1111,13 @@ final class NavigationModel: ObservableObject {
         duplicatedNames = result.duplicatedNames
         let selectedBefore = selection
         ReaderStages.measure("model.pruneSelection") { pruneSelectionToDisplayed() }
-        // Pruning is the list's own change, not the user's: a selection being restored by Back survives it, as
-        // it must when the returned-to list arrives after the move (W40.fix-reader-scope-exit-main).
-        if pendingVisitSelection?.applied == selectedBefore { pendingVisitSelection?.applied = selection }
+        // The first list after a Back that is built off main prunes the selection of the place left, which is not
+        // the user's change: the restore survives it. Only that one: a later prune is a filter's, and a row it
+        // removed must not come back selected when the filter clears (W40.fix-reader-scope-exit-main).
+        if visitAwaitsList {
+            visitAwaitsList = false
+            if pendingVisitSelection?.applied == selectedBefore { pendingVisitSelection?.applied = selection }
+        }
         refreshSelectionCache()
         checkSelectionEnds()
         persistViewState()
@@ -1183,8 +1196,11 @@ final class NavigationModel: ObservableObject {
         case .smartFolder:
             exitScope()
         case .text:
+            // `runFullTextSearch`'s reset, without its task's main-thread recompute, which would undo the
+            // background build below (W40.fix-reader-scope-exit-main).
             fullTextQuery = ""
-            runFullTextSearch()   // the reset: bumps the generation, restores the sort
+            ftsGeneration += 1   // a search still running is dropped
+            if sort.first?.field == .relevance, scopeRules?.rankingExpression == nil { sort = LibrarySort.default }
             ftsPaths = nil; ftsRank = nil; ftsSnippets = [:]
         case .name:
             filterSearchText = ""
@@ -1907,6 +1923,8 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var placeHistory = NavigationHistory<Visit>()
     /// A return's selection still waiting for rows a smart folder's text rules have not answered yet.
     private var pendingVisitSelection: (place: Place, ids: Set<ArchiveFile.ID>, applied: Set<ArchiveFile.ID>)?
+    /// A Back or Forward whose list is still being built: its first presentation's prune is not the user's.
+    private var visitAwaitsList = false
     private var travelling = false
 
     var currentPlace: Place {
@@ -1952,6 +1970,7 @@ final class NavigationModel: ObservableObject {
         }
         travelling = false
         pendingVisitSelection = (to.place, to.selection, selection)
+        visitAwaitsList = listBuildPending
         reapplyVisitSelection()
     }
 

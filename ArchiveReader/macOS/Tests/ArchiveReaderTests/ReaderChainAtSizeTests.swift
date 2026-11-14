@@ -195,6 +195,21 @@ final class ReaderChainAtSizeTests: XCTestCase {
         }
     }
 
+    /// Leaving a smart folder by its chip, choosing a folder and choosing All Files (W40.fix-reader-scope-exit-main):
+    /// none builds the whole list on the main thread, and what main-busy is left is the table showing the new rows.
+    private func assertScopeBudget(_ runs: [String: [Chain]]) {
+        guard optimized else { return }
+        for (label, chains) in runs.sorted(by: { $0.key < $1.key }) where !chains.isEmpty {
+            let table = median(chains.map { onMain("view.table showRows (emulated)", $0) })
+            print("CH budget \(label): main-busy median \(ms(median(chains.map(\.busy)))), of it the table's showRows "
+                  + "\(ms(table)); longest stall max \(ms(chains.map(\.longest).max() ?? 0))")
+            for (k, run) in chains.enumerated() {
+                XCTAssertEqual(onMain("presentation.build", run), 0, "\(label) run \(k + 1): the whole list built on main")
+                XCTAssertNotNil(run.visible, "\(label) run \(k + 1): the change never showed")
+            }
+        }
+    }
+
     /// The file-switch budget W40.reader-scale-measure set (W40.fix-reader-viewer-switch): the next file within
     /// 100 ms main-busy with 5 open.
     private func assertViewerBudget(_ label: String, _ runs: [Chain]) {
@@ -403,6 +418,21 @@ final class ReaderChainAtSizeTests: XCTestCase {
 
         navigation.removeFilter(.smartFolder)
         _ = await waitUntil(timeout: 30) { navigation.displayed.count == navigation.library.files.count }
+
+        // ── 2c. Choosing a folder in the sidebar, then All Files (W40.fix-reader-scope-exit-main).
+        let all = navigation.library.files.count
+        let folderPath = (navigation.library.files[all / 2].path as NSString).deletingLastPathComponent
+        var scopes: [String: [Chain]] = ["chip-exit": deletes["chip-exit"] ?? []]
+        for k in 0..<3 {
+            scopes["folder", default: []].append(await measureChain("choose a folder (run \(k + 1))",
+                trigger: { navigation.setFolderScope(folderPath) },
+                visible: { navigation.filter.pathPrefix == folderPath && navigation.displayed.count < all }))
+            scopes["all-files", default: []].append(await measureChain("choose All Files (run \(k + 1))",
+                trigger: { navigation.setFolderScope(nil) },
+                visible: { navigation.filter.pathPrefix == nil && navigation.displayed.count == all }))
+        }
+        for label in ["folder", "all-files"] { summarize(label, scopes[label] ?? []) }
+        assertScopeBudget(scopes)
 
         // ── 3. Selection: an arrow key with 1 and with 500 selected, ⇧-extending by one row. Edit Info is shown,
         // the costlier case: a hidden inspector follows nothing (W40.fix-reader-selection-at-size).

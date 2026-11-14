@@ -399,8 +399,9 @@ struct AppKitTableView: NSViewRepresentable {
         func showRows(_ files: [ArchiveFile], orderGeneration: Int? = nil, keepingPlace: Bool = false) -> Bool {
             let sameOrder = orderGeneration != nil && orderGeneration == checkedOrderGeneration
                 && files.count == currentSnapshotIDs.count
-            let idsChanged = !sameOrder && (files.count != currentSnapshotIDs.count
-                || !zip(files, currentSnapshotIDs).allSatisfy { $0.id == $1 })
+            let idsChanged = !sameOrder && ReaderStages.measure("table.showRows compare") {
+                files.count != currentSnapshotIDs.count || !zip(files, currentSnapshotIDs).allSatisfy { $0.id == $1 }
+            }
             // Return writes a tag cell's tags while it is still being edited (W40.fix-reader-tag-entry), and that
             // write can move or drop rows: a sort by tags, a tag filter. A new snapshot then would reload the cell
             // under its field editor, and the cell, reused for another row, would keep this file's id and tokens,
@@ -413,7 +414,7 @@ struct AppKitTableView: NSViewRepresentable {
             rows = files
             if idsChanged {
                 let place = keepingPlace ? visiblePlace() : []
-                applySnapshot(files.map(\.id), animated: false)
+                applySnapshot(ReaderStages.measure("table.showRows ids") { files.map(\.id) }, animated: false)
                 keepPlace(place)
             }
             checkedOrderGeneration = orderGeneration
@@ -491,20 +492,24 @@ struct AppKitTableView: NSViewRepresentable {
             return rows[i]
         }
 
+        /// Each step is its own stage, so the at-size lanes show which one grows with the row count
+        /// (W40.fix-reader-scope-exit-main).
         func applySnapshot(_ ids: [ArchiveFile.ID], animated: Bool) {
-            guard ids != currentSnapshotIDs else { return }
+            guard ReaderStages.measure("table.apply compare", { ids != currentSnapshotIDs }) else { return }
             currentSnapshotIDs = ids
-            rowByID = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+            rowByID = ReaderStages.measure("table.apply rowByID") {
+                Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+            }
             var snapshot = NSDiffableDataSourceSnapshot<Int, ArchiveFile.ID>()
             snapshot.appendSections([0])
-            snapshot.appendItems(ids, toSection: 0)
+            ReaderStages.measure("table.apply snapshot") { snapshot.appendItems(ids, toSection: 0) }
             // A selection change the apply itself reports is the table shifting or trimming row
             // indices, not the user choosing rows; written back it would retarget the model's selection
             // to whatever rows slid under the old indices. The caller re-pushes the model's selection
             // afterwards (`W40.fix-reader-phantom-selection`).
             isUpdatingSelection = true
             defer { isUpdatingSelection = false }
-            dataSource?.apply(snapshot, animatingDifferences: animated)
+            ReaderStages.measure("table.apply dataSource") { dataSource?.apply(snapshot, animatingDifferences: animated) }
         }
 
         func syncSelection(_ sel: Set<ArchiveFile.ID>) {
