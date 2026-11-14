@@ -160,7 +160,7 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
   `Space`) fire only when the list has key focus (text-field-safe); `\` writes tags, so a bare key firing in a
   text field is an unintended tag write. All read-state mutation goes through `mark(.read)` → `TagWriter`
   (undoable).
-- The nav list is an AppKit `NSTableView` (diffable, 150 ms-debounced filter, off the keystroke path); don't
+- The nav list is an AppKit `NSTableView` (plain data source + reload, not diffable: W40.fix-reader-table-apply-at-size; 150 ms-debounced filter, off the keystroke path); don't
   return to SwiftUI `Table`, which janked at 40k.
 - The display calendar (W24.cal1-reader) is display only — sort, filter and tags keep ISO.
 - **Dates are edited only in the ⌥⌘I Inspector**, the one date editor (owner, 2026-10-12); no inline date editing

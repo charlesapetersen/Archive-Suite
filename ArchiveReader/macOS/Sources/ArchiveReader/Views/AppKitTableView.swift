@@ -6,7 +6,7 @@ import ArchiveCoreUI
 // MARK: - NSViewRepresentable bridge
 
 /// A high-performance AppKit `NSTableView` wrapped for SwiftUI. Replaces the SwiftUI `Table` for
-/// the navigation window: virtualized rows (cell reuse), incremental diffable-data-source apply,
+/// the navigation window: virtualized rows (cell reuse), a reload that asks only for the rows on screen,
 /// and AppKit-native column-header sorting. The data model (`NavigationModel.displayed`) and tag
 /// mutations (`NavigationModel`) are unchanged — this is a VIEW-layer swap only.
 struct AppKitTableView: NSViewRepresentable {
@@ -168,24 +168,13 @@ struct AppKitTableView: NSViewRepresentable {
         scrollView.onScrollWheel = tableView.onUserInput
         coordinator.columnFitter = Self.fitColumns(of: tableView)
 
-        let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
-            coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
-        }
-        // Header-click sorting: `sortDescriptorsDidChange` is an NSTableViewDataSource callback, so it
-        // must live on the DATA SOURCE (the diffable source is the real dataSource) — not the coordinator,
-        // which is only the table's delegate — or header clicks never reach the model. The subclass
-        // forwards it to the coordinator here.
-        dataSource.onSortDescriptorsChange = { [weak coordinator] descriptors in
-            coordinator?.applyHeaderSort(descriptors)
-        }
-        dataSource.rowViewProvider = { [weak coordinator] tv, _, itemID in
-            coordinator?.makeRowView(tableView: tv, itemID: itemID.base as? ArchiveFile.ID) ?? ListRowView()
-        }
-        coordinator.dataSource = dataSource
+        // The coordinator is both data source and delegate: the rows are `currentSnapshotIDs`, and cells and row
+        // views come from the delegate (W40.fix-reader-table-apply-at-size).
+        tableView.dataSource = coordinator
         tableView.delegate = coordinator
         tableView.sortDescriptors = sortDescriptorsFromModel()
 
-        coordinator.showRows(model.displayed)
+        coordinator.showRows(model.displayed, rowIndex: model.displayedRowIndex)
         coordinator.syncSelection(selection)
 
         return scrollView
@@ -230,7 +219,7 @@ struct AppKitTableView: NSViewRepresentable {
                 && model.lastRebuildGeneration <= coordinator.lastDisplayedGeneration
             coordinator.lastDisplayedGeneration = gen
             if coordinator.showRows(model.displayed, orderGeneration: model.displayedOrderGeneration,
-                                    keepingPlace: onlyPatched) {
+                                    keepingPlace: onlyPatched, rowIndex: model.displayedRowIndex) {
                 rowsChanged = true
             } else {
                 // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
@@ -317,10 +306,9 @@ struct AppKitTableView: NSViewRepresentable {
     // MARK: - Coordinator
 
     @MainActor
-    final class Coordinator: NSObject, NSTableViewDelegate, NSTokenFieldDelegate {
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTokenFieldDelegate {
         var parent: AppKitTableView
         weak var tableView: NSTableView?
-        var dataSource: NSTableViewDiffableDataSource<Int, ArchiveFile.ID>?
         var currentFontSize: CGFloat = 13
         var currentMarkerColours = ItemTypeColors.none
         var lastPushedSelection: Set<ArchiveFile.ID> = []
@@ -396,7 +384,9 @@ struct AppKitTableView: NSViewRepresentable {
         /// last checked at, the rows were only replaced in place, so comparing every id (79 ms at 116k rows,
         /// W40.reader-scale-measure) is skipped. nil always compares. `keepingPlace`: rows left or came in a list
         /// that kept its order, and the rows that stay keep their place on screen (`keepPlace`).
-        func showRows(_ files: [ArchiveFile], orderGeneration: Int? = nil, keepingPlace: Bool = false) -> Bool {
+        /// `rowIndex` is `files`' index by id, if one was made with them (`NavigationModel.displayedRowIndex`).
+        func showRows(_ files: [ArchiveFile], orderGeneration: Int? = nil, keepingPlace: Bool = false,
+                      rowIndex: [ArchiveFile.ID: Int]? = nil) -> Bool {
             let sameOrder = orderGeneration != nil && orderGeneration == checkedOrderGeneration
                 && files.count == currentSnapshotIDs.count
             let idsChanged = !sameOrder && ReaderStages.measure("table.showRows compare") {
@@ -414,7 +404,7 @@ struct AppKitTableView: NSViewRepresentable {
             rows = files
             if idsChanged {
                 let place = keepingPlace ? visiblePlace() : []
-                applySnapshot(ReaderStages.measure("table.showRows ids") { files.map(\.id) }, animated: false)
+                applySnapshot(ReaderStages.measure("table.showRows ids") { files.map(\.id) }, rowIndex: rowIndex)
                 keepPlace(place)
             }
             checkedOrderGeneration = orderGeneration
@@ -494,22 +484,42 @@ struct AppKitTableView: NSViewRepresentable {
 
         /// Each step is its own stage, so the at-size lanes show which one grows with the row count
         /// (W40.fix-reader-scope-exit-main).
-        func applySnapshot(_ ids: [ArchiveFile.ID], animated: Bool) {
+        ///
+        /// The table reloads: it asks only for the rows it shows. A diffable data source, which this replaced
+        /// (W40.fix-reader-table-apply-at-size), copied and hashed every id into its snapshot and diffed it
+        /// against the last one, ~350 ms at 116k rows on top of the reload, for an apply that was never
+        /// animated: the rows that stay are found again by id (`rowByID`, `keepPlace`, `syncSelection`).
+        /// `rowIndex`: `ids`' index, when the model's background build made it (`displayedRowIndex`).
+        func applySnapshot(_ ids: [ArchiveFile.ID], rowIndex: [ArchiveFile.ID: Int]? = nil) {
             guard ReaderStages.measure("table.apply compare", { ids != currentSnapshotIDs }) else { return }
             currentSnapshotIDs = ids
-            rowByID = ReaderStages.measure("table.apply rowByID") {
-                Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
-            }
-            var snapshot = NSDiffableDataSourceSnapshot<Int, ArchiveFile.ID>()
-            snapshot.appendSections([0])
-            ReaderStages.measure("table.apply snapshot") { snapshot.appendItems(ids, toSection: 0) }
-            // A selection change the apply itself reports is the table shifting or trimming row
-            // indices, not the user choosing rows; written back it would retarget the model's selection
-            // to whatever rows slid under the old indices. The caller re-pushes the model's selection
+            rowByID = rowIndex ?? ReaderStages.measure("table.apply rowByID") { ArchiveFile.rowIndex(ids) }
+            // A selection change the reload itself reports is the table trimming row indices past the new
+            // end, not the user choosing rows; written back it would retarget the model's selection to
+            // whatever rows now sit under the old indices. The caller re-pushes the model's selection
             // afterwards (`W40.fix-reader-phantom-selection`).
             isUpdatingSelection = true
             defer { isUpdatingSelection = false }
-            ReaderStages.measure("table.apply dataSource") { dataSource?.apply(snapshot, animatingDifferences: animated) }
+            ReaderStages.measure("table.apply reload") { tableView?.reloadData() }
+        }
+
+        // MARK: Data source
+
+        func numberOfRows(in tableView: NSTableView) -> Int { currentSnapshotIDs.count }
+
+        func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+            applyHeaderSort(tableView.sortDescriptors)
+        }
+
+        func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+            guard let tableColumn, row < currentSnapshotIDs.count else { return nil }
+            return ReaderStages.measure("table.makeCell") {
+                makeCell(tableView: tableView, column: tableColumn, itemID: currentSnapshotIDs[row])
+            }
+        }
+
+        func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+            makeRowView(tableView: tableView, itemID: row < currentSnapshotIDs.count ? currentSnapshotIDs[row] : nil)
         }
 
         func syncSelection(_ sel: Set<ArchiveFile.ID>) {
@@ -567,7 +577,7 @@ struct AppKitTableView: NSViewRepresentable {
             return file(for: id)?.path == path
         }
 
-        /// The diffable data source's row view provider: the table asks it, not the delegate.
+        /// The row view for `itemID`'s row (`tableView(_:rowViewForRow:)`).
         func makeRowView(tableView: NSTableView, itemID: ArchiveFile.ID?) -> NSTableRowView {
             let rowView = tableView.makeView(withIdentifier: ListRowView.reuseID, owner: nil) as? ListRowView ?? ListRowView()
             rowView.identifier = ListRowView.reuseID
@@ -942,8 +952,8 @@ struct AppKitTableView: NSViewRepresentable {
                                            otherEnd: otherEnd.map { currentSnapshotIDs[$0] })
         }
 
-        /// Applies a header-click sort to the model. Invoked from `SortableDiffableDataSource`'s forwarded
-        /// `sortDescriptorsDidChange` (that callback must live on the data source, not the delegate). The
+        /// Applies a header-click sort to the model. Invoked from the coordinator's data-source
+        /// `sortDescriptorsDidChange` (that callback is the data source's, not the delegate's). The
         /// `isSortingFromModel` guard stops the model→table push (updateNSView) from feeding back.
         func applyHeaderSort(_ descriptors: [NSSortDescriptor]) {
             guard !isSortingFromModel else { return }
@@ -1055,30 +1065,13 @@ struct AppKitTableView: NSViewRepresentable {
             rowsWaitingForEdit = false
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.editingItemID == nil, let tableView = self.tableView else { return }
-                if self.showRows(self.parent.model.displayed) {
+                if self.showRows(self.parent.model.displayed, rowIndex: self.parent.model.displayedRowIndex) {
                     self.syncSelection(self.parent.selection)
                 } else {
                     tableView.reloadData()
                 }
             }
         }
-    }
-}
-
-// MARK: - Sortable diffable data source
-
-/// `NSTableViewDiffableDataSource` does not forward `sortDescriptorsDidChange` (an NSTableViewDataSource
-/// callback), and since the diffable source IS the table's `dataSource`, a header-click sort would be
-/// dropped. This subclass implements the callback and forwards it to `onSortDescriptorsChange`.
-@MainActor
-final class SortableDiffableDataSource: NSTableViewDiffableDataSource<Int, ArchiveFile.ID> {
-    var onSortDescriptorsChange: (([NSSortDescriptor]) -> Void)?
-    // `@objc` is REQUIRED: this OPTIONAL NSTableViewDataSource method is added on a SUBCLASS (the
-    // protocol conformance is inherited from NSTableViewDiffableDataSource), so Swift does NOT auto-infer
-    // @objc for it. Without @objc the Obj-C runtime's `respondsToSelector:` returns false and AppKit never
-    // calls it — which left header-click sorting dead even though the method existed.
-    @objc func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
-        onSortDescriptorsChange?(tableView.sortDescriptors)
     }
 }
 
@@ -1768,8 +1761,7 @@ final class ContextMenuTableView: NSTableView {
             selectRowIndexes(IndexSet(integer: clickedRow), byExtendingSelection: false)
         }
 
-        guard let ds = dataSource as? NSTableViewDiffableDataSource<Int, ArchiveFile.ID> else { return nil }
-        let allIDs = ds.snapshot().itemIdentifiers(inSection: 0)
+        guard let allIDs = (dataSource as? AppKitTableView.Coordinator)?.currentSnapshotIDs else { return nil }
         var selIDs = Set<ArchiveFile.ID>()
         for i in selectedRowIndexes {
             if i < allIDs.count { selIDs.insert(allIDs[i]) }

@@ -259,11 +259,7 @@ final class SelectionCurrentTests: XCTestCase {
         let coordinator = AppKitTableView.Coordinator(AppKitTableView(
             model: model, selection: Binding(get: { model.selection }, set: { model.selection = $0 }), fontSize: 13,
             scrollRequest: 0, scrollTargetID: nil, onDoubleClick: {}, buildContextMenu: { _ in nil }))
-        let dataSource = SortableDiffableDataSource(tableView: table) { tv, column, _, id in
-            coordinator.makeCell(tableView: tv, column: column, itemID: id)
-        }
-        dataSource.rowViewProvider = { tv, _, id in coordinator.makeRowView(tableView: tv, itemID: id.base as? ArchiveFile.ID) }
-        coordinator.dataSource = dataSource
+        table.dataSource = coordinator
         coordinator.tableView = table
         table.delegate = coordinator
         coordinator.showRows(model.displayed)

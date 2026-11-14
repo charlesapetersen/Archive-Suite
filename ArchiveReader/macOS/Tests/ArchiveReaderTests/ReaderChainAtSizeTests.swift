@@ -597,13 +597,17 @@ final class MainThreadMeter: @unchecked Sendable {
 
 /// What the library window's mounted views run after a publish, once per main-queue turn as SwiftUI would:
 /// the inspector's `libraryFiles(atPaths:)` over the selection (`TagEditorView`), the table's `showRows` on a
-/// new `displayed` and `syncSelection` on a new selection.
+/// new `displayed` and `syncSelection` on a new selection. The table is in a window, never shown, and lays out after
+/// each change as the window's display cycle would: a reload makes the visible rows' cells there, not in `showRows`
+/// (W40.fix-reader-table-apply-at-size).
 @MainActor
 final class ViewEmulation {
     private let navigation: NavigationModel
     private var cancellable: AnyCancellable?
     private var pending = false
     private let coordinator: AppKitTableView.Coordinator
+    private let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1_200, height: 800), styleMask: [.titled],
+                                  backing: .buffered, defer: false)
     private let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 1_200, height: 800))
     private var shownGeneration = -1
     private var shownSelection = Set<URL>()
@@ -612,6 +616,8 @@ final class ViewEmulation {
         self.navigation = navigation
         let tableView = NSTableView(frame: scrollView.bounds)
         scrollView.documentView = tableView
+        window.isReleasedWhenClosed = false
+        window.contentView = scrollView
         tableView.usesAutomaticRowHeights = true
         tableView.rowHeight = max(20, 13 * 1.8)
         for column in AppKitTableView.columnDefinitions {
@@ -624,10 +630,7 @@ final class ViewEmulation {
             onDoubleClick: {}, buildContextMenu: { _ in nil }))
         coordinator.tableView = tableView
         let coordinator = coordinator
-        let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, _, itemID in
-            coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
-        }
-        coordinator.dataSource = dataSource
+        tableView.dataSource = coordinator
         tableView.delegate = coordinator
     }
 
@@ -640,7 +643,7 @@ final class ViewEmulation {
         } }
     }
 
-    func detach() { cancellable = nil }
+    func detach() { cancellable = nil; window.close() }
 
     private func render() {
         pending = false
@@ -651,14 +654,20 @@ final class ViewEmulation {
         }
         if navigation.displayedGeneration != shownGeneration {
             shownGeneration = navigation.displayedGeneration
-            ReaderStages.measure("view.table showRows (emulated)") { _ = coordinator.showRows(navigation.displayed,
-                                                                                    orderGeneration: navigation.displayedOrderGeneration) }
+            ReaderStages.measure("view.table showRows (emulated)") {
+                _ = coordinator.showRows(navigation.displayed, orderGeneration: navigation.displayedOrderGeneration,
+                                         rowIndex: navigation.displayedRowIndex)
+            }
         }
         if navigation.selection != shownSelection {
             shownSelection = navigation.selection
             ReaderStages.measure("view.table syncSelection (emulated)") { coordinator.syncSelection(shownSelection) }
             // The preview's image prefetch asks for the rows around a single selection on each change.
             ReaderStages.measure("view.prefetch paths (emulated)") { _ = navigation.previewPrefetchPaths(neighbours: true) }
+        }
+        ReaderStages.measure("view.table layout (emulated)") {
+            window.contentView?.layoutSubtreeIfNeeded()
+            window.displayIfNeeded()
         }
     }
 }

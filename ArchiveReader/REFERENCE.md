@@ -544,8 +544,9 @@ Views/
                               publishes content-index classification for read-only nav-row provenance.
   NavigationWindowView.swift  Results Table (customizable columns), filter bar, sidebar+tag-cloud panels,
                               toolbar, context menus, sheets, header-click sort, focus shortcuts, FlowLayout.
-  AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (NSTableViewDiffableDataSource):
-                              virtualized rows, incremental snapshot apply, 150ms-debounced filter;
+  AppKitTableView.swift       NSViewRepresentable over NSScrollView+NSTableView (the Coordinator is the
+                              data source; a new list reloads, and the model's background build makes
+                              the id→row index): virtualized rows, 150ms-debounced filter;
                               the Quality-column popup is the per-file Quality editor;
                               the Read column's ReadStateCellView is the per-file read-state editor (a
                               click, made on release inside the cell, switches Unread↔Read once the

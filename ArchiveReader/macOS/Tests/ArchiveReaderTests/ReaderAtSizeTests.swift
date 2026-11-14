@@ -520,10 +520,7 @@ final class ReaderAtSizeTests: XCTestCase {
             model: navigation, selection: .constant([]), fontSize: 13, scrollRequest: 0, scrollTargetID: nil,
             onDoubleClick: {}, buildContextMenu: { _ in nil }))
         coordinator.tableView = tableView
-        let dataSource = SortableDiffableDataSource(tableView: tableView) { tv, column, row, itemID in
-            coordinator.makeCell(tableView: tv, column: column, itemID: itemID)
-        }
-        coordinator.dataSource = dataSource
+        tableView.dataSource = coordinator
         tableView.delegate = coordinator
 
         // `updateNSView`'s per-generation work: rebuild the id→row map, map the ids, compare with the
@@ -534,9 +531,9 @@ final class ReaderAtSizeTests: XCTestCase {
         let perChange = repeated(3) { XCTAssertFalse(coordinator.showRows(navigation.displayed)) }
         print("D7 table per-change refresh (ids unchanged, e.g. a tag edit) median \(ms(perChange.median)) max \(ms(perChange.max))")
         let reversed = Array(ids.reversed())
-        let (_, resort) = time { coordinator.applySnapshot(reversed, animated: false) }
+        let (_, resort) = time { coordinator.applySnapshot(reversed) }
         print("D7 table re-sorted snapshot (every row moves) \(ms(resort))")
-        coordinator.applySnapshot(ids, animated: false)
+        coordinator.applySnapshot(ids)
         let lastID = ids.last!
         let selection = repeated { coordinator.syncSelection([lastID]) }
         print("D7 table syncSelection one row median \(ms(selection.median)) max \(ms(selection.max)) (looks up the selected ids)")

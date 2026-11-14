@@ -113,6 +113,13 @@ struct ArchiveFile: Identifiable, Sendable {
     /// then keeps their byte-distinct spellings separate in table diffing and selection.
     var id: URL { url }
 
+    /// Each id's row; the first wins if one is listed twice. One hash per row, last to first.
+    static func rowIndex(_ ids: [ID]) -> [ID: Int] {
+        var index = [ID: Int](minimumCapacity: ids.count)
+        for row in ids.indices.reversed() { index.updateValue(row, forKey: ids[row]) }
+        return index
+    }
+
     var sortDate: Int? { tags.sortDate }
     var dateIsAmbiguous: Bool { !dateAmbiguities.isEmpty }
 

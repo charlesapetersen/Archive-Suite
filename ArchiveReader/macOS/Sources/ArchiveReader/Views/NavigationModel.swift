@@ -153,6 +153,13 @@ final class NavigationModel: ObservableObject {
     /// replaced in place (a tag change, W40.fix-reader-change-incremental). The table skips its comparison
     /// of every row id while this stands.
     private(set) var displayedOrderGeneration: Int = 0
+    /// Each displayed row's index by id, when the background build made it with the list; the table takes it
+    /// instead of hashing every id on the main thread (~60 ms at 116k rows, W40.fix-reader-table-apply-at-size).
+    /// Nil once `displayedOrderGeneration` moves on: rows that only changed in place keep their index.
+    var displayedRowIndex: [ArchiveFile.ID: Int]? {
+        prebuiltRowIndex?.order == displayedOrderGeneration ? prebuiltRowIndex?.index : nil
+    }
+    private var prebuiltRowIndex: (index: [ArchiveFile.ID: Int], order: Int)?
     @Published private(set) var selectedFilesCache: [ArchiveFile] = [] { didSet { followSelectionInInspector() } }
     @Published private(set) var allSubjectsCache: [String] = []
     @Published private(set) var folderTree: FolderNode?   // sidebar file tree, derived from paths
@@ -1072,11 +1079,15 @@ final class NavigationModel: ObservableObject {
         presentedFilesRevision = nil
         listBuildPending = true
         listBuild = Task { [weak self] in
-            let result = await Task.detached(priority: .userInitiated) {
-                ReaderStages.measure("presentation.build (background)") { input.build() }
+            let (result, rowIndex) = await Task.detached(priority: .userInitiated) {
+                let result = ReaderStages.measure("presentation.build (background)") { input.build() }
+                let rowIndex = ReaderStages.measure("presentation.rowIndex (background)") {
+                    ArchiveFile.rowIndex(result.displayed.map(\.id))
+                }
+                return (result, rowIndex)
             }.value
             guard let self, self.viewRevision == view, self.library.filesRevision == filesRevision else { return }
-            self.present(result, marks: input.marks, filesRevision: filesRevision)
+            self.present(result, marks: input.marks, filesRevision: filesRevision, rowIndex: rowIndex)
         }
     }
 
@@ -1096,7 +1107,8 @@ final class NavigationModel: ObservableObject {
     /// set starts where the list stands (W40.fix-reader-change-incremental).
     private var presentedFilesRevision: UInt64?
 
-    private func present(_ result: LibraryPresentation, marks: SortMarks, filesRevision: UInt64) {
+    private func present(_ result: LibraryPresentation, marks: SortMarks, filesRevision: UInt64,
+                         rowIndex: [ArchiveFile.ID: Int]? = nil) {
         presentedFilesRevision = filesRevision
         listBuildPending = false
         if result.ambiguousCount != ambiguousDateCount { ambiguousDateCount = result.ambiguousCount }
@@ -1107,6 +1119,7 @@ final class NavigationModel: ObservableObject {
         displayedGeneration += 1
         lastRebuildGeneration = displayedGeneration
         displayedOrderGeneration += 1
+        prebuiltRowIndex = rowIndex.map { ($0, displayedOrderGeneration) }
         _tagCloudCache = nil
         duplicatedNames = result.duplicatedNames
         let selectedBefore = selection
