@@ -40,6 +40,8 @@ The compression functional checks pass, but the broader suites have existing fai
 the solver chooses Qwen (`W46.ent-profile-e-solver`, baseline 9a79dd98). Headless script/VM sampler teardown with
 TERM blocked is queued as `W40.processor-test-term-mask` / `W40.vm-sampler-term-mask`. Exact evidence:
 `verification/evidence/processor/W42.int-s5-compress-verification.md`.
+The full Processor VM lane also has an empty saved-result assertion in the unchanged manual-date UI test
+(`W40.processor-manual-date-result-vm`); the searchable-page controls pass both alone and in that lane.
 
 ## ⚠️ LIMITATION (W42.int-s5-hands, 2026-11-13): what the hand placer does not yet do
 
