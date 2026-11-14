@@ -132,6 +132,33 @@ expect 1 'a PDFDocument.write on a function parameter fails (W9.e3)' 'PlantedPar
 expect 1 'a PDFDocument.write on a closure parameter fails (W9.e3)' 'PlantedParameterPDFWrite.swift:6:'
 
 fresh_tree
+cat >> "$SCRATCH/$SRC/OCR/PDFGenerator.swift" <<'SWIFT'
+
+extension PDFGenerator {
+    static func plantedArchivalWrite(_ document: PDFDocument, _ outputURL: URL) throws {
+        try Self.writeArchival(document, to: outputURL)
+    }
+}
+SWIFT
+expect 1 'a third writeArchival call inside PDFGenerator fails (W42.int-s5)' 'PDFGenerator.writeArchival outside'
+
+fresh_tree
+mkdir -p "$SCRATCH/$SRC/OCR"
+cat > "$SCRATCH/$SRC/OCR/PlantedArchivalWrite.swift" <<'SWIFT'
+import PDFKit
+func plantedArchivalWriteElsewhere(_ document: PDFDocument, _ outputURL: URL) throws {
+    try PDFGenerator.writeArchival(
+        document, to: outputURL)
+}
+SWIFT
+expect 1 'a writeArchival call in a new source file fails (W42.int-s5)' 'PlantedArchivalWrite.swift:3:'
+
+fresh_tree
+/usr/bin/perl -0pi -e 's/try Self\.writeArchival\(merged, to: outputURL\)/try Self.writeArchival(merged, to: mergedURL)/' \
+  "$SCRATCH/$SRC/OCR/PDFGenerator.swift"
+expect 2 'a changed audited writeArchival line is stale and flagged as a new site' 'STALE write allowance'
+
+fresh_tree
 mv "$SCRATCH/$SRC" "$SCRATCH/macOS/Sources/ArchiveProcessorMoved"
 expect 1 'a missing source root fails instead of passing vacuously' 'source root is missing'
 

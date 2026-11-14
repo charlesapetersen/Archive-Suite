@@ -3,8 +3,10 @@
 #
 # Processor's `MacOSTagger` is deliberately only a fresh-write adapter over ArchiveCore's audited
 # `CoordinatedTagWriter`; a direct setResourceValue/setxattr call here would bypass its coordinated
-# read/verify path. PDF output is likewise centralised in PDFGenerator: its two exact write sites are
+# read/verify path. PDF output is likewise centralised in PDFGenerator: its two exact output sites are
 # reviewed because later callers decide whether a source may be retired. This lint makes both boundaries loud.
+# Since W42.int-s5 those sites call `PDFGenerator.writeArchival` (the PDF/A-2b writer), so no `PDFDocument.write`
+# is allowed anywhere, and a `writeArchival` call is allowed only on the two audited lines.
 #
 # Run before Processor commits. It and its scratch-only mutation proof are health-gate steps, so this is a
 # backstop rather than a promise someone has to remember. `PROCESSOR_LINT_ROOT` is test-only and must point at
@@ -19,8 +21,9 @@ SEP=$'\x1f'
 # rule<SEP>relative path<SEP>exact trimmed source line. Never allow a whole file: an added PDF write in
 # PDFGenerator must be re-audited just as surely as one in a new source file.
 ALLOW=(
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}guard pdfDocument.write(to: outputURL) else {"
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}guard merged.write(to: outputURL) else { throw PDFError.writeFailed }"
+  # W42.int-s5: the processed output and the merged document, both through the PDF/A-2b writer.
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(merged, to: outputURL)"
   # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
   # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
   "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"
@@ -57,7 +60,7 @@ for allowed in "${ALLOW[@]}"; do
   allowed_path="${allowed#*"$SEP"}"; allowed_path="${allowed_path%%"$SEP"*}"
   allowed_line="${allowed##*"$SEP"}"
   if [ ! -f "$allowed_path" ] || ! grep -qF -- "$allowed_line" "$allowed_path"; then
-    echo "✗ STALE PDF-write allowance — this audited write no longer exists as written"
+    echo "✗ STALE write allowance — this audited write no longer exists as written"
     echo "    $allowed_path"
     echo "    $allowed_line"
     no
@@ -132,14 +135,24 @@ pdf_document_write_hits() {
   done < <(find "$SRC" -name '*.swift' -type f -print0)
 }
 
+# Every call of the PDF/A output writer, its definition and comment lines aside. A new caller is a new PDF
+# output site and must be audited (and allowed by its exact line) like the two above.
+archival_write_hits() {
+  grep -rnE '\bwriteArchival[[:space:]]*\(' "$SRC" --include='*.swift' 2>/dev/null \
+    | /usr/bin/perl -ne 'next if /^[^:]+:\d+:\s*(?:\/\/|\/\*|\*)/; next if /\bfunc\s+writeArchival\b/; print' || true
+}
+
 scan_stream tagwrite \
   'direct Finder-tag write API in Processor source (use ArchiveCore.CoordinatedTagWriter through MacOSTagger):' \
   < <(tag_write_hits)
 scan_stream pdfwrite \
-  'PDFDocument.write outside the two audited PDFGenerator output sites (or an allowed line changed):' \
+  'PDFDocument.write in Processor source (PDF output goes through PDFGenerator.writeArchival):' \
   < <(pdf_document_write_hits)
+scan_stream pdfwrite \
+  'PDFGenerator.writeArchival outside the two audited PDFGenerator output sites (or an allowed line changed):' \
+  < <(archival_write_hits)
 
 if [ "$FAIL" -eq 0 ]; then
-  echo "✓ Processor write-surface lint clean ($SRC; direct tag writes forbidden; ${#ALLOW[@]} PDF output writes audited)"
+  echo "✓ Processor write-surface lint clean ($SRC; direct tag writes forbidden; ${#ALLOW[@]} audited write lines)"
 fi
 exit "$FAIL"
