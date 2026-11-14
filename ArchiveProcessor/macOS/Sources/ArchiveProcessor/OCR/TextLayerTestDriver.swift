@@ -150,6 +150,9 @@ enum TextLayerTestDriver {
             check("3 \(name): no text on the image page", s.isEmpty, String(s.prefix(60)))
             if options == nil {
                 lines.append("SIZE jpeg plain \(size(out)) bytes")
+                if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                    try? FileManager.default.copyItem(at: out, to: URL(fileURLWithPath: keep).appendingPathComponent("plain.pdf"))
+                }
                 let source = (try? Data(contentsOf: jpeg)) ?? Data()
                 lines.append("NOTE plain output embeds the source JPEG's bytes: \(doc.page(at: 0).map(jpegStreams)?.contains(source) == true)")
             }
