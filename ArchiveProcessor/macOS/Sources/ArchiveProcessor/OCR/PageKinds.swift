@@ -51,9 +51,10 @@ enum PageKindName: String, CaseIterable, Codable, Sendable {
     }
 
     /// The model guide's kind whose pick reads this kind (`OCRPageGuidance`, which has rows for the classifier's four
-    /// only). Print for newspapers and clippings until the layout stage gives them their own route
-    /// (`W46.layout-newspapers`); a mixed page goes to the handwritten pick (`kind-classifier.md` §1); a register is
-    /// read as a form, as the settings layer reads it (`SettingsResolver.answers`).
+    /// only). Print for newspapers and an unclassified clipping until the layout stage gives them their own route
+    /// (`W46.layout-newspapers`). A tagged clipping keeps its classifier hand (`PageKind.routingKind`); a mixed page
+    /// goes to the handwritten pick (`kind-classifier.md` §1); a register is read as a form, as the settings layer
+    /// reads it (`SettingsResolver.answers`).
     var routingKind: PageKindName {
         switch self {
         case .handwritten, .typewritten, .printed, .forms: return self
@@ -67,8 +68,9 @@ enum PageKindName: String, CaseIterable, Codable, Sendable {
     var mixKind: PageKindName { routingKind }
 
     /// The PDF header's `Kind:` (`SPEC/tag-format.md`), which keeps the four kinds the readers are ranked by: a
-    /// newspaper or a clipping is print. nil for mixed pages and registers, which say nothing of the writing, so the
-    /// line stays absent rather than guessed (as `PDFGenerator` leaves an unknown kind out).
+    /// newspaper or unclassified clipping is print (tagged clippings use `PageKind.headerKind`). nil for mixed pages
+    /// and registers, which say nothing of the writing, so the line stays absent rather than guessed (as
+    /// `PDFGenerator` leaves an unknown kind out).
     var headerKind: OCRPageKind? {
         switch self {
         case .handwritten: return .handwritten
@@ -81,13 +83,14 @@ enum PageKindName: String, CaseIterable, Codable, Sendable {
 
     /// The kind a source file's Finder tags give it, the corpus's own labels: Handwritten, Clippings and Statistics
     /// (1,304 Statistics, 1,140 Clippings and 286 Handwritten among the corpus photographs' tags). Statistics are
-    /// tables, so forms. Matched without case; a tag's colour suffix (`Name\n6`) is ignored. Handwritten wins over
-    /// Clippings over Statistics when a file holds several: the hand is what defeats the readers.
+    /// tables, so forms. Matched without case; a tag's colour suffix (`Name\n6`) is ignored. Clippings wins so its
+    /// layout identity survives other tags; Handwritten then wins over Statistics for an unsure classifier call.
+    /// These labels do not establish confidence or override a sure classifier's reading kind.
     static func fromFinderTags(_ tags: [String]) -> PageKindName? {
         let names = Set(tags.map { ($0.split(separator: "\n").first.map(String.init) ?? $0)
             .trimmingCharacters(in: .whitespaces).lowercased() })
-        if names.contains("handwritten") { return .handwritten }
         if names.contains("clippings") || names.contains("clipping") { return .clippings }
+        if names.contains("handwritten") { return .handwritten }
         if names.contains("statistics") { return .forms }
         return nil
     }
@@ -109,38 +112,53 @@ struct PageKind: Codable, Sendable, Equatable {
     }
 
     let kind: PageKindName
-    /// The classifier's probability for its call; 1 for a Finder tag (the owner's label: it passes the 0.8 gate
-    /// whatever the classifier thought) or the newspaper call.
+    /// The classifier's probability, retained when a tag contributes a kind; 1 for the newspaper rule.
     let confidence: Double
+    /// A tagged clipping keeps its layout kind, but is read and labelled in the PDF by the classifier's hand.
+    let readingKind: PageKindName?
     var source: Source = .classifier
     var photographed = false
 
-    init(kind: PageKindName, confidence: Double, source: Source = .classifier, photographed: Bool = false) {
+    init(kind: PageKindName, confidence: Double, source: Source = .classifier, photographed: Bool = false,
+         readingKind: PageKindName? = nil) {
         self.kind = kind
         self.confidence = confidence
+        self.readingKind = readingKind
         self.source = source
         self.photographed = photographed
     }
 
-    private enum CodingKeys: String, CodingKey { case kind, confidence, source, photographed }
+    private enum CodingKeys: String, CodingKey { case kind, confidence, source, photographed, readingKind }
 
     /// A run record written before the source and the photographed axis decodes as the classifier's, not scanned.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = try c.decode(PageKindName.self, forKey: .kind)
         confidence = try c.decode(Double.self, forKey: .confidence)
+        readingKind = try c.decodeIfPresent(PageKindName.self, forKey: .readingKind)
         source = try c.decodeIfPresent(Source.self, forKey: .source) ?? .classifier
         photographed = try c.decodeIfPresent(Bool.self, forKey: .photographed) ?? false
     }
 
-    /// The one rule that puts the signals together. A Finder tag corrects everything (the owner's label); then the
-    /// newspaper call (`EnginePageKind.readNewspaper`; the classifier has no newspaper class and calls one printed);
-    /// then the classifier. `classified` nil (no weights, an older macOS, an unreadable image) gives nil whatever else
-    /// is known, so a page keeps the run's model when the weights fail to load, as the rule note requires.
+    /// The guide's kind and the PDF's four-kind header, independent of a clipping's layout identity.
+    var routingKind: PageKindName { (readingKind ?? kind).routingKind }
+    var headerKind: OCRPageKind? { (readingKind ?? kind).headerKind }
+
+    /// Owner, 2026-11-13 walkthrough (c): the classifier picks the reader. Clippings marks the layout kind only;
+    /// Handwritten and Statistics break an unsure call, without lifting its probability over the routing floor.
+    /// Otherwise the newspaper rule then the classifier stand. No classifier (missing weights, an older macOS,
+    /// unreadable image) still gives no kind, whatever the tags, so the run keeps its model.
     static func detect(classified: PageKind?, newspaper: Bool, tags: [String], photographed: Bool) -> PageKind? {
         guard let classified else { return nil }
         if let tagged = PageKindName.fromFinderTags(tags) {
-            return PageKind(kind: tagged, confidence: 1, source: .finderTag, photographed: photographed)
+            if tagged == .clippings {
+                return PageKind(kind: .clippings, confidence: classified.confidence, source: .finderTag,
+                                photographed: photographed, readingKind: classified.kind)
+            }
+            if classified.confidence < PageKindRouting.minimumConfidence {
+                return PageKind(kind: tagged, confidence: classified.confidence, source: .finderTag,
+                                photographed: photographed)
+            }
         }
         if newspaper {
             return PageKind(kind: .newspapers, confidence: 1, source: .layout, photographed: photographed)

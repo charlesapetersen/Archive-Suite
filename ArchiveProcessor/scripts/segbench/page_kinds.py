@@ -43,7 +43,7 @@ NEWSBENCH = [Path.home() / 'Claude/Long term storage/FarmShare-20261019/ocr/imag
 OWNER_SUPPLIED = Path.home() / '.local/state/visionocr-autonomous/owner-supplied'
 APP = APP_DIR / 'macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor'
 KINDS = ['handwritten', 'typewritten', 'printed', 'forms', 'newspapers', 'clippings', 'registers', 'mixed']
-# PageKindName.routingKind: the model guide's kind whose pick reads each kind.
+# PageKindName.routingKind defaults; a tagged clipping's reader/header is carried separately by PageKind.
 ROUTING = {'handwritten': 'handwritten', 'typewritten': 'typewritten', 'printed': 'printed', 'forms': 'forms',
            'newspapers': 'printed', 'clippings': 'printed', 'registers': 'forms', 'mixed': 'handwritten'}
 
@@ -161,7 +161,7 @@ def cmd_run(out=CACHE):
 
 
 CALL_COLS = ['id', 'call', 'source', 'confidence', 'classifier', 'lines', 'wideW', 'photographed', 'untagged',
-             'seconds', 'engine_newspaper']
+             'seconds', 'engine_newspaper', 'routing', 'untagged_routing', 'header', 'classifier_confidence']
 
 
 def calls(path):
@@ -169,6 +169,8 @@ def calls(path):
     for line in open(path, encoding='utf-8'):
         f = line.rstrip('\n').split('\t')
         if f and f[0]:
+            if len(f) > 2 and len(f) != len(CALL_COLS):
+                sys.exit(f'{path}: stale or malformed call rows; rerun page_kinds.py run before scoring')
             out[f[0]] = dict(zip(CALL_COLS, f)) if len(f) > 2 else {'id': f[0], 'call': 'unread'}
     return out
 
@@ -195,10 +197,13 @@ def score_owner(truth, got):
         ok = {'mixed': {'mixed', 'handwritten'}}.get(k, {k})
         with_tags = Counter(got.get(r['id'], {}).get('call', 'missing') for r in rows)
         untagged = Counter(got.get(r['id'], {}).get('untagged', 'missing') for r in rows)
-        # Routed right: the call's pick is the true kind's (a clipping call on a printed page reaches print's pick).
-        routes = lambda c: sum(v for kk, v in c.items() if ROUTING.get(kk) == ROUTING[k])
+        # Reader identity comes from the app, separately from its semantic kind (clippings may have any hand).
+        routes = sum(got.get(r['id'], {}).get('routing') == ROUTING[k] for r in rows)
+        bare_routes = sum(got.get(r['id'], {}).get('untagged_routing') == ROUTING[k] for r in rows)
+        gated_routes = sum(got.get(r['id'], {}).get('routing') == ROUTING[k]
+                           and float(got[r['id']]['confidence']) >= 0.8 for r in rows)
         per[k] = {'n': len(rows), 'right': sum(with_tags[c] for c in ok), 'right_untagged': sum(untagged[c] for c in ok),
-                  'routed': routes(with_tags), 'routed_untagged': routes(untagged),
+                  'routed': routes, 'routed_untagged': bare_routes, 'routed_above_floor': gated_routes,
                   'calls': dict(with_tags.most_common())}
     tagged = [r for r in truth if r['tags'] and any(t in r['tags'].split('; ') for t in
                                                     ('Handwritten', 'Clippings', 'Statistics'))]
@@ -209,7 +214,13 @@ def score_owner(truth, got):
                       if got.get(r['id'], {}).get('source') == 'finder_tag'
                       and got.get(r['id'], {}).get('call') != got.get(r['id'], {}).get('untagged'))
     secs = sorted(float(g['seconds']) for g in got.values() if g.get('seconds'))
+    # The seven reader mismatches recorded by W42.int-s3 before the owner's 2026-11-13 tag-precedence call.
+    baseline = json.loads((RESULTS / 'page-kinds.json').read_text())['owner']['tag_precedence']['baseline']
+    corrected = [r['id'] for r in baseline if got.get(r['id'], {}).get('routing') == r['truth_routing']]
+    above_floor = [r['id'] for r in baseline if r['id'] in corrected and float(got[r['id']]['confidence']) >= 0.8]
     return {'per_kind': per, 'n': len(truth), 'tagged_pages': len(tagged), 'sources': dict(sources),
+            'tag_precedence': {'baseline': baseline, 'corrected': corrected, 'above_floor': above_floor},
+            'below_floor': sum(float(got.get(r['id'], {}).get('confidence', 0)) < 0.8 for r in truth),
             'photographed': photographed, 'newspaper_calls': newspaper_false,
             'tag_changed': {f'{a} -> {b}': v for (a, b), v in changed.most_common()},
             'engine_newspaper': sum(1 for r in truth if got.get(r['id'], {}).get('engine_newspaper') == '1'),
@@ -265,16 +276,16 @@ def cmd_report():
     s = scores(CACHE / 'calls-owner.tsv', CACHE / 'calls-newspaper.tsv')
     missing = [l for l in (CACHE / 'newspaper-missing.txt').read_text().split() if l]
     s['newspaper']['not_found'] = missing
-    s['measured'] = 'W42.int-s3, 2026-11-13, M3 Pro 18 GB, macOS 27.2'
+    s['measured'] = 'W42.int-s3-tag-precedence, 2026-11-15, M3 Pro 18 GB, macOS 27.2'
     (RESULTS / 'page-kinds.json').write_text(json.dumps(s, indent=1, sort_keys=True) + '\n')
     o, n = s['owner'], s['newspaper']
     L = ['# Page kinds: the app\'s one list, measured per kind (W42.int-s3)', '',
          'The Processor\'s page-kind call (`OCR/PageKinds.swift`, `PageKind.detect`) on two truth sets, run through the '
          'app itself (`OCRPageKindTestDriver` §11) by `scripts/segbench/page_kinds.py`. The call puts three signals '
-         'together: a Finder tag (Handwritten, Clippings, Statistics) corrects everything; then a whole newspaper '
-         'page told by the shape of Vision\'s lines (VisionOCRKit\'s ocr-newspaper-detect rule); then the bundled '
-         'classifier. Photographed is a second axis, from the engine\'s page-kinds-three rule. Clippings, registers '
-         'and mixed pages are not detected: they come from a tag or the collection interview.', '',
+         'together: a Clippings tag marks the layout kind but keeps the classifier\'s reader, header kind and confidence; '
+         'Handwritten and Statistics change only calls below 0.8, without raising confidence; otherwise the whole newspaper '
+         'rule (VisionOCRKit\'s ocr-newspaper-detect) then the classifier stand. Authority: owner walkthrough 2026-11-13, option (c). '
+         'Photographed is a second axis. Clippings come from a tag or the interview; registers and mixed pages are asked.', '',
          '## Owner\'s labelled pages', '',
          f'{o["n"]} pages: kind_classifier.py\'s 144 labelled originals. A form is a page labelled a form or table, '
          'whatever its hand; mixed pages count right when they reach the handwritten pick.', '',
@@ -291,13 +302,19 @@ def cmd_report():
     routed = sum(v['routed'] for v in o['per_kind'].values())
     routed_u = sum(v['routed_untagged'] for v in o['per_kind'].values())
     L += ['', f'All: {tot} of {o["n"]} right with the tags ({lo}-{hi}%, Wilson), {tot_u} with none; {routed} reach their '
-          f'kind\'s pick with the tags, {routed_u} with none. Pages a Finder tag decided: '
-          f'{o["sources"].get("finder_tag", 0)} ({o["tagged_pages"]} by the truth set\'s record of the original\'s tags, '
-          f'the rest the held-out hand pages\' own). Where a tag changed the call (label -> call): '
+          f'kind\'s pick with the tags, {routed_u} with none (routing identity, before the 0.8 floor). Pages whose kind comes from a Finder tag: '
+          f'{o["sources"].get("finder_tag", 0)}. The truth record supplies kind tags on {o["tagged_pages"]} originals; '
+          'other source images may also carry their own tags. Where a tag changed the call (label -> call): '
           + ', '.join(f'{k} {v}' for k, v in o['tag_changed'].items()) + '. '
           f'Pages called a newspaper: {o["newspaper_calls"]} (the engine\'s reading called {o["engine_newspaper"]}, '
           f'on a page the classifier did not call printed, so it was not read for it). Called photographed: '
           f'{o["photographed"]}. Unread or no kind: {o["unread"]}.', '',
+          f'Of the seven pages tags previously sent to a different reader than their label, '
+          f'{len(o["tag_precedence"]["corrected"])} now reach the label\'s reader identity; '
+          f'{len(o["tag_precedence"]["above_floor"])} also clear the 0.8 routing floor. '
+          f'Across all 144, {sum(v["routed_above_floor"] for v in o["per_kind"].values())} '
+          f'reach their label\'s pick above the floor; {o["below_floor"]} keep the run\'s model as unsure. '
+          'A clipping remains clippings for layout and sidecars even when its reader and PDF Kind are typed, handwritten or forms.', '',
           '## Vision OCR\'s newspaper truth pages', '',
           f'{n["n"]} of the 152 pages of `PAGE-KIND-2026-10-12.tsv` found on this Mac'
           + (f' ({len(missing)} not found: {", ".join(missing)})' if missing else '') + '. A whole newspaper page should be '
@@ -333,7 +350,7 @@ def cmd_report():
           'photographed axis is reported, not scored (no truth for it here). Tags were not checked against the hand '
           'labels beyond these pages.', '',
           'Pinned by `scripts/test-ocr-page-kind.sh` (when the caches are on the Mac): a fresh run may not get fewer '
-          'pages right per kind than this file\'s json.', '']
+          'pages right or routed to their label\'s reader per kind than this file\'s json; above-floor routing is pinned too.', '']
     (RESULTS / 'page-kinds.md').write_text('\n'.join(L))
     print('\n'.join(L))
 
@@ -344,11 +361,18 @@ def cmd_pin(owner_calls, news_calls):
     bad = []
     for part in ('owner', 'newspaper'):
         for k, v in pinned[part]['per_kind'].items():
-            got = fresh[part]['per_kind'].get(k, {}).get('right', 0)
-            if got < v['right']:
-                bad.append(f'{part} {k}: {got} right, pinned {v["right"]} of {v["n"]}')
-            else:
-                print(f'PIN {part} {k}: {got} of {v["n"]} right (pinned {v["right"]})')
+            for metric in ('right', 'routed', 'routed_above_floor'):
+                if metric not in v:
+                    continue
+                got = fresh[part]['per_kind'].get(k, {}).get(metric, 0)
+                if got < v[metric]:
+                    bad.append(f'{part} {k}: {got} {metric}, pinned {v[metric]} of {v["n"]}')
+                else:
+                    print(f'PIN {part} {k}: {got} {metric} of {v["n"]} (pinned {v[metric]})')
+    for metric in ('corrected', 'above_floor'):
+        for pid in pinned['owner']['tag_precedence'][metric]:
+            if pid not in fresh['owner']['tag_precedence'][metric]:
+                bad.append(f'owner {pid}: prior tag-caused reader mismatch returned ({metric})')
     if bad:
         print('PIN FAILED: ' + '; '.join(bad))
         sys.exit(1)

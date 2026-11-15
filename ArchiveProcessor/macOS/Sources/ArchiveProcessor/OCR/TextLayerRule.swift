@@ -104,8 +104,8 @@ enum TextLayerRule {
         }
     }
 
-    /// The kind `PDFGenerator` writes in the header, as a `PageKindName`: the person's choice, else the classifier's
-    /// stored call, else an imported kind.
+    /// The layout kind: the person's choice, else the stored call, else an imported kind. A tagged clipping stays
+    /// clippings here even when its classifier hand supplies a different PDF header Kind.
     static func kind(explicit: OCRPageKind?, result: OCRResult) -> PageKindName? {
         if let explicit { return PageKindName(rawValue: explicit.rawValue) }
         if let stored = result.pageReader?.kind.flatMap(PageKindName.init(rawValue:)) { return stored }

@@ -37,8 +37,12 @@ the Mac reader about 140 times Vision's time on typed pages (25.5 s against 0.17
   the corrected truth (`ocr-hands-rescore.json`, OCR-1). The settings build replaces it with 04's rows. A page whose
   top class is under 0.8 keeps the run's model [M, K-kinds §5 citing W41.app-page-kind]. No low-resolution flag: neither image size nor text height catches the pages that fall [M,
   `kind-classifier.md` §6]. Mixed pages have no class: the learned rows count them as handwriting [M, `kind-classifier.md`
-  §1], so a mixed page goes to the handwritten pick. Clippings and newspapers take their kind from layout, not hand
-  (`03-layout.md`) [I, K-kinds §6.1].
+  §1], so a mixed page goes to the handwritten pick. A Clippings Finder tag marks the clipping kind for the interview,
+  layout and sidecar, while its reader and PDF `Kind:` follow the classifier's hand, including a form call. Handwritten
+  and Statistics tags count only below 0.8 and retain the classifier's confidence, so they do not pass the routing
+  floor. Clippings wins when tags coexist; otherwise Handwritten precedes Statistics. No classifier call still means
+  no kind and the run's reader. The newspaper rule and the untagged path stand unchanged. This replaces Phase 4's
+  tag-corrects-everything rule [owner walkthrough 2026-11-13, option (c); W42.int-s3-tag-precedence].
 - Kind routing is worth most on cheap routes: on the 96, routing by the true kinds reads 97.26 against 96.47 for the best
   single reader, and by our classifier 96.26 [M, `kind-classifier.md` §4]. On R4 and R5 the solver may show kind routing
   as worth under a point [I, K-kinds §5].
@@ -182,3 +186,12 @@ ocr-page-guidance.json; ArchiveOCRBench/difficulty.md §4, 5 and rule; OCRCascad
 headers; SUITE_TODO.md (W46.mixed-route-setting, W46.review-phase4, W46.marks-detect-own); SUITE_TODO_DONE.md entries for
 W46.vision-27-swap, W46.kind-mixed-support, W46.ocr-96-vision-filter, W46.hands-owner-pages, W46.marks-two-pass; for the
 2026-11-06 edits, `ocr-hands-rescore.json`, `04-reading.md`, `14-owner-calls.md`.
+
+## Owner's call (2026-11-13): Finder-tag precedence
+
+Option (c): the classifier picks the reader. The original photographs' Handwritten, Clippings and Statistics tags
+are the owner's own labels, not app output. Clippings supplies a layout identity, while Statistics and Handwritten
+only break an unsure classifier call and never raise its confidence to 0.8. A tagged clipping's classifier hand is
+carried separately through the frozen reader plan and run record, so its PDF header keeps the same four-kind
+vocabulary the Reader parses. The re-measure and seven prior reader mismatches are in
+`ArchiveProcessor/segbench-results/page-kinds.md`; this is in-sample evidence, not a new classifier benchmark.

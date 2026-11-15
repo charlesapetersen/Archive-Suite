@@ -1,5 +1,5 @@
 {
- "measured": "W42.int-s3, 2026-11-13, M3 Pro 18 GB, macOS 27.2",
+ "measured": "W42.int-s3-tag-precedence, 2026-11-15, M3 Pro 18 GB, macOS 27.2",
  "newspaper": {
   "by_set": {
    "outside": {
@@ -45,14 +45,15 @@
    }
   },
   "photographed": 1,
-  "read_seconds_max": 13.75,
-  "read_seconds_median": 1.26,
+  "read_seconds_max": 14.71,
+  "read_seconds_median": 1.23,
   "wrong": [
    "nb14",
    "xn01"
   ]
  },
  "owner": {
+  "below_floor": 0,
   "engine_newspaper": 1,
   "n": 144,
   "newspaper_calls": 0,
@@ -65,7 +66,8 @@
     "n": 14,
     "right": 13,
     "right_untagged": 14,
-    "routed": 13,
+    "routed": 14,
+    "routed_above_floor": 14,
     "routed_untagged": 14
    },
    "handwritten": {
@@ -76,6 +78,7 @@
     "right": 34,
     "right_untagged": 34,
     "routed": 34,
+    "routed_above_floor": 34,
     "routed_untagged": 34
    },
    "mixed": {
@@ -86,45 +89,101 @@
     "right": 2,
     "right_untagged": 2,
     "routed": 2,
+    "routed_above_floor": 2,
     "routed_untagged": 2
    },
    "printed": {
     "calls": {
      "clippings": 10,
-     "forms": 3,
-     "printed": 18
+     "printed": 21
     },
     "n": 31,
-    "right": 18,
+    "right": 21,
     "right_untagged": 31,
-    "routed": 28,
+    "routed": 31,
+    "routed_above_floor": 31,
     "routed_untagged": 31
    },
    "typewritten": {
     "calls": {
      "clippings": 2,
-     "forms": 1,
-     "typewritten": 60
+     "typewritten": 61
     },
     "n": 63,
-    "right": 60,
+    "right": 61,
     "right_untagged": 63,
-    "routed": 60,
+    "routed": 63,
+    "routed_above_floor": 63,
     "routed_untagged": 63
    }
   },
   "photographed": 117,
-  "read_seconds_median": 1.65,
+  "read_seconds_median": 1.55,
   "sources": {
-   "classifier": 99,
-   "finder_tag": 45
+   "classifier": 131,
+   "finder_tag": 13
   },
   "tag_changed": {
    "forms -> clippings": 1,
    "printed -> clippings": 10,
-   "printed -> forms": 3,
-   "typewritten -> clippings": 2,
-   "typewritten -> forms": 1
+   "typewritten -> clippings": 2
+  },
+  "tag_precedence": {
+   "above_floor": [
+    "p024",
+    "p058",
+    "p061",
+    "p063",
+    "p065",
+    "p079",
+    "p098"
+   ],
+   "baseline": [
+    {
+     "id": "p024",
+     "previous_routing": "forms",
+     "truth_routing": "typewritten"
+    },
+    {
+     "id": "p058",
+     "previous_routing": "forms",
+     "truth_routing": "printed"
+    },
+    {
+     "id": "p061",
+     "previous_routing": "forms",
+     "truth_routing": "printed"
+    },
+    {
+     "id": "p063",
+     "previous_routing": "forms",
+     "truth_routing": "printed"
+    },
+    {
+     "id": "p065",
+     "previous_routing": "printed",
+     "truth_routing": "forms"
+    },
+    {
+     "id": "p079",
+     "previous_routing": "printed",
+     "truth_routing": "typewritten"
+    },
+    {
+     "id": "p098",
+     "previous_routing": "printed",
+     "truth_routing": "typewritten"
+    }
+   ],
+   "corrected": [
+    "p024",
+    "p058",
+    "p061",
+    "p063",
+    "p065",
+    "p079",
+    "p098"
+   ]
   },
   "tagged_pages": 30,
   "unread": 0

@@ -1,3 +1,4 @@
+import ArchiveCore
 import Foundation
 
 /// Which model reads a page, from its kind (W41.app-page-kind): the first of the model guide's picks for that kind
@@ -65,10 +66,10 @@ enum PageKindRouting {
             }
             return nil
         }
-        if handwritingOnTyped, typedKinds.contains(kind.kind.routingKind), let c = firstPick("handwritten") {
+        if handwritingOnTyped, typedKinds.contains(kind.routingKind), let c = firstPick("handwritten") {
             return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .handwriting)
         }
-        guard let c = firstPick(kind.kind.routingKind.rawValue) else { return keep(.noPick) }
+        guard let c = firstPick(kind.routingKind.rawValue) else { return keep(.noPick) }
         return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .kind)
     }
 
@@ -108,7 +109,7 @@ enum PageKindRouting {
         func record(_ reason: Reason, _ p: LLMProvider, _ m: LLMModel, cost: Double? = nil) -> PageReaderRecord {
             PageReaderRecord(kind: entry.kind?.kind.rawValue, confidence: entry.kind?.confidence, reason: reason,
                              provider: p.rawValue, model: m.displayName, estimatedCost: cost,
-                             replacedCost: cost == nil ? nil : price(model))
+                             replacedCost: cost == nil ? nil : price(model), readingKind: entry.kind?.readingKind)
         }
         let c = entry.choice
         let differs = c.provider != provider || c.modelID != model.id
@@ -227,6 +228,11 @@ struct PageReaderRecord: Codable, Equatable, Sendable {
     /// a model other than the run's. The run history adds the difference to the run's estimate.
     var estimatedCost: Double? = nil
     var replacedCost: Double? = nil
+
+    /// The classifier's hand for a tagged clipping; `kind` stays clippings for layout and sidecars.
+    var readingKind: PageKindName? = nil
+
+    var headerKind: OCRPageKind? { (readingKind ?? kind.flatMap(PageKindName.init(rawValue:)))?.headerKind }
 
     /// True when the page was read by a model other than the run's (the guide's pick or the user's choice): only
     /// then is a price recorded.

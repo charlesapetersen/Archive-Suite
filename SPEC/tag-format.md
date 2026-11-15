@@ -292,8 +292,10 @@ Date evidence: <evidence>      ← OPTIONAL (W46.date-route-header); what a non-
 - **Kind (W44.reocr-spec)** is per text page, independent of segmentation Classification. Exact IDs:
   `handwritten`, `typewritten`, `printed`, `forms`; labels Handwritten, Typewritten, Printed, Form or table.
   New output writes the explicit person's choice when supplied to `PDFGenerator.generate(pageKind:)`,
-  otherwise the classifier's stored `pageReader.kind`, otherwise a validated imported kind. A known
-  classifier kind is written even when it did not change the reader. Missing, invalid (including imported
+  otherwise the stored reading kind (`pageReader.readingKind` for a tagged clipping, else `pageReader.kind`),
+  otherwise a validated imported kind. A Clippings Finder tag marks layout and sidecars only; its PDF Kind
+  keeps the classifier's hand (owner walkthrough, 2026-11-13, option (c)). The four IDs and Reader parser
+  are unchanged. A known classifier kind is written even when it did not change the reader. Missing, invalid (including imported
   `mixed`), repeated or conflicting Kind is unknown, with Core diagnostics; absence is never guessed
   printed. Newspaper/register/script attributes belong to settings, not new Kind IDs. No new classifier
   call is implied on routes that have no classification; they leave Kind absent. No migration is written

@@ -359,7 +359,7 @@ extension EntityRunPolicy {
                        provider: LLMProvider, model: LLMModel, gateway: GatewayConfig?,
                        localAgent: LocalAgentConfig?) -> Inputs {
         let family: Family = localAgent != nil ? .plan : (gateway?.isLocalModel == true ? .mac : .cloud)
-        let kinds = results.map { PageKind($0?.pageReader?.kind) }
+        let kinds = results.map { PageKind($0?.pageReader?.readingKind?.rawValue ?? $0?.pageReader?.kind) }
         let readers: [String?] = results.map { r in
             guard let r else { return nil }
             if let second = r.secondReader { return second.provider }

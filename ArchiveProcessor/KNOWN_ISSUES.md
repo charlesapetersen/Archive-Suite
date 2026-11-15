@@ -2,6 +2,23 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ Fixed (2026-11-15): Finder tags overrode a sure reader choice — W42.int-s3-tag-precedence
+
+`PageKind.detect` used to give every Handwritten, Statistics or Clippings tag confidence 1, overriding the
+classifier and sending every clipping to the print pick. The classifier now picks the reader. Clippings keeps
+its layout/interview/sidecar kind, carrying the classifier's reading kind separately through the frozen plan,
+OCR result and PDF header. Handwritten and Statistics count only below 0.8 and retain the classifier confidence;
+they cannot push an unsure page through the routing gate. Handwritten clipping text also retains its hand for
+the names-stage safety rule. Untagged and newspaper routing are unchanged.
+
+The PDF keeps the same four Kind IDs; its existing shared parser is checked on scratch PDFs for all four hands.
+The headless contract covers boundaries, overlapping tags, distinct reader picks, overrides, Codable and the
+real OCR seam with injected replies. Its parity-enabled shell launch was also repaired (expanded assignments
+were being executed as a command). Re-measure and routing pins: `segbench-results/page-kinds.md` and `.json`.
+All seven former tag-caused reader mismatches are corrected; all 144 labelled pages reach their label's reader
+above 0.8. Untagged and classifier calls match the prior run on 144/144. These are in-sample figures; the held-out
+classifier result remains 137/141. No paid call, real-corpus write or migration (there is no app-produced production material to migrate).
+
 ## ✅ Fixed (2026-11-15): unrelated segmentation routes borrowed g2's spread — W46.seg-tie-borrowed-range
 
 The 10.4-point tie used g2's 5.2-point window-offset range for every comparison, letting the free 2B tie Gemini

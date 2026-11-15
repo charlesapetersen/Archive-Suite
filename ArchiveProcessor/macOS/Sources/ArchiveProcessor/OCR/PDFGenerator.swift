@@ -768,7 +768,7 @@ struct PDFGenerator {
         }
         // Kind is distinct from segmentation classification. Validate imported freeform kinds;
         // missing/unknown (including "mixed") stays absent, never guessed printed.
-        if let kind = pageKind ?? result.pageReader?.kind.flatMap(PageKindName.init(rawValue:))?.headerKind
+        if let kind = pageKind ?? result.pageReader?.headerKind
             ?? result.imported?.kind.flatMap(OCRPageKind.init(rawValue:)) {
             headerLine += "\n\(PDFHeaderParser.kindPrefix)\(kind.rawValue)"
         }

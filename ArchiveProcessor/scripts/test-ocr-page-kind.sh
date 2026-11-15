@@ -28,9 +28,14 @@ if [ "${PAGE_KIND_PARITY:-1}" = 1 ] && [ -f "$cache/signals-list.tsv" ] && [ -f 
     parity=(OCRPAGEKIND_PARITY_LIST="$cache/signals-list.tsv" OCRPAGEKIND_PARITY_OUT="$work/parity.tsv")
 fi
 
+# Expanded array elements are command words, not shell assignments. Export optional parity variables before
+# calling the child-launch function, or a populated cache tries to execute OCRPAGEKIND_PARITY_LIST=… instead.
+if [ ${#parity[@]} -gt 0 ]; then export "${parity[@]}"; fi
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
-    OCRPAGEKIND_TEST=1 OCRPAGEKIND_TEST_OUT="$report" ${parity[@]+"${parity[@]}"} \
+    OCRPAGEKIND_TEST=1 OCRPAGEKIND_TEST_OUT="$report" \
     processor_test_start pid "$bin" >"$log" 2>&1
+# The child has inherited these; later benchmark launches should not repeat or overwrite this parity run.
+unset OCRPAGEKIND_PARITY_LIST OCRPAGEKIND_PARITY_OUT
 
 wait_for_test_report "$report" "$log" "$pid" "OCR-page-kind" "OCRPAGEKIND" 600
 cat "$report"

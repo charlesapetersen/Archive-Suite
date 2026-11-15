@@ -178,8 +178,9 @@ One list for the whole app, decided here and stated in the session's notes. It i
 handwritten, mixed, form or table, and photographed page as a second axis (it changes the image, not the writing).
 Box and folder labels stay Archive Processor's classification, not a kind. The detector uses the first Vision pass
 (line shapes and Vision's own confidence), the photo detection from Vision OCR's page-kinds-three, and the file's
-Finder tags (Handwritten, Clippings, Statistics) when present. If those are not enough for handwriting, a small
-on-device classifier is tried and measured before it is adopted.
+Finder tags (Handwritten, Clippings, Statistics) when present. The bundled on-device classifier decides the reader;
+a Clippings tag marks the layout kind only, and Handwritten/Statistics affect calls below 0.8 without raising
+confidence (owner walkthrough 2026-11-13, option (c); `W42.int-s3-tag-precedence`).
 
 Done when: the detector's accuracy is measured on the W41 truth set (99 pages, kinds confirmed by the owner) and on
 Vision OCR's newspaper truth pages, reported per kind, with a check pinning it.

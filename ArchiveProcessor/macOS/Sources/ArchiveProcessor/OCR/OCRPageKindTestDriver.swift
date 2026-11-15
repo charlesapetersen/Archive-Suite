@@ -378,8 +378,9 @@ enum OCRPageKindTestDriver {
               && PageKindName.fromFinderTags(["Clippings"]) == .clippings
               && PageKindName.fromFinderTags(["STATISTICS", "Q2"]) == .forms
               && PageKindName.fromFinderTags(["Regis McKenna", "Q1"]) == nil)
-        check("10 a file with several kind tags: Handwritten, then Clippings, then Statistics",
-              PageKindName.fromFinderTags(["Statistics", "Clippings", "Handwritten"]) == .handwritten
+        check("10 a clipping keeps its layout identity with other tags; otherwise Handwritten wins over Statistics",
+              PageKindName.fromFinderTags(["Statistics", "Clippings", "Handwritten"]) == .clippings
+              && PageKindName.fromFinderTags(["Statistics", "Handwritten"]) == .handwritten
               && PageKindName.fromFinderTags(["Statistics", "Clippings"]) == .clippings)
         func pageLines(_ n: Int, width: Double, text: String = "word word") -> [PageLine] {
             (0..<n).map { i in PageLine(text: text, box: CGRect(x: 0.1, y: Double(i) / Double(n + 1), width: width,
@@ -395,9 +396,10 @@ enum OCRPageKindTestDriver {
               !EnginePageKind.isNewspaper(lines: pageLines(700, width: 0.1, text: "a b"))
               && EnginePageKind.shape(of: pageLines(10, width: 0.3, text: "abcd")).lines == 10)
         let typed = PageKind(kind: .typewritten, confidence: 0.6)
-        check("10 a Finder tag corrects the classifier and the newspaper rule",
+        check("10 a Clippings tag keeps the kind, classifier hand and confidence even beside a newspaper call",
               PageKind.detect(classified: typed, newspaper: true, tags: ["Clippings"], photographed: true)
-              == PageKind(kind: .clippings, confidence: 1, source: .finderTag, photographed: true))
+              == PageKind(kind: .clippings, confidence: 0.6, source: .finderTag, photographed: true,
+                          readingKind: .typewritten))
         check("10 the newspaper call wins over the classifier's print call",
               PageKind.detect(classified: typed, newspaper: true, tags: [], photographed: false)
               == PageKind(kind: .newspapers, confidence: 1, source: .layout))
@@ -419,10 +421,91 @@ enum OCRPageKindTestDriver {
         check("10 the header's Kind keeps the four ranked kinds; mixed and registers leave it absent",
               PageKindName.allCases.map(\.headerKind) == [.handwritten, .typewritten, .printed, .forms,
                                                           .printed, .printed, nil, nil])
-        check("10 a Finder tag passes the confidence gate: an unsure printed page tagged Statistics takes the form pick",
-              PageKind.detect(classified: PageKind(kind: .printed, confidence: 0.5), newspaper: false,
-                              tags: ["Statistics"], photographed: false).map { choose($0.kind, $0.confidence) }
-              == choose(.forms))
+        func route(_ k: PageKind?, hand: Bool = false, override: PageKindRouting.Candidate? = nil)
+            -> PageKindRouting.Choice {
+            PageKindRouting.choose(kind: k, guidance: guide, available: all, runDefault: runDefault,
+                                   override: override, handwritingOnTyped: hand)
+        }
+        for tag in ["Statistics", "Handwritten"] {
+            for confidence in [0.79, 0.8, 0.95] {
+                let classified = PageKind(kind: .printed, confidence: confidence)
+                let tagged = PageKind.detect(classified: classified, newspaper: false, tags: [tag], photographed: false)
+                let expected: PageKindName = tag == "Statistics" ? .forms : .handwritten
+                check("10 \(tag) at \(confidence): changes only an unsure kind and never lifts its confidence",
+                      tagged?.kind == (confidence < 0.8 ? expected : .printed)
+                      && tagged?.source == (confidence < 0.8 ? .finderTag : .classifier)
+                      && tagged?.confidence == confidence
+                      && route(tagged) == (confidence < 0.8 ? choose(.printed, confidence) : choose(.printed)))
+            }
+            check("10 a sure newspaper call is unchanged by \(tag)",
+                  PageKind.detect(classified: PageKind(kind: .printed, confidence: 0.9), newspaper: true,
+                                  tags: [tag], photographed: false)
+                  == PageKind(kind: .newspapers, confidence: 1, source: .layout))
+        }
+        // Distinct picks expose a forms/print mix-up even while the bundled guide gives both the same reader.
+        let distinctModels = [flash, claude, LLMModel.mistralModels[0], qwen]
+        let distinctGuide = OCRPageGuidance(measured: "fixture", footnote: "", kinds:
+            zip(PageKindName.classifierKinds, distinctModels).map { kind, model in
+                .init(id: kind.rawValue, label: kind.label, pages: 1, picks: [
+                    .init(name: model.displayName, nes: 100, appModel: model.id,
+                          source: .init(file: "fixture", route: "fixture", attribute: "kind", value: kind.rawValue))
+                ], note: nil)
+            })
+        let distinctAvailable = Set(distinctModels.map(cand))
+        for (hand, expected) in zip(PageKindName.classifierKinds, distinctModels) {
+            let clipping = PageKind.detect(classified: PageKind(kind: hand, confidence: 0.9), newspaper: false,
+                                           tags: ["Clippings"], photographed: false)
+            let pick = PageKindRouting.choose(kind: clipping, guidance: distinctGuide, available: distinctAvailable,
+                                              runDefault: runDefault)
+            check("10 clipping \(hand.rawValue) reaches its distinct fixture reader",
+                  pick.provider == expected.provider && pick.modelID == expected.id)
+        }
+        // Scratch JPEG -> real OCR seam -> Codable record -> generated two-page PDF. The semantic kind stays
+        // clippings for layout and sidecars; every classifier hand keeps its own reader and four-kind header.
+        await script.set(["anthropic": (200, claudeText), "generativelanguage": (200, geminiText),
+                          "openrouter": (200, #"{"choices":[{"finish_reason":"stop","message":{"content":"FORM-TEXT"}}]}"#)])
+        for hand in PageKindName.classifierKinds {
+            let classified = PageKind(kind: hand, confidence: 0.95)
+            let clipping = PageKind.detect(classified: classified, newspaper: false,
+                                           tags: ["Statistics", "HANDWRITTEN", "Clippings\n6"], photographed: true)
+            let choice = route(clipping)
+            check("10 a tagged clipping classified \(hand.rawValue) takes that reader and header",
+                  clipping?.kind == .clippings && clipping?.routingKind == hand
+                  && clipping?.headerKind == hand.headerKind && choice == route(classified)
+                  && route(clipping, hand: true) == route(classified, hand: true))
+            var plan = PageReaderPlan()
+            plan.pages[PageReaderPlan.key(image)] = .init(kind: clipping, choice: choice)
+            let planBack = (try? JSONEncoder().encode(plan)).flatMap { try? JSONDecoder().decode(PageReaderPlan.self, from: $0) }
+            check("10 clipping \(hand.rawValue) survives the frozen plan", planBack == plan)
+            let result = await ocr(image, planBack ?? .empty)
+            let back = (try? JSONEncoder().encode(result)).flatMap { try? JSONDecoder().decode(OCRResult.self, from: $0) }
+            check("10 clipping \(hand.rawValue) records its layout kind and classifier hand through Codable",
+                  result.errorMessage == nil && result.text?.isEmpty == false && back?.pageReader == result.pageReader && result.pageReader?.kind == "clippings"
+                  && result.pageReader?.readingKind == hand
+                  && result.pageReader?.model == PageKindRouting.model(.init(provider: choice.provider, modelID: choice.modelID))?.displayName
+                  && TextLayerRule.kind(explicit: nil, result: result) == .clippings)
+            let pdf = root.appendingPathComponent("clipping-\(hand.rawValue).pdf")
+            _ = try? PDFGenerator().generate(imageURL: image, result: back ?? result, model: claude, outputURL: pdf)
+            check("10 clipping \(hand.rawValue) writes its classifier's Kind to a scratch PDF",
+                  PDFHeaderParser.extract(pdf)?.textPages.first?.header?.kind == hand.headerKind)
+        }
+        let handwrittenClipping = OCRResult(text: "fixture", classification: nil, errorMessage: nil, errorCode: nil,
+            pageReader: PageReaderRecord(kind: "clippings", confidence: 0.95, reason: .same,
+                                         provider: LLMProvider.appleVision.rawValue, model: "fixture", readingKind: .handwritten))
+        let entityInput = EntityRunPolicy.inputs(results: [handwrittenClipping], runProvider: nil, settings: [:],
+            provider: .appleVision, model: claude, gateway: nil, localAgent: nil)
+        check("10 entity safety keeps a clipping's classified handwriting on Vision text",
+              entityInput.pageKinds == [.handwritten] && entityInput.textSource == .vision)
+        let unsureClipping = PageKind.detect(classified: typed, newspaper: false, tags: ["Clippings"], photographed: false)
+        check("10 an unsure clipping keeps the run's model, but an explicit reader still wins",
+              route(unsureClipping).reason == .uncertain
+              && route(unsureClipping, override: cand(flash)).reason == .override)
+        var unsurePlan = PageReaderPlan()
+        unsurePlan.pages[PageReaderPlan.key(image)] = .init(kind: unsureClipping, choice: route(unsureClipping))
+        let unsureResult = await ocr(image, unsurePlan)
+        check("10 an unsure clipping is read by the run's model and retains its classifier hand",
+              unsureResult.pageReader?.reason == .uncertain && unsureResult.pageReader?.readingKind == .typewritten
+              && unsureResult.text?.contains("CLAUDE-TEXT") == true)
         check("10 a run record from before the source and photographed fields still decodes",
               (try? JSONDecoder().decode(PageKind.self, from: Data(#"{"kind":"printed","confidence":0.9}"#.utf8)))
               == PageKind(kind: .printed, confidence: 0.9))
@@ -440,7 +523,8 @@ enum OCRPageKindTestDriver {
 
         // 11. The measure (W42.int-s3): with OCRPAGEKIND_KINDS_LIST (rows `id <TAB> file <TAB> page [<TAB> tags]`),
         // classify each page as the app does (an image file with its camera and Finder tags; a PDF page as the run
-        // renders it) and write `id call source confidence classifier lines wideW photographed untagged seconds` rows to
+        // renders it) and write `id call source confidence classifier lines wideW photographed untagged seconds
+        // engine_newspaper routing untagged_routing header classifier_confidence` rows to
         // OCRPAGEKIND_KINDS_OUT, which `scripts/segbench/page_kinds.py` scores against the truth. A tags column
         // ("; "-separated, the truth set's record of the original's tags) stands in for the xattr a cached copy lacks;
         // `untagged` is the call with no tags at all. Every page gets the engine's newspaper reading here, for its
@@ -480,10 +564,12 @@ enum OCRPageKindTestDriver {
                 let k = PageKind.detect(classified: call, newspaper: news, tags: tags, photographed: photo)
                 let bare = PageKind.detect(classified: call, newspaper: news, tags: [], photographed: photo)
                 outRows.append([f[0], k?.kind.rawValue ?? "unknown", k?.source.rawValue ?? "-",
-                                String(format: "%.4f", k?.confidence ?? 0), call?.kind.rawValue ?? "unknown",
+                                String(format: "%.12g", k?.confidence ?? 0), call?.kind.rawValue ?? "unknown",
                                 "\(read?.lines ?? -1)", String(format: "%.3f", read?.wideWidth ?? -1), photo ? "1" : "0",
                                 bare?.kind.rawValue ?? "unknown", String(format: "%.2f", seconds),
-                                read?.isNewspaper == true ? "1" : "0"]
+                                read?.isNewspaper == true ? "1" : "0", k?.routingKind.rawValue ?? "unknown",
+                                bare?.routingKind.rawValue ?? "unknown", k?.headerKind?.rawValue ?? "unknown",
+                                String(format: "%.6f", call?.confidence ?? 0)]
                     .joined(separator: "\t"))
             }
             try? (outRows.joined(separator: "\n") + "\n").write(toFile: out, atomically: true, encoding: .utf8)
