@@ -35,9 +35,12 @@ written where the `searchableFor` setting names the input's format and the page'
 
 ## Verification baseline (2026-11-14)
 
-The compression functional checks pass, but the broader suites have existing failures: VisionOCRKit 2126/2142
-(14 accepted outline-fixture failures from W42.int-s1; preferences isolation and its nested light-tier check,
-`W42.kit-preferences-isolation`), and the latest entity figures leave solver profile E expecting Gemini while
+The compression functional checks pass. VisionOCRKit now passes 2134/2148: only the 14 accepted outline-fixture
+failures from W42.int-s1 remain. **W42.kit-preferences-isolation fixed the preferences boundary and nested light-tier
+failures**: default-only engine/compression/timing snapshots use typed values without opening a defaults store or
+registering preferences; the original guard is intact. Focused 13/13 and light 627/627 pass; evidence:
+`verification/evidence/processor/W42.kit-preferences-isolation.md`. The initial compression run was 2126/2142.
+The latest entity figures still leave solver profile E expecting Gemini while
 the solver chooses Qwen (`W46.ent-profile-e-solver`, baseline 9a79dd98). VM sampler teardown with
 TERM blocked is queued as `W40.vm-sampler-term-mask`. Exact evidence:
 `verification/evidence/processor/W42.int-s5-compress-verification.md`.
