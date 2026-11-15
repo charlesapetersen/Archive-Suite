@@ -16209,3 +16209,26 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   - Tier-2: separate adversarial review clean; five focused VM repetitions pass (20.421 / 18.247 / 17.776 / 18.182 / 17.928 s), no new warning. One final full VM_SPLIT=4 lane executes all 47 tests: 38 passed, 9 expected skips, zero failures, 1002 s; manual-date passes in its full-lane chunk 3 context in 17.885 s. No suite crash/hang; dated-card and baseline after-Save pixels inspected. No paid call or real corpus I/O.
   - Evidence retained: `verification/evidence/processor/W40.processor-manual-date-result-vm.md` (diagnosis, exact commands and per-chunk results). No item scratch created in the shared bench cache; rebuildable VM artifacts leave with the clean item worktree. The shipped item note is deleted.
   <!-- /W40.processor-manual-date-result-vm -->
+
+- [x] **W46.date-route-image-routes — the dating image pass beyond the gateway [S-M]** · §Document processing review — W46 · SHIPPED 2026-11-15 (this commit; documentation close-out, both routes dropped) (lane: processor) (uses: build) (blocked-on: W46.date-route-pipeline-8b)
+  Filed by W46.date-route, 2026-11-13. The first session found neither proposed route measured and filed
+  W46.date-route-pipeline-8b and W46.date-route-pipeline-38. The item required a measured gain before adding a route;
+  a route with no gain was to be dropped. Both candidates are now settled, so there is no route to implement.
+  **Mac 8B dropped on its measurement:** a7068d5f (W46.date-route-pipeline-8b, 2026-11-14),
+  `ArchiveProcessor/segbench-results/date-route-pipeline.md` §“The Mac 8B as step 2”: on Gemini's trace it gets
+  48/91 correct years not in text, the same 48/91 without step 2; on the 27B's trace 30/91, the same 30/91 without.
+  Neither gains a document. As a quote source (in-sample), 1 gained / 1 lost and 2 / 1, both p = 1.0, plus one
+  undated false year. Call 7.5 (c) is not added; the 16 GB laptop route keeps no image pass. The measured row
+  `qwen3-vl-8b-image-mac` remains in the table as not offered, as the prerequisite already shipped it.
+  **Direct-key Gemini 3.8 dropped by the owner:** walkthrough 2026-11-13, 737b5bb9; no direct Gemini key, no
+  direct-key measure or route. W46.date-route-pipeline-38 was dropped with that call. The 27B cluster measurement
+  W46.date-route-pipeline-27b (68b188b1) does not authorize borrowing its figures for a model on this Mac.
+  **Result:** step 2 continues only through a remote gateway with the measured Gemini 3.7 Flash route. A direct key,
+  OpenRouter, a Local Agent or a model on this Mac skips it; the sidecar keeps
+  `image_pass: not sent: no measured image route on this backend`. Updated the dated limitation in KNOWN_ISSUES
+  and the stage note's final owner-call recap so they no longer imply this item awaits a route.
+  **Verified:** independent read-only review of the measurements, call 7.5, §9 and `DateRoute.Backend` / `run` found
+  no behavior change needed; settings-routes drift/source check and tracker/document checks pass. Documentation
+  close-out only: no app code, prompt, figures or policy changed; no app build or model run. $0. No bench-cache
+  scratch created or removed; prerequisite replies stay as its recorded rescore inputs. No item plan remained.
+  <!-- /W46.date-route-image-routes -->

@@ -146,8 +146,11 @@ What remains: a box with many such pages has more gaps to check than the figures
   written on a manual card only while it still holds the date the route filled; a date the user typed carries none.
 - **The image pass runs only through a remote gateway** (Gemini 3.7 Flash, the measured route). On a direct key,
   OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
-  estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`
-  (`W46.date-route-image-routes`).
+  estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`.
+  **Settled by W46.date-route-image-routes (2026-11-15):** the Mac 8B was measured in a7068d5f
+  (`segbench-results/date-route-pipeline.md`, W46.date-route-pipeline-8b) and gained no correct year over no image
+  pass on either trace, so it is not added (08-dating.md call 7.5). The direct-key Gemini 3.8 route was dropped by
+  the owner on 2026-11-13 (737b5bb9). This remains the supported scope, with no route pending under that item.
 - **The PDF header's `Date evidence:` line (W46.date-route-header) is written on one-pair outputs only.** A Re-OCR
   multi-page output (several pairs in one file) and any output whose text page does not read back cleanly (a wrapped
   filename PDFKit splits differently, a page whose text is not the run's) are left as they are, logged, with the

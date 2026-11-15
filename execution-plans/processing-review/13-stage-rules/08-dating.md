@@ -454,8 +454,10 @@ header, the evidence class and quote being the "confidence score or similar" the
 estimate that fails the evidence check is not shown at all until item 8.3 (7.6). Section 2's dating picks, open to the
 owner's veto: the image pass runs only where the app's own text gives no year candidate (7.3); the trained 2B and 4B
 are not dating defaults (7.4); the no-key laptop route is Vision text, rules, the 2B chooser and propagation at t=3,
-every propagated year `Date Uncertain` with its source document, the Mac 8B image pass added at 16 GB once item 8.1
-shows its quotes help (7.5). Section 3 carries all of these; the inherited flag on a dated folder stays with
+every propagated year `Date Uncertain` with its source document. The Mac 8B image pass was conditional on item 8.1
+showing its quotes help (7.5); the completed 8B measure (a7068d5f, 2026-11-14) found no gain over no image pass,
+so it is not added at 16 GB (W46.date-route-image-routes closed 2026-11-15). Section 3 carries these rules; the inherited
+flag on a dated folder stays with
 `W47.ct-folder-date`.
 
 Files read: `execution-plans/processing-review/00-plan.md` (1-140); the worktree's `13-stage-rules/00-index.md`;
