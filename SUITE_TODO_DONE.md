@@ -16251,3 +16251,8 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Evidence: `verification/evidence/processor/W46.seg-tie-borrowed-range.md`. No model calls, no spend, no corpus
   access and no ArchiveSuiteRehearsal cache created; drivers clean scratch, diagnostics/renders retained in `/tmp`.
   <!-- /W46.seg-tie-borrowed-range -->
+
+- [x] **gate-fix — restore the four Tags-window items to the engine queue** · §Autonomous infrastructure · SHIPPED 2026-11-15 (this commit)
+  The health gate's handoff step correctly rejected four open tracker entries filed in 76225fc1 without plan mirrors: W40.tag-window-core, W40.tag-window-reader, W40.tag-window-processor and W40.tag-window-notes. Added their open WORK QUEUE lines with the locked plan-edit helper, preserving each title, lane, uses and blocked-on metadata; normalized the four tracker tags to bare tags. The Tags-window implementation remains open. No gate check or exemption changed.
+  Verification: reproduced the four missing tags; handoff visibility passed three consecutive runs after repair; tracker-sync and todo-stubs passed; the existing handoff proof passed all 13 assertions. Queue resolution confirms core is actionable, Reader waits on core, and Notes/Processor wait on both core and tag-rename-suite. Independent read-only review confirmed metadata and queue eligibility. No app changes, corpus access, paid calls or bench cache were involved.
+  <!-- /gate-fix -->
