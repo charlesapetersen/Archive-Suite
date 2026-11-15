@@ -728,6 +728,24 @@ extension OCRProcessor {
     ) async {
         let total = fileURLs.count
 
+        // Find regions before the first irreversible submission. The durable manifest records identities,
+        // not scratch paths; the server owns the encoded images once submission has completed.
+        let preparationJobs = jobs.map(\.id)
+        statusMessage = "Finding newspaper regions…"
+        let newspaper: NewspaperBatch.Prepared
+        do { newspaper = try await NewspaperBatch.prepare(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage) }
+        catch {
+            guard jobs.map(\.id) == preparationJobs else { return }
+            batchPollInterrupted = true
+            isProcessing = false
+            statusMessage = "Batch preparation stopped. No batch requests were sent."
+            return
+        }
+        defer { newspaper.removeScratch() }
+        guard !Task.isCancelled, jobs.map(\.id) == preparationJobs else { return }
+        let preparedRequests = newspaper.manifest.hasExpandedPages ? newspaper.requests : nil
+        activeRunHistory?.reserveNewspaperBatch(newspaper.manifest)
+
         // This submission's own money count and cause, cleared before the first create (W16.bat3-fu2).
         // `batchPollInterrupted` is the standing warning about what happens when paid-batch state is left
         // to carry over between runs — a stale total here would put a PREVIOUS batch's jobs into this one's
@@ -767,6 +785,10 @@ extension OCRProcessor {
             submissionComplete: false, completedResults: [:], completedOutputPaths: [:],
             mixedPDFOutcomes: mixedPDFOutcomes
         )
+        if newspaper.manifest.hasExpandedPages || newspaper.manifest.pages.contains(where: { $0.fallback != nil }) {
+            initialPendingBatch.newspaperManifest = newspaper.manifest
+            initialPendingBatch.newspaperParts = [:]
+        }
         initialPendingBatch.cascade = Self.ocrCallValues(for: runConfig).cascade
         initialPendingBatch.resolvedSettings = activeResolvedSettings
         guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
@@ -795,13 +817,13 @@ extension OCRProcessor {
             switch provider {
             case .anthropic:
                 let client = AnthropicBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale, preparedRequests: preparedRequests)
                 guard recordSubmittedBatchChunk(batchId) else {
                     throw OCRError.networkError("Could not persist the submitted Anthropic batch ID")
                 }
             case .mistral:
                 let client = MistralBatchClient(apiKey: apiKey, model: model)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, imageScale: imageScale)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, imageScale: imageScale, preparedRequests: preparedRequests)
                 guard recordSubmittedBatchChunk(batchId) else {
                     throw OCRError.networkError("Could not persist the submitted Mistral batch ID")
                 }
@@ -809,7 +831,7 @@ extension OCRProcessor {
                 let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
                 batchId = try await client.submitBatch(
                     fileURLs: fileURLs, sendPreviousImage: sendPreviousImage,
-                    customPrompt: customPrompt, imageScale: imageScale
+                    customPrompt: customPrompt, imageScale: imageScale, preparedRequests: preparedRequests
                 ) { [weak self] chunkId in
                     guard let self else {
                         throw OCRError.networkError("Batch owner was released during submission")
@@ -864,6 +886,7 @@ extension OCRProcessor {
             isProcessing = false
             return
         }
+        newspaper.removeScratch()
         statusMessage = "Batch submitted. Waiting for results…"
 
         // Poll for completion
@@ -1172,6 +1195,21 @@ extension OCRProcessor {
         // outputs over a live run.
         // W16.bat10 — the slot's identity is the JOB's id, not its source URL: a list cleared and re-dropped
         // with the same file at the same index passes a source comparison and fails this one.
+        if let pending = activePendingBatch, let manifest = pending.newspaperManifest {
+            var missing: [String: OCRResult] = [:]
+            for page in manifest.pages where page.isExpanded && pending.completedResults[String(page.fileIndex)] == nil {
+                for key in page.requestIDs where pending.newspaperParts?[key] == nil {
+                    missing[key] = OCRResult(text: nil, classification: nil,
+                        errorMessage: "The batch returned no result for this region.", errorCode: "no_result")
+                }
+            }
+            if !missing.isEmpty {
+                guard await processBatchResults(missing, fileURLs: pending.fileURLs.map { pdfToImageMap[$0] ?? $0 }, model: model,
+                    apiKey: activeBatch?.apiKey ?? "", outputDirectory: outputDirectory, runConfig: runConfig) else {
+                    batchPollInterrupted = true; return false
+                }
+            }
+        }
         let sweptSlots: [(index: Int, source: URL, jobID: OCRJob.ID)] = jobs.indices
             .filter { jobs[$0].status == .processing }
             .map { (index: $0, source: jobs[$0].sourceURL, jobID: jobs[$0].id) }
@@ -1217,6 +1255,29 @@ extension OCRProcessor {
                 batchResultMaterializationAddress = nil
             }
         }
+        // Persist every region part BEFORE a provider chunk may be marked consumed. Regions from the same
+        // page can arrive in different Gemini chunks, including across a quit and Resume.
+        var results = results
+        if var pending = activePendingBatch, let manifest = pending.newspaperManifest {
+            guard ClosedPaidBatchJournalAddress(activePendingBatch) == materializationAddress else { return false }
+            let allowed = Set(manifest.pages.flatMap(\.requestIDs))
+            var parts = pending.newspaperParts ?? [:]
+            for (key, value) in results where allowed.contains(key) { parts[key] = value }
+            pending.newspaperParts = parts
+            guard let saved = Self.savePendingBatch(pending) else { return false }
+            activePendingBatch = saved
+            results = NewspaperBatch.aggregate(manifest: manifest, parts: parts)
+            for (key, var result) in results {
+                if parts[key] == nil, var layout = result.newspaperLayout {
+                    layout.estimatedExtraCost = Double(max(0, layout.requests - 1))
+                        * PageKindRouting.pagePrice(model, imageScale: Self.liveImageScaleFraction(),
+                            sendPreviousImage: pending.sendPreviousImage && (NewspaperBatch.originalIndex(key) ?? 0) > 0,
+                            contextCharCount: 0) * model.batchDiscount
+                    result.newspaperLayout = layout
+                    results[key] = result
+                }
+            }
+        }
         // Parse valid entries upfront so the task group doesn't need to touch fileURLs.
         // A resumed paid batch restores these keys from disk. Skip them before output-path allocation so
         // re-fetching an incompletely acknowledged chunk cannot create duplicate "(2)" PDFs.
@@ -1256,6 +1317,8 @@ extension OCRProcessor {
         let fallbackPrompt = activePendingBatch?.customPrompt
         let fallbackPreviousImage = activePendingBatch?.sendPreviousImage ?? false
         let fallbackScale = Self.liveImageScaleFraction()
+        let batchThinking = activePendingBatch?.thinkingLevel
+        let expandedPages = Set(activePendingBatch?.newspaperManifest?.pages.filter(\.isExpanded).map(\.fileIndex) ?? [])
         var allPersisted = true
         await withTaskGroup(of: (Int, URL, OCRJob.ID?, OCRResult, Bool).self) { group in
             var iter = entries.makeIterator()
@@ -1263,8 +1326,37 @@ extension OCRProcessor {
             func addNext() -> Bool {
                 guard let entry = iter.next() else { return false }
                 group.addTask {
+                    var first = entry.result
+                    if first.errorCode == NewspaperBatch.failedRegionCode {
+                        do {
+                            try Task.checkCancellation()
+                            let reader = try PageReaders.reader(provider: model.provider, model: model, apiKey: apiKey,
+                                                                thinkingLevel: batchThinking, newspaperLayout: false)
+                            var whole = try await reader.read(PageReaderInput(
+                                imageURL: entry.url, previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
+                                customPrompt: fallbackPrompt, imageScale: fallbackScale)).detail
+                            var note = first.newspaperLayout
+                            let standardCost = PageKindRouting.pagePrice(model, imageScale: fallbackScale,
+                                sendPreviousImage: fallbackPreviousImage && entry.previousURL != nil, contextCharCount: 0)
+                            let extra = (note?.estimatedExtraCost ?? 0) + standardCost
+                            note?.estimatedExtraCost = extra
+                            if let n = note {
+                                note = NewspaperLayoutRecord(regions: n.regions, requests: n.requests + 1,
+                                    coverage: n.coverage, filled: n.filled, fallback: n.fallback,
+                                    estimatedExtraCost: n.estimatedExtraCost, standardFallbackCost: standardCost)
+                            }
+                            whole.newspaperLayout = note
+                            first = whole
+                        } catch {
+                            if !Task.isCancelled {
+                                first = OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription,
+                                                  errorCode: NewspaperBatch.failedRegionCode,
+                                                  newspaperLayout: first.newspaperLayout)
+                            }
+                        }
+                    }
                     let read = await OCRCascade.resolve(
-                        entry.result, cascade: batchCascade, provider: model.provider, model: model,
+                        first, cascade: batchCascade, provider: model.provider, model: model,
                         refusalFallback: secondReaderFallback, imageURL: entry.url, previousText: nil,
                         previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
                         customPrompt: fallbackPrompt, imageScale: fallbackScale,
@@ -1294,6 +1386,11 @@ extension OCRProcessor {
                     allPersisted = false
                     group.cancelAll()
                     return
+                }
+                if expandedPages.contains(index) {
+                    guard persistNewspaperFallback(resolved, index: index, address: materializationAddress) else {
+                        allPersisted = false; group.cancelAll(); return
+                    }
                 }
                 guard await handleOCRResult(
                     resolved, index: index, jobID: jobID, url: url, model: model,
@@ -1687,7 +1784,8 @@ extension OCRProcessor {
                     rotationDegrees: result.rotationDegrees,
                     errorMessage: "OCR succeeded but the output PDF could not be written. Check that the "
                                 + "output folder exists and is writable, and that there is free disk space.",
-                    errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported)
+                    errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
+                    newspaperLayout: result.newspaperLayout)
                 jobs[index].status = .failed
             }
             let name = sourceURL.lastPathComponent
@@ -1784,7 +1882,7 @@ extension OCRProcessor {
                 gateway: gatewayConfig, localAgent: localAgent, visionSettings: visionSettings)
             networkResult = try await reader.read(PageReaderInput(
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                customPrompt: customPrompt, imageScale: scale)).detail
+                customPrompt: customPrompt, imageScale: scale, costScale: imageScale)).detail
         } catch {
             _ = await rotationCorrection  // let the concurrent task finish
             return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil,

@@ -1019,8 +1019,11 @@ struct SettingsSheetWords {
             return "Pages are read from the image as captured. No cleaning, conversion to black and white, or removal of "
                 + "marks is applied to the image a reading program reads: none of these helped any program tested."
         case "layout":
-            return "Newspapers and other dense multi-column pages are read in regions, column by column. Everything else "
-                + "is read as a whole page. Handwriting, registers and ledgers are never split into regions."
+            return "Newspaper pages are read in regions in the detector’s reading order, pictures included, with every reader. "
+                + "Photographs are corrected for perspective first. Text outside the regions gets a separate fill reading "
+                + "when coverage is low; an unsuccessful layout or region reading uses the whole page. "
+                + "Download the helper below to use regions; until then, newspapers read whole. "
+                + "Everything else reads whole. Handwriting, registers, ledgers and uncertain kinds are never split."
         case "placement":
             return "On typed and printed pages the text is laid over the page image line by line, so you can select and "
                 + "search it where it sits; this is free. On handwritten pages the lines are found on the page and the "

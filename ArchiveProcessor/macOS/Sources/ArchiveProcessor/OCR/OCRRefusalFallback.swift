@@ -125,15 +125,16 @@ enum OCRRefusalFallback {
             // The cascade's route was the only one, and it failed: say so, not "no second reader is set up".
             return OCRResult(text: nil, classification: nil,
                              errorMessage: "\(why) Second readers failed too — \(failedBefore)", errorCode: exhaustedCode,
-                             readingCodes: codes)
+                             readingCodes: codes, newspaperLayout: refused.newspaperLayout)
         }
         guard !routes.isEmpty else {
             NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent) (\(refused.errorCode ?? "?")); no second reader")
             return OCRResult(text: nil, classification: nil,
                              errorMessage: "\(why) No second reader is set up: add an Anthropic, OpenRouter, "
                                  + "OpenAI or Mistral key, or install claude, to read pages Gemini refuses.",
-                             errorCode: exhaustedCode, readingCodes: codes)
+                             errorCode: exhaustedCode, readingCodes: codes, newspaperLayout: refused.newspaperLayout)
         }
+        var incurredLayout = refused.newspaperLayout
         var reasons: [String] = failedBefore.map { [$0] } ?? []
         for route in routes {
             // Stopped: spend nothing more. The caller sees the exhausted code and, in a batch, does not persist it.
@@ -142,7 +143,7 @@ enum OCRRefusalFallback {
             do {
                 result = try await read(route, imageURL: imageURL, previousText: previousText,
                                         previousImageURL: previousImageURL, customPrompt: customPrompt,
-                                        imageScale: imageScale)
+                                        imageScale: imageScale, costScale: costScale)
             } catch {
                 reasons.append("\(route.label): \(error.localizedDescription)")
                 codes.append("")
@@ -156,21 +157,22 @@ enum OCRRefusalFallback {
                 NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")
                 return OCRResult(text: result.text, classification: result.classification,
                                  rotationDegrees: result.rotationDegrees, errorMessage: nil, errorCode: nil,
-                                 enclosure: result.enclosure, secondReader: reader)
+                                 enclosure: result.enclosure, secondReader: reader, newspaperLayout: NewspaperLayoutRecord.combining(result.newspaperLayout, after: incurredLayout))
             }
+            incurredLayout = NewspaperLayoutRecord.combining(result.newspaperLayout, after: incurredLayout)
             reasons.append("\(route.label): \(result.errorMessage ?? "no text")")
             codes.append(result.errorCode ?? "")
         }
         NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); every second reader failed")
         return OCRResult(text: nil, classification: nil,
                          errorMessage: "\(why) Second readers failed too — " + reasons.joined(separator: "; "),
-                         errorCode: exhaustedCode, readingCodes: codes)
+                         errorCode: exhaustedCode, readingCodes: codes, newspaperLayout: incurredLayout)
     }
 
     /// One route's reading of the page. Also the cascade's escalation read (`OCRCascade`), which may be Gemini.
     static func read(
         _ route: Route, imageURL: URL, previousText: String?, previousImageURL: URL?,
-        customPrompt: String?, imageScale: Double
+        customPrompt: String?, imageScale: Double, costScale: Double? = nil
     ) async throws -> OCRResult {
         // Never a second reader: Vision's text is not a transcription the panel scored as one.
         if route.localAgent == nil, route.provider == .appleVision {
@@ -183,6 +185,6 @@ enum OCRRefusalFallback {
                                             thinkingLevel: nil, localAgent: route.localAgent)
         return try await reader.read(PageReaderInput(
             imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-            customPrompt: customPrompt, imageScale: imageScale)).detail
+            customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)).detail
     }
 }

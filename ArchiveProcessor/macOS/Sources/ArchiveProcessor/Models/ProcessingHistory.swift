@@ -42,6 +42,10 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     var kindRoutedPages: Int? = nil
     /// Pages the agreement rule left as they were, rotation unsure (W46.rotation-default). Optional, as above.
     var rotationUnsurePages: Int? = nil
+    /// Pages that entered the newspaper layout stage, including its whole-page fallbacks.
+    var newspaperPages: Int? = nil
+    /// Image-reading requests made by those pages (regions, fills and fallbacks), across their recorded attempts.
+    var newspaperRequests: Int? = nil
 }
 
 /// Parameters captured at the START of a Process-Files run so the pipeline's completion tails can
@@ -83,6 +87,23 @@ struct RunHistorySnapshot {
     /// before its images; a resume starts after it). What a run that ends early has spent is priced from these.
     var pdfSources: [URL] = []
     var pdfHalfRead = false
+    /// Additional region and fill requests already reserved for a paid newspaper batch. Kept independently of
+    /// completed jobs, since the provider may bill requests whose parts have not arrived or aggregated yet.
+    var newspaperBatchExtraCost: Double = 0
+
+    /// Reserve all expanded batch requests beyond the original request the base estimate already counts.
+    /// Each crop keeps its original page's previous-image context; batch discounts apply to these requests only.
+    mutating func reserveNewspaperBatch(_ manifest: NewspaperBatch.Manifest?) {
+        guard batchMode, localAgent == nil, gatewayConfig == nil else {
+            newspaperBatchExtraCost = 0
+            return
+        }
+        newspaperBatchExtraCost = (manifest?.pages ?? []).filter(\.isExpanded).reduce(0) { total, page in
+            let price = PageKindRouting.pagePrice(model, imageScale: imageScale,
+                sendPreviousImage: sendPreviousImage && page.fileIndex > 0, contextCharCount: 0)
+            return total + Double(max(0, page.requestIDs.count - 1)) * price * model.batchDiscount
+        }
+    }
 
     /// Cost of this run using the exact same per-model math the pre-run estimator uses: the image subset
     /// at the standard or batch total picked by `batchMode`, plus any direct PDF pages at standard.
@@ -95,7 +116,7 @@ struct RunHistorySnapshot {
             useGateway: gatewayConfig != nil, imageTokenProvider: imageTokenProvider,
             gatewayRotation: gatewayRotation) : nil
         guard imageCount > 0 else {
-            return CostEstimator.runTotal(images: nil, directPDFPages: pdfPages, batch: batchMode)
+            return CostEstimator.runTotal(images: nil, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
         }
         let costModel = visionTextModel ?? model
         let est = CostEstimator.estimate(
@@ -113,24 +134,29 @@ struct RunHistorySnapshot {
             visionTextOnly: visionTextModel != nil,
             gatewayRotation: gatewayRotation
         )
-        return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode)
+        return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
     }
 
     /// What a run that ends before its success tail has spent (W46.settings-ledger-more): the estimate for the pages
     /// it read (`readSources`, a job with a result or a failure; the PDF half whole once read), plus their second
-    /// and routed readers. Overcounts a page that failed before any call, the safe side for a monthly limit.
+    /// and routed readers and additional newspaper region/fill/fallback requests. Overcounts a page that failed
+    /// before any call, the safe side for a monthly limit. A paid batch retains its entire region reserve even
+    /// when no original page has aggregated: these requests are paid independently of local result collection.
     func spentSoFar(readSources: Set<URL>, secondReaders: [SecondReader] = [],
-                    pageReaders: [PageReaderRecord] = []) -> Double {
+                    pageReaders: [PageReaderRecord] = [], layouts: [NewspaperLayoutRecord] = []) -> Double {
         var part = self
         let pdfRead = pdfHalfRead ? pdfSources : pdfSources.filter { readSources.contains($0) }
         let images = min(readSources.subtracting(pdfSources).count, max(0, fileCount - pdfFileCount))
         part.pdfFileCount = pdfRead.count
         part.pdfPageCount = pdfHalfRead ? pdfPageCount : Self.directPDFPageCount(pdfRead)
         part.fileCount = pdfRead.count + images
-        guard part.fileCount > 0 || !secondReaders.isEmpty || !pageReaders.isEmpty else { return 0 }
-        let base = part.fileCount > 0 ? part.estimatedCost : 0
+        guard part.fileCount > 0 || newspaperBatchExtraCost > 0 || !secondReaders.isEmpty
+                || !pageReaders.isEmpty || !layouts.isEmpty else { return 0 }
+        let base = part.fileCount > 0 ? part.estimatedCost : newspaperBatchExtraCost
         let extra = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
             + pageReaders.filter(\.isRouted).reduce(0) { $0 + ($1.estimatedCost ?? 0) - ($1.replacedCost ?? 0) }
+            + layouts.reduce(0) { $0 + (newspaperBatchExtraCost > 0
+                ? ($1.standardFallbackCost ?? 0) : ($1.estimatedExtraCost ?? 0)) }
         return max(0, base + extra)
     }
 
@@ -167,13 +193,18 @@ struct RunHistorySnapshot {
     /// succeeded + failed always equals the file count (a run either produces output or is a failure).
     /// `secondReaders` are the run's pages a second reader read; their own estimated cost is added to the run's.
     /// `pageReaders` are the run's per-page reader records (W41.app-page-kind); a page read by another model than the
-    /// run's adds that model's page price less the run model's.
+    /// run's adds that model's page price less the run model's. `layouts` adds the newspaper requests beyond
+    /// the one whole-page request already counted by the base or second-reader estimate.
     func makeRun(succeeded: Int, secondReaders: [SecondReader] = [], pageReaders: [PageReaderRecord] = [],
-                 rotationUnsure: Int = 0) -> ProcessingRun {
+                 rotationUnsure: Int = 0, layouts: [NewspaperLayoutRecord] = []) -> ProcessingRun {
         let ok = max(0, min(succeeded, fileCount))
         let secondReaderCost = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
         let routed = pageReaders.filter(\.isRouted)
         let routedCost = routed.reduce(0) { $0 + ($1.estimatedCost ?? 0) - ($1.replacedCost ?? 0) }
+        // Batch region/fill requests are already in estimatedCost's reserve. Only its unbatched whole-page
+        // fallbacks are additional; synchronous runs still add every extra reading recorded by their layout.
+        let layoutCost = layouts.reduce(0) { $0 + (newspaperBatchExtraCost > 0
+            ? ($1.standardFallbackCost ?? 0) : ($1.estimatedExtraCost ?? 0)) }
         return ProcessingRun(
             date: startedAt,
             providerLabel: providerLabel,
@@ -183,10 +214,12 @@ struct RunHistorySnapshot {
             failed: fileCount - ok,
             batchMode: batchMode,
             modeLabel: modeLabel,
-            cost: max(0, estimatedCost + secondReaderCost + routedCost),
+            cost: max(0, estimatedCost + secondReaderCost + routedCost + layoutCost),
             secondReaderPages: secondReaders.isEmpty ? nil : secondReaders.count,
             kindRoutedPages: routed.isEmpty ? nil : routed.count,
-            rotationUnsurePages: rotationUnsure > 0 ? rotationUnsure : nil
+            rotationUnsurePages: rotationUnsure > 0 ? rotationUnsure : nil,
+            newspaperPages: layouts.isEmpty ? nil : layouts.count,
+            newspaperRequests: layouts.isEmpty ? nil : layouts.reduce(0) { $0 + $1.requests }
         )
     }
 }
@@ -259,6 +292,7 @@ extension RunHistorySnapshot {
             pdfSources: batch.mixedPDFOutcomes?.map(\.sourceURL) ?? [],
             pdfHalfRead: batch.mixedPDFOutcomes != nil
         )
+        reserveNewspaperBatch(batch.newspaperManifest)
     }
 }
 

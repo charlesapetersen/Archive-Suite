@@ -1,5 +1,26 @@
 import Foundation
 
+/// One paid batch request. Expanded newspaper regions keep the original page's identity and previous page;
+/// without an expansion the batch clients retain their `file-N` ids and existing context cache.
+struct BatchOCRRequest: Sendable {
+    let imageURL: URL
+    let customID: String
+    let previousImageURL: URL?
+
+    init(imageURL: URL, customID: String, previousImageURL: URL? = nil) {
+        self.imageURL = imageURL
+        self.customID = customID
+        self.previousImageURL = previousImageURL
+    }
+
+    static func originals(_ urls: [URL], sendPreviousImage: Bool) -> [Self] {
+        urls.enumerated().map { i, url in
+            Self(imageURL: url, customID: "file-\(i)",
+                 previousImageURL: sendPreviousImage && i > 0 ? urls[i - 1] : nil)
+        }
+    }
+}
+
 /// Shared HTTP error-body → message parsing for the batch clients. Checks a top-level `message`
 /// first (Mistral's shape), then nested `error.message` (Anthropic/Gemini). Anthropic and Gemini
 /// error bodies carry no top-level `message`, so this is behavior-identical to their prior
@@ -44,7 +65,8 @@ struct AnthropicBatchClient: Sendable {
     private var baseURL: String { "https://api.anthropic.com/v1/messages/batches" }
 
     /// Submit a batch of OCR requests. Returns the batch ID.
-    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0) async throws -> String {
+    func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0,
+                     preparedRequests: [BatchOCRRequest]? = nil) async throws -> String {
         // M5 perf fix: serialize each request to JSON Data immediately and append to the
         // body buffer, so only ONE image's base64 lives in the dict tree at a time. The old
         // approach held ALL base64 strings in the `requests` array simultaneously, then
@@ -54,19 +76,33 @@ struct AnthropicBatchClient: Sendable {
         // L4 perf: cache the previous iteration's JPEG so sendPreviousImage reuses it
         // instead of re-loading + re-encoding from disk each iteration.
         var previousJPEG: Data?
+        var previousOriginalURL: URL?
+        var previousOriginalJPEG: Data?
+        let requests = preparedRequests ?? BatchOCRRequest.originals(fileURLs, sendPreviousImage: sendPreviousImage)
 
-        for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
+        for (index, item) in requests.enumerated() {
+            try Task.checkCancellation()
+            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: item.imageURL, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
+            let context: Data?
+            if preparedRequests == nil {
+                context = sendPreviousImage && index > 0 ? previousJPEG : nil
+            } else if sendPreviousImage, let previousURL = item.previousImageURL {
+                if previousURL != previousOriginalURL {
+                    previousOriginalURL = previousURL
+                    previousOriginalJPEG = ImageEncoding.loadImageAsJPEG(url: previousURL, scale: imageScale)
+                }
+                context = previousOriginalJPEG
+            } else { context = nil }
             let prompt = OCRPrompt.build(
                 previousText: nil,
-                previousImageIncluded: sendPreviousImage && index > 0,
+                previousImageIncluded: preparedRequests == nil ? sendPreviousImage && index > 0 : context != nil,
                 customPrompt: customPrompt
             )
 
             var content: [[String: Any]] = []
 
-            if sendPreviousImage && index > 0, let prevData = previousJPEG {
+            if let prevData = context {
                 content.append([
                     "type": "image",
                     "source": [
@@ -102,7 +138,7 @@ struct AnthropicBatchClient: Sendable {
             }
 
             let requestObj: [String: Any] = [
-                "custom_id": "file-\(index)",
+                "custom_id": item.customID,
                 "params": params
             ]
 
@@ -303,6 +339,7 @@ struct GeminiBatchClient: Sendable {
         sendPreviousImage: Bool,
         customPrompt: String? = nil,
         imageScale: Double = 1.0,
+        preparedRequests: [BatchOCRRequest]? = nil,
         onJobCreated: (@Sendable (String) async throws -> Void)? = nil
     ) async throws -> String {
         // Build JSONL lines for each file, tracking sizes for chunking
@@ -310,19 +347,33 @@ struct GeminiBatchClient: Sendable {
         // L4 perf: cache the previous iteration's JPEG so sendPreviousImage reuses it
         // instead of re-loading + re-encoding from disk each iteration.
         var previousJPEG: Data?
+        var previousOriginalURL: URL?
+        var previousOriginalJPEG: Data?
+        let requests = preparedRequests ?? BatchOCRRequest.originals(fileURLs, sendPreviousImage: sendPreviousImage)
 
-        for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
+        for (index, item) in requests.enumerated() {
+            try Task.checkCancellation()
+            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: item.imageURL, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
+            let context: Data?
+            if preparedRequests == nil {
+                context = sendPreviousImage && index > 0 ? previousJPEG : nil
+            } else if sendPreviousImage, let previousURL = item.previousImageURL {
+                if previousURL != previousOriginalURL {
+                    previousOriginalURL = previousURL
+                    previousOriginalJPEG = ImageEncoding.loadImageAsJPEG(url: previousURL, scale: imageScale)
+                }
+                context = previousOriginalJPEG
+            } else { context = nil }
             let prompt = OCRPrompt.build(
                 previousText: nil,
-                previousImageIncluded: sendPreviousImage && index > 0,
+                previousImageIncluded: preparedRequests == nil ? sendPreviousImage && index > 0 : context != nil,
                 customPrompt: customPrompt
             )
 
             var parts: [[String: Any]] = []
 
-            if sendPreviousImage && index > 0, let prevData = previousJPEG {
+            if let prevData = context {
                 parts.append(["inlineData": ["mimeType": "image/jpeg", "data": prevData.base64EncodedString()]])
             }
 
@@ -339,7 +390,7 @@ struct GeminiBatchClient: Sendable {
             }
 
             let lineObj: [String: Any] = [
-                "key": "file-\(index)",
+                "key": item.customID,
                 "request": requestBody
             ]
 
@@ -797,17 +848,20 @@ struct MistralBatchClient: Sendable {
     private var filesURL: String { "https://api.mistral.ai/v1/files" }
 
     /// Submit a batch of OCR requests. Uploads a JSONL file then creates a batch job. Returns the batch job ID.
-    func submitBatch(fileURLs: [URL], imageScale: Double = 1.0) async throws -> String {
+    func submitBatch(fileURLs: [URL], imageScale: Double = 1.0,
+                     preparedRequests: [BatchOCRRequest]? = nil) async throws -> String {
         // Build JSONL content — one request per line
         var jsonlLines: [String] = []
 
-        for (index, url) in fileURLs.enumerated() {
-            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: url, scale: imageScale) else { continue }
+        let requests = preparedRequests ?? BatchOCRRequest.originals(fileURLs, sendPreviousImage: false)
+        for item in requests {
+            try Task.checkCancellation()
+            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: item.imageURL, scale: imageScale) else { continue }
             let base64 = jpegData.base64EncodedString()
             let dataURI = "data:image/jpeg;base64,\(base64)"
 
             let requestObj: [String: Any] = [
-                "custom_id": "file-\(index)",
+                "custom_id": item.customID,
                 "body": [
                     "model": model.id,
                     "document": [

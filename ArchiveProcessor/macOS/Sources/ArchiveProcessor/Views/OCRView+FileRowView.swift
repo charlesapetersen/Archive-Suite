@@ -86,7 +86,7 @@ struct FileItem: ProcessableItem {
          availableActions: [ItemAction] = []) {
         self.itemID = job?.id.uuidString ?? url.path
         self.title = url.lastPathComponent
-        self.subtitle = nil
+        self.subtitle = job?.result?.newspaperLayout?.summary
         self.state = Self.state(for: job)
         self.classification = shownClassification
         self.rotationDegrees = (job?.result?.rotationDegrees).flatMap { $0 != 0 ? $0 : nil }

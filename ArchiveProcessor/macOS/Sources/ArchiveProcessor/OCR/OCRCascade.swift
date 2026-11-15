@@ -205,11 +205,12 @@ struct OCRCascade: Codable, Equatable, Sendable {
             let note = " Not escalated: \(admitted.escalated) of the run's \(admitted.pages) pages already were, which "
                 + "points to a fault on the first route rather than hard pages."
             return OCRResult(text: nil, classification: nil, errorMessage: (first.errorMessage ?? "No text.") + note,
-                             errorCode: first.errorCode)
+                             errorCode: first.errorCode, newspaperLayout: first.newspaperLayout)
         }
 
         let firstLabel = firstReaderLabel ?? "\(model.provider.rawValue) · \(model.displayName)"
         let targetLabel = "\(target.provider.rawValue) · \(target.displayName)"
+        var incurredLayout = first.newspaperLayout
         var why: String
         // The escalation's code for `OCRResult.readingCodes`: "" when it threw or had no key.
         var whyCode = ""
@@ -221,7 +222,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
             do {
                 let read = try await OCRRefusalFallback.read(
                     route, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                    customPrompt: customPrompt, imageScale: imageScale)
+                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)
                 if read.text != nil {
                     let reader = SecondReader(
                         provider: route.provenanceProvider, model: route.provenanceModel, firstCode: firstCode,
@@ -230,8 +231,9 @@ struct OCRCascade: Codable, Equatable, Sendable {
                     NSLog("[OCR] \(imageURL.lastPathComponent): read by \(reader.summary)")
                     return OCRResult(text: read.text, classification: read.classification,
                                      rotationDegrees: read.rotationDegrees, errorMessage: nil, errorCode: nil,
-                                     enclosure: read.enclosure, secondReader: reader)
+                                     enclosure: read.enclosure, secondReader: reader, newspaperLayout: NewspaperLayoutRecord.combining(read.newspaperLayout, after: incurredLayout))
                 }
+                incurredLayout = NewspaperLayoutRecord.combining(read.newspaperLayout, after: incurredLayout)
                 why = "\(targetLabel): \(read.errorMessage ?? "no text")"
                 whyCode = read.errorCode ?? ""
             } catch {
@@ -249,8 +251,14 @@ struct OCRCascade: Codable, Equatable, Sendable {
         NSLog("[OCR] \(imageURL.lastPathComponent): escalation (\(trigger.rawValue)) failed — \(why)")
 
         // A disagreement still has the first reader's text: keep it rather than fail a page that was read.
-        if trigger == .disagreement { return first }
+        if trigger == .disagreement {
+            var first = first
+            first.newspaperLayout = incurredLayout
+            return first
+        }
         if refused {
+            var first = first
+            first.newspaperLayout = incurredLayout
             return await OCRRefusalFallback.readRefusedPage(
                 first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: imageScale, costScale: costScale, excluding: target,
@@ -259,7 +267,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
         let firstWhy = first.errorMessage ?? "\(firstLabel) returned no text (\(firstCode))."
         return OCRResult(text: nil, classification: nil,
                          errorMessage: "\(firstWhy) Escalated to \(targetLabel), which failed too — \(why)",
-                         errorCode: exhaustedCode, readingCodes: [first.errorCode ?? "", whyCode])
+                         errorCode: exhaustedCode, readingCodes: [first.errorCode ?? "", whyCode], newspaperLayout: incurredLayout)
     }
 
     private static func key(for provider: LLMProvider) -> String? {
@@ -270,7 +278,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
     private static func visionWordCount(imageURL: URL, settings: VisionOCRSettings) async -> Int? {
         if let visionWordsOverride { return visionWordsOverride(imageURL) }
         guard let reader = try? PageReaders.reader(provider: .appleVision, model: LLMModel.appleVisionModels[0],
-                                                   apiKey: "", thinkingLevel: nil, visionSettings: settings),
+                                                   apiKey: "", thinkingLevel: nil, visionSettings: settings, newspaperLayout: false),
               let text = try? await reader.read(PageReaderInput(imageURL: imageURL)).text else { return nil }
         return wordCount(text)
     }

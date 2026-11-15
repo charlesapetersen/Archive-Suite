@@ -1,0 +1,689 @@
+{
+  "item": "W46.layout-newspapers",
+  "pages": [
+    {
+      "page": "newsbench__mss3413200223-28",
+      "width": 5305,
+      "height": 4771,
+      "regions": 71,
+      "detector_rectangles": {
+        "coverage": 0.9655599097371643,
+        "vision_line_union_area": 0.64721325821109,
+        "covered_vision_line_union_area": 0.6249231751789961,
+        "lines": 913,
+        "fully_covered_lines": 779,
+        "partially_covered_lines": 101,
+        "uncovered_lines": 33,
+        "lines_under_80pct": 39
+      },
+      "actual_crops": {
+        "coverage": 0.973301539632287,
+        "vision_line_union_area": 0.64721325821109,
+        "covered_vision_line_union_area": 0.6299336606872828,
+        "lines": 913,
+        "fully_covered_lines": 874,
+        "partially_covered_lines": 25,
+        "uncovered_lines": 14,
+        "lines_under_80pct": 35
+      },
+      "app_partition": {
+        "retained_regions": 71,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.973301539632287,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 269,
+        "boundary_lines_including_transitive": 676,
+        "transitively_added_lines": 407,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201283-24",
+      "width": 5491,
+      "height": 4368,
+      "regions": 49,
+      "detector_rectangles": {
+        "coverage": 0.7668529532659721,
+        "vision_line_union_area": 0.22343314200956585,
+        "covered_vision_line_union_area": 0.17134036480753093,
+        "lines": 397,
+        "fully_covered_lines": 366,
+        "partially_covered_lines": 21,
+        "uncovered_lines": 10,
+        "lines_under_80pct": 11
+      },
+      "actual_crops": {
+        "coverage": 0.7719209759853919,
+        "vision_line_union_area": 0.22343314200956585,
+        "covered_vision_line_union_area": 0.17247272904750674,
+        "lines": 397,
+        "fully_covered_lines": 386,
+        "partially_covered_lines": 2,
+        "uncovered_lines": 9,
+        "lines_under_80pct": 11
+      },
+      "app_partition": {
+        "retained_regions": 49,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.7719209759853919,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 86,
+        "boundary_lines_including_transitive": 126,
+        "transitively_added_lines": 40,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201309-4",
+      "width": 5577,
+      "height": 4552,
+      "regions": 67,
+      "detector_rectangles": {
+        "coverage": 0.8146382919287684,
+        "vision_line_union_area": 0.2481681430013524,
+        "covered_vision_line_union_area": 0.20216727212575605,
+        "lines": 276,
+        "fully_covered_lines": 196,
+        "partially_covered_lines": 39,
+        "uncovered_lines": 41,
+        "lines_under_80pct": 45
+      },
+      "actual_crops": {
+        "coverage": 0.8364898410719653,
+        "vision_line_union_area": 0.2481681430013524,
+        "covered_vision_line_union_area": 0.20759013049832603,
+        "lines": 276,
+        "fully_covered_lines": 228,
+        "partially_covered_lines": 12,
+        "uncovered_lines": 36,
+        "lines_under_80pct": 45
+      },
+      "app_partition": {
+        "retained_regions": 67,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.8364898410719653,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 93,
+        "boundary_lines_including_transitive": 133,
+        "transitively_added_lines": 40,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201315-4",
+      "width": 3615,
+      "height": 4266,
+      "regions": 50,
+      "detector_rectangles": {
+        "coverage": 0.9636694147187304,
+        "vision_line_union_area": 0.02408653227502898,
+        "covered_vision_line_union_area": 0.023211454460080987,
+        "lines": 76,
+        "fully_covered_lines": 66,
+        "partially_covered_lines": 8,
+        "uncovered_lines": 2,
+        "lines_under_80pct": 2
+      },
+      "actual_crops": {
+        "coverage": 0.9727777249738602,
+        "vision_line_union_area": 0.02408653227502898,
+        "covered_vision_line_union_area": 0.023430842069012147,
+        "lines": 76,
+        "fully_covered_lines": 74,
+        "partially_covered_lines": 0,
+        "uncovered_lines": 2,
+        "lines_under_80pct": 2
+      },
+      "app_partition": {
+        "retained_regions": 50,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9727777249738602,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 21,
+        "boundary_lines_including_transitive": 32,
+        "transitively_added_lines": 11,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201322-4",
+      "width": 3357,
+      "height": 4991,
+      "regions": 45,
+      "detector_rectangles": {
+        "coverage": 0.9609954105384286,
+        "vision_line_union_area": 0.37987970988531455,
+        "covered_vision_line_union_area": 0.365062657756457,
+        "lines": 679,
+        "fully_covered_lines": 593,
+        "partially_covered_lines": 75,
+        "uncovered_lines": 11,
+        "lines_under_80pct": 25
+      },
+      "actual_crops": {
+        "coverage": 0.9875742964540537,
+        "vision_line_union_area": 0.37987970988531455,
+        "covered_vision_line_union_area": 0.37515943722715955,
+        "lines": 679,
+        "fully_covered_lines": 657,
+        "partially_covered_lines": 15,
+        "uncovered_lines": 7,
+        "lines_under_80pct": 14
+      },
+      "app_partition": {
+        "retained_regions": 45,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9875742964540537,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 141,
+        "boundary_lines_including_transitive": 381,
+        "transitively_added_lines": 240,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201323-27",
+      "width": 5203,
+      "height": 3605,
+      "regions": 54,
+      "detector_rectangles": {
+        "coverage": 0.8827452289516633,
+        "vision_line_union_area": 0.39132681978723277,
+        "covered_vision_line_union_area": 0.34544188312800705,
+        "lines": 778,
+        "fully_covered_lines": 589,
+        "partially_covered_lines": 79,
+        "uncovered_lines": 110,
+        "lines_under_80pct": 121
+      },
+      "actual_crops": {
+        "coverage": 0.8983603672227523,
+        "vision_line_union_area": 0.39132681978723277,
+        "covered_vision_line_union_area": 0.35155250552817024,
+        "lines": 778,
+        "fully_covered_lines": 658,
+        "partially_covered_lines": 62,
+        "uncovered_lines": 58,
+        "lines_under_80pct": 117
+      },
+      "app_partition": {
+        "retained_regions": 54,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.8983603672227523,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 312,
+        "boundary_lines_including_transitive": 485,
+        "transitively_added_lines": 173,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201417-17",
+      "width": 5844,
+      "height": 4716,
+      "regions": 56,
+      "detector_rectangles": {
+        "coverage": 0.9947536730983235,
+        "vision_line_union_area": 0.44643393623775823,
+        "covered_vision_line_union_area": 0.44409179786825276,
+        "lines": 458,
+        "fully_covered_lines": 400,
+        "partially_covered_lines": 58,
+        "uncovered_lines": 0,
+        "lines_under_80pct": 2
+      },
+      "actual_crops": {
+        "coverage": 0.9982497615687929,
+        "vision_line_union_area": 0.44643393623775823,
+        "covered_vision_line_union_area": 0.44565257040555983,
+        "lines": 458,
+        "fully_covered_lines": 457,
+        "partially_covered_lines": 1,
+        "uncovered_lines": 0,
+        "lines_under_80pct": 1
+      },
+      "app_partition": {
+        "retained_regions": 56,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9982497615687929,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 293,
+        "boundary_lines_including_transitive": 412,
+        "transitively_added_lines": 119,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201417-20",
+      "width": 5613,
+      "height": 4067,
+      "regions": 69,
+      "detector_rectangles": {
+        "coverage": 0.9704161941758299,
+        "vision_line_union_area": 0.44281542548433966,
+        "covered_vision_line_union_area": 0.4297152599208637,
+        "lines": 586,
+        "fully_covered_lines": 518,
+        "partially_covered_lines": 59,
+        "uncovered_lines": 9,
+        "lines_under_80pct": 16
+      },
+      "actual_crops": {
+        "coverage": 0.9783236002216907,
+        "vision_line_union_area": 0.44281542548433966,
+        "covered_vision_line_union_area": 0.433216781293539,
+        "lines": 586,
+        "fully_covered_lines": 572,
+        "partially_covered_lines": 11,
+        "uncovered_lines": 3,
+        "lines_under_80pct": 14
+      },
+      "app_partition": {
+        "retained_regions": 69,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9783236002216907,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 144,
+        "boundary_lines_including_transitive": 366,
+        "transitively_added_lines": 222,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201417-25",
+      "width": 5580,
+      "height": 4496,
+      "regions": 91,
+      "detector_rectangles": {
+        "coverage": 0.870281428161754,
+        "vision_line_union_area": 0.38448585200584307,
+        "covered_vision_line_union_area": 0.3346108963916339,
+        "lines": 525,
+        "fully_covered_lines": 406,
+        "partially_covered_lines": 69,
+        "uncovered_lines": 50,
+        "lines_under_80pct": 63
+      },
+      "actual_crops": {
+        "coverage": 0.8906380148290014,
+        "vision_line_union_area": 0.38448585200584307,
+        "covered_vision_line_union_area": 0.3424377159603213,
+        "lines": 525,
+        "fully_covered_lines": 464,
+        "partially_covered_lines": 45,
+        "uncovered_lines": 16,
+        "lines_under_80pct": 59
+      },
+      "app_partition": {
+        "retained_regions": 91,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.8906380148290014,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 218,
+        "boundary_lines_including_transitive": 423,
+        "transitively_added_lines": 205,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201417-29",
+      "width": 5742,
+      "height": 4687,
+      "regions": 93,
+      "detector_rectangles": {
+        "coverage": 0.9191962547572314,
+        "vision_line_union_area": 0.4424410988892787,
+        "covered_vision_line_union_area": 0.40669020104969883,
+        "lines": 493,
+        "fully_covered_lines": 401,
+        "partially_covered_lines": 62,
+        "uncovered_lines": 30,
+        "lines_under_80pct": 41
+      },
+      "actual_crops": {
+        "coverage": 0.9349853938588764,
+        "vision_line_union_area": 0.4424410988892787,
+        "covered_vision_line_union_area": 0.4136759651043463,
+        "lines": 493,
+        "fully_covered_lines": 452,
+        "partially_covered_lines": 13,
+        "uncovered_lines": 28,
+        "lines_under_80pct": 37
+      },
+      "app_partition": {
+        "retained_regions": 93,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9349853938588764,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 184,
+        "boundary_lines_including_transitive": 393,
+        "transitively_added_lines": 209,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201573-36",
+      "width": 3812,
+      "height": 4404,
+      "regions": 76,
+      "detector_rectangles": {
+        "coverage": 0.9205960249625289,
+        "vision_line_union_area": 0.1742059808206461,
+        "covered_vision_line_union_area": 0.16037333346818533,
+        "lines": 359,
+        "fully_covered_lines": 267,
+        "partially_covered_lines": 58,
+        "uncovered_lines": 34,
+        "lines_under_80pct": 38
+      },
+      "actual_crops": {
+        "coverage": 0.9402101261192692,
+        "vision_line_union_area": 0.1742059808206461,
+        "covered_vision_line_union_area": 0.16379022719811065,
+        "lines": 359,
+        "fully_covered_lines": 324,
+        "partially_covered_lines": 13,
+        "uncovered_lines": 22,
+        "lines_under_80pct": 34
+      },
+      "app_partition": {
+        "retained_regions": 74,
+        "redundant_regions_omitted": 2,
+        "coverage": 0.940210126119269,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 100,
+        "boundary_lines_including_transitive": 164,
+        "transitively_added_lines": 64,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201628-41",
+      "width": 5732,
+      "height": 4855,
+      "regions": 99,
+      "detector_rectangles": {
+        "coverage": 0.9251375583709475,
+        "vision_line_union_area": 0.4808527494095117,
+        "covered_vision_line_union_area": 0.4448549385246727,
+        "lines": 518,
+        "fully_covered_lines": 412,
+        "partially_covered_lines": 81,
+        "uncovered_lines": 25,
+        "lines_under_80pct": 47
+      },
+      "actual_crops": {
+        "coverage": 0.9445422210361719,
+        "vision_line_union_area": 0.4808527494095117,
+        "covered_vision_line_union_area": 0.45418572391861,
+        "lines": 518,
+        "fully_covered_lines": 473,
+        "partially_covered_lines": 27,
+        "uncovered_lines": 18,
+        "lines_under_80pct": 39
+      },
+      "app_partition": {
+        "retained_regions": 99,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9445422210361719,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 250,
+        "boundary_lines_including_transitive": 463,
+        "transitively_added_lines": 213,
+        "low_coverage_fill": true,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201819-6",
+      "width": 5750,
+      "height": 3915,
+      "regions": 70,
+      "detector_rectangles": {
+        "coverage": 0.9559691090352879,
+        "vision_line_union_area": 0.480472924289788,
+        "covered_vision_line_union_area": 0.45931727334888794,
+        "lines": 644,
+        "fully_covered_lines": 543,
+        "partially_covered_lines": 88,
+        "uncovered_lines": 13,
+        "lines_under_80pct": 28
+      },
+      "actual_crops": {
+        "coverage": 0.9628398255010748,
+        "vision_line_union_area": 0.480472924289788,
+        "covered_vision_line_union_area": 0.4626184665811706,
+        "lines": 644,
+        "fully_covered_lines": 615,
+        "partially_covered_lines": 20,
+        "uncovered_lines": 9,
+        "lines_under_80pct": 28
+      },
+      "app_partition": {
+        "retained_regions": 70,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9628398255010748,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 255,
+        "boundary_lines_including_transitive": 454,
+        "transitively_added_lines": 199,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss3413201879-7",
+      "width": 5297,
+      "height": 3528,
+      "regions": 45,
+      "detector_rectangles": {
+        "coverage": 0.9822854557813623,
+        "vision_line_union_area": 0.425762718332437,
+        "covered_vision_line_union_area": 0.4182205258318897,
+        "lines": 972,
+        "fully_covered_lines": 930,
+        "partially_covered_lines": 39,
+        "uncovered_lines": 3,
+        "lines_under_80pct": 3
+      },
+      "actual_crops": {
+        "coverage": 0.9869654410238591,
+        "vision_line_union_area": 0.425762718332437,
+        "covered_vision_line_union_area": 0.42021308907049076,
+        "lines": 972,
+        "fully_covered_lines": 969,
+        "partially_covered_lines": 0,
+        "uncovered_lines": 3,
+        "lines_under_80pct": 3
+      },
+      "app_partition": {
+        "retained_regions": 45,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.9869654410238591,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 45,
+        "boundary_lines_including_transitive": 225,
+        "transitively_added_lines": 180,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    },
+    {
+      "page": "newsbench__mss425490669-55",
+      "width": 5539,
+      "height": 5031,
+      "regions": 38,
+      "detector_rectangles": {
+        "coverage": 0.9811546261571178,
+        "vision_line_union_area": 0.22344810857766703,
+        "covered_vision_line_union_area": 0.21923714543703596,
+        "lines": 461,
+        "fully_covered_lines": 398,
+        "partially_covered_lines": 48,
+        "uncovered_lines": 15,
+        "lines_under_80pct": 19
+      },
+      "actual_crops": {
+        "coverage": 0.987939482028907,
+        "vision_line_union_area": 0.22344810857766703,
+        "covered_vision_line_union_area": 0.22075320864855935,
+        "lines": 461,
+        "fully_covered_lines": 442,
+        "partially_covered_lines": 6,
+        "uncovered_lines": 13,
+        "lines_under_80pct": 19
+      },
+      "app_partition": {
+        "retained_regions": 38,
+        "redundant_regions_omitted": 0,
+        "coverage": 0.987939482028907,
+        "vision_unavailable": false,
+        "initial_boundary_lines": 167,
+        "boundary_lines_including_transitive": 289,
+        "transitively_added_lines": 122,
+        "low_coverage_fill": false,
+        "boundary_fill": true,
+        "requires_fill": true
+      }
+    }
+  ],
+  "method": {
+    "metric": "area(union(Vision line boxes) intersect union(crop boxes)) / area(union(Vision line boxes))",
+    "origin": "top-left",
+    "boxes": "normalised [x0,y0,x1,y1]",
+    "picture_regions": "all labels kept; app partition omits only crops entirely covered by earlier crops",
+    "crop_padding": 0.004,
+    "crop_min_side_pixels": 32,
+    "crop_rounding": "nearest integer, ties to even, as regions_cluster.pixel_box",
+    "vision_lines": 8135,
+    "threshold": 0.95,
+    "threshold_status": "conservative engineering floor; OCR accuracy and optimal threshold untested",
+    "partition": "native order; first intersecting crop owns pixels; split lines and all transitively intersecting Vision lines move intact to fill",
+    "fill_conditions": "coverage below .95 OR boundary lines present OR Vision unavailable",
+    "partial_line_warning": "the app's whole-line guard addresses known Vision boxes split across crops; geometry alone does not establish OCR accuracy or protect writing Vision did not find",
+    "prior_694pct": "dark pixels below 128 at 1000px long side, 2% margin excluded, picture labels dropped; not Vision line-box coverage",
+    "sources": [
+      "layout-photo/pages.jsonl",
+      "layout-photo/regions/pp.json",
+      "layout-order/vision/newsbench__*.json"
+    ],
+    "no_new_reading": "no model, image decode, transcription scoring, network or paid call"
+  },
+  "region_counts": {
+    "minimum": 38,
+    "median": 67,
+    "mean": 64.86666666666666,
+    "maximum": 99
+  },
+  "summary": {
+    "detector_rectangles": {
+      "coverage": {
+        "minimum": 0.7668529532659721,
+        "median": 0.9559691090352879,
+        "mean": 0.9249501022427407,
+        "maximum": 0.9947536730983235
+      },
+      "fully_covered_lines": 6864,
+      "partially_covered_lines": 885,
+      "uncovered_lines": 386,
+      "fill_counts": [
+        {
+          "threshold": 0.8,
+          "pages": 1
+        },
+        {
+          "threshold": 0.85,
+          "pages": 2
+        },
+        {
+          "threshold": 0.9,
+          "pages": 4
+        },
+        {
+          "threshold": 0.95,
+          "pages": 7
+        },
+        {
+          "threshold": 0.98,
+          "pages": 12
+        }
+      ]
+    },
+    "actual_crops": {
+      "coverage": {
+        "minimum": 0.7719209759853919,
+        "median": 0.9628398255010748,
+        "mean": 0.9376745741018636,
+        "maximum": 0.9982497615687929
+      },
+      "fully_covered_lines": 7645,
+      "partially_covered_lines": 252,
+      "uncovered_lines": 238,
+      "fill_counts": [
+        {
+          "threshold": 0.8,
+          "pages": 1
+        },
+        {
+          "threshold": 0.85,
+          "pages": 2
+        },
+        {
+          "threshold": 0.9,
+          "pages": 4
+        },
+        {
+          "threshold": 0.95,
+          "pages": 7
+        },
+        {
+          "threshold": 0.98,
+          "pages": 11
+        }
+      ]
+    },
+    "app_partition": {
+      "low_coverage_fill_pages": 7,
+      "boundary_fill_pages": 15,
+      "boundary_only_fill_pages": 8,
+      "both_boundary_and_low_coverage_pages": 7,
+      "vision_unavailable_pages": 0,
+      "requires_fill_pages": 15,
+      "initial_boundary_lines": 2578,
+      "boundary_lines_including_transitive": 5022,
+      "transitively_added_lines": 2444,
+      "redundant_regions_omitted": 2,
+      "retained_region_counts": {
+        "minimum": 38,
+        "median": 67,
+        "mean": 64.73333333333333,
+        "maximum": 99
+      }
+    }
+  }
+}

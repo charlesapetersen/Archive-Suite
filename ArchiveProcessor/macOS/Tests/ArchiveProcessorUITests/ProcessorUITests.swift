@@ -40,6 +40,21 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-default-drop-zone")
     }
 
+    func testNewspaperLayoutRuleOffersItsHelper() throws {
+        let button = element("ap.segmentation.openSettingsSheet")
+        XCTAssertTrue(button.waitForExistence(timeout: 10))
+        button.click()
+        let rules = app.sheets.firstMatch.radioButtons["Rules"]
+        XCTAssertTrue(rules.waitForExistence(timeout: 10))
+        rules.click()
+        let download = app.buttons.matching(NSPredicate(format: "title BEGINSWITH %@", "Download the newspaper layout helper")).firstMatch
+        XCTAssertTrue(download.waitForExistence(timeout: 5), "the rule offers the checked helper download")
+        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
+        for _ in 0..<15 where !download.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -180) }
+        XCTAssertTrue(download.isHittable)
+        attachScreenshot("processor-newspaper-layout-rule")
+    }
+
     func testAnthropicGuidedKeySetupShowsConsoleCostPrivacyAndKeyShape() throws {
         openSettings()
         let guidedSetup = element("ap.settings.guidedKeySetup")

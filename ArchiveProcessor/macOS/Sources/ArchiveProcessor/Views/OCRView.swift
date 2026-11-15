@@ -778,7 +778,7 @@ struct OCRView: View {
                             segmentationCostLine
                             Divider()
                             HStack {
-                                Text("Total (standard):").fontWeight(.medium)
+                                Text(preOCRedInput ? "Total (standard):" : "Whole-page estimate (standard):").fontWeight(.medium)
                                 Spacer()
                                 Text(CostEstimate.money(CostEstimator.runTotal(
                                     images: costEstimate, directPDFPages: pdfPageEstimate, batch: false)
@@ -787,7 +787,7 @@ struct OCRView: View {
                             }
                             if !useGateway && batchMode && !preOCRedInput && costEstimate != nil {
                                 HStack {
-                                    Text(pdfPageEstimate == nil ? "Total (batch):" : "Total (batch images + direct PDF pages):")
+                                    Text(pdfPageEstimate == nil ? "Whole-page estimate (batch):" : "Whole-page estimate (batch images + direct PDF pages):")
                                         .foregroundStyle(.primary)
                                     Spacer()
                                     // Segmentation windows are never batched, so they add the same dollars.
@@ -843,6 +843,8 @@ struct OCRView: View {
                     }
                 }
 
+                newspaperLayoutAllowance
+
                 // Output directory
                 GroupBox("Output Folder") {
                     HStack {
@@ -877,6 +879,53 @@ struct OCRView: View {
                         .buttonStyle(.bordered)
                         .frame(maxWidth: .infinity)
                 }
+            }
+        }
+    }
+
+    /// The detector has not run at estimate time, so a numerical upper allowance assumes every input page
+    /// is a newspaper and reserves all 130 requests per attempt. Multiplying the whole estimate (including
+    /// tagging and rotation) is deliberately conservative; it is not a predicted bill or a spend cap.
+    @ViewBuilder
+    private var newspaperLayoutAllowance: some View {
+        if !preOCRedInput && !droppedFiles.isEmpty {
+            GroupBox("Newspaper layout allowance") {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Confirmed newspaper pages use one reading request per region, with a possible fill and a whole-page fallback. Other kinds, handwriting, registers and uncertain pages keep whole-page reading.")
+                    Text("Allow up to 130 requests per newspaper per attempt: 128 regions, one fill and one fallback. Retries and second readers can make additional attempts.")
+                    if useLocalAgent {
+                        Text("These requests use your subscription allowance. No per-request dollar estimate is available.")
+                    } else if useAppleVision {
+                        Text("Vision reads the regions locally, with no image-reading charge. Any optional text-only judgement is estimated separately above.")
+                    } else if useGateway && !gatewayHasCosts {
+                        Text("Gateway pricing is unknown. Enter model pricing to see a dollar allowance; the request allowance still applies.")
+                    } else {
+                        let standard = CostEstimator.runTotal(images: costEstimate, directPDFPages: pdfPageEstimate, batch: false)
+                            + (segmentationRow?.apiDollars ?? 0)
+                        HStack {
+                            Text("Conservative allowance (standard):")
+                            Spacer()
+                            Text(CostEstimate.money(standard * 130))
+                                .accessibilityIdentifier("ap.ocr.newspaperStandardAllowance")
+                        }
+                        if !useGateway && batchMode && costEstimate != nil {
+                            let batch = CostEstimator.runTotal(images: costEstimate, directPDFPages: pdfPageEstimate, batch: true)
+                                + (segmentationRow?.apiDollars ?? 0)
+                            HStack {
+                                Text("Conservative allowance (batch):")
+                                Spacer()
+                                Text(CostEstimate.money(batch * 130))
+                                    .accessibilityIdentifier("ap.ocr.newspaperBatchAllowance")
+                            }
+                        }
+                        Text("These allowances multiply the entire whole-page estimate by 130, as if every input page were a newspaper. They include non-reading costs repeatedly, so they are deliberately high. Actual costs depend on regions, fills, fallbacks and further attempts; this is not a spending limit.")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(4)
+                .accessibilityIdentifier("ap.ocr.newspaperAllowance")
             }
         }
     }

@@ -16,26 +16,42 @@ enum PageReaders {
     static func reader(
         provider: LLMProvider, model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel?,
         gateway: GatewayConfig? = nil, localAgent: LocalAgentConfig? = nil,
-        visionSettings: VisionOCRSettings = .default
+        visionSettings: VisionOCRSettings = .default,
+        newspaperLayout: Bool = true
+    ) throws -> any PageReader<OCRResult> {
+        let client = try rawReader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
+                                   gateway: gateway, localAgent: localAgent, visionSettings: visionSettings)
+        return newspaperLayout ? NewspaperPageReader(client: client) : client
+    }
+
+    private static func rawReader(
+        provider: LLMProvider, model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel?,
+        gateway: GatewayConfig?, localAgent: LocalAgentConfig?, visionSettings: VisionOCRSettings
     ) throws -> any PageReader<OCRResult> {
         if let localAgent { return Measured(LocalAgentClient(config: localAgent), dollars: nil) }
         if let gateway {
-            return Measured(OpenAICompatibleClient.gateway(gateway), route: "Gateway|\(gateway.modelID)", dollars: nil)
+            let priced: LLMModel? = if let input = gateway.inputCostPer1M, let output = gateway.outputCostPer1M {
+                LLMModel(id: gateway.modelID, displayName: gateway.displayName, provider: provider,
+                         supportsThinking: false, returnsMd: false, inputCostPer1M: input,
+                         outputCostPer1M: output, batchDiscount: 0)
+            } else { nil }
+            return Measured(OpenAICompatibleClient.gateway(gateway), route: "Gateway|\(gateway.modelID)",
+                            dollars: priced.map(pagePrice), pricedModel: priced)
         }
         let price = pagePrice(model)
         switch provider {
         case .anthropic:
-            return Measured(AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel), dollars: price)
+            return Measured(AnthropicClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel), dollars: price, pricedModel: model)
         case .gemini:
-            return Measured(GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel), dollars: price)
+            return Measured(GeminiClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel), dollars: price, pricedModel: model)
         case .mistral:
-            return Measured(MistralClient(apiKey: apiKey, model: model), dollars: price)
+            return Measured(MistralClient(apiKey: apiKey, model: model), dollars: price, pricedModel: model)
         case .openai:
             return Measured(OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel),
-                            route: OCRCascade.routeID(for: model), dollars: price)
+                            route: OCRCascade.routeID(for: model), dollars: price, pricedModel: model)
         case .openrouter:
             return Measured(try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey),
-                            route: OCRCascade.routeID(for: model), dollars: price)
+                            route: OCRCascade.routeID(for: model), dollars: price, pricedModel: model)
         case .appleVision:
             return Measured(VisionClient(settings: visionSettings), dollars: nil)
         }
@@ -51,11 +67,13 @@ enum PageReaders {
         let client: Client
         let route: String
         let dollars: Double?
+        let pricedModel: LLMModel?
 
-        init(_ client: Client, route: String? = nil, dollars: Double?) {
+        init(_ client: Client, route: String? = nil, dollars: Double?, pricedModel: LLMModel? = nil) {
             self.client = client
             self.route = route ?? client.route
             self.dollars = dollars
+            self.pricedModel = pricedModel
         }
 
         func read(_ page: PageReaderInput) async throws -> PageReading<OCRResult> {
@@ -64,7 +82,11 @@ enum PageReaders {
             let elapsed = ContinuousClock.now - start
             reading.seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
             // A failed page is not billed as a read; a provider's own 4xx/5xx costs nothing.
-            reading.dollars = reading.detail.text == nil ? nil : dollars
+            let price = pricedModel.map {
+                PageKindRouting.pagePrice($0, imageScale: page.costScale ?? page.imageScale * page.imageScale,
+                    sendPreviousImage: page.previousImageURL != nil, contextCharCount: page.previousText?.count ?? 0)
+            } ?? dollars
+            reading.dollars = reading.detail.text == nil ? nil : price
             return reading
         }
     }

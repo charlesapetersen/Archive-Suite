@@ -450,6 +450,8 @@ class OCRProcessor: ObservableObject {
         var lifecycleFingerprint: String?
         /// PDF work completed before the image batch was submitted. Image indices remain contiguous.
         var mixedPDFOutcomes: [MixedPDFOutcome]?
+        var newspaperManifest: NewspaperBatch.Manifest? = nil
+        var newspaperParts: [String: OCRResult]? = nil
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
@@ -519,6 +521,8 @@ class OCRProcessor: ObservableObject {
             completedOutputPaths = try c.decodeIfPresent([String: String].self, forKey: .completedOutputPaths)
             lifecycleFingerprint = try c.decodeIfPresent(String.self, forKey: .lifecycleFingerprint)
             mixedPDFOutcomes = try c.decodeIfPresent([MixedPDFOutcome].self, forKey: .mixedPDFOutcomes)
+            newspaperManifest = try c.decodeIfPresent(NewspaperBatch.Manifest.self, forKey: .newspaperManifest)
+            newspaperParts = try c.decodeIfPresent([String: OCRResult].self, forKey: .newspaperParts)
             cascade = try c.decodeIfPresent(OCRCascade.self, forKey: .cascade)
             // A record only: one this build cannot read never blocks resuming the paid batch.
             resolvedSettings = (try? c.decodeIfPresent(ResolvedSettingsSnapshot.self, forKey: .resolvedSettings)) ?? nil

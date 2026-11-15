@@ -952,6 +952,27 @@ do {
 
 // MARK: - A document Vision reads nothing from says so (A13.2)
 
+section("the newspaper detector keeps pictures and native order and rejects invalid geometry") {
+    let json = #"[{"bbox":[100,10,300,400],"reading_order":3,"label":"text","score":0.9},"#
+        + #"{"bbox":[0,450,200,900],"reading_order":1,"label":"image","score":0.8},"#
+        + #"{"bbox":[-10,900,1100,1010],"reading_order":2,"label":"table","score":0.5},"#
+        + #"{"bbox":[100,500,100,600],"reading_order":4,"label":"text","score":0.9},"#
+        + #"{"bbox":[100,500,200],"reading_order":5,"label":"text","score":0.9},"#
+        + #"{"bbox":[100,500,200,600],"reading_order":0,"label":"text","score":0.9}]"#
+    let decoded = try? NewspaperLayout.decode(Data(json.utf8))
+    check("the newspaper detector follows native order, including pictures and tables",
+          decoded?.map(\.order) == [1, 2, 3] && decoded?.map(\.label) == ["image", "table", "text"])
+    check("the newspaper detector uses y-x viewer coordinates and clamps the page edges",
+          decoded?.first?.box == CGRect(x: 0.45, y: 0, width: 0.45, height: 0.2)
+              && decoded?[1].box.minX == 0.9 && decoded?[1].box.minY == 0
+              && abs((decoded?[1].box.width ?? 0) - 0.1) < 1e-12 && decoded?[1].box.height == 1)
+    check("a model score rounded down to 0.500 still keeps its region", decoded?[1].score == 0.5)
+    check("an unreadable reply is a failed detector, not empty success",
+          (try? NewspaperLayout.decode(Data("{}".utf8))) == nil)
+    check("an empty successful detection is empty, for the app's whole-page fallback",
+          (try? NewspaperLayout.decode(Data("[]".utf8))) == [])
+}
+
 // W42.int-s5-hands. The hand placer: it runs only once downloaded, hands the page and reading to its script, reads
 // back the lines that hold text and the confidence the gate is read against, and a failed run is an error, not lines.
 section("the hand placer places only when downloaded, and reads its script's lines back") {

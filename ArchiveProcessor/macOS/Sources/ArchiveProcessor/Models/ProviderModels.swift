@@ -596,12 +596,15 @@ struct OCRResult: Codable {
     /// W46.rotation-default — the agreement rule left this page as it is: Vision and PP-LCNet disagreed, or Vision
     /// found no text, and no cloud route was set. `nil` = rotation was settled (or not checked).
     var rotationUnsure: Bool? = nil
+    /// The fixed newspaper layout stage, including a visible whole-page fallback reason.
+    var newspaperLayout: NewspaperLayoutRecord? = nil
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
          secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil, imported: ImportedReading? = nil,
-         readingCodes: [String]? = nil) {
+         readingCodes: [String]? = nil, newspaperLayout: NewspaperLayoutRecord? = nil) {
         self.readingCodes = readingCodes
+        self.newspaperLayout = newspaperLayout
         self.secondReader = secondReader
         self.pageReader = pageReader
         self.imported = imported
@@ -638,6 +641,7 @@ struct OCRResult: Codable {
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
                   secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes)
         copy.rotationUnsure = rotationUnsure
+        copy.newspaperLayout = newspaperLayout
         return copy
     }
 }

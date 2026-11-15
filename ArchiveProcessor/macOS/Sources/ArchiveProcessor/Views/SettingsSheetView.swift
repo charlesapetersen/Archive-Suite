@@ -307,6 +307,7 @@ struct SettingsSheetPage: View {
                         .accessibilityIdentifier("ap.sheet.switch.\(sw.id)")
                         if sw.offersHandDownload { HandPlacerDownloadRow() }
                     }
+                    if stage.id == "layout" { NewspaperLayoutDownloadRow() }
                     if let forms = stage.forms { formsRow(forms) }
                     DisclosureGroup("The rules in detail") {
                         VStack(alignment: .leading, spacing: 3) {

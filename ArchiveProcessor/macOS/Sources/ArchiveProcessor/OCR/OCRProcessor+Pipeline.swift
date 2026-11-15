@@ -143,6 +143,8 @@ extension OCRProcessor {
         let completedResults: [String: OCRResult]
         let completedOutputPaths: [String: String]?
         let mixedPDFOutcomes: [MixedPDFOutcome]?
+        let newspaperManifest: NewspaperBatch.Manifest?
+        let newspaperParts: [String: OCRResult]?
 
         init(batch: PendingBatch) {
             batchId = batch.batchId
@@ -169,6 +171,8 @@ extension OCRProcessor {
             completedResults = batch.completedResults
             completedOutputPaths = batch.completedOutputPaths
             mixedPDFOutcomes = batch.mixedPDFOutcomes
+            newspaperManifest = batch.newspaperManifest
+            newspaperParts = batch.newspaperParts
         }
     }
 
@@ -664,7 +668,8 @@ extension OCRProcessor {
                     && url.deletingLastPathComponent().path
                         == batch.outputDirectory.standardizedFileURL.path
             }
-        guard resultKeysAreValid, outputPathsAreValid,
+        guard NewspaperBatch.valid(batch.newspaperManifest, parts: batch.newspaperParts, files: batch.fileURLs.count),
+              resultKeysAreValid, outputPathsAreValid,
               mixedPDFOutcomesAreValid(batch.mixedPDFOutcomes, images: batch.fileURLs,
                                        outputDirectory: batch.outputDirectory,
                                        imageOutputPaths: Array(outputPaths.values)),
@@ -872,7 +877,8 @@ extension OCRProcessor {
         let run = snapshot.makeRun(
             succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader },
             pageReaders: jobs.compactMap { $0.result?.pageReader },
-            rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count)
+            rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count,
+            layouts: jobs.compactMap { $0.result?.newspaperLayout })
         ProcessingHistoryStore.shared.record(run)
         SettingsLayerStore.shared.recordSpend(usd: run.cost, runID: snapshot.ledgerRunID,
                                               outputDirectory: snapshot.outputDirectory, files: run.fileCount)
@@ -895,14 +901,16 @@ extension OCRProcessor {
         var files = snapshot.fileCount
         if wholeRun {
             usd = snapshot.makeRun(succeeded: 0, secondReaders: jobs.compactMap { $0.result?.secondReader },
-                                   pageReaders: jobs.compactMap { $0.result?.pageReader }).cost
+                                   pageReaders: jobs.compactMap { $0.result?.pageReader },
+                                   layouts: jobs.compactMap { $0.result?.newspaperLayout }).cost
         } else {
             let read = jobs.filter { $0.result != nil || $0.status == .succeeded || $0.status == .failed }
             let sources = Set(read.map(\.sourceURL))
             files = snapshot.pdfHalfRead ? sources.union(snapshot.pdfSources).count : sources.count
             usd = snapshot.spentSoFar(readSources: sources,
                                       secondReaders: read.compactMap { $0.result?.secondReader },
-                                      pageReaders: read.compactMap { $0.result?.pageReader })
+                                      pageReaders: read.compactMap { $0.result?.pageReader },
+                                      layouts: read.compactMap { $0.result?.newspaperLayout })
         }
         SettingsLayerStore.shared.recordSpend(usd: usd, runID: snapshot.ledgerRunID,
                                               outputDirectory: snapshot.outputDirectory, files: min(files, snapshot.fileCount))
@@ -1222,6 +1230,24 @@ extension OCRProcessor {
         var appended = onDisk
         appended.submittedChunkIds.append(chunkId)
         return Self.savePendingBatch(appended) != nil
+    }
+
+    /// A successful standard-rate newspaper fallback is durable before its output is materialised, even when
+    /// Stop closed the live journal while the response was arriving. Never creates or reopens a journal.
+    func persistNewspaperFallback(_ result: OCRResult, index: Int,
+                                  address: ClosedPaidBatchJournalAddress?) -> Bool {
+        guard let address else { return false }
+        let live = activePendingBatch.map { address.matches($0) } == true
+        let closed = activePendingBatch == nil && closedPaidBatchJournalAddress == address
+        guard live || closed,
+              var pending = live ? activePendingBatch : Self.loadPendingBatch(), address.matches(pending),
+              pending.newspaperManifest?.pages.contains(where: { $0.fileIndex == index && $0.isExpanded }) == true
+        else { return false }
+        if pending.newspaperParts == nil { pending.newspaperParts = [:] }
+        pending.newspaperParts?["file-\(index)"] = result
+        guard let saved = Self.savePendingBatch(pending) else { return false }
+        if live { activePendingBatch = saved }
+        return true
     }
 
     /// Record a result whose PDF was materialized after Stop had closed its in-memory journal. This is the

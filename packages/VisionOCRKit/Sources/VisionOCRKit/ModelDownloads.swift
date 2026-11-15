@@ -48,6 +48,9 @@ enum ModelDownloads {
         /// The hand placer (W42.int-s5-hands, `HandPlacer`): kraken and PyTorch with blla and McCATMuS, built by
         /// `ops/make-hands-runtime.sh`. Fetched when the host app's user asks for it, never with a reader.
         case hands
+        /// PP-DocLayoutV3's weights for the app's newspaper rule (W46.layout-newspapers). The shared runtime already
+        /// carries its MLX implementation; this is separate from `layout`, which remains the engine's YOLO model.
+        case newspaperLayout
 
         var name: String {
             switch self {
@@ -57,6 +60,7 @@ enum ModelDownloads {
             case .paddle: return Prefs.AccurateReader.paddle.name
             case .lighton: return Prefs.AccurateReader.lighton.name
             case .hands: return "the handwriting placer"
+            case .newspaperLayout: return "the newspaper layout detector"
             }
         }
 
@@ -74,6 +78,13 @@ enum ModelDownloads {
                 return .archive(File(path: "hands.tgz", bytes: 286_946_670,
                                      sha256: "f835149bf6f4921b28becd063953b538004f6e1247a38e3ad8e7343289dc1470"),
                                 top: "hands", destination: "Hands")
+            case .newspaperLayout:
+                return .hub(repo: "HashNuke/pp-doclayout-v3-mlx", revision: "cd50996ad0c7e35a7e20c27480f99cec1822cf7b", files: [
+                    File(path: "config.json", bytes: 2460,
+                         sha256: "3cf834b91d23a756b1519bce4db42c09e852f3e35c35092dd5a3e253a50c071a"),
+                    File(path: "model.safetensors", bytes: 133_232_741,
+                         sha256: "57d0def397166f9518572b7a01472e2d23c14de0455f1b82fae465a78ca6d9e5"),
+                ])
             // Only what loading reads: not the model cards, their images or their benchmark files.
             case .falcon:
                 return .hub(repo: "tiiuae/Falcon-OCR", revision: "fe757d59ecd79d4d68760162306a70a015761ad9", files: [

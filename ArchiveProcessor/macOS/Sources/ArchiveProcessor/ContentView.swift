@@ -87,6 +87,7 @@ struct ContentView: View {
             OCRCascadeTestDriver.runIfRequested()            // $0 W41 cheap-first OCR cascade, no wire
             InstitutionalComputeImportTestDriver.runIfRequested()       // $0 W41 an institutional-computing bulk run's text, no wire
             OpenRouterTestDriver.runIfRequested()             // $0 W41 OpenRouter request pinning, no wire
+            NewspaperLayoutTestDriver.runIfRequested()
             PageReaderTestDriver.runIfRequested()             // $0 W42 one way to read a page, no wire
             PageReaderLiveDriver.runIfRequested()             // PAID W42 OpenRouter smoke read (env + key gated)
             TextLayerTestDriver.runIfRequested()              // $0 W42 the image page's searchable layer, scratch only

@@ -22,6 +22,7 @@ let package = Package(
             resources: [
                 .copy("Resources/read-model.py"),
                 .copy("Resources/place-hands.py"),
+                .copy("Resources/detect-newspaper.py"),
                 .copy("Resources/mac-ocr-LICENSE"),
             ]
         ),

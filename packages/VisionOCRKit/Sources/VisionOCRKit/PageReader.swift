@@ -49,15 +49,20 @@ public struct PageReaderInput: Sendable {
     public var customPrompt: String?
     /// The dimension scale the image is sent at (1 = full size).
     public var imageScale: Double
+    /// The estimator's area/size fraction, separate from the per-file linear dimension scale used to encode the
+    /// image. A host that knows its size slider passes it; nil uses the square of the dimension scale.
+    public var costScale: Double?
 
     public init(imageURL: URL, visionLines: [PageLine] = [], previousText: String? = nil,
-                previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1) {
+                previousImageURL: URL? = nil, customPrompt: String? = nil, imageScale: Double = 1,
+                costScale: Double? = nil) {
         self.imageURL = imageURL
         self.visionLines = visionLines
         self.previousText = previousText
         self.previousImageURL = previousImageURL
         self.customPrompt = customPrompt
         self.imageScale = imageScale
+        self.costScale = costScale
     }
 }
 
