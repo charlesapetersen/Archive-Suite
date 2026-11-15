@@ -284,8 +284,13 @@ final class ProcessorUITests: XCTestCase {
 
         save.click()
         let result = element("ap.uitest.flaggedResult")
-        XCTAssertTrue(result.waitForExistence(timeout: 10), "Save must commit the segment")
-        XCTAssertTrue(renderedText(of: result).contains("segtag date=1968|03 March|Day 12 sentWith=1958-03"),
+        // The DEBUG bridge polls the completed segments, then SwiftUI publishes its AX text. Existence alone
+        // does not check that text is readable; wait for a nonempty result, not for a particular answer. Keep
+        // the original ten-second bound, and check the saved strings separately so a wrong value fails.
+        XCTAssertTrue(waitUntil(10) { result.exists && !self.renderedText(of: result).isEmpty },
+                      "Save must publish the committed segment's tags")
+        // W40.suite-month-tag-zero: the owner's Month format is now `3 March` (SPEC/tag-format.md).
+        XCTAssertTrue(renderedText(of: result).contains("segtag date=1968|3 March|Day 12 sentWith=1958-03"),
                       "the saved strings are the tag format's: \(renderedText(of: result))")
     }
 
