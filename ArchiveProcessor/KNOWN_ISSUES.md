@@ -2,6 +2,31 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (W46.layout-newspapers, 2026-11-15): newspapers read in detector regions with every reader
+
+`PageReaders.reader` wraps every provider, gateway and Local Agent with `NewspaperPageReader`; the independent
+Vision disagreement baseline and a failed page's whole-page fallback bypass layout deliberately. Only confirmed
+newspaper kinds run PP-DocLayoutV3, in native order, with pictures retained. Download its checked 134 MB weights
+(and the shared runtime if missing) in Settings → Rules → Columns and reading order; without it newspapers read
+whole and say why in the file row. Typed single-column pages, clippings, tables, handwriting, registers, mixed and
+uncertain kinds stay whole. Photographs get perspective correction before detection; failure reads whole.
+
+The coverage floor is 95% of Vision line-box union area (7/15 cached L9 pages below it). This is a conservative
+geometry policy, not an OCR-accuracy optimum. A stronger boundary guard keeps split lines intact in the fill,
+including transitively overlapping lines: all 15 cached pages need fill under that guard. Region pixels have one
+owner; the fill reads uncovered pixels plus complete boundary lines. No textual deduplication. See
+`segbench-results/layout-coverage-fallback.md` for sensitivity and limits; the partition's OCR accuracy has not
+been measured on the newspaper truth set. A failed region replaces partial text with one whole-page reading;
+Stop starts no new fallback. At most 128 regions, one fill and one whole fallback per attempt.
+
+Batch regions retain their original-file identities, previous-page context and all partial replies in the
+fingerprinted recovery journal before chunks are consumed. Only complete pages produce output. Missing/failed
+regions get a standard-rate whole fallback; its result is durable before output, including after Stop. Estimates
+show whole-page costs separately from a conservative request allowance; batch spend reserves submitted region
+requests even before replies arrive. Source images are never changed. No migration: there is no production app
+output to migrate. Tests: scratch newspaper driver, all-provider journeys, batch recovery, cascade/refusal,
+history and Settings contracts; final evidence is in the shipped tracker entry.
+
 ## ✅ Fixed (2026-11-15): Finder tags overrode a sure reader choice — W42.int-s3-tag-precedence
 
 `PageKind.detect` used to give every Handwritten, Statistics or Clippings tag confidence 1, overriding the
@@ -573,7 +598,7 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 **The one list of kinds** (W42.int-s3, `OCR/PageKinds.swift`; `segbench-results/page-kinds.md`). A whole newspaper page
 is told by the engine's own banded Vision reading, only on a page the classifier calls printed (30 of 32 whole pages,
 no false call on 147 other pages and the owner's 144; about 1.3-1.7 s a page more, up to 14 s), and routed to print's
-pick until the layout stage (`W46.layout-newspapers`) gives it a route of its own. **Clippings, registers and mixed pages
+pick, through the fixed PP region stage above (`W46.layout-newspapers`). **Clippings, registers and mixed pages
 are not detected**: they come from a Finder tag (Clippings) or the collection interview. **A Finder tag overrides the
 classifier and passes the 0.8 floor**, as Phase 4 decided; on the owner's 144 labelled pages the tags changed 17 calls and
 sent 7 pages to another pick than their label's (Statistics on 4 pages labelled not a form; Clippings on 2 typewritten

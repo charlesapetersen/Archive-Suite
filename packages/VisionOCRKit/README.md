@@ -44,3 +44,9 @@ A whole-package release build needs `-Xswiftc -enable-testing`, because `visiono
 
 `-c release` matters: the suite's own notes (`run_tests.sh`) explain why `-O` is load-bearing. `run_tests.sh` and
 `build.sh` still build the suite and Vision OCR's app with `swiftc` from these sources, as a reference lane.
+
+`NewspaperLayout` (W46.layout-newspapers) exposes checked PP-DocLayoutV3 downloads and an offline, memory-guarded
+region detector using the existing shared runtime. It keeps all labels and the detector's native order. The
+Processor owns the kind gate, crops, fill and fallback. Its public model pin has the same 857 tensors as the
+measured lab copy. `PageReaderInput.costScale` keeps the estimator's area fraction separate from the encoder's
+linear dimension scale. No corpus or settings are changed by detection.

@@ -136,3 +136,20 @@ From `14-owner-calls.md` §2 "Layout", taken on this note's recommendations and 
 - The PP-DocLayoutV3 against DocLayout-YOLO pair test on L9 is filed (layout-pair-newspapers; call 1).
 
 Files read: execution-plans/processing-review/00-plan.md (1-105), 13-stage-rules/00-index.md (worktree suite-wt-20261106-205546-44529), 14-owner-calls.md, kind-classifier.md (speed), E-layout.md (sections 5, 6, 7, 9), segbench-results/layout-photo.md, layout-photo-hands.md, layout-photo-tables.md, layout-order.md, layout-order-paid.md, layout-order-marks.md, 11-measurement-audit.md (LAY-1 to LAY-3, OCR-6), measure-reviews/2026-10-31.md (R-2), 2026-11-01.md, 2026-11-02.md, 2026-11-04-2.md, 2026-11-05.md, 2026-11-05-2.md, 2026-11-05-3.md, 2026-11-03.md (grep excerpts only), settings-design/figures.json ("fixed").
+
+## App implementation (W46.layout-newspapers, 2026-11-15)
+
+The Processor now applies PP-DocLayoutV3 through `PageReaders.reader`, including gateway, subscription, Vision and
+paid-batch readers. The checked helper download is offered under the Rules tab, Columns and reading order; until
+installed, confirmed newspapers read whole with a reason. The existing kind detector gates it; an unknown kind
+and all other kinds stay whole. Pictures and native order remain. Photographs take the quad first. A failed
+preparation or region read replaces partial text with one whole-page read; cancellation never starts that fallback.
+
+`segbench-results/layout-coverage-fallback.md` measures the threshold's **geometry**, not its accuracy: keeping
+pictures, the padded crop union covers 93.77% of Vision line-box area on average on the 15 L9 scans (8,135 boxes).
+The engineering floor is 95%, with 7/15 pages below it. Boundary ownership also requires fill: lines split between
+crops move intact into the masked whole-page fill, with their overlapping lines; earlier crop pixels are whitened
+in later crops. That stronger guard requires fill on all 15 cached pages and moves 5,022 line boxes. No text
+deduplication is used. Accuracy and speed of this partition on the truth set remain unmeasured; the old 69.4%
+dark-pixel figure excluded pictures and is not Vision coverage. This implements the fallback policy, without
+claiming an accuracy-optimal threshold or changing the detector comparison above.

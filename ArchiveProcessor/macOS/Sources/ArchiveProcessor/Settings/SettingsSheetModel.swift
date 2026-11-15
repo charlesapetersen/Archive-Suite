@@ -1019,7 +1019,7 @@ struct SettingsSheetWords {
             return "Pages are read from the image as captured. No cleaning, conversion to black and white, or removal of "
                 + "marks is applied to the image a reading program reads: none of these helped any program tested."
         case "layout":
-            return "Newspaper pages are read in regions in the detector’s reading order, pictures included, with every reader. "
+            return "Newspapers are read in regions in the detector’s reading order, pictures included, with every reader. "
                 + "Photographs are corrected for perspective first. Text outside the regions gets a separate fill reading "
                 + "when coverage is low; an unsuccessful layout or region reading uses the whole page. "
                 + "Download the helper below to use regions; until then, newspapers read whole. "
