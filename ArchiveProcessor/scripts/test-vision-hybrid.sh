@@ -11,18 +11,11 @@ bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacO
 work=$(mktemp -d)
 report="$work/result.txt"
 log="$work/app.log"
-cleanup() {
-    kill "$pid" 2>/dev/null || true
-    # The app intentionally idles after writing the report. Reap its expected SIGTERM so the shell
-    # does not print a misleading “Terminated” job-control line after an otherwise green contract.
-    wait "$pid" 2>/dev/null || true
-    rm -rf "$work"
-}
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 
 ARCHIVEPROC_HEADLESS=1 VISIONHYBRID_TEST=1 VISIONHYBRID_TEST_OUT="$report" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap cleanup EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 wait_for_test_report "$report" "$log" "$pid" "Vision hybrid" "VISIONHYBRID" 60
 cat "$report"
 grep -q '^ALL PASS$' "$report"

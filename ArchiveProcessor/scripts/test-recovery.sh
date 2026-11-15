@@ -21,15 +21,15 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 mkdir -p "$work/out"
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     LIVECAPTURE_TESTOUT="$work/out" \
     LIVECAPTURE_RECOVERYTEST=1 LIVECAPTURE_RECOVERYTEST_OUT="$report" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 wait_for_test_report "$report" "$log" "$pid" "Recovery data-safety" "RECOVERYTEST"
 

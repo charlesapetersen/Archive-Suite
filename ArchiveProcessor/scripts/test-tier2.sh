@@ -28,6 +28,8 @@ GKEY="${AP_GEMINI_KEY:-$(security find-generic-password -s com.archiveprocessor.
 
 say "=== Archive Processor Tier-2 pipeline test · $(date '+%Y-%m-%d %H:%M:%S') ==="
 say "out: $OUTBASE"
+source "$PWD/scripts/test-child.sh"
+processor_test_init
 pass=0; fail=0
 
 # run_case NAME  INPUT_DIR  MODE  MAXIMAGES  EXPORT(0|1)  [GT_CSV]
@@ -36,7 +38,7 @@ run_case(){
   local out="$OUTBASE/$name"
   mkdir -p "$out"
   say ""; say "── case: $name  (mode=$mode, max=$max, export=$export)"
-  pkill -x ArchiveProcessor 2>/dev/null; sleep 1
+  ARCHIVEPROC_HEADLESS=1 \
   PROCESSFILES_TESTMODE=1 \
   PROCESSFILES_TESTKEY="$GKEY" \
   PROCESSFILES_TESTIN="$indir" \
@@ -45,11 +47,10 @@ run_case(){
   PROCESSFILES_MAXIMAGES="$max" \
   PROCESSFILES_EXPORTORIGINALS="$export" \
   PROCESSFILES_TESTDONE="$out/DONE.txt" \
-    "$BIN" >"$out/app.log" 2>&1 &
-  local pid=$!
+    processor_test_start pid "$BIN" >"$out/app.log" 2>&1
   local i
   for i in $(seq 1 150); do [ -f "$out/DONE.txt" ] && break; sleep 2; done   # up to ~5 min
-  kill "$pid" 2>/dev/null; pkill -x ArchiveProcessor 2>/dev/null; sleep 1
+  processor_test_stop "$pid" || exit 1
   # Teardown: remove the pipeline's resume-state so a crash/kill can't leave a stale, paid
   # "Resume Run" prompt for a later NORMAL launch (the driver also clears it on a clean exit).
   rm -f "$HOME/Library/Application Support/ArchiveProcessor/pending_run.json" \

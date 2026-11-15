@@ -13,17 +13,15 @@ work=$(mktemp -d /tmp/usbmux-test.XXXXXX)
 sock="$work/usbmuxd"
 report="$work/result.txt"
 log="$work/app.log"
-/usr/bin/python3 scripts/fake-usbmuxd.py "$sock" >"$work/fake.log" 2>&1 &
-fake=$!
-pid=
-trap 'kill $pid $fake 2>/dev/null || true; rm -rf "$work"' EXIT
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
+processor_test_start fake /usr/bin/python3 scripts/fake-usbmuxd.py "$sock" >"$work/fake.log" 2>&1
 for _ in $(seq 1 50); do [ -S "$sock" ] && break; sleep 0.1; done
 [ -S "$sock" ] || { cat "$work/fake.log" >&2; exit 1; }
 
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     USBMUX_TEST=1 USBMUX_TEST_OUT="$report" ARCHIVE_USBMUX_SOCKET="$sock" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 for _ in $(seq 1 120); do [ -f "$report" ] && break; sleep 1; done
 if [ ! -f "$report" ]; then tail -80 "$log" >&2; exit 1; fi

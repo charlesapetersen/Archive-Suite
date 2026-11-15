@@ -23,15 +23,15 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 launch=()
 if [ -n "${OUTPUT_MEASURE_PROFILE:-}" ]; then
     launch=(sandbox-exec -f "$OUTPUT_MEASURE_PROFILE")
 fi
-env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" OUTPUT_MEASURE=1 OUTPUT_MEASURE_IN="$in" \
-    OUTPUT_MEASURE_OUT="$out/processor" OUTPUT_MEASURE_REPORT="$report" "${launch[@]}" "$bin" >"$work/app.log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" OUTPUT_MEASURE=1 OUTPUT_MEASURE_IN="$in" \
+    OUTPUT_MEASURE_OUT="$out/processor" OUTPUT_MEASURE_REPORT="$report" processor_test_start pid ${launch[@]+"${launch[@]}"} "$bin" >"$work/app.log" 2>&1
 
 for _ in $(seq 1 900); do
     [ -f "$report" ] && break

@@ -18,8 +18,9 @@ bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacO
 KEY=$(security find-generic-password -s com.archiveprocessor.app -a OpenRouter -w 2>/dev/null || true)
 [ -n "$KEY" ] || { echo "no OpenRouter key in the Keychain (com.archiveprocessor.app / OpenRouter)" >&2; exit 1; }
 
-work=$(mktemp -d); pid=""
-trap '[ -n "$pid" ] && kill "$pid" 2>/dev/null; rm -rf "$work"' EXIT
+work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 cat > "$work/gen.swift" <<'SWIFT'
 import Foundation
 import CoreGraphics
@@ -48,8 +49,7 @@ swiftc -O "$work/gen.swift" -o "$work/gen" 2>/dev/null || { echo "could not buil
 
 report="$work/result.txt"
 PAGEREADER_LIVE=1 PAGEREADER_LIVE_KEY="$KEY" PAGEREADER_LIVE_DIR="$work" PAGEREADER_LIVE_OUT="$report" \
-    ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" "$bin" >"$work/app.log" 2>&1 &
-pid=$!
+    ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" processor_test_start pid "$bin" >"$work/app.log" 2>&1
 for _ in $(seq 1 120); do [ -f "$report" ] && break; sleep 1; done
 [ -f "$report" ] || { echo "live page reader check timed out" >&2; tail -30 "$work/app.log" >&2; exit 1; }
 cat "$report"

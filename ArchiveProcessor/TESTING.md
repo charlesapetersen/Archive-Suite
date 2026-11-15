@@ -273,6 +273,16 @@ not need pixels — which, given the Processor has **no unit-test target** (`pro
 `ArchiveProcessorUITests` UI bundle, run off-screen in the VM by `ops/gui/vm-gui-runner.sh processor xcuitest`, and
 none of its tests starts a run), is where nearly all of its coverage lives.
 
+App-driving scripts share `scripts/test-child.sh` (W40.processor-test-term-mask). After creating scratch,
+source it and call `processor_test_init "$work"` (`unlock` as a second argument for immutable fixtures).
+Launch with `TEST_FLAG=1 … processor_test_start pid "$bin"` without a trailing `&`; it captures the
+direct child and unblocks only its inherited TERM mask. EXIT stops every registered child with TERM,
+then KILL after about five seconds if needed, checks ownership and reaps it before removing scratch.
+Failed shutdown fails the run and keeps scratch; an existing failure status survives cleanup. Scripts
+that keep their outputs call `processor_test_init` without a directory. Never use app-name `pkill`.
+The outer `test-smoke.sh` and `e2e-phone-mac.sh` retain their separately proven owned-child teardown.
+Keep keys in the temporary environment assignments before the function, never in command arguments.
+
 The four long-running report drivers (`test-recovery.sh`, `test-manifest-persistence.sh`,
 `test-merge-safety.sh`, and `test-batch-resume.sh`) share one bounded report waiter: 180 seconds for the
 three former 60-second waits, and the batch-resume driver's existing 300 seconds for its 80-Stop sweep. Each
@@ -483,6 +493,10 @@ existing scratch, key-free, no-network execution remains unchanged.
   exact launch line, refusal to signal a nonchild, and fixtures (including a real API-502 run) that must go
   red. In the health gate. `--real <binary> <input dir> [mixed]` drives the built app the same way for a
   few tiny Flash-Lite calls.
+- **`test-headless-child.py`** — $0 proof of the shared launch and bounded cleanup under blocked TERM:
+  graceful, TERM-resistant and exited children; two owned children; interruption during registration;
+  foreign-PID and inspection refusals; scratch retention and exit status. Also parses all migrated callers.
+  Run outside the Codex sandbox (exit 3 inside it): process inspection is required; no app or heavy lock.
 - **`test-localagent.sh`** — drives the real `LocalAgentClient` against a fake CLI
   (`scripts/localagent-fake-cli.sh`), so the Local Agent path is provable with no account and no spend.
 - **`test-segmentation-engine.sh`** — the W36 window segmenter on recorded answers: the bundled options.json,

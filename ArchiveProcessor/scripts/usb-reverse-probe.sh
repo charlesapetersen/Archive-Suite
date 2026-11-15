@@ -38,14 +38,14 @@ log(){ printf '[usb-probe] %s\n' "$*" | tee -a "$REPORT"; }
 MAC_PID=""; FAILED=0
 fail(){ log "FAIL: $*"; FAILED=1; }
 # shellcheck disable=SC2329  # invoked by the EXIT trap below
-cleanup(){
-  [ -n "$MAC_PID" ] && { kill "$MAC_PID" 2>/dev/null; wait "$MAC_PID" 2>/dev/null; }
+processor_test_after_stop(){
   "$ADB" reverse --remove-all >/dev/null 2>&1
   [ "${KEEP_EMU:-0}" = 1 ] || "$ADB" emu kill >/dev/null 2>&1
   [ -f "$READYFILE" ] && sed -i '' -E 's/token=[^ ]+/token=[REDACTED]/g' "$READYFILE"
   [ -f "$MACLOG" ] && sed -i '' -E 's/token=[^ ]+/token=[REDACTED]/g' "$MACLOG"
 }
-trap cleanup EXIT
+source "$HERE/test-child.sh"
+processor_test_init
 
 [ -x "$APP" ] || { log "setup: no built app at $APP"; exit 2; }
 [ -x "$ADB" ] || { log "setup: no adb"; exit 2; }
@@ -57,8 +57,7 @@ log "run dir: $RUN · app: $APP · commit: $(git -C "$HERE" rev-parse --short HE
 
 # --- 1. the real app, headless, with no device attached ----------------------
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$RUN/backup" LIVECAPTURE_AUTOSTART=1 \
-LIVECAPTURE_READYFILE="$READYFILE" LIVECAPTURE_TESTOUT="$RUN/out" "$APP" >"$MACLOG" 2>&1 &
-MAC_PID=$!
+LIVECAPTURE_READYFILE="$READYFILE" LIVECAPTURE_TESTOUT="$RUN/out" processor_test_start MAC_PID "$APP" >"$MACLOG" 2>&1
 for _ in $(seq 1 60); do grep -q '^LIVECAPTURE_READY port=' "$READYFILE" 2>/dev/null && break
   kill -0 "$MAC_PID" 2>/dev/null || { log "setup: app exited early (see $MACLOG)"; exit 2; }; sleep 1; done
 LINE="$(grep '^LIVECAPTURE_READY port=' "$READYFILE" 2>/dev/null | head -1)"

@@ -25,11 +25,11 @@ if [ $# -ge 3 ]; then mkdir -p "$3"; extra+=(VISIONOCR_MODEL_HOME="$(cd "$3" && 
 if [ $# -eq 4 ]; then extra+=(VISIONOCR_MODEL_SOURCE="$(cd "$4" && pwd)" HAND_MEASURE_INSTALL=1); fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
-env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" HAND_MEASURE=1 HAND_MEASURE_IN="$in" \
-    HAND_MEASURE_OUT="$out" HAND_MEASURE_REPORT="$report" ${extra[@]+"${extra[@]}"} "$bin" >"$work/app.log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+processor_test_start pid env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" HAND_MEASURE=1 HAND_MEASURE_IN="$in" \
+    HAND_MEASURE_OUT="$out" HAND_MEASURE_REPORT="$report" ${extra[@]+"${extra[@]}"} "$bin" >"$work/app.log" 2>&1
 
 for _ in $(seq 1 3600); do
     [ -f "$report" ] && break

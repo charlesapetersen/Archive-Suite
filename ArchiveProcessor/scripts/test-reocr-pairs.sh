@@ -13,14 +13,14 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work" unlock
 report="$work/result.txt"
 mkdir "$work/fixtures"
 log="$work/app.log"
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     REOCR_PAIRS_TEST=1 REOCR_PAIRS_TEST_OUT="$report" REOCR_PAIRS_TEST_DIR="$work/fixtures" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; chflags -R nouchg "$work" 2>/dev/null; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 for _ in $(seq 1 60); do
     [ -f "$report" ] && break

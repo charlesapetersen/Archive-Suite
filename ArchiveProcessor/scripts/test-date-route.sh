@@ -15,14 +15,14 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     DATE_ROUTE_TEST=1 DATE_ROUTE_TEST_OUT="$report" \
     DATE_ROUTE_CASES="$PWD/scripts/segbench/fixtures/date-route-cases.json" DATE_ROUTE_REAL_CASES="$HOME/Library/Caches/ArchiveSuiteRehearsal/date-route-pipeline/swift-cases.json" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 for _ in $(seq 1 90); do
     [ -f "$report" ] && break

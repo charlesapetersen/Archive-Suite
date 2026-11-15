@@ -17,14 +17,14 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 keep="${TEXTLAYER_TEST_KEEP:-$work/keep}"
 mkdir -p "$keep"
-env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
-    TEXTLAYER_TEST=1 TEXTLAYER_TEST_OUT="$report" TEXTLAYER_TEST_KEEP="$keep" "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
+    TEXTLAYER_TEST=1 TEXTLAYER_TEST_OUT="$report" TEXTLAYER_TEST_KEEP="$keep" processor_test_start pid "$bin" >"$log" 2>&1
 
 for _ in $(seq 1 180); do
     [ -f "$report" ] && break

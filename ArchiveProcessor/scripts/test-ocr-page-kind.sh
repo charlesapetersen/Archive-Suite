@@ -18,6 +18,8 @@ bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacO
 [ -x "$bin" ] || { echo "ArchiveProcessor is not built" >&2; exit 1; }
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 cache="${KIND_CACHE:-$HOME/Library/Caches/ArchiveSuiteRehearsal/kind-classifier}"
@@ -26,11 +28,9 @@ if [ "${PAGE_KIND_PARITY:-1}" = 1 ] && [ -f "$cache/signals-list.tsv" ] && [ -f 
     parity=(OCRPAGEKIND_PARITY_LIST="$cache/signals-list.tsv" OCRPAGEKIND_PARITY_OUT="$work/parity.tsv")
 fi
 
-env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
+ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     OCRPAGEKIND_TEST=1 OCRPAGEKIND_TEST_OUT="$report" ${parity[@]+"${parity[@]}"} \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 wait_for_test_report "$report" "$log" "$pid" "OCR-page-kind" "OCRPAGEKIND" 600
 cat "$report"

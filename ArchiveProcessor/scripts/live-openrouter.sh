@@ -34,8 +34,10 @@ bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacO
 KEY=$(security find-generic-password -s com.archiveprocessor.app -a OpenRouter -w 2>/dev/null || true)
 [ -n "$KEY" ] || { echo "no OpenRouter key in the Keychain (com.archiveprocessor.app / OpenRouter)" >&2; exit 1; }
 
-work=$(mktemp -d); pid=""
-trap '[ -n "$pid" ] && kill "$pid" 2>/dev/null; rm -rf "$work"; rm -f "$HOME/Library/Application Support/ArchiveProcessor/pending_run.json"' EXIT
+work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
+processor_test_after_stop() { rm -f "$HOME/Library/Application Support/ArchiveProcessor/pending_run.json"; }
 cat > "$work/gen.swift" <<'SWIFT'
 import Foundation
 import CoreGraphics
@@ -67,10 +69,9 @@ for i in "${!models[@]}"; do
   m="${models[$i]}"; out="$work/out-$i"; mkdir -p "$out"; done_file="$out/TEST_DONE.txt"
   PROCESSFILES_TESTMODE=1 PROCESSFILES_TESTKEY="$KEY" PROCESSFILES_PROVIDER=OpenRouter PROCESSFILES_MODEL="$m" \
     PROCESSFILES_MAXIMAGES=2 PROCESSFILES_TESTIN="$work/in" PROCESSFILES_TESTOUT="$out" PROCESSFILES_TESTDONE="$done_file" \
-    ARCHIVEPROC_HEADLESS=1 "$bin" >"$work/app-$i.log" 2>&1 &
-  pid=$!
+    ARCHIVEPROC_HEADLESS=1 processor_test_start pid "$bin" >"$work/app-$i.log" 2>&1
   for _ in $(seq 1 90); do [ -f "$done_file" ] && break; sleep 2; done
-  kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; pid=""
+  processor_test_stop "$pid" || exit 1
   rm -f "$HOME/Library/Application Support/ArchiveProcessor/pending_run.json"
   marker=$(cat "$done_file" 2>/dev/null || echo "no marker (timed out)")
   pdfs=$(find "$out" -type f -iname '*.pdf' | wc -l | tr -d ' ')

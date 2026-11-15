@@ -38,11 +38,20 @@ written where the `searchableFor` setting names the input's format and the page'
 The compression functional checks pass, but the broader suites have existing failures: VisionOCRKit 2126/2142
 (14 accepted outline-fixture failures from W42.int-s1; preferences isolation and its nested light-tier check,
 `W42.kit-preferences-isolation`), and the latest entity figures leave solver profile E expecting Gemini while
-the solver chooses Qwen (`W46.ent-profile-e-solver`, baseline 9a79dd98). Headless script/VM sampler teardown with
-TERM blocked is queued as `W40.processor-test-term-mask` / `W40.vm-sampler-term-mask`. Exact evidence:
+the solver chooses Qwen (`W46.ent-profile-e-solver`, baseline 9a79dd98). VM sampler teardown with
+TERM blocked is queued as `W40.vm-sampler-term-mask`. Exact evidence:
 `verification/evidence/processor/W42.int-s5-compress-verification.md`.
 The full Processor VM lane also has an empty saved-result assertion in the unchanged manual-date UI test
 (`W40.processor-manual-date-result-vm`); the searchable-page controls pass both alone and in that lane.
+
+## ✅ Fixed (2026-11-14): headless test children stranded by blocked TERM — W40.processor-test-term-mask
+
+The engine's blocked TERM mask survived exec into test apps, so a passing text-layer script could leave its
+child orphaned and the heavy lock held. All 54 affected headless shell callers now use `scripts/test-child.sh`:
+unblock TERM in the captured child, verify direct-child ownership, bound TERM/KILL/reap, then remove scratch
+only after shutdown. FileRelay and Tier-2 also stop only their own children. ReOCR's immutable-fixture cleanup
+is retained. Assertions and output destinations are unchanged. Proof: `scripts/test-headless-child.py` and the
+blocked-TERM real-driver runs recorded in SUITE_TODO_DONE.md; the existing smoke/E2E launchers stay intact.
 
 ## ⚠️ LIMITATION (W42.int-s5-hands, 2026-11-13): what the hand placer does not yet do
 

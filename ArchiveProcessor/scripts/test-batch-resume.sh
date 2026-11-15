@@ -12,6 +12,8 @@ bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacO
 [ -x "$bin" ] || { echo "ArchiveProcessor is not built" >&2; exit 1; }
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 # ARCHIVEPROC_TEST_STATE_ROOT redirects `pending_batch.json` / `pending_run.json` away from the operator's
@@ -22,9 +24,7 @@ log="$work/app.log"
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     ARCHIVEPROC_TEST_STATE_ROOT="$work/state" \
     BATCHRESUME_TEST=1 BATCHRESUME_TEST_OUT="$report" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 # The cancel-WIRING sweep (W16.bat2-fu3) presses Stop 80 times and each Stop ends in a real
 # checkForPendingBatch(), which decodes whatever paid-batch and interrupted-run manifests it finds. Since

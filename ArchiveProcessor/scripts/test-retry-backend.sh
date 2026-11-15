@@ -12,6 +12,8 @@ bin="${ARCHIVEPROC_TEST_BINARY:-$default_bin}"
 [ -x "$bin" ] || { echo "ArchiveProcessor test binary is not executable: $bin" >&2; exit 1; }
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 fake="$PWD/scripts/localagent-fake-cli.sh"
@@ -19,9 +21,7 @@ chmod +x "$fake" 2>/dev/null || true
 
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     RETRY_BACKEND_TEST=1 RETRY_BACKEND_TEST_OUT="$report" LOCALAGENT_FAKE_CLI="$fake" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 wait_for_test_report "$report" "$log" "$pid" "Retry-backend" "RETRY" 120
 cat "$report"

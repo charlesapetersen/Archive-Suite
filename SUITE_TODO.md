@@ -838,7 +838,6 @@ consciously deferred (perf-only / LOW / GUI infra / new idea). All armed in `.ma
 as **Waves 7–10** for the next daemon run (relaunch the daemon to start it — `ops/autonomous/README.md`).
 ## P2 — Processor (KI#3 done; rest bucketed by how it can be verified)
 
-- [ ] **W40.processor-test-term-mask — headless test children must exit when the engine blocks TERM [S]** (lane: processor) (uses: build) — Found verifying W42.int-s5-compress at baseline 68b188b1: `scripts/test-text-layer.sh` finished ALL PASS and every veraPDF check, but its EXIT trap's `kill` left the exact headless app child orphaned and holding the heavy lock. The engine's inherited blocked TERM mask also reaches the app (`ArchiveProcessor/test-smoke.sh` already unblocks it). Audit the headless script launch/teardown seam, bound cleanup of only each script's owned child, and prove it with TERM blocked in the caller; never signal another app. Keep the assertions and scratch-only I/O. Evidence in `verification/evidence/processor/W42.int-s5-compress-verification.md`.
 **Done:**
 **Heads-down doable now (macOS, build-verifiable, NOT phone-gated):**
 **Live-session / phone-gated (drive Live Capture — ideally a paired phone — to verify; do interactively, like the viewer bugs):**

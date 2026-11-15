@@ -16,14 +16,14 @@ if [ ! -x "$bin" ]; then
 fi
 
 work=$(mktemp -d)
+source "$PWD/scripts/test-child.sh"
+processor_test_init "$work"
 report="$work/result.txt"
 log="$work/app.log"
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     REVIEW_CORRECTIONS_TEST=1 REVIEW_CORRECTIONS_TEST_DIR="$work/scratch" REVIEW_CORRECTIONS_TEST_OUT="$report" \
     REVIEW_CORRECTIONS_TEST_KEEP="$work/kept" \
-    "$bin" >"$log" 2>&1 &
-pid=$!
-trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
+    processor_test_start pid "$bin" >"$log" 2>&1
 
 for _ in $(seq 1 60); do
     [ -f "$report" ] && break
