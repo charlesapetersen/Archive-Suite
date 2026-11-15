@@ -326,8 +326,26 @@ enum SettingsSolverTestDriver {
               e.blockers("segmentation", "qwen3.5-27b-teacher").contains { $0.contains("not as a voter alone") })
         var clKey = cl
         clKey.keys = ["openrouter"]
-        eq("E with a key as well: names from the entity feature's prompt (note 09 §9 profile 4)",
-           pick(solve("E-key", clKey, ea), "entities", "correspondence-typed"), "gemini-entity-feature")
+        // W46.ent-local-shipped-prompt: the 27B is now 0.66 on sender, against the feature's 0.69.
+        // No paired comparison with the feature is reported, so use the unpaired 0.05 tie rule.
+        // ent-local-shipped.md pairs with Gemini's tagging prompt. Cluster: $0; feature: $2.37/1,000.
+        for key in ["openrouter", "gemini"] {
+            var keyed = clKey
+            keyed.keys = [key]
+            let ek = solve("E-\(key)", keyed, ea)
+            check("E with a \(key) key: the entity feature is usable",
+                  ek.blockers("entities", "gemini-entity-feature").isEmpty)
+            for kind in ["correspondence-typed", "correspondence-handwritten"] {
+                eq("E with a \(key) key: names tie on sender, so the free cluster (\(kind))",
+                   pick(ek, "entities", kind), "qwen3.6-27b")
+            }
+            let names = ek.pick("entities", "correspondence-typed")
+            check("E with a \(key) key: the reason names the tied feature and the lower cost",
+                  names?.reason.contains("gemini-entity-feature") == true
+                    && names?.reason.contains("ties") == true && names?.reason.contains("cheaper") == true,
+                  names?.reason ?? "missing")
+            check("E with a \(key) key: names cost no money", names?.usd == 0, "\(names?.usd ?? -1)")
+        }
         clKey.excludedModelFamilies = ["gemini"]
         let ek = solve("E-key-nogemini", clKey, ea)
         eq("E with an OpenRouter key, no Gemini: names on the cluster", pick(ek, "entities", "correspondence-typed"),

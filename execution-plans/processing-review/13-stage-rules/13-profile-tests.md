@@ -120,8 +120,10 @@ of the two; Claude has none measured and is held to the largest, Gemini 3.7 g2's
 - Segmentation: `seg-qwen3.5-2b-bf16-cluster` (79.7%; the fastest of three ties, the 4B 83.0% and the teacher 81.5%); review rule disagreement with the
   teacher as partner.
 - Dating: steps 1 and 4 `qwen3.6-27b-trace-neigh-vision` (56.5 not in text, 93.3 in text), step 2 `qwen3.6-27b-image`.
-- Entities: `qwen3.6-27b` (sender 0.62) on correspondence; never from Vision text on handwriting. With an OpenRouter
-  key as well, `gemini-entity-feature` (0.69); with Gemini excluded, still `qwen3.6-27b`.
+- Entities: `qwen3.6-27b` (sender 0.66 on Vision text, `ent-local-shipped.md`) on correspondence; never from Vision
+  text on handwriting. With a Gemini or OpenRouter key as well, still `qwen3.6-27b`: the feature's 0.69 is only
+  0.03 ahead on sender, inside the unpaired 0.05 tie rule, so $0 on the cluster wins over $2.37 per 1,000 documents
+  (note 09 §9 profile 4). With Gemini excluded, also `qwen3.6-27b`.
 - Placement: the hand line detector setting visible (owner section 2, placement); PP-OCRv6 det offered as the
   cluster-side detector.
 

@@ -383,8 +383,11 @@ Kinds: T typed or printed correspondence, H handwritten correspondence, N non-co
   and `gemini-tagging-place` (0.73) are not offered by the app. A ceiling that leaves less than the feature's cost
   drops names to the profile-1 pick. **Plan only:** no plan row; fall to the profile-1 pick.
 - **4. Cluster.** T and H: `qwen3.6-27b` (0.66 sender on Vision text), any reading
-  route but Vision for H. With a key as well:
-  `gemini-entity-feature`.
+  route but Vision for H. With a Gemini or OpenRouter key as well: still `qwen3.6-27b`. Its sender gap to
+  `gemini-entity-feature` (0.69) is 0.03, inside the unpaired 0.05 tie rule, so the cluster's $0 wins over
+  $2.37 per 1,000 correspondence documents. No paired feature comparison is reported; `ent-local-shipped.md`'s
+  paired comparison is against Gemini's tagging prompt. The feature's recipient and city
+  figures are higher, but the sender tie goes to cost under the current rule.
 - **5. Plus a coding agent.** As the base profile: no kit route (the fine-tune not run, `ent-robust.md`).
 
 ## Owner's calls (2026-11-06)

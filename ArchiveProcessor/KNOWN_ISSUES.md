@@ -40,8 +40,11 @@ failures from W42.int-s1 remain. **W42.kit-preferences-isolation fixed the prefe
 failures**: default-only engine/compression/timing snapshots use typed values without opening a defaults store or
 registering preferences; the original guard is intact. Focused 13/13 and light 627/627 pass; evidence:
 `verification/evidence/processor/W42.kit-preferences-isolation.md`. The initial compression run was 2126/2142.
-The latest entity figures still leave solver profile E expecting Gemini while
-the solver chooses Qwen (`W46.ent-profile-e-solver`, baseline 9a79dd98). VM sampler teardown with
+**W46.ent-profile-e-solver reconciled profile E's stale expectation** (baseline 9a79dd98): Qwen's sender 0.66
+ties the entity feature's 0.69 under the 0.05 floor, so free cluster access wins even with a key. The solver
+and figures are unchanged; both key types, Gemini eligibility, the cost and explanation are checked.
+Solver 129/129 and offscreen settings sheet 363/363 pass; evidence:
+`verification/evidence/processor/W46.ent-profile-e-solver.md`. VM sampler teardown with
 TERM blocked is queued as `W40.vm-sampler-term-mask`. Exact evidence:
 `verification/evidence/processor/W42.int-s5-compress-verification.md`.
 The full Processor VM lane also has an empty saved-result assertion in the unchanged manual-date UI test
