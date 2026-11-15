@@ -64,6 +64,11 @@ targets:
       - name: PDFium (pinned static build)
         script: '"$PROJECT_DIR/../scripts/bootstrap-pdfium.sh"'
         basedOnDependencyAnalysis: false
+    # Before Xcode signs the outer app: relocate the compression tools, then sign their changed Mach-O files.
+    postBuildScripts:
+      - name: Bundle searchable PDF compression (Release)
+        script: 'python3 "$PROJECT_DIR/../scripts/bundle-compression-tools.py"'
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.archiveprocessor.app

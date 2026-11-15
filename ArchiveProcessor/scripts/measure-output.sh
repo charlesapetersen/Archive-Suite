@@ -6,13 +6,17 @@
 # of the same files (packages/VisionOCRKit `visionocr-pdf`), and veraPDF on every output when it is installed.
 #
 #   scripts/measure-output.sh <in-dir> <out-dir>
+# OUTPUT_MEASURE_APP may name a scratch Debug app carrying the Release resources.
+# OUTPUT_MEASURE_PROFILE optionally restricts just that app and its children with sandbox-exec
+# (e.g. deny Homebrew reads to prove the bundled tools work). Never alters installed tools.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ $# -eq 2 ] || { echo "usage: scripts/measure-output.sh <in-dir> <out-dir>" >&2; exit 2; }
 in=$(cd "$1" && pwd); mkdir -p "$2"; out=$(cd "$2" && pwd)
 
-bin="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
+app="${OUTPUT_MEASURE_APP:-$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app}"
+bin="$app/Contents/MacOS/ArchiveProcessor"
 if [ ! -x "$bin" ]; then
     echo "ArchiveProcessor is not built; run the documented Debug build first." >&2
     exit 1
@@ -20,8 +24,12 @@ fi
 
 work=$(mktemp -d)
 report="$work/result.txt"
+launch=()
+if [ -n "${OUTPUT_MEASURE_PROFILE:-}" ]; then
+    launch=(sandbox-exec -f "$OUTPUT_MEASURE_PROFILE")
+fi
 env ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" OUTPUT_MEASURE=1 OUTPUT_MEASURE_IN="$in" \
-    OUTPUT_MEASURE_OUT="$out/processor" OUTPUT_MEASURE_REPORT="$report" "$bin" >"$work/app.log" 2>&1 &
+    OUTPUT_MEASURE_OUT="$out/processor" OUTPUT_MEASURE_REPORT="$report" "${launch[@]}" "$bin" >"$work/app.log" 2>&1 &
 pid=$!
 trap 'kill "$pid" 2>/dev/null || true; rm -rf "$work"' EXIT
 

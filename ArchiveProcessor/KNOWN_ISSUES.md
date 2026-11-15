@@ -6,11 +6,12 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 The searchable form (one page per source page, the header in the XMP: `SPEC/tag-format.md` §"The searchable form") is
 written where the `searchableFor` setting names the input's format and the page's kind; empty by default. Open:
-- **Compressed only where `jbig2` and `qpdf` are found** (W42.int-s5-compress): the app's own Resources, then
-  /opt/homebrew/bin, /usr/local/bin, /opt/local/bin, then the login shell's PATH (VisionOCRKit `Runner.locateTool`).
-  The app does not ship them yet, so on a Mac without Homebrew's `jbig2enc` and `qpdf` every searchable page is the
-  embedded JPEG as before (about 2 MB a photographed page) and the run log says "written uncompressed: jbig2 and qpdf
-  not found". Bundling both (Apache-2.0) into the Release app is `W42.int-s5-compress-ship`.
+- **Release bundles `jbig2`, `qpdf` and their libraries** (W42.int-s5-compress-ship), with licences and jbig2enc's
+  PATENTS notice. No Homebrew is needed on the build tools' architecture (arm64 on this build Mac). The universal
+  app still runs on Intel, but arm64-only bundled tools are ignored there: install native `jbig2enc` and `qpdf` for
+  compression. Debug also uses installed tools. Lookup is Resources, then /opt/homebrew/bin, /usr/local/bin,
+  /opt/local/bin, then the login shell's PATH. Without runnable tools the embedded JPEG remains (about 2 MB a
+  photographed page), and the run log says "written uncompressed: jbig2 and qpdf not found".
 - **Compressing costs time**: 3 s the drawn memo, 10 s UIUC 00233, about 67 s each UIUC 00149 and 00156 (the engine's
   rebuild and MRC layering, every page in the app's process; measured 2026-11-14, Debug build). An unplaced page also
   runs Vision once more, to tell the layering where the words are.

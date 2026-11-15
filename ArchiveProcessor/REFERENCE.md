@@ -712,6 +712,16 @@ example script lives at `.maintenance/` during active maintenance sessions.
 
 ## Releasing (macOS DMG + GitHub release)
 
+Release builds run `scripts/bundle-compression-tools.py` before Xcode signs the app (W42.int-s5-compress-ship).
+The build Mac needs `jbig2enc` and `qpdf` installed; missing tools, licences, relocation or signing failures stop
+the build. VisionOCRKit's `Tools/bundle-libs.py` copies their library closure into `Contents/Resources/lib`,
+rewrites dependencies to `@loader_path`, and places notices in `third-party-licences` (including jbig2enc's
+PATENTS). Each changed library and helper is signed with the app's identity, then Xcode signs the outer app.
+Helpers run without hardened runtime so the local certificate's lack of a Team ID does not block their dylibs;
+the Processor keeps hardened runtime and strict library validation. Debug skips bundling. Helpers have the
+installed Homebrew tools' architectures: this Mac supplies arm64; Intel uses its own installed native tools.
+No DMG or release is produced by this build phase.
+
 Versioning is by **git tag** (`vMAJOR.MINOR.PATCH`, e.g. `v3.8.1`) — the tag is the source of truth; `Info.plist` `CFBundleShortVersionString` is left at "1.0". Patch bump for internal-only changes (refactors), minor for user-facing features. Distribution is **owner-only** — signed with the suite's local **self-signed** cert
 (`CODE_SIGN_IDENTITY: "Archive Suite Dev"`, not ad-hoc since 2026-08-07), still not notarized, so a fresh
 macOS may need right-click→Open the first time. Rationale + setup: root [`CLAUDE.md`](../CLAUDE.md)
