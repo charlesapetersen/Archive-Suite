@@ -880,8 +880,7 @@ extension OCRProcessor {
             rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count,
             layouts: jobs.compactMap { $0.result?.newspaperLayout })
         ProcessingHistoryStore.shared.record(run)
-        SettingsLayerStore.shared.recordSpend(usd: run.cost, runID: snapshot.ledgerRunID,
-                                              outputDirectory: snapshot.outputDirectory, files: run.fileCount)
+        Self.recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: run.cost, files: run.fileCount, baseSources: nil)
         activeRunHistory = nil
     }
 
@@ -899,6 +898,7 @@ extension OCRProcessor {
     static func recordLedgerSpend(_ snapshot: RunHistorySnapshot, jobs: [OCRJob], wholeRun: Bool) {
         let usd: Double
         var files = snapshot.fileCount
+        var baseSources: Set<URL>? = nil
         if wholeRun {
             usd = snapshot.makeRun(succeeded: 0, secondReaders: jobs.compactMap { $0.result?.secondReader },
                                    pageReaders: jobs.compactMap { $0.result?.pageReader },
@@ -906,14 +906,34 @@ extension OCRProcessor {
         } else {
             let read = jobs.filter { $0.result != nil || $0.status == .succeeded || $0.status == .failed }
             let sources = Set(read.map(\.sourceURL))
+            baseSources = sources
             files = snapshot.pdfHalfRead ? sources.union(snapshot.pdfSources).count : sources.count
             usd = snapshot.spentSoFar(readSources: sources,
                                       secondReaders: read.compactMap { $0.result?.secondReader },
                                       pageReaders: read.compactMap { $0.result?.pageReader },
                                       layouts: read.compactMap { $0.result?.newspaperLayout })
         }
-        SettingsLayerStore.shared.recordSpend(usd: usd, runID: snapshot.ledgerRunID,
-                                              outputDirectory: snapshot.outputDirectory, files: min(files, snapshot.fileCount))
+        recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: usd, files: min(files, snapshot.fileCount),
+                                     baseSources: baseSources)
+    }
+
+    /// Abandoned region calls have their own stable attempt IDs in the ledger. A resumed page buys another
+    /// reading: it must add to those charges, rather than replacing them via the original run's high-water mark.
+    /// A late batch result can carry the same IDs back from its journal; subtract already-recorded attempts
+    /// from the parent run, so collecting that result later cannot charge them twice.
+    static func recordNewspaperAdjustedSpend(_ snapshot: RunHistorySnapshot, jobs: [OCRJob], usd: Double,
+                                             files: Int, baseSources: Set<URL>?, store: SettingsLayerStore = .shared) {
+        let layouts = jobs.compactMap { $0.result?.newspaperLayout }
+        let charges = snapshot.newspaperSpend.unreportedCharges(layouts: layouts, baseSources: baseSources,
+                                                                allPDFPagesRead: snapshot.pdfHalfRead)
+        for (id, amount) in charges {
+            store.recordSpend(usd: amount, runID: id, outputDirectory: snapshot.outputDirectory, files: 0)
+        }
+        let separateIDs = Set(layouts.flatMap { $0.spendIDs ?? [] }).union(charges.keys)
+        let separateCost = store.file.ledger.filter { $0.runID.map(separateIDs.contains) ?? false }
+            .reduce(0) { $0 + max(0, $1.usd) }
+        store.recordSpend(usd: max(0, usd - separateCost), runID: snapshot.ledgerRunID ?? snapshot.newspaperSpend.parentLedgerID,
+                          outputDirectory: snapshot.outputDirectory, files: files)
     }
 
     /// The run summary's last line: the counts, and how many pages a second reader read (W41.app-ocr-default-fu1).
@@ -2242,6 +2262,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
 
         if segmentationContext.previousTextCharCount == 0 {
@@ -2277,7 +2298,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil,
@@ -2316,7 +2337,7 @@ extension OCRProcessor {
                                 gatewayConfig: gateway, localAgent: localAgent,
                                 rotationMode: ocrRun.rotationMode,
                                 standardImageMB: ocrRun.standardImageMB,
-                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                             )
                             let result = await Self.applyingVisionTextClassification(
                                 to: ocrResult, previousText: nil,
@@ -2354,7 +2375,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                 )
 
                 if Self.isTimeoutError(result) {
@@ -2368,7 +2389,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                     )
                 }
 
@@ -2654,7 +2675,16 @@ extension OCRProcessor {
         // What the stopped run has read so far goes into the ledger (W46.settings-ledger-more); a batch job's whole
         // estimate is added below if the provider does not confirm its cancellation.
         let unfinishedRun = activeRunHistory
+        let unfinishedJobs = jobs
         recordUnfinishedRunSpend()
+        if let unfinishedRun, let interruptedRun {
+            Task {
+                await interruptedRun.value
+                // The stopped run may finish an already-bought region while unwinding. Use only its captured
+                // snapshot and rows: Clear or a newer run cannot lend this update another run's identity.
+                Self.recordLedgerSpend(unfinishedRun, jobs: unfinishedJobs, wholeRun: false)
+            }
+        }
         if activePendingMixedPDF != nil, interruptedRun != nil {
             mixedPDFCancellationUnwinding = true
             Task {
@@ -3534,6 +3564,7 @@ extension OCRProcessor {
         let jobID = jobs[index].id
         let ocrURL = imageURL ?? jobs[index].sourceURL
         let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: effectiveRunConfig.provider, model: effectiveRunConfig.model,
             thinkingLevel: effectiveRunConfig.thinkingLevel, apiKey: effectiveRunConfig.apiKey,
@@ -3542,14 +3573,14 @@ extension OCRProcessor {
             standardImageMB: ocrRun.standardImageMB,
             // W41.app-institutional-compute: no import here. A Retry (or Rotate & re-run) is the user asking for a fresh
             // read, and an imported page matches its institutional-computing text again by its bytes (Tier-2 review).
-            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil)
+            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil, newspaperSpend: newspaperSpend)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,
                                errorMessage: result.errorMessage, errorCode: result.errorCode,
                                enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure),
                                secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
-                               readingCodes: result.readingCodes)
+                               readingCodes: result.readingCodes, newspaperLayout: result.newspaperLayout)
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,

@@ -10,6 +10,9 @@ import VisionOCRKit
 /// in PP's native order. A failed region replaces the assembled reading with a whole-page reading. Never use
 /// textual deduplication: repeated headings and repeated words on a newspaper can both be real.
 struct NewspaperPageReader: PageReader {
+    /// Set by the run's call boundary, inherited by cascade/refusal readers. It outlives a cancelled read.
+    @TaskLocal static var spend: NewspaperReadingSpend?
+    @TaskLocal static var hasBasePageAllowance = true
     let client: any PageReader<OCRResult>
     var route: String { client.route }
 
@@ -38,6 +41,7 @@ struct NewspaperPageReader: PageReader {
     }
 
     func readRegions(_ page: PageReaderInput, plan: NewspaperPagePlan) async throws -> PageReading<OCRResult> {
+            let spendID = UUID()
             var readings: [PageReading<OCRResult>] = []
             var attempts = 0
             for image in plan.images {
@@ -51,15 +55,19 @@ struct NewspaperPageReader: PageReader {
                     read = try await client.read(crop)
                 } catch {
                     try Task.checkCancellation()
-                    return try await whole(page, reason: "a region could not be read", previous: readings, attempts: attempts)
+                    return try await whole(page, reason: "a region could not be read", previous: readings, attempts: attempts, spendID: spendID)
                 }
                 readings.append(read)
+                Self.spend?.add(read.dollars ?? 0, id: spendID, source: page.imageURL,
+                               baseAllowance: Self.hasBasePageAllowance)
                 guard read.detail.text != nil, read.detail.errorCode == nil else {
                     try Task.checkCancellation()
-                    return try await whole(page, reason: "a region could not be read", previous: readings, attempts: attempts)
+                    return try await whole(page, reason: "a region could not be read", previous: readings, attempts: attempts, spendID: spendID)
                 }
             }
-            return Self.combine(readings, regions: plan.regionCount, coverage: plan.coverage, filled: plan.hasFill)
+            var combined = Self.combine(readings, regions: plan.regionCount, coverage: plan.coverage, filled: plan.hasFill)
+            combined.detail.newspaperLayout?.spendIDs = [spendID]
+            return combined
     }
 
     private enum Prepared: Sendable { case whole(String?), regions(NewspaperPagePlan) }
@@ -102,15 +110,19 @@ struct NewspaperPageReader: PageReader {
     }
 
     private func whole(_ page: PageReaderInput, reason: String,
-                       previous: [PageReading<OCRResult>] = [], attempts: Int = 0) async throws -> PageReading<OCRResult> {
+                       previous: [PageReading<OCRResult>] = [], attempts: Int = 0,
+                       spendID: UUID = UUID()) async throws -> PageReading<OCRResult> {
         try Task.checkCancellation()
         var read = try await client.read(page)
+        Self.spend?.add(read.dollars ?? 0, id: spendID, source: page.imageURL,
+                       baseAllowance: Self.hasBasePageAllowance)
         read.seconds += previous.reduce(0) { $0 + $1.seconds }
         if let dollars = read.dollars { read.dollars = dollars + previous.compactMap(\.dollars).reduce(0, +) }
         read.detail.newspaperLayout = NewspaperLayoutRecord(regions: 0, requests: attempts + 1,
                                                           coverage: nil, filled: false, fallback: reason,
                                                           estimatedExtraCost: previous.compactMap(\.dollars).reduce(0, +),
                                                           standardFallbackCost: previous.compactMap(\.dollars).reduce(0, +))
+        read.detail.newspaperLayout?.spendIDs = [spendID]
         return read
     }
 
@@ -146,6 +158,8 @@ struct NewspaperLayoutRecord: Codable, Equatable, Sendable {
     var estimatedExtraCost: Double? = nil
     /// Standard-rate requests beyond an original batch reserve: a raw fallback and any later region reads.
     var standardFallbackCost: Double? = nil
+    /// Matches this result to the runtime cost accumulator, so successful results are counted only once.
+    var spendIDs: [UUID]? = nil
 
     /// The first route may have bought several successful regions before it failed. A second reader replaces
     /// its text, never its incurred request count or estimate. Its own one-page charge is counted separately.
@@ -156,12 +170,60 @@ struct NewspaperLayoutRecord: Codable, Equatable, Sendable {
         current.standardFallbackCost = (current.standardFallbackCost ?? 0) + (previous.standardFallbackCost ?? 0)
         return Self(regions: current.regions, requests: current.requests + previous.requests,
                     coverage: current.coverage, filled: current.filled, fallback: current.fallback,
-                    estimatedExtraCost: current.estimatedExtraCost, standardFallbackCost: current.standardFallbackCost)
+                    estimatedExtraCost: current.estimatedExtraCost, standardFallbackCost: current.standardFallbackCost,
+                    spendIDs: (previous.spendIDs ?? []) + (current.spendIDs ?? []))
     }
 
     var summary: String {
         if let fallback { return "Whole page: \(fallback)." }
         return "\(regions) newspaper regions in reading order" + (filled ? ", plus text outside them." : ".")
+    }
+}
+
+/// Completed readings remain billable if Stop or a throwing fallback prevents the page result returning.
+/// Only a run owns this accumulator; it never looks at current controller state or another run's ledger ID.
+final class NewspaperReadingSpend: @unchecked Sendable {
+    /// Legacy runs without a persisted settings ID still need an idempotent identity during Stop's two updates.
+    let parentLedgerID = UUID()
+    private struct Reading {
+        let source: URL
+        let first: Double
+        let sequence: Int
+        var total: Double
+    }
+    private let lock = NSLock()
+    private var readings: [UUID: Reading] = [:]
+
+    func add(_ dollars: Double, id: UUID, source: URL, baseAllowance: Bool = true) {
+        guard dollars.isFinite, dollars >= 0 else { return }
+        lock.withLock {
+            if readings[id] == nil {
+                readings[id] = Reading(source: source, first: baseAllowance ? dollars : 0, sequence: readings.count, total: 0)
+            }
+            readings[id]?.total += dollars
+        }
+    }
+
+    /// Add only calls missing from the returned page records. A completed record consumes that source's base
+    /// page allowance. Otherwise subtract the first call once when the normal estimate already prices it.
+    /// nil baseSources means the final estimate prices every original page; a partial run names its read pages.
+    func unreported(layouts: [NewspaperLayoutRecord], baseSources: Set<URL>?, allPDFPagesRead: Bool = false) -> Double {
+        unreportedCharges(layouts: layouts, baseSources: baseSources, allPDFPagesRead: allPDFPagesRead).values.reduce(0, +)
+    }
+
+    func unreportedCharges(layouts: [NewspaperLayoutRecord], baseSources: Set<URL>?,
+                           allPDFPagesRead: Bool = false) -> [UUID: Double] {
+        let reported = Set(layouts.flatMap { $0.spendIDs ?? [] })
+        return lock.withLock {
+            var consumed = Set(reported.compactMap { readings[$0]?.source })
+            var charges: [UUID: Double] = [:]
+            for (id, read) in readings.sorted(by: { $0.value.sequence < $1.value.sequence }) where !reported.contains(id) {
+                let hasBase = baseSources == nil || baseSources!.contains(read.source) || allPDFPagesRead
+                let subtract = hasBase && consumed.insert(read.source).inserted ? read.first : 0
+                charges[id] = max(0, read.total - subtract)
+            }
+            return charges
+        }
     }
 }
 

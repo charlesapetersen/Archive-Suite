@@ -21,13 +21,14 @@ enum NewspaperLayoutTestDriver {
         let failAt: Int?
         let delay: Bool
         let throwAt: Int?
-        init(failAt: Int? = nil, delay: Bool = false, throwAt: Int? = nil) {
-            self.failAt = failAt; self.delay = delay; self.throwAt = throwAt
+        let delayAt: Int?
+        init(failAt: Int? = nil, delay: Bool = false, throwAt: Int? = nil, delayAt: Int? = nil) {
+            self.failAt = failAt; self.delay = delay; self.throwAt = throwAt; self.delayAt = delayAt
         }
         func read(_ page: PageReaderInput) async throws -> PageReading<OCRResult> {
             calls.append(page)
-            if delay { try await Task.sleep(for: .seconds(20)) }
             let n = calls.count
+            if delay || n == delayAt { try await Task.sleep(for: .seconds(20)) }
             if n == throwAt { throw URLError(.cannotConnectToHost) }
             let result = OCRResult(text: n == failAt ? nil : page.imageURL.lastPathComponent,
                                    classification: .documentStart, errorMessage: nil,
@@ -85,11 +86,16 @@ enum NewspaperLayoutTestDriver {
             let input = PageReaderInput(imageURL: source, previousText: "previous page", previousImageURL: previous)
             let plan = NewspaperPagePlan(directory: dir, images: [dir.appendingPathComponent("right-first.png"), dir.appendingPathComponent("left-second.png"), dir.appendingPathComponent("outside.png")], regionCount: 2, coverage: 0.7, hasFill: true)
             let fake = Fake()
-            let read = try await NewspaperPageReader(client: fake).readRegions(input, plan: plan)
+            let completeSpend = NewspaperReadingSpend()
+            let read = try await NewspaperPageReader.$spend.withValue(completeSpend) {
+                try await NewspaperPageReader(client: fake).readRegions(input, plan: plan)
+            }
             check("native order with fill last, no text deduplication", read.text == "right-first.png\n\nleft-second.png\n\noutside.png")
             let contextOK = await fake.contextIs(previous)
             check("every region keeps preceding original page as context", contextOK)
             check("requests and extra costs count region reads", read.detail.newspaperLayout?.requests == 3 && abs((read.detail.newspaperLayout?.estimatedExtraCost ?? 0) - 0.02) < 1e-9)
+            check("returned layout consumes its accumulated costs once",
+                  completeSpend.unreported(layouts: [read.detail.newspaperLayout!], baseSources: nil) == 0)
             check("rotation copy preserves layout provenance", read.detail.with(classification: read.detail.classification, rotationDegrees: 90).newspaperLayout == read.detail.newspaperLayout)
             let failing = Fake(failAt: 2)
             let fallback = try await NewspaperPageReader(client: failing).readRegions(input, plan: plan)
@@ -114,6 +120,29 @@ enum NewspaperLayoutTestDriver {
             do { _ = try await task.value } catch is CancellationError { cancelled = true }
             let cancelledCalls = await slow.count()
             check("Stop never buys a fallback reading", cancelled && cancelledCalls == 1)
+            let partialSpend = NewspaperReadingSpend()
+            let partial = Fake(delayAt: 3)
+            let partialTask = Task {
+                try await NewspaperPageReader.$spend.withValue(partialSpend) {
+                    try await NewspaperPageReader(client: partial).readRegions(input, plan: plan)
+                }
+            }
+            while await partial.count() < 3 { try await Task.sleep(for: .milliseconds(10)) }
+            partialTask.cancel()
+            do { _ = try await partialTask.value } catch is CancellationError { }
+            check("Stop retains two completed region charges even without a page result",
+                  abs(partialSpend.unreported(layouts: [], baseSources: []) - 0.02) < 1e-9)
+            check("an already-priced base page is subtracted only once",
+                  abs(partialSpend.unreported(layouts: [], baseSources: [source]) - 0.01) < 1e-9)
+            let throwSpend = NewspaperReadingSpend()
+            do {
+                _ = try await NewspaperPageReader.$spend.withValue(throwSpend) {
+                    try await NewspaperPageReader(client: Fake(failAt: 2, throwAt: 3)).readRegions(input, plan: plan)
+                }
+                check("whole fallback throws in the charged-partial fixture", false)
+            } catch { }
+            check("a throwing whole fallback retains its earlier region costs",
+                  abs(throwSpend.unreported(layouts: [], baseSources: []) - 0.02) < 1e-9)
             check("source bytes remain unchanged", (try Data(contentsOf: source)) == bytes)
 
             let ids = (0..<3).map { NewspaperBatch.regionID(fileIndex: 0, regionIndex: $0, total: 3) }
@@ -150,7 +179,60 @@ enum NewspaperLayoutTestDriver {
                 changed.newspaperParts?[ids[0]] = .cutOff
                 check("journal fingerprint covers partial region replies", before != OCRProcessor.pendingBatchLifecycleFingerprint(changed))
             }
-            var snapshot = RunHistorySnapshot(resuming: pending, rotationMode: .off, imageScale: 1)
+            let syncHistory = RunHistorySnapshot(startedAt: Date(), provider: .gemini, gatewayConfig: nil,
+                localAgent: nil, imageTokenProvider: nil, model: model, visionTextProvider: nil, visionTextModel: nil,
+                batchMode: false, enableTagging: false, enableCollectionSegmentation: false, preOCRedInput: false,
+                reOCRMultiPagePDF: false, mixedReOCR: false, sendPreviousImage: false, contextCharCount: 0,
+                imageScale: 1, rotationMode: .off, fileCount: 1)
+            var snapshot = syncHistory
+            snapshot.newspaperSpend = partialSpend
+            check("the unfinished-run ledger prices completed regions without a completed file",
+                  abs(snapshot.spentSoFar(readSources: []) - 0.02) < 1e-9)
+            snapshot.newspaperSpend = completeSpend
+            check("completed page history does not add its runtime costs again",
+                  abs(snapshot.makeRun(succeeded: 1, layouts: [read.detail.newspaperLayout!]).cost
+                      - snapshot.estimatedCost - 0.02) < 1e-9)
+            snapshot.newspaperSpend = NewspaperReadingSpend()
+            let ledger = SettingsLayerStore(directory: dir.appendingPathComponent("ledger"))
+            snapshot.ledgerRunID = UUID()
+            snapshot.newspaperSpend = partialSpend
+            let stoppedCost = snapshot.spentSoFar(readSources: [])
+            OCRProcessor.recordNewspaperAdjustedSpend(snapshot, jobs: [], usd: stoppedCost, files: 0,
+                                                       baseSources: [], store: ledger)
+            let reloadedLedger = SettingsLayerStore(directory: ledger.directory)
+            check("abandoned region charges survive reopening the scratch ledger",
+                  abs(reloadedLedger.monthSpend().usd - stoppedCost) < 1e-9)
+            // A fresh resumed snapshot has no runtime accumulator and the same persisted run identity.
+            var resumed = syncHistory
+            resumed.ledgerRunID = snapshot.ledgerRunID
+            let resumedCost = resumed.makeRun(succeeded: 1).cost
+            OCRProcessor.recordNewspaperAdjustedSpend(resumed, jobs: [], usd: resumedCost, files: 1,
+                                                       baseSources: nil, store: reloadedLedger)
+            check("Stop then Resume adds abandoned regions to the resumed run instead of absorbing them",
+                  abs(reloadedLedger.monthSpend().usd - stoppedCost - resumedCost) < 1e-9)
+            // A late result with the same attempt ID can arrive from a kept batch journal after Stop.
+            let lateIDs = Array(partialSpend.unreportedCharges(layouts: [], baseSources: []).keys)
+            let lateNote = NewspaperLayoutRecord(regions: 2, requests: 2, coverage: 1, filled: false,
+                                                 fallback: nil, estimatedExtraCost: 0.01, spendIDs: lateIDs)
+            var lateJob = OCRJob(sourceURL: source)
+            lateJob.result = OCRResult(text: "late result", classification: nil, errorMessage: nil,
+                                       errorCode: nil, newspaperLayout: lateNote)
+            let lateLedger = SettingsLayerStore(directory: dir.appendingPathComponent("late-ledger"))
+            OCRProcessor.recordNewspaperAdjustedSpend(snapshot, jobs: [], usd: stoppedCost, files: 0,
+                                                       baseSources: [], store: lateLedger)
+            OCRProcessor.recordNewspaperAdjustedSpend(resumed, jobs: [lateJob], usd: 0.03, files: 1,
+                                                       baseSources: nil, store: lateLedger)
+            check("a late collected result never charges its already-ledgered attempt twice",
+                  abs(lateLedger.monthSpend().usd - 0.03) < 1e-9)
+            let standardSpend = NewspaperReadingSpend()
+            snapshot = RunHistorySnapshot(resuming: pending, rotationMode: .off, imageScale: 1)
+            let standardID = UUID()
+            standardSpend.add(0.01, id: standardID, source: source, baseAllowance: false)
+            standardSpend.add(0.01, id: standardID, source: source, baseAllowance: false)
+            snapshot.newspaperSpend = standardSpend
+            check("a batch reserve never pays the first call of a later standard-rate reader",
+                  abs(snapshot.makeRun(succeeded: 0).cost - snapshot.estimatedCost - 0.02) < 1e-9)
+            snapshot.newspaperSpend = NewspaperReadingSpend()
             snapshot.reserveNewspaperBatch(manifest)
             let reserve = snapshot.newspaperBatchExtraCost
             check("unaggregated paid regions reserve money", reserve > 0)

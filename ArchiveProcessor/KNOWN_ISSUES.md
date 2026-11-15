@@ -23,7 +23,11 @@ Batch regions retain their original-file identities, previous-page context and a
 fingerprinted recovery journal before chunks are consumed. Only complete pages produce output. Missing/failed
 regions get a standard-rate whole fallback; its result is durable before output, including after Stop. Estimates
 show whole-page costs separately from a conservative request allowance; batch spend reserves submitted region
-requests even before replies arrive. Source images are never changed. No migration: there is no production app
+requests even before replies arrive. A run-owned accumulator retains completed synchronous region charges
+when Stop or a throwing fallback discards the page result. Stop flushes again after the task unwinds, using
+captured run state; abandoned attempts have their own ledger IDs, so Resume adds them and collecting a late
+batch result does not count them twice. This covers Stop/Resume, not a process crash before any spend flush.
+Source images are never changed. No migration: there is no production app
 output to migrate. Tests: scratch newspaper driver, all-provider journeys, batch recovery, cascade/refusal,
 history and Settings contracts; final evidence is in the shipped tracker entry.
 

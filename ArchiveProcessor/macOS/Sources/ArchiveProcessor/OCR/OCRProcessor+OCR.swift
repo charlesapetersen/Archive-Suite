@@ -313,6 +313,7 @@ extension OCRProcessor {
             return
         }
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
         let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
         let pdfMB = pdfSettings.imageMB
         let txtCols = pdfSettings.textColumns
@@ -411,7 +412,7 @@ extension OCRProcessor {
                         customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                     )
                     }
                     if activePendingMixedPDF != nil &&
@@ -1301,6 +1302,7 @@ extension OCRProcessor {
         // handleOCRResult runs back on MainActor (serialized) for state updates;
         // its PDF gen is off-MainActor via M3.
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
         let rotationMode = ocrRun.rotationMode
         let gateway = currentGateway
         let localAgent = currentLocalAgent
@@ -1326,52 +1328,60 @@ extension OCRProcessor {
             func addNext() -> Bool {
                 guard let entry = iter.next() else { return false }
                 group.addTask {
-                    var first = entry.result
-                    if first.errorCode == NewspaperBatch.failedRegionCode {
-                        do {
-                            try Task.checkCancellation()
-                            let reader = try PageReaders.reader(provider: model.provider, model: model, apiKey: apiKey,
-                                                                thinkingLevel: batchThinking, newspaperLayout: false)
-                            var whole = try await reader.read(PageReaderInput(
-                                imageURL: entry.url, previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
-                                customPrompt: fallbackPrompt, imageScale: fallbackScale)).detail
-                            var note = first.newspaperLayout
-                            let standardCost = PageKindRouting.pagePrice(model, imageScale: fallbackScale,
-                                sendPreviousImage: fallbackPreviousImage && entry.previousURL != nil, contextCharCount: 0)
-                            let extra = (note?.estimatedExtraCost ?? 0) + standardCost
-                            note?.estimatedExtraCost = extra
-                            if let n = note {
-                                note = NewspaperLayoutRecord(regions: n.regions, requests: n.requests + 1,
-                                    coverage: n.coverage, filled: n.filled, fallback: n.fallback,
-                                    estimatedExtraCost: n.estimatedExtraCost, standardFallbackCost: standardCost)
+                    await NewspaperPageReader.$spend.withValue(newspaperSpend) {
+                        await NewspaperPageReader.$hasBasePageAllowance.withValue(false) {
+                            var first = entry.result
+                            if first.errorCode == NewspaperBatch.failedRegionCode {
+                                do {
+                                    try Task.checkCancellation()
+                                    let reader = try PageReaders.reader(provider: model.provider, model: model, apiKey: apiKey,
+                                                                        thinkingLevel: batchThinking, newspaperLayout: false)
+                                    var whole = try await reader.read(PageReaderInput(
+                                        imageURL: entry.url, previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
+                                        customPrompt: fallbackPrompt, imageScale: fallbackScale)).detail
+                                    var note = first.newspaperLayout
+                                    let standardCost = PageKindRouting.pagePrice(model, imageScale: fallbackScale,
+                                        sendPreviousImage: fallbackPreviousImage && entry.previousURL != nil, contextCharCount: 0)
+                                    let extra = (note?.estimatedExtraCost ?? 0) + standardCost
+                                    note?.estimatedExtraCost = extra
+                                    if let n = note {
+                                        note = NewspaperLayoutRecord(regions: n.regions, requests: n.requests + 1,
+                                            coverage: n.coverage, filled: n.filled, fallback: n.fallback,
+                                            estimatedExtraCost: n.estimatedExtraCost, standardFallbackCost: standardCost)
+                                    }
+                                    let spendID = UUID()
+                                    newspaperSpend?.add(standardCost, id: spendID, source: entry.url, baseAllowance: false)
+                                    let spendIDs = (note?.spendIDs ?? []) + [spendID]
+                                    note?.spendIDs = spendIDs
+                                    whole.newspaperLayout = note
+                                    first = whole
+                                } catch {
+                                    if !Task.isCancelled {
+                                        first = OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription,
+                                                          errorCode: NewspaperBatch.failedRegionCode,
+                                                          newspaperLayout: first.newspaperLayout)
+                                    }
+                                }
                             }
-                            whole.newspaperLayout = note
-                            first = whole
-                        } catch {
-                            if !Task.isCancelled {
-                                first = OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription,
-                                                  errorCode: NewspaperBatch.failedRegionCode,
-                                                  newspaperLayout: first.newspaperLayout)
-                            }
+                            let read = await OCRCascade.resolve(
+                                first, cascade: batchCascade, provider: model.provider, model: model,
+                                refusalFallback: secondReaderFallback, imageURL: entry.url, previousText: nil,
+                                previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
+                                customPrompt: fallbackPrompt, imageScale: fallbackScale,
+                                visionSettings: ocrRun.visionSettings)
+                            let verdict = await Self.detectRotation(
+                                imageURL: entry.url, provider: model.provider, apiKey: apiKey,
+                                mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
+                            )
+                            // A Stop cancels the routes mid-read, so "every second reader failed" is not true: never
+                            // persist that verdict; the kept journal brings the page back on resume. Since
+                            // W40.fix-processor-cascade-edges a stopped escalation hands back the batch's own failure, so
+                            // any page left without text under a Stop is held back, not only an exhausted one.
+                            let abandoned = Task.isCancelled && read.text == nil
+                            return (entry.index, entry.url, entry.jobID,
+                                    Self.mergeRotation(into: read, verdict: verdict), abandoned)
                         }
                     }
-                    let read = await OCRCascade.resolve(
-                        first, cascade: batchCascade, provider: model.provider, model: model,
-                        refusalFallback: secondReaderFallback, imageURL: entry.url, previousText: nil,
-                        previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
-                        customPrompt: fallbackPrompt, imageScale: fallbackScale,
-                        visionSettings: ocrRun.visionSettings)
-                    let verdict = await Self.detectRotation(
-                        imageURL: entry.url, provider: model.provider, apiKey: apiKey,
-                        mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
-                    )
-                    // A Stop cancels the routes mid-read, so "every second reader failed" is not true: never
-                    // persist that verdict; the kept journal brings the page back on resume. Since
-                    // W40.fix-processor-cascade-edges a stopped escalation hands back the batch's own failure, so
-                    // any page left without text under a Stop is held back, not only an exhausted one.
-                    let abandoned = Task.isCancelled && read.text == nil
-                    return (entry.index, entry.url, entry.jobID,
-                            Self.mergeRotation(into: read, verdict: verdict), abandoned)
                 }
                 return true
             }
@@ -1460,6 +1470,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         var previousText: String? = nil
         var previousImageURL: URL? = nil
@@ -1494,7 +1505,7 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
             )
 
             // If timed out, retry once without context
@@ -1513,7 +1524,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                 )
             }
 
@@ -1547,6 +1558,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         let concurrency = model.provider == .appleVision
             ? VisionClient.recommendedConcurrency
@@ -1580,7 +1592,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                     )
                     let result = await Self.applyingVisionTextClassification(
                         to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1620,7 +1632,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1815,6 +1827,37 @@ extension OCRProcessor {
     /// W16.cfg6 `rotationMode` and `standardImageMB` are **required**, so the compiler, not a code
     /// review, is what guarantees no call site silently falls back to a process-global.
     nonisolated static func performOCRCall(
+        imageURL: URL,
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        previousText: String?,
+        previousImageURL: URL?,
+        customPrompt: String? = nil,
+        imageScale: Double = 1.0,
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil,
+        rotationMode: RotationMode,
+        standardImageMB: Double,
+        visionSettings: VisionOCRSettings = .default,
+        cascade: OCRCascade,
+        refusalFallback: Bool = true,
+        readers: PageReaderPlan = .empty,
+        imported: InstitutionalComputeImport? = nil,
+        newspaperSpend: NewspaperReadingSpend? = nil
+    ) async -> OCRResult {
+        await NewspaperPageReader.$spend.withValue(newspaperSpend) {
+            await performOCRCallUntracked(
+                imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt,
+                imageScale: imageScale, gatewayConfig: gatewayConfig, localAgent: localAgent,
+                rotationMode: rotationMode, standardImageMB: standardImageMB, visionSettings: visionSettings,
+                cascade: cascade, refusalFallback: refusalFallback, readers: readers, imported: imported)
+        }
+    }
+
+    nonisolated private static func performOCRCallUntracked(
         imageURL: URL,
         provider: LLMProvider,
         model: LLMModel,
@@ -2034,6 +2077,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let newspaperSpend = activeRunHistory?.newspaperSpend
 
         statusMessage = "Waiting to retry \(retryIndices.count) file\(retryIndices.count == 1 ? "" : "s") (model was busy)…"
         try? await Task.sleep(for: .seconds(10))
@@ -2057,7 +2101,7 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
             )
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.

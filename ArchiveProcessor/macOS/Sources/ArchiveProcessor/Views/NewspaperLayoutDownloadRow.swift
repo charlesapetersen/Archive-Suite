@@ -1,7 +1,7 @@
 import SwiftUI
 import VisionOCRKit
 
-/// W42.int-s5-hands — the hand placer's download, which the user starts (nothing is fetched at install): VisionOCRKit's
+/// W46.layout-newspapers — the newspaper detector's download, which the user starts (nothing is fetched at install): VisionOCRKit's
 /// `NewspaperLayout.download`, checked against the size and SHA-256 the app carries and moved into place whole, so a cancel
 /// or a bad file leaves nothing half installed. One download at a time for the whole app.
 @MainActor
@@ -49,7 +49,7 @@ final class NewspaperLayoutDownload: ObservableObject {
     }
 }
 
-/// Under the layout rule on the settings sheet, while the placer is not downloaded.
+/// Under the layout rule on the settings sheet, while the detector is not downloaded.
 struct NewspaperLayoutDownloadRow: View {
     @ObservedObject private var download = NewspaperLayoutDownload.shared
 

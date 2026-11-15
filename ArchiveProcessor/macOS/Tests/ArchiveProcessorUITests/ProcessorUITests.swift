@@ -47,7 +47,7 @@ final class ProcessorUITests: XCTestCase {
         let rules = app.sheets.firstMatch.radioButtons["Rules"]
         XCTAssertTrue(rules.waitForExistence(timeout: 10))
         rules.click()
-        let download = app.buttons.matching(NSPredicate(format: "title BEGINSWITH %@", "Download the newspaper layout helper")).firstMatch
+        let download = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Download the newspaper layout helper")).firstMatch
         XCTAssertTrue(download.waitForExistence(timeout: 5), "the rule offers the checked helper download")
         let scroll = app.sheets.firstMatch.scrollViews.firstMatch
         for _ in 0..<15 where !download.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -180) }

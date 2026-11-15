@@ -90,6 +90,8 @@ struct RunHistorySnapshot {
     /// Additional region and fill requests already reserved for a paid newspaper batch. Kept independently of
     /// completed jobs, since the provider may bill requests whose parts have not arrived or aggregated yet.
     var newspaperBatchExtraCost: Double = 0
+    /// Runtime-only completed region charges, including reads whose result Stop discards.
+    var newspaperSpend = NewspaperReadingSpend()
 
     /// Reserve all expanded batch requests beyond the original request the base estimate already counts.
     /// Each crop keeps its original page's previous-image context; batch discounts apply to these requests only.
@@ -150,14 +152,16 @@ struct RunHistorySnapshot {
         part.pdfFileCount = pdfRead.count
         part.pdfPageCount = pdfHalfRead ? pdfPageCount : Self.directPDFPageCount(pdfRead)
         part.fileCount = pdfRead.count + images
+        let unreported = newspaperSpend.unreported(layouts: layouts, baseSources: readSources,
+                                                   allPDFPagesRead: pdfHalfRead)
         guard part.fileCount > 0 || newspaperBatchExtraCost > 0 || !secondReaders.isEmpty
-                || !pageReaders.isEmpty || !layouts.isEmpty else { return 0 }
+                || !pageReaders.isEmpty || !layouts.isEmpty || unreported > 0 else { return 0 }
         let base = part.fileCount > 0 ? part.estimatedCost : newspaperBatchExtraCost
         let extra = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
             + pageReaders.filter(\.isRouted).reduce(0) { $0 + ($1.estimatedCost ?? 0) - ($1.replacedCost ?? 0) }
             + layouts.reduce(0) { $0 + (newspaperBatchExtraCost > 0
                 ? ($1.standardFallbackCost ?? 0) : ($1.estimatedExtraCost ?? 0)) }
-        return max(0, base + extra)
+        return max(0, base + extra + unreported)
     }
 
     /// The run's rotation calls went to the gateway's model (W46.rotation-default).
@@ -214,7 +218,8 @@ struct RunHistorySnapshot {
             failed: fileCount - ok,
             batchMode: batchMode,
             modeLabel: modeLabel,
-            cost: max(0, estimatedCost + secondReaderCost + routedCost + layoutCost),
+            cost: max(0, estimatedCost + secondReaderCost + routedCost + layoutCost
+                      + newspaperSpend.unreported(layouts: layouts, baseSources: nil)),
             secondReaderPages: secondReaders.isEmpty ? nil : secondReaders.count,
             kindRoutedPages: routed.isEmpty ? nil : routed.count,
             rotationUnsurePages: rotationUnsure > 0 ? rotationUnsure : nil,
