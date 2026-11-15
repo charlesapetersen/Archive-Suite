@@ -17,6 +17,12 @@ import Foundation
 /// drawn pages in its own temporary directory, answered the way the sheet answers.
 @MainActor
 enum FlaggedCheckTimingTestDriver {
+    struct ContextPage: Decodable {
+        let index: Int
+        let path: String
+        let rotation: Int
+    }
+
     struct PackItem: Decodable {
         let key: String
         let left: String
@@ -26,6 +32,8 @@ enum FlaggedCheckTimingTestDriver {
         let cue: String
         let left_rotation: Int
         let right_rotation: Int
+        let gap_index: Int?
+        let context_pages: [ContextPage]?
     }
 
     struct Pack: Decodable {
@@ -119,9 +127,12 @@ enum FlaggedCheckTimingTestDriver {
         guard !processor.isProcessing, !pack.items.isEmpty else { return nil }
         let keys = pack.items.map(\.key)
         processor.flaggedGapItems = pack.items.enumerated().map { k, p in
-            FlaggedGapItem(id: k, leftURL: URL(fileURLWithPath: p.left), rightURL: URL(fileURLWithPath: p.right),
+            FlaggedGapItem(id: p.gap_index ?? k, leftURL: URL(fileURLWithPath: p.left), rightURL: URL(fileURLWithPath: p.right),
                            leftRotation: p.left_rotation, rightRotation: p.right_rotation, proposal: p.proposal,
-                           confidence: p.confidence, cue: p.cue)
+                           confidence: p.confidence, cue: p.cue,
+                           contextPages: (p.context_pages ?? []).map {
+                               FlaggedContextPage(id: $0.index, url: URL(fileURLWithPath: $0.path), rotation: $0.rotation)
+                           })
         }
         processor.flaggedGapFocus = 0
         processor.flaggedReviewApproachName = pack.approach
@@ -204,7 +215,10 @@ enum FlaggedCheckTimingTestDriver {
         let packJSON = """
         {"approach": "Gemini", "items": [
          {"key": "T 1|2", "left": "\(urls[0])", "right": "\(urls[1])", "proposal": "new", "confidence": 0.9,
-          "cue": "new:a letterhead", "left_rotation": 0, "right_rotation": 90},
+          "cue": "new:a letterhead", "left_rotation": 0, "right_rotation": 90, "gap_index": 0,
+          "context_pages": [{"index": 0, "path": "\(urls[0])", "rotation": 0},
+                            {"index": 1, "path": "\(urls[1])", "rotation": 90},
+                            {"index": 2, "path": "\(urls[2])", "rotation": 0}]},
          {"key": "T 2|3", "left": "\(urls[1])", "right": "\(urls[2])", "proposal": "continue", "confidence": 0.6,
           "cue": "continue:page 2", "left_rotation": 90, "right_rotation": 0}]}
         """
@@ -222,6 +236,11 @@ enum FlaggedCheckTimingTestDriver {
         for _ in 0..<200 where processor.flaggedReviewContinuation == nil { try? await Task.sleep(for: .milliseconds(10)) }
         check("2 the sheet is up on the pack", processor.awaitingFlaggedReview && processor.flaggedGapItems.count == 2
               && processor.flaggedGapItems[1].leftRotation == 90 && processor.flaggedReviewApproachName == "Gemini")
+        check("2 the wider pack carries ordered context and rotation",
+              processor.flaggedGapItems[0].displayedPages.map(\.url.path) == urls
+                && processor.flaggedGapItems[0].displayedPages.map(\.rotation) == [0, 90, 0])
+        check("2 an old isolated pair still displays",
+              processor.flaggedGapItems[1].displayedPages.map(\.url.path) == Array(urls.suffix(2)))
         check("2 Done is not offered yet", !FlaggedReview.isComplete(processor.flaggedGapItems))
         clock.t = 6
         processor.flaggedGapItems[0].answer = .join

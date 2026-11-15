@@ -9,7 +9,7 @@
 The settings sheet prices the user's own checking at 20 s a flagged boundary, a guess nobody had timed
 (12-settings-design.md §3.9; 07-segmentation.md §7 call 6). This measures it: `pack` takes the gaps the app's Gemini
 route flags on the two test boxes (prompt g2, Gemini 3.7's cached gateway answers, the shipped level <= 0.965, rule
-min: seg-magazine-rule-app.md, 92 gaps), with the proposal, confidence and model cues the app would show, and the
+min: seg-magazine-rule-app.md, 92 gaps), with the proposal, confidence and model cues kept hidden, and the
 owner checks them on the app's own "Check Flagged Boundaries" sheet (`scripts/time-flagged-checks.sh`, the Debug-only
 FlaggedCheckTimingTestDriver). The driver logs every focus change and answer with its time; `score` turns that log into
 seconds a boundary with n, and scores the answers against the boxes' truth.
@@ -107,17 +107,20 @@ def cmd_pack(_a):
     for name in BOXES:
         col, gaps = flagged(name, level)
         for i, proposal, conf, cue, t, unsure in gaps:
-            pair = []
-            for p in (col.pages[i], col.pages[i + 1]):
+            context = []
+            for k in range(max(0, i - 2), min(len(col.pages), i + 4)):
+                p = col.pages[k]
                 dest = PAGES / f"{name}-{p.n:03d}{p.path.suffix.lower()}"
                 if not dest.exists():
                     shutil.copyfile(p.path, dest)   # read the box's image, write only the bench cache
-                pair.append(str(dest))
+                context.append({"index": k, "path": str(dest)})
             key = f"{name} {col.pages[i].n}|{col.pages[i + 1].n}"
-            items.append({"key": key, "left": pair[0], "right": pair[1], "proposal": proposal,
+            paths = {p["index"]: p["path"] for p in context}
+            items.append({"key": key, "left": paths[i], "right": paths[i + 1], "proposal": proposal,
+                          "gap_index": i, "context_pages": context,
                           "confidence": round(conf, 6), "cue": cue})
             truth.append({"key": key, "truth": t, "proposal": proposal, "unsure": unsure})
-    turns = orient(sorted({x for it in items for x in (it["left"], it["right"])}))
+    turns = orient(sorted({p["path"] for it in items for p in it["context_pages"]}))
     scores = json.loads((OUT / "orient-scores.json").read_text())
     close = sorted(Path(p).stem for p, sc in scores.items() if max(range(4), key=lambda k: sc[k]) and not turns[p])
     unchecked = [c for c in close if c not in EYE_UPRIGHT]
@@ -125,8 +128,10 @@ def cmd_pack(_a):
         raise SystemExit(f"close orientation calls not checked by eye: {unchecked}; look, then add to EYE_UPRIGHT")
     for it in items:
         it["left_rotation"], it["right_rotation"] = turns[it["left"]], turns[it["right"]]
+        for p in it["context_pages"]:
+            p["rotation"] = turns[p["path"]]
     meta = {"tag": TAG, "date": dt.date.today().isoformat(), "boxes": list(BOXES), "level": level,
-            "approach": "Gemini", "evidence": "prompt g2, Gemini 3.7 Flash's cached gateway answers, rule min "
+            "approach": "Gemini", "context_pages_each_side": 3, "evidence": "prompt g2, Gemini 3.7 Flash's cached gateway answers, rule min "
             "(seg-magazine-rule-app.md)", "turned_pages": sum(v != 0 for v in turns.values()),
             "close_calls_upright_by_eye": close}
     PACK.write_text(json.dumps({**meta, "items": items}, indent=1) + "\n")

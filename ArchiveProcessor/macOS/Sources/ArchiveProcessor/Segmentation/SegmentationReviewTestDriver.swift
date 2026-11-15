@@ -155,6 +155,19 @@ enum SegmentationReviewTestDriver {
         eq("2 the flagged gaps, in order", items.map(\.id), [2, 3])
         eq("2 page n beside page n+1", items.first.map { [$0.leftURL, $0.rightURL] } ?? [], [urls[2], urls[3]])
         eq("2 rotation carried", items.first?.leftRotation, 90)
+        eq("2 three context pages either side", items[0].contextPages.map(\.url), urls)
+        eq("2 context keeps run indices", items[1].contextPages.map(\.id), [1, 2, 3, 4, 5])
+        eq("2 context rotation carried", items[0].contextPages.map(\.rotation), [0, 0, 90, 0, 0, 0])
+        let edgeProposals = [0, 4].map {
+            GapProposal(gap: $0, decision: .new, confidence: 0.5, agreed: true, flagged: true, cue: "hidden", fixed: false)
+        }
+        let edges = FlaggedReview.items(proposals: edgeProposals, pages: pages, rotations: [])
+        eq("2 context at the start", edges[0].contextPages.map(\.id), [0, 1, 2, 3])
+        eq("2 context at the end", edges[1].contextPages.map(\.id), [2, 3, 4, 5])
+        let pair = WindowStagePages(fileIndices: [4, 7], urls: Array(urls.prefix(2)), photoKinds: [nil, nil])
+        let short = FlaggedReview.items(proposals: [edgeProposals[0]], pages: pair, rotations: [270, 90])
+        eq("2 two-page run has only its own pages", short[0].displayedPages.map(\.url), pair.urls)
+        eq("2 retained pages use aligned rotations", short[0].displayedPages.map(\.rotation), [270, 90])
         eq("2 the proposal is kept internally", items.map(\.proposal), [.continue, .continue])
         check("2 not done with an unanswered gap", !FlaggedReview.isComplete(items))
         items[0].answer = .split

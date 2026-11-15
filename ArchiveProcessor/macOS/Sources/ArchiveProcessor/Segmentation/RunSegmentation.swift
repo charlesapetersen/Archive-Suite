@@ -86,7 +86,14 @@ enum SavedGapAnswer: String, Sendable, Codable, Equatable {
     }
 }
 
-/// One flagged gap as the pass shows it: page n beside page n+1.
+/// One page in a flagged gap's context, indexed in the run's retained page order.
+struct FlaggedContextPage: Identifiable, Equatable, Sendable {
+    let id: Int
+    let url: URL
+    let rotation: Int
+}
+
+/// One flagged gap as the pass shows it, with up to three pages on each side.
 struct FlaggedGapItem: Identifiable, Equatable, Sendable {
     /// The gap's index in the run's page list (`WindowStagePages`), between `pages[id]` and `pages[id + 1]`.
     let id: Int
@@ -98,6 +105,13 @@ struct FlaggedGapItem: Identifiable, Equatable, Sendable {
     let confidence: Double
     let cue: String
     var answer: FlaggedGapAnswer?
+    var contextPages: [FlaggedContextPage] = []
+
+    /// Isolated-pair tools (the old timing packs) have no surrounding page inventory.
+    var displayedPages: [FlaggedContextPage] {
+        contextPages.isEmpty ? [FlaggedContextPage(id: id, url: leftURL, rotation: leftRotation),
+                               FlaggedContextPage(id: id + 1, url: rightURL, rotation: rightRotation)] : contextPages
+    }
 
     var decision: GapDecision? { answer?.decision }
 }
@@ -119,7 +133,11 @@ enum FlaggedReview {
                            leftRotation: p.gap < rotations.count ? rotations[p.gap] : 0,
                            rightRotation: p.gap + 1 < rotations.count ? rotations[p.gap + 1] : 0,
                            proposal: p.decision, confidence: p.confidence, cue: p.cue,
-                           answer: prior[pages.urls[p.gap + 1].path]?.answer(proposed: p.decision))
+                           answer: prior[pages.urls[p.gap + 1].path]?.answer(proposed: p.decision),
+                           contextPages: (max(0, p.gap - 2)..<min(pages.urls.count, p.gap + 4)).map { k in
+                               FlaggedContextPage(id: k, url: pages.urls[k],
+                                                  rotation: k < rotations.count ? rotations[k] : 0)
+                           })
         }
     }
 

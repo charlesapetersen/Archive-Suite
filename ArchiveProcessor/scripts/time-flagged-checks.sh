@@ -21,7 +21,15 @@ fi
 py="$HOME/Library/Caches/ArchiveSuiteRehearsal/torch-env/bin/python"
 [ -x "$py" ] || py="$(bash scripts/segbench/torch-env.sh | tail -1)"
 cache="$HOME/Library/Caches/ArchiveSuiteRehearsal/seg-check-time"
-[ -f "$cache/pack.json" ] || "$py" scripts/segbench/check_time.py pack
+# W46.seg-check-context: an old pair-only pack cannot measure the wider sheet. Rebuild it first;
+# existing run logs stay intact, and the owner can still inspect the old two-page measurement.
+if [ ! -f "$cache/pack.json" ] || ! /usr/bin/python3 -c '
+import json, sys
+p = json.load(open(sys.argv[1]))
+sys.exit(0 if p.get("context_pages_each_side") == 3 else 1)
+' "$cache/pack.json"; then
+    "$py" scripts/segbench/check_time.py pack
+fi
 
 bin="$here/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
 # Build when the app is missing or older than any of its sources: on 2026-11-12 the primary checkout's app dated from

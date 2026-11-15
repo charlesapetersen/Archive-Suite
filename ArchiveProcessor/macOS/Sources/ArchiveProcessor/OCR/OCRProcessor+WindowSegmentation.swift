@@ -389,14 +389,14 @@ extension OCRProcessor {
 
 #if DEBUG
 extension OCRProcessor {
-    /// UI test only (`-APUITestFlaggedReview`): the flagged pass over two synthetic gaps among three drawn pages
+    /// UI test only (`-APUITestFlaggedReview`): the flagged pass over two adjacent synthetic gaps among nine drawn pages
     /// in this app's own temporary directory. No run, OCR, model call, manifest or output is involved; the
     /// answers are shown in `uiTestFlaggedResult` once Done is pressed.
     func _uiTestShowFlaggedReview() {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("APUITestFlagged-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let urls = (1...3).map { n -> URL in
+        let urls = (1...9).map { n -> URL in
             let url = dir.appendingPathComponent("page-\(n).png")
             let image = NSImage(size: NSSize(width: 300, height: 400), flipped: false) { r in
                 NSColor.white.setFill(); r.fill()
@@ -409,12 +409,14 @@ extension OCRProcessor {
             }
             return url
         }
-        flaggedGapItems = [
-            FlaggedGapItem(id: 0, leftURL: urls[0], rightURL: urls[1], leftRotation: 0, rightRotation: 0,
-                           proposal: .continue, confidence: 0.6, cue: "the letter seems to go on"),
-            FlaggedGapItem(id: 1, leftURL: urls[1], rightURL: urls[2], leftRotation: 0, rightRotation: 0,
-                           proposal: .new, confidence: 0.8, cue: "a new letterhead"),
-        ]
+        let pages = WindowStagePages(fileIndices: Array(urls.indices), urls: urls,
+                                     photoKinds: Array(repeating: nil, count: urls.count))
+        flaggedGapItems = FlaggedReview.items(proposals: [
+            GapProposal(gap: 2, decision: .continue, confidence: 0.6, agreed: true, flagged: true,
+                        cue: "the letter seems to go on", fixed: false),
+            GapProposal(gap: 3, decision: .new, confidence: 0.8, agreed: true, flagged: true,
+                        cue: "a new letterhead", fixed: false),
+        ], pages: pages, rotations: [])
         flaggedGapFocus = 0
         flaggedReviewApproachName = "Claude"
         flaggedReviewPartnerName = nil

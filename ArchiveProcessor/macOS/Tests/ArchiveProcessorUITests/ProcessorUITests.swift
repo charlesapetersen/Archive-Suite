@@ -200,7 +200,7 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(choose.exists, "cancelling leaves the next run without an import")
     }
 
-    /// W36.seg-opt-review: one flagged pass, page n beside page n+1. Done waits for every gap's answer, an
+    /// W46.seg-check-context: a flagged pass with a scrolling run of pages and the central pair marked. Done waits for every gap's answer, an
     /// answer moves to the next gap, and the answers come back in order. W46.seg-check-blind: only Split and Join
     /// are offered, and the model's proposal is not shown. Synthetic pages, no run behind it.
     func testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone() throws {
@@ -217,13 +217,34 @@ final class ProcessorUITests: XCTestCase {
                       "the sheet offers Split and Join")
         let done = element("flaggedReview.done")
         XCTAssertFalse(done.isEnabled, "Done must wait until every flagged gap is answered")
+        XCTAssertTrue(element("flaggedReview.context").exists, "a horizontal context strip is shown")
+        for page in 0...5 {
+            XCTAssertTrue(element("flaggedReview.page.\(page)").exists, "three pages either side, including page \(page + 1)")
+        }
+        XCTAssertFalse(element("flaggedReview.page.6").exists, "context is bounded to six pages")
+        XCTAssertTrue(element("flaggedReview.currentGap").exists, "the gap to check is marked")
+        XCTAssertFalse(element("flaggedReview.answer.3").exists, "an unanswered neighbour reveals no proposal")
         attachScreenshot("processor-flagged-review-first-gap")
 
-        element("flaggedReview.split").click()
+        app.typeKey("s", modifierFlags: [])
         XCTAssertTrue(waitUntil { self.renderedText(of: counter).contains("2 of 2") },
                       "an answer moves on to the next unanswered gap")
         XCTAssertFalse(done.isEnabled, "one gap is still unanswered")
-        element("flaggedReview.join").click()
+        XCTAssertTrue(element("flaggedReview.answer.2").waitForExistence(timeout: 5), "the earlier answer is drawn at its gap")
+        XCTAssertTrue(renderedText(of: element("flaggedReview.answer.2")).contains("Split"), "only the human answer is shown")
+        attachScreenshot("processor-flagged-review-context-answered")
+        element("flaggedReview.context").swipeLeft()
+        app.typeKey(.leftArrow, modifierFlags: [])
+        XCTAssertTrue(waitUntil { self.renderedText(of: counter).contains("1 of 2") }, "left returns to an answered gap")
+        XCTAssertTrue(waitUntil {
+            abs(self.element("flaggedReview.currentGap").frame.midX - self.element("flaggedReview.context").frame.midX) < 40
+        }, "moving recentres the question after scrolling through context")
+        app.typeKey("j", modifierFlags: [])
+        XCTAssertTrue(waitUntil { self.renderedText(of: counter).contains("2 of 2") }, "changing an answer returns to the unanswered gap")
+        XCTAssertTrue(renderedText(of: element("flaggedReview.answer.2")).contains("Join"), "the neighbouring answer updates")
+        app.typeKey(.leftArrow, modifierFlags: [])
+        app.typeKey("s", modifierFlags: [])
+        app.typeKey("j", modifierFlags: [])
         XCTAssertTrue(waitUntil { done.isEnabled }, "Done is enabled once every gap is answered")
         done.click()
 

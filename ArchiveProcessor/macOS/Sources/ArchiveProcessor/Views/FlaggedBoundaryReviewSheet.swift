@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - The review of flagged boundaries (W36.seg-opt-review)
 
-/// One flagged gap at a time, page n on the left and page n+1 on the right
+/// One flagged gap at a time, with up to three pages either side in a scrolling strip
 /// (execution-plans/segmentation/04-options-build.md Part 3 §5). It asks one question: Split makes the right page
 /// start a document, Join makes it continue the left one. The model's proposal, its confidence and its cue are not
 /// shown, since a cue usually gives away which way the model leaned (W46.seg-check-blind). An answer is never final
@@ -26,7 +26,7 @@ struct FlaggedBoundaryReviewSheet: View {
             Divider()
             footer
         }
-        .frame(minWidth: 900, minHeight: 600)
+        .frame(minWidth: 900, idealWidth: 1200, minHeight: 600, idealHeight: 740)
         .onKeyPress(characters: ["s", "S"]) { _ in answer(.split); return .handled }
         .onKeyPress(characters: ["j", "J"]) { _ in answer(.join); return .handled }
         .onKeyPress(.leftArrow) { move(-1); return .handled }
@@ -61,30 +61,83 @@ struct FlaggedBoundaryReviewSheet: View {
 
     private func gap(_ item: FlaggedGapItem) -> some View {
         VStack(spacing: 12) {
-            HStack(spacing: 16) {
-                page(item.leftURL, rotation: item.leftRotation, caption: "Page before")
-                page(item.rightURL, rotation: item.rightRotation, caption: "Page after")
+            Text("Up to three pages on each side. Scroll sideways for context; only your own answers are marked.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            GeometryReader { geometry in
+                ScrollViewReader { scroll in
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) {
+                            ForEach(item.displayedPages) { p in
+                                let central = p.id == item.id || p.id == item.id + 1
+                                page(p, central: central, before: p.id == item.id)
+                                    .frame(width: central ? geometry.size.width * 0.32 : geometry.size.width * 0.16,
+                                           height: central ? geometry.size.height - 16 : geometry.size.height * 0.62)
+                                if p.id != item.displayedPages.last?.id {
+                                    contextGap(after: p, item: item)
+                                        .id(p.id == item.id ? "current-gap" : "gap-\(p.id)")
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+                    }
+                    .accessibilityIdentifier("flaggedReview.context")
+                    .onAppear { scroll.scrollTo("current-gap", anchor: .center) }
+                    .onChange(of: focus) { _, _ in scroll.scrollTo("current-gap", anchor: .center) }
+                }
             }
-            .padding(.horizontal)
-            .padding(.top, 8)
             HStack(spacing: 12) {
                 choice("Split", .split, item, help: "The right page starts a new document (S)")
                 choice("Join", .join, item, help: "The right page continues the left one (J)")
             }
             .padding(.bottom, 8)
         }
+        .padding(.top, 8)
     }
 
-    private func page(_ url: URL, rotation: Int, caption: String) -> some View {
+    private func page(_ p: FlaggedContextPage, central: Bool, before: Bool) -> some View {
         VStack(spacing: 4) {
-            ArchiveThumbnail(url: url, maxSize: 1600, rotationDegrees: rotation, framed: true)
+            ArchiveThumbnail(url: p.url, maxSize: central ? 1600 : 600,
+                             rotationDegrees: p.rotation, framed: true)
+                .id(central)
                 .padding(4)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text("\(caption): \(url.lastPathComponent)")
-                .font(.caption)
-                .foregroundStyle(.primary)
+            Text(central ? (before ? "Page before" : "Page after") : "Context")
+                .fontWeight(central ? .semibold : .regular)
+            Text("\(p.id + 1): \(p.url.lastPathComponent)")
                 .lineLimit(1)
+                .truncationMode(.middle)
+                .help(p.url.lastPathComponent)
         }
+        .font(.caption)
+        .foregroundStyle(.primary)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("flaggedReview.page.\(p.id)")
+    }
+
+    private func contextGap(after p: FlaggedContextPage, item: FlaggedGapItem) -> some View {
+        let current = p.id == item.id
+        // Match both URLs: only an answer on this actual adjacent pair belongs here. Never show proposals.
+        let next = item.displayedPages.first { $0.id == p.id + 1 }
+        let answer = items.first { $0.leftURL == p.url && $0.rightURL == next?.url }?.answer
+        return VStack(spacing: 6) {
+            if current {
+                Text("Check\nthis gap")
+                    .fontWeight(.semibold)
+                    .accessibilityIdentifier("flaggedReview.currentGap")
+            } else if let answer {
+                Text("Your answer:\n\(answer == .split ? "Split" : "Join")")
+                    .accessibilityIdentifier("flaggedReview.answer.\(p.id)")
+            }
+            Rectangle()
+                .fill(current ? Color.accentColor : Color.secondary.opacity(0.35))
+                .frame(width: current ? 3 : 1, height: current ? 90 : 35)
+        }
+        .font(.caption)
+        .multilineTextAlignment(.center)
+        .foregroundStyle(current ? Color.accentColor : Color.primary)
+        .frame(width: 56)
     }
 
     /// The chosen answer is drawn accent-filled, the others plain, so the pick reads at a glance and is not
