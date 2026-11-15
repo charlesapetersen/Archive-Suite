@@ -16274,3 +16274,42 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Cost $0. Item-specific rebuildable cache removed before commit; shared benchmark inputs/caches retained for future
   pins. No real-corpus write and no migration, because there is no app-produced production material to migrate.
   <!-- /W42.int-s3-tag-precedence -->
+
+- [x] **W46.layout-newspapers — PP-DocLayoutV3 regions on newspapers in the app, for every reader [M]** · §Document processing review — W46 · SHIPPED 2026-11-15 (this commit) (lane: processor) (uses: build) (blocked-on: W42.int-s2, W46.layout-pair-newspapers) — `execution-plans/processing-review/13-stage-rules/03-layout.md`: a layout stage on newspapers and dense multi-column print only, read in the detector's own order, for every reader (the gain is nil, not negative, for large readers); never on handwriting or registers; picture regions kept, since the app's filter kept 7 of 45 marks against 26; a whole-page fill when the regions cover too little of Vision's ink (PP reads 69.4% of L9 ink on average; the threshold measured in this item); whole page as the failed-page fallback. 794 MB RSS; time from `W46.ocr-time-like-for-like`.
+
+  PP-DocLayoutV3 now wraps every page reader (direct, gateway, subscription and Vision) and paid batches,
+  with a checked, user-started helper download in Settings → Rules → Columns and reading order. Confirmed
+  newspapers alone use regions, with pictures retained and the detector's own order. Photographs get the quad
+  first. Other/uncertain kinds stay whole. Missing/failed detection or a failed region reads the whole page;
+  a failed-region fallback replaces partial text, and Stop never starts another read.
+
+  The geometry-only sweep measured 15 cached L9 scans / 8,135 Vision line boxes: padded regions with pictures
+  cover 93.77% of line-box union area on average. The engineering floor is 95% (7/15 below it). Complete lines
+  crossing region ownership boundaries, and their overlapping lines, move to a disjoint whole-page fill:
+  this guard needs fill on all 15 pages and moves 5,022 boxes. Each pixel has one owner; no text deduplication.
+  This is a conservative geometry policy, not an accuracy-optimal threshold. OCR accuracy/speed of this new
+  partition on the truth set remains unmeasured. The old 69.4% dark-pixel figure excluded pictures. The public
+  model's 857 tensor shapes, dtypes and hashes equal the measured lab copy; no new paid comparison was run.
+
+  Batch request identities, partial cross-chunk replies and whole fallback results are durable before a
+  chunk is consumed or output is written; only complete original pages aggregate. Submitted regions are
+  reserved in cost estimates. Synchronous completed-region charges survive Stop and a throwing fallback;
+  captured-state post-unwind updates and stable attempt ledger IDs preserve abandoned charges across Resume
+  and avoid counting a late batch result twice. A process crash before a spend flush is outside that protection.
+
+  Verification: Debug build, no new source warnings; eight scratch/no-wire Processor harnesses pass
+  (49 newspaper checks including the real offline detector and pixel ownership; provider golden journeys,
+  batch recovery, cascade, refusal, history, Settings sheet and settings layers). Independent adversarial
+  review has no open confirmed finding. Debug-driver lint and page-reader seam pass. Headless row PNG and
+  the focused VM Settings screenshot inspected: rule text and helper button readable, no clipping. Focused
+  VM test 1/1; full VM lane: 48 selected, 39 passed, 9 existing opt-in skips (phone journey and visual tours),
+  0 failures, four fresh chunks, 1,045 s, no suite crash/hang reports. Package newspaper checks 8/8.
+  Full kit 2,139/2,153: all 14 failures involve
+  unchanged outline fixtures that already lack outlines before OCR; isolated 11/19 and queued/mirrored as
+  W42.kit-outline-fixtures (old/W42.kit-outline-fixtures-20261115.md). The direct Gemini paid smoke was not
+  used: that prepaid key route is empty/retired for review work. No paid calls, corpus writes or cluster contact.
+
+  Checkpoints: 59edc6df, a39a9a2d, a79a09cc. Deleted the item resume note. Removed this item's rebuildable
+  133,235,201-byte model download cache; kept committed numeric coverage evidence and the outline failure
+  report, with other items' caches untouched. No migration: there is no app-produced production material.
+  <!-- /W46.layout-newspapers -->
