@@ -464,6 +464,11 @@ grep -q '\[ "\$CRASH_FOUND" = 0 \] || die' "$RUNNER" \
   && ok "runner exits non-zero when a suite process left a crash report" \
   || no "runner does not fail on a suite crash report"
 
+echo "== sampler ownership and TERM-mask teardown =="
+python3 "$HERE/prove-vm-sampler.py" "$LIB" \
+  && ok "sampler stops with TERM blocked and preserves verdicts" \
+  || no "sampler ownership / bounded teardown proof failed"
+
 echo
 echo "prove-vm-lane: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

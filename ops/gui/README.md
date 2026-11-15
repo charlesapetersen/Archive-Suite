@@ -82,6 +82,13 @@ Smoke 4 s), so the slowdown is the guest's, over a long run. Run a full lane as 
 the scheme's whole plan whatever `-only-testing` says, so the runner narrows it to the selectors itself; a killed
 runner (TERM, INT, HUP) still stops its guest and drops the VM lock.
 
+The load sampler has its own process group in the runner's session. It unblocks only TERM before launching
+its shell, transport and sleep, so an inherited engine signal mask cannot hang teardown. `tart_sampler_stop`
+verifies the direct child's ownership before signalling that group, gives TERM two seconds, then KILL two
+seconds, and waits only after no live member remains. Inspection failures refuse signalling and fail cleanup;
+load sampling never supplies or changes a test verdict. Scratch-only signal proof (also in `prove-vm-lane.sh`):
+`python3 ops/autonomous/tests/prove-vm-sampler.py` (outside the Codex sandbox for process inspection).
+
 **Index warning / recovery check (W23.m9-fu3):** the opt-in `CORRUPT_INDEX_FIXTURE=1` mode seeds only the
 generated Reader or Notes fixture with 1 KiB of invalid SQLite bytes. Run the focused check per app:
 

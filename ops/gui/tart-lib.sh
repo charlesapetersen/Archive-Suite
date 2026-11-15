@@ -587,11 +587,15 @@ TART_KEEP_STATE="${VM_KEEP_STATE:-$HOME/.tart-mirror/.vm-keep}"
 #   epoch, host load1, host memory-pressure level (1 normal, 2 warn, 4 critical), guest load1, guest free /
 #   compressor-held / swapped-out pages, WindowServer %cpu and RSS (KB), testmanagerd %cpu, the app's RSS (KB).
 # Cheap (one `tart exec` a minute). Rows the transport drops are simply missing.
+TART_SAMPLER_HELPER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tart-sampler.py"
 tart_sampler_start() {
   local vm="$1" out="$2" every="${3:-60}" proc="${4:-Archive}"
-  TART_SAMPLER_PID=""
+  tart_sampler_stop || return 1
   printf 'epoch\thost_load1\thost_pressure\tguest_load1\tguest_free\tguest_compressor\tguest_swapouts\tws_cpu\tws_rss_kb\ttestmanagerd_cpu\tapp_rss_kb\n' >"$out"
-  (
+  local sample_loop
+  IFS= read -r -d '' sample_loop <<'TART_SAMPLE' || true
+    set -euo pipefail
+    vm="$1"; out="$2"; every="$3"; proc="$4"
     while :; do
       g="$(tart exec "$vm" bash -c "
         l=\$(sysctl -n vm.loadavg | awk '{print \$2}')
@@ -605,15 +609,18 @@ tart_sampler_start() {
         "$(sysctl -n kern.memorystatus_vm_pressure_level 2>/dev/null)" "$g" >>"$out"
       sleep "$every"
     done
-  ) &
+TART_SAMPLE
+  # A separate sampler-only process group, with TERM unblocked before bash/transport/sleep inherit it.
+  python3 "$TART_SAMPLER_HELPER" run bash -c "$sample_loop" \
+    vm-sampler "$vm" "$out" "$every" "$proc" &
   TART_SAMPLER_PID=$!
   return 0
 }
 tart_sampler_stop() {
   [ -n "${TART_SAMPLER_PID:-}" ] || return 0
-  # Its running `sleep` or `tart exec` first: left orphaned in the caller's session, they would hold heavy-run.py.
-  pkill -P "$TART_SAMPLER_PID" 2>/dev/null || true
-  kill "$TART_SAMPLER_PID" 2>/dev/null || true
+  # Never wait on a live child: the helper verifies ownership, bounds TERM/KILL for its entire group,
+  # and proves it has stopped first. A refusal retains the PID and fails, without changing a test log.
+  python3 "$TART_SAMPLER_HELPER" stop "$TART_SAMPLER_PID" "$$" || return 1
   wait "$TART_SAMPLER_PID" 2>/dev/null || true
   TART_SAMPLER_PID=""
   return 0

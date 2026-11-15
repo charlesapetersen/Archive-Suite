@@ -52,7 +52,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
-- [ ] **W40.vm-sampler-term-mask — the VM sampler must stop when the caller blocks TERM [S · Tier-2]** (lane: suite) (uses: vm) — Found verifying W42.int-s5-compress at baseline 68b188b1: after XCTest finished, `ops/gui/tart-lib.sh:tart_sampler_stop` sent TERM then waited forever on its sampler shell, which inherited the engine's blocked TERM mask. The failed test's log had stopped growing, and the sampler and its sleep child alone kept the runner in teardown. Audit the owned sampler's signal mask and bounded teardown; prove it with TERM blocked without changing a test verdict or weakening a check. Evidence in `verification/evidence/processor/W42.int-s5-compress-verification.md`. Later verification launches explicitly unblock TERM first.
 
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
 
