@@ -793,7 +793,7 @@ public enum Prefs {
     /// JSON into the `.txt` path `uniqueOutputs` had already reserved.
     ///
     /// Snapshot it once, pass it down.
-    public struct Snapshot: Sendable {
+    public struct Snapshot: Sendable, Equatable {
         var mode: Mode
         var textFormat: TextFormat
         var besideOriginal: Bool
@@ -830,6 +830,29 @@ public enum Prefs {
         /// layer: set by `model(for:)` on a handwritten page only, never by a caller.
         var textPage: Bool = false
         var modelMemoryGB: Double = Prefs.defaultModelMemoryGB()
+
+        /// The shipped settings without consulting or registering any preferences. Registration below
+        /// takes its snapshot values from here too, so host-independent readers use the same defaults.
+        static let defaults = Snapshot(
+            mode: .searchablePDF,
+            textFormat: .text,
+            besideOriginal: false,
+            useJBIG2: true,
+            photoDetail: .balanced,
+            imageDetail: .initial,
+            joinHyphenated: true,
+            preserveAnnotations: false,
+            fast: false,
+            languages: "",
+            languageCorrection: true,
+            confidence: 0.0,
+            pdfDPIAuto: true,
+            pdfDPI: 144,
+            password: "",
+            customWords: "",
+            minTextHeightOn: false,
+            minTextHeight: 0.0,
+            handTextPage: true)
 
         /// Reads the live settings. Call on the main actor, once per batch.
         static func current(_ d: UserDefaults = Prefs.store) -> Snapshot {
@@ -984,17 +1007,15 @@ public enum Prefs {
     /// harm through a door A4.3 did not consider. It also means two runs of one
     /// tool race on one file, which is the `tests.plist` hazard in CLAUDE.md.
     ///
-    /// The registration itself is in-memory, so a tool calling
-    /// `register(migrate: false)` gets exactly the shipped defaults and writes
-    /// nothing at all. Every tool passes false; only the app migrates.
-    ///
-    /// `store` is for a run that wants the shipped defaults and none of the user's
-    /// settings (`TimingRun`): a scratch domain registered here and never written.
+    /// Registration supplies fallbacks in memory; saved, argument and global values still take
+    /// precedence. Every tool passes false; only the app migrates. Runs that need only the
+    /// shipped settings use `Snapshot.defaults` instead, without touching any preferences domain.
     static func register(migrate: Bool = true, into store: UserDefaults = Prefs.store) {
         if migrate { migrateFromPreviousName() }
+        let s = Snapshot.defaults
         store.register(defaults: [
-            mode: Mode.searchablePDF.rawValue,
-            besideOriginal: false,
+            mode: s.mode.rawValue,
+            besideOriginal: s.besideOriginal,
             openWhenDone: true,
 
             // On by default: an app distributed outside the App Store has no
@@ -1005,18 +1026,18 @@ public enum Prefs {
             lastUpdateCheck: 0.0,
             skippedVersion: "",
 
-            textFormat: TextFormat.text.rawValue,
+            textFormat: s.textFormat.rawValue,
 
-            fast: false,
-            languages: "",
-            languageCorrection: true,
-            confidence: 0.0,
-            pdfDPIAuto: true,
-            pdfDPI: 144,
-            password: "",
-            customWords: "",
-            minTextHeightOn: false,
-            minTextHeight: 0.0,
+            fast: s.fast,
+            languages: s.languages,
+            languageCorrection: s.languageCorrection,
+            confidence: s.confidence,
+            pdfDPIAuto: s.pdfDPIAuto,
+            pdfDPI: s.pdfDPI,
+            password: s.password,
+            customWords: s.customWords,
+            minTextHeightOn: s.minTextHeightOn,
+            minTextHeight: s.minTextHeight,
 
             // Feeding this app an already-OCR'd PDF must redo the recognition
             // rather than pass the old layer through, and the rebuild is what
@@ -1034,7 +1055,7 @@ public enum Prefs {
 
             // Roughly a third the size at identical resolution. Falls back to
             // CoreGraphics' Flate silently when jbig2enc/qpdf aren't installed.
-            useJBIG2: true,
+            useJBIG2: s.useJBIG2,
 
             // Balanced, not Maximum. The pages this applies to are the ones with
             // pictures on them, so the default has to be a real answer rather
@@ -1042,28 +1063,28 @@ public enum Prefs {
             // halftone is very hard to tell from the original, while costing a
             // third of the bytes. Maximum is one click away for anyone who wants
             // the pixels, and the text is full resolution at every level.
-            photoDetail: PhotoDetail.balanced.rawValue,
+            photoDetail: s.photoDetail.rawValue,
 
             // The owner's pick, 2026-10-14: Baker's 87 KB step (`ImageDetail`).
-            imageDetail: ImageDetail.initial.rawValue,
+            imageDetail: s.imageDetail.rawValue,
 
             // On by default. The failure mode of joining is a slightly noisier
             // extracted text — the tail of the word appears twice — and the
             // failure mode of not joining is a document whose long words cannot
             // be found at all. In narrow-column archival material that is most
             // of the words worth searching for.
-            joinHyphenated: true,
+            joinHyphenated: s.joinHyphenated,
 
-            modelArrangement: ModelArrangement.off.rawValue,
-            modelReader: "",
-            modelMemoryGB: defaultModelMemoryGB(),
+            modelArrangement: s.modelArrangement.rawValue,
+            modelReader: s.modelReader,
+            modelMemoryGB: s.modelMemoryGB,
             accurateMode: false,
             accurateReader: AccurateReader.vision.rawValue,
             accurateNewspaperReader: AccurateReader.vision.rawValue,
             accuratePhotoReader: AccurateReader.vision.rawValue,
             accurateHandReader: AccurateReader.vision.rawValue,
             accurateEnabled: "",
-            handTextPage: true,
+            handTextPage: s.handTextPage,
 
             // On by default. The cost is a few kilobytes of text per batch in
             // the directory macOS already keeps logs in; the benefit is that a

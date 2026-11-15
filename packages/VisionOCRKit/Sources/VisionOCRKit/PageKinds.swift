@@ -41,14 +41,8 @@ public enum EnginePageKind {
         return (Recogniser.pageKind(shape: s, pasteUp: false) == .newspaper, s.lines, s.wideWidth)
     }
 
-    /// The engine's default settings, read from a store of its own so the host app's saved values never reach the
-    /// reading. `register(defaults:)` writes nothing to disk, but its registration domain is process-wide
-    /// (`Prefs.swift`), so the engine's keys also read as registered defaults in the host's standard store.
-    static let settings: Prefs.Snapshot = {
-        let store = UserDefaults(suiteName: "VisionOCRKit.EnginePageKind") ?? UserDefaults()
-        Prefs.register(migrate: false, into: store)
-        return Prefs.Snapshot.current(store)
-    }()
+    /// The engine's defaults in memory: no host settings, saved domain or registration side effects.
+    static let settings = Prefs.Snapshot.defaults
 
     /// Whether a page image is a photograph rather than a scan: a camera's tags in `properties` (the image file's
     /// `CGImageSourceCopyPropertiesAtIndex`), else the lighting in its pixels.

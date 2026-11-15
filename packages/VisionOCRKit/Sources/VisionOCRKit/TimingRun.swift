@@ -43,11 +43,7 @@ enum TimingRun {
     /// Falcon-OCR is approved only on regions for newspapers and only on align for the rest);
     /// a Mac that called them otherwise would end the run, saying the reader is not offered.
     static func settings(_ leg: Leg, memoryGB: Double) -> Prefs.Snapshot {
-        // Registered only, so nothing is written; nil is only ever NSGlobalDomain's name.
-        let name = "local.visionocr-timing.\(UUID().uuidString)"
-        let d = UserDefaults(suiteName: name)!
-        Prefs.register(migrate: false, into: d)
-        var s = Prefs.Snapshot.current(d)
+        var s = Prefs.Snapshot.defaults
         let route = leg.reader.route(leg.kind)
         s.modelArrangement = route.arrangement
         s.modelReader = route.reader

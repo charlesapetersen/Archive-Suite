@@ -437,6 +437,60 @@ do {
           offenders == ["Sources/VisionOCRKit/Prefs.swift: nonisolated(unsafe) static var store: UserDefaults = .standard"],
           offenders.joined(separator: " | "))
     Prefs.store.removeObject(forKey: sentinel)
+
+    // A defaults-only snapshot must not pick up the host's choices or change its registration
+    // domain. Poison only this run's private store; the source-boundary check above stays intact.
+    let defaults = Prefs.Snapshot.current()
+    let registration = d.volatileDomain(forName: UserDefaults.registrationDomain)
+    defer {
+        d.setVolatileDomain(registration, forName: UserDefaults.registrationDomain)
+        resetPrefs()
+    }
+    let hostile: [String: Any] = [
+        Prefs.mode: Prefs.Mode.text.rawValue, Prefs.textFormat: Prefs.TextFormat.json.rawValue,
+        Prefs.besideOriginal: true, Prefs.useJBIG2: false,
+        Prefs.photoDetail: Prefs.PhotoDetail.maximum.rawValue, Prefs.imageDetail: 8,
+        Prefs.joinHyphenated: false, Prefs.preserveAnnotations: true,
+        Prefs.fast: true, Prefs.languages: "fr-FR", Prefs.languageCorrection: false,
+        Prefs.confidence: 0.9, Prefs.pdfDPIAuto: false, Prefs.pdfDPI: 72,
+        Prefs.password: "scratch-password", Prefs.customWords: "scratch-word",
+        Prefs.minTextHeightOn: true, Prefs.minTextHeight: 0.2,
+        Prefs.modelArrangement: Prefs.ModelArrangement.replace.rawValue,
+        Prefs.modelReader: "scratch-reader",
+        Prefs.newspaperModelArrangement: Prefs.ModelArrangement.fill.rawValue,
+        Prefs.newspaperModelReader: "scratch-newspaper",
+        Prefs.photoModelArrangement: Prefs.ModelArrangement.regions.rawValue,
+        Prefs.photoModelReader: "scratch-photo",
+        Prefs.handModelArrangement: Prefs.ModelArrangement.align.rawValue,
+        Prefs.handModelReader: "scratch-hand", Prefs.handTextPage: false,
+        Prefs.modelMemoryGB: 12, Prefs.accurateMode: true,
+        Prefs.accurateReader: Prefs.AccurateReader.falcon.rawValue,
+        Prefs.accurateEnabled: Prefs.AccurateReader.falcon.rawValue,
+    ]
+    for (key, value) in hostile { d.set(value, forKey: key) }
+    var hostileRegistration = registration
+    hostileRegistration.merge(hostile) { _, new in new }
+    d.setVolatileDomain(hostileRegistration, forName: UserDefaults.registrationDomain)
+    let saved = d.persistentDomain(forName: testDomain) ?? [:]
+    check("the scratch host actually has nondefault settings", Prefs.Snapshot.current() != defaults)
+    check("the typed defaults equal the complete registered snapshot", Prefs.Snapshot.defaults == defaults)
+    check("page-kind and compression defaults ignore every saved host choice",
+          EnginePageKind.settings == defaults && CompressedPage.settings == defaults)
+    var timed = defaults
+    let route = Prefs.AccurateReader.falcon.route(.newspaper)
+    timed.modelArrangement = route.arrangement
+    timed.modelReader = route.reader
+    timed.newspaperModelArrangement = route.arrangement
+    timed.newspaperModelReader = route.reader
+    timed.modelMemoryGB = 7
+    check("timing changes only its own reader choices and cap",
+          TimingRun.settings(.init(reader: .falcon, kind: .newspaper), memoryGB: 7) == timed
+              && EnginePageKind.settings == defaults && Prefs.Snapshot.defaults == defaults)
+    check("default snapshots leave saved host settings untouched",
+          NSDictionary(dictionary: saved).isEqual(to: d.persistentDomain(forName: testDomain) ?? [:]))
+    check("default snapshots leave the host's registration domain untouched",
+          NSDictionary(dictionary: hostileRegistration).isEqual(
+            to: d.volatileDomain(forName: UserDefaults.registrationDomain)))
 }
 }  // end of section
 

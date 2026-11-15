@@ -41,8 +41,7 @@ public enum CompressedPage {
     /// The qpdf the compression uses, for a host that merges or finishes what it wrote without redrawing it.
     public static var qpdf: URL? { JBIG2.merger.map { URL(fileURLWithPath: $0) } }
 
-    /// The engine's defaults as Vision OCR registers them, never the user's or the host's own: the page-kind
-    /// reader's store (`EnginePageKind.settings`, a registration domain that writes nothing).
+    /// The engine's defaults in memory, shared with the page-kind reader; no saved preferences are read.
     static let settings: Prefs.Snapshot = {
         var s = EnginePageKind.settings
         s.mode = .searchablePDF

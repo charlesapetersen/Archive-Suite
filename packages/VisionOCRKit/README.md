@@ -29,11 +29,16 @@ python3 ops/autonomous/heavy-run.py run -- swift test -c release -Xswiftc -enabl
 `visionocr-pdf <out-dir> <file>...` (`Tools/pdf/`) makes Vision OCR 1.16.0's searchable PDF of each file with its defaults, headless, and prints bytes and seconds: the size baseline for Archive Processor's output (W42.int-s5, `ArchiveProcessor/scripts/measure-output.sh`).
 
 `CompressedPage.write(image:lines:ink:pageSize:to:)` writes one compressed searchable page with the host's own
-`TextLayer.Lines`, without recognising text. It uses the engine's registered defaults and the JBIG2/MRC route;
+`TextLayer.Lines`, without recognising text. It uses the engine's shipped defaults and the JBIG2/MRC route;
 `ink` supplies the actual text locations when the layer's lines are unplaced. Call it off the main thread.
 `CompressedPage.missingTools` names absent `jbig2`/`qpdf` executables, found in the host's Resources, standard
 Homebrew/MacPorts locations, then the login PATH. The caller supplies those tools and finishes PDF/A metadata;
 copy the resulting PDF streams when finishing or merging, since drawing through Quartz undoes compression.
+
+The page-kind detector, text-layer reader, compression and timing runs start from `Prefs.Snapshot.defaults`,
+the same typed defaults used by preferences registration. Taking that snapshot reads no saved preferences and
+changes neither persistent preferences nor the process's registration domain. A timing leg changes only its
+reader choices and memory cap in its own copy.
 
 A whole-package release build needs `-Xswiftc -enable-testing`, because `visionocr-checks`, `visionocr-gate` and `visionocr-pdf` use `@testable import`; without it those targets fail with "unable to resolve Swift module dependency". The library and the helper build without it (`--product visionocr-recognise`), and so does a debug build. The `ux-regression.sh` run was not repeated after the move (owner, 2026-11-13: the suite's matching count is enough; Vision OCR's `testdocs/` corpus stays on the OneDrive backup), so `Tools/ux-regression.sh` through the package products is wired but has not been run.
 
