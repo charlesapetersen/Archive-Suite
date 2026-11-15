@@ -2,6 +2,15 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ✅ Fixed (2026-11-15): unrelated segmentation routes borrowed g2's spread — W46.seg-tie-borrowed-range
+
+The 10.4-point tie used g2's 5.2-point window-offset range for every comparison, letting the free 2B tie Gemini
+text and cheap GLM tie ChatGPT. Each pair now uses twice its larger own range, borrowing g1's 2.4 only where
+unmeasured (owner, 2026-11-13). Thus those pairs use 4.8, g2 pairs keep 10.4, and new measurements replace the
+borrowed value per route. Gemini text and ChatGPT win the affected profiles; both plans and D5 retain Claude alone.
+Solver, chooser and sheet functional checks pass, with offscreen renders and a separate adversarial review.
+Evidence: `verification/evidence/processor/W46.seg-tie-borrowed-range.md`.
+
 ## ⚠️ LIMITATION (W42.int-s5-searchable, 2026-11-13): what the searchable form does not yet do
 
 The searchable form (one page per source page, the header in the XMP: `SPEC/tag-format.md` §"The searchable form") is

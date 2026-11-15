@@ -144,11 +144,9 @@ enum SettingsSheetTestDriver {
         let gem = layer(.general, [(.keys, .strings(["gemini"])), (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
                                    (.batchCeilingUSD, .double(10)), (.staysOnMac, .bool(false)),
                                    (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)))])
-        // W46.seg-truth-owner-fixes: on a 16 GB Mac the free 2B ties Gemini under the 10.4-point floor and is the pick, so
-        // the Gemini cards are checked on an 8 GB Mac, which cannot run it.
-        check("3 a Gemini key on a 16 GB Mac: the Mac 2B is the segmentation pick",
-              card(sheet("gemini-16gb", general: gem), "segmentation")?.routeID == "seg-qwen3.5-2b-8bit")
-        let paid = sheet("gemini", general: gem, gb: 8)
+        check("3 a Gemini key on a 16 GB Mac: Gemini text beats the Mac 2B beyond 4.8",
+              card(sheet("gemini-16gb", general: gem), "segmentation")?.routeID == "gemini3.8-flash-text")
+        let paid = sheet("gemini", general: gem)
         // W46.seg-text-tier-default: the text-only window ties the image window for half the price and is the pick; the
         // card says why and what the image window buys, and offers it beside the pick.
         if let s = card(paid, "segmentation") {
@@ -165,6 +163,27 @@ enum SettingsSheetTestDriver {
                   image.map { "\($0.figure), \($0.cost)" } ?? s.alternatives.map(\.id).joined(separator: ", "))
             check("3 the image window can be chosen", s.options.contains { $0.id == "gemini3.8-flash" && $0.blocked == nil })
         } else { check("3 segmentation card", false) }
+        if let s = card(paid, "segmentation") {
+            check("3 the 2B alternative is outside the text pair's 4.8 floor",
+                  s.alternatives.first { $0.id == "seg-qwen3.5-2b-8bit" }.map {
+                      !$0.figure.contains("a tie with the pick")
+                  } == true)
+        }
+        // A zero ceiling leaves the 2B selected and puts the two Gemini routes first among limit alternatives.
+        let localChosen = sheet("gemini-no-spend", general: layer(.general, [(.keys, .strings(["gemini"])),
+                                (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)), (.batchCeilingUSD, .double(0)),
+                                (.staysOnMac, .bool(false))]))
+        if let s = card(localChosen, "segmentation") {
+            check("3 a zero ceiling keeps the 2B", s.routeID == "seg-qwen3.5-2b-8bit", s.routeID ?? "nil")
+            check("3 better text is outside the local pair's 4.8 floor",
+                  s.better.first { $0.id == "gemini3.8-flash-text" }.map {
+                      !$0.reason.contains("no real gain")
+                  } == true)
+            check("3 better image remains inside g2's own 10.4 floor",
+                  s.better.first { $0.id == "gemini3.8-flash" }.map {
+                      $0.reason.contains("no real gain")
+                  } == true)
+        } else { check("3 custom local segmentation card", false) }
         let paidImage = sheet("gemini-image", general: gem,
                               collection: layer(.collection, [(SettingsSheetModel.overrideKey("segmentation"), .string("gemini3.8-flash"))]),
                               gb: 8)

@@ -291,7 +291,7 @@ extension SettingsSheetModel {
                 + (usd < 0.005 ? ", free." : String(format: ", about $%.2f per 1,000 \(unitWord).", usd / units * 1000))
             if let top = points.filter({ $0.state == .usable }).max(by: { $0.y < $1.y }), top.y > base * scale + 1e-9 {
                 let gap = top.y - base * scale
-                text += gap < Self.tieFloor(stage.id) * scale
+                text += gap < Self.tieFloor(stage.id, card.routeID.flatMap(stage.route), stage.route(top.id), answers: a) * scale
                     ? String(format: " \(top.name) alone scores %.1f higher, which is within what the measurements can tell "
                              + "apart, so the app counts it as a tie and keeps its choice by its own rule.", gap)
                     : String(format: " \(top.name) alone scores %.1f higher; “Use for all of this step” on its row would use it "

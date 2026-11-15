@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-14",
+ "built": "2026-11-15",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -37,7 +37,7 @@
   },
   "segmentation": {
    "metric": "pages_exact",
-   "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none takes the largest measured: Gemini 3.7 g2 5.2, so 10.4 points; reading's construction, 07-segmentation.md §3); in gap accuracy the paired interval decides",
+   "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none borrows g1's 2.4 points: 4.8 when neither is measured, 10.4 for a pair involving g2's measured 5.2; owner, 2026-11-13, W46.seg-tie-borrowed-range, 07-segmentation.md §3); in gap accuracy the paired interval decides",
    "source": "seg-g2-offsets.md §Reading; seg-boxes-score.md §Paired differences"
   },
   "dating": {
@@ -8261,7 +8261,7 @@
      },
      "caveats": [
       "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)",
-      "the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 88.8-89.1% no checking, 25.3-29.2 checks per 100 pages, 100.0% after checking and no unflagged error (seg-g2-offsets.md); 3.7's range on g1 at this level is 83.0-85.2%",
+      "the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.8-90.0% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its measured 5.2-point range gives its own pairs a 10.4-point floor; unmeasured routes borrow g1's 2.4, not this range (W46.seg-tie-borrowed-range)",
       "introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1",
       "no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)",
       "the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"

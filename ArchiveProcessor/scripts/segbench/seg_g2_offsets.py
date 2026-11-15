@@ -305,14 +305,13 @@ def render(out) -> str:
           + ", RG165 "
           + "–".join(_p(f(rows[f"o{o}"]["by_box"]["RG165"]["pages_exact_no_review"] for o in OFFSETS)) for f in (min, max))
           + ", so a per-box figure is less settled than the pooled one.", "",
-          f"The settings layer's tie rule (07-segmentation.md §3) is reading's construction: twice the larger "
-          f"offset range of the two routes compared, a route with none held to the largest measured ("
-          f"{'g2' if sp['g2'] >= sp['g1'] else 'g1'}'s {max(sp['g1'], sp['g2']):.1f}), so "
-          f"{2 * round(max(sp['g1'], sp['g2']), 1):.1f} points for every pair the table holds. "
-          f"Gemini's {100 * (rng['pages_exact_no_review'][0] - out['claude_o0']):+.1f} to "
-          f"{100 * (rng['pages_exact_no_review'][1] - out['claude_o0']):+.1f} points against Claude is under it, a "
-          "tie, so profile D5 (a Claude plan and a Gemini key) takes the plan route on money. Claude's w1 carries no "
-          "article rule, so the gap is not like for like either way.", "",
+          "The settings layer's tie rule (07-segmentation.md §3; owner, 2026-11-13, W46.seg-tie-borrowed-range) "
+          "takes twice the larger of the two routes' own offset ranges; a route with none measured borrows g1's "
+          "2.4 points. Two unmeasured routes therefore use 4.8 points, while pairs with g2's measured "
+          f"{sp['g2']:.1f} retain {2 * round(max(sp['g2'], 2.4), 1):.1f}. A route's own measured range replaces its "
+          "borrowed value when it lands. Profile D5 (a Claude plan and a Gemini key) still takes Claude on money: "
+          "89.1 against text alone's 87.9 is inside their 4.8 floor; the image g2 pair retains 10.4. Claude's w1 "
+          "carries no article rule, so the gap is not like for like either way.", "",
           "## Gateway", "",
           f"{gw['calls']} settled calls, {gw['input_tokens']:,} input and {gw['output_tokens']:,} output tokens, "
           f"${gw['spent_usd']:.4f} counted of the ${CAP:.2f} cap ({gw['billed_note']}), {gw['invalid']} invalid. "

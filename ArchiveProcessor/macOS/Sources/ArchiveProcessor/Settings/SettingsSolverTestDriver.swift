@@ -215,10 +215,9 @@ enum SettingsSolverTestDriver {
         check("D1 reading cites its pair", d1.pick("reading", "all")?.gap?.citation.contains("owner96/all/answered") == true)
         eq("D1 handwritten: Gemini 3.8 Flash", pick(d1, "reading", "handwritten"), "gemini3.8-flash")
         check("D1 no cascade beats Gemini 3.8 Flash", !pick(d1, "reading").hasPrefix("casc-"))
-        // W46.seg-truth-owner-fixes: on the corrected truth the Mac 2B's 79.7 is 8.2 points under the text alone's 87.9,
-        // inside the 10.4 floor (twice g2's 5.2 offset range), so a tie and the free 2B wins; an 8 GB Mac cannot run it.
-        eq("D1 segmentation: the Mac 2B ties Gemini under the 10.4 floor and costs nothing", pick(d1, "segmentation"),
-           "seg-qwen3.5-2b-8bit")
+        // Text alone and the 2B have no measured ranges: the 4.8-point floor cannot tie their 8.2-point gap.
+        eq("D1 segmentation: Gemini text beats the Mac 2B beyond their 4.8 floor", pick(d1, "segmentation"),
+           "gemini3.8-flash-text")
         var gem8 = mac(8)
         gem8.keys = ["gemini"]
         let d1s = solve("D1-8GB", gem8)
@@ -279,7 +278,7 @@ enum SettingsSolverTestDriver {
         eq("D4 segmentation: ChatGPT", pick(d4, "segmentation"), "chatgpt-gpt6.1-sol")
         var both = mac(16)
         both.plans = ["claude", "chatgpt"]
-        // W46.seg-truth-owner-fixes: the mix's 90.3 is 1.2 points over Claude alone's 89.1, inside the 10.4 floor, so a
+        // W46.seg-truth-owner-fixes: the mix's 90.3 is 1.2 points over Claude alone's 89.1, inside their 4.8 floor, so a
         // tie and the one plan wins on cost.
         eq("D4 both plans: segmentation Claude alone ties the mix", pick(solve("D4-both", both), "segmentation"),
            "claude-sonnet5.5")
@@ -289,14 +288,46 @@ enum SettingsSolverTestDriver {
         d5r.keys = ["gemini"]
         var cheap = SettingsAnswers()
         cheap.preference = .cheapestWithinPoint
-        // W46.seg-g2-offsets, rescored by W46.seg-truth-owner-fixes: Gemini's 87.6 (3.7's g2 answers, 84.8-90.0 over
-        // three window offsets) is 1.5 points under Claude's 89.1, inside the 10.4 floor (twice 5.2, the larger offset
-        // range of the two: Claude has none measured and takes the largest), so a tie and the plan wins on money.
-        eq("D5 segmentation: Gemini 1.5 points behind, inside the 10.4 floor, so the plan", pick(solve("D5", d5r, cheap), "segmentation"),
+        // Claude 89.1 versus text 87.9: still a tie under 4.8; the image g2 pair retains its own 10.4 floor.
+        let d5 = solve("D5", d5r, cheap)
+        eq("D5 segmentation: Claude ties Gemini text under 4.8 and costs no money", pick(d5, "segmentation"),
            "claude-sonnet5.5")
-        let ranges = (table.stage("segmentation")?.routes ?? []).compactMap { $0.figure("test-boxes.offset_range") }
-        check("segmentation floor is twice the largest measured offset range",
-              abs(SettingsSolver.segmentationTie - 2 * (ranges.max() ?? 0)) < 0.05, "\(ranges)")
+        let seg = table.stage("segmentation")!
+        let g2 = seg.route("gemini3.8-flash")!, g1 = seg.route("gemini3.7-flash-gateway")!
+        let text = seg.route("gemini3.8-flash-text")!, local = seg.route("seg-qwen3.5-2b-8bit")!
+        for (name, a, b, want) in [("neither measured", text, local, 4.8), ("g1 measured", g1, local, 4.8),
+                                    ("g2 measured", g2, local, 10.4), ("both measured", g1, g2, 10.4)] {
+            check("segmentation pair floor: \(name)", abs(SettingsSolver.segmentationTie(a, b) - want) < 1e-9)
+            check("segmentation pair floor symmetric: \(name)",
+                  SettingsSolver.segmentationTie(a, b) == SettingsSolver.segmentationTie(b, a))
+        }
+
+        // A future measured range replaces the borrowed value, even below 2.4; it is not a minimum.
+        do {
+            let url = Bundle.main.url(forResource: SettingsRouteTable.resourceName, withExtension: "json")!
+            let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+            let stages = raw["stages"] as! [[String: Any]]
+            var row = (stages.first { $0["id"] as? String == "segmentation" }!["routes"] as! [[String: Any]])[0]
+            func measured(_ range: Double) throws -> SettingsRouteTable.Route {
+                row["figures"] = ["test-boxes.offset_range": ["value": range]]
+                return try JSONDecoder().decode(SettingsRouteTable.Route.self, from: JSONSerialization.data(withJSONObject: row))
+            }
+            let small = try measured(0.4), other = try measured(0.8)
+            check("segmentation newly measured ranges replace the borrowed range below 2.4",
+                  abs(SettingsSolver.segmentationTie(small, other) - 1.6) < 1e-9)
+            check("segmentation sheet keeps the smaller measured pair floor at best measured",
+                  abs(SettingsSheetModel.tieFloor("segmentation", small, other, answers: SettingsAnswers()) - 1.6) < 1e-9)
+            let tiny = try measured(0.3)
+            check("segmentation sheet shares the solver's within-point preference for a smaller measured pair",
+                  abs(SettingsSheetModel.tieFloor("segmentation", small, tiny, answers: cheap) - 1.0) < 1e-9)
+            check("segmentation only the unmeasured side borrows 2.4",
+                  abs(SettingsSolver.segmentationTie(small, text) - 4.8) < 1e-9)
+        } catch { check("segmentation synthetic measured ranges decode", false, "\(error)") }
+        var imagePair = SettingsAnswers()
+        imagePair.onlyRoutes["segmentation"] = [g2.id, local.id]
+        let imageTie = solve("D1-image-local", gem, imagePair)
+        eq("D1 g2 against the 2B still ties under g2's 10.4", pick(imageTie, "segmentation"), local.id)
+        check("D1 g2 pair explanation keeps 10.4", imageTie.pick("segmentation", "all")?.reason.contains("10.4-point") == true)
 
         // E. A cluster (Sherlock), two GPUs a job, no key; nothing downloaded to the Mac.
         var cl = mac(16, downloads: false)

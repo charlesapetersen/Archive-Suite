@@ -335,13 +335,11 @@ enum SegmentationChooserTestDriver {
         check("6 no key, nothing saved: saves nothing",
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
-        // The settings solver's pick (W46.settings-solver): since the owner's truth corrections
-        // (W46.seg-truth-owner-fixes) GLM-5.3 Flash's 83.0% ties ChatGPT's 90.3% under the 10.4-point floor and is the
-        // cheapest key route (Claude's sign-in is unknown); with Gemini's key alone, Gemini 3.8 Flash on the text alone,
-        // which ties it with the images for half the price (W46.seg-text-tier-default).
+        // Unknown ranges borrow g1's 2.4: ChatGPT's 90.3 beats GLM's 83.0 beyond their 4.8 floor.
+        // Gemini alone still picks text, which ties the image window at about half the price.
         check("6 no Gemini key, nothing saved: saves the solver's pick",
               SegmentationApproach.preselect(noGemini, defaults: d))
-        eq("6 no Gemini key, nothing saved: glm", SegmentationApproach.stored(d), .glm)
+        eq("6 no Gemini key, nothing saved: ChatGPT", SegmentationApproach.stored(d), .openai)
         d.removeObject(forKey: key)
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini-text", SegmentationApproach.stored(d), .geminiText)
