@@ -47,8 +47,12 @@ Solver 129/129 and offscreen settings sheet 363/363 pass; evidence:
 `verification/evidence/processor/W46.ent-profile-e-solver.md`. VM sampler teardown with
 TERM blocked is queued as `W40.vm-sampler-term-mask`. Exact evidence:
 `verification/evidence/processor/W42.int-s5-compress-verification.md`.
-The full Processor VM lane also has an empty saved-result assertion in the unchanged manual-date UI test
-(`W40.processor-manual-date-result-vm`); the searchable-page controls pass both alone and in that lane.
+**W40.processor-manual-date-result-vm reconciled the manual-date UI result check** (2026-11-15): baseline
+9a79dd98 already saves canonical `3 March` after the owner's W40.suite-month-tag-zero change; the UI assertion
+still expected `03 March`. It now strictly checks the current spelling after waiting for readable AX text within
+the same 10-second deadline. Five focused repetitions and the full 47-test split lane pass (38 passed, 9 expected
+skips), with no suite crash/hang. The earlier empty snapshot did not recur; no production save defect is claimed.
+Evidence: `verification/evidence/processor/W40.processor-manual-date-result-vm.md`.
 
 ## ✅ Fixed (2026-11-14): headless test children stranded by blocked TERM — W40.processor-test-term-mask
 

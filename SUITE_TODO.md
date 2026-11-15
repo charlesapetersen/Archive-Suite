@@ -47,7 +47,6 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 ## Processor build/test gate follow-up (found 2026-08-12)
 
-- [ ] **W40.processor-manual-date-result-vm — the manual-date UI test's saved result is empty in the full lane [S · Tier-2]** (lane: processor) (uses: vm) — Found verifying W42.int-s5-compress: unchanged `ProcessorUITests.testManualSegmentCardTypesOneDateWithSentWithBelow` (baseline 9a79dd98, same at b5e4470e) reaches Save after its date/heading assertions pass, then its final saved-result text is empty instead of `segtag date=1968|03 March|Day 12 sentWith=1958-03`. Sole failure in the 47-test VM_SPLIT=4 lane, reproduced alone in 22.667 s; no suite crash/hang. Reproduce against the baseline and inspect the save/result bridge; preserve the exact contract assertion, do not hide a race with a timeout increase. If it passes alone, reproduce the split-lane effect before changing the test. Evidence in `verification/evidence/processor/W42.int-s5-compress-verification.md`.
 
 ## Autonomous daemon — handoff integrity (2026-08-13)
 
