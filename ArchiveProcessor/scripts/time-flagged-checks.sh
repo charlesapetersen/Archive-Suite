@@ -1,5 +1,5 @@
 #!/bin/bash
-# W46.seg-check-time — the owner's timing session: check the 92 gaps the app's Gemini route flags on Stanton and RG165
+# W46.seg-check-context-time — the owner's timing session: check the 92 gaps the app's Gemini route flags on Stanton and RG165
 # on the app's own Check Flagged Boundaries sheet, while the Debug-only FlaggedCheckTimingTestDriver logs how long each
 # takes. Interactive, on the owner's screen; about half an hour at the 20 s the settings sheet assumes. $0: no model
 # call, no key, no network; nothing is written but the log below (no run, manifest, tag or output).
@@ -56,7 +56,7 @@ fi
 if /usr/bin/python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("done") else 1)' "$run"; then
     "$py" scripts/segbench/check_time.py score "$run" --notes "$notes" --preview
     echo "That is a preview; an engine session writes the result. Add any notes to $notes, then hand the log back:"
-    echo "  ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md release W46.seg-check-time 'results in $run'"
+    echo "  ops/autonomous/plan-edit.sh .maintenance/AUTONOMOUS_PLAN.md approve W46.seg-check-context-time-owner-ok 'results in $run'"
 else
     echo "Stopped before Done; the log so far is $run (run the script again for a full session)."
 fi

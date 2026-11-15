@@ -9,6 +9,7 @@ import SwiftUI
 /// until Done, which is enabled only once every flagged gap has one; Escape cancels the run, and nothing is written.
 struct FlaggedBoundaryReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
+    @FocusState private var keyboardFocused: Bool
 
     private var items: [FlaggedGapItem] { processor.flaggedGapItems }
     private var focus: Int { min(max(0, processor.flaggedGapFocus), max(0, items.count - 1)) }
@@ -27,6 +28,10 @@ struct FlaggedBoundaryReviewSheet: View {
             footer
         }
         .frame(minWidth: 900, idealWidth: 1200, minHeight: 600, idealHeight: 740)
+        .focusable()
+        .focused($keyboardFocused)
+        .focusEffectDisabled()
+        .onAppear { keyboardFocused = true }
         .onKeyPress(characters: ["s", "S"]) { _ in answer(.split); return .handled }
         .onKeyPress(characters: ["j", "J"]) { _ in answer(.join); return .handled }
         .onKeyPress(.leftArrow) { move(-1); return .handled }

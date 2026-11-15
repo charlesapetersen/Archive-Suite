@@ -454,6 +454,21 @@ The W46.ocr-postcorrect scorer must count each request once and recompute its ba
 no model rerun is needed for identical inputs. Details: `../execution-plans/items/W46.ocr-postcorrect.md`.
 
 
+## FIXED (W46.seg-check-context, 2026-11-15): flagged boundaries needed more surrounding pages
+
+`FlaggedBoundaryReviewSheet` shows up to three retained pages on each side of the gap, including the larger
+central pair, in a strip sized to the sheet. Moving between flagged gaps recentres it after a manual scroll.
+Only the user's Split/Join answers are drawn between neighbouring pages; model proposals, confidence and cues
+stay hidden. Run ends and short runs show just the pages available; rotations follow the retained run order.
+The blind question, S/J keys and Done's every-gap-answer requirement remain in place.
+
+The existing **3.2 s/gap** figure describes the earlier two-page sheet; the wider sheet needs a new owner
+session before claiming that time for it. The timing pack builder now includes actual surrounding images and
+rotations, and `scripts/time-flagged-checks.sh` rebuilds an old pair-only pack before a new session. Historical
+run logs are retained. Key-free scratch proofs: `scripts/test-segmentation-review.sh`,
+`scripts/test-flagged-check-timing.sh`, `scripts/segbench/test_check_time_context.py`; interaction and pixels are
+checked by `ProcessorUITests.testFlaggedBoundaryPassNeedsEveryAnswerBeforeDone` in the off-screen VM.
+
 ## ✅ VERIFIED (W41.app-local-seg-proof, 2026-10-17): the local 8-bit segmenter reaches the app's review stage
 
 The real corpus-trained Qwen3.5 2B at 8 bits now runs through mlx-vlm and the Processor's own window stage,
