@@ -380,10 +380,13 @@ propagation at t=3, every propagated year with `Date Uncertain` and its document
 a document; (d) no non-explicit years at all, explicit dates only. Evidence: section 4 rows. Recommendation: (a) at 8 GB
 and up, adding (c) at 16 GB once item 8.1 shows its quotes improve the year [I]; (d) is the user's switch, not the
 default. Decided as recommended (`14-owner-calls.md` section 2). Item 8.1's 8B half (W46.date-route-pipeline-8b,
-2026-11-14, `date-route-pipeline.md` §"The Mac 8B as step 2"): its quotes do not improve the year. As step 2 it gains
+2026-11-14, `date-route-pipeline.md` §"The Mac 8B as step 2"): on the two strong trace baselines, as step 2 it gains
 no document on Gemini's or the 27B's trace replies; taken as a quote source (its own date, else its one quoted year)
 it gains 1 and loses 1 on Gemini's, gains 2 and loses 1 on the 27B's (p 1.0 both), and adds one undated false year.
-So (c) is not added: the 16 GB route is (a), with no image pass, and `qwen3-vl-8b-image-mac` is not offered.
+The actual (a) baseline was not measured with those quotes. Measurement review pass 15 (2026-11-15, P15-3)
+therefore leaves its gain unresolved under `W46.date-8b-local-baseline`. Pending that comparison, (c) is not
+added: the 16 GB route stays (a), with no image pass, and `qwen3-vl-8b-image-mac` is not offered; the owner
+required a measured gain before adding it.
 
 7.6 **What happens to an estimate whose evidence fails.** The owner's rule forbids writing it. Whether it is offered to
 the user as an unwritten suggestion is not settled. Evidence: 45 of 131 Gemini trace-neigh replies fail the check,
@@ -422,8 +425,8 @@ gateway tagging call's own cost per 1,000; batch prices measured, not halved by 
 ## 9. Profile test expectations
 
 - **Laptop, 16 GB, no key:** step 1 and 4 `vision-2b-chooser-t3` (47.3 not in text, 89.9 in text, over
-  `mlx-date-2b-8bit` 38.9 with no evidence); no step 2: `qwen3-vl-8b-image-mac` is not offered, its quotes adding no
-  year (7.5, W46.date-route-pipeline-8b), so the solver flags "no image pass".
+  `mlx-date-2b-8bit` 38.9 with no evidence); no step 2: `qwen3-vl-8b-image-mac` is not offered pending
+  `W46.date-8b-local-baseline` (7.5, P15-3); its gain on this local route is unmeasured. The solver flags "no image pass".
 - **Laptop, 32 GB and 64 GB:** as 16 GB until item 8.4 measures the 27B on a Mac; the solver must not borrow the
   cluster rows' figures [?].
 - **Laptop, under 8 GB:** `vision-rules-t3` (48.1, 85.7); a tie with the 2B row on `not_in_text`, broken on in-text.
@@ -455,8 +458,9 @@ estimate that fails the evidence check is not shown at all until item 8.3 (7.6).
 owner's veto: the image pass runs only where the app's own text gives no year candidate (7.3); the trained 2B and 4B
 are not dating defaults (7.4); the no-key laptop route is Vision text, rules, the 2B chooser and propagation at t=3,
 every propagated year `Date Uncertain` with its source document. The Mac 8B image pass was conditional on item 8.1
-showing its quotes help (7.5); the completed 8B measure (a7068d5f, 2026-11-14) found no gain over no image pass,
-so it is not added at 16 GB (W46.date-route-image-routes closed 2026-11-15). Section 3 carries these rules; the inherited
+showing its quotes help (7.5); the completed 8B measure (a7068d5f, 2026-11-14) tested Gemini and 27B traces,
+not this local route. The pass stays unoffered pending `W46.date-8b-local-baseline` (P15-3); the implementation
+item W46.date-route-image-routes closed 2026-11-15, but the local measurement question remains open. Section 3 carries these rules; the inherited
 flag on a dated folder stays with
 `W47.ct-folder-date`.
 
