@@ -80,7 +80,7 @@ Precision at the loose level (ed2; kind at the Zotero item type). Owner-checked,
 
 | route | owner-checked precision, pooled | stratified precision | recall | drafted-truth precision | recall | verdict |
 |---|---|---|---|---|---|---|
-| Gemini 3.7 Flash, item prompt on the page images (drafter A) | 62/71 0.87 [0.78, 0.93] | 0.91 [0.83, 0.94] of 148 | 62/77 | 127/136 0.93 [0.88, 0.96] (agreement) | 127/142 | too close |
+| Gemini 3.7 Flash, item prompt on the page images (drafter A) | 62/71 0.87 [0.78, 0.93] | 0.91 [0.83, 0.94] of 148 | 62/77 | 127/136 0.93 [0.88, 0.96] (agreement) | 127/142 | waits on the fourth sheet |
 | Gemini 3.7 Flash, the app's call on Vision text | - | - | 0/77 | - (agreement) | 0/142 | never filled |
 | Gemini 3.8 Flash, the app's call on ABBYY text (cached) | - | - | 0/40 | - (agreement) | 0/73 | never filled |
 | GPT 5.6 Luna, item prompt on the page images (drafter B) | 61/78 0.78 [0.68, 0.86] | 0.82 [0.74, 0.89] of 158 | 61/77 | 126/143 0.88 [0.82, 0.92] (agreement) | 126/142 | below the bar |
@@ -234,7 +234,7 @@ On the 147 documents 3.8 answered (base only); right is the ed2 match or both em
 ## The verdict
 
 - **kind**: Gemini 3.7 image prompt fill; Gemini 3.7 app call too close; Gemini 3.8 app call too close (n 35); Luna image prompt too close; Qwen3.6 27B too close; Qwen3-VL 8B too close; Qwen3.5 4B too close; Qwen3.5 4B extractor too close.
-- **title**: Gemini 3.7 image prompt too close; Gemini 3.7 app call never filled; Gemini 3.8 app call never filled; Luna image prompt below the bar; Qwen3.6 27B never filled; Qwen3-VL 8B never filled; Qwen3.5 4B never filled; Qwen3.5 4B extractor below the bar.
+- **title**: Gemini 3.7 image prompt waits on the fourth sheet; Gemini 3.7 app call never filled; Gemini 3.8 app call never filled; Luna image prompt below the bar; Qwen3.6 27B never filled; Qwen3-VL 8B never filled; Qwen3.5 4B never filled; Qwen3.5 4B extractor below the bar.
 - **byline**: Gemini 3.7 image prompt fill; Gemini 3.7 app call too close; Gemini 3.8 app call below the bar; Luna image prompt too close; Qwen3.6 27B too close; Qwen3-VL 8B too close; Qwen3.5 4B too close; Qwen3.5 4B extractor too close.
 - **publication**: Gemini 3.7 image prompt fill; Gemini 3.7 app call too close; Gemini 3.8 app call too close (n 22); Luna image prompt too close; Qwen3.6 27B too close (n 34); Qwen3-VL 8B too close (n 34); Qwen3.5 4B below the bar; Qwen3.5 4B extractor below the bar.
 - **publication_date**: Gemini 3.7 image prompt fill; Gemini 3.7 app call below the bar; Gemini 3.8 app call below the bar; Luna image prompt too close; Qwen3.6 27B below the bar; Qwen3-VL 8B below the bar; Qwen3.5 4B below the bar; Qwen3.5 4B extractor too close.
@@ -242,7 +242,7 @@ On the 147 documents 3.8 answered (base only); right is the ed2 match or both em
 
 Fields the image prompt fills by the rule: kind, byline, publication, publication_date, recipient_place. On title its point is 0.91 and the lower bound 0.83: about 13 more drawn pairs, every one right, would let it fill.
 
-The verdicts rest on the stratified precision: the first sheet's pairs, which lean to the hard cases, at their own share, and the pool the second sheet drew from at its share. The third sheet (W47.item-fields-third-score) continued the same seeded draw for kind, title and publication; on its pairs alone the image prompt was right on kind 34/35 0.97 [0.85, 0.99], title 29/31 0.94 [0.79, 0.98], publication 22/22 1.00 [0.85, 1.00]. Its wrong kind called a journal article a newsletter; its wrong titles took a kicker line into the headline and gave only the first page's half of a title the owner noted runs over two pages. The app's call on Vision text gives no title and returns the document's date rather than the printed issue date, so the image prompt is the route for the item fields. The local routes and the extractor ran on ABBYY text, which the app will not use (owner, 2026-10-30): their rows are a record rather than a candidate.
+The verdicts rest on the stratified precision: the first sheet's pairs, which lean to the hard cases, at their own share, and the pool the second sheet drew from at its share. The third sheet (W47.item-fields-third-score) continued the same seeded draw for kind, title and publication; on its pairs alone the image prompt was right on kind 34/35 0.97 [0.85, 0.99], title 29/31 0.94 [0.79, 0.98], publication 22/22 1.00 [0.85, 1.00]. Its wrong kind called a journal article a newsletter; its wrong titles took a kicker line into the headline and gave only the first page's half of a title the owner noted runs over two pages. Title waits on the fourth sheet (W47.item-fields-title): its last look, the third on these pairs (measurement review pass 12, P12-2), sized before any answer as the whole of title's remaining pool, every unsettled pair the image prompt filled (77 of 133), so the pool becomes a census; no further title sheet follows whatever it shows. The app's call on Vision text gives no title and returns the document's date rather than the printed issue date, so the image prompt is the route for the item fields. The local routes and the extractor ran on ABBYY text, which the app will not use (owner, 2026-10-30): their rows are a record rather than a candidate.
 
 ## Measurement card
 

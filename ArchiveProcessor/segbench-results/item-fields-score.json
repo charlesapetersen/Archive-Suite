@@ -345,6 +345,7 @@
   "notes": 68,
   "notes_by_sheet": {
    "first": 63,
+   "fourth": 0,
    "second": 4,
    "third": 1
   },
@@ -411,6 +412,7 @@
   },
   "sheets": {
    "first": 174,
+   "fourth": 0,
    "second": 195,
    "third": 88
   },
@@ -470,6 +472,7 @@
    "right": 29
   }
  },
+ "draw4": {},
  "draw_routes": {
   "app-gemini-3.8-flash|byline": [
    7,
@@ -664,6 +667,7 @@
    0
   ]
  },
+ "fourth_sheet_open": true,
  "paired": {
   "drafted": {
    "byline": {
@@ -3308,7 +3312,7 @@
   "draft-gemini|publication": "fill",
   "draft-gemini|publication_date": "fill",
   "draft-gemini|recipient_place": "fill",
-  "draft-gemini|title": "too close",
+  "draft-gemini|title": "waits on the fourth sheet",
   "draft-luna|byline": "too close",
   "draft-luna|kind": "too close",
   "draft-luna|publication": "too close",

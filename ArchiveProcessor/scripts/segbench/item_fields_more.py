@@ -4,6 +4,7 @@ owner-checked n reaches the fill rule's floor (filed by W47.item-fields-retruth-
 
     python3 item_fields_more.py sheet     # CACHE/sheet2: index.html and key.json (private); the draw summary
     python3 item_fields_more.py third     # CACHE/sheet3: the draw that continues it (W47.item-fields-more-score)
+    python3 item_fields_more.py fourth    # CACHE/sheet4: title's last look, the rest of its pool (W47.item-fields-title)
 
 Offline and $0: every reading is already in the bench cache. It reads the corpus's Finder tags with getxattr(2)
 (corpus_survey.read_tags), nothing else there, and writes nothing in it.
@@ -30,6 +31,15 @@ The third sheet takes the next THIRD[field] filled pairs of each in the same see
 these together are the first of one uniform draw; each number is the fewest with which the image prompt's stratified
 figure still fills with one of the new readings wrong (item_fields_score.draws_to_fill counts the all-right case).
 Ids are "<doc>:third-<field>".
+
+The fourth sheet (W47.item-fields-title). On the third sheet title stayed too close (53 of 56 drawn right, stratified
+0.91 [0.83, 0.94]). Measurement review pass 12 (P12-2) allows one more title look, sized in advance, the last one and
+reported as the third on these pairs: sequential looks raise the chance that a route under the bar fills. Its size is
+the whole of title's remaining pool, every unsettled pair the image prompt filled (FOURTH_N, 77 of 133), set before
+any answer: it turns that pool into a census, so the verdict carries no sampling error on these documents, and of the
+sizes tried it gives a route at a true 0.88 the least chance to fill (fill chance by draw size, with the fill rule as
+it stands: 13 pairs 0.19, 24 0.20, 36 0.18, 47 0.17, 60 0.14, all 77 0.09; at 0.95, 0.51 to 0.81). Ids are
+"<doc>:fourth-title". Whatever it shows, no further title sheet follows.
 
 The sheet. One reading per question (the image prompt's value, or "(empty)"), confirmed or corrected, in
 item_fields_retruth's sheet with its notes box per document, the fields it does not ask, and pages upright (root
@@ -66,6 +76,9 @@ OUT_THIRD = os.path.join(IR.CACHE, "sheet3")
 THIRD = {"kind": 35, "title": 31, "publication": 22}
 STORE_THIRD = "w47-item-fields-third"
 STORE = "w47-item-fields-more"
+OUT_FOURTH = os.path.join(IR.CACHE, "sheet4")
+FOURTH_FIELD, FOURTH_N = "title", 77
+STORE_FOURTH = "w47-item-fields-fourth"
 DATE_NAME = "date (your Finder tags on the first page)"
 
 INTRO = """A second check, drawn at random so the readings can be measured. Each question offers one reading of a
@@ -275,6 +288,37 @@ def cmd_third(_a):
     print(os.path.join(OUT_THIRD, "index.html"), "written" if ok else "left as it was (answered)")
 
 
+def cmd_fourth(_a):
+    rows, docs, key, answers, fixes = IS.load()             # every sheet folded: what is still unsettled
+    if not os.path.exists(os.path.join(IS.SHEET3, "answers.json")):
+        sys.exit("the third sheet is not answered: the fourth continues it")
+    frows, _chk = IS.fold(rows, key, answers, fixes)
+    skip = {x["doc"] for x in json.load(open(IS.RETRUTH_JSON, encoding="utf-8"))["counts"]["sideways"]}
+    pred = IS.predictions(rows, docs)[ROUTE]
+    rest = eligible(frows, pred, skip)[FOURTH_FIELD]["filled"]
+    if len(rest) != FOURTH_N:
+        sys.exit(f"{FOURTH_FIELD}'s remaining pool is {len(rest)}, not the {FOURTH_N} this sheet was sized on")
+    order = sorted(rest)
+    random.Random(SEED).shuffle(order)                      # the order shown; every pair is asked
+    items, keyed = questions([(d, FOURTH_FIELD, "filled") for d in order], rows, frows, docs, tag="fourth")
+    ent, tags = entity_truth(), IS.owner_tags(docs)
+    fr = {t["id"]: t for t in frows}
+    turns = IR.display_turns()
+    intro = INTRO.replace("A second check", "A fourth and last check, of the title or headline alone (every title the "
+                          "reading gave that no earlier sheet asked)")
+    ok = IR.write_sheet(items, keyed, docs, rows, turns=turns, out=OUT_FOURTH, intro=intro, store=STORE_FOURTH,
+                        appendable=(), seed=SEED, agreed=lambda d, asked: not_asked(fr[d], asked, ent.get(d),
+                                                                                    tags.get(d)))
+    o = {"questions": len(keyed), "documents": len(items), "field": FOURTH_FIELD,
+         "by_part": dict(collections.Counter(fr[d]["part"] for d in items)), "minutes": round(IR.minutes(items)),
+         "turned_pages": sum(1 for d in items for p in IR.capped({x["id"]: x for x in docs}[d]["pages"])
+                             if turns.get(IR.key(p))),
+         "close_calls": close_calls(items, docs, turns), "written": ok}
+    json.dump(o, open(os.path.join(OUT_FOURTH, "draw.json"), "w"), indent=1, sort_keys=True)
+    print(json.dumps(o, indent=1))
+    print(os.path.join(OUT_FOURTH, "index.html"), "written" if ok else "left as it was (answered)")
+
+
 def report(o):
     L = ["# Item fields: the second owner sheet, a random draw from the image prompt (W47.item-fields-more-checks)",
          "",
@@ -322,6 +366,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("sheet").set_defaults(fn=cmd_sheet)
     sub.add_parser("third").set_defaults(fn=cmd_third)
+    sub.add_parser("fourth").set_defaults(fn=cmd_fourth)
     a = ap.parse_args()
     a.fn(a)
 

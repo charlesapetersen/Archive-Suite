@@ -12,7 +12,7 @@ getxattr(2) (corpus_survey.read_tags), nothing else there, and writes nothing in
 The fold. The sheet's answers (sheet/answers.json against sheet/key.json): a kind answer is the owner's kind; a
 dispute answer is the reading he picked (Gemini 3.7's or Luna's value); a control confirms the truth's value; "?" and
 an unanswered question change nothing. The later sheets (sheet2, the random draw from the image prompt's readings,
-W47.item-fields-more-checks; sheet3, the draw that continues it) fold the same way, each with its own key, answers,
+W47.item-fields-more-checks; sheet3, the draw that continues it; sheet4, title's last look, W47.item-fields-title) fold the same way, each with its own key, answers,
 and note-fixes.json, their question ids distinct and their notes kept apart (`note2`, `note3` on the truth row); a
 typed answer the date reader cannot parse is read by hand into note-fixes' `answer`, which keeps the question's part.
 The owner's notes (`_notes/<doc>`) were read one by one by the scoring session
@@ -74,10 +74,11 @@ CACHE = IR.CACHE
 SHEET = os.path.join(CACHE, "sheet")
 # The later sheets, each folded once its answers.json is saved: the random draw from the image prompt's readings
 # (W47.item-fields-more-checks) and the third sheet that continues it for kind, title and publication
-# (W47.item-fields-more-score).
+# (W47.item-fields-more-score), and the fourth, title's last look: the rest of its pool (W47.item-fields-title).
 SHEET2 = os.path.join(CACHE, "sheet2")
 SHEET3 = os.path.join(CACHE, "sheet3")
-MORE_SHEETS = [(SHEET2, "_notes2"), (SHEET3, "_notes3")]
+SHEET4 = os.path.join(CACHE, "sheet4")
+MORE_SHEETS = [(SHEET2, "_notes2"), (SHEET3, "_notes3"), (SHEET4, "_notes4")]
 THIRD_FIELDS = ("kind", "title", "publication")   # what the third sheet draws more of (item_fields_more.THIRD)
 DRAW = "draw"
 RESULTS = os.path.join(HERE, "..", "..", "segbench-results", "item-fields-score.md")
@@ -691,6 +692,8 @@ def build():
     tags = owner_tags(docs)
     scores, verdicts, by_part, strat = {}, {}, {}, {}
     third_open = not os.path.exists(os.path.join(SHEET3, "answers.json"))
+    fourth_open = os.path.exists(os.path.join(SHEET4, "key.json")) and not os.path.exists(
+        os.path.join(SHEET4, "answers.json"))
     for rk, _label, fam in ROUTES:
         for which in ("owner", "drafted"):
             for f in FIELDS:
@@ -702,6 +705,8 @@ def build():
             v = verdict(so, 0.0, sd, st) if fam and st else verdict(sd, err_hi)
             if fam and f in THIRD_FIELDS and third_open and v not in ("fill", "below the bar", "never filled"):
                 v = "waits on the third sheet"   # kind: 3 drawn pairs cannot carry its pool (P11-2)
+            if fam and f == "title" and fourth_open and v not in ("fill", "below the bar", "never filled"):
+                v = "waits on the fourth sheet"   # title's last look (P12-2)
             verdicts[f"{rk}|{f}"] = v
         for part in ("base", "clippings", "handwritten"):
             fr = [t for t in frows if t["part"] == part]
@@ -727,12 +732,15 @@ def build():
     o = {"counts": {
         "documents": len(frows), "notes": len(notes), "answered": sum(1 for k, v in answers.items()
                                                                      if not k.startswith("_") and v is not None),
-        "questions": len(key), "sheets": {"first": sum(":more-" not in n and ":third-" not in n for n in key),
+        "questions": len(key), "sheets": {"first": sum(":more-" not in n and ":third-" not in n and ":fourth-" not in n
+                                                  for n in key),
                                           "second": sum(":more-" in n for n in key),
-                                          "third": sum(":third-" in n for n in key)},
+                                          "third": sum(":third-" in n for n in key),
+                                          "fourth": sum(":fourth-" in n for n in key)},
         "notes_by_sheet": {"first": sum(k.startswith("_notes/") for k in notes),
                            "second": sum(k.startswith("_notes2/") for k in notes),
-                           "third": sum(k.startswith("_notes3/") for k in notes)},
+                           "third": sum(k.startswith("_notes3/") for k in notes),
+                           "fourth": sum(k.startswith("_notes4/") for k in notes)},
         "typed_by_hand": sum(len(fx.get("answer") or {}) for fx in fixes.values()),
         "note_sets": sum(len(fx.get("set") or {}) for fx in fixes.values()),
         "note_drops": sum(len(fx.get("drop") or []) for fx in fixes.values()),
@@ -750,6 +758,9 @@ def build():
         "draw": draw_summary(frows, P["draft-gemini"], skip),
         "draw3": draw_summary(frows, P["draft-gemini"], skip, {(k["doc"], k["field"]) for n, k in key.items()
                                                                  if ":third-" in n}), "draw_routes": draw_routes(P, frows, skip),
+        "draw4": draw_summary(frows, P["draft-gemini"], skip, four) if (four := {
+            (k["doc"], k["field"]) for n, k in key.items() if ":fourth-" in n}) else {},
+        "fourth_sheet_open": fourth_open,
         "unasked_disputes": unasked_disputes(frows, skip), "third_sheet_open": third_open,
         "tags": {rk: tag_score(P[rk], frows, tags, skip) for rk, *_ in ROUTES},
         "tag_conflicts": tag_conflicts(P["draft-gemini"], frows, tags, skip),
@@ -793,8 +804,10 @@ def report(o):
     L += ["## The fold", "",
           f"{c['answered']} of {c['questions']} sheet questions answered ({sc['first']} on the first sheet, "
           f"{sc['second']} on the second, a random draw from the image prompt's readings"
-          + (f", {sc['third']} on the third" if sc["third"] else "") + f"), notes on {c['notes']} documents "
+          + (f", {sc['third']} on the third" if sc["third"] else "")
+          + (f", {sc['fourth']} on the fourth, title alone" if sc["fourth"] else "") + f"), notes on {c['notes']} documents "
           f"({ns['first']} first sheet, {ns['second']} second" + (f", {ns['third']} third" if ns["third"] else "")
+          + (f", {ns['fourth']} fourth" if ns["fourth"] else "")
           + "; a document on two sheets keeps both notes apart). Every note "
           f"was read before scoring, and {c['typed_by_hand']} typed dates the reader cannot parse (\"22 May 1967\", "
           f"a season, a two-month issue) were read by hand, a season or a two-month issue as its year: {c['note_sets']} values set from a note and {c['note_drops']} fields dropped as "
@@ -973,7 +986,7 @@ def report(o):
     udn, udb = sum(v[0] for v in ud.values()), sum(v[1] for v in ud.values())
     gem = [f for f in FIELDS if o["verdicts"][f"draft-gemini|{f}"] == "fill"]
     close = [(f, draws_to_fill(o["stratified"][f"draft-gemini|{f}"])) for f in FIELDS if f != "kind"
-             and o["verdicts"][f"draft-gemini|{f}"] in ("too close", "waits on the third sheet")]
+             and o["verdicts"][f"draft-gemini|{f}"] in ("too close", "waits on the third sheet", "waits on the fourth sheet")]
     L += ["", (("Fields the image prompt fills by the rule: " + ", ".join(gem) + ".") if gem else
                "The image prompt clears the rule on no field.")
           + ("".join(f" On {f} its point is {f2(o['stratified'][f'draft-gemini|{f}']['precision'])} and the lower "
@@ -988,6 +1001,16 @@ def report(o):
                          for f in THIRD_FIELDS)
              + ". Its wrong kind called a journal article a newsletter; its wrong titles took a kicker line into the headline and gave only the first page's half of a "
                "title the owner noted runs over two pages. " if not o["third_sheet_open"] else "")
+          + ("Title waits on the fourth sheet (W47.item-fields-title): its last look, the third on these pairs "
+             "(measurement review pass 12, P12-2), sized before any answer as the whole of title's remaining pool, "
+             "every unsettled pair the image prompt filled (77 of 133), so the pool becomes a census; no further "
+             "title sheet follows whatever it shows. " if o.get("fourth_sheet_open") else "")
+          + ("The fourth sheet (W47.item-fields-title), title's last look and the third on these pairs (P12-2), "
+             "asked the whole of title's remaining pool, sized before any answer; on its pairs alone the image "
+             f"prompt was right on {frac(o['draw4']['title'].get('right', 0), o['draw4']['title'].get('filled', 0))}. "
+             "Three sequential looks raise the chance that a route under the bar fills (at a true 0.88, about 17% "
+             "against 4% for one look); this was the last. " if o["counts"]["sheets"].get("fourth")
+             and not o.get("fourth_sheet_open") else "")
           + ("Kind, title and publication wait on the third sheet (W47.item-fields-third-score), which continues "
              "the same seeded draw: the second sheet drew 3 of kind's 254 unsettled pairs, too few to carry the "
              "pool (P11-2), and title's and publication's lower bounds fall short as above, so it draws 35 kind, 31 "
