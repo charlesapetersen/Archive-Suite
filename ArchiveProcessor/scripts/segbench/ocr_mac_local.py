@@ -78,6 +78,9 @@ HW = {
         # with its vision model_type renamed back, and the load is not strict for its one extra tensor, an lm_head
         # equal to the tied embedding (checked tensor for tensor; with it dropped the strict load passes).
         'load': {'strict': False},
+        # mlx-vlm's byte-level BPE streaming detokenizer has no byte for the full-width bar some of its tokens
+        # carry (KeyError '｜' on p010), so this reader decodes with the tokenizer itself (NaiveStreamingDetokenizer)
+        'naive_detokenizer': True,
         'repo': P.CACHE.parent / 'licence-freed-sweep' / 'hunyuanocr-1.5-patched'},
     'fastvlm-0.5b-bf16': {
         'name': 'FastVLM 0.5B bf16', 'hosted': None, 'reply': 'plain', 'max_side': None, 'max_tokens': 4096,
@@ -154,6 +157,9 @@ def collect(limit=None, key=KEY):
     t0 = time.time()
     model, processor = load(str(spec['repo']), **({'trust_remote_code': True} if key in HW else {}), **spec.get('load', {}))
     load_s = time.time() - t0
+    if spec.get('naive_detokenizer'):
+        from mlx_vlm.tokenizer_utils import NaiveStreamingDetokenizer
+        processor.detokenizer = NaiveStreamingDetokenizer(getattr(processor, 'tokenizer', processor))
     chat = apply_chat_template(processor, model.config, prompt, num_images=1, **spec['template'])
     tmp = tempfile.mkdtemp(prefix='mac-local-shrunk-')
     for k, job in enumerate(todo, 1):
@@ -167,7 +173,8 @@ def collect(limit=None, key=KEY):
             image = Path(tmp) / (job['id'] + '.png'); im.save(image)
         mx.reset_peak_memory()
         start = time.time(); first = None; text = []; last = None
-        for r in stream_generate(model, processor, chat, image=[str(image)], max_tokens=max_tokens, temperature=0.0):
+        for r in stream_generate(model, processor, chat, image=[str(image)], max_tokens=max_tokens, temperature=0.0,
+                                 **spec.get('generate', {})):
             if first is None:
                 first = time.time()
             text.append(r.text); last = r

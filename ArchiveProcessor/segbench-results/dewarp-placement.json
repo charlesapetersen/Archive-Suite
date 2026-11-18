@@ -9,6 +9,150 @@
     "cut": 0,
     "broken": 117
    },
+   "docgeonet-copy": {
+    "own_lines": 1095,
+    "own_pass": 48.9,
+    "cut": 296,
+    "broken": 125,
+    "vs_route": {
+     "lines": 1095,
+     "arm": 48.9,
+     "route": 71.6,
+     "delta": [
+      -22.7,
+      -33.8,
+      -13.0
+     ],
+     "better": 2,
+     "worse": 20
+    }
+   },
+   "docgeonet-guarded": {
+    "own_lines": 1095,
+    "own_pass": 71.5,
+    "cut": 1,
+    "broken": 120,
+    "vs_route": {
+     "lines": 1095,
+     "arm": 71.5,
+     "route": 71.6,
+     "delta": [
+      -0.1,
+      -0.3,
+      0.0
+     ],
+     "better": 0,
+     "worse": 1
+    }
+   },
+   "docgeonet-place-chunk": {
+    "own_lines": 1076,
+    "own_pass": 61.3,
+    "cut": 0,
+    "broken": 277,
+    "vs_route": {
+     "lines": 1027,
+     "arm": 61.0,
+     "route": 73.2,
+     "delta": [
+      -12.3,
+      -18.8,
+      -6.8
+     ],
+     "better": 3,
+     "worse": 18
+    }
+   },
+   "docgeonet-place-line": {
+    "own_lines": 1076,
+    "own_pass": 62.7,
+    "cut": 0,
+    "broken": 195,
+    "vs_route": {
+     "lines": 1027,
+     "arm": 62.6,
+     "route": 73.2,
+     "delta": [
+      -10.6,
+      -16.2,
+      -6.0
+     ],
+     "better": 4,
+     "worse": 17
+    }
+   },
+   "docscanner-copy": {
+    "own_lines": 1095,
+    "own_pass": 53.2,
+    "cut": 279,
+    "broken": 99,
+    "vs_route": {
+     "lines": 1095,
+     "arm": 53.2,
+     "route": 71.6,
+     "delta": [
+      -18.4,
+      -30.1,
+      -8.5
+     ],
+     "better": 5,
+     "worse": 19
+    }
+   },
+   "docscanner-guarded": {
+    "own_lines": 1095,
+    "own_pass": 71.6,
+    "cut": 0,
+    "broken": 117,
+    "vs_route": {
+     "lines": 1095,
+     "arm": 71.6,
+     "route": 71.6,
+     "delta": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "better": 0,
+     "worse": 0
+    }
+   },
+   "docscanner-place-chunk": {
+    "own_lines": 1073,
+    "own_pass": 66.7,
+    "cut": 0,
+    "broken": 229,
+    "vs_route": {
+     "lines": 1026,
+     "arm": 66.5,
+     "route": 72.3,
+     "delta": [
+      -5.8,
+      -12.7,
+      -0.3
+     ],
+     "better": 5,
+     "worse": 16
+    }
+   },
+   "docscanner-place-line": {
+    "own_lines": 1073,
+    "own_pass": 63.2,
+    "cut": 0,
+    "broken": 194,
+    "vs_route": {
+     "lines": 1026,
+     "arm": 63.3,
+     "route": 72.3,
+     "delta": [
+      -9.1,
+      -14.6,
+      -5.3
+     ],
+     "better": 3,
+     "worse": 19
+    }
+   },
    "dvd-copy": {
     "own_lines": 1095,
     "own_pass": 59.7,
@@ -153,8 +297,12 @@
      "worse": 13
     }
    },
+   "docscanner-guard_pass": 0,
+   "docscanner-filled_words": 1405,
    "dvd-guard_pass": 1,
    "dvd-filled_words": 1375,
+   "docgeonet-guard_pass": 1,
+   "docgeonet-filled_words": 1491,
    "uvdoc-guard_pass": 12,
    "uvdoc-filled_words": 1120
   },
@@ -165,6 +313,150 @@
     "own_pass": 93.5,
     "cut": 0,
     "broken": 25
+   },
+   "docgeonet-copy": {
+    "own_lines": 851,
+    "own_pass": 62.2,
+    "cut": 97,
+    "broken": 115,
+    "vs_route": {
+     "lines": 851,
+     "arm": 62.2,
+     "route": 93.5,
+     "delta": [
+      -31.4,
+      -37.8,
+      -23.8
+     ],
+     "better": 0,
+     "worse": 23
+    }
+   },
+   "docgeonet-guarded": {
+    "own_lines": 851,
+    "own_pass": 93.5,
+    "cut": 0,
+    "broken": 25,
+    "vs_route": {
+     "lines": 851,
+     "arm": 93.5,
+     "route": 93.5,
+     "delta": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "better": 0,
+     "worse": 0
+    }
+   },
+   "docgeonet-place-chunk": {
+    "own_lines": 816,
+    "own_pass": 86.2,
+    "cut": 0,
+    "broken": 71,
+    "vs_route": {
+     "lines": 809,
+     "arm": 86.0,
+     "route": 94.3,
+     "delta": [
+      -8.3,
+      -14.7,
+      -3.8
+     ],
+     "better": 4,
+     "worse": 16
+    }
+   },
+   "docgeonet-place-line": {
+    "own_lines": 816,
+    "own_pass": 86.6,
+    "cut": 0,
+    "broken": 65,
+    "vs_route": {
+     "lines": 809,
+     "arm": 86.5,
+     "route": 94.3,
+     "delta": [
+      -7.8,
+      -14.5,
+      -3.0
+     ],
+     "better": 4,
+     "worse": 16
+    }
+   },
+   "docscanner-copy": {
+    "own_lines": 851,
+    "own_pass": 79.2,
+    "cut": 76,
+    "broken": 31,
+    "vs_route": {
+     "lines": 851,
+     "arm": 79.2,
+     "route": 93.5,
+     "delta": [
+      -14.3,
+      -19.9,
+      -8.3
+     ],
+     "better": 1,
+     "worse": 20
+    }
+   },
+   "docscanner-guarded": {
+    "own_lines": 851,
+    "own_pass": 94.0,
+    "cut": 0,
+    "broken": 17,
+    "vs_route": {
+     "lines": 851,
+     "arm": 94.0,
+     "route": 93.5,
+     "delta": [
+      0.5,
+      -1.1,
+      2.8
+     ],
+     "better": 1,
+     "worse": 2
+    }
+   },
+   "docscanner-place-chunk": {
+    "own_lines": 833,
+    "own_pass": 87.2,
+    "cut": 0,
+    "broken": 75,
+    "vs_route": {
+     "lines": 826,
+     "arm": 87.0,
+     "route": 93.5,
+     "delta": [
+      -6.4,
+      -12.1,
+      -2.4
+     ],
+     "better": 3,
+     "worse": 14
+    }
+   },
+   "docscanner-place-line": {
+    "own_lines": 833,
+    "own_pass": 87.0,
+    "cut": 0,
+    "broken": 70,
+    "vs_route": {
+     "lines": 826,
+     "arm": 86.9,
+     "route": 93.5,
+     "delta": [
+      -6.5,
+      -11.9,
+      -2.8
+     ],
+     "better": 3,
+     "worse": 17
+    }
    },
    "dvd-copy": {
     "own_lines": 851,
@@ -310,8 +602,12 @@
      "worse": 10
     }
    },
+   "docscanner-guard_pass": 5,
+   "docscanner-filled_words": 445,
    "dvd-guard_pass": 3,
    "dvd-filled_words": 400,
+   "docgeonet-guard_pass": 1,
+   "docgeonet-filled_words": 572,
    "uvdoc-guard_pass": 10,
    "uvdoc-filled_words": 185
   },
@@ -322,6 +618,150 @@
     "own_pass": 87.8,
     "cut": 0,
     "broken": 13
+   },
+   "docgeonet-copy": {
+    "own_lines": 221,
+    "own_pass": 68.8,
+    "cut": 21,
+    "broken": 14,
+    "vs_route": {
+     "lines": 221,
+     "arm": 68.8,
+     "route": 87.8,
+     "delta": [
+      -19.0,
+      -27.1,
+      -9.4
+     ],
+     "better": 1,
+     "worse": 7
+    }
+   },
+   "docgeonet-guarded": {
+    "own_lines": 221,
+    "own_pass": 87.8,
+    "cut": 0,
+    "broken": 13,
+    "vs_route": {
+     "lines": 221,
+     "arm": 87.8,
+     "route": 87.8,
+     "delta": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "better": 0,
+     "worse": 0
+    }
+   },
+   "docgeonet-place-chunk": {
+    "own_lines": 223,
+    "own_pass": 84.8,
+    "cut": 0,
+    "broken": 21,
+    "vs_route": {
+     "lines": 214,
+     "arm": 85.5,
+     "route": 87.9,
+     "delta": [
+      -2.3,
+      -12.1,
+      2.8
+     ],
+     "better": 3,
+     "worse": 3
+    }
+   },
+   "docgeonet-place-line": {
+    "own_lines": 223,
+    "own_pass": 83.9,
+    "cut": 0,
+    "broken": 18,
+    "vs_route": {
+     "lines": 214,
+     "arm": 85.0,
+     "route": 87.9,
+     "delta": [
+      -2.8,
+      -13.6,
+      2.1
+     ],
+     "better": 3,
+     "worse": 2
+    }
+   },
+   "docscanner-copy": {
+    "own_lines": 221,
+    "own_pass": 80.1,
+    "cut": 16,
+    "broken": 12,
+    "vs_route": {
+     "lines": 221,
+     "arm": 80.1,
+     "route": 87.8,
+     "delta": [
+      -7.7,
+      -17.0,
+      -0.6
+     ],
+     "better": 2,
+     "worse": 6
+    }
+   },
+   "docscanner-guarded": {
+    "own_lines": 221,
+    "own_pass": 87.8,
+    "cut": 0,
+    "broken": 13,
+    "vs_route": {
+     "lines": 221,
+     "arm": 87.8,
+     "route": 87.8,
+     "delta": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "better": 0,
+     "worse": 0
+    }
+   },
+   "docscanner-place-chunk": {
+    "own_lines": 219,
+    "own_pass": 90.0,
+    "cut": 0,
+    "broken": 14,
+    "vs_route": {
+     "lines": 210,
+     "arm": 91.0,
+     "route": 89.0,
+     "delta": [
+      1.9,
+      -1.5,
+      4.7
+     ],
+     "better": 5,
+     "worse": 1
+    }
+   },
+   "docscanner-place-line": {
+    "own_lines": 219,
+    "own_pass": 87.7,
+    "cut": 0,
+    "broken": 15,
+    "vs_route": {
+     "lines": 210,
+     "arm": 88.6,
+     "route": 89.0,
+     "delta": [
+      -0.5,
+      -7.1,
+      3.6
+     ],
+     "better": 4,
+     "worse": 1
+    }
    },
    "dvd-copy": {
     "own_lines": 221,
@@ -467,8 +907,12 @@
      "worse": 2
     }
    },
+   "docscanner-guard_pass": 0,
+   "docscanner-filled_words": 124,
    "dvd-guard_pass": 1,
    "dvd-filled_words": 113,
+   "docgeonet-guard_pass": 0,
+   "docgeonet-filled_words": 147,
    "uvdoc-guard_pass": 1,
    "uvdoc-filled_words": 81
   },
@@ -479,6 +923,150 @@
     "own_pass": 83.5,
     "cut": 0,
     "broken": 165
+   },
+   "docgeonet-copy": {
+    "own_lines": 2448,
+    "own_pass": 57.3,
+    "cut": 444,
+    "broken": 283,
+    "vs_route": {
+     "lines": 2448,
+     "arm": 57.3,
+     "route": 83.5,
+     "delta": [
+      -26.2,
+      -31.8,
+      -20.0
+     ],
+     "better": 3,
+     "worse": 58
+    }
+   },
+   "docgeonet-guarded": {
+    "own_lines": 2448,
+    "own_pass": 83.4,
+    "cut": 1,
+    "broken": 168,
+    "vs_route": {
+     "lines": 2448,
+     "arm": 83.4,
+     "route": 83.5,
+     "delta": [
+      -0.0,
+      -0.1,
+      0.0
+     ],
+     "better": 0,
+     "worse": 1
+    }
+   },
+   "docgeonet-place-chunk": {
+    "own_lines": 2372,
+    "own_pass": 74.6,
+    "cut": 0,
+    "broken": 401,
+    "vs_route": {
+     "lines": 2305,
+     "arm": 74.7,
+     "route": 84.6,
+     "delta": [
+      -10.0,
+      -13.6,
+      -6.8
+     ],
+     "better": 10,
+     "worse": 44
+    }
+   },
+   "docgeonet-place-line": {
+    "own_lines": 2372,
+    "own_pass": 75.3,
+    "cut": 0,
+    "broken": 310,
+    "vs_route": {
+     "lines": 2305,
+     "arm": 75.5,
+     "route": 84.6,
+     "delta": [
+      -9.1,
+      -12.4,
+      -6.1
+     ],
+     "better": 11,
+     "worse": 42
+    }
+   },
+   "docscanner-copy": {
+    "own_lines": 2448,
+    "own_pass": 67.4,
+    "cut": 398,
+    "broken": 164,
+    "vs_route": {
+     "lines": 2448,
+     "arm": 67.4,
+     "route": 83.5,
+     "delta": [
+      -16.1,
+      -21.6,
+      -10.8
+     ],
+     "better": 8,
+     "worse": 53
+    }
+   },
+   "docscanner-guarded": {
+    "own_lines": 2448,
+    "own_pass": 83.6,
+    "cut": 0,
+    "broken": 157,
+    "vs_route": {
+     "lines": 2448,
+     "arm": 83.6,
+     "route": 83.5,
+     "delta": [
+      0.1,
+      -0.4,
+      1.0
+     ],
+     "better": 1,
+     "worse": 3
+    }
+   },
+   "docscanner-place-chunk": {
+    "own_lines": 2397,
+    "own_pass": 78.1,
+    "cut": 0,
+    "broken": 351,
+    "vs_route": {
+     "lines": 2332,
+     "arm": 78.2,
+     "route": 84.1,
+     "delta": [
+      -5.9,
+      -9.4,
+      -2.9
+     ],
+     "better": 13,
+     "worse": 38
+    }
+   },
+   "docscanner-place-line": {
+    "own_lines": 2397,
+    "own_pass": 76.3,
+    "cut": 0,
+    "broken": 311,
+    "vs_route": {
+     "lines": 2332,
+     "arm": 76.5,
+     "route": 84.1,
+     "delta": [
+      -7.5,
+      -10.4,
+      -5.0
+     ],
+     "better": 10,
+     "worse": 44
+    }
    },
    "dvd-copy": {
     "own_lines": 2448,
@@ -624,8 +1212,12 @@
      "worse": 30
     }
    },
+   "docscanner-guard_pass": 6,
+   "docscanner-filled_words": 2108,
    "dvd-guard_pass": 6,
    "dvd-filled_words": 2009,
+   "docgeonet-guard_pass": 2,
+   "docgeonet-filled_words": 2369,
    "uvdoc-guard_pass": 28,
    "uvdoc-filled_words": 1433
   }
@@ -633,6 +1225,14 @@
  "owner_pages": {
   "uiuc-00233": {
    "route": "21/27",
+   "docscanner-copy": "19/27",
+   "docscanner-place-line": "19/27",
+   "docscanner-place-chunk": "26/27",
+   "docgeonet-copy": "14/27",
+   "docgeonet-place-line": "19/27",
+   "docgeonet-place-chunk": "24/27",
+   "docscanner-guarded": "21/27",
+   "docgeonet-guarded": "21/27",
    "dvd-copy": "23/27",
    "dvd-place-line": "20/27",
    "dvd-place-chunk": "24/27",
@@ -642,6 +1242,16 @@
    "uvdoc-place-chunk": "23/27",
    "uvdoc-guarded": "21/27",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 17,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 19,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 13,
@@ -656,6 +1266,14 @@
   },
   "uiuc-00149": {
    "route": "33/33",
+   "docscanner-copy": "5/33",
+   "docscanner-place-line": "30/33",
+   "docscanner-place-chunk": "29/33",
+   "docgeonet-copy": "11/33",
+   "docgeonet-place-line": "31/33",
+   "docgeonet-place-chunk": "31/33",
+   "docscanner-guarded": "33/33",
+   "docgeonet-guarded": "33/33",
    "dvd-copy": "23/33",
    "dvd-place-line": "23/32",
    "dvd-place-chunk": "23/32",
@@ -665,6 +1283,16 @@
    "uvdoc-place-chunk": "29/34",
    "uvdoc-guarded": "33/33",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 20,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 25,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 14,
@@ -686,6 +1314,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 17,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 19,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 13,
@@ -698,11 +1336,69 @@
     }
    },
    "filled": {
+    "docscanner": 17,
+    "docgeonet": 19,
     "dvd": 13,
     "uvdoc": 8
    },
    "arms": {
     "route": {
+     "n": 27,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 27,
+     "pass": 19,
+     "broken": 5,
+     "cut": 2,
+     "ends_moved": 25
+    },
+    "docscanner-place-line": {
+     "n": 27,
+     "pass": 19,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 27,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 27,
+     "pass": 14,
+     "broken": 5,
+     "cut": 3,
+     "ends_moved": 22
+    },
+    "docgeonet-place-line": {
+     "n": 27,
+     "pass": 19,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 27,
+     "pass": 24,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 27,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 27,
      "pass": 21,
      "broken": 3,
@@ -774,6 +1470,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 20,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 25,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 14,
@@ -786,11 +1492,69 @@
     }
    },
    "filled": {
+    "docscanner": 20,
+    "docgeonet": 25,
     "dvd": 14,
     "uvdoc": 12
    },
    "arms": {
     "route": {
+     "n": 33,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 33,
+     "pass": 5,
+     "broken": 6,
+     "cut": 7,
+     "ends_moved": 20
+    },
+    "docscanner-place-line": {
+     "n": 33,
+     "pass": 30,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 33,
+     "pass": 29,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 33,
+     "pass": 11,
+     "broken": 5,
+     "cut": 8,
+     "ends_moved": 19
+    },
+    "docgeonet-place-line": {
+     "n": 33,
+     "pass": 31,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 33,
+     "pass": 31,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 33,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 33,
      "pass": 33,
      "broken": 0,
@@ -862,6 +1626,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 4
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 4
+    },
     "dvd": {
      "pass": false,
      "lost_own": 9,
@@ -874,11 +1648,69 @@
     }
    },
    "filled": {
+    "docscanner": 14,
+    "docgeonet": 14,
     "dvd": 13,
     "uvdoc": 9
    },
    "arms": {
     "route": {
+     "n": 4,
+     "pass": 3,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 4,
+     "pass": 2,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 4,
+     "pass": 4,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 4,
+     "pass": 4,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 4,
+     "pass": 1,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 4,
+     "pass": 2,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 4,
+     "pass": 2,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 4,
+     "pass": 3,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 4,
      "pass": 3,
      "broken": 0,
@@ -950,6 +1782,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 6,
@@ -962,11 +1804,69 @@
     }
    },
    "filled": {
+    "docscanner": 5,
+    "docgeonet": 8,
     "dvd": 6,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 1,
+     "pass": 0,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 1,
+     "pass": 0,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 1,
      "pass": 1,
      "broken": 0,
@@ -1038,6 +1938,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 335,
+     "lost_neighbour": 92
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 357,
+     "lost_neighbour": 92
+    },
     "dvd": {
      "pass": false,
      "lost_own": 451,
@@ -1050,11 +1960,69 @@
     }
    },
    "filled": {
+    "docscanner": 427,
+    "docgeonet": 449,
     "dvd": 543,
     "uvdoc": 367
    },
    "arms": {
     "route": {
+     "n": 159,
+     "pass": 133,
+     "broken": 18,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 159,
+     "pass": 65,
+     "broken": 15,
+     "cut": 67,
+     "ends_moved": 15
+    },
+    "docscanner-place-line": {
+     "n": 146,
+     "pass": 112,
+     "broken": 19,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 146,
+     "pass": 111,
+     "broken": 22,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 159,
+     "pass": 63,
+     "broken": 12,
+     "cut": 71,
+     "ends_moved": 17
+    },
+    "docgeonet-place-line": {
+     "n": 159,
+     "pass": 123,
+     "broken": 25,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 159,
+     "pass": 122,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 159,
+     "pass": 133,
+     "broken": 18,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 159,
      "pass": 133,
      "broken": 18,
@@ -1126,6 +2094,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 77,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 84,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 24,
@@ -1138,11 +2116,69 @@
     }
    },
    "filled": {
+    "docscanner": 77,
+    "docgeonet": 84,
     "dvd": 24,
     "uvdoc": 5
    },
    "arms": {
     "route": {
+     "n": 143,
+     "pass": 90,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 143,
+     "pass": 94,
+     "broken": 7,
+     "cut": 27,
+     "ends_moved": 27
+    },
+    "docscanner-place-line": {
+     "n": 137,
+     "pass": 80,
+     "broken": 16,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 137,
+     "pass": 81,
+     "broken": 30,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 143,
+     "pass": 93,
+     "broken": 8,
+     "cut": 24,
+     "ends_moved": 30
+    },
+    "docgeonet-place-line": {
+     "n": 141,
+     "pass": 74,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 141,
+     "pass": 85,
+     "broken": 31,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 143,
+     "pass": 90,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 143,
      "pass": 90,
      "broken": 10,
@@ -1214,6 +2250,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 11
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 11
+    },
     "dvd": {
      "pass": false,
      "lost_own": 9,
@@ -1226,11 +2272,69 @@
     }
    },
    "filled": {
+    "docscanner": 22,
+    "docgeonet": 22,
     "dvd": 20,
     "uvdoc": 13
    },
    "arms": {
     "route": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 26,
+     "pass": 12,
+     "broken": 4,
+     "cut": 2,
+     "ends_moved": 8
+    },
+    "docscanner-place-line": {
+     "n": 26,
+     "pass": 14,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 26,
+     "pass": 17,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 26,
+     "pass": 14,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 5
+    },
+    "docgeonet-place-line": {
+     "n": 29,
+     "pass": 12,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 29,
+     "pass": 14,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 26,
      "pass": 20,
      "broken": 3,
@@ -1302,6 +2406,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 267,
+     "lost_neighbour": 3
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 268,
+     "lost_neighbour": 3
+    },
     "dvd": {
      "pass": false,
      "lost_own": 270,
@@ -1314,11 +2428,69 @@
     }
    },
    "filled": {
+    "docscanner": 270,
+    "docgeonet": 271,
     "dvd": 273,
     "uvdoc": 276
    },
    "arms": {
     "route": {
+     "n": 148,
+     "pass": 82,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 148,
+     "pass": 71,
+     "broken": 20,
+     "cut": 39,
+     "ends_moved": 39
+    },
+    "docscanner-place-line": {
+     "n": 145,
+     "pass": 74,
+     "broken": 28,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 145,
+     "pass": 90,
+     "broken": 39,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 148,
+     "pass": 54,
+     "broken": 36,
+     "cut": 39,
+     "ends_moved": 39
+    },
+    "docgeonet-place-line": {
+     "n": 138,
+     "pass": 69,
+     "broken": 32,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 138,
+     "pass": 52,
+     "broken": 65,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 148,
+     "pass": 82,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 148,
      "pass": 82,
      "broken": 27,
@@ -1390,6 +2562,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 18,
+     "lost_neighbour": 9
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 28,
+     "lost_neighbour": 9
+    },
     "dvd": {
      "pass": false,
      "lost_own": 13,
@@ -1402,11 +2584,69 @@
     }
    },
    "filled": {
+    "docscanner": 27,
+    "docgeonet": 37,
     "dvd": 22,
     "uvdoc": 14
    },
    "arms": {
     "route": {
+     "n": 21,
+     "pass": 17,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 21,
+     "pass": 8,
+     "broken": 0,
+     "cut": 12,
+     "ends_moved": 3
+    },
+    "docscanner-place-line": {
+     "n": 21,
+     "pass": 5,
+     "broken": 13,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 21,
+     "pass": 5,
+     "broken": 13,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 21,
+     "pass": 4,
+     "broken": 0,
+     "cut": 16,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 21,
+     "pass": 4,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 21,
+     "pass": 4,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 21,
+     "pass": 17,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 21,
      "pass": 17,
      "broken": 1,
@@ -1478,6 +2718,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 82,
+     "lost_neighbour": 8
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 89,
+     "lost_neighbour": 8
+    },
     "dvd": {
      "pass": false,
      "lost_own": 86,
@@ -1490,11 +2740,69 @@
     }
    },
    "filled": {
+    "docscanner": 90,
+    "docgeonet": 97,
     "dvd": 94,
     "uvdoc": 98
    },
    "arms": {
     "route": {
+     "n": 105,
+     "pass": 73,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 105,
+     "pass": 60,
+     "broken": 11,
+     "cut": 30,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 112,
+     "pass": 75,
+     "broken": 24,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 112,
+     "pass": 77,
+     "broken": 23,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 105,
+     "pass": 60,
+     "broken": 9,
+     "cut": 30,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 110,
+     "pass": 75,
+     "broken": 20,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 110,
+     "pass": 74,
+     "broken": 19,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 105,
+     "pass": 73,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 105,
      "pass": 73,
      "broken": 15,
@@ -1566,6 +2874,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 12,
+     "lost_neighbour": 10
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 10
+    },
     "dvd": {
      "pass": false,
      "lost_own": 8,
@@ -1578,11 +2896,69 @@
     }
    },
    "filled": {
+    "docscanner": 22,
+    "docgeonet": 24,
     "dvd": 18,
     "uvdoc": 10
    },
    "arms": {
     "route": {
+     "n": 33,
+     "pass": 18,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 33,
+     "pass": 19,
+     "broken": 5,
+     "cut": 3,
+     "ends_moved": 29
+    },
+    "docscanner-place-line": {
+     "n": 33,
+     "pass": 13,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 33,
+     "pass": 17,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 33,
+     "pass": 15,
+     "broken": 10,
+     "cut": 7,
+     "ends_moved": 25
+    },
+    "docgeonet-place-line": {
+     "n": 33,
+     "pass": 13,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 33,
+     "pass": 13,
+     "broken": 14,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 33,
+     "pass": 18,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 33,
      "pass": 18,
      "broken": 10,
@@ -1654,6 +3030,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 16,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": true,
      "lost_own": 0,
@@ -1666,11 +3052,69 @@
     }
    },
    "filled": {
+    "docscanner": 9,
+    "docgeonet": 16,
     "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 24,
+     "pass": 17,
+     "broken": 0,
+     "cut": 4,
+     "ends_moved": 11
+    },
+    "docscanner-place-line": {
+     "n": 25,
+     "pass": 18,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 25,
+     "pass": 19,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 24,
+     "pass": 18,
+     "broken": 0,
+     "cut": 3,
+     "ends_moved": 10
+    },
+    "docgeonet-place-line": {
+     "n": 27,
+     "pass": 15,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 27,
+     "pass": 12,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 24,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 24,
      "pass": 22,
      "broken": 0,
@@ -1742,6 +3186,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 8,
@@ -1754,11 +3208,69 @@
     }
    },
    "filled": {
+    "docscanner": 10,
+    "docgeonet": 11,
     "dvd": 8,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 34,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 34,
+     "pass": 17,
+     "broken": 7,
+     "cut": 2,
+     "ends_moved": 31
+    },
+    "docscanner-place-line": {
+     "n": 34,
+     "pass": 21,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 34,
+     "pass": 22,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 34,
+     "pass": 14,
+     "broken": 9,
+     "cut": 5,
+     "ends_moved": 29
+    },
+    "docgeonet-place-line": {
+     "n": 34,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 34,
+     "pass": 21,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 34,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 34,
      "pass": 22,
      "broken": 1,
@@ -1830,6 +3342,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 3
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 3
+    },
     "dvd": {
      "pass": false,
      "lost_own": 12,
@@ -1842,11 +3364,69 @@
     }
    },
    "filled": {
+    "docscanner": 17,
+    "docgeonet": 17,
     "dvd": 15,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 25,
+     "pass": 18,
+     "broken": 0,
+     "cut": 4,
+     "ends_moved": 4
+    },
+    "docscanner-place-line": {
+     "n": 24,
+     "pass": 13,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 24,
+     "pass": 15,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 25,
+     "pass": 10,
+     "broken": 4,
+     "cut": 4,
+     "ends_moved": 4
+    },
+    "docgeonet-place-line": {
+     "n": 22,
+     "pass": 14,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 22,
+     "pass": 15,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 25,
      "pass": 16,
      "broken": 4,
@@ -1918,6 +3498,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 3
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 3
+    },
     "dvd": {
      "pass": false,
      "lost_own": 11,
@@ -1930,11 +3520,69 @@
     }
    },
    "filled": {
+    "docscanner": 14,
+    "docgeonet": 14,
     "dvd": 14,
     "uvdoc": 14
    },
    "arms": {
     "route": {
+     "n": 10,
+     "pass": 6,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 10,
+     "pass": 4,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 2
+    },
+    "docscanner-place-line": {
+     "n": 9,
+     "pass": 6,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 9,
+     "pass": 5,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 10,
+     "pass": 4,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 11,
+     "pass": 7,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 11,
+     "pass": 5,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 10,
+     "pass": 6,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 10,
      "pass": 6,
      "broken": 0,
@@ -2006,6 +3654,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 2,
+     "lost_neighbour": 3
+    },
+    "docgeonet": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 3
+    },
     "dvd": {
      "pass": false,
      "lost_own": 1,
@@ -2018,6 +3676,8 @@
     }
    },
    "filled": {
+    "docscanner": 5,
+    "docgeonet": 3,
     "dvd": 4,
     "uvdoc": 3
    },
@@ -2028,6 +3688,62 @@
      "broken": 2,
      "cut": 0,
      "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 31,
+     "pass": 15,
+     "broken": 4,
+     "cut": 2,
+     "ends_moved": 31
+    },
+    "docscanner-place-line": {
+     "n": 29,
+     "pass": 19,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 29,
+     "pass": 18,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 31,
+     "pass": 19,
+     "broken": 5,
+     "cut": 1,
+     "ends_moved": 32
+    },
+    "docgeonet-place-line": {
+     "n": 29,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 29,
+     "pass": 20,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 31,
+     "pass": 20,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
+     "n": 31,
+     "pass": 19,
+     "broken": 5,
+     "cut": 1,
+     "ends_moved": 32
     },
     "dvd-copy": {
      "n": 31,
@@ -2094,6 +3810,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 5,
@@ -2106,11 +3832,69 @@
     }
    },
    "filled": {
+    "docscanner": 9,
+    "docgeonet": 13,
     "dvd": 5,
     "uvdoc": 2
    },
    "arms": {
     "route": {
+     "n": 18,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 18,
+     "pass": 8,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 8
+    },
+    "docscanner-place-line": {
+     "n": 16,
+     "pass": 10,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 16,
+     "pass": 10,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 18,
+     "pass": 7,
+     "broken": 0,
+     "cut": 6,
+     "ends_moved": 4
+    },
+    "docgeonet-place-line": {
+     "n": 19,
+     "pass": 9,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 19,
+     "pass": 9,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 18,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 18,
      "pass": 14,
      "broken": 0,
@@ -2182,6 +3966,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 15,
+     "lost_neighbour": 42
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 20,
+     "lost_neighbour": 42
+    },
     "dvd": {
      "pass": false,
      "lost_own": 12,
@@ -2194,11 +3988,69 @@
     }
    },
    "filled": {
+    "docscanner": 57,
+    "docgeonet": 62,
     "dvd": 54,
     "uvdoc": 42
    },
    "arms": {
     "route": {
+     "n": 35,
+     "pass": 21,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 35,
+     "pass": 16,
+     "broken": 8,
+     "cut": 5,
+     "ends_moved": 29
+    },
+    "docscanner-place-line": {
+     "n": 35,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 35,
+     "pass": 20,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 35,
+     "pass": 11,
+     "broken": 9,
+     "cut": 8,
+     "ends_moved": 26
+    },
+    "docgeonet-place-line": {
+     "n": 35,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 35,
+     "pass": 20,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 35,
+     "pass": 21,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 35,
      "pass": 21,
      "broken": 5,
@@ -2270,6 +4122,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 13,
@@ -2282,11 +4144,69 @@
     }
    },
    "filled": {
+    "docscanner": 13,
+    "docgeonet": 13,
     "dvd": 13,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 36,
+     "pass": 23,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 36,
+     "pass": 29,
+     "broken": 6,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 36,
+     "pass": 20,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 36,
+     "pass": 31,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 36,
+     "pass": 32,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 35,
+     "pass": 24,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 35,
+     "pass": 22,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 36,
+     "pass": 23,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 36,
      "pass": 23,
      "broken": 6,
@@ -2358,6 +4278,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 7,
@@ -2370,11 +4300,69 @@
     }
    },
    "filled": {
+    "docscanner": 7,
+    "docgeonet": 8,
     "dvd": 7,
     "uvdoc": 5
    },
    "arms": {
     "route": {
+     "n": 18,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 18,
+     "pass": 16,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 3
+    },
+    "docscanner-place-line": {
+     "n": 16,
+     "pass": 14,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 16,
+     "pass": 14,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 18,
+     "pass": 16,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 4
+    },
+    "docgeonet-place-line": {
+     "n": 17,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 17,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 18,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 18,
      "pass": 15,
      "broken": 1,
@@ -2446,6 +4434,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 6,
@@ -2458,11 +4456,69 @@
     }
    },
    "filled": {
+    "docscanner": 5,
+    "docgeonet": 10,
     "dvd": 6,
     "uvdoc": 7
    },
    "arms": {
     "route": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 38,
+     "pass": 36,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docscanner-place-line": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 38,
+     "pass": 36,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 36,
+     "pass": 36,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 36,
+     "pass": 36,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 38,
      "pass": 38,
      "broken": 0,
@@ -2534,6 +4590,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 81,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 101,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 53,
@@ -2546,11 +4612,69 @@
     }
    },
    "filled": {
+    "docscanner": 81,
+    "docgeonet": 101,
     "dvd": 53,
     "uvdoc": 74
    },
    "arms": {
     "route": {
+     "n": 36,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 36,
+     "pass": 6,
+     "broken": 0,
+     "cut": 28,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 34,
+     "pass": 13,
+     "broken": 13,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 34,
+     "pass": 15,
+     "broken": 14,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 36,
+     "pass": 8,
+     "broken": 1,
+     "cut": 27,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 32,
+     "pass": 8,
+     "broken": 19,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 32,
+     "pass": 7,
+     "broken": 18,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 36,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 36,
      "pass": 26,
      "broken": 0,
@@ -2622,6 +4746,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 1
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 1
+    },
     "dvd": {
      "pass": false,
      "lost_own": 8,
@@ -2634,11 +4768,69 @@
     }
    },
    "filled": {
+    "docscanner": 10,
+    "docgeonet": 15,
     "dvd": 9,
     "uvdoc": 8
    },
    "arms": {
     "route": {
+     "n": 37,
+     "pass": 34,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 37,
+     "pass": 35,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 39,
+     "pass": 37,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 39,
+     "pass": 37,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 37,
+     "pass": 30,
+     "broken": 0,
+     "cut": 3,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 39,
+     "pass": 36,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 39,
+     "pass": 37,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 37,
+     "pass": 34,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 37,
      "pass": 34,
      "broken": 1,
@@ -2710,6 +4902,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 35
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 15,
+     "lost_neighbour": 35
+    },
     "dvd": {
      "pass": true,
      "lost_own": 0,
@@ -2722,11 +4924,69 @@
     }
    },
    "filled": {
+    "docscanner": 43,
+    "docgeonet": 50,
     "dvd": 35,
     "uvdoc": 35
    },
    "arms": {
     "route": {
+     "n": 52,
+     "pass": 43,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 52,
+     "pass": 37,
+     "broken": 4,
+     "cut": 7,
+     "ends_moved": 9
+    },
+    "docscanner-place-line": {
+     "n": 52,
+     "pass": 44,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 52,
+     "pass": 45,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 52,
+     "pass": 28,
+     "broken": 1,
+     "cut": 9,
+     "ends_moved": 20
+    },
+    "docgeonet-place-line": {
+     "n": 52,
+     "pass": 44,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 52,
+     "pass": 45,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 52,
+     "pass": 43,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 52,
      "pass": 43,
      "broken": 4,
@@ -2798,6 +5058,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 5,
@@ -2810,11 +5080,69 @@
     }
    },
    "filled": {
+    "docscanner": 8,
+    "docgeonet": 7,
     "dvd": 5,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 23,
+     "pass": 18,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 3
+    },
+    "docscanner-place-line": {
+     "n": 23,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 23,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 23,
+     "pass": 17,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 2
+    },
+    "docgeonet-place-line": {
+     "n": 23,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 23,
+     "pass": 19,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 23,
      "pass": 19,
      "broken": 0,
@@ -2886,6 +5214,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 86,
+     "lost_neighbour": 111
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 77,
+     "lost_neighbour": 112
+    },
     "dvd": {
      "pass": false,
      "lost_own": 70,
@@ -2898,11 +5236,69 @@
     }
    },
    "filled": {
+    "docscanner": 197,
+    "docgeonet": 189,
     "dvd": 181,
     "uvdoc": 190
    },
    "arms": {
     "route": {
+     "n": 42,
+     "pass": 29,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 42,
+     "pass": 5,
+     "broken": 1,
+     "cut": 35,
+     "ends_moved": 1
+    },
+    "docscanner-place-line": {
+     "n": 42,
+     "pass": 11,
+     "broken": 28,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 42,
+     "pass": 9,
+     "broken": 29,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 42,
+     "pass": 5,
+     "broken": 3,
+     "cut": 31,
+     "ends_moved": 4
+    },
+    "docgeonet-place-line": {
+     "n": 42,
+     "pass": 14,
+     "broken": 24,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 42,
+     "pass": 11,
+     "broken": 25,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 42,
+     "pass": 29,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 42,
      "pass": 29,
      "broken": 9,
@@ -2974,6 +5370,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 18,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 20,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 17,
@@ -2986,11 +5392,69 @@
     }
    },
    "filled": {
+    "docscanner": 18,
+    "docgeonet": 20,
     "dvd": 17,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 45,
+     "pass": 40,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 45,
+     "pass": 39,
+     "broken": 4,
+     "cut": 1,
+     "ends_moved": 8
+    },
+    "docscanner-place-line": {
+     "n": 43,
+     "pass": 40,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 43,
+     "pass": 41,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 45,
+     "pass": 27,
+     "broken": 11,
+     "cut": 1,
+     "ends_moved": 15
+    },
+    "docgeonet-place-line": {
+     "n": 45,
+     "pass": 41,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 45,
+     "pass": 39,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 45,
+     "pass": 40,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 45,
      "pass": 40,
      "broken": 4,
@@ -3062,6 +5526,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 1
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 1
+    },
     "dvd": {
      "pass": false,
      "lost_own": 4,
@@ -3074,11 +5548,69 @@
     }
    },
    "filled": {
+    "docscanner": 11,
+    "docgeonet": 9,
     "dvd": 5,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 24,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 24,
+     "pass": 18,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 24,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 24,
+     "pass": 19,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 2
+    },
+    "docgeonet-place-line": {
+     "n": 24,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 24,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 24,
      "pass": 19,
      "broken": 5,
@@ -3150,6 +5682,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 3,
@@ -3162,11 +5704,69 @@
     }
    },
    "filled": {
+    "docscanner": 3,
+    "docgeonet": 5,
     "dvd": 3,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 11,
+     "pass": 11,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 11,
+     "pass": 10,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docscanner-place-line": {
+     "n": 13,
+     "pass": 11,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 13,
+     "pass": 12,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 11,
+     "pass": 3,
+     "broken": 5,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 11,
+     "pass": 7,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 11,
+     "pass": 9,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 11,
+     "pass": 11,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 11,
      "pass": 11,
      "broken": 0,
@@ -3238,6 +5838,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 15,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 8,
@@ -3250,11 +5860,69 @@
     }
    },
    "filled": {
+    "docscanner": 15,
+    "docgeonet": 10,
     "dvd": 8,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 15,
+     "pass": 10,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 15,
+     "pass": 5,
+     "broken": 1,
+     "cut": 6,
+     "ends_moved": 2
+    },
+    "docscanner-place-line": {
+     "n": 13,
+     "pass": 8,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 13,
+     "pass": 8,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 15,
+     "pass": 10,
+     "broken": 0,
+     "cut": 3,
+     "ends_moved": 2
+    },
+    "docgeonet-place-line": {
+     "n": 8,
+     "pass": 8,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 8,
+     "pass": 8,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 15,
+     "pass": 10,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 15,
      "pass": 10,
      "broken": 1,
@@ -3326,6 +5994,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 5,
@@ -3338,11 +6016,69 @@
     }
    },
    "filled": {
+    "docscanner": 3,
+    "docgeonet": 7,
     "dvd": 5,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 28,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 28,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 28,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 28,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 28,
+     "pass": 24,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 28,
+     "pass": 24,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 28,
+     "pass": 23,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 28,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 28,
      "pass": 25,
      "broken": 0,
@@ -3414,6 +6150,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 1,
@@ -3426,11 +6172,69 @@
     }
    },
    "filled": {
+    "docscanner": 3,
+    "docgeonet": 8,
     "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 34,
+     "pass": 34,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 34,
+     "pass": 29,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 11
+    },
+    "docscanner-place-line": {
+     "n": 34,
+     "pass": 34,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 34,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 34,
+     "pass": 20,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 8
+    },
+    "docgeonet-place-line": {
+     "n": 34,
+     "pass": 31,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 34,
+     "pass": 31,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 34,
+     "pass": 34,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 34,
      "pass": 34,
      "broken": 0,
@@ -3502,6 +6306,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 16,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 11,
@@ -3514,11 +6328,69 @@
     }
    },
    "filled": {
+    "docscanner": 7,
+    "docgeonet": 16,
     "dvd": 11,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 17,
+     "pass": 12,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 13
+    },
+    "docscanner-place-line": {
+     "n": 17,
+     "pass": 15,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 17,
+     "pass": 15,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 17,
+     "pass": 13,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 10
+    },
+    "docgeonet-place-line": {
+     "n": 17,
+     "pass": 16,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 17,
+     "pass": 15,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 17,
      "pass": 17,
      "broken": 0,
@@ -3590,6 +6462,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 15,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 18,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 17,
@@ -3602,11 +6484,69 @@
     }
    },
    "filled": {
+    "docscanner": 15,
+    "docgeonet": 18,
     "dvd": 17,
     "uvdoc": 4
    },
    "arms": {
     "route": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 38,
+     "pass": 31,
+     "broken": 1,
+     "cut": 4,
+     "ends_moved": 5
+    },
+    "docscanner-place-line": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 38,
+     "pass": 37,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 38,
+     "pass": 26,
+     "broken": 3,
+     "cut": 5,
+     "ends_moved": 7
+    },
+    "docgeonet-place-line": {
+     "n": 34,
+     "pass": 28,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 34,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 38,
      "pass": 38,
      "broken": 0,
@@ -3678,6 +6618,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 4,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": true,
      "lost_own": 0,
@@ -3690,11 +6640,69 @@
     }
    },
    "filled": {
+    "docscanner": 4,
+    "docgeonet": 1,
     "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 26,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 26,
+     "pass": 23,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 26,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 26,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 26,
+     "pass": 24,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 26,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 26,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 26,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 26,
      "pass": 25,
      "broken": 1,
@@ -3766,6 +6774,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 3,
@@ -3778,11 +6796,69 @@
     }
    },
    "filled": {
+    "docscanner": 13,
+    "docgeonet": 11,
     "dvd": 3,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 23,
+     "pass": 23,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 4,
+     "ends_moved": 13
+    },
+    "docscanner-place-line": {
+     "n": 23,
+     "pass": 19,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 23,
+     "pass": 19,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 23,
+     "pass": 14,
+     "broken": 0,
+     "cut": 3,
+     "ends_moved": 21
+    },
+    "docgeonet-place-line": {
+     "n": 23,
+     "pass": 18,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 23,
+     "pass": 18,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 23,
+     "pass": 23,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 23,
      "pass": 23,
      "broken": 0,
@@ -3854,6 +6930,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 2,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 1,
@@ -3866,11 +6952,69 @@
     }
    },
    "filled": {
+    "docscanner": 0,
+    "docgeonet": 2,
     "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 10,
+     "pass": 10,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 10,
+     "pass": 9,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 1
+    },
+    "docscanner-place-line": {
+     "n": 9,
+     "pass": 7,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 9,
+     "pass": 9,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 10,
+     "pass": 7,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 10,
+     "pass": 9,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 10,
+     "pass": 9,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 10,
+     "pass": 9,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 1
+    },
+    "docgeonet-guarded": {
      "n": 10,
      "pass": 10,
      "broken": 0,
@@ -3942,6 +7086,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 2,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 4,
@@ -3954,11 +7108,69 @@
     }
    },
    "filled": {
+    "docscanner": 2,
+    "docgeonet": 7,
     "dvd": 4,
     "uvdoc": 2
    },
    "arms": {
     "route": {
+     "n": 52,
+     "pass": 48,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 52,
+     "pass": 39,
+     "broken": 5,
+     "cut": 1,
+     "ends_moved": 12
+    },
+    "docscanner-place-line": {
+     "n": 52,
+     "pass": 47,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 52,
+     "pass": 48,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 52,
+     "pass": 35,
+     "broken": 10,
+     "cut": 3,
+     "ends_moved": 25
+    },
+    "docgeonet-place-line": {
+     "n": 47,
+     "pass": 42,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 47,
+     "pass": 43,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 52,
+     "pass": 48,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 52,
      "pass": 48,
      "broken": 0,
@@ -4030,6 +7242,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 18,
+     "lost_neighbour": 38
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 24,
+     "lost_neighbour": 38
+    },
     "dvd": {
      "pass": false,
      "lost_own": 19,
@@ -4042,11 +7264,69 @@
     }
    },
    "filled": {
+    "docscanner": 56,
+    "docgeonet": 62,
     "dvd": 57,
     "uvdoc": 43
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 24,
+     "pass": 15,
+     "broken": 0,
+     "cut": 7,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 24,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 24,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 24,
+     "pass": 15,
+     "broken": 0,
+     "cut": 8,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 22,
+     "pass": 16,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 22,
+     "pass": 16,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 24,
      "pass": 23,
      "broken": 1,
@@ -4118,6 +7398,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 42,
+     "lost_neighbour": 88
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 42,
+     "lost_neighbour": 88
+    },
     "dvd": {
      "pass": false,
      "lost_own": 42,
@@ -4130,11 +7420,69 @@
     }
    },
    "filled": {
+    "docscanner": 130,
+    "docgeonet": 130,
     "dvd": 130,
     "uvdoc": 123
    },
    "arms": {
     "route": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 40,
+     "pass": 35,
+     "broken": 0,
+     "cut": 5,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 40,
+     "pass": 36,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 40,
+     "pass": 36,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 40,
+     "pass": 17,
+     "broken": 17,
+     "cut": 5,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 40,
      "pass": 38,
      "broken": 1,
@@ -4206,6 +7554,16 @@
    "class": "flat",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 15,
+     "lost_neighbour": 1
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 19,
+     "lost_neighbour": 1
+    },
     "dvd": {
      "pass": false,
      "lost_own": 12,
@@ -4218,11 +7576,69 @@
     }
    },
    "filled": {
+    "docscanner": 16,
+    "docgeonet": 20,
     "dvd": 13,
     "uvdoc": 6
    },
    "arms": {
     "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 17,
+     "pass": 5,
+     "broken": 0,
+     "cut": 11,
+     "ends_moved": 3
+    },
+    "docscanner-place-line": {
+     "n": 17,
+     "pass": 7,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 17,
+     "pass": 7,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 17,
+     "pass": 4,
+     "broken": 0,
+     "cut": 12,
+     "ends_moved": 4
+    },
+    "docgeonet-place-line": {
+     "n": 17,
+     "pass": 6,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 17,
+     "pass": 6,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 17,
      "pass": 17,
      "broken": 0,
@@ -4294,6 +7710,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": true,
      "lost_own": 0,
@@ -4306,11 +7732,69 @@
     }
    },
    "filled": {
+    "docscanner": 0,
+    "docgeonet": 0,
     "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 23,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 23,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 25,
      "pass": 25,
      "broken": 0,
@@ -4382,6 +7866,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 17,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 26,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 4,
@@ -4394,11 +7888,69 @@
     }
    },
    "filled": {
+    "docscanner": 17,
+    "docgeonet": 26,
     "dvd": 4,
     "uvdoc": 4
    },
    "arms": {
     "route": {
+     "n": 27,
+     "pass": 20,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 27,
+     "pass": 15,
+     "broken": 1,
+     "cut": 6,
+     "ends_moved": 9
+    },
+    "docscanner-place-line": {
+     "n": 28,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 28,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 27,
+     "pass": 9,
+     "broken": 3,
+     "cut": 9,
+     "ends_moved": 8
+    },
+    "docgeonet-place-line": {
+     "n": 24,
+     "pass": 15,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 24,
+     "pass": 15,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 27,
+     "pass": 20,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 27,
      "pass": 20,
      "broken": 0,
@@ -4470,6 +8022,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 21,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 22,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 18,
@@ -4482,11 +8044,69 @@
     }
    },
    "filled": {
+    "docscanner": 21,
+    "docgeonet": 22,
     "dvd": 18,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 32,
+     "pass": 32,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 32,
+     "pass": 27,
+     "broken": 0,
+     "cut": 4,
+     "ends_moved": 7
+    },
+    "docscanner-place-line": {
+     "n": 32,
+     "pass": 28,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 32,
+     "pass": 28,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 32,
+     "pass": 24,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 3
+    },
+    "docgeonet-place-line": {
+     "n": 32,
+     "pass": 27,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 32,
+     "pass": 27,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 32,
+     "pass": 32,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 32,
      "pass": 32,
      "broken": 0,
@@ -4558,6 +8178,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 23,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 26,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 18,
@@ -4570,11 +8200,69 @@
     }
    },
    "filled": {
+    "docscanner": 23,
+    "docgeonet": 26,
     "dvd": 18,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 29,
+     "pass": 27,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 29,
+     "pass": 27,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 29,
+     "pass": 27,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 29,
+     "pass": 25,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 29,
+     "pass": 27,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 29,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 29,
      "pass": 29,
      "broken": 0,
@@ -4646,6 +8334,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 1
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 1
+    },
     "dvd": {
      "pass": false,
      "lost_own": 5,
@@ -4658,11 +8356,69 @@
     }
    },
    "filled": {
+    "docscanner": 8,
+    "docgeonet": 12,
     "dvd": 6,
     "uvdoc": 4
    },
    "arms": {
     "route": {
+     "n": 33,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 33,
+     "pass": 26,
+     "broken": 1,
+     "cut": 3,
+     "ends_moved": 9
+    },
+    "docscanner-place-line": {
+     "n": 34,
+     "pass": 26,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 34,
+     "pass": 27,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 33,
+     "pass": 20,
+     "broken": 4,
+     "cut": 2,
+     "ends_moved": 14
+    },
+    "docgeonet-place-line": {
+     "n": 34,
+     "pass": 22,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 34,
+     "pass": 24,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 33,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 33,
      "pass": 26,
      "broken": 0,
@@ -4734,6 +8490,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 10,
@@ -4746,11 +8512,69 @@
     }
    },
    "filled": {
+    "docscanner": 10,
+    "docgeonet": 10,
     "dvd": 10,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 22,
+     "pass": 21,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 22,
+     "pass": 18,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 22,
      "pass": 22,
      "broken": 0,
@@ -4822,6 +8646,16 @@
    "class": "flat",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 7,
@@ -4834,11 +8668,69 @@
     }
    },
    "filled": {
+    "docscanner": 5,
+    "docgeonet": 9,
     "dvd": 7,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 29,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 29,
+     "pass": 24,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docscanner-place-line": {
+     "n": 29,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 29,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 29,
+     "pass": 22,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 29,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 29,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 29,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 29,
      "pass": 25,
      "broken": 2,
@@ -4910,6 +8802,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 26,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 49,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 17,
@@ -4922,11 +8824,69 @@
     }
    },
    "filled": {
+    "docscanner": 26,
+    "docgeonet": 49,
     "dvd": 17,
     "uvdoc": 8
    },
    "arms": {
     "route": {
+     "n": 26,
+     "pass": 19,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 26,
+     "pass": 16,
+     "broken": 3,
+     "cut": 4,
+     "ends_moved": 2
+    },
+    "docscanner-place-line": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 26,
+     "pass": 10,
+     "broken": 5,
+     "cut": 8,
+     "ends_moved": 2
+    },
+    "docgeonet-place-line": {
+     "n": 25,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 25,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 26,
+     "pass": 19,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 26,
      "pass": 19,
      "broken": 4,
@@ -4998,6 +8958,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 15,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 22,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 6,
@@ -5010,11 +8980,69 @@
     }
    },
    "filled": {
+    "docscanner": 15,
+    "docgeonet": 22,
     "dvd": 6,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 24,
+     "pass": 13,
+     "broken": 0,
+     "cut": 9,
+     "ends_moved": 6
+    },
+    "docscanner-place-line": {
+     "n": 24,
+     "pass": 15,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 24,
+     "pass": 15,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 24,
+     "pass": 9,
+     "broken": 1,
+     "cut": 10,
+     "ends_moved": 10
+    },
+    "docgeonet-place-line": {
+     "n": 24,
+     "pass": 9,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 24,
+     "pass": 9,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 24,
      "pass": 24,
      "broken": 0,
@@ -5086,6 +9114,16 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 7,
@@ -5098,11 +9136,69 @@
     }
    },
    "filled": {
+    "docscanner": 7,
+    "docgeonet": 10,
     "dvd": 7,
     "uvdoc": 7
    },
    "arms": {
     "route": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 42,
+     "pass": 29,
+     "broken": 4,
+     "cut": 2,
+     "ends_moved": 9
+    },
+    "docscanner-place-line": {
+     "n": 42,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 42,
+     "pass": 39,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 42,
+     "pass": 29,
+     "broken": 9,
+     "cut": 3,
+     "ends_moved": 2
+    },
+    "docgeonet-place-line": {
+     "n": 41,
+     "pass": 39,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 41,
+     "pass": 39,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 42,
      "pass": 41,
      "broken": 0,
@@ -5174,6 +9270,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 3,
@@ -5186,11 +9292,69 @@
     }
    },
    "filled": {
+    "docscanner": 0,
+    "docgeonet": 5,
     "dvd": 3,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 30,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 2
+    },
+    "docscanner-place-line": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 30,
+     "pass": 25,
+     "broken": 4,
+     "cut": 1,
+     "ends_moved": 11
+    },
+    "docgeonet-place-line": {
+     "n": 30,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 30,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 30,
+     "pass": 28,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 2
+    },
+    "docgeonet-guarded": {
      "n": 30,
      "pass": 29,
      "broken": 1,
@@ -5262,6 +9426,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 3,
@@ -5274,11 +9448,69 @@
     }
    },
    "filled": {
+    "docscanner": 8,
+    "docgeonet": 5,
     "dvd": 3,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 28,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 4
+    },
+    "docscanner-place-line": {
+     "n": 28,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 28,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 28,
+     "pass": 17,
+     "broken": 3,
+     "cut": 1,
+     "ends_moved": 8
+    },
+    "docgeonet-place-line": {
+     "n": 24,
+     "pass": 20,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 24,
+     "pass": 20,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 28,
      "pass": 27,
      "broken": 0,
@@ -5350,6 +9582,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 30,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 9,
@@ -5362,11 +9604,69 @@
     }
    },
    "filled": {
+    "docscanner": 7,
+    "docgeonet": 30,
     "dvd": 9,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 17,
+     "pass": 13,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 15
+    },
+    "docscanner-place-line": {
+     "n": 17,
+     "pass": 10,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 17,
+     "pass": 10,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 17,
+     "pass": 11,
+     "broken": 0,
+     "cut": 6,
+     "ends_moved": 12
+    },
+    "docgeonet-place-line": {
+     "n": 17,
+     "pass": 10,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 17,
+     "pass": 10,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 17,
      "pass": 17,
      "broken": 0,
@@ -5438,6 +9738,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 5,
@@ -5450,11 +9760,69 @@
     }
    },
    "filled": {
+    "docscanner": 5,
+    "docgeonet": 3,
     "dvd": 5,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 14,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 14,
+     "pass": 10,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 14,
+     "pass": 13,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 14,
+     "pass": 12,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 14,
+     "pass": 6,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 7
+    },
+    "docgeonet-place-line": {
+     "n": 7,
+     "pass": 6,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 7,
+     "pass": 6,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 14,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 14,
      "pass": 14,
      "broken": 0,
@@ -5526,6 +9894,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 26,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 48,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 34,
@@ -5538,11 +9916,69 @@
     }
    },
    "filled": {
+    "docscanner": 26,
+    "docgeonet": 48,
     "dvd": 34,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 108,
+     "pass": 101,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 108,
+     "pass": 81,
+     "broken": 20,
+     "cut": 3,
+     "ends_moved": 30
+    },
+    "docscanner-place-line": {
+     "n": 99,
+     "pass": 85,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 99,
+     "pass": 85,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 108,
+     "pass": 68,
+     "broken": 20,
+     "cut": 6,
+     "ends_moved": 23
+    },
+    "docgeonet-place-line": {
+     "n": 97,
+     "pass": 88,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 97,
+     "pass": 88,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 108,
+     "pass": 101,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 108,
      "pass": 101,
      "broken": 7,
@@ -5614,6 +10050,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 1,
@@ -5626,11 +10072,69 @@
     }
    },
    "filled": {
+    "docscanner": 0,
+    "docgeonet": 14,
     "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 45,
+     "pass": 35,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 45,
+     "pass": 43,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 3
+    },
+    "docscanner-place-line": {
+     "n": 43,
+     "pass": 28,
+     "broken": 14,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 43,
+     "pass": 23,
+     "broken": 19,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 45,
+     "pass": 18,
+     "broken": 22,
+     "cut": 1,
+     "ends_moved": 41
+    },
+    "docgeonet-place-line": {
+     "n": 41,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 41,
+     "pass": 35,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 45,
+     "pass": 43,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 3
+    },
+    "docgeonet-guarded": {
      "n": 45,
      "pass": 35,
      "broken": 10,
@@ -5702,6 +10206,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 4,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": true,
      "lost_own": 0,
@@ -5714,11 +10228,69 @@
     }
    },
    "filled": {
+    "docscanner": 0,
+    "docgeonet": 4,
     "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 27,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 27,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 27,
+     "pass": 25,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 27,
      "pass": 27,
      "broken": 0,
@@ -5790,6 +10362,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 22,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 24,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 16,
@@ -5802,11 +10384,69 @@
     }
    },
    "filled": {
+    "docscanner": 22,
+    "docgeonet": 24,
     "dvd": 16,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 28,
+     "pass": 15,
+     "broken": 1,
+     "cut": 10,
+     "ends_moved": 16
+    },
+    "docscanner-place-line": {
+     "n": 28,
+     "pass": 19,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 28,
+     "pass": 19,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 28,
+     "pass": 17,
+     "broken": 2,
+     "cut": 9,
+     "ends_moved": 17
+    },
+    "docgeonet-place-line": {
+     "n": 28,
+     "pass": 16,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 28,
+     "pass": 16,
+     "broken": 12,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 28,
      "pass": 27,
      "broken": 0,
@@ -5878,6 +10518,16 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 1,
@@ -5890,11 +10540,69 @@
     }
    },
    "filled": {
+    "docscanner": 1,
+    "docgeonet": 10,
     "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 41,
+     "pass": 37,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 35,
+     "pass": 31,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 35,
+     "pass": 33,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 41,
+     "pass": 34,
+     "broken": 4,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 35,
+     "pass": 33,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 35,
+     "pass": 33,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 41,
      "pass": 38,
      "broken": 2,
@@ -5966,6 +10674,16 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": true,
      "lost_own": 0,
@@ -5978,11 +10696,69 @@
     }
    },
    "filled": {
+    "docscanner": 0,
+    "docgeonet": 1,
     "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 36,
+     "pass": 32,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 31,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 31,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 36,
+     "pass": 27,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 1
+    },
+    "docgeonet-place-line": {
+     "n": 34,
+     "pass": 30,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 34,
+     "pass": 29,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 36,
+     "pass": 32,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 36,
      "pass": 35,
      "broken": 1,
@@ -6054,6 +10830,16 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 106,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 103,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 80,
@@ -6066,11 +10852,69 @@
     }
    },
    "filled": {
+    "docscanner": 106,
+    "docgeonet": 103,
     "dvd": 80,
     "uvdoc": 15
    },
    "arms": {
     "route": {
+     "n": 156,
+     "pass": 150,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 156,
+     "pass": 122,
+     "broken": 2,
+     "cut": 18,
+     "ends_moved": 20
+    },
+    "docscanner-place-line": {
+     "n": 154,
+     "pass": 149,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 154,
+     "pass": 149,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 156,
+     "pass": 84,
+     "broken": 12,
+     "cut": 17,
+     "ends_moved": 96
+    },
+    "docgeonet-place-line": {
+     "n": 150,
+     "pass": 138,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 150,
+     "pass": 137,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 156,
+     "pass": 150,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 156,
      "pass": 150,
      "broken": 4,
@@ -6142,6 +10986,16 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 2,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 8,
@@ -6154,11 +11008,69 @@
     }
    },
    "filled": {
+    "docscanner": 2,
+    "docgeonet": 7,
     "dvd": 8,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 42,
+     "pass": 26,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 20
+    },
+    "docscanner-place-line": {
+     "n": 40,
+     "pass": 39,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 40,
+     "pass": 39,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 42,
+     "pass": 17,
+     "broken": 14,
+     "cut": 3,
+     "ends_moved": 30
+    },
+    "docgeonet-place-line": {
+     "n": 40,
+     "pass": 40,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 40,
+     "pass": 40,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 42,
      "pass": 41,
      "broken": 0,
@@ -6230,6 +11142,16 @@
    "class": "flat",
    "route": "deskew",
    "guard": {
+    "docscanner": {
+     "pass": false,
+     "lost_own": 27,
+     "lost_neighbour": 0
+    },
+    "docgeonet": {
+     "pass": false,
+     "lost_own": 24,
+     "lost_neighbour": 0
+    },
     "dvd": {
      "pass": false,
      "lost_own": 32,
@@ -6242,11 +11164,69 @@
     }
    },
    "filled": {
+    "docscanner": 27,
+    "docgeonet": 24,
     "dvd": 32,
     "uvdoc": 6
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-copy": {
+     "n": 24,
+     "pass": 20,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docscanner-place-line": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-place-chunk": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-copy": {
+     "n": 24,
+     "pass": 20,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "docgeonet-place-line": {
+     "n": 24,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-place-chunk": {
+     "n": 24,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docscanner-guarded": {
+     "n": 24,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "docgeonet-guarded": {
      "n": 24,
      "pass": 22,
      "broken": 1,

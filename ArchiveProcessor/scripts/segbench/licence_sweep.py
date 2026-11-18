@@ -234,8 +234,55 @@ def bln600(n: int = 40, seed: int = 20261118) -> int:
     return 0
 
 
+SIG_REPO, SIG_REV = "tech4humans/conditional-detr-50-signature-detector", "9582471a22"
+
+
+def signature() -> int:
+    """The named tech4humans YOLOv8s signature detector (AGPL-3.0) is gated: its weights need a logged-in Hugging
+    Face account that has accepted the terms. Its ungated sibling from the same authors, a Conditional DETR-50
+    trained on the same Tobacco800 + signatures data (Apache-2.0), stands in for it on marks_detect's 32 owner-core
+    pages: class-agnostic recall against every mark, as marks-detect scores the YOLO11m arm, at its floors."""
+    import torch
+    from huggingface_hub import snapshot_download
+    from PIL import Image
+    from transformers import AutoImageProcessor, AutoModelForObjectDetection
+    import marks_detect as M
+    root = Path(snapshot_download(SIG_REPO, allow_patterns=["*.json", "*.safetensors"],
+                                  ignore_patterns=["eval/*", "train/*"]))
+    assert root.name.startswith(SIG_REV), root
+    src = root if (root / "model.safetensors").exists() else root / "best_checkpoint"
+    proc = AutoImageProcessor.from_pretrained(src)
+    model = AutoModelForObjectDetection.from_pretrained(src).eval()
+    t = M.truth()
+    pages = {}
+    for pid in t:
+        im = Image.open(M.IMAGES / f"{pid}.jpg").convert("RGB")
+        W, H = im.size
+        with torch.no_grad():
+            out = model(**proc(images=im, return_tensors="pt"))
+        res = proc.post_process_object_detection(out, threshold=0.05, target_sizes=[(H, W)])[0]
+        pages[pid] = [{"box": [round(float(b[0]) / W, 5), round(float(b[1]) / H, 5), round(float(b[2]) / W, 5),
+                               round(float(b[3]) / H, 5)],
+                       "cls": model.config.id2label[int(l)], "conf": round(float(c), 4)}
+                      for b, l, c in zip(res["boxes"], res["labels"], res["scores"])]
+    store = {"model": f"{SIG_REPO}@{SIG_REV}", "licence": "Apache-2.0", "conf_floor": 0.05, "pages": pages}
+    (WORK / "signature-detr.json").write_text(json.dumps(store) + "\n")
+    res = {"item": "W46.licence-freed-sweep", "model": store["model"], "licence": store["licence"],
+           "stands_in_for": "tech4humans/yolov8s-signature-detector (AGPL-3.0, gated)", "pages": len(t),
+           "marks": sum(len(p["marks"]) for p in t.values()), "by_floor": {}}
+    for conf in (0.05, 0.25, 0.5):
+        arm = dict(pages="all")
+        sc = M.score(t, M.boxes(pages, conf), arm)
+        res["by_floor"][str(conf)] = {"boxes": sum(len(v) for v in M.boxes(pages, conf).values()), **sc}
+        a = sc["hit"]["all"]
+        print(f"floor {conf}: {res['by_floor'][str(conf)]['boxes']} boxes; loose-hit recall "
+              f"{json.dumps(a)[:160]}")
+    (RES / "licence-sweep-signature.json").write_text(json.dumps(res, indent=1) + "\n")
+    return 0
+
+
 if __name__ == "__main__":
-    cmds = {"layoutreader": layoutreader, "hunyuan-prep": hunyuan_prep, "readers": readers, "bln600": bln600}
+    cmds = {"signature": signature, "layoutreader": layoutreader, "hunyuan-prep": hunyuan_prep, "readers": readers, "bln600": bln600}
     if len(sys.argv) == 2 and sys.argv[1] in cmds:
         sys.exit(cmds[sys.argv[1]]())
     print(__doc__)
