@@ -4842,6 +4842,22 @@ enum Flattener {
     /// lowered); a wider window (on `_1939_Former students` it closed few of the gaps).
     /// Left as it was: a photograph Vision boxed words over is stretched like pale ink
     /// when its tones are close, and gains speckle in the stencil.
+    ///
+    /// ⛔ Never asked about a camera's photo of a page (`mrcLayers`' and `mrcStencil`'s
+    /// `photographed`, from `cameraExposed`; W42.stroke-weight-photographed). Its paper
+    /// is grey from the exposure rather than from age, so every page reads as pale: 10
+    /// of 10 sampled from the owner's 733 Pixel 6 photos of the Scott papers. The
+    /// stretched cut held 1.1-3.7x the first cut's pixels, and C56's lift could not take
+    /// them out again: a camera's strokes are blurred and noisy, so the stencil's peak
+    /// is no core (96 on `0011 — Scott`, paper 172, a midpoint over all but 66 of 344,269
+    /// pixels). Filled with the core's colour, the type inside the words carried
+    /// 1.06-1.26x the photo's ink and 1.11-1.38x its dark pixels; Sauvola's first cut and
+    /// the lift alone carry 0.96-1.12x its ink and 0.76-1.06x its dark pixels, the faint
+    /// pink carbons the fewest: their strokes are filled darker than the photo's average,
+    /// so they carry its ink in fewer pixels, and side by side they read as the photo.
+    /// Rejected, keeping the re-cut and cutting it at a midpoint from the strokes' core to
+    /// the paper around them: a carbon's ink changes from letter to letter, and blocks of
+    /// 64 or 256 pixels wore its faint words away while its strong ones stayed heavy.
     static func paleInkLevels(_ grey: [UInt8], stencil: [Bool], region: [Bool]) -> [UInt8]? {
         guard grey.count == stencil.count, grey.count == region.count else { return nil }
         var ink = [Int](repeating: 0, count: 256), paper = [Int](repeating: 0, count: 256)
@@ -5342,6 +5358,7 @@ enum Flattener {
                           foregroundDownsample: Int = mrcForegroundDownsample,
                           inColour: Bool = false,
                           fromImage image: Prefs.ImageDetail? = nil,
+                          photographed: Bool = false,
                           stencil cut: (png: Data, width: Int, height: Int)? = nil) -> MRCLayers? {
         // No words means a plate with no text on it. An empty stencil would put
         // the whole page into a downsampled background — publishing a picture at
@@ -5366,13 +5383,14 @@ enum Flattener {
             return mrcLayers(for: page, boxes: boxes, into: directory, stem: stem,
                              backgroundDownsample: backgroundDownsample,
                              foregroundDownsample: foregroundDownsample, inColour: false,
-                             fromImage: image)
+                             fromImage: image, photographed: photographed)
         }
         // C39. The finer stencil is cut first, before anything below is allocated, so
         // its Sauvola peak is the only one alive: `analyticMRCBytesPerPixel` at no more
         // than `maximumMRCPageMegapixels`, the grey bound's own terms. It comes back as
         // a PNG, and the recursion below is handed it rather than cutting it again.
-        var fine = cut ?? (typeDPI > dpi ? mrcStencil(page, box: box, boxes: boxes, dpi: typeDPI) : nil)
+        var fine = cut ?? (typeDPI > dpi ? mrcStencil(page, box: box, boxes: boxes, dpi: typeDPI,
+                                                      photographed: photographed) : nil)
         let w = max(Int(wide), 1), h = max(Int(high), 1)
         guard let grey = renderGrey(page, box: box, scale: scale,
                                     width: w, height: h, from: .mediaBox) else { return nil }
@@ -5394,8 +5412,9 @@ enum Flattener {
         for i in 0..<(w * h) where !region[i] { mask[i] = false }
         // C54. Pale ink is cut again with the page's levels stretched. The first mask is
         // released before the second cut, so the peak is one byte a pixel over the
-        // first's: `region`, which the first cut did not have.
-        let paleInk = paleInkLevels(grey, stencil: mask, region: region)
+        // first's: `region`, which the first cut did not have. Never on a camera's photo
+        // (`paleInkLevels`).
+        let paleInk = photographed ? nil : paleInkLevels(grey, stencil: mask, region: region)
         if let levels = paleInk {
             mask = []
             mask = sauvolaMask(grey, width: w, height: h,
@@ -5513,7 +5532,8 @@ enum Flattener {
             // done this. The finer stencil is cut twice on such a page; the first is
             // needed before `pageIsAllText` can be asked.
             if fine != nil, cut == nil {
-                fine = mrcStencil(page, box: box, boxes: boxes, dpi: typeDPI, outsideWords: true)
+                fine = mrcStencil(page, box: box, boxes: boxes, dpi: typeDPI, outsideWords: true,
+                                  photographed: photographed)
             }
             mask = sauvolaMask(grey, width: w, height: h,
                                window: sauvolaWindow(dpi: dpi, width: w, height: h),
@@ -5596,7 +5616,8 @@ enum Flattener {
                 return mrcLayers(for: page, boxes: boxes, into: directory, stem: stem,
                                  backgroundDownsample: backgroundDownsample,
                                  foregroundDownsample: foregroundDownsample,
-                                 inColour: false, fromImage: image, stencil: fine)
+                                 inColour: false, fromImage: image, photographed: photographed,
+                                 stencil: fine)
             }
             // C31. The foreground is sampled from the dark core of the strokes, not
             // from every stencil pixel. See `foregroundHoles`.
@@ -5738,8 +5759,8 @@ enum Flattener {
     /// `outsideWords` keeps the ink outside the words too, for a page read as all text
     /// (C28, in `mrcLayers`), as far as `keepWordsAndInterior` allows.
     static func mrcStencil(_ page: PDFPage, box: CGRect, boxes: [SearchableWriter.BoundingBox],
-                           dpi: Double,
-                           outsideWords: Bool = false) -> (png: Data, width: Int, height: Int)? {
+                           dpi: Double, outsideWords: Bool = false,
+                           photographed: Bool = false) -> (png: Data, width: Int, height: Int)? {
         let scale = dpi / 72.0
         let wide = (box.width * scale).rounded(), high = (box.height * scale).rounded()
         guard wide.isFinite, high.isFinite, wide >= 1, high >= 1,
@@ -5751,8 +5772,9 @@ enum Flattener {
                                window: sauvolaWindow(dpi: dpi, width: w, height: h))
         let region = textRegionMask(boxes, width: w, height: h)
         guard mask.count == w * h, region.count == w * h else { return nil }
-        // C54, as in `mrcLayers`, decided at this resolution from this render.
-        if let levels = paleInkLevels(grey, stencil: mask, region: region) {
+        // C54, as in `mrcLayers`, decided at this resolution from this render, and never
+        // on a camera's photo.
+        if !photographed, let levels = paleInkLevels(grey, stencil: mask, region: region) {
             mask = []
             mask = sauvolaMask(grey, width: w, height: h,
                                window: sauvolaWindow(dpi: dpi, width: w, height: h),

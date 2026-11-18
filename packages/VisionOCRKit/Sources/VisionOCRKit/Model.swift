@@ -2568,7 +2568,8 @@ final class OCRModel: ObservableObject {
                             stem: String(format: "m%05d", index + 1),
                             backgroundDownsample: settings.photoDetail.downsample,
                             inColour: encoded[index].isColour,
-                            fromImage: fromImage ? settings.imageDetail : nil)
+                            fromImage: fromImage ? settings.imageDetail : nil,
+                            photographed: cameraExposed)
                         else { continue }
                         let stencil = pngDir.appendingPathComponent(
                             String(format: "m%05d.jbig2", index + 1))

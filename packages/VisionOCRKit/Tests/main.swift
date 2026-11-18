@@ -6879,6 +6879,148 @@ do {
 }
 }  // end of section
 
+// MARK: - W42.stroke-weight-photographed: a camera's photo keeps its stroke weight when layered
+
+section("a camera's photo of a page keeps its stroke weight when layered (W42.stroke-weight-photographed)") {
+do {
+    // Dark grey type on grey paper, blurred and noisy, as a phone's photo of a page
+    // arrives: it reads as pale ink (C54), whose stretched re-cut thickened the type.
+    let w = 1224, h = 1584
+    let paperLevel = 158, inkLevel = 64
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                               bitsPerSample: 8, samplesPerPixel: 1, hasAlpha: false,
+                               isPlanar: false, colorSpaceName: .deviceWhite,
+                               bytesPerRow: w, bitsPerPixel: 8)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    NSColor(white: CGFloat(paperLevel) / 255, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: w, height: h).fill()
+    let attrs: [NSAttributedString.Key: Any] = [
+        .font: NSFont(name: "Times-Roman", size: 36) ?? NSFont.systemFont(ofSize: 36),
+        .foregroundColor: NSColor(white: CGFloat(inkLevel) / 255, alpha: 1)]
+    for i in 0..<22 {
+        ("The quick brown fox jumps over the dog \(i)" as NSString)
+            .draw(at: NSPoint(x: 90, y: 1440 - i * 62), withAttributes: attrs)
+    }
+    NSGraphicsContext.current?.flushGraphics()
+    NSGraphicsContext.restoreGraphicsState()
+    let clean = Array(UnsafeBufferPointer(start: rep.bitmapData!, count: w * h))
+    // One 3x3 box blur, then noise of up to 12 either way from a fixed seed.
+    var photo = clean
+    for y in 1..<(h - 1) {
+        for x in 1..<(w - 1) {
+            var s = 0
+            for dy in -1...1 { for dx in -1...1 { s += Int(clean[(y + dy) * w + x + dx]) } }
+            photo[y * w + x] = UInt8(s / 9)
+        }
+    }
+    var seed: UInt64 = 0x5eed_c0de
+    for i in photo.indices {
+        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+        photo[i] = UInt8(clamping: Int(photo[i]) + Int((seed >> 33) % 25) - 12)
+    }
+    let src = tmp.appendingPathComponent("photographed-type.pdf")
+    var box = CGRect(x: 0, y: 0, width: 612, height: 792)
+    if let provider = CGDataProvider(data: Data(photo) as CFData),
+       let cg = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w,
+                        space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+       let pdf = CGContext(src as CFURL, mediaBox: &box, nil) {
+        pdf.beginPDFPage(nil); pdf.draw(cg, in: box); pdf.endPDFPage(); pdf.closePDF()
+    }
+    let dir = tmp.appendingPathComponent("photographed")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let words = [SearchableWriter.BoundingBox(x: 0.05, y: 0.05, width: 0.9, height: 0.9)]
+    guard let doc = PDFDocument(url: src), let page = doc.page(at: 0) else {
+        check("W42.stroke-weight-photographed: the test page opens", false, "")
+        return
+    }
+    let (typeDPI, imageDPI) = Flattener.resolutions(of: page)
+    let cutDPI = max(typeDPI, imageDPI)
+    let cutBox = Flattener.fullBox(of: page)
+    let cw = Int((cutBox.width * cutDPI / 72).rounded())
+    let ch = Int((cutBox.height * cutDPI / 72).rounded())
+    // A layer drawn at the page's size, grey, top-down, as a reader's renderer scales it.
+    func drawn(_ url: URL) -> [UInt8]? {
+        guard let s = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let bits = CGImageSourceCreateImageAtIndex(s, 0, nil),
+              let g = CGContext(data: nil, width: cw, height: ch, bitsPerComponent: 8,
+                                bytesPerRow: cw, space: CGColorSpaceCreateDeviceGray(),
+                                bitmapInfo: 0) else { return nil }
+        g.interpolationQuality = .high
+        g.draw(bits, in: CGRect(x: 0, y: 0, width: cw, height: ch))
+        return Array(UnsafeBufferPointer(start: g.data!.bindMemory(to: UInt8.self, capacity: cw * ch),
+                                         count: cw * ch))
+    }
+    // The page as published: the foreground through the stencil, the background elsewhere.
+    func published(_ layers: Flattener.MRCLayers?) -> (stencil: [Bool], page: [UInt8])? {
+        guard let layers, let mask = drawn(layers.mask), let fg = drawn(layers.foreground),
+              let bg = drawn(layers.background) else { return nil }
+        let stencil = mask.map { $0 < 128 }
+        return (stencil, (0..<(cw * ch)).map { stencil[$0] ? fg[$0] : bg[$0] })
+    }
+    let asPhoto = published(Flattener.mrcLayers(for: page, boxes: words, into: dir, stem: "p",
+                                                photographed: true))
+    let asScan = published(Flattener.mrcLayers(for: page, boxes: words, into: dir, stem: "s"))
+    guard cw == w, ch == h, let asPhoto, let asScan,
+          let grey = Flattener.renderGrey(page, box: cutBox, scale: cutDPI / 72,
+                                          width: cw, height: ch, from: .mediaBox) else {
+        check("W42.stroke-weight-photographed: the page is layered at its image's resolution",
+              false, "\(cw)x\(ch) at \(cutDPI) DPI")
+        return
+    }
+    // Inside the words, the published page's dark pixels and its ink (each pixel's depth
+    // under the paper) over those of the type as drawn, before the blur and the noise;
+    // dark is under halfway from the type's ink to its paper. Both buffers run top-down.
+    let region = Flattener.textRegionMask(words, width: w, height: h)
+    let middle = (inkLevel + paperLevel) / 2
+    func dark(_ px: [UInt8]) -> Int { (0..<(w * h)).filter { region[$0] && Int(px[$0]) < middle }.count }
+    func ink(_ px: [UInt8]) -> Int {
+        (0..<(w * h)).reduce(0) { region[$1] ? $0 + max(0, paperLevel - Int(px[$1])) : $0 }
+    }
+    let drawnDark = Double(max(dark(clean), 1)), drawnInk = Double(max(ink(clean), 1))
+    let photoDark = Double(dark(asPhoto.page)) / drawnDark, scanDark = Double(dark(asScan.page)) / drawnDark
+    let photoInk = Double(ink(asPhoto.page)) / drawnInk, scanInk = Double(ink(asScan.page)) / drawnInk
+    var cut = Flattener.sauvolaMask(grey, width: w, height: h,
+                                    window: Flattener.sauvolaWindow(dpi: cutDPI, width: w, height: h))
+    for i in 0..<(w * h) where !region[i] { cut[i] = false }
+    check("W42.stroke-weight-photographed: the test page reads as pale ink, as a phone's photo does",
+          Flattener.paleInkLevels(grey, stencil: cut, region: region) != nil, "")
+    check("W42.stroke-weight-photographed: …and layered as a scan, its type comes out heavier than drawn",
+          scanDark > 1.30 && scanInk > photoInk + 0.15,
+          String(format: "%.3f of the drawn type's dark pixels, %.3f of its ink", scanDark, scanInk))
+    // The bound is on the heavy side, which is the defect: C56's 5%. A camera's blurred
+    // strokes, filled from their darkest quarter (`foregroundHoles`), carry their ink in
+    // fewer pixels than they cover, and the background keeps their blurred edges, so the
+    // dark pixels come out under the drawn type's and the ink over it, by about a fifth
+    // each (the owner's pink carbons 0.76-0.80 and 0.96-1.02). Lighter than 0.75 would be
+    // strokes lost.
+    check("W42.stroke-weight-photographed: a camera's photo publishes no more dark pixels than the "
+            + "drawn type and C56's 5%, not thickened by the pale-ink re-cut",
+          photoDark <= 1.05 && photoDark >= 0.75,
+          String(format: "%.3f of the drawn type's dark pixels (%.3f of its ink), %.3f as a scan",
+                 photoDark, photoInk, scanDark))
+    // Its stencil is the first cut with C56's lift, as a page with no pale ink takes.
+    let thin = Flattener.strokeWeightMask(grey, mask: cut, region: region, width: w, height: h)
+    check("W42.stroke-weight-photographed: …its stencil is Sauvola's first cut with C56's lift",
+          asPhoto.stencil == thin && asScan.stencil != thin,
+          "\(asPhoto.stencil.filter { $0 }.count) published, \(thin.filter { $0 }.count) thinned, "
+            + "\(asScan.stencil.filter { $0 }.count) as a scan")
+    var fine: [Bool] = []
+    if let made = Flattener.mrcStencil(page, box: cutBox, boxes: words, dpi: cutDPI, photographed: true),
+       let s = CGImageSourceCreateWithData(made.png as CFData, nil),
+       let bits = CGImageSourceCreateImageAtIndex(s, 0, nil), bits.width == w, bits.height == h,
+       let g = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                         space: CGColorSpaceCreateDeviceGray(), bitmapInfo: 0) {
+        g.draw(bits, in: CGRect(x: 0, y: 0, width: w, height: h))
+        let p = g.data!.bindMemory(to: UInt8.self, capacity: w * h)
+        fine = (0..<(w * h)).map { p[$0] < 128 }
+    }
+    check("W42.stroke-weight-photographed: …and the finer-resolution stencil makes the same cut",
+          fine == thin, "\(fine.filter { $0 }.count) cut finer, \(thin.filter { $0 }.count) thinned")
+}
+}  // end of section
+
 // MARK: - C37: a scan that is already 1-bit JBIG2 keeps its own stream
 
 section("a 1-bit JBIG2 source page keeps its own stream (C37)") {
