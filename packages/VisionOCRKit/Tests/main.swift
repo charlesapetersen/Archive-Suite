@@ -14594,6 +14594,123 @@ do {
 }
 }  // end of section
 
+section("W42.c41-newspaper-scans: a Vision line lying across two layout regions is cut between them") {
+
+do {
+    typealias Box = SearchableWriter.BoundingBox
+    typealias Obs = SearchableWriter.Observation
+    // Two columns, and a row Vision read from the left one on into the right, as on C41's newspaper
+    // scans; a heading set across the gap between the regions, its words over it, below them.
+    let width = 1900, height = 1000
+    let font = CTFontCreateWithName("Times-Roman" as CFString, 40, nil)
+    func ink(_ s: String) -> Double {
+        Double(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(
+            NSAttributedString(string: s, attributes: [.font: font])), nil, nil, nil))
+    }
+    let columnText = [
+        ["the left column holds one story", "about the county fair and its cattle",
+         "and the prizes the farmers took home", "when the judges had all gone away",
+         "and the barns were quiet again", "until the next summer came round"],
+        ["the right column is another story", "about the mayor and the new bridge",
+         "which opens to traffic next week", "after three years of hard building",
+         "by the men of the river company", "who were paid at last in full"]]
+    let lefts = [60.0, 1000]
+    let headingText = "FARMERS AND MAYOR MEET AT THE BRIDGE"
+    let headingX = 420.0, headingBaseline = 900.0
+    var drawn: CGImage?
+    if let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                           bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                           bitmapInfo: CGImageAlphaInfo.none.rawValue) {
+        ctx.setFillColor(gray: 1, alpha: 1)
+        ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        ctx.setFillColor(gray: 0, alpha: 1)
+        for (c, texts) in columnText.enumerated() {
+            for (r, s) in texts.enumerated() {
+                ctx.textPosition = CGPoint(x: lefts[c], y: Double(height - (150 + r * 110)))
+                CTLineDraw(CTLineCreateWithAttributedString(
+                    NSAttributedString(string: s, attributes: [.font: font])), ctx)
+            }
+        }
+        ctx.textPosition = CGPoint(x: headingX, y: Double(height) - headingBaseline)
+        CTLineDraw(CTLineCreateWithAttributedString(
+            NSAttributedString(string: headingText, attributes: [.font: font])), ctx)
+        drawn = ctx.makeImage()
+    }
+    func box(_ c: Int, _ r: Int, to: Double? = nil) -> Box {
+        let x0 = lefts[c] - 4, x1 = to ?? (lefts[c] + ink(columnText[c][r]) + 4)
+        return Box(x: x0 / Double(width), y: Double(150 + r * 110 - 36) / Double(height),
+                   width: (x1 - x0) / Double(width), height: 50 / Double(height))
+    }
+    var vision: [Obs] = []
+    for c in 0..<2 {
+        for r in 0..<6 where r != 3 { vision.append(Obs(boundingBox: box(c, r), text: columnText[c][r], confidence: 1)) }
+    }
+    let fused = Obs(boundingBox: box(0, 3, to: lefts[1] + ink(columnText[1][3]) + 4),
+                    text: columnText[0][3] + " " + columnText[1][3], confidence: 1)
+    let heading = Obs(boundingBox: Box(x: (headingX - 4) / Double(width), y: (headingBaseline - 36) / Double(height),
+                                       width: (ink(headingText) + 8) / Double(width), height: 50 / Double(height)),
+                      text: headingText, confidence: 1)
+    // DocLayout-YOLO's boxes sit on the ink: one region a column, each over the heading's row too.
+    let regions = [Box(x: 50.0 / Double(width), y: 100.0 / Double(height),
+                       width: (Double(lefts[0]) + 700 - 50) / Double(width), height: 830.0 / Double(height)),
+                   Box(x: 990.0 / Double(width), y: 100.0 / Double(height),
+                       width: 860.0 / Double(width), height: 830.0 / Double(height))]
+    let blocks = regions.map { Recogniser.ModelBlock(box: $0, label: Recogniser.visionRegionLabel, text: "") }
+    let lines = vision + [fused, heading]
+    if let image = drawn {
+        let settings = Prefs.Snapshot.current()
+        let cut = Recogniser.cutAtRegions(lines, blocks: blocks, of: image, settings: settings)
+        let got = cut.map { $0.text.lowercased() }
+        check("a row read across two regions side by side is read again as its two halves",
+              !got.contains(fused.text) && got.contains(columnText[0][3]) && got.contains(columnText[1][3])
+                  && cut.count == lines.count + 1, "\(got)")
+        check("…each half inside its own region, so the region's words go on it",
+              cut.filter { got.contains($0.text.lowercased()) && [columnText[0][3], columnText[1][3]]
+                  .contains($0.text.lowercased()) }
+                  .allSatisfy { half in regions.contains { Recogniser.regionHolds($0, half.boundingBox) } },
+              "\(cut.map(\.boundingBox))")
+        check("…a heading set across the gap, its ink over it, is left whole",
+              cut.contains { $0.text == headingText && $0.boundingBox.width == heading.boundingBox.width },
+              "\(got)")
+        check("…and every line held by one region keeps its box and words",
+              vision.allSatisfy { v in cut.contains { $0.text == v.text && $0.boundingBox.x == v.boundingBox.x
+                  && $0.boundingBox.width == v.boundingBox.width } }, "\(got)")
+        let one = Recogniser.cutAtRegions(lines, blocks: [blocks[0]], of: image, settings: settings)
+        check("…while with one region there is nothing to cut between", one.map(\.text) == lines.map(\.text),
+              "\(one.map(\.text))")
+
+        // Through the arrangement: a layout-only reader cuts the page into the two columns, Vision
+        // reads each, and the fused row's halves take their own column's words.
+        let dir = tmp.appendingPathComponent("c41-cut")
+        try? FileManager.default.removeItem(at: dir)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let shown = dir.appendingPathComponent("page.png")
+        if let dest = CGImageDestinationCreateWithURL(shown as CFURL, "public.png" as CFString, 1, nil) {
+            CGImageDestinationAddImage(dest, image, nil)
+            _ = CGImageDestinationFinalize(dest)
+        }
+        let rows = regions.map { b in String(format: "%.5f\\t%.5f\\t%.5f\\t%.5f\\t", b.x, b.y, b.x + b.width,
+                                            b.y + b.height) + Recogniser.visionRegionLabel + "\\t\\n" }.joined()
+        let script = dir.appendingPathComponent("layout.sh")
+        try? ("#!/bin/sh\nprintf '" + rows + "' > \"$2\"\n").write(to: script, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+        let aspect = Double(height) / Double(width)
+        let whole = try? Recogniser.regionedReading(of: lines, shown: shown, reader: script.path, aspect: aspect,
+                                                    settings: settings)
+        check("without the page to cut on, the arrangement leaves the fused row one line",
+              whole?.count == lines.count, "\(whole?.map(\.text) ?? [])")
+        let read = try? Recogniser.regionedReading(of: lines, shown: shown, reader: script.path, aspect: aspect,
+                                                   settings: settings, cutOn: image)
+        let readText = (read ?? []).map { $0.text.lowercased() }
+        check("with it, the regions arrangement publishes the fused row as two lines, one in each column",
+              read?.count == lines.count + 1 && readText.contains(columnText[0][3])
+                  && readText.contains(columnText[1][3]) && !readText.contains(fused.text), "\(readText)")
+    } else {
+        check("the two-column page for the region cut is drawn", false)
+    }
+}
+}  // end of section
+
 section("ocr-newspaper-detect: a newspaper page is told from print by Vision's lines alone") {
 
 do {

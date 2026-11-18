@@ -1045,7 +1045,8 @@ public enum Recogniser {
             return fitted
         }
         do {
-            return try modelPass(fitted, on: fitOn, shown: shown, settings: settings, isCancelled: isCancelled,
+            return try modelPass(fitted, on: fitOn, shown: shown, settings: settings, newspaper: kind == .newspaper,
+                                 isCancelled: isCancelled,
                                  onTextPage: { reading in
                                      // Only text worth a page; a reading of nothing over no lines adds none.
                                      guard !modelWords(reading).isEmpty else { return }
@@ -1070,7 +1071,7 @@ public enum Recogniser {
 
     /// The model's part of `recognisePage(at:)`: the arrangement set, over Vision's `fitted` lines.
     private static func modelPass(_ fitted: [SearchableWriter.Observation], on fitOn: CGImage, shown: URL,
-                                  settings: Prefs.Snapshot, isCancelled: () -> Bool,
+                                  settings: Prefs.Snapshot, newspaper: Bool, isCancelled: () -> Bool,
                                   onTextPage: (String) throws -> Void)
         throws -> [SearchableWriter.Observation] {
         // pk-upright. Vision reads sideways pixels, but alignment and layout work in an
@@ -1100,7 +1101,8 @@ public enum Recogniser {
                 line.region = o.region
                 return line
             }
-            let read = try modelReadingPass(lines, on: upright, shown: view, settings: settings,
+            // Not cut at its regions: a cut line could not be carried back to the page's own frame.
+            let read = try modelReadingPass(lines, on: upright, shown: view, settings: settings, cutAtRegions: false,
                                             isCancelled: isCancelled, onTextPage: onTextPage)
             guard read.count == fitted.count else {
                 throw Failure.modelReader("the upright reading changed the number of lines")
@@ -1111,7 +1113,8 @@ public enum Recogniser {
                                              region: original.region)
             }
         }
-        return try modelReadingPass(fitted, on: fitOn, shown: shown, settings: settings, isCancelled: isCancelled,
+        return try modelReadingPass(fitted, on: fitOn, shown: shown, settings: settings, cutAtRegions: newspaper,
+                                    isCancelled: isCancelled,
                                     onTextPage: onTextPage)
     }
 
@@ -1147,7 +1150,7 @@ public enum Recogniser {
     }
 
     private static func modelReadingPass(_ fitted: [SearchableWriter.Observation], on fitOn: CGImage, shown: URL,
-                                         settings: Prefs.Snapshot, isCancelled: () -> Bool,
+                                         settings: Prefs.Snapshot, cutAtRegions: Bool, isCancelled: () -> Bool,
                                          onTextPage: (String) throws -> Void)
         throws -> [SearchableWriter.Observation] {
         if settings.modelArrangement == .fill {
@@ -1161,7 +1164,8 @@ public enum Recogniser {
         if settings.modelArrangement == .regions {
             return try regionedReading(of: fitted, shown: shown, reader: settings.modelReader,
                                        aspect: Double(fitOn.height) / Double(fitOn.width),
-                                       settings: settings, isCancelled: isCancelled)
+                                       settings: settings, cutOn: cutAtRegions ? fitOn : nil,
+                                       isCancelled: isCancelled)
         }
         let reading = try modelReading(of: shown, reader: settings.modelReader, memoryGB: settings.modelMemoryGB,
                                        size: readingSize(fitted), isCancelled: isCancelled)
@@ -2586,18 +2590,12 @@ public enum Recogniser {
     /// regions are unchanged; only text changes.
     static func regionAligned(_ lines: [SearchableWriter.Observation], blocks: [ModelBlock],
                               aspect: Double) -> [SearchableWriter.Observation] {
-        func inside(_ b: SearchableWriter.BoundingBox, _ o: SearchableWriter.Observation) -> Bool {
-            let l = o.boundingBox
-            let cx = l.x + l.width / 2, cy = l.y + l.height / 2
-            guard cx >= b.x, cx <= b.x + b.width, cy >= b.y, cy <= b.y + b.height else { return false }
-            return min(l.x + l.width, b.x + b.width) - max(l.x, b.x) >= 0.75 * l.width
-        }
         var out = lines
         var taken = Set<Int>()
         for block in blocks {
             let words = modelWords(block.text)
             guard !words.isEmpty else { continue }
-            let members = lines.indices.filter { !taken.contains($0) && inside(block.box, lines[$0]) }
+            let members = lines.indices.filter { !taken.contains($0) && regionHolds(block.box, lines[$0].boundingBox) }
             guard !members.isEmpty else { continue }
             taken.formUnion(members)
             for (i, o) in zip(members, alignedReading(of: members.map { lines[$0] }, from: words, aspect: aspect)) {
@@ -2605,6 +2603,102 @@ public enum Recogniser {
             }
         }
         return out
+    }
+
+    /// Whether the region `b` takes the line `l` in `regionAligned`: its centre is in the
+    /// region, and three quarters of its width are too.
+    static func regionHolds(_ b: SearchableWriter.BoundingBox, _ l: SearchableWriter.BoundingBox) -> Bool {
+        let cx = l.x + l.width / 2, cy = l.y + l.height / 2
+        guard cx >= b.x, cx <= b.x + b.width, cy >= b.y, cy <= b.y + b.height else { return false }
+        return min(l.x + l.width, b.x + b.width) - max(l.x, b.x) >= 0.75 * l.width
+    }
+
+    /// `lines` with each upright line that runs from one layout region into the region
+    /// beside it, and that no region holds (`regionHolds`), read again as its two halves,
+    /// cut on the blank paper between the regions (`blankGutter`, `readHalves`), before
+    /// `regionAligned` puts the regions' words on them (W42.c41-newspaper-scans). On C41's
+    /// five newspaper scans Vision returned some rows as one line across two printed
+    /// columns (Kalispell 1939's `Esquire club at the Hopkins has hoen repudiated by the`),
+    /// and with half its width in each column's region such a line kept Vision's words
+    /// and its one run across the gutter: 30 rows over the five pages with the regions
+    /// arrangement off, 34 with it on, the same lines (`C41-FUSED-ACCURATE-2026-10-14.tsv`);
+    /// DocLayout-YOLO's regions put 14 of 35 on a boundary between two regions
+    /// (`LAYOUT-COMPARE-2026-10-16-fused.tsv`).
+    ///
+    /// Two regions are beside each other when each holds half the line's height or more,
+    /// the left one ends before the right one does, and they overlap by under a line height
+    /// across. The line has to reach a line height past the gap into each, as
+    /// `splitAtGutter` asks (`SearchableWriter.readsAcross`): a line overshooting its own
+    /// region's edge is left. The paper decides, as there: a row with ink across the gap,
+    /// as a heading's has between its words, is left whole, and so is one whose halves do
+    /// not both read. A gap narrower than a third of a line, two regions touching, is
+    /// asked as a third of a line around its middle. Each half is asked again, so a line
+    /// across three regions is cut twice; at most four cuts a line.
+    static func cutAtRegions(_ lines: [SearchableWriter.Observation], blocks: [ModelBlock], of image: CGImage,
+                             settings: Prefs.Snapshot, isCancelled: () -> Bool = { false })
+        -> [SearchableWriter.Observation] {
+        let w = image.width, h = image.height
+        guard w > 0, h > 0, blocks.count >= 2 else { return lines }
+        let line = lineHeight(of: lines, pageHeight: h)
+        let lineX = Double(line) / Double(w)
+        let boxes = blocks.map(\.box)
+        func overlap(_ a0: Double, _ a1: Double, _ b0: Double, _ b1: Double) -> Double {
+            max(0, min(a1, b1) - max(a0, b0))
+        }
+        // The gap a line is cut across, or nil when it lies across no two regions side by side.
+        func gap(_ l: SearchableWriter.BoundingBox) -> SearchableWriter.Gutter? {
+            guard !boxes.contains(where: { regionHolds($0, l) }) else { return nil }
+            let beside = boxes.filter { b in
+                overlap(l.y, l.y + l.height, b.y, b.y + b.height) >= l.height / 2
+                    && overlap(l.x, l.x + l.width, b.x, b.x + b.width) > 0
+            }.sorted { $0.x + $0.width / 2 < $1.x + $1.width / 2 }
+            // Every pair, not only neighbours: a region over the gutter, a headline's, may lie between them.
+            for (i, a) in beside.enumerated() {
+                for b in beside.dropFirst(i + 1) {
+                    let aEnd = a.x + a.width, bEnd = b.x + b.width
+                    guard aEnd < bEnd, a.x < b.x, aEnd - b.x < lineX else { continue }
+                    var from = min(aEnd, b.x), to = max(aEnd, b.x)
+                    if to - from < lineX / 3 {
+                        let mid = (from + to) / 2
+                        from = mid - lineX / 6
+                        to = mid + lineX / 6
+                    }
+                    let g = SearchableWriter.Gutter(from: from, to: to)
+                    if SearchableWriter.readsAcross(l, g, reach: lineX) { return g }
+                }
+            }
+            return nil
+        }
+        var level: UInt8??
+        var out: [SearchableWriter.Observation] = []
+        var added = Set<Int>()
+        for o in lines {
+            var pending = [(o, 0)]
+            var pieces: [SearchableWriter.Observation] = []
+            var cutHere = false
+            while let (p, cuts) = pending.popLast() {
+                guard !isCancelled(), cuts < 4, (p.quarterTurns ?? 0) == 0, let g = gap(p.boundingBox) else {
+                    pieces.append(p); continue
+                }
+                if level == nil { level = inkScan(of: image, strips: [])?.level }
+                guard let known = level ?? nil,
+                      let cut = blankGutter(under: p.boundingBox, near: g, of: image, level: known, lineX: lineX)
+                else { pieces.append(p); continue }
+                let halves = readHalves(of: p, cut: cut, of: image, lineHeight: line, settings: settings)
+                guard !halves.isEmpty else { pieces.append(p); continue }
+                cutHere = true
+                // Last first, since the stack takes from its end: the pieces stay left to right.
+                pending += halves.reversed().map { half -> (SearchableWriter.Observation, Int) in
+                    var t = half
+                    t.region = p.region
+                    return (t, cuts + 1)
+                }
+            }
+            if cutHere { added.formUnion(out.count..<(out.count + pieces.count)) }
+            out += pieces
+        }
+        // As in `splitAtGutter`: a half whose reading a taller line over it holds already is dropped.
+        return out.indices.filter { !added.contains($0) || !readElsewhere($0, in: out) }.map { out[$0] }
     }
 
     /// `regionAligned` over the page: the reader writes the regions of `shown` and each
@@ -2620,8 +2714,13 @@ public enum Recogniser {
     /// own reading of it (`visionRegionText`), so the arrangement runs with no model.
     /// Vision reads it on `shown`, the grey render when there is one: on the finer 1-bit
     /// bitmap instead, Helena 1941 / 1931's wrong words rose 930 -> 976 / 2179 -> 2298.
+    ///
+    /// Given `image`, the page Vision's lines were read on, a line lying across two regions
+    /// side by side is first cut between them (`cutAtRegions`), so each half takes its own
+    /// region's words. Only upright newspaper pages are given it (W42.c41-newspaper-scans);
+    /// everywhere else the lines keep their boxes and number, and only their text changes.
     static func regionedReading(of lines: [SearchableWriter.Observation], shown: URL, reader: String,
-                                aspect: Double, settings: Prefs.Snapshot = .current(),
+                                aspect: Double, settings: Prefs.Snapshot = .current(), cutOn image: CGImage? = nil,
                                 isCancelled: () -> Bool = { false })
         throws -> [SearchableWriter.Observation] {
         let raw = ModelRuntime.readers[reader] != nil || reader == ModelRuntime.visionRegions
@@ -2649,7 +2748,10 @@ public enum Recogniser {
             // A cancelled reading returns what it had; the last region's may be half of it.
             if isCancelled() { throw Failure.cancelled }
         }
-        return regionAligned(lines, blocks: blocks, aspect: aspect)
+        guard let image else { return regionAligned(lines, blocks: blocks, aspect: aspect) }
+        let cut = cutAtRegions(lines, blocks: blocks, of: image, settings: settings, isCancelled: isCancelled)
+        if isCancelled() { throw Failure.cancelled }
+        return regionAligned(cut, blocks: blocks, aspect: aspect)
     }
 
     /// The blocks `reader-regions.sh` writes, made in the app (C57, ie-layout): the page cut by
@@ -3555,41 +3657,8 @@ public enum Recogniser {
             guard let known = level ?? nil,
                   let cut = blankGutter(under: b, near: g, of: image, level: known, lineX: lineX)
             else { out.append(o); continue }
-            var halves: [SearchableWriter.Observation] = []
-            for s in [SearchableWriter.BoundingBox(x: b.x, y: b.y, width: cut.left - b.x,
-                                                   height: b.height),
-                      SearchableWriter.BoundingBox(x: cut.right, y: b.y, width: b.x + b.width - cut.right,
-                                                   height: b.height)] {
-                guard let rect = stretchCrop(s, pageWidth: w, pageHeight: h, lineHeight: line),
-                      let crop = image.cropping(to: CGRect(x: rect.left, y: rect.top,
-                                                           width: rect.right - rect.left,
-                                                           height: rect.bottom - rect.top))
-                else { halves = []; break }
-                var local = settings
-                local.minTextHeight = min(1, settings.minTextHeight * Double(h)
-                                            / Double(rect.bottom - rect.top))
-                // `stretchPiece` leaves y in the crop's rows, which `mergeBands` lifts;
-                // nothing merges these, so they are lifted here.
-                let rows = Double(rect.bottom - rect.top)
-                let piece = stretchPiece((try? recognise(crop, settings: local)) ?? [], of: s,
-                                         crop: rect, pageWidth: w, pageHeight: h).observations
-                    .map { p in
-                        SearchableWriter.Observation(
-                            boundingBox: SearchableWriter.BoundingBox(
-                                x: p.boundingBox.x,
-                                y: (Double(rect.top) + p.boundingBox.y * rows) / Double(h),
-                                width: p.boundingBox.width,
-                                height: p.boundingBox.height * rows / Double(h)),
-                            text: p.text, confidence: p.confidence,
-                            quarterTurns: p.quarterTurns)
-                    }
-                let read = Double(piece.reduce(0) { $0 + $1.text.count })
-                guard !piece.isEmpty, read >= 0.4 * s.width / b.width * Double(o.text.count)
-                else { halves = []; break }
-                halves += piece
-            }
-            let read = Double(halves.reduce(0) { $0 + $1.text.count })
-            if !halves.isEmpty, read >= 0.8 * Double(o.text.count) {
+            let halves = readHalves(of: o, cut: cut, of: image, lineHeight: line, settings: settings)
+            if !halves.isEmpty {
                 added.formUnion(out.count..<(out.count + halves.count))
                 out += halves
             } else {
@@ -3599,6 +3668,54 @@ public enum Recogniser {
         // A box taller than its row takes in a piece of the row beside it, which is
         // read already: `ble.` again, under `ble. And it was…` (C41).
         return out.indices.filter { !added.contains($0) || !readElsewhere($0, in: out) }.map { out[$0] }
+    }
+
+    /// The line `o` read again as two halves, `o`'s box up to `cut.left` and from
+    /// `cut.right`, each recognised on its own as an unread stretch is; empty, so that
+    /// the line is kept whole, when a half reads nothing or under 0.4 of its share of
+    /// `o`'s characters by width, or the two read under 0.8 of them between them
+    /// (invariant 1: the fused reading is kept rather than lose its text).
+    /// `splitAtGutter`'s and `cutAtRegions`'s.
+    static func readHalves(of o: SearchableWriter.Observation, cut: (left: Double, right: Double),
+                           of image: CGImage, lineHeight line: Int,
+                           settings: Prefs.Snapshot) -> [SearchableWriter.Observation] {
+        let w = image.width, h = image.height
+        let b = o.boundingBox
+        var halves: [SearchableWriter.Observation] = []
+        for s in [SearchableWriter.BoundingBox(x: b.x, y: b.y, width: cut.left - b.x,
+                                               height: b.height),
+                  SearchableWriter.BoundingBox(x: cut.right, y: b.y, width: b.x + b.width - cut.right,
+                                               height: b.height)] {
+            guard let rect = stretchCrop(s, pageWidth: w, pageHeight: h, lineHeight: line),
+                  let crop = image.cropping(to: CGRect(x: rect.left, y: rect.top,
+                                                       width: rect.right - rect.left,
+                                                       height: rect.bottom - rect.top))
+            else { return [] }
+            var local = settings
+            local.minTextHeight = min(1, settings.minTextHeight * Double(h)
+                                        / Double(rect.bottom - rect.top))
+            // `stretchPiece` leaves y in the crop's rows, which `mergeBands` lifts;
+            // nothing merges these, so they are lifted here.
+            let rows = Double(rect.bottom - rect.top)
+            let piece = stretchPiece((try? recognise(crop, settings: local)) ?? [], of: s,
+                                     crop: rect, pageWidth: w, pageHeight: h).observations
+                .map { p in
+                    SearchableWriter.Observation(
+                        boundingBox: SearchableWriter.BoundingBox(
+                            x: p.boundingBox.x,
+                            y: (Double(rect.top) + p.boundingBox.y * rows) / Double(h),
+                            width: p.boundingBox.width,
+                            height: p.boundingBox.height * rows / Double(h)),
+                        text: p.text, confidence: p.confidence,
+                        quarterTurns: p.quarterTurns)
+                }
+            let read = Double(piece.reduce(0) { $0 + $1.text.count })
+            guard !piece.isEmpty, read >= 0.4 * s.width / b.width * Double(o.text.count)
+            else { return [] }
+            halves += piece
+        }
+        let read = Double(halves.reduce(0) { $0 + $1.text.count })
+        return !halves.isEmpty && read >= 0.8 * Double(o.text.count) ? halves : []
     }
 
     /// Where a line read across `g` is cut: the middle of a run of blank paper under its

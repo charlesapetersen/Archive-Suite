@@ -6,6 +6,10 @@
 //
 // Prints one line a file: bytes, seconds, outcome and the input's name. The defaults are this tool's own domain,
 // never Vision OCR's, so the owner's settings are neither read nor changed.
+//
+// `VISIONOCR_PDF_NEWSPAPER=<reader>` reads newspaper pages in the regions arrangement with that reader
+// (`paddleocr-vl`, `falcon-ocr`, or `vision` for Vision on the layout regions), as the accurate mode routes them:
+// how W42.c41-newspaper-scans publishes C41's five scans with the mode on. Unset, every page is Vision's alone.
 
 @testable import VisionOCRKit
 import Foundation
@@ -24,6 +28,12 @@ d.set(Prefs.Mode.searchablePDF.rawValue, forKey: Prefs.mode)
 d.set(true, forKey: Prefs.rebuildImages)
 d.set(true, forKey: Prefs.useJBIG2)
 d.set(false, forKey: Prefs.warnDigitalText)
+d.removeObject(forKey: Prefs.newspaperModelArrangement)
+d.removeObject(forKey: Prefs.newspaperModelReader)
+if let reader = ProcessInfo.processInfo.environment["VISIONOCR_PDF_NEWSPAPER"], !reader.isEmpty {
+    d.set(Prefs.ModelArrangement.regions.rawValue, forKey: Prefs.newspaperModelArrangement)
+    d.set(reader, forKey: Prefs.newspaperModelReader)
+}
 
 var failed = false
 for path in args.dropFirst() {
