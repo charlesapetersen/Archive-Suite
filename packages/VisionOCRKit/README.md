@@ -26,7 +26,7 @@ python3 ops/autonomous/heavy-run.py run -- swift test -c release -Xswiftc -enabl
   --package-path packages/VisionOCRKit
 ```
 
-`visionocr-pdf <out-dir> <file>...` (`Tools/pdf/`) makes Vision OCR 1.16.0's searchable PDF of each file with its defaults, headless, and prints bytes and seconds: the size baseline for Archive Processor's output (W42.int-s5, `ArchiveProcessor/scripts/measure-output.sh`).
+`visionocr-pdf <out-dir> <file>...` (`Tools/pdf/`) makes Vision OCR 1.16.0's searchable PDF of each file with its defaults, headless, and prints bytes and seconds: the size baseline for Archive Processor's output (W42.int-s5, `ArchiveProcessor/scripts/measure-output.sh`). With `VISIONOCR_PDF_NEWSPAPER=<reader>` (`paddleocr-vl`, `falcon-ocr`, `vision`) it reads newspaper pages in the regions arrangement, as the accurate mode does (W42.c41-newspaper-scans).
 
 `CompressedPage.write(image:lines:ink:pageSize:to:)` writes one compressed searchable page with the host's own
 `TextLayer.Lines`, without recognising text. It uses the engine's shipped defaults and the JBIG2/MRC route;

@@ -2627,13 +2627,22 @@ public enum Recogniser {
     ///
     /// Two regions are beside each other when each holds half the line's height or more,
     /// the left one ends before the right one does, and they overlap by under a line height
-    /// across. The line has to reach a line height past the gap into each, as
-    /// `splitAtGutter` asks (`SearchableWriter.readsAcross`): a line overshooting its own
-    /// region's edge is left. The paper decides, as there: a row with ink across the gap,
-    /// as a heading's has between its words, is left whole, and so is one whose halves do
-    /// not both read. A gap narrower than a third of a line, two regions touching, is
-    /// asked as a third of a line around its middle. Each half is asked again, so a line
-    /// across three regions is cut twice; at most four cuts a line.
+    /// across. The line has to reach a line height past the gap into each: a line
+    /// overshooting its own region's edge is left. The paper decides, as in `splitAtGutter`:
+    /// a row with ink across the gap, as a heading's has between its words, is left whole,
+    /// and so is one whose halves do not both read. A gap narrower than a third of a line,
+    /// two regions touching, is asked as a third of a line around its middle. A headline no
+    /// region holds, set large across two touching regions, can have a word space that
+    /// wide on the boundary, so halves read over 1.4 of the page's line height tall are
+    /// refused and the line kept whole: a fused row is body type and its halves read as
+    /// body lines (0.6-1.2 of the line on Kalispell 1939). Capitals read only their cap
+    /// height, so a headline in capitals under about twice the body's size can still be cut
+    /// at a word space; its words stay, as two lines. The line's own box is no guide, since
+    /// Vision's fused boxes are taller than a row (Kalispell's 0.0125-0.0144 of the page
+    /// against a median line of 0.007): asking a third of that, the narrow gutters there
+    /// refused 6 of 16 rows. Nor are its word spaces: asked to be twice as wide as them, the
+    /// paper at 31 of the five pages' 73 crossings was refused. Each half is asked again,
+    /// so a line across three regions is cut twice; pieces are cut four deep at most.
     static func cutAtRegions(_ lines: [SearchableWriter.Observation], blocks: [ModelBlock], of image: CGImage,
                              settings: Prefs.Snapshot, isCancelled: () -> Bool = { false })
         -> [SearchableWriter.Observation] {
@@ -2648,6 +2657,7 @@ public enum Recogniser {
         // The gap a line is cut across, or nil when it lies across no two regions side by side.
         func gap(_ l: SearchableWriter.BoundingBox) -> SearchableWriter.Gutter? {
             guard !boxes.contains(where: { regionHolds($0, l) }) else { return nil }
+            let narrowest = lineX / 3
             let beside = boxes.filter { b in
                 overlap(l.y, l.y + l.height, b.y, b.y + b.height) >= l.height / 2
                     && overlap(l.x, l.x + l.width, b.x, b.x + b.width) > 0
@@ -2658,13 +2668,14 @@ public enum Recogniser {
                     let aEnd = a.x + a.width, bEnd = b.x + b.width
                     guard aEnd < bEnd, a.x < b.x, aEnd - b.x < lineX else { continue }
                     var from = min(aEnd, b.x), to = max(aEnd, b.x)
-                    if to - from < lineX / 3 {
+                    if to - from < narrowest {
                         let mid = (from + to) / 2
-                        from = mid - lineX / 6
-                        to = mid + lineX / 6
+                        from = mid - narrowest / 2
+                        to = mid + narrowest / 2
                     }
-                    let g = SearchableWriter.Gutter(from: from, to: to)
-                    if SearchableWriter.readsAcross(l, g, reach: lineX) { return g }
+                    if from - l.x > lineX, l.x + l.width - to > lineX {
+                        return SearchableWriter.Gutter(from: from, to: to)
+                    }
                 }
             }
             return nil
@@ -2672,7 +2683,20 @@ public enum Recogniser {
         var level: UInt8??
         var out: [SearchableWriter.Observation] = []
         var added = Set<Int>()
-        for o in lines {
+        // A half's crop reaches a line above and below its row, and Vision's fused boxes are
+        // taller than a row, so a half can come back with a neighbouring row read again: on
+        // Kalispell 1939, `ed by the Esquire club at the` beside the row's own line. A piece
+        // over half of whose box another of the page's lines covers is that line's, and goes.
+        func repeats(_ piece: SearchableWriter.BoundingBox, besides index: Int) -> Bool {
+            let area = piece.width * piece.height
+            return area > 0 && lines.indices.contains { j in
+                guard j != index else { return false }
+                let b = lines[j].boundingBox
+                return overlap(piece.x, piece.x + piece.width, b.x, b.x + b.width)
+                    * overlap(piece.y, piece.y + piece.height, b.y, b.y + b.height) >= area / 2
+            }
+        }
+        for (index, o) in lines.enumerated() {
             var pending = [(o, 0)]
             var pieces: [SearchableWriter.Observation] = []
             var cutHere = false
@@ -2685,7 +2709,12 @@ public enum Recogniser {
                       let cut = blankGutter(under: p.boundingBox, near: g, of: image, level: known, lineX: lineX)
                 else { pieces.append(p); continue }
                 let halves = readHalves(of: p, cut: cut, of: image, lineHeight: line, settings: settings)
-                guard !halves.isEmpty else { pieces.append(p); continue }
+                    .filter { !repeats($0.boundingBox, besides: index) }
+                // Invariant 1 again, on what is left: the line is kept whole rather than lose text.
+                guard halves.count >= 2,
+                      Double(halves.reduce(0) { $0 + $1.text.count }) >= 0.8 * Double(p.text.count),
+                      halves.allSatisfy({ $0.boundingBox.height * Double(h) <= 1.4 * Double(line) })
+                else { pieces.append(p); continue }
                 cutHere = true
                 // Last first, since the stack takes from its end: the pieces stay left to right.
                 pending += halves.reversed().map { half -> (SearchableWriter.Observation, Int) in

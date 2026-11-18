@@ -14664,17 +14664,69 @@ do {
         check("a row read across two regions side by side is read again as its two halves",
               !got.contains(fused.text) && got.contains(columnText[0][3]) && got.contains(columnText[1][3])
                   && cut.count == lines.count + 1, "\(got)")
+        let halves = cut.filter { [columnText[0][3], columnText[1][3]].contains($0.text.lowercased()) }
         check("…each half inside its own region, so the region's words go on it",
-              cut.filter { got.contains($0.text.lowercased()) && [columnText[0][3], columnText[1][3]]
-                  .contains($0.text.lowercased()) }
-                  .allSatisfy { half in regions.contains { Recogniser.regionHolds($0, half.boundingBox) } },
-              "\(cut.map(\.boundingBox))")
+              halves.count == 2 && zip(halves, regions).allSatisfy { Recogniser.regionHolds($1, $0.boundingBox) },
+              "\(halves.map(\.boundingBox))")
         check("…a heading set across the gap, its ink over it, is left whole",
               cut.contains { $0.text == headingText && $0.boundingBox.width == heading.boundingBox.width },
               "\(got)")
         check("…and every line held by one region keeps its box and words",
               vision.allSatisfy { v in cut.contains { $0.text == v.text && $0.boundingBox.x == v.boundingBox.x
                   && $0.boundingBox.width == v.boundingBox.width } }, "\(got)")
+        // Two regions touching, and a headline no region holds set in capitals three times the
+        // body's size across them, a word space on the boundary: its halves read as large type.
+        let big = CTFontCreateWithName("Times-Roman" as CFString, 120, nil)
+        func bigInk(_ s: String) -> Double {
+            Double(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(
+                NSAttributedString(string: s, attributes: [.font: big])), nil, nil, nil))
+        }
+        let words = ("FAIR", "OPENS")
+        let space = bigInk(words.0 + " " + words.1) - bigInk(words.0) - bigInk(words.1)
+        let bigX = 950 - bigInk(words.0) - space / 2, bigBaseline = 960.0
+        var headlined: CGImage?
+        if let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                               bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(),
+                               bitmapInfo: CGImageAlphaInfo.none.rawValue) {
+            ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            ctx.setFillColor(gray: 1, alpha: 1)
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: 230))
+            ctx.setFillColor(gray: 0, alpha: 1)
+            ctx.textPosition = CGPoint(x: bigX, y: Double(height) - bigBaseline)
+            CTLineDraw(CTLineCreateWithAttributedString(
+                NSAttributedString(string: words.0 + " " + words.1, attributes: [.font: big])), ctx)
+            headlined = ctx.makeImage()
+        }
+        let headline = Obs(boundingBox: Box(x: (bigX - 6) / Double(width), y: (bigBaseline - 100) / Double(height),
+                                            width: (bigInk(words.0 + " " + words.1) + 12) / Double(width),
+                                            height: 110 / Double(height)),
+                           text: words.0 + " " + words.1, confidence: 1)
+        let touching = [Box(x: 50.0 / Double(width), y: 100.0 / Double(height), width: 900.0 / Double(width),
+                            height: 895.0 / Double(height)),
+                        Box(x: 950.0 / Double(width), y: 100.0 / Double(height), width: 900.0 / Double(width),
+                            height: 895.0 / Double(height))]
+            .map { Recogniser.ModelBlock(box: $0, label: Recogniser.visionRegionLabel, text: "") }
+        let large = headlined.map {
+            Recogniser.cutAtRegions(vision + [headline], blocks: touching, of: $0, settings: settings)
+        }
+        check("…and so is a large headline across two touching regions, its halves read taller than body lines",
+              headlined != nil && large?.contains { $0.text == headline.text } == true
+                  && large?.count == vision.count + 1, "\(large?.map(\.text) ?? [])")
+        // A fused box two rows tall, as Vision's are (Kalispell 1939): each half's reading holds the
+        // row below too, which Vision has as lines of its own, here misread. They are not published twice.
+        let misread = vision.map { o -> Obs in
+            guard let r = (0..<2).compactMap({ columnText[$0].firstIndex(of: o.text) }).first, r == 4 else { return o }
+            return Obs(boundingBox: o.boundingBox, text: o.text.replacingOccurrences(of: "e", with: "c"), confidence: 1)
+        }
+        let tall = Obs(boundingBox: Box(x: fused.boundingBox.x, y: fused.boundingBox.y, width: fused.boundingBox.width,
+                                        height: 160 / Double(height)),
+                       text: fused.text, confidence: 1)
+        let twoRows = Recogniser.cutAtRegions(misread + [tall], blocks: blocks, of: image, settings: settings)
+        let twoRowsText = twoRows.map { $0.text.lowercased() }
+        check("…a half read with the row below it keeps only its own row, the row below being Vision's lines already",
+              twoRowsText.contains(columnText[0][3]) && twoRowsText.contains(columnText[1][3])
+                  && !twoRowsText.contains(columnText[0][4]) && !twoRowsText.contains(columnText[1][4])
+                  && twoRows.count == misread.count + 2, "\(twoRowsText)")
         let one = Recogniser.cutAtRegions(lines, blocks: [blocks[0]], of: image, settings: settings)
         check("…while with one region there is nothing to cut between", one.map(\.text) == lines.map(\.text),
               "\(one.map(\.text))")
