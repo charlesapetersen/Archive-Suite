@@ -287,6 +287,19 @@ def markdown(result):
               "- `layout-photo/regions/pp.json`: detector rectangles and page dimensions.",
               "- `layout-order/vision/newsbench__*.json`: line rectangles and page dimensions; text ignored.", "",
               "The companion JSON contains numeric per-page measures and counts, no transcriptions or pixels.", ""]
+    from seg_card import card
+    lines += card("None. The reference for coverage is Apple Vision's own line boxes, not a hand-drawn truth of where "
+                  "the writing is, so writing Vision missed is invisible here and a line box may hold no ink.",
+                  "All 15 L9 newspaper scans, the bench's fixed set (at most 12 items, almost all one collection); "
+                  "nothing chosen by the detector or by Vision.",
+                  "The detector's raw rectangles against the app's padded pixel crops and its partition, on the same "
+                  "cached detection (PP-DocLayoutV3, 1,024px, confidence 0.5) and the same Vision lines.",
+                  "One cached detection, deterministic geometry: no rerun floor and no interval. With 15 pages, one "
+                  "page is 6.7 points of any share above.",
+                  "Geometry only: how much of Vision's line area the crops cover and which pages the fill rules would "
+                  "send to a whole-page reading. It does not measure OCR accuracy, the cost of the fill reading, "
+                  "photographed newspapers or the best floor; the partition's OCR evidence is separate "
+                  "(W46.layout-partition-score, W46.layout-partition-fix).")
     return "\n".join(lines)
 
 

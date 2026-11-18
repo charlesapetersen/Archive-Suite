@@ -61,3 +61,11 @@ Inputs beneath `~/Library/Caches/ArchiveSuiteRehearsal` (or `--cache`):
 - `layout-order/vision/newsbench__*.json`: line rectangles and page dimensions; text ignored.
 
 The companion JSON contains numeric per-page measures and counts, no transcriptions or pixels.
+
+## Measurement card
+
+- **Truth.** None. The reference for coverage is Apple Vision's own line boxes, not a hand-drawn truth of where the writing is, so writing Vision missed is invisible here and a line box may hold no ink.
+- **Selection.** All 15 L9 newspaper scans, the bench's fixed set (at most 12 items, almost all one collection); nothing chosen by the detector or by Vision.
+- **Comparison.** The detector's raw rectangles against the app's padded pixel crops and its partition, on the same cached detection (PP-DocLayoutV3, 1,024px, confidence 0.5) and the same Vision lines.
+- **Noise.** One cached detection, deterministic geometry: no rerun floor and no interval. With 15 pages, one page is 6.7 points of any share above.
+- **Scope.** Geometry only: how much of Vision's line area the crops cover and which pages the fill rules would send to a whole-page reading. It does not measure OCR accuracy, the cost of the fill reading, photographed newspapers or the best floor; the partition's OCR evidence is separate (W46.layout-partition-score, W46.layout-partition-fix).

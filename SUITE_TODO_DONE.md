@@ -16366,3 +16366,29 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W46.kit-continuation-replay -->
 - [x] **W40.reader-search-filetype — filter Advanced Search by file type [S]** · §Archive Reader — owner's notes (lane: reader) — SHIPPED 2026-11-17. Owner's Reader notes, 2026-11-17: e.g. leave out everything that is only a JPEG. Advanced Search (and so a smart folder) has a **File type** row beside Read state: is / is not, with a picker of PDF, JPEG, PNG, TIFF, HEIC, GIF and BMP, tested against `ArchiveFile.fileType` (the library's extension label, PDF for a PDF). JPG folds into JPEG, TIF into TIFF and HEIF into HEIC, so "is not JPEG" leaves out .jpg and .jpeg alike; a label outside the list passes every "is not". Not the Box/Folder item type, which is a tag. `SearchRule.fileType` decodes with a PDF default, so every saved smart folder loads unchanged (the November fixture passes untouched); the new shape is frozen as `Fixtures/saved-searches-2026-11-filetype.json` (built by `SavedSearchFixtures.november2026FileType`, now `newest`), and the coverage test also requires every file-type choice. Tests: `AdvancedSearchTests.testFileTypeIsAndIsNot` (is/is not, folding, prepared path, decode default, round trip); the whole Reader unit bundle passes (902 tests, DeepLinkTests skipped as usual); in the VM, `AdvancedSearchUITests.testFileTypeRowLeavesOutTheJPEG` passes (the fixture's one JPEG: "is JPEG" 1 document, "is not JPEG" 11 of 12; screenshot `uitest-w40-advanced-filetype-row.png` checked by eye). No migration written because there is nothing to migrate. No bench cache used.
   <!-- /W40.reader-search-filetype -->
+- [x] **W46.p15-score-hygiene — exclude unknown calibration gaps, add three cards and correct the dependent p-value [S]** · §Document processing review — W46 · SHIPPED 2026-11-17
+  (lane: segbench). Measurement review 2026-11-15, P15-4/P15-5; offline, $0, no model, upload or paid run.
+  `ocr_logprob.seg_gaps` now builds its rows in `gap_rows`, which leaves out the owner's unsure gaps (`score.doc_unsure`)
+  as well as photo gaps, as `score.risk_coverage` does; the self-test checks that an unsure gap is neither agreement nor
+  error. Rescored from the cached FarmShare answers (`ocr_logprob.py seg`): test 313 gaps (was 315), 129 boundaries
+  (130), 25 wrong (27; both RG165 unknowns, 79|80 and 99|100, had been counted as errors); AUC P(new) against a boundary
+  0.970 (0.966), low confidence against wrong 0.744 (0.733), disagreement 0.731 (0.714); raw Brier 0.054 (0.060), ECE
+  0.048 (0.048); calibrated Brier 0.058 (0.063), ECE 0.061 (0.060); 20 wrong at calibrated P >= 0.5 (22). RG165 is now
+  75 gaps, 1 wrong, so its per-box AUC of 1.000 rests on one error. Development unchanged. **The direction stands:**
+  isotonic calibration on development makes the test Brier and ECE worse; the report now prints that verdict from the
+  figures. The hand-written summary line in `ocr_logprob.py report` / `ocr-logprob.md` carried stale test figures (AUC
+  0.70) and is corrected to these. Generator-owned measurement cards: `ocr-logprob-seg.md` (`seg_report`),
+  `kind-churn.md` (`kind_churn.render`, classifier self-consistency, no per-page hand truth; new `--render` rewrites
+  the report from the committed JSON, used here so the classifier did not rerun) and `layout-coverage-fallback.md`
+  (`markdown`, geometry only, regenerated from the cache with identical figures). Not on the bench page, so no
+  ArchiveOCRBench rebuild.
+  **Correction to W46.date-route-pipeline-8b (append-only, so recorded here):** its DONE account justified the run with
+  the image step's "4 up and 0 down" on the 27B's trace and "5 and 0" on Gemini's, "9 and 0 pooled, p about 0.004". Both
+  traces were scored on the same 91 documents, so the nine are not independent and the pooled binomial p is not valid.
+  The committed JSON keeps only counts, not which documents, so no document-grouped test was computed; the evidence is
+  the two separate paired sign tests, p 0.0625 (Gemini) and 0.125 (the 27B), each inside the rerun floor. This changes
+  only the reason given for running the 8B; its measured results stand. No live repetition of the pooled figure was
+  found outside that archived entry (`date-route-pipeline.md` already gives the separate p-values). P15-1's
+  conditional-exactness question does not reach these three reports beyond the card's pointer to it.
+  Bench cache: nothing written, nothing kept.
+  <!-- /W46.p15-score-hygiene -->

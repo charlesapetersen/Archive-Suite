@@ -11,3 +11,11 @@ Made by `scripts/segbench/kind_churn.py` (method in its docstring): the shipped 
 - Their median confidence is 0.765 against 0.988 for all pages; **17 of the 29 are below the app's 0.8 floor**, against 78 of all 848 pages (9.2%).
 
 A document prior used only below the floor could change at most the minority pages below it; those above it would need the prior to overrule a confident call, which the K note's design does not propose.
+
+## Measurement card
+
+- **Truth.** None for the page kind: these boxes have no per-page hand or form truth, so this is the classifier's consistency with itself inside a document, not its accuracy, and a change counted may be a real change of hand (a typed letter with a printed enclosure) or a classifier error. The documents are the owner's segmentation truth for Dean, Deaver, Herrnstein, Stanton and RG165; at the gaps the owner left unsure the document split follows the label the truth file carries, which nobody has confirmed. The classifier's own held-out accuracy is reported separately (`kind-classifier.md`).
+- **Selection.** Every document page of the five owner boxes, label photos excluded; nothing chosen by the classifier.
+- **Comparison.** None between routes: one classifier, the one the app ships, against the floor the app uses (0.8).
+- **Noise.** One deterministic run, no interval and no rerun floor; the per-box counts are small (RG165 has 15 multi-page documents), so the box-to-box differences are not a finding.
+- **Scope.** How much a document prior applied below the floor could change, which decides whether building one is worth it. It does not measure how often the classifier is right, whether a churned document is wrong, or what any change would do to OCR or segmentation.
