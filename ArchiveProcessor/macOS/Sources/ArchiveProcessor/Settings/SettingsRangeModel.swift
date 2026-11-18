@@ -300,7 +300,7 @@ extension SettingsSheetModel {
             together = .init(x: max(0, usd) / units * 1000, y: base * scale, text: text)
         }
 
-        let kit = Self.rangeKit(stage.id, solution: s, answers: a, base: cmp.base, words: words)
+        let kit = Self.rangeKit(stage.id, solution: s, words: words)
 
         let ceilingText: String? = leftPer1000.map { per in
             if a.ceilingUSD == 0 { return "Red line: you chose to spend nothing, so only free choices fit." }
@@ -392,27 +392,15 @@ extension SettingsSheetModel {
     }
 
     /// The kit's after-training points for this chart (note 12 §3, `13-profile-tests.md` F), with each condition.
-    private static func rangeKit(_ stage: String, solution s: SettingsSolution, answers a: SettingsAnswers,
-                                 base: Double?, words: Words) -> [SettingsRangeChart.KitPoint] {
-        let home = ["kit-hands-ppocrv6-ft": "reading", "kit-seg-lora-mac": "segmentation",
-                    "kit-seg-student-tags": "segmentation", "seg-2b-lora-k200": "segmentation"]
+    private static func rangeKit(_ stage: String, solution s: SettingsSolution,
+                                 words: Words) -> [SettingsRangeChart.KitPoint] {
+        let home = ["kit-seg-lora-mac": "segmentation", "kit-seg-student-tags": "segmentation",
+                    "seg-2b-lora-k200": "segmentation"]
         guard let kit = words.table.stage("training-kit") else { return [] }
-        // The handwriting fine-tune improves one reader; where another reads the handwriting it is not shown (F).
-        return s.afterTraining.filter { home[$0.id] == stage && !$0.reason.hasPrefix("shown only where") }.compactMap { p in
+        return s.afterTraining.filter { home[$0.id] == stage }.compactMap { p in
             guard let r = kit.route(p.id) else { return nil }
             var measured: String?
-            var y: Double?
             switch p.id {
-            case "kit-hands-ppocrv6-ft":
-                if let g = r.figure("handwritten-one-hand-160-lines") {
-                    let n = r.figures["handwritten-one-hand-160-lines"]?["n"]?.double.map { " (\(Int($0)) test pages)" } ?? ""
-                    measured = String(format: "about %.1f more characters right in 100 on one person's handwriting, after "
-                                      + "160 corrected lines", g) + n + "; fewer lines gain less"
-                    // On the reading chart: the gain, on the handwritten share of the user's mix.
-                    let kinds = ["typewritten", "printed", "handwritten"]
-                    let total = kinds.reduce(0) { $0 + (a.mix[$1] ?? 0) }
-                    if p.shown, let base, total > 0 { y = base + g * (a.mix["handwritten"] ?? 0) / total }
-                }
             case "kit-seg-student-tags":
                 if let v = r.figure("owner-heldout-box-sasha") {
                     let n = r.figures["owner-heldout-box-sasha"]?["n"]?.double.map { Int($0) } ?? 0
@@ -439,14 +427,13 @@ extension SettingsSheetModel {
             default: break
             }
             return SettingsRangeChart.KitPoint(id: p.id, name: Self.kitName(p.id, r), measured: measured,
-                                               condition: Self.kitCondition(p.reason), y: y, caveats: r.caveats,
+                                               condition: Self.kitCondition(p.reason), y: nil, caveats: r.caveats,
                                                licence: r.licence)
         }
     }
 
     static func kitName(_ id: String, _ r: SettingsRouteTable.Route) -> String {
         [
-            "kit-hands-ppocrv6-ft": "kraken PP-OCRv6 trained on lines you corrected in one person's hand, on this Mac",
             "kit-seg-lora-mac": "The document finder trained on this Mac",
             "kit-seg-student-tags": "A document finder trained on your collection's own tags or folders, on a computing cluster",
             "seg-2b-lora-k200": "The app's document finder adapted to your papers, on a computing cluster",
@@ -455,17 +442,6 @@ extension SettingsSheetModel {
 
     /// The solver's kit reasons (`SettingsSolver.kitPoints`) in the sheet's words.
     static func kitCondition(_ r: String) -> String {
-        if r.hasPrefix("shown only where the handwriting reader is kraken") {
-            return "Shown only when handwriting is read by kraken PP-OCRv6 on this Mac, the reader it improves."
-        }
-        if let m = r.range(of: #"^needs 80 corrected lines of one hand \((\d+) so far"#, options: .regularExpression) {
-            let n = r[m].split(separator: "(").last?.split(separator: " ").first ?? "0"
-            return "Appears once you have corrected 80 lines written by one person (\(n) so far); 160 is the aim."
-        }
-        if r.hasPrefix("after training on") {
-            return "Can be trained now from your corrected lines; it is used only after it passes a check on pages it "
-                + "never saw."
-        }
         if r.hasPrefix("not offered: not measured to fit") {
             return "Not offered: training it on a Mac has not been shown to fit in memory."
         }

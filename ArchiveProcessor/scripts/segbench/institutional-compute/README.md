@@ -261,13 +261,9 @@ measured notes are a record of those jobs. Historical `fs-*` bench method keys a
 ## Your corrections: how many you have
 
 Archive Processor keeps what you settle in a review with the collection. That includes every boundary you checked or
-changed in a window-segmented run, and, once the line-correction screen exists, every handwriting line you correct.
-They are kept in the output folder's hidden `.archivesuite/corrections/`, in the format given in
-`SPEC/collection-settings.md` §"The review records". The two after-training routes wait on these counts:
-
-- The segmentation continuation needs 200 gaps of one material ruled on by a person. Gaps you left as proposed do
-  not count.
-- The handwriting fine-tune needs 80 corrected lines of one hand, and 160 is the target.
+changed in a window-segmented run. They are kept in the output folder's hidden `.archivesuite/corrections/`, in the
+format given in `SPEC/collection-settings.md` §"The review records". The segmentation continuation waits on this
+count: it needs 200 gaps of one material ruled on by a person. Gaps you left as proposed do not count.
 
 ```bash
 python3 kit_corrections.py count "/path/to/Box 1" "/path/to/Box 2"           # each collection its own material
@@ -340,8 +336,6 @@ model you train carries its base model's licence; the material you train it on m
 | Model or tool | What the kit uses it for | Licence |
 |---|---|---|
 | Qwen3.5 (2B, 4B; the 27B teacher) | the segmentation students `train_seg.py` trains, and their teacher | Apache-2.0 |
-| kraken | the handwriting fine-tune's line detection (blla), training and reading | Apache-2.0 |
-| Benjamin Kiessling's kraken port of PP-OCRv6 medium ([Zenodo 10.5281/zenodo.21788410](https://doi.org/10.5281/zenodo.21788410)) | the base of the handwriting fine-tune on the Mac | Apache-2.0 |
 | doc-split-v1 (`nutrientdocs/doc-split-v1`) | the laptop segmenter the bench measured beside the students | Apache-2.0 |
 | mlx-vlm | converting a trained student for the Mac (`train_seg.py mac`) | MIT |
 | GLM-OCR (`zai-org/GLM-OCR`) | the layout-first newspaper reader (`download.sh glm-ocr`) | MIT |

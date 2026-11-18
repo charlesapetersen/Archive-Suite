@@ -63,17 +63,6 @@ class Count(unittest.TestCase):
         (r,) = self.rows()
         self.assertTrue(r["gaps"]["continuation_offered"])
 
-    def test_lines_per_hand(self):
-        lines = [{"page": {"name": "p.jpg", "sha256": "s"}, "line": i, "boundary": [], "recognised": "x",
-                  "recognisedBy": "ocr-kraken-ppocrv6", "corrected": "y", "hand": "A. L." if i < 80 else None}
-                 for i in range(81)]
-        write(self.root / "a", "lines-1.json", {"schemaVersion": 1, "kind": "lines", "runID": "1",
-                                               "recordedAt": "2026-11-01T00:00:00Z",
-                                               "owner": {"collectionID": "A", "collectionName": "Box 1"}, "lines": lines})
-        (r,) = self.rows()
-        self.assertEqual([(h["hand"], h["lines"], h["fine_tune_offered"]) for h in r["lines"]],
-                         [("", 1, False), ("A. L.", 80, True)])
-
     def test_unsafe_or_unknown_files_are_skipped(self):
         write(self.root / "a", "gaps-1.json", gaps_record("1", "2026-11-01T00:00:00Z", "A", [gap(0, "checked")]))
         c = self.root / "a" / ".archivesuite" / "corrections"
@@ -96,11 +85,8 @@ class Count(unittest.TestCase):
         write(self.root / "a", "gaps-2.json", dict(gaps_record("2", "2026-11-02T00:00:00Z", "A", [gap(4, "checked")]),
                                                   schemaVersion="1"))
         write(self.root / "a", "gaps-3.json", dict(gaps_record("3", 5, "A", [gap(6, "checked")])))
-        write(self.root / "a", "lines-4.json", {"schemaVersion": 1, "kind": "lines", "runID": "4",
-                                               "recordedAt": "2026-11-01T00:00:00Z", "owner": {"collectionID": "A"},
-                                               "lines": [{"page": "p", "line": 0}, {"page": {"name": "p"}, "line": "x"}, 3]})
         (r,) = self.rows()
-        self.assertEqual((r["gaps"]["ruled"], r["lines"]), (1, []))
+        self.assertEqual(r["gaps"]["ruled"], 1)
 
     def test_a_missing_hash_never_splits_a_pair(self):
         unhashed = gap(0, "accepted")

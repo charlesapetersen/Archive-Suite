@@ -2,8 +2,8 @@
 # Key-free ($0) self-test of the collection's review records (W46.kit-corrections-store): runs
 # ReviewCorrectionsTestDriver headless, which checks how a run's reviewed gaps are built (checked, changed, accepted;
 # label photos and removed pages left out), written beside the output (atomically, a resumed run's record replaced,
-# never through a link, nothing created in a missing folder) and read back, and the lines format; then the kit's
-# reader (kit_corrections.py) counts the records the app wrote. Scratch folders only, deleted after. No model call,
+# never through a link, nothing created in a missing folder) and read back; then the kit's reader
+# (kit_corrections.py) counts the records the app wrote. Scratch folders only, deleted after. No model call,
 # no network, no Keychain read, no window, never an output folder of the user's.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
@@ -39,14 +39,13 @@ fi
 cat "$report"
 grep -q '^ALL PASS$' "$report"
 
-# The kit reads what the app wrote: the newer of the two runs over the same pages is counted, 3 gaps ruled of 4 known,
-# and the one line of hand "A. L.".
+# The kit reads what the app wrote: the newer of the two runs over the same pages is counted, 3 gaps ruled of 4 known.
 counted=$(/usr/bin/python3 scripts/segbench/institutional-compute/kit_corrections.py count "$work/kept" --json)
 /usr/bin/python3 - "$counted" <<'PY'
 import json, sys
 (r,) = json.loads(sys.argv[1])
-got = (r["name"], r["gaps"]["ruled"], r["gaps"]["known"], [(h["hand"], h["lines"]) for h in r["lines"]])
-want = ("Lincoln box 1", 3, 4, [("A. L.", 1)])
+got = (r["name"], r["gaps"]["ruled"], r["gaps"]["known"], sorted(r))
+want = ("Lincoln box 1", 3, 4, ["folders", "gaps", "material", "name"])
 print("PASS kit reads the app's records" if got == want else f"FAIL kit reads the app's records: got {got} want {want}")
 sys.exit(got != want)
 PY

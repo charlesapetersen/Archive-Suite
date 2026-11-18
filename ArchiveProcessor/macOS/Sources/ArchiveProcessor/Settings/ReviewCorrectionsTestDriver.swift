@@ -199,17 +199,6 @@ enum ReviewCorrectionsTestDriver {
         eq("empty: nothing to record", ReviewCorrections.recordGaps(empty), nil)
         eq("empty: no file", ReviewCorrections.gapRecords(in: out).count, 2)
 
-        // Lines: the format the line-correction screen will write, read back.
-        let lineRecord = LineReviewRecord(runID: runID, recordedAt: day,
-                                          owner: ReviewCorrections.owner(settings: snapshot, in: out), lines: [
-            ReviewedLine(page: ReviewedPage(name: "IMG_1.jpg", sha256: "ab", output: nil), line: 0,
-                         boundary: [[0, 0], [100, 0], [100, 20], [0, 20]], baseline: [[0, 18], [100, 18]],
-                         recognised: "Dear Sir", recognisedBy: "ocr-kraken-ppocrv6", corrected: "Dear Sirs", hand: "A. L."),
-        ])
-        do { try ReviewCorrections.write(lineRecord, in: out) } catch { check("lines: written", false, "\(error)") }
-        eq("lines: read back", ReviewCorrections.lineRecords(in: out), [lineRecord])
-        eq("lines: not read as gaps", ReviewCorrections.gapRecords(in: out).count, 2)
-
         // A file that is not a record is skipped.
         try? Data("not json".utf8).write(to: ReviewCorrections.folder(in: out).appendingPathComponent("gaps-broken.json"))
         eq("reading: a broken file is skipped", ReviewCorrections.gapRecords(in: out).count, 2)

@@ -380,8 +380,7 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                `recordReviewedGaps` (`OCRProcessor+WindowSegmentation.swift`) writes every reviewed gap
                                (proposal, final call, checked / changed / accepted, each page's name and SHA-256) to
                                `<output>/.archivesuite/corrections/gaps-<run id>.json`, off the main actor; a resumed
-                               run's record replaces its first. `LineReviewRecord` is the format the line-correction
-                               screen (W46.kit-hands) writes. SPEC §"The review records"; the kit counts them with
+                               run's record replaces its first. SPEC §"The review records"; the kit counts them with
                                `scripts/segbench/institutional-compute/kit_corrections.py`. Self-test:
                                `ReviewCorrectionsTestDriver`, `scripts/test-review-corrections.sh`.
   SettingsInterviews.swift     The two interviews' logic: `MacInventory` (memory, keys by `KeychainHelper.exists`,

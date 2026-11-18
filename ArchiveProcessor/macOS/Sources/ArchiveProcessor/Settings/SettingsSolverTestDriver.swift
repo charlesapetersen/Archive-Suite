@@ -535,20 +535,13 @@ enum SettingsSolverTestDriver {
         var krakenOnly = SettingsAnswers()
         krakenOnly.onlyRoutes["reading"] = ["apple-vision", "ppocrv6-kraken-blla"]
         krakenOnly.fineTuning = .codingAgent
-        krakenOnly.correctedLinesOneHand = 100
         let fk = solve("F-kraken", mac(16), krakenOnly)
         eq("F hands on kraken (a restricted table)", pick(fk, "reading", "handwritten"), "ppocrv6-kraken-blla")
-        check("F coding agent: the hand fine-tune shown past 80 lines",
-              fk.afterTraining.first { $0.id == "kit-hands-ppocrv6-ft" }?.shown == true)
-        krakenOnly.correctedLinesOneHand = 50
-        check("F coding agent: hidden below 80 lines", solve("F-kraken-50", mac(16), krakenOnly)
-              .afterTraining.first { $0.id == "kit-hands-ppocrv6-ft" }?.shown == false)
+        // The handwriting fine-tune does not ship (owner, 2026-11-17; W46.kit-hands-retire): no reading row at all.
+        eq("F coding agent on kraken: only the Mac LoRA, as not offered", fk.afterTraining.map(\.id), ["kit-seg-lora-mac"])
         var agent = SettingsAnswers()
         agent.fineTuning = .codingAgent
-        agent.correctedLinesOneHand = 200
         let fa = solve("F-agent", mac(16), agent)
-        check("F coding agent: no hand fine-tune where the reader is not kraken",
-              fa.afterTraining.first { $0.id == "kit-hands-ppocrv6-ft" }?.shown == false)
         let lora = fa.afterTraining.first { $0.id == "kit-seg-lora-mac" }
         check("F coding agent: the Mac LoRA shown as not offered", lora?.shown == true && lora?.selectable == false
               && lora?.reason.contains("not measured to fit") == true)

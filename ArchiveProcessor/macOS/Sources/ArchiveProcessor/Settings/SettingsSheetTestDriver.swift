@@ -383,24 +383,20 @@ enum SettingsSheetTestDriver {
                   r.together.map { abs($0.y - (base ?? -1)) < 1e-6 && $0.x == 0 } == true || r.points.filter(\.picked).count < 2,
                   "\(r.together?.y ?? -1) vs \(base ?? -1)")
         } else { check("8 free reading chart and Vision's figures", false) }
-        // F with 160 corrected lines of one hand on kraken: the star on the reading chart, at the gain on the
-        // handwritten share.
+        // F with kraken reading the handwriting: the handwriting fine-tune does not ship (owner, 2026-11-17;
+        // W46.kit-hands-retire), so the reading chart has no after-training point even there.
         var kitAnswers = agent.answers
-        kitAnswers.correctedLinesOneHand = 160
         kitAnswers.onlyRoutes["reading"] = ["apple-vision", "ppocrv6-kraken-blla"]
         let kitSolution = SettingsSolver(table: table, pairs: pairs, resources: agent.resources, answers: kitAnswers).solve()
         let kitWords = SettingsSheetWords(table: table, answers: kitAnswers, resources: agent.resources)
-        if kitSolution.pick("reading", "handwritten")?.routeID == "ppocrv6-kraken-blla",
-           let g = table.stage("training-kit")?.route("kit-hands-ppocrv6-ft")?.figure("handwritten-one-hand-160-lines") {
+        if kitSolution.pick("reading", "handwritten")?.routeID == "ppocrv6-kraken-blla" {
             let charts = SettingsSheetModel.ranges(table: table, solution: kitSolution, app: kitSolution, answers: kitAnswers,
                                                    cards: agent.cards, words: kitWords)
-            let star = charts.first { $0.id == "reading" }?.kit.first { $0.id == "kit-hands-ppocrv6-ft" }
-            let base = SettingsSheetModel.comparable("reading", kitSolution, words: kitWords).base ?? 0
-            let mix = kitAnswers.mix
-            let share = (mix["handwritten"] ?? 0) / ((mix["typewritten"] ?? 0) + (mix["printed"] ?? 0) + (mix["handwritten"] ?? 0))
-            check("8 F 160 lines on kraken: the fine-tune is a star at the gain on the handwritten share",
-                  star?.y.map { abs($0 - (base + g * share)) < 1e-6 } == true, "\(star?.y ?? -1) vs \(base + g * share)")
-        } else { lines.append("SKIP 8 F star: kraken does not read the handwriting on this Mac") }
+            let readingKit = charts.first { $0.id == "reading" }?.kit ?? []
+            check("8 F coding agent on kraken: no handwriting fine-tune on the reading chart", readingKit.isEmpty,
+                  readingKit.map(\.id).joined(separator: ","))
+        } else { lines.append("SKIP 8 F kraken: kraken does not read the handwriting on this Mac") }
+        check("8 F: the table has no handwriting fine-tune row", table.stage("training-kit")?.route("kit-hands-ppocrv6-ft") == nil)
         for (name, m) in [("free", free), ("gemini", paid), ("custom", custom), ("small", small), ("stays-on-mac", onMac),
                           ("kit-cluster", clusterKit), ("over-ceiling", over), ("overnight", night)] {
             range(name, m, table: table)
@@ -439,11 +435,8 @@ enum SettingsSheetTestDriver {
               agentSeg.map(\.id) == ["kit-seg-lora-mac"] && agentSeg.first?.condition.hasPrefix("Not offered") == true,
               agentSeg.map(\.id).joined(separator: ","))
         let handKit = agent.ranges.first { $0.id == "reading" }?.kit ?? []
-        let handPick = agent.solution.pick("reading", "handwritten")?.routeID
-        check("8 F coding agent: the handwriting fine-tune only where kraken reads the handwriting, and off the chart below 80 lines",
-              handPick == "ppocrv6-kraken-blla"
-                ? handKit.first.map { $0.y == nil && $0.condition.contains("80 lines") } == true
-                : handKit.isEmpty, "\(handPick ?? "nil") \(handKit.map(\.condition))")
+        check("8 F coding agent: no after-training point on the reading chart", handKit.isEmpty,
+              handKit.map(\.id).joined(separator: ","))
         let clusterSeg = clusterKit.ranges.first { $0.id == "segmentation" }?.kit ?? []
         check("8 F cluster: the student and the continuation listed with their conditions",
               Set(clusterSeg.map(\.id)) == ["kit-seg-lora-mac", "kit-seg-student-tags", "seg-2b-lora-k200"]

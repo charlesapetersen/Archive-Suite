@@ -15,23 +15,24 @@ the trained routes as "after training" points beside the shipped routes of stage
 Yes, of a special kind. No row here is a route the user can pick on day one: each row has status `after-training`,
 appears only when the fine-tuning answer allows it, and becomes selectable only once its condition holds (enough
 labels, and for segmentation a passing gate and a manifest). The solver never picks an after-training row as a
-default; it shows it as a point with its expected gain against the route it would replace. Three routes are rows; a
-fourth (the Mac segmentation LoRA) is a row marked not offered, so the sheet can say why it is absent.
+default; it shows it as a point with its expected gain against the route it would replace. Two routes are rows (a third,
+the handwriting fine-tune, was dropped on 2026-11-17); the Mac segmentation LoRA is a row marked not offered, so the
+sheet can say why it is absent.
 
 ## 3. The rule for the settings layer
 
-**Amended by the owner, 2026-11-17 (14-owner-calls.md call 7): the handwriting fine-tune does not ship.** The
-`kit-hands-ppocrv6-ft` row below, the "with a coding agent" mapping to it, call 7.4 and `W46.kit-hands-check` are
-history; until the app's row is removed (W46.kit-hands-retire) the sheet must not offer it. The cluster rows stand.
-The sheet text loses "or on this Mac (one handwriting hand)".
+**Amended by the owner, 2026-11-17 (14-owner-calls.md call 7): the handwriting fine-tune does not ship.** Its row
+(`kit-hands-ppocrv6-ft`), the "with a coding agent" mapping to it, call 7.4 and `W46.kit-hands-check` are history;
+W46.kit-hands-retire removed the row from §4, the table, the solver, the sheet and the review records. The cluster
+rows stand.
 
-Text the sheet shows: "Training adapts a model to your material. It is optional, runs on a cluster (segmentation) or
-on this Mac (one handwriting hand), and a trained model is used only after it passes a check on pages it never saw."
+Text the sheet shows: "Training adapts a model to your material. It is optional, runs on a cluster (segmentation),
+and a trained model is used only after it passes a check on pages it never saw."
 
 The fine-tuning answer (general interview, `12-settings-design.md` §3.1: no; with a coding agent; on a cluster):
 - **no** (the default): no row of this stage is shown.
-- **with a coding agent** (no cluster): the Mac-side row only, `kit-hands-ppocrv6-ft`, for the handwritten kind.
-  The answers are nested; the mapping is confirmed (call 7.6, decided 2026-11-06).
+- **with a coding agent** (no cluster): only `kit-seg-lora-mac`, shown as not offered. The answers are nested
+  (call 7.6, decided 2026-11-06; its handwriting row dropped 2026-11-17).
 - **on a cluster**: the cluster rows as well (`kit-seg-student-tags`, `seg-2b-lora-k200`), with `needs.cluster`
   true. A cluster answer without a coding agent still shows them: the README's steps are manual commands
   (`institutional-compute/README.md`, training section) [M].
@@ -158,47 +159,6 @@ hold out whole collections or boxes, never a random page split).
   "kind_rules": [],
   "fallback": null,
   "conditions": ["not offered in this release (14-owner-calls.md call 7); revisited only if a Mac step is measured to complete"]
- },
- {
-  "id": "kit-hands-ppocrv6-ft",
-  "name": "kraken PP-OCRv6 fine-tuned on corrected lines of one hand (Mac)",
-  "family": "kit",
-  "app_route": null,
-  "status": "after-training",
-  "licence": "Apache-2.0, its base model's (Benjamin Kiessling's kraken port of PP-OCRv6 medium, Zenodo 10.5281/zenodo.21788410); kraken itself is Apache-2.0",
-  "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 16, "gpus": 0},
-  "figures": {
-   "handwritten-one-hand-160-lines": {"value": 2.50, "n": 16, "truth": "By the People, Blackwell held-out pages", "metric": "NES gain over the untuned model, base 59.7; +1.70 to +3.24 (CPU)",
-     "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "blackwell-n160-cpu", "attribute": "delta", "value": "+2.50"}},
-   "handwritten-one-hand-160-lines-mps": {"value": 2.60, "n": 16, "truth": "Blackwell held-out", "metric": "NES gain; +1.74 to +3.43",
-     "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "blackwell-n160-mps", "attribute": "delta", "value": "+2.60"}},
-   "handwritten-one-hand-80-lines": {"value": 1.12, "n": 16, "truth": "Blackwell held-out", "metric": "NES gain; +0.31 to +1.91 (CPU)",
-     "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "blackwell-n80-cpu", "attribute": "delta", "value": "+1.12"}},
-   "handwritten-owner-base": {"value": 71.6, "n": 16, "truth": "owner 16 handwritten pages, drafted, hand places owner-checked", "metric": "NES of the untuned recogniser on blla lines",
-     "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "ppocrv6-kraken-blla", "attribute": "handwritten", "value": "71.6"}}
-  },
-  "cost": {"usd_1000_list": 0.0, "usd_1000_batch": null, "price_read": null,
-    "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "all", "attribute": "money", "value": "No money"}},
-  "time": {"per_unit_s": null, "measured": true, "measured_on": "M3 Pro 18 GB: training 6.3 min (MPS) or 18.1 min (CPU) at 160 lines; reading 4.2-13.6 s a page median (CPU)",
-    "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "blackwell-n160-mps / -cpu", "attribute": "minutes", "value": "6.3 / 18.1"}},
-  "memory": {"peak_gb": 5.88, "measured_on": "M3 Pro 18 GB, MPS training at 160 lines (CPU 3.54; reading 5.78-5.87 a call)",
-    "source": {"file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.md", "route": "blackwell-n160-mps", "attribute": "peak GB", "value": "5.88"}},
-  "caveats": [
-   "one public hand, one seed per condition; seed and cross-hand variability unmeasured",
-   "20 and 40 lines are ties; 240 against 160 is a measured tie, both trained to early stop at 5 epochs (P7-5)",
-   "on the owner's Shils pages with paragraph truth it made 3 of 4 held-out pages worse",
-   "the untuned recogniser is 71.6 on the owner's hand pages against 89.9 for LightOnOCR-3 4B 8-bit on the Mac, so a +2.5 gain does not close that gap",
-   "needs blla or Vision line boxes and a line-correction screen, which the Processor lacks today and builds in this release (H-corpus.md 6.3; 14-owner-calls.md call 7)"
-  ],
-  "kind_rules": ["handwritten only; one fine-tune per hand"],
-  "fallback": "ppocrv6-kraken-blla",
-  "conditions": [
-   "the fine-tuning answer is 'with a coding agent' or 'on a cluster'",
-   "at least 80 line-broken corrected lines of one hand, target about 160 (call 7.4, decided)",
-   "the line-correction screen exists (built in this release, 14-owner-calls.md call 7)",
-   "a separate held-out acceptance check for each hand passes (ocr-ppocrv6-hands.md)",
-   "kraken PP-OCRv6 on blla lines is the stage 04 route the user has (the low-memory fallback)"
-  ]
  }
 ]
 ```
@@ -358,13 +318,12 @@ default pick.
 
 - **Laptop 16 GB, open weights, answer "no".** No row shown. Segmentation stays the shipped 2B (stage 07; 4.4 GB peak,
   `seg-students.md`).
-- **Laptop 16 GB, "with a coding agent".** Handwritten kind: `kit-hands-ppocrv6-ft` shown as an after-training point only
-  where stage 04 has chosen kraken on blla lines, with "+2.50 at 160 lines on one hand"; hidden below 80 corrected lines.
-  `kit-seg-lora-mac` shown as not offered ("not measured to fit"). Typed, printed and other kinds: nothing.
+- **Laptop 16 GB, "with a coding agent".** `kit-seg-lora-mac` shown as not offered ("not measured to fit"). No reading
+  row, even where stage 04 has chosen kraken on blla lines (the handwriting fine-tune was dropped, 2026-11-17).
 - **Laptop 32 GB and 64 GB, "with a coding agent".** As 16 GB: the Mac LoRA row stays not offered, because 32 GB is
   unmeasured (`kit-mac-lora.md`), not because it failed.
-- **Cheap API; premium APIs or plans, answer "no".** No row. With "with a coding agent": only the hands row, and only if
-  the user's handwritten route is kraken; the cloud readers lead it on the owner's hands (stage 04).
+- **Cheap API; premium APIs or plans, answer "no".** No row. With "with a coding agent": only the Mac LoRA, as not
+  offered.
 - **A cluster, answer "on a cluster".** All kinds' segmentation: `kit-seg-student-tags` shown when the corpus has tags or
   per-document folders, with Sasha 89.1% gap accuracy and the TABME++ caveat; `seg-2b-lora-k200` shown after 200
   corrected gaps of one material, with box 2's 17.2 to 4.9 errors per 100 gaps, the lost-start caveat and the label

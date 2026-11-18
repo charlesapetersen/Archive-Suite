@@ -3,11 +3,10 @@ import Foundation
 // MARK: - The collection's review records (W46.kit-corrections-store)
 //
 // What a person settled in a run's review, kept with the collection so the training kit can read it: every gap of a
-// reviewed run with the model's proposal and the final call, and (once `W46.kit-hands` builds its screen) every
-// corrected handwriting line. The kit counts them per material toward its thresholds: 200 person-ruled gaps of one
-// material before the segmentation continuation (`seg-2b-lora-k200`), 80 corrected lines of one hand before the
-// handwriting fine-tune (14-owner-calls.md call 7; `execution-plans/processing-review/13-stage-rules/12-training-kit.md`
-// §7.4, §7.5). One file per run and kind in `<output>/.archivesuite/corrections/`. Format: `SPEC/collection-settings.md`
+// reviewed run with the model's proposal and the final call. The kit counts them per material toward its threshold:
+// 200 person-ruled gaps of one material before the segmentation continuation (`seg-2b-lora-k200`; 14-owner-calls.md
+// call 7; `execution-plans/processing-review/13-stage-rules/12-training-kit.md` §7.5). One file per run in
+// `<output>/.archivesuite/corrections/`. Format: `SPEC/collection-settings.md`
 // §"The review records"; reader: `ArchiveProcessor/scripts/segbench/institutional-compute/kit_corrections.py`.
 //
 // Written beside the output, so it is guarded as the settings document is (`CollectionSettingsFile`): only into an
@@ -69,34 +68,6 @@ struct GapReviewRecord: Codable, Equatable, Sendable {
     var personRuled: Int { gaps.filter(\.personRuled).count }
 }
 
-/// One handwriting line a person corrected or confirmed. Written by the line-correction screen (`W46.kit-hands`);
-/// the format is fixed here so the kit can read it from the start.
-struct ReviewedLine: Codable, Equatable, Sendable {
-    var page: ReviewedPage
-    /// The line's index on the page, in the segmenter's reading order.
-    var line: Int
-    /// The line's boundary polygon and baseline in the page image's pixels, as the line segmenter gave them.
-    var boundary: [[Double]]
-    var baseline: [[Double]]?
-    /// The recogniser's reading, its route id (`settings-routes.json`), and the person's text.
-    var recognised: String
-    var recognisedBy: String
-    var corrected: String
-    /// The hand, as the person names it; the kit's 80 is per hand.
-    var hand: String?
-}
-
-/// A run's (or a correction session's) reviewed lines.
-struct LineReviewRecord: Codable, Equatable, Sendable {
-    static let currentSchemaVersion = 1
-    var schemaVersion = Self.currentSchemaVersion
-    var kind = "lines"
-    var runID: UUID
-    var recordedAt: Date
-    var owner: ReviewRecordOwner
-    var lines: [ReviewedLine]
-}
-
 enum ReviewCorrections {
     static let folderName = "corrections"
 
@@ -106,10 +77,6 @@ enum ReviewCorrections {
 
     static func gapsURL(runID: UUID, in outputDirectory: URL) -> URL {
         folder(in: outputDirectory).appendingPathComponent("gaps-\(runID.uuidString).json")
-    }
-
-    static func linesURL(runID: UUID, in outputDirectory: URL) -> URL {
-        folder(in: outputDirectory).appendingPathComponent("lines-\(runID.uuidString).json")
     }
 
     // MARK: Building the gaps record (pure)
@@ -200,11 +167,6 @@ enum ReviewCorrections {
                   in: outputDirectory)
     }
 
-    static func write(_ record: LineReviewRecord, in outputDirectory: URL) throws {
-        try write(record, recordedAt: record.recordedAt, to: linesURL(runID: record.runID, in: outputDirectory),
-                  in: outputDirectory)
-    }
-
     /// What the replace rule reads of a record already at the name.
     private struct Existing: Decodable {
         let schemaVersion: Int
@@ -244,10 +206,6 @@ enum ReviewCorrections {
     /// The collection's gaps records, by file name; a file that is not one, a link or an oversized file is skipped.
     static func gapRecords(in outputDirectory: URL) -> [GapReviewRecord] {
         records(prefix: "gaps-", in: outputDirectory)
-    }
-
-    static func lineRecords(in outputDirectory: URL) -> [LineReviewRecord] {
-        records(prefix: "lines-", in: outputDirectory)
     }
 
     private static func records<T: Decodable>(prefix: String, in outputDirectory: URL) -> [T] {

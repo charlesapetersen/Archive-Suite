@@ -132,7 +132,7 @@ image g2 route (+1.5 [−4.0, +7.7]).
 ## F. Any profile plus a coding agent (fine-tuning answer)
 
 - "No": no kit row anywhere.
-- (Dropped 2026-11-17, 14-owner-calls.md call 7: no handwriting fine-tune; W46.kit-hands-retire removes the row.) "With a coding agent": the handwriting fine-tune `kit-hands-ppocrv6-ft` shown as an after-training point on the
+- (Dropped 2026-11-17, 14-owner-calls.md call 7: no handwriting fine-tune; W46.kit-hands-retire removed the row.) "With a coding agent": the handwriting fine-tune `kit-hands-ppocrv6-ft` shown as an after-training point on the
   handwritten kind where the reading pick is kraken, hidden below 80 corrected lines, target 160 (+2.50 at 160 on one
   hand; owner call 7); `kit-seg-lora-mac` shown as not offered ("not measured to fit").
 - "On a cluster": `kit-seg-student-tags` shown when the corpus has tags or per-document folders (Sasha 89.1% gap

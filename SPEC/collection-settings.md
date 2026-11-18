@@ -101,8 +101,8 @@ record encodes its dates as that file's other dates are (seconds since 2001), no
 ## The review records
 
 What a person settled in a run's review, kept with the collection for the training kit (`W46.kit-corrections-store`;
-`execution-plans/processing-review/13-stage-rules/12-training-kit.md` §7.4, §7.5). They are in
-`<output folder>/.archivesuite/corrections/`, one file per run and kind: `gaps-<run id>.json` and `lines-<run id>.json`.
+`execution-plans/processing-review/13-stage-rules/12-training-kit.md` §7.5). They are in
+`<output folder>/.archivesuite/corrections/`, one file per run: `gaps-<run id>.json`.
 The run id is the run record's. The writer is the Processor's `Settings/ReviewCorrections.swift`. The kit's reader is
 `ArchiveProcessor/scripts/segbench/institutional-compute/kit_corrections.py`, which counts the records per material
 (`count`) and exports the gaps (`export`). The Reader and Notes do not read them. The same JSON conventions as above
@@ -127,27 +127,15 @@ A gap next to a box or folder photo is left out, because such a gap is a boundar
 a page the skim removed, or next to a page left with no classification. The kit's 200 counts `checked` and `changed` gaps, the ones a person ruled on. `accepted`
 gaps are known, but they are not counted.
 
-A **lines record** has `schemaVersion` (`1`), `kind` (`"lines"`), `runID`, `recordedAt`, `owner` and `lines`. Each line
-has these keys:
-
-- `page`, as above.
-- `line`: its index in reading order.
-- `boundary`, plus `baseline` if there is one: point lists in the page image's pixels.
-- `recognised`: the recogniser's text. `recognisedBy`: the recogniser's route id.
-- `corrected`: the person's text.
-- `hand`: the hand, as the person names it.
-
-The line-correction screen (`W46.kit-hands`) writes these. No screen writes them yet. The kit's 80 counts lines per hand.
-
 The material is the collection. A record whose `collectionID` is null joins the collection id that the folder's other records
 carry. A user who knows that several collections are one material pools them with `kit_corrections.py --pool`; nothing
-in the records says so. A page pair or a line that appears in more than one record is counted once, from the newest
+in the records says so. A page pair that appears in more than one record is counted once, from the newest
 record. A page is matched by its `sha256` when both pages of the pair have one. Otherwise it is matched by its name
 within its own folder.
 
 Writing follows the same rules as the settings document. A record is written only into an existing output folder, and
 `.archivesuite` and `corrections` are created one level at a time, never through a link. The write is atomic. A
-run's earlier record of the same kind is replaced, because a resumed run's review supersedes its first. Some things at
+run's earlier record is replaced, because a resumed run's review supersedes its first. Some things at
 that name are left alone instead: a record with a later `recordedAt`, a record with a larger `schemaVersion`, and a
 name that is a link or a folder. A failure is logged and never stops the run. Pages are hashed and the file
 is written off the main thread.

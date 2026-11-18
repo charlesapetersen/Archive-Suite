@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """W46.kit-corrections-store. Read the review records the Processor keeps with each collection, and count them per
-material toward the kit's thresholds.
+material toward the kit's threshold.
 
-  kit_corrections.py count  DIR [DIR ...] [--pool NAME] [--json]   # gaps per material, lines per hand, against the floors
+  kit_corrections.py count  DIR [DIR ...] [--pool NAME] [--json]   # gaps per material, against the floor
   kit_corrections.py export DIR [DIR ...] [--pool NAME] --out FILE # every recorded gap, one JSON object a line
 
 DIR is a collection's output folder, or a folder above several (Live Capture files each collection into its own
@@ -10,16 +10,15 @@ subfolder): every `.archivesuite/corrections/` below it is read. Links are never
 newer format is skipped. The format is SPEC/collection-settings.md §"The review records"; the writer is the
 Processor's `Settings/ReviewCorrections.swift`.
 
-The floors (14-owner-calls.md call 7; execution-plans/processing-review/13-stage-rules/12-training-kit.md §7.4, §7.5):
-- the segmentation continuation (`seg-2b-lora-k200`) once 200 gaps of one material were ruled on by a person: checked
-  in the flagged pass or changed in the skim. A gap left as proposed through the skim (`accepted`) is known but not
-  counted. The gate then needs a further box of the same material with at least 267 known gaps in 10 documents,
-  which this count does not check (`train_seg.py check` does).
-- the handwriting fine-tune (`kit-hands-ppocrv6-ft`) from 80 corrected lines of one hand, 160 the target.
+The floor (14-owner-calls.md call 7; execution-plans/processing-review/13-stage-rules/12-training-kit.md §7.5): the
+segmentation continuation (`seg-2b-lora-k200`) once 200 gaps of one material were ruled on by a person: checked in the
+flagged pass or changed in the skim. A gap left as proposed through the skim (`accepted`) is known but not counted. The
+gate then needs a further box of the same material with at least 267 known gaps in 10 documents, which this count does
+not check (`train_seg.py check` does).
 
 The material is the collection (its id in the collection's settings document). Several collections of one material
 are counted together with `--pool NAME`, which the user decides: nothing in the records says two boxes are one
-material. A page pair reviewed in more than one run is counted once, from the newest record; so is a line.
+material. A page pair reviewed in more than one run is counted once, from the newest record.
 """
 from __future__ import annotations
 import argparse
@@ -30,8 +29,6 @@ import sys
 from pathlib import Path
 
 GAPS_FLOOR = 200
-LINES_FLOOR = 80
-LINES_TARGET = 160
 MAX_BYTES = 8 * 1024 * 1024
 SCHEMA = 1
 
@@ -62,7 +59,7 @@ def read_records(roots):
             except OSError:
                 continue
             for name in names:
-                if not (name.startswith(("gaps-", "lines-")) and name.endswith(".json")):
+                if not (name.startswith("gaps-") and name.endswith(".json")):
                     continue
                 try:
                     p = cdir / name
@@ -74,9 +71,8 @@ def read_records(roots):
                 except (OSError, ValueError):
                     continue
                 if not (isinstance(r, dict) and isinstance(r.get("schemaVersion"), int) and r["schemaVersion"] <= SCHEMA
-                        and r.get("kind") in ("gaps", "lines") and isinstance(r.get("recordedAt"), str)
-                        and isinstance(r.get("owner", {}), dict)
-                        and isinstance(r.get("gaps" if r.get("kind") == "gaps" else "lines"), list)):
+                        and r.get("kind") == "gaps" and isinstance(r.get("recordedAt"), str)
+                        and isinstance(r.get("owner", {}), dict) and isinstance(r.get("gaps"), list)):
                     continue
                 out.append((str(folder), name, r))
     out.sort(key=lambda x: (x[2]["recordedAt"], x[1]))
@@ -91,7 +87,7 @@ def page_key(p, folder):
 
 
 def gather(roots, pool=None):
-    """Per material: its name, the newest call on each page pair, and the newest text of each line. The material is
+    """Per material: its name and the newest call on each page pair. The material is
     the record's collection id; a record without one joins the id other records of its folder carry, else the folder."""
     records = read_records(roots)
     folder_ids = {}
@@ -110,21 +106,15 @@ def gather(roots, pool=None):
                 mid, mname = cid, owner.get("collectionName") or Path(folder).name
             else:
                 mid, mname = folder_ids.get(folder, (folder, Path(folder).name))
-        m = mats.setdefault(mid, {"name": mname, "gaps": {}, "lines": {}, "folders": set()})
+        m = mats.setdefault(mid, {"name": mname, "gaps": {}, "folders": set()})
         m["folders"].add(folder)
-        for item in r["gaps"] if r["kind"] == "gaps" else r["lines"]:
+        for item in r["gaps"]:
             try:
-                if r["kind"] == "gaps":
-                    l, rt = page_key(item["left"], folder), page_key(item["right"], folder)
-                    # Both pages by hash, or both by name: a pair is never keyed half one way.
-                    if l[0] != rt[0]:
-                        l, rt = ("name", folder, item["left"]["name"]), ("name", folder, item["right"]["name"])
-                    m["gaps"][(l, rt)] = dict(item, runID=r.get("runID"), folder=folder)   # newer overwrites older
-                else:
-                    if not isinstance(item.get("line"), int):
-                        continue
-                    m["lines"][(page_key(item["page"], folder), item["line"])] = dict(item, runID=r.get("runID"),
-                                                                                       folder=folder)
+                l, rt = page_key(item["left"], folder), page_key(item["right"], folder)
+                # Both pages by hash, or both by name: a pair is never keyed half one way.
+                if l[0] != rt[0]:
+                    l, rt = ("name", folder, item["left"]["name"]), ("name", folder, item["right"]["name"])
+                m["gaps"][(l, rt)] = dict(item, runID=r.get("runID"), folder=folder)   # newer overwrites older
             except (KeyError, TypeError, ValueError, AttributeError):
                 continue
     return mats
@@ -135,17 +125,11 @@ def summary(mats):
     for mid, m in sorted(mats.items(), key=lambda x: x[1]["name"]):
         gaps = list(m["gaps"].values())
         ruled = sum(g.get("ruling") in ("checked", "changed") for g in gaps)
-        hands = {}
-        for ln in m["lines"].values():
-            hand = ln.get("hand") if isinstance(ln.get("hand"), str) else ""
-            hands[hand] = hands.get(hand, 0) + 1
         rows.append({
             "material": mid, "name": m["name"], "folders": sorted(m["folders"]),
             "gaps": {"ruled": ruled, "known": len(gaps), "changed_from_proposal":
                      sum(g.get("final") != g.get("proposed") for g in gaps),
                      "floor": GAPS_FLOOR, "continuation_offered": ruled >= GAPS_FLOOR},
-            "lines": [{"hand": h, "lines": n, "floor": LINES_FLOOR, "target": LINES_TARGET,
-                       "fine_tune_offered": n >= LINES_FLOOR} for h, n in sorted(hands.items())],
         })
     return rows
 
@@ -162,11 +146,6 @@ def cmd_count(a):
         g = r["gaps"]
         state = "the continuation can be offered" if g["continuation_offered"] else f"{GAPS_FLOOR - g['ruled']} more to go"
         print(f"{r['name']}: {g['ruled']} gaps ruled on by a person ({g['known']} known); {state}.")
-        for h in r["lines"]:
-            who = h["hand"] or "an unnamed hand"
-            line_state = (f"the fine-tune can be offered (target {LINES_TARGET})" if h["fine_tune_offered"]
-                          else f"{LINES_FLOOR - h['lines']} more to go")
-            print(f"  {who}: {h['lines']} corrected lines; {line_state}.")
 
 
 def cmd_export(a):

@@ -80,7 +80,6 @@ struct SettingsAnswers: Sendable {
     /// Minutes the user will spend checking boundaries.
     var checkingMinutes: Double = 0
     var fineTuning: FineTuningAnswer = .no
-    var correctedLinesOneHand = 0
     var correctedGapsOneMaterial = 0
     var collectionHasTagsOrFolders = false
     /// A kit manifest past the gate sits beside the Mac build (`W46.kit-mac-build`).
@@ -895,16 +894,6 @@ struct SettingsSolver {
     func kitPoints(_ picks: [SettingsPick]) -> [SettingsKitPoint] {
         guard answers.fineTuning != .no, let kit = table.stage("training-kit") else { return [] }
         var out: [SettingsKitPoint] = []
-        if kit.route("kit-hands-ppocrv6-ft") != nil {
-            let hand = picks.first { $0.stage == "reading" && $0.part == "handwritten" }?.routeID
-            let onKraken = hand == "ppocrv6-kraken-blla"
-            let lines = answers.correctedLinesOneHand
-            out.append(SettingsKitPoint(
-                id: "kit-hands-ppocrv6-ft", shown: onKraken && lines >= 80, selectable: false,
-                reason: !onKraken ? "shown only where the handwriting reader is kraken PP-OCRv6"
-                    : lines < 80 ? "needs 80 corrected lines of one hand (\(lines) so far; target 160)"
-                    : "after training on \(lines) corrected lines of one hand (target 160; +2.50 at 160 on one hand)"))
-        }
         if kit.route("kit-seg-lora-mac") != nil {
             out.append(SettingsKitPoint(id: "kit-seg-lora-mac", shown: true, selectable: false,
                                         reason: "not offered: not measured to fit"))
