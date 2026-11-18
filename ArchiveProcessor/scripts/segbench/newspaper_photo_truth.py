@@ -290,12 +290,101 @@ def cmd_sheet(a):
     f.write_text(f.read_text().replace('W46 owner set: disputed words', 'W46 photographed newspapers: disputed words'))
 
 
+# ---------------------------------------------------------------- the committed result: counts only
+
+def _json(name):
+    f = OUT / name
+    return json.loads(f.read_text()) if f.exists() else None
+
+
+def report_lines() -> list[str]:
+    """segbench-results/newspaper-photo-truth.md from what the cache holds now. Counts only: no path, name, folder
+    or collection (the repo is public and the pages are the owner's). A step not run yet is left out or says so."""
+    d, size, cmp, rul = _json('draw.json'), _json('size.json'), _json('compare.json'), _json('rulings.json')
+    cands = candidates()
+    kinds = sorter()
+    screens = {r['id']: screened(r) for r in cands}
+    chosen = [r for r in G.load_pages() if 'screen' in r]      # before `select`, pages.jsonl holds the candidates
+    words = sorted(r['vision_words'] for r in cands)
+    src = collections.Counter(r['source'].split(' (')[0] for r in cands)
+    L = ['# W46.newspaper-photo-truth: a small truth set of photographed newspapers', '',
+         'Owner review of the pipeline doc, 2026-11-17: no photographed newspaper with truth exists (L9 is 15 scans), '
+         'so the staged route on photographed newspapers (W46.layout-photo-newspapers) has nothing to be scored on. '
+         'Built by `scripts/segbench/newspaper_photo_truth.py`, which runs `owner_set_grow.py`\'s drafting, sheet and '
+         'fold; images, drafts and the sheet stay in the bench cache, since the pages are the owner\'s.', '',
+         '## The draw', '',
+         f"- Pool: {d['pool']:,} corpus PDFs carrying the owner's Finder tag Clippings, outside the numbered workflow "
+         'folders and not tagged Red or Purple.',
+         f"- Order: sha256 of a fixed salt and the corpus path; at most {d['folder_max']} a folder and "
+         f"{d['collection_max']} a collection. {d['candidates']} candidates from {len(d['collections'])} collections; "
+         f"{len(d['failed'])} passed over as unreadable. Images: " + ', '.join(f'{n} {k}' for k, n in src.most_common())
+         + '.',
+         f"- Apple Vision words a candidate: median {words[len(words) // 2]}, range {words[0]:,}-{words[-1]:,}."]
+    if kinds:
+        L.append("- Vision OCR's page sorter (recorded, does not select): " + ', '.join(
+            f'{n} {k}' for k, n in collections.Counter(kinds.get(r['id'], 'not run') for r in cands).most_common()) + '.')
+    if size:
+        p20, a20 = size['at_printed_rate'][str(TARGET)], size['at_all_rate'][str(TARGET)]
+        L += ['', '## The owner\'s time, sized before any draft', '',
+              f"At the 96's dispute rate between two drafters ({size['disputes_per_kword_96_printed']} disputed spans a "
+              f"1,000 words on printed pages, {size['disputes_per_kword_96']} on all) and the candidates' mean of "
+              f"{size['vision_words_mean']} Vision words, {TARGET} pages are about {p20['disputes']}-{a20['disputes']} "
+              f"disputes and {p20['minutes']}-{a20['minutes']} owner minutes with {G.CONTROLS} controls. An estimate, "
+              're-sized from the drafts before the sheet is offered.']
+    if any(screens.values()):
+        got = collections.Counter((v or {}).get('source', 'not screened') for v in screens.values())
+        L += ['', '## The screen and the set', '',
+              f"{SCREENER} through the gateway, on the upright page: " + ', '.join(
+                  f'{n} {k.lower()}' for k, n in got.most_common()) + '.']
+        if chosen:
+            cols = collections.Counter((r['screen'] or {}).get('columns') for r in chosen)
+            agree = sum(1 for r in chosen if kinds.get(r['id']) == 'newspaper')
+            L.append(f"The set: the first {len(chosen)} screened newspaper in the hashed order (target {TARGET}). "
+                     'Columns by the screen: ' + ', '.join(f'{k}: {n}' for k, n in sorted(cols.items(), key=str)) +
+                     f". Vision OCR's sorter calls {agree} of them newspaper.")
+    if cmp:
+        s = G.summary(chosen or cands, cmp['pages'], cmp['missing'])
+        L += ['', '## The drafts and the sheet', '',
+              f"Drafters, blind: {cmp['a']} and {cmp['b']}, through the gateway. {s['pages']} pages drafted by both "
+              f"({s['missing']} missing). {s['words']:,} words; {s['disputes']:,} disputed spans covering "
+              f"{s['disputed_words']:,} words; {s['pages_without_dispute']} pages with none; {s['controls']} agreed "
+              f"controls. Estimated owner time: about {s['owner_minutes']} minutes."]
+    if rul:
+        tot = collections.Counter()
+        for r in rul['pages'].values():
+            tot.update(r['counts'])
+        kept = [r for r in rul['pages'].values() if r['status'] == 'settled' and not r['drop']]
+        drops = collections.Counter(r['drop'] for r in rul['pages'].values() if r['drop'])
+        L += ['', '## The owner\'s rulings', '', f"{len(kept)} pages settled and kept; dropped: " +
+              (', '.join(f'{n} {k}' for k, n in drops.items()) or 'none') + '. ' +
+              ', '.join(f'{k} {n}' for k, n in sorted(tot.items())) + '.']
+    L += ['', '## Measurement card', '',
+          '- **Truth:** ' + ('two gateway drafters of different families, blind; every disputed span and the controls '
+                              'ruled by the owner on a blind sheet boxed from Apple Vision\'s word positions.' if rul else
+                              'not made yet: the screen, the drafts and the owner\'s sheet are pending.'),
+          '- **Selection:** the owner\'s Clippings tag and a salted hash order, capped by folder and collection; no '
+          f'tested route and no ABBYY text chose a page. The newspaper screen is a kind judgement by {SCREENER}, not a '
+          'reading; the sheet lists its answer and the owner can drop a page in a note.',
+          '- **Comparison:** a route scored on this set is scored with the same scorer and settings as the 96 '
+          '(`ocr_panel_score`) and reported beside them, never pooled. A drafter is scored only on owner-ruled spans.',
+          f'- **Noise:** about {TARGET} pages: enough to see a route fail on newsprint columns, not to separate two '
+          'close routes; a gap inside the paired interval is a tie.',
+          '- **Scope:** photographed clippings in the owner\'s collections; not scans (L9 covers 15), and microfilm '
+          'prints only as far as the draw took them.', '']
+    return L
+
+
+def cmd_report(_):
+    RESULTS.write_text('\n'.join(report_lines()))
+    print(RESULTS)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
     for name, fn in (('pool', cmd_pool), ('draw', cmd_draw), ('vision', cmd_vision), ('size', cmd_size),
                      ('select', cmd_select), ('compare', G.cmd_compare), ('sheet', cmd_sheet),
-                     ('models', G.cmd_models)):
+                     ('models', G.cmd_models), ('report', cmd_report)):
         sub.add_parser(name).set_defaults(fn=fn)
     s = sub.add_parser('screen')
     s.add_argument('--limit', type=int)

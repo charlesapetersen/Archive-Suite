@@ -65,5 +65,45 @@ class Wiring(unittest.TestCase):
         self.assertEqual(G.image({'key': 'k'}), N.OUT / 'prep' / 'k.jpg')
 
 
+class Report(unittest.TestCase):
+    def test_counts_only_and_pending_steps(self):
+        import json, tempfile
+        from pathlib import Path
+        old = N.OUT
+        with tempfile.TemporaryDirectory() as t:
+            N.OUT = G.OUT = Path(t)
+            try:
+                rows = [{'id': f'n{i:03d}', 'set': 'news', 'key': f'k{i}', 'folder': 'Secret Coll/Folder X',
+                         'name': f'Private Name {i}.pdf', 'source': 'original (exact name)', 'vision_words': w,
+                         'order': i} for i, w in enumerate([300, 500, 900], 1)]
+                text = ''.join(json.dumps(r) + '\n' for r in rows)
+                (N.OUT / 'candidates.jsonl').write_text(text)
+                (N.OUT / 'pages.jsonl').write_text(text)
+                (N.OUT / 'draw.json').write_text(json.dumps({'pool': 6285, 'candidates': 3, 'failed': [],
+                    'folder_max': 3, 'collection_max': 8, 'collections': {'Secret Coll': 3}}))
+                (N.OUT / 'sorter.tsv').write_text('id\tvision_kind\nn001\tnewspaper\nn002\tphotograph\n')
+                out = '\n'.join(N.report_lines())
+                self.assertIn('6,285', out)
+                self.assertIn('median 500, range 300-900', out)
+                self.assertIn('1 newspaper', out)
+                self.assertIn('not made yet', out)
+                self.assertIn('## Measurement card', out)
+                self.assertNotIn('## The screen', out)
+                for leak in ('Secret', 'Folder X', 'Private Name'):
+                    self.assertNotIn(leak, out)
+                (N.OUT / 'screen').mkdir()
+                for r, a in zip(rows, ('SOURCE: NEWSPAPER\nCOLUMNS: 5', 'SOURCE: OTHER', 'SOURCE: NEWSPAPER')):
+                    N.screen_path(r).write_text(json.dumps({'raw': a}))
+                chosen = N.choose(rows, {r['id']: N.screened(r) for r in rows})
+                (N.OUT / 'pages.jsonl').write_text(''.join(json.dumps({**r, 'screen': N.screened(r)}) + '\n'
+                                                           for r in chosen))
+                out = '\n'.join(N.report_lines())
+                self.assertIn('2 newspaper, 1 other', out)
+                self.assertIn('the first 2 screened newspaper', out)
+                self.assertIn("sorter calls 1 of them newspaper", out)
+            finally:
+                N.OUT = G.OUT = old
+
+
 if __name__ == '__main__':
     unittest.main()
