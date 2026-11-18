@@ -144,6 +144,12 @@ reindexing, exclusions, rapid rule replacement/deletion and snippet clearing, an
 count row and actual filename formatter. `AdvancedSearchUITests.testSmartFolderCountsAndPreviewsOnlyForUserTextSearch`
 checks the sidebar count and saved-folder/search/clear transitions in the off-screen VM.
 
+**Fixed 2026-11-17 (`W40.fix-reader-ocr-clear-preview`):** clearing the search could leave a preview on the
+rows below the visible rect. When the rows kept their IDs, the table reloaded only the visible rows, but
+NSTableView also holds rows it has prepared past that rect. Those kept the old snippet and came on screen
+as the shorter rows moved up. The list now reloads every row it holds a view for, and notes their heights.
+Snippet fill and type-marker colour changes use the same set.
+
 ## ✅ CLOSED (W40.fix-reader-tag-add-speed, 2026-11-08) — verified tags render before the large-library refresh
 
 The inspector already submitted Return and Tab promptly. Scratch timing found the delay after verification:

@@ -203,9 +203,9 @@ struct AppKitTableView: NSViewRepresentable {
         // W40.suite-item-types: a new marker colour redraws the visible names.
         if coordinator.currentMarkerColours != model.itemTypeMarkerColours {
             coordinator.currentMarkerColours = model.itemTypeMarkerColours
-            let visRange = tableView.rows(in: tableView.visibleRect)
-            if visRange.length > 0 {
-                tableView.reloadData(forRowIndexes: IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length)),
+            let rowSet = Self.loadedRows(of: tableView)
+            if !rowSet.isEmpty {
+                tableView.reloadData(forRowIndexes: rowSet,
                                      columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
             }
         }
@@ -222,43 +222,41 @@ struct AppKitTableView: NSViewRepresentable {
                                     keepingPlace: onlyPatched, rowIndex: model.displayedRowIndex) {
                 rowsChanged = true
             } else {
-                // IDs unchanged but values may have changed (tag edit, flag toggle) — reload visible rows.
+                // IDs unchanged but values may have changed (tag edit, flag toggle, a search cleared) — reload
+                // every row the table holds a view for, not only the visible rect: rows prepared just past it
+                // kept a cleared search's snippet and showed it when the shorter rows brought them on screen
+                // (W40.fix-reader-ocr-clear-preview). Their heights may change with the snippet line.
                 // Exclude the row with an active tag edit to prevent editor dismissal.
-                let visRange = tableView.rows(in: tableView.visibleRect)
-                if visRange.length > 0 {
-                    var rowSet = IndexSet(integersIn: visRange.location..<(visRange.location + visRange.length))
-                    if let editID = coordinator.editingItemID,
-                       let editIdx = coordinator.rowByID[editID] {
-                        rowSet.remove(editIdx)
-                    }
-                    if !rowSet.isEmpty {
-                        tableView.reloadData(
-                            forRowIndexes: rowSet,
-                            columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
-                    }
+                var rowSet = Self.loadedRows(of: tableView)
+                if let editID = coordinator.editingItemID,
+                   let editIdx = coordinator.rowByID[editID] {
+                    rowSet.remove(editIdx)
+                }
+                if !rowSet.isEmpty {
+                    tableView.reloadData(
+                        forRowIndexes: rowSet,
+                        columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                    tableView.noteHeightOfRows(withIndexesChanged: rowSet)
                 }
             }
         }
 
         // Search snippets filled in after the hits were listed (W40.fix-reader-fts-snippets): redraw the
-        // visible rows that got one, and let them grow by the line.
+        // loaded rows (visible or prepared past the visible rect) that got one, and let them grow by the line.
         if coordinator.lastSnippetFillGeneration != model.snippetFillGeneration {
             coordinator.lastSnippetFillGeneration = model.snippetFillGeneration
             let filled = model.takeFilledSnippetPaths()
-            let visRange = tableView.rows(in: tableView.visibleRect)
-            if visRange.length > 0 {
-                let ids = coordinator.currentSnapshotIDs
-                var rowSet = IndexSet((visRange.location..<NSMaxRange(visRange)).filter {
-                    $0 < ids.count && filled.contains(ids[$0].path)
-                })
-                if let editID = coordinator.editingItemID, let editIdx = coordinator.rowByID[editID] {
-                    rowSet.remove(editIdx)
-                }
-                if !rowSet.isEmpty {
-                    tableView.reloadData(forRowIndexes: rowSet,
-                                         columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
-                    tableView.noteHeightOfRows(withIndexesChanged: rowSet)
-                }
+            let ids = coordinator.currentSnapshotIDs
+            var rowSet = Self.loadedRows(of: tableView).filteredIndexSet {
+                $0 < ids.count && filled.contains(ids[$0].path)
+            }
+            if let editID = coordinator.editingItemID, let editIdx = coordinator.rowByID[editID] {
+                rowSet.remove(editIdx)
+            }
+            if !rowSet.isEmpty {
+                tableView.reloadData(forRowIndexes: rowSet,
+                                     columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
+                tableView.noteHeightOfRows(withIndexesChanged: rowSet)
             }
         }
 
@@ -297,6 +295,16 @@ struct AppKitTableView: NSViewRepresentable {
                 if scrollTargetAtTop { coordinator.scrollRowToTop(idx, in: scrollView) }
             }
         }
+    }
+
+    /// Every row the table holds a view for: the visible ones and those it prepared past the visible rect.
+    /// A cell that is not reloaded keeps what it last drew, and a prepared row comes on screen without
+    /// being asked for again.
+    @MainActor
+    static func loadedRows(of tableView: NSTableView) -> IndexSet {
+        var rows = IndexSet()
+        tableView.enumerateAvailableRowViews { _, row in if row >= 0 { rows.insert(row) } }
+        return rows
     }
 
     private func sortDescriptorsFromModel() -> [NSSortDescriptor] {
