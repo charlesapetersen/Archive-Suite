@@ -65,7 +65,7 @@ struct NewspaperPageReader: PageReader {
                     return try await whole(page, reason: "a region could not be read", previous: readings, attempts: attempts, spendID: spendID)
                 }
             }
-            var combined = Self.combine(readings, regions: plan.regionCount, coverage: plan.coverage, filled: plan.hasFill)
+            var combined = Self.combine(readings, regions: plan.regionImages, coverage: plan.coverage, filled: plan.hasFill)
             combined.detail.newspaperLayout?.spendIDs = [spendID]
             return combined
     }
@@ -234,10 +234,15 @@ struct NewspaperPagePlan: Sendable {
     static let padding = 0.004
     static let maximumRegions = 128
     let directory: URL
+    /// The region crops read, in native order, then `fillCount` crops of text outside every region.
     let images: [URL]
+    /// Regions detected and kept; a region whose crop masking left blank is among them but not read.
     let regionCount: Int
     let coverage: Double?
-    let hasFill: Bool
+    let fillCount: Int
+
+    var hasFill: Bool { fillCount > 0 }
+    var regionImages: Int { images.count - fillCount }
 
     static func usesRegions(_ kind: PageKind?) -> Bool {
         kind?.kind == .newspapers && (kind?.confidence ?? 0) >= PageKindRouting.minimumConfidence
@@ -265,21 +270,19 @@ struct NewspaperPagePlan: Sendable {
         for box in rawBoxes where unionArea(boxes.map { box.intersection($0) }) < box.width * box.height - 0.5 {
             boxes.append(box)
         }
-        let vision = TextLayer.visionLines(of: image)?.lines.map(\.box) ?? []
+        let page = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let vision = TextLayer.visionLines(of: image)?.lines ?? []
         let normalized = boxes.map { CGRect(x: $0.minX / Double(image.width), y: $0.minY / Double(image.height),
                                             width: $0.width / Double(image.width), height: $0.height / Double(image.height)) }
-        let coverage = coverage(lines: vision, crops: normalized)
-        let boundaries = boundaryLines(vision, crops: normalized)
-        let fill = coverage == nil || coverage! < coverageFloor || !boundaries.isEmpty
-        // A line crossing the crop union must reach one reader intact. On fill pages move those complete
-        // line rectangles into the fill, whitening them in every region. Include any intersecting Vision line
-        // transitively, so restoring one box cannot duplicate characters from another overlapping line.
-        let fillLines = boundaries
-        let fillPixels = fillLines.map { r in
-            CGRect(x: r.minX * Double(image.width), y: r.minY * Double(image.height),
-                   width: r.width * Double(image.width), height: r.height * Double(image.height)).integral
-                .intersection(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        let coverage = coverage(lines: vision.map(\.box), crops: normalized)
+        let lines = vision.map { l in
+            CGRect(x: l.box.minX * Double(image.width), y: l.box.minY * Double(image.height),
+                   width: l.box.width * Double(image.width), height: l.box.height * Double(image.height))
+                .integral.intersection(page)
         }
+        // W46.layout-partition-fix: every Vision line is read once, whole, by the region holding most of it.
+        // A line is never moved out of its region, and owning one never pulls in its neighbours.
+        let owners = owners(of: lines, boxes: boxes)
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ap-newspaper-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         var success = false
@@ -287,26 +290,146 @@ struct NewspaperPagePlan: Sendable {
         var images: [URL] = []
         for (i, box) in boxes.enumerated() {
             guard !isCancelled() else { throw Failure.cancelled }
-            guard let cut = image.cropping(to: box) else { throw Failure.image }
-            let erase = (fillPixels + Array(boxes.prefix(i))).compactMap { r -> CGRect? in
-                let overlap = r.intersection(box)
-                return overlap.isNull ? nil : overlap.offsetBy(dx: -box.minX, dy: -box.minY)
-            }
-            guard let crop = erase.isEmpty ? cut : masked(cut, boxes: erase) else { throw Failure.image }
+            let owned = lines.indices.filter { owners[$0] == i }.map { lines[$0] }
+            let others = lines.indices.filter { owners[$0] != i }.map { lines[$0] }
+            // Earlier regions own their overlap pixels; the region's own lines are restored over them whole,
+            // and lines another reader owns are whitened. A crop widens only to hold its own lines.
+            let frame = owned.reduce(box) { $0.union($1) }.intersection(page)
+            // Where two lines' rectangles overlap across owners, the earlier region keeps the shared pixels.
+            let earlier = lines.indices.filter { owners[$0].map { $0 < i } ?? false }.map { lines[$0] }
+            guard let crop = compose(image, frame: frame, keep: [box], erase: Array(boxes.prefix(i)) + others,
+                                     restore: owned, trim: overlaps(owned, earlier)) else { throw Failure.image }
+            // Masking can leave a crop with nothing on it, and a reader invents text on a blank image.
+            if owned.isEmpty && !hasInk(crop) { continue }
             let target = dir.appendingPathComponent("region-\(i).png")
             try write(crop, to: target)
             images.append(target)
         }
-        if fill {
-            // Whole-page geometry, only unowned pixels: reading the original again and concatenating it would
-            // repeat every region. Covered rectangles are whitened, never textually subtracted afterwards.
-            guard let masked = masked(image, boxes: boxes, restore: fillPixels) else { throw Failure.image }
+        var fill = 0
+        if vision.isEmpty {
+            // No Vision geometry to place: whole-page geometry, only the pixels no region owns. Covered rectangles
+            // are whitened, never textually subtracted afterwards.
+            // Not ink-checked: a few lines of text are a tiny share of a whole page.
+            guard let masked = masked(image, boxes: boxes) else { throw Failure.image }
             let target = dir.appendingPathComponent("outside-regions.png")
             try write(masked, to: target)
             images.append(target)
+            fill = 1
+        } else {
+            // Lines no region touches, read as small crops of their own lines on white, never a whole-page image.
+            let leftover = lines.indices.filter { owners[$0] == nil && !lines[$0].isNull && lines[$0].width * lines[$0].height > 0 }
+            let margin = padding * Double(max(image.width, image.height))
+            for (n, group) in groups(leftover.map { lines[$0] }).enumerated() {
+                guard !isCancelled() else { throw Failure.cancelled }
+                let members = group.map { leftover[$0] }
+                guard members.reduce(0, { $0 + vision[$1].text.filter { $0.isLetter || $0.isNumber }.count }) >= 3 else { continue }
+                let held = members.map { lines[$0] }
+                let frame = held.dropFirst().reduce(held[0]) { $0.union($1) }.insetBy(dx: -margin, dy: -margin)
+                    .integral.intersection(page)
+                let read = lines.indices.filter { owners[$0] != nil }.map { lines[$0] }
+                guard let crop = compose(image, frame: frame, keep: [], erase: [], restore: held,
+                                         trim: overlaps(held, read)) else { throw Failure.image }
+                let target = dir.appendingPathComponent("outside-\(n).png")
+                try write(crop, to: target)
+                images.append(target)
+                fill += 1
+            }
         }
+        guard !images.isEmpty else { throw Failure.regions }
         success = true
-        return Self(directory: dir, images: images, regionCount: boxes.count, coverage: coverage, hasFill: fill)
+        return Self(directory: dir, images: images, regionCount: boxes.count, coverage: coverage, fillCount: fill)
+    }
+
+    /// The region that reads each line: the one with most of the line's pixels it owns (earlier regions own an
+    /// overlap), the earlier on a tie; nil for a line no region touches. Pixel rectangles, page coordinates.
+    static func owners(of lines: [CGRect], boxes: [CGRect]) -> [Int?] {
+        lines.map { line in
+            var best: (index: Int, area: Double)?
+            for (k, box) in boxes.enumerated() {
+                let hit = line.intersection(box)
+                guard !hit.isNull, hit.width > 0, hit.height > 0 else { continue }
+                let owned = hit.width * hit.height - unionArea(boxes.prefix(k).map { hit.intersection($0) })
+                if owned > 1e-9, owned > (best?.area ?? 0) { best = (k, owned) }
+            }
+            return best?.index
+        }
+    }
+
+    static let maximumOutsideCrops = 32
+
+    /// Leftover lines grouped into column-like runs: lines that overlap across and sit within a line height of
+    /// each other, transitively, in reading order (top first, then left). Past `maximumOutsideCrops` groups the
+    /// lines are read together as one group, still cut to their own extent.
+    static func groups(_ lines: [CGRect]) -> [[Int]] {
+        var parent = Array(lines.indices)
+        func root(_ i: Int) -> Int { var i = i; while parent[i] != i { i = parent[i] }; return i }
+        for i in lines.indices {
+            for j in lines.indices where j > i {
+                let a = lines[i], b = lines[j]
+                let gap = max(a.minY, b.minY) - min(a.maxY, b.maxY)
+                if min(a.maxX, b.maxX) > max(a.minX, b.minX), gap <= max(a.height, b.height) {
+                    let (ri, rj) = (root(i), root(j))
+                    if ri != rj { parent[rj] = ri }
+                }
+            }
+        }
+        let grouped = Dictionary(grouping: lines.indices, by: root).values.map { $0.sorted() }
+        guard grouped.count <= maximumOutsideCrops else { return lines.isEmpty ? [] : [Array(lines.indices)] }
+        func top(_ g: [Int]) -> (Double, Double) { (g.map { lines[$0].minY }.min()!, g.map { lines[$0].minX }.min()!) }
+        return grouped.sorted { top($0) < top($1) }
+    }
+
+    /// Every non-empty intersection of a rectangle in `a` with one in `b`.
+    static func overlaps(_ a: [CGRect], _ b: [CGRect]) -> [CGRect] {
+        a.flatMap { r in b.map { r.intersection($0) } }.filter { !$0.isNull && $0.width > 0 && $0.height > 0 }
+    }
+
+    /// A crop of `frame` on white: `keep` rectangles copied from the page, then `erase` whitened, then `restore`
+    /// copied again, then `trim` whitened. Integral page-pixel rectangles; what lies outside `frame` is ignored.
+    static func compose(_ image: CGImage, frame: CGRect, keep: [CGRect], erase: [CGRect], restore: [CGRect],
+                        trim: [CGRect] = []) -> CGImage? {
+        let f = frame.integral
+        guard f.width >= 1, f.height >= 1,
+              let ctx = CGContext(data: nil, width: Int(f.width), height: Int(f.height), bitsPerComponent: 8,
+                                  bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: f.width, height: f.height))
+        func local(_ r: CGRect) -> CGRect? {
+            let clip = r.intersection(f)
+            guard !clip.isNull, clip.width > 0, clip.height > 0 else { return nil }
+            return clip
+        }
+        func place(_ r: CGRect) -> CGRect { CGRect(x: r.minX - f.minX, y: f.maxY - r.maxY, width: r.width, height: r.height) }
+        func copy(_ rects: [CGRect]) -> Bool {
+            for r in rects.compactMap(local) {
+                guard let piece = image.cropping(to: r) else { return false }
+                ctx.draw(piece, in: place(r))
+            }
+            return true
+        }
+        guard copy(keep) else { return nil }
+        for r in erase.compactMap(local) { ctx.fill(place(r)) }
+        guard copy(restore) else { return nil }
+        for r in trim.compactMap(local) { ctx.fill(place(r)) }
+        return ctx.makeImage()
+    }
+
+    /// Whether a crop carries any mark: at least 0.3% of its pixels darker than 160/255, sampled (nearest
+    /// neighbour, never averaged, so thin strokes keep their darkness) at 512 px at most. A picture or a column of
+    /// text passes easily; a crop masked down to slivers does not.
+    static func hasInk(_ image: CGImage) -> Bool {
+        let scale = min(1, 512 / Double(max(image.width, image.height)))
+        let w = max(1, Int(Double(image.width) * scale)), h = max(1, Int(Double(image.height) * scale))
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                                  space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue)
+        else { return true }
+        ctx.interpolationQuality = .none
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let data = ctx.data else { return true }
+        let pixels = data.bindMemory(to: UInt8.self, capacity: w * h)
+        let dark = (0..<(w * h)).reduce(0) { $0 + (pixels[$1] < 160 ? 1 : 0) }
+        return Double(dark) >= 0.003 * Double(w * h)
     }
 
     /// Benchmark crop geometry: 0.004 of each page dimension, ties-to-even, clipped, at least 32 px a side.
@@ -352,30 +475,6 @@ struct NewspaperPagePlan: Sendable {
             area += (b - a) * (span + bottom - top)
         }
         return area
-    }
-
-    static func boundaryLines(_ lines: [CGRect], crops: [CGRect]) -> [CGRect] {
-        var selected = Set(lines.indices.filter { i in
-            // The first intersecting crop owns the pixels. Union coverage alone misses a line divided
-            // between two adjacent or overlapping crops even when their union covers every character.
-            guard let first = crops.first(where: {
-                let hit = lines[i].intersection($0)
-                return !hit.isNull && hit.width * hit.height > 1e-12
-            }) else { return false }
-            let hit = lines[i].intersection(first)
-            return hit.width * hit.height < lines[i].width * lines[i].height - 1e-12
-        })
-        var previous = -1
-        while previous != selected.count {
-            previous = selected.count
-            for i in lines.indices where !selected.contains(i) {
-                if selected.contains(where: { !lines[i].intersection(lines[$0]).isNull
-                    && lines[i].intersection(lines[$0]).width * lines[i].intersection(lines[$0]).height > 0 }) {
-                    selected.insert(i)
-                }
-            }
-        }
-        return selected.sorted().map { lines[$0] }
     }
 
     static func masked(_ image: CGImage, boxes: [CGRect], restore: [CGRect] = []) -> CGImage? {

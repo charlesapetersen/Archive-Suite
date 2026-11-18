@@ -9,14 +9,16 @@ enum NewspaperBatch {
 
     struct Page: Codable, Equatable, Sendable {
         let fileIndex: Int
-        /// The exact keys expected, in native region order, with an optional masked whole-page fill last.
+        /// The exact keys expected: the region crops in native order, then the crops of text outside them.
         let requestIDs: [String]
+        /// Region crops read (a region masking left blank is not read), then `fills` outside crops.
         let regions: Int
+        let fills: Int
         let coverage: Double?
-        let filled: Bool
         let fallback: String?
 
-        var isExpanded: Bool { regions > 0 }
+        var filled: Bool { fills > 0 }
+        var isExpanded: Bool { regions + fills > 0 }
     }
 
     struct Manifest: Codable, Equatable, Sendable {
@@ -51,13 +53,13 @@ enum NewspaperBatch {
                 requests += zip(plan.images, ids).map {
                     BatchOCRRequest(imageURL: $0.0, customID: $0.1, previousImageURL: previous)
                 }
-                pages.append(Page(fileIndex: index, requestIDs: ids, regions: plan.regionCount,
-                                  coverage: plan.coverage, filled: plan.hasFill, fallback: nil))
+                pages.append(Page(fileIndex: index, requestIDs: ids, regions: plan.regionImages,
+                                  fills: plan.fillCount, coverage: plan.coverage, fallback: nil))
             } else {
                 let id = "file-\(index)"
                 requests.append(BatchOCRRequest(imageURL: url, customID: id, previousImageURL: previous))
-                pages.append(Page(fileIndex: index, requestIDs: [id], regions: 0, coverage: nil,
-                                  filled: false, fallback: prepared.fallback))
+                pages.append(Page(fileIndex: index, requestIDs: [id], regions: 0, fills: 0, coverage: nil,
+                                  fallback: prepared.fallback))
             }
         }
         try Task.checkCancellation()
@@ -98,10 +100,11 @@ enum NewspaperBatch {
         var allowed = Set<String>()
         for page in manifest.pages {
             guard page.regions >= 0, page.regions <= NewspaperPagePlan.maximumRegions,
+                  page.fills >= 0, page.fills <= NewspaperPagePlan.maximumOutsideCrops,
                   page.coverage.map({ $0.isFinite && $0 >= 0 && $0 <= 1 }) ?? true else { return false }
             let whole = "file-\(page.fileIndex)"
             if page.isExpanded {
-                guard page.requestIDs.count == page.regions + (page.filled ? 1 : 0),
+                guard page.requestIDs.count == page.regions + page.fills,
                       page.requestIDs.enumerated().allSatisfy({ i, key in
                           key == regionID(fileIndex: page.fileIndex, regionIndex: i, total: page.requestIDs.count)
                       }) else { return false }
@@ -132,8 +135,9 @@ enum NewspaperBatch {
             }
             // A raw fallback the caller already journaled wins over the regions that caused it.
             if results[key] != nil { continue }
-            guard page.fileIndex >= 0, page.regions <= NewspaperPagePlan.maximumRegions,
-                  page.requestIDs.count == page.regions + (page.filled ? 1 : 0),
+            guard page.fileIndex >= 0, page.regions >= 0, page.regions <= NewspaperPagePlan.maximumRegions,
+                  page.fills >= 0, page.fills <= NewspaperPagePlan.maximumOutsideCrops,
+                  page.requestIDs.count == page.regions + page.fills,
                   !page.requestIDs.isEmpty,
                   page.requestIDs.enumerated().allSatisfy({ offset, id in
                       guard let parsed = parseRegionID(id) else { return false }

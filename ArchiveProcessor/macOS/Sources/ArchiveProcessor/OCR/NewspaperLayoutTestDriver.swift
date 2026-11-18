@@ -57,9 +57,16 @@ enum NewspaperLayoutTestDriver {
                     let crops = kept.map { CGRect(x: $0.minX / Double(image.width), y: $0.minY / Double(image.height),
                                                   width: $0.width / Double(image.width), height: $0.height / Double(image.height)) }
                     let vision = TextLayer.visionLines(of: image)?.lines.map(\.box) ?? []
+                    let page = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+                    let pixels = vision.map { CGRect(x: $0.minX * Double(image.width), y: $0.minY * Double(image.height),
+                        width: $0.width * Double(image.width), height: $0.height * Double(image.height)).integral.intersection(page) }
+                    let owners = NewspaperPagePlan.owners(of: pixels, boxes: kept)
+                    // fill_lines: lines no region touches; split_lines: lines a region reads whole across its edge.
+                    let split = pixels.indices.filter { i in owners[i].map { !kept[$0].contains(pixels[i]) } ?? false }
                     let record: [String: Any] = [
                         "width": image.width, "height": image.height, "vision_lines": vision.count,
-                        "fill_lines": NewspaperPagePlan.boundaryLines(vision, crops: crops).count, "kept": kept.count,
+                        "fill_lines": owners.filter { $0 == nil }.count, "split_lines": split.count, "kept": kept.count,
+                        "coverage_crops": crops.count,
                         "regions": regions.map { ["box": [$0.box.minX, $0.box.minY, $0.box.maxX, $0.box.maxY],
                                                   "order": $0.order, "label": $0.label, "score": $0.score] as [String: Any] }]
                     return try JSONSerialization.data(withJSONObject: record)
@@ -74,6 +81,8 @@ enum NewspaperLayoutTestDriver {
                 record["plan_regions"] = plan.regionCount
                 record["coverage"] = plan.coverage ?? NSNull()
                 record["has_fill"] = plan.hasFill
+                record["region_images"] = plan.regionImages
+                record["fill_crops"] = plan.fillCount
                 record["images"] = names
                 record["prepare_seconds"] = prepareSeconds
                 let data = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
@@ -133,11 +142,23 @@ enum NewspaperLayoutTestDriver {
             let crop = CGRect(x: 0, y: 0, width: 0.5, height: 1)
             check("union coverage counts overlapping lines only once", abs((NewspaperPagePlan.coverage(lines: [line, line], crops: [crop]) ?? 0) - 0.5) < 1e-9)
             check("no Vision geometry requests fill", NewspaperPagePlan.coverage(lines: [], crops: [crop]) == nil)
-            check("boundary line moves intact to fill", NewspaperPagePlan.boundaryLines([line], crops: [crop]) == [line])
-            check("a line divided across two otherwise complete regions reaches fill intact",
-                  NewspaperPagePlan.boundaryLines([line], crops: [crop, CGRect(x: 0.5, y: 0, width: 0.5, height: 1)]) == [line])
-            let overlap = CGRect(x: 0.75, y: 0.3, width: 0.1, height: 0.1)
-            check("overlapping line follows the moved line", NewspaperPagePlan.boundaryLines([line, overlap], crops: [crop]).count == 2)
+            // W46.layout-partition-fix, pixel rectangles: a line is read once, whole, by the region holding most.
+            let left = CGRect(x: 0, y: 0, width: 50, height: 100), right = CGRect(x: 50, y: 0, width: 50, height: 100)
+            let split = CGRect(x: 20, y: 30, width: 60, height: 10), inside = CGRect(x: 60, y: 38, width: 30, height: 10)
+            check("a split line goes whole to the region holding most of it",
+                  NewspaperPagePlan.owners(of: [split], boxes: [CGRect(x: 0, y: 0, width: 40, height: 100), CGRect(x: 40, y: 0, width: 60, height: 100)]) == [1])
+            check("an even split goes to the earlier region", NewspaperPagePlan.owners(of: [split], boxes: [left, right]) == [0])
+            check("no transitive closure: an overlapping line stays with its own region",
+                  NewspaperPagePlan.owners(of: [split, inside], boxes: [left, right]) == [0, 1])
+            check("a line in an overlap belongs to the earlier region, which owns those pixels",
+                  NewspaperPagePlan.owners(of: [CGRect(x: 45, y: 0, width: 10, height: 10)], boxes: [CGRect(x: 0, y: 0, width: 60, height: 100), CGRect(x: 40, y: 0, width: 60, height: 100)]) == [0])
+            check("a line no region touches is left over", NewspaperPagePlan.owners(of: [split], boxes: [CGRect(x: 0, y: 60, width: 100, height: 40)]) == [nil])
+            let column = (0..<4).map { CGRect(x: 10, y: 10 + $0 * 15, width: 30, height: 10) }
+            let other = CGRect(x: 60, y: 10, width: 30, height: 10), far = CGRect(x: 10, y: 400, width: 30, height: 10)
+            check("leftover lines group by column, top first, never across a gap",
+                  NewspaperPagePlan.groups(column + [other, far]) == [[0, 1, 2, 3], [4], [5]])
+            check("too many leftover groups read as one",
+                  NewspaperPagePlan.groups((0..<40).map { CGRect(x: $0 * 20, y: 0, width: 10, height: 10) }).count == 1)
             let context = CGContext(data: nil, width: 100, height: 100, bitsPerComponent: 8, bytesPerRow: 0,
                                     space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
             context.setFillColor(CGColor(gray: 1, alpha: 1)); context.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
@@ -154,12 +175,37 @@ enum NewspaperLayoutTestDriver {
                 }.count }
             }
             check("region omits moved line; fill has all its pixels", ink(regionImage) == 0 && ink(fillImage) == ink(original) && ink(fillImage) == 600)
+            // The owner's crop widens to hold the whole split line; the other region keeps none of it.
+            let owner = NewspaperPagePlan.compose(original, frame: left.union(split), keep: [left], erase: [], restore: [split])!
+            let loser = NewspaperPagePlan.compose(original, frame: right, keep: [right], erase: [left, split], restore: [])!
+            func inkCount(_ image: CGImage) -> Int {
+                let rep = NSBitmapImageRep(cgImage: image)
+                return (0..<image.height).reduce(0) { sum, y in sum + (0..<image.width).filter { x in
+                    (rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB)?.redComponent ?? 1) < 0.5
+                }.count }
+            }
+            check("the owning region reads the whole split line and the other none of it",
+                  owner.width == 80 && inkCount(owner) == 600 && inkCount(loser) == 0)
+            let firstLine = CGRect(x: 20, y: 30, width: 40, height: 10), secondLine = CGRect(x: 50, y: 30, width: 30, height: 10)
+            let early = NewspaperPagePlan.compose(original, frame: left.union(firstLine), keep: [], erase: [], restore: [firstLine])!
+            let late = NewspaperPagePlan.compose(original, frame: right, keep: [], erase: [], restore: [secondLine],
+                                                 trim: NewspaperPagePlan.overlaps([secondLine], [firstLine]))!
+            let band = NewspaperPagePlan.compose(original, frame: CGRect(x: 0, y: 25, width: 100, height: 20),
+                                                 keep: [CGRect(x: 0, y: 25, width: 100, height: 20)], erase: [], restore: [])!
+            let bandRep = NSBitmapImageRep(cgImage: band)
+            check("a frame below the top keeps its rows in place",
+                  inkCount(band) == 600 && (bandRep.colorAt(x: 25, y: 7)?.usingColorSpace(.deviceRGB)?.redComponent ?? 1) < 0.5
+                      && (bandRep.colorAt(x: 25, y: 2)?.usingColorSpace(.deviceRGB)?.redComponent ?? 0) > 0.5)
+            check("overlapping line rectangles across owners: the earlier region keeps the shared pixels",
+                  inkCount(early) == 400 && inkCount(late) == 200)
+            check("a crop masked blank is skipped, a line of text is not",
+                  !NewspaperPagePlan.hasInk(loser) && NewspaperPagePlan.hasInk(owner))
             let source = dir.appendingPathComponent("whole.png")
             try NewspaperPagePlan.write(original, to: source)
             let bytes = try Data(contentsOf: source)
             let previous = dir.appendingPathComponent("previous.png")
             let input = PageReaderInput(imageURL: source, previousText: "previous page", previousImageURL: previous)
-            let plan = NewspaperPagePlan(directory: dir, images: [dir.appendingPathComponent("right-first.png"), dir.appendingPathComponent("left-second.png"), dir.appendingPathComponent("outside.png")], regionCount: 2, coverage: 0.7, hasFill: true)
+            let plan = NewspaperPagePlan(directory: dir, images: [dir.appendingPathComponent("right-first.png"), dir.appendingPathComponent("left-second.png"), dir.appendingPathComponent("outside.png")], regionCount: 2, coverage: 0.7, fillCount: 1)
             let fake = Fake()
             let completeSpend = NewspaperReadingSpend()
             let read = try await NewspaperPageReader.$spend.withValue(completeSpend) {
@@ -222,7 +268,7 @@ enum NewspaperLayoutTestDriver {
 
             let ids = (0..<3).map { NewspaperBatch.regionID(fileIndex: 0, regionIndex: $0, total: 3) }
             let manifest = NewspaperBatch.Manifest(pages: [NewspaperBatch.Page(fileIndex: 0, requestIDs: ids,
-                regions: 2, coverage: 0.7, filled: true, fallback: nil)])
+                regions: 2, fills: 1, coverage: 0.7, fallback: nil)])
             var parts = [ids[0]: OCRResult(text: "repeat", classification: .documentStart, errorMessage: nil, errorCode: nil)]
             check("incomplete cross-chunk page is never output", NewspaperBatch.aggregate(manifest: manifest, parts: parts).isEmpty)
             parts[ids[2]] = OCRResult(text: "outside", classification: nil, errorMessage: nil, errorCode: nil)
@@ -233,6 +279,18 @@ enum NewspaperLayoutTestDriver {
                   && !NewspaperBatch.valid(manifest, parts: ["file-1-region-0-of-3": parts[ids[0]]!], files: 1))
             check("ids are strictly anchored", NewspaperBatch.originalIndex(ids[0]) == nil
                   && NewspaperBatch.originalIndex("file-00") == nil && NewspaperBatch.parseRegionID("file-0-region-3-of-3") == nil)
+            // W46.layout-partition-fix shapes: skipped regions and several outside crops, or outside crops alone.
+            let shapes = [(1, 2), (0, 2), (2, 0)].map { regions, fills in
+                NewspaperBatch.Page(fileIndex: 0, requestIDs: (0..<(regions + fills)).map {
+                    NewspaperBatch.regionID(fileIndex: 0, regionIndex: $0, total: regions + fills) },
+                    regions: regions, fills: fills, coverage: 0.9, fallback: nil) }
+            check("pages with skipped regions or several outside crops assemble in order", shapes.allSatisfy { page in
+                let replies = Dictionary(uniqueKeysWithValues: page.requestIDs.enumerated().map {
+                    ($1, OCRResult(text: "t\($0)", classification: nil, errorMessage: nil, errorCode: nil)) })
+                return page.isExpanded && NewspaperBatch.valid(NewspaperBatch.Manifest(pages: [page]), parts: replies, files: 1)
+                    && NewspaperBatch.aggregate(manifest: NewspaperBatch.Manifest(pages: [page]), parts: replies)["file-0"]?.text
+                        == page.requestIDs.indices.map { "t\($0)" }.joined(separator: "\n\n")
+            })
             parts[ids[1]] = .cutOff
             check("a failed region invalidates the batch page", NewspaperBatch.aggregate(manifest: manifest, parts: parts)["file-0"]?.errorCode == NewspaperBatch.failedRegionCode)
             parts["file-0"] = OCRResult(text: "whole fallback", classification: .documentStart, errorMessage: nil, errorCode: nil)
@@ -350,7 +408,8 @@ enum NewspaperLayoutTestDriver {
                     try NewspaperPagePlan.prepare(authored, photographed: false, isCancelled: { false })
                 }
                 defer { realPlan.removeScratch() }
-                check("real PP prepares regions from the authored newspaper", realPlan.regionCount > 0 && realPlan.images.count >= realPlan.regionCount)
+                check("real PP prepares regions from the authored newspaper", realPlan.regionCount > 0 && realPlan.regionImages > 0
+                      && realPlan.regionImages <= realPlan.regionCount)
                 check("real prepared crops exist", realPlan.images.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
             }
             let renderer = ImageRenderer(content: NewspaperLayoutDownloadRow().padding().frame(width: 600).background(.white))
