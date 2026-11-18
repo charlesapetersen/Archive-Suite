@@ -99,6 +99,61 @@ struct PageTurnScroll {
     }
 }
 
+/// Watches one pane's scroll and swipe events, and turns the page when `PageTurnScroll` says so. A local event
+/// monitor rather than a `scrollWheel(with:)` override: a PDFView's scroll events go to the NSScrollView inside it,
+/// which handles them and never passes them up to the PDFView, and a short extracted text leaves the clip view,
+/// not the text view, under the pointer. The monitor acts only on an event in the pane's window whose hit view is
+/// the pane or inside it, so a sheet, another pane or a control over it gets its events untouched.
+@MainActor
+final class PageTurnMonitor {
+    private nonisolated(unsafe) var monitor: Any?
+    private var scroll = PageTurnScroll()
+    private weak var area: NSView?
+    private var clip: () -> NSClipView? = { nil }
+    private var turn: () -> ((Bool) -> Void)? = { nil }
+
+    /// Watch while `area` is in a window; call from its `viewDidMoveToWindow`, which also stops it on removal.
+    func follow(_ area: NSView, clip: @escaping () -> NSClipView?, turn: @escaping () -> ((Bool) -> Void)?) {
+        self.area = area
+        self.clip = clip
+        self.turn = turn
+        guard area.window != nil else { stop(); return }
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .swipe]) { [weak self] event in
+            nonisolated(unsafe) let event = event   // local monitors run on the main thread
+            return MainActor.assumeIsolated { self?.consumes(event) ?? false } ? nil : event
+        }
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+    }
+
+    deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
+
+    /// Whether the event turned the page or belongs to a gesture that did, and so goes no further.
+    private func consumes(_ event: NSEvent) -> Bool {
+        guard let area, let window = area.window, event.window === window, let content = window.contentView,
+              let hit = content.hitTest(content.superview?.convert(event.locationInWindow, from: nil)
+                                        ?? event.locationInWindow),
+              hit.isDescendant(of: area), let turn = turn(), let clip = clip() else { return false }
+        if event.type == .swipe {
+            guard let next = event.swipeTurnsToNext else { return false }
+            turn(next)
+            return true
+        }
+        switch scroll.handle(phase: event.phase, momentum: event.momentumPhase, dx: event.scrollingDeltaX,
+                             dy: event.scrollingDeltaY, time: event.timestamp, edges: PageEdge.reached(by: clip)) {
+        case .scroll: return false
+        case .swallow: return true
+        case .turn(let next):
+            turn(next)
+            return true
+        }
+    }
+}
+
 extension NSEvent {
     /// ← or → with no modifier (the arrow keys carry the numeric-pad and function flags, Caps Lock is ignored):
     /// `true` for →, `false` for ←, nil for anything else.

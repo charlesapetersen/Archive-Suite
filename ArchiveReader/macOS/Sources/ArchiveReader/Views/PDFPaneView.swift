@@ -686,6 +686,7 @@ struct PDFPaneView: NSViewRepresentable {
 final class ReaderPDFView: PDFView {
     var pageAccessibilityTitle = "PDF page"
     weak var paneController: PDFPaneController?
+    private let pageTurns = PageTurnMonitor()
 
     override func accessibilityChildren() -> [Any]? {
         let children = super.accessibilityChildren()
@@ -739,31 +740,6 @@ final class ReaderPDFView: PDFView {
             return
         }
         super.keyDown(with: event)
-    }
-
-    // MARK: Swipe and scroll past the edge turn the page (W40.reader-page-nav)
-
-    private var scrollTurn = PageTurnScroll()
-
-    override func scrollWheel(with event: NSEvent) {
-        guard let turn = paneController?.turnPage, let clip = documentView?.enclosingScrollView?.contentView else {
-            super.scrollWheel(with: event)
-            return
-        }
-        switch scrollTurn.handle(phase: event.phase, momentum: event.momentumPhase, dx: event.scrollingDeltaX,
-                                 dy: event.scrollingDeltaY, time: event.timestamp, edges: PageEdge.reached(by: clip)) {
-        case .scroll: super.scrollWheel(with: event)
-        case .swallow: break
-        case .turn(let next): turn(next)
-        }
-    }
-
-    override func swipe(with event: NSEvent) {
-        if let next = event.swipeTurnsToNext, let turn = paneController?.turnPage {
-            turn(next)
-        } else {
-            super.swipe(with: event)
-        }
     }
 
     /// How far one arrow press moves the page: a tenth of the pane, and never less than `minPanStep` points.
@@ -836,6 +812,9 @@ final class ReaderPDFView: PDFView {
     /// view takes it back when its pane is the focused one; never from a field or another view.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        // A swipe, or a scroll past the page's edge, turns the page (W40.reader-page-nav).
+        pageTurns.follow(self, clip: { [weak self] in self?.documentView?.enclosingScrollView?.contentView },
+                         turn: { [weak self] in self?.paneController?.turnPage })
         guard window != nil, paneController?.holdsFocus?() == true else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window, window.firstResponder === window,

@@ -299,7 +299,8 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
 - *Row context menu only (no menu-bar item):* Open in Default App — opens every selected file, read-only.
 
 *Document window* (the **focused pane** carries an accent border; click a pane or switch it with `⌘⌥←`/`⌘⌥→`)
-- `←/→/↑/↓` **pan** the focused PDF page, stopping at its edges; a fitted page stays put. In the extracted-text pane, arrows keep their native text-navigation behavior (W40.fix-reader-doc-keys-focus).
+- `←/→/↑/↓` **pan** the focused PDF page, stopping at its edges; a fitted page stays put. In the extracted-text pane, ↑/↓ and modified arrows keep their native text-navigation behavior (W40.fix-reader-doc-keys-focus).
+- `←`/`→` **turn the page** when the pan has nowhere to go that way (a fitted page, or a zoomed one at that edge; a held key only pans), from either pane; in the extracted-text pane they always turn. A horizontal swipe turns it, and so does a trackpad scroll that pushes past an edge the page already sat at when it began (one page per gesture; its momentum is swallowed), or a mouse-wheel run that starts at one. ↑/↓ only pan (`W40.reader-page-nav`, `PageTurnInput.swift`).
 - `⌘⇧↑/⌘⇧↓` previous/next page in the segment (the opened run/selection)
 - `⌘[`/`⌘]` Go ▸ Back/Forward through this window's page jumps — a thumbnail or contact-sheet click, a find hit —
   as in Preview; stepping a page is not a jump, and a new jump after Back ends the forward list. The preview sheet

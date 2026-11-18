@@ -167,6 +167,7 @@ struct ExtractedTextPane: NSViewRepresentable {
 /// NSTextView's own would also put the find highlights on the pasteboard as rich text.
 final class ExtractedTextView: NSTextView {
     weak var controller: ExtractedTextController?
+    private let pageTurns = PageTurnMonitor()
 
     override func copy(_ sender: Any?) {
         if let copy = controller?.copySelection { copy() } else { super.copy(sender) }
@@ -186,7 +187,8 @@ final class ExtractedTextView: NSTextView {
     }
 
     /// W40.reader-page-nav: the text wraps, so ← / → have no pan to do and turn the page, as on a fitted PDF
-    /// page (a held key turns once). A swipe turns it, and so does a scroll past the text's top or bottom.
+    /// page (a held key turns once). A swipe turns it, and so does a scroll past the text's top or bottom
+    /// (`PageTurnMonitor`, watching the whole scroll view: a short text leaves the clip view under the pointer).
     override func keyDown(with event: NSEvent) {
         guard let next = event.plainHorizontalArrow, let turn = controller?.turnPage else {
             super.keyDown(with: event)
@@ -195,33 +197,16 @@ final class ExtractedTextView: NSTextView {
         if !event.isARepeat { turn(next) }
     }
 
-    private var scrollTurn = PageTurnScroll()
-
-    override func scrollWheel(with event: NSEvent) {
-        guard let turn = controller?.turnPage, let clip = enclosingScrollView?.contentView else {
-            super.scrollWheel(with: event)
-            return
-        }
-        switch scrollTurn.handle(phase: event.phase, momentum: event.momentumPhase, dx: event.scrollingDeltaX,
-                                 dy: event.scrollingDeltaY, time: event.timestamp, edges: PageEdge.reached(by: clip)) {
-        case .scroll: super.scrollWheel(with: event)
-        case .swallow: break
-        case .turn(let next): turn(next)
-        }
-    }
-
-    override func swipe(with event: NSEvent) {
-        if let next = event.swipeTurnsToNext, let turn = controller?.turnPage {
-            turn(next)
-        } else {
-            super.swipe(with: event)
-        }
-    }
-
     /// Takes the focus back when the text pane is the focused one and nothing holds it, as `ReaderPDFView`
     /// does for a rebuilt PDF pane.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if let scroll = enclosingScrollView {
+            pageTurns.follow(scroll, clip: { [weak scroll] in scroll?.contentView },
+                             turn: { [weak self] in self?.controller?.turnPage })
+        } else {
+            pageTurns.stop()
+        }
         guard window != nil, controller?.holdsFocus?() == true else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, let window = self.window, window.firstResponder === window,
