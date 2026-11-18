@@ -27,6 +27,9 @@ not found in the file its source names.
 | 11-capture.md | phone capture: what the companions set and check | rules | pages | L | capture-ladder, capture-tags |
 | 12-training-kit.md | training on the user's own photographs: the kit, its gate, its plug-in points | yes, after training | gaps / lines | H | seg-kit-gate*, seg-students, seg-teacher, seg-adapt-*, kit-mac-lora, ocr-ppocrv6-hands* |
 
+Not a stage: `15-training-terms.md` records which providers may train on uploaded pages, with sources, for the
+collection's "must not train" switch (W46.training-optout).
+
 ## The note format (every stage, in this order)
 
 1. **Stage and question.** Two lines: what the stage does to a page or document, and what the user is choosing, or

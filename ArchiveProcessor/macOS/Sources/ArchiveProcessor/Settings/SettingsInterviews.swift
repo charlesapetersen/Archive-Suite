@@ -342,7 +342,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     /// and the languages) are one group, written together into one layer, so a collection's mix never sits beside a
     /// project's strata, and an emptied answer still overrides the project's.
     static let keys: [SettingsKey] = [.mix, .period, .languages, .scripts, .batchCeilingUSD, .hours, .checkingMinutes,
-                                      .priorities, .preference, .straightenReadingCopy, .staysOnMac]
+                                      .priorities, .preference, .straightenReadingCopy, .staysOnMac, .noTraining]
     static let mixGroup: [SettingsKey] = [.mix, .strata, .scripts, .period, .languages]
     /// Where the mix shown came from when this layer did not answer it ("the project “Letters”", "your general
     /// settings"); nil when it is this layer's own or there is none.
@@ -370,6 +370,8 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     var preference: SettingsPreference = .bestMeasured
     var straightenReadingCopy = true
     var staysOnMac = true
+    /// W46.training-optout: hide every route whose provider may train on the pages.
+    var noTraining = false
     var startingPoint: SettingsStartingPoint?
     /// The keys this interview will write (`SettingsKey.rawValue`).
     var answered: Set<String> = []
@@ -386,6 +388,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         preference = r.resolve(.preference).value.string.flatMap(SettingsPreference.init(rawValue:)) ?? preference
         straightenReadingCopy = r.resolve(.straightenReadingCopy).value.bool ?? straightenReadingCopy
         staysOnMac = r.resolve(.staysOnMac).value.bool ?? staysOnMac
+        noTraining = r.resolve(.noTraining).value.bool ?? noTraining
         // The mix group is read from the one layer that answered the mix.
         let mix = r.resolve(.mix)
         func group(_ key: SettingsKey) -> SettingsValue? {
@@ -642,5 +645,6 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         put(.preference, .string(preference.rawValue))
         put(.straightenReadingCopy, .bool(straightenReadingCopy))
         put(.staysOnMac, .bool(staysOnMac))
+        put(.noTraining, .bool(noTraining))
     }
 }

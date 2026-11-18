@@ -447,6 +447,7 @@ public enum CollectionSettingsVocabulary {
         "priorities": "What matters most",
         "weights": "How much each one counts",
         "staysOnMac": "Pages stay on this Mac",
+        "noTraining": "Pages never go where they may train a provider's models",
         "readingFallback": "A page that fails goes to another reader",
         "checkingMinutes": "Minutes you will spend checking where documents begin",
         "straightenReadingCopy": "Straighten the copy you read",

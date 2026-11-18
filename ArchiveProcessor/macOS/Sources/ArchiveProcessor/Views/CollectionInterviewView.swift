@@ -321,6 +321,9 @@ struct CollectionInterviewView: View {
                 .help("Turns a page photographed at a slant level in the PDF you read. Nothing on the page is removed.")
             Toggle("Keep these pages on this Mac", isOn: bind(\.staysOnMac, .staysOnMac))
                 .help("For sensitive material: every page is read here, even when a key or a plan would read it better.")
+            Toggle("My pages must not train a provider's models", isOn: bind(\.noTraining, .noTraining))
+                .help("Hides every reader whose provider may use uploads for training: free API tiers, personal Claude "
+                      + "and ChatGPT plans, and OpenRouter providers that train. The settings sheet says what that costs.")
         }
     }
 

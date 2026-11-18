@@ -281,6 +281,21 @@ Not fixed by also dropping the token of the file's current label: that would tak
 `Red` off a demoted "Red Scare" box page (`ProcessFilesTagWarningTestDriver` §8b), which is worse. A fix would
 record on the job the colour it was tagged with.
 
+## ⚠️ LIMITATION (W46.training-optout, 2026-11-17): what "My pages must not train a provider's models" does not yet do
+
+- **It shapes the settings sheet's picks, not the run.** Like "Keep these pages on this Mac", the switch hides routes
+  in the solver and the sheet; Process Files still runs the app's processing settings (below), so a Gemini key or a
+  plan already chosen there keeps running until the user applies the sheet's pick. OpenRouter requests do not yet
+  carry `provider.data_collection: "deny"`, which would make OpenRouter refuse an upstream that trains
+  (`W46.training-optout-run`). The default segmenter (`SegmentationApproach.preferredDefault`) and Improve OCR's
+  ranking (`ReOCRRanking`) solve without it, so they may still offer a route the switch hides.
+- **It cannot tell a billed key or an opted-out plan.** A Gemini or Mistral key is hidden because their free tiers
+  train, and a Claude or ChatGPT plan because its training setting may be on; a user whose key is billed or whose
+  plan's setting is off loses those routes anyway (`W46.training-optout-run`).
+- **The terms are a reading of 2026-11-17.** They live in `SettingsTraining.swift` and
+  `execution-plans/processing-review/13-stage-rules/15-training-terms.md`, with their sources; a provider that
+  changes its terms needs both edited.
+
 ## ⚠️ LIMITATION (W46.settings-layers, 2026-11-11): what the settings layers do not yet cover
 
 - **The interviews fill the layers; nothing shows the picks yet.** The general and collection interviews

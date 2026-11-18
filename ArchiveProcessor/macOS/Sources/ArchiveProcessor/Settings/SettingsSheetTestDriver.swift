@@ -140,6 +140,43 @@ enum SettingsSheetTestDriver {
         } else { check("2 segmentation card", false) }
         check("2 reading already runs: nothing to apply", card(free, "reading")?.apply == nil)
 
+        // T. W46.training-optout: a Gemini key and an OpenRouter key, the collection's pages must not train a model.
+        // Each card says what the switch costs: the best route it hides, its figure and price against the pick's,
+        // and whose terms hide it.
+        let keyed = layer(.general, [(.keys, .strings(["gemini", "openrouter"])), (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
+                                     (.batchCeilingUSD, .double(50)), (.staysOnMac, .bool(false)),
+                                     (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)))])
+        let optOut = sheet("no-training", general: keyed, collection: layer(.collection, [(.noTraining, .bool(true))]))
+        let optIn = sheet("training-allowed", general: keyed)
+        check("T the limits list the switch", optOut.limits.contains { $0.id == "noTraining" && $0.value.hasPrefix("Yes") },
+              optOut.limits.map { "\($0.id)=\($0.value)" }.joined(separator: "; "))
+        check("T switched off, no card has a training line", optIn.cards.allSatisfy { $0.trainingCost == nil })
+        check("T switched on, every card has one", optOut.cards.allSatisfy { $0.trainingCost != nil },
+              optOut.cards.filter { $0.trainingCost == nil }.map(\.id).joined(separator: ", "))
+        if let r = card(optOut, "reading"), let t = r.trainingCost {
+            check("T reading: the pick is not a Gemini key route", !(r.routeID ?? "").hasPrefix("gemini"), r.routeID ?? "nil")
+            check("T reading: the line names the hidden route, its price per 1,000, and Google's terms",
+                  t.contains("per 1,000 pages") && t.contains("Gemini") && t.contains("free tier"), t)
+        } else { check("T reading card's training line", false) }
+        let trCustom = sheet("no-training-custom", general: keyed,
+                           collection: layer(.collection, [(.noTraining, .bool(true)),
+                                                           (SettingsSheetModel.overrideKey("reading"), .string("apple-vision"))]))
+        check("T a Custom reading card still names what the switch hides",
+              card(trCustom, "reading")?.trainingCost.map { $0.contains("costs this step") && $0.contains("Gemini") } == true,
+              card(trCustom, "reading")?.trainingCost ?? "nil")
+        let gemRunning = SettingsSheetModel.Running(readingRouteID: "gemini3.8-flash", readingName: "Gemini 3.8 Flash",
+                                                    segmentation: .manual)
+        let runsGem = sheet("no-training-running-gemini", general: keyed,
+                            collection: layer(.collection, [(.noTraining, .bool(true))]), running: gemRunning)
+        check("T a reader in use that may train is called out",
+              card(runsGem, "reading")?.runsNow.map { $0.contains("may train on your pages") } == true,
+              card(runsGem, "reading")?.runsNow ?? "nil")
+        if let sg = card(optOut, "segmentation") {
+            check("T segmentation: a hidden Gemini route reads as the user's switch",
+                  sg.options.contains { $0.id == "gemini3.8-flash" && ($0.blocked ?? "").contains("must not train") },
+                  sg.options.first { $0.id == "gemini3.8-flash" }?.blocked ?? "no option")
+        }
+
         // 3. A Gemini key and a ceiling (D1-like).
         let gem = layer(.general, [(.keys, .strings(["gemini"])), (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
                                    (.batchCeilingUSD, .double(10)), (.staysOnMac, .bool(false)),
@@ -561,6 +598,7 @@ enum SettingsSheetTestDriver {
         for c in m.cards {
             dump.append("CARD \(c.title) | \(c.routeName) | \(c.family) | custom \(c.isCustom) | \(c.weight)")
             dump.append("  why: \(c.why)")
+            if let t = c.trainingCost { dump.append("  training: \(t)") }
             for p in c.parts { dump.append("  part \(p.label): \(p.figure) \(p.routeName.map { "— \($0)" } ?? "") (\(p.sample ?? "-")) \(p.label2 ?? "")") }
             dump.append("  cost: \(c.cost) | time: \(c.time) | memory: \(c.memory)")
             for l in c.labels { dump.append("  label: \(l)") }

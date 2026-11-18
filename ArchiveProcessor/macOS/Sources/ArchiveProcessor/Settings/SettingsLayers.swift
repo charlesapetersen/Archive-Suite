@@ -212,6 +212,9 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     /// Each ranked priority's stage weight, by `SettingsPriority` name; empty is 45, 30, 15, 10 by position.
     static let weights = SettingsKey(rawValue: "weights")
     static let staysOnMac = SettingsKey(rawValue: "staysOnMac")
+    /// W46.training-optout: pages go only where the provider's terms say uploads do not train its models
+    /// (`SettingsTraining`); a route that may train, or whose terms depend on the user's account, is hidden.
+    static let noTraining = SettingsKey(rawValue: "noTraining")
     static let readingFallback = SettingsKey(rawValue: "readingFallback")
     static let checkingMinutes = SettingsKey(rawValue: "checkingMinutes")
     static let straightenReadingCopy = SettingsKey(rawValue: "straightenReadingCopy")
@@ -235,7 +238,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     ]
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
-        .preference, .priorities, .weights, .staysOnMac, .readingFallback, .checkingMinutes, .straightenReadingCopy,
+        .preference, .priorities, .weights, .staysOnMac, .noTraining, .readingFallback, .checkingMinutes, .straightenReadingCopy,
         .placeHandOnImage, .dateImageEveryDocument, .searchableFor,
     ]
     static let catalog: [SettingsKey] = generalOnly + anyLayer
@@ -269,6 +272,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         case .priorities: return .strings(skipped.priorities.map(\.rawValue))
         case .weights: return .numbers([:])
         case .staysOnMac: return .bool(skipped.staysOnMac)
+        case .noTraining: return .bool(false)
         case .readingFallback: return .bool(skipped.readingFallback)
         case .checkingMinutes: return .double(skipped.checkingMinutes)
         // Owner call 6: straightening on by default, switchable off.
@@ -312,6 +316,7 @@ extension SettingsKey {
         case .priorities: return "What matters most"
         case .weights: return "How much each one counts"
         case .staysOnMac: return "Pages stay on this Mac"
+        case .noTraining: return "Pages never go where they may train a provider's models"
         case .readingFallback: return "A page that fails goes to another reader"
         case .checkingMinutes: return "Minutes you will spend checking where documents begin"
         case .straightenReadingCopy: return "Straighten the copy you read"
@@ -542,6 +547,7 @@ struct SettingsResolver: Sendable {
             }
         }
         a.staysOnMac = resolve(.staysOnMac).value.bool ?? true
+        a.noTraining = resolve(.noTraining).value.bool ?? false
         a.readingFallback = resolve(.readingFallback).value.bool ?? true
         a.checkingMinutes = max(0, resolve(.checkingMinutes).value.double ?? 0)
         a.fineTuning = resolve(.fineTuning).value.string.flatMap(FineTuningAnswer.init(rawValue:)) ?? .no

@@ -89,6 +89,9 @@ struct SettingsSheetModel {
         let labels: [String]
         let caveats: [String]
         let better: [Better]
+        /// W46.training-optout: under the "must not train" switch, what it gives up here — the best route it hides,
+        /// its figure and price per 1,000 against the pick's, and whose terms hide it. Nil when the switch is off.
+        let trainingCost: String?
         let alternatives: [Alternative]
         let options: [Option]
         /// The app's own pick when the card is Custom, for the way back.
@@ -285,6 +288,9 @@ struct SettingsSheetModel {
                   source: Self.sourceWords(r.resolve(.priorities))),
             Limit(id: "staysOnMac", label: "Pages stay on this Mac", value: a.staysOnMac ? "Yes" : "No",
                   source: Self.sourceWords(r.resolve(.staysOnMac))),
+            Limit(id: "noTraining", label: "Pages must not train a provider's models",
+                  value: a.noTraining ? "Yes: routes whose provider may train on them are hidden; each card says what that costs" : "No",
+                  source: Self.sourceWords(r.resolve(.noTraining))),
         ]
     }
 
@@ -630,6 +636,12 @@ struct SettingsSheetModel {
             }
         default: break
         }
+        // W46.training-optout: the reader Process Files uses now may itself train on the pages.
+        if stage.id == "reading", a.noTraining, let id = running.readingRouteID, id != route?.id,
+           let now = stage.route(id), let rec = solver.trainingRisk(now) {
+            runsNow = (runsNow.map { $0 + " " } ?? "") + "What Process Files reads with now may train on your pages ("
+                + rec.provider + ": " + rec.summary + "), which this collection's switch rules out."
+        }
 
         var sources = [String]()
         if let n = stage.note { sources.append(n) }
@@ -675,8 +687,59 @@ struct SettingsSheetModel {
             time: words.time(hours, routes: usedRoutes, stage: stage),
             memory: words.memory(usedRoutes),
             labels: labels, caveats: Self.unique(usedRoutes.flatMap(\.caveats)),
-            better: betterAll, alternatives: Array(alternatives), options: options, appPick: appPick,
+            better: betterAll,
+            trainingCost: Self.trainingCost(stage, app: app, solver: solver, answers: a, words: words),
+            alternatives: Array(alternatives), options: options, appPick: appPick,
             runsNow: runsNow, apply: apply, sources: sources)
+    }
+
+    /// W46.training-optout: the best route the "must not train" switch hides on this card, the only thing keeping it
+    /// out, against the app's own pick, on the card's own figure and in price per 1,000 (`SettingsTraining`). Read from
+    /// the app's solution, so a Custom card still compares the app's pick with what the switch hides; a route over the
+    /// batch's ceiling is not counted, since the limit would keep it out anyway.
+    static func trainingCost(_ stage: SettingsRouteTable.Stage, app: SettingsSolution, solver: SettingsSolver,
+                             answers a: SettingsAnswers, words: Words) -> String? {
+        guard a.noTraining else { return nil }
+        if stage.id == "entities", !a.priorities.contains(.names) {
+            return "Keeping your pages out of training costs nothing here: names are not looked for in this batch."
+        }
+        let leadPart = ["dating": "step 1", "entities": "correspondence-typed"][stage.id] ?? "all"
+        let picks = app.picks.filter { $0.stage == stage.id }
+        let lead = picks.first { $0.part == leadPart } ?? picks.first
+        let route = lead?.flag == nil ? lead?.route : nil
+        let cmp = Self.comparable(stage.id, app, words: words)
+        let units = stage.unit == "documents" ? Double(a.documentCount) : Double(a.pages)
+        let blocked = app.blocked[stage.id] ?? [:]
+        let hidden = stage.routes.filter { r in
+            guard !r.afterTraining, r.offered, let b = blocked[r.id], !b.isEmpty,
+                  b.allSatisfy({ $0.hasPrefix(SettingsTraining.blockerPrefix) }) else { return false }
+            return a.ceilingUSD.map { solver.usdPer1000(r, stage: stage.id) * units / 1000 <= $0 + 1e-9 } ?? true
+        }
+        .compactMap { r in cmp.of(r).map { (r, $0) } }
+        guard let (best, v) = hidden.max(by: { $0.1 < $1.1 }) else {
+            return "Keeping your pages out of training costs nothing here: it hides no route you could otherwise use."
+        }
+        let name = words.display(stage.id, best)
+        let price = words.per1000(solver.usdPer1000(best, stage: stage.id), unit: stage.unit)
+        let pickPrice = route.map { words.per1000(solver.usdPer1000($0, stage: stage.id), unit: stage.unit) }
+        let why = solver.trainingRisk(best).map { " It is hidden by the terms of \($0.provider): \($0.summary)." } ?? ""
+        guard let base = cmp.base, route != nil else {
+            return "Keeping your pages out of training hides \(name), \(words.figure(stage.id, v)) at \(price); "
+                + "nothing else can do this step here." + why
+        }
+        let gain = v - base
+        if gain <= 0 {
+            return "Keeping your pages out of training costs no accuracy here: the best route it hides, \(name), is not "
+                + "better than the pick, at \(price)" + (pickPrice.map { " against \($0) for the pick" } ?? "") + "." + why
+        }
+        if gain < Self.tieFloor(stage.id, route, best, answers: a) {
+            return "Keeping your pages out of training costs no measured accuracy here: the best route it hides, \(name), "
+                + "is better by less than the margin of error, at \(price)"
+                + (pickPrice.map { " against \($0) for the pick" } ?? "") + "." + why
+        }
+        return "Keeping your pages out of training costs this step \(words.gain(stage.id, gain)): the best route it hides, "
+            + "\(name), would give \(words.figure(stage.id, v)) at \(price)"
+            + (pickPrice.map { ", against \($0) for the pick" } ?? "") + "." + why
     }
 
     private static func parts(_ stage: SettingsRouteTable.Stage, picks: [SettingsPick], answers a: SettingsAnswers,
@@ -1243,6 +1306,11 @@ struct SettingsSheetWords {
         if r == "not in this comparison" { return "you chose another option for this step" }
         if r == "this batch stays on the Mac" {
             return "it sends pages off this Mac, online or to a cluster, and you chose to keep them on this Mac"
+        }
+        if r.hasPrefix(SettingsTraining.blockerPrefix) {
+            let rest = r.dropFirst(SettingsTraining.blockerPrefix.count).components(separatedBy: " — ")
+            return "your pages must not train a provider's models, and through \(rest[0]) they might"
+                + (rest.count > 1 ? ": " + rest[1...].joined(separator: " — ") : "")
         }
         if r == "ties the pick and costs more or is slower" { return "no better within the bench's margin of error, and costs more or is slower" }
         if r.hasPrefix("waits for: ") { return "not ready in the app yet" }

@@ -402,6 +402,10 @@ struct StageCardView: View {
                 }
                 Text(card.why).fixedSize(horizontal: false, vertical: true)
                     .help(card.evidence)
+                if let t = card.trainingCost {
+                    Label(t, systemImage: "lock.shield").foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
                     ForEach(card.parts) { p in

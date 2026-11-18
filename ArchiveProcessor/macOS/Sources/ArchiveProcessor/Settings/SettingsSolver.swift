@@ -70,6 +70,8 @@ struct SettingsAnswers: Sendable {
     var weights: [String: Double] = [:]
     /// The per-batch "stays on the Mac" switch (owner call 2): no page leaves this Mac.
     var staysOnMac = false
+    /// W46.training-optout: no page goes where the provider's terms let it train on uploads (`SettingsTraining`).
+    var noTraining = false
     /// A failed page goes on to another reader, so readers are ranked on answered pages; off, on strict NES.
     var readingFallback = true
     /// Minutes the user will spend checking boundaries.
@@ -277,6 +279,7 @@ struct SettingsSolver {
             }
         }
         if answers.appRoutesOnly && r.appRoute == nil { out.append("not in the app yet") }
+        if answers.noTraining, let rec = trainingRisk(r) { out.append(SettingsTraining.blocker(rec)) }
         let n = r.needs
         if answers.staysOnMac && r.family != .mac && r.family != .manual {
             out.append("this batch stays on the Mac")
@@ -307,6 +310,11 @@ struct SettingsSolver {
             if let floor = n.macGB, resources.macMemoryGB < floor { out.append("needs a \(Int(floor)) GB Mac") }
         }
         return out
+    }
+
+    /// Whose terms would let pages sent by this route train a model; nil when none would (`SettingsTraining.risk`).
+    func trainingRisk(_ r: SettingsRouteTable.Route) -> SettingsTraining.Record? {
+        SettingsTraining.risk(r, resources: resources) { id in table.stage("reading")?.route(id) }
     }
 
     static func keyName(_ k: String) -> String {

@@ -376,6 +376,17 @@ enum SettingsInterviewsTestDriver {
         eq("the solver reads the collection's mix", ans.mix, ["typewritten": 50, "printed": 25, "handwritten": 25])
         eq("and its checking minutes", ans.checkingMinutes, 20)
         check("and its switch to let pages leave", !ans.staysOnMac)
+        check("the training switch is off until it is answered", !ans.noTraining && layer.entry(.noTraining) == nil)
+        a.noTraining = true
+        a.touch(.noTraining)
+        a.apply(to: &layer, now: day)
+        eq("W46.training-optout: the switch is the collection's own", layer.entry(.noTraining)?.value, .bool(true))
+        check("and the solver reads it", SettingsResolver(general: SettingsLayer(kind: .general, name: "General"),
+                                                          collection: layer).answers(pages: 200).noTraining)
+        eq("and the interview reads it back", CollectionInterviewAnswers(resolver: SettingsResolver(
+            general: SettingsLayer(kind: .general, name: "General"), collection: layer), own: layer).noTraining, true)
+        a.noTraining = false
+        a.apply(to: &layer, now: day)
         eq("its ceiling still waits on the general spending habit", ans.ceilingUSD, 0)
 
         a.correctedMix = true

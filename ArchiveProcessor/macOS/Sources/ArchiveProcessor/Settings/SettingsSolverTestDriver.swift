@@ -154,6 +154,49 @@ enum SettingsSolverTestDriver {
         check("A detected key listed hollow, nothing spent", a.usd == 0
               && a.blockers("reading", "gemini3.8-flash").contains("this batch stays on the Mac"))
 
+        // T. W46.training-optout: "my pages must not train a provider's models" hides every route whose way in may
+        // train (a Gemini or Mistral key's free tier, a personal plan, an OpenRouter upstream that trains or is not
+        // pinned) and keeps the ones whose terms rule it out (the gateway, the paid APIs, DeepInfra, Alibaba, Z.ai).
+        var noTrain = SettingsAnswers()
+        noTrain.noTraining = true
+        var many = mac(16)
+        many.keys = ["gemini", "openrouter", "gateway"]
+        many.plans = ["claude"]
+        let t = solve("T", many, noTrain)
+        let tFree = solve("T-off", many)
+        func trains(_ s: SettingsSolution, _ stage: String, _ id: String) -> Bool {
+            s.blockers(stage, id).contains { $0.hasPrefix(SettingsTraining.blockerPrefix) }
+        }
+        check("T a Gemini key's route is hidden (its free tier trains)", trains(t, "reading", "gemini3.8-flash"),
+              t.blockers("reading", "gemini3.8-flash").joined(separator: "; "))
+        check("T Qwen3.6 27B on Chutes is hidden", trains(t, "reading", "qwen3.6-27b"))
+        check("T an OpenRouter model the app does not pin is hidden", trains(t, "reading", "qwen3.5-397b"))
+        check("T a cascade through Qwen3.6 27B on Chutes is hidden", trains(t, "reading", "casc-2-fail"))
+        check("T the Claude plan's Sonnet row is hidden", trains(t, "segmentation", "claude-sonnet5.5"))
+        check("T Qwen3-VL 235B on DeepInfra stays", !trains(t, "reading", "qwen3-vl-235b"))
+        check("T Qwen3.8 Flash on Alibaba stays", !trains(t, "reading", "qwen3.8-flash"))
+        check("T GLM-5.3 Flash on Z.ai stays", !trains(t, "segmentation", "glm5.3-flash"))
+        check("T the gateway stays", !trains(t, "reading", "gemini3.7-flash-gw") && !trains(t, "dating", "gemini3.7-flash-image"))
+        check("T Vision on this Mac stays", !trains(t, "reading", "apple-vision"))
+        check("T no pick is a route that may train",
+              t.picks.allSatisfy { p in p.route.map { !trains(t, p.stage, $0.id) } ?? true },
+              t.picks.compactMap { p in p.route.flatMap { trains(t, p.stage, $0.id) ? "\(p.stage)/\($0.id)" : nil } }.joined(separator: ", "))
+        check("T switched off, nothing is hidden for training",
+              tFree.blocked.values.allSatisfy { $0.values.allSatisfy { !$0.contains { $0.hasPrefix(SettingsTraining.blockerPrefix) } } })
+        var trOR = mac(16)
+        trOR.keys = ["openrouter"]
+        let tOR = solve("T-openrouter", trOR, noTrain)
+        check("T Gemini through OpenRouter stays (Google's paid API)", !trains(tOR, "reading", "gemini3.8-flash"),
+              tOR.blockers("reading", "gemini3.8-flash").joined(separator: "; "))
+        check("T a cascade of Qwen3.8 Flash and Gemini, both through OpenRouter, stays", !trains(tOR, "reading", "casc-1-fail"),
+              tOR.blockers("reading", "casc-1-fail").joined(separator: "; "))
+        check("T an unpinned Mistral row through OpenRouter is hidden (open weights, any upstream)",
+              trains(tOR, "reading", "mistral-large4"))
+        check("T a names row is not pinned by the reading row of the same id", trains(tOR, "entities", "qwen3.6-27b"))
+        var apiKey = mac(16)
+        apiKey.keys = ["anthropic"]
+        check("T Sonnet on an Anthropic API key stays", !trains(solve("T-anthropic", apiKey, noTrain), "segmentation", "claude-sonnet5.5"))
+
         // C. An OpenRouter key, Gemini models not used.
         var orKey = mac(16)
         orKey.keys = ["openrouter"]
