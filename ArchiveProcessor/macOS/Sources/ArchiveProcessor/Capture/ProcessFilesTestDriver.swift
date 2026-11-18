@@ -33,6 +33,8 @@ import PDFKit
 @MainActor
 enum ProcessFilesTestDriver {
     private static var didRun = false
+    /// Set when the driven run's `startProcessing` returns, so the batch watcher knows the run is over.
+    private static var runFinished = false
     private static let imageExts = Set(ImageEncoding.acceptedImageExtensions)
 
     static func runIfRequested() {
@@ -250,7 +252,8 @@ enum ProcessFilesTestDriver {
             preOCRedInput: false,
             segmentationContext: SegmentationContext(
                 previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, imageScale: 1.0),
-            gatewayConfig: gateway) }
+            gatewayConfig: gateway)
+            runFinished = true }
         processor.processingTask = run
 
         // W40.d4: the provider's batch IDs, read from the recovery journal once the submission is marked complete,
@@ -264,7 +267,7 @@ enum ProcessFilesTestDriver {
                     ids = pending.effectiveChunkIds
                     break
                 }
-                if processor.activeBatch == nil && !processor.isProcessing { break }
+                if runFinished { break }
                 try? await Task.sleep(nanoseconds: 200_000_000)
             }
             var lines = ["provider=\(provider.rawValue)\tmodel=\(model.id)\tids=\(ids.joined(separator: ","))"

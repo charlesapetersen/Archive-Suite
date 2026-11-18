@@ -429,10 +429,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-batch-resume.sh` (`BATCHRESUME_TEST`, `Capture/BatchResumeTestDriver.swift`) and
   the `OCR/Batch*Contract.swift` files it runs: parse, journal, cancel retention, resume, the uncertain-outcome and
   empty-chunk sentences. No real provider; the submission and the toggle are not covered.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** 2026-11-18 W40.d4, `verification/evidence/processor/W40.d4-batch.md`: real Mistral
+  (`mistral-ocr-latest`) and Anthropic (`claude-sonnet-4-6`) batches of three RG 165 photos through Process Files in
+  the VM, submitted, polled and collected (3 of 3 each, every PDF passes the checker; the providers report 3
+  succeeded); an Anthropic batch stopped right after submission was cancelled server-side (3 canceled) and its
+  journal deleted. Gemini `unverifiable-here` (no direct key, owner 2026-11-13; no batch through the gateway).
+- **Status:** `works` (Anthropic, Mistral; Gemini `unverifiable-here`)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d4 — real batch submit, poll, collect and a cancel: `works` for Anthropic and Mistral.
 - **Notes:** the toggle is not disabled for OpenAI or OpenRouter, which have no batch
   (`Models/ProviderModels.swift:36-40`), nor for the Local Agent. Suspect `S-027`.
 

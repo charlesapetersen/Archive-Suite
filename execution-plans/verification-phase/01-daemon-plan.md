@@ -195,7 +195,8 @@ where it can.
   2026-11-18: evidence `verification/evidence/processor/W40.d3-providers.md`; OpenAI and Local Agent
   `unverifiable-here`.)*
 - **`W40.d4` — one tiny real batch job per batch-capable provider [S-M].** Submit, poll, collect; and a cancel.
-  State the cost first.
+  State the cost first. *(SHIPPED 2026-11-18: evidence `verification/evidence/processor/W40.d4-batch.md`;
+  Gemini `unverifiable-here`.)*
 - **`W40.d5` — live capture with hand-driven review [M].** Emulator, real images from `Test Files` through the
   inject seam, tag cards and finalize done by hand, the stage-for-later hand-off. Prove originals go to the Trash
   only after their output is on disk.
