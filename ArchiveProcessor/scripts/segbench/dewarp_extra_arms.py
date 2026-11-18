@@ -195,3 +195,74 @@ def doctrpp_arm(img, src: Path):
     out = (out[0].numpy().transpose(1, 2, 0) * 255).clip(0, 255).astype(np.uint8)
     gg = g[0].numpy().transpose(1, 2, 0)
     return out, (gg + 1) / 2 * ((w - 1) / w, (h - 1) / h)
+
+
+# W46.licence-freed-sweep: DocScanner-L and DocGeoNet (fh2019ustc, Hao Feng's own non-commercial licence), the authors'
+# Google Drive weights in src/DocScanner/model_pretrained and src/DocGeoNet/model_pretrained. Each runs its repo's
+# inference.Net (U2NETP page mask, then the rectifier) at the repo's input size on CPU. The backward map is upsampled
+# with align_corners like doctrpp_arm; the repos' own cv2 resize and 3 x 3 blur of the full-size map are left out, so
+# the lattice is the network's own. The two repos share module names (model, seg, extractor), so each import starts
+# from a clean slate.
+_FH_MODULES = ('model', 'seg', 'extractor', 'update', 'unet', 'position_encoding', 'inference')
+
+
+def _fh_net(name: str, src: Path):
+    if name in _models:
+        return _models[name]
+    root = src / {'docscanner': 'DocScanner', 'docgeonet': 'DocGeoNet'}[name]
+    for m in _FH_MODULES:
+        sys.modules.pop(m, None)
+    sys.path.insert(0, str(root))
+    real_cuda = torch.Tensor.cuda
+    torch.Tensor.cuda = lambda self, *a, **k: self  # DocGeoNet's forward calls .cuda() on fresh tensors
+    try:
+        import inference as inf
+        if name == 'docscanner':
+            net = inf.Net()
+            seg_w, rec_w, rec_strip = 'seg.pth', 'DocScanner-L.pth', 0
+        else:
+            net = inf.Net(None)
+            seg_w, rec_w, rec_strip = 'preprocess.pth', 'DocGeoNet.pth', 7
+        rec_part = net.bm if name == 'docscanner' else net.DocTr
+        for part, w, strip in ((net.msk, seg_w, 6), (rec_part, rec_w, rec_strip)):
+            sd = torch.load(root / 'model_pretrained' / w, map_location='cpu')
+            own = part.state_dict()
+            got = {k[strip:]: v for k, v in sd.items() if k[strip:] in own}
+            assert len(got) == len(own), f'{name} {w}: {len(got)} of {len(own)} tensors matched'
+            part.load_state_dict(got)
+    finally:
+        torch.Tensor.cuda = real_cuda
+        sys.path.remove(str(root))
+        for m in _FH_MODULES:
+            sys.modules.pop(m, None)
+    _models[name] = net.eval().to(DEVICE)
+    return _models[name]
+
+
+def _fh_arm(name: str, img, src: Path):
+    net = _fh_net(name, src)
+    size = 288 if name == 'docscanner' else 256
+    h, w = img.shape[:2]
+    x = img.astype(np.float32) / 255
+    inp = torch.from_numpy(cv2.resize(x, (size, size)).transpose(2, 0, 1)).unsqueeze(0)
+    saved = torch.Tensor.cuda
+    torch.Tensor.cuda = lambda self, *a, **k: self
+    try:
+        with torch.no_grad():
+            g = net(inp)  # (1, 2, size, size) in [-1, 1], align_corners=True, as the repo's Net returns it
+            up = F.interpolate(g, size=(h, w), mode='bilinear', align_corners=True)
+            out = F.grid_sample(torch.from_numpy(x.transpose(2, 0, 1)).unsqueeze(0), up.permute(0, 2, 3, 1),
+                                align_corners=True)
+    finally:
+        torch.Tensor.cuda = saved
+    out = (out[0].numpy().transpose(1, 2, 0) * 255).clip(0, 255).astype(np.uint8)
+    gg = g[0].numpy().transpose(1, 2, 0)
+    return out, (gg + 1) / 2 * ((w - 1) / w, (h - 1) / h)
+
+
+def docscanner_arm(img, src: Path):
+    return _fh_arm('docscanner', img, src)
+
+
+def docgeonet_arm(img, src: Path):
+    return _fh_arm('docgeonet', img, src)

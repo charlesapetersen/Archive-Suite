@@ -1,0 +1,146 @@
+{
+ "item": "W46.licence-freed-sweep",
+ "set": "owner96 (the 96 accuracy pages)",
+ "metric": "strict NES",
+ "scorer_check": {
+  "route": "lightonocr-3-4b-mlx8",
+  "pages": 96,
+  "max_abs_diff": 0.0
+ },
+ "readers": {
+  "hunyuanocr-1.5-bf16": {
+   "name": "HunyuanOCR-1.5 bf16",
+   "pages": 2,
+   "failed": 0,
+   "nes": 0.9623,
+   "wall_s_median": 41.31,
+   "mlx_peak_gb_max": 4.38,
+   "by_kind": {
+    "typewritten": {
+     "pages": 2,
+     "nes": 0.9623
+    }
+   },
+   "against": {
+    "apple-vision": {
+     "pages": 2,
+     "base_nes": 0.9709,
+     "diff": -0.0087,
+     "lo": -0.0184,
+     "hi": 0.0011
+    },
+    "lightonocr-3-4b-mlx8": {
+     "pages": 2,
+     "base_nes": 0.9429,
+     "diff": 0.0194,
+     "lo": -0.0069,
+     "hi": 0.0457
+    },
+    "paddleocr-vl1.6-bf16": {
+     "pages": 2,
+     "base_nes": 0.9761,
+     "diff": -0.0139,
+     "lo": -0.0196,
+     "hi": -0.0081
+    },
+    "xiaomi-ocr-0-bf16": {
+     "pages": 2,
+     "base_nes": 0.9787,
+     "diff": -0.0164,
+     "lo": -0.0293,
+     "hi": -0.0035
+    },
+    "qwen3-vl-8b-mlx4": {
+     "pages": 2,
+     "base_nes": 0.9419,
+     "diff": 0.0204,
+     "lo": -0.0127,
+     "hi": 0.0536
+    },
+    "granite-docling-258m-mlx": {
+     "pages": 2,
+     "base_nes": 0.9393,
+     "diff": 0.023,
+     "lo": -0.0209,
+     "hi": 0.0668
+    },
+    "ppocrv6-medium": {
+     "pages": 2,
+     "base_nes": 0.9763,
+     "diff": -0.014,
+     "lo": -0.0196,
+     "hi": -0.0085
+    }
+   }
+  },
+  "fastvlm-0.5b-bf16": {
+   "name": "FastVLM 0.5B bf16",
+   "pages": 4,
+   "failed": 1,
+   "nes": 0.3262,
+   "wall_s_median": 2.37,
+   "mlx_peak_gb_max": 1.9,
+   "by_kind": {
+    "printed": {
+     "pages": 1,
+     "nes": 0.1244
+    },
+    "typewritten": {
+     "pages": 3,
+     "nes": 0.3934
+    }
+   },
+   "against": {
+    "apple-vision": {
+     "pages": 4,
+     "base_nes": 0.9781,
+     "diff": -0.652,
+     "lo": -0.9292,
+     "hi": -0.2245
+    },
+    "lightonocr-3-4b-mlx8": {
+     "pages": 4,
+     "base_nes": 0.9651,
+     "diff": -0.639,
+     "lo": -0.9252,
+     "hi": -0.2162
+    },
+    "paddleocr-vl1.6-bf16": {
+     "pages": 4,
+     "base_nes": 0.9733,
+     "diff": -0.6472,
+     "lo": -0.9131,
+     "hi": -0.2164
+    },
+    "xiaomi-ocr-0-bf16": {
+     "pages": 4,
+     "base_nes": 0.9833,
+     "diff": -0.6572,
+     "lo": -0.9411,
+     "hi": -0.2132
+    },
+    "qwen3-vl-8b-mlx4": {
+     "pages": 4,
+     "base_nes": 0.9703,
+     "diff": -0.6442,
+     "lo": -0.9366,
+     "hi": -0.2245
+    },
+    "granite-docling-258m-mlx": {
+     "pages": 4,
+     "base_nes": 0.6368,
+     "diff": -0.3106,
+     "lo": -0.6569,
+     "hi": 0.0357
+    },
+    "ppocrv6-medium": {
+     "pages": 4,
+     "base_nes": 0.8365,
+     "diff": -0.5103,
+     "lo": -0.8716,
+     "hi": -0.149
+    }
+   }
+  }
+ }
+}

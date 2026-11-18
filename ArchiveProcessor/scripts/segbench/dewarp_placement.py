@@ -52,8 +52,9 @@ from place_geom import (PT, carried_layer, deskew_map, identity_map, lattice_inv
 RESULTS = HERE.parents[1] / 'segbench-results'
 CACHE = DCS.REH / 'dewarp-placement'
 DCS.CACHE = CACHE                 # its upright copies, HEIC conversions and quads go to this item's cache
+LF_SRC = DCS.REH / 'licence-freed-sweep' / 'src'  # DocScanner and DocGeoNet (W46.licence-freed-sweep)
 EXTRA = CACHE / 'src'             # DvD and DocTr++ code and weights (downloaded, never bundled; dewarp_extra_arms.py)
-DEWARPERS = ('uvdoc', 'dvd', 'doctrpp')
+DEWARPERS = ('uvdoc', 'dvd', 'doctrpp', 'docscanner', 'docgeonet')
 CHUNK_TALL = 1.4
 
 
@@ -63,7 +64,9 @@ def dewarp_fn(d):
     if d == 'uvdoc':
         return lambda img: A.uvdoc_arm(img, DCS.UVDOC_SRC)
     import dewarp_extra_arms as X
-    return {'dvd': lambda img: X.dvd_arm(img, EXTRA), 'doctrpp': lambda img: X.doctrpp_arm(img, EXTRA)}[d]
+    return {'dvd': lambda img: X.dvd_arm(img, EXTRA), 'doctrpp': lambda img: X.doctrpp_arm(img, EXTRA),
+            'docscanner': lambda img: X.docscanner_arm(img, LF_SRC),
+            'docgeonet': lambda img: X.docgeonet_arm(img, LF_SRC)}[d]
 
 
 def after_quad(img, quad, fn):

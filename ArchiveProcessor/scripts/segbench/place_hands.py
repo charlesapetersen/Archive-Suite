@@ -292,7 +292,73 @@ def detect_ppocrv6(todo):
                        device=f'saved FarmShare run on a {cw}x{ch} copy', source=str(src.relative_to(LTS))))
 
 
-DETECTORS = {'blla': detect_blla, 'orli': detect_orli, 'surya': detect_surya, 'ppocrv6': detect_ppocrv6}
+GUTEN = ('bevaya/GutenOCR-3B', 'fd16c80c01')  # W46.licence-freed-sweep (CC BY-NC 4.0); revision checked at load
+GUTEN_SIDE = 1792  # longest side given to the model, a multiple of Qwen2.5-VL's 28-pixel patch pair
+GUTEN_PROMPT = 'Read all text in the image and return a LINES JSON array.'
+
+
+def guten_lines(raw: str):
+    """GutenOCR's LINES reply: a JSON array of {text, bbox}; a reply cut off mid-array keeps its whole objects."""
+    s = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip())
+    try:
+        got = json.loads(s)
+    except json.JSONDecodeError:
+        got = [json.loads(m) for m in re.findall(r'\{"text":\s*"(?:[^"\\]|\\.)*",\s*"bbox":\s*\[[^\]]*\]\}', s)]
+    return [g for g in got if isinstance(g, dict) and isinstance(g.get('bbox'), list) and len(g['bbox']) == 4]
+
+
+def detect_gutenocr(todo):
+    """GutenOCR-3B (Qwen2.5-VL-3B fine-tuned for grounded OCR, bf16, mlx-vlm in the lab venv) asked for LINES. The
+    page goes in at GUTEN_SIDE on its longer side, each side a multiple of 28, so the processor keeps that size and
+    the boxes, in its pixels, scale straight back. Each box is a line piece; pieces on one row are joined as for the
+    box detectors. The reply is kept beside the lines (raw text, private cache)."""
+    import model_store
+    model_store.use()
+    import mlx.core as mx
+    from huggingface_hub import snapshot_download
+    from mlx_vlm import load, stream_generate
+    from mlx_vlm.prompt_utils import apply_chat_template
+    from PIL import Image
+    path = snapshot_download(GUTEN[0], allow_patterns=['*.json', '*.txt', '*.jinja', 'model-0000*'], local_files_only=True)
+    assert Path(path).name.startswith(GUTEN[1]), path
+    mx.set_cache_limit(256 * 2**20)
+    model, proc = load(path)
+    chat = apply_chat_template(proc, model.config, GUTEN_PROMPT, num_images=1)
+    tmp = CACHE / 'tmp-gutenocr'
+    tmp.mkdir(parents=True, exist_ok=True)
+    for t in todo:
+        out = CACHE / 'lines/gutenocr' / f'{key(t)}.json'
+        if out.exists():
+            continue
+        im = Image.open(t['image']).convert('RGB')
+        W, H = im.size
+        s = GUTEN_SIDE / max(W, H)
+        w, h = max(28, round(W * s / 28) * 28), max(28, round(H * s / 28) * 28)
+        small = tmp / f'{key(t)}.png'
+        im.resize((w, h), Image.LANCZOS).save(small)
+        t0 = time.time()
+        text, last = [], None
+        for r in stream_generate(model, proc, chat, image=[str(small)], max_tokens=6144, temperature=0.0):
+            text.append(r.text)
+            last = r
+        sec = time.time() - t0
+        small.unlink()
+        raw = ''.join(text)
+        got = guten_lines(raw)
+        sx, sy = W / w, H / h
+        pieces = []
+        for g in got:
+            x1, y1, x2, y2 = (float(v) for v in g['bbox'])
+            if x2 > x1 and y2 > y1:
+                pieces.append(quad_line([(x1 * sx, y1 * sy), (x2 * sx, y1 * sy), (x2 * sx, y2 * sy), (x1 * sx, y2 * sy)]))
+        save(CACHE / 'lines/gutenocr-raw' / f'{key(t)}.json', {'raw': raw, 'input': [w, h]})
+        save(out, normalise(join_rows(pieces), W, H, sec, device='mlx bf16', pieces=len(pieces), input=[w, h],
+                            tokens=getattr(last, 'generation_tokens', 0), mlx_peak_gb=round(mx.get_peak_memory() / 2**30, 2)))
+        print(f"{t['page']}: {len(pieces)} lines, {sec:.0f} s, {getattr(last, 'generation_tokens', 0)} tokens", flush=True)
+
+
+DETECTORS = {'blla': detect_blla, 'orli': detect_orli, 'surya': detect_surya, 'ppocrv6': detect_ppocrv6,
+             'gutenocr': detect_gutenocr}
 
 
 # ---------------------------------------------------------------- readings

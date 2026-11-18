@@ -65,6 +65,25 @@ HW = {
         'name': 'granite-docling-258M bf16', 'hosted': None, 'reply': 'doctags', 'prompt': 'Convert this page to docling.',
         'max_side': None, 'max_tokens': 8192, 'template': {},
         'repo': model_store.snapshot('ibm-granite/granite-docling-258M-mlx', 'e9939db25d2f296c8678d0491c4609a8c596c50a')},
+    # W46.licence-freed-sweep's pilots: models first left out on their licence alone. HunyuanOCR-1.5 (Tencent Hunyuan
+    # community licence: not for users in the EU, UK or South Korea) in the publisher's bf16 with its card's parsing
+    # prompt; the card's repetition penalty (1.08) is not applied, as for every other reader here. Apple FastVLM 0.5B
+    # (Apple AMLR, research only) is a general VLM with no OCR prompt of its own, so it gets a plain transcription ask.
+    'hunyuanocr-1.5-bf16': {
+        'name': 'HunyuanOCR-1.5 bf16', 'hosted': None, 'reply': 'plain', 'max_side': None, 'max_tokens': 8192,
+        'template': {},
+        'prompt': '提取文档图片中正文的所有信息用markdown格式表示，其中页眉、页脚部分忽略，表格用html格式表达，'
+                  '文档中公式用latex格式表示，按照阅读顺序组织进行解析。',
+        # mlx-vlm 0.7.4 (and 0.8.0) knows HunyuanOCR 1.0: `licence_sweep.py hunyuan-prep` links the 1.5 snapshot
+        # with its vision model_type renamed back, and the load is not strict for its one extra tensor, an lm_head
+        # equal to the tied embedding (checked tensor for tensor; with it dropped the strict load passes).
+        'load': {'strict': False},
+        'repo': P.CACHE.parent / 'licence-freed-sweep' / 'hunyuanocr-1.5-patched'},
+    'fastvlm-0.5b-bf16': {
+        'name': 'FastVLM 0.5B bf16', 'hosted': None, 'reply': 'plain', 'max_side': None, 'max_tokens': 4096,
+        'template': {},
+        'prompt': 'Transcribe all the text in this document image in reading order. Output only the text.',
+        'repo': model_store.snapshot('mlx-community/FastVLM-0.5B-bf16', '81ffe929046666c43de53691147b1669ba0f3a4c')},
 }
 # docling-core for the DocTags reply, installed apart from the lab venv (`uv pip install --target DIR
 # docling-core==2.105.0`) and put after its site-packages, so nothing mlx-vlm imported is replaced.
@@ -133,7 +152,7 @@ def collect(limit=None, key=KEY):
         import docling_core  # noqa: F401  (fail before the model loads, not after the first page)
     mx.set_cache_limit(256 * 2**20)  # as the lab's read-mlx.py: freed buffers otherwise inflate the footprint
     t0 = time.time()
-    model, processor = load(str(spec['repo']), **({'trust_remote_code': True} if key in HW else {}))
+    model, processor = load(str(spec['repo']), **({'trust_remote_code': True} if key in HW else {}), **spec.get('load', {}))
     load_s = time.time() - t0
     chat = apply_chat_template(processor, model.config, prompt, num_images=1, **spec['template'])
     tmp = tempfile.mkdtemp(prefix='mac-local-shrunk-')
