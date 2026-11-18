@@ -113,7 +113,75 @@ final class RotationUITests: FixtureUITestCase {
         app.typeKey(.delete, modifierFlags: [])
     }
 
+    /// W40.reader-rotate-undo: ⌘Z undoes a turn and ⇧⌘Z does it again, through the Tags menu's one Undo, which
+    /// names the rotation while it is the most recent action.
+    func testRotationIsOnUndoAndRedo() throws {
+        waitForRows(minimum: 3, timeout: 10)
+        let filterField = app.textFields["ar.filter.name"]
+        XCTAssertTrue(filterField.waitForExistence(timeout: 5))
+        filterField.click()
+        filterField.typeText("00001 IMG")
+        settle(1)
+        XCTAssertEqual(rowCount, 1)
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        let control = app.descendants(matching: .any)["ar.doc.imageSource"].firstMatch
+        XCTAssertTrue(control.waitForExistence(timeout: 5))
+        let docWindow = app.windows.containing(.any, identifier: "ar.doc.imageSource").firstMatch
+        control.descendants(matching: .any).matching(NSPredicate(format: "label == 'PDF' OR title == 'PDF'")).firstMatch.click()
+        let reset = documentMenuItem("Reset Rotation")
+        if reset.isEnabled { reset.click() } else { closeMenu() }
+        let zoomOut = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label == %@",
+                                                       "ar.doc.imageZoomOut", "Zoom Out Image")).firstMatch
+        zoomOut.click(); zoomOut.click()
+        settle(1)
+
+        pressKey("r", modifiers: [.command, .control])
+        settle(1)
+        let turned = inkBounds(in: docWindow)
+        XCTAssertGreaterThan(turned.height, turned.width * 3, "⌃⌘R turned the page")
+        let undo = tagsMenuItem("Undo Rotation")
+        XCTAssertTrue(undo.exists && undo.isEnabled, "the menu's Undo names the rotation, the most recent action")
+        closeMenu()
+
+        pressKey("z", modifiers: .command)
+        settle(1)
+        captureScreenshot("w40-rotate-undo-1-undone")
+        let undone = inkBounds(in: docWindow)
+        XCTAssertGreaterThan(undone.width, undone.height * 3, "⌘Z puts the page back upright")
+        let redo = tagsMenuItem("Redo Rotation")
+        XCTAssertTrue(redo.exists && redo.isEnabled, "the menu's Redo names the rotation")
+        closeMenu()
+
+        pressKey("z", modifiers: [.command, .shift])
+        settle(1)
+        captureScreenshot("w40-rotate-undo-2-redone")
+        let redone = inkBounds(in: docWindow)
+        XCTAssertGreaterThan(redone.height, redone.width * 3, "⇧⌘Z turns it again")
+
+        pressKey("z", modifiers: .command)
+        settle(1)
+        XCTAssertFalse(tagsMenuItem("Undo Rotation").exists, "nothing of the rotation is left to undo")
+        closeMenu()
+        pressKey("w", modifiers: .command)
+        settle(0.5)
+        filterField.click()
+        pressKey("a", modifiers: .command)
+        app.typeKey(.delete, modifierFlags: [])
+    }
+
     // MARK: - Helpers
+
+    private func tagsMenuItem(_ title: String) -> XCUIElement {
+        let bar = app.menuBars.element(boundBy: 0)
+        let tags = bar.menuBarItems["Tags"]
+        XCTAssertTrue(tags.waitForExistence(timeout: 5), "the Tags menu should exist")
+        tags.click()
+        let item = bar.menuItems[title]
+        _ = item.waitForExistence(timeout: 2)
+        return item
+    }
 
     private func settle(_ seconds: TimeInterval) {
         RunLoop.current.run(until: Date().addingTimeInterval(seconds))

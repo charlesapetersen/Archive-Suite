@@ -16459,3 +16459,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `as? Bool` missing it). Unit: DocumentCopyTextPaneTests.testTheSwapSettingMakesCommandCTheCleanedCopy, whole
   bundle green (915). VM: CopyShortcutSwapUITests and the existing CopyShortcutUITests pass. No bench cache scratch.
   <!-- /W40.reader-copy-shortcut-swap -->
+- [x] **W40.reader-rotate-undo — image rotation on Undo and Redo [S-M]** · §W40 — verification phase (lane: reader) — SHIPPED 2026-11-18
+  Owner's Reader notes, 2026-11-17: Rotate Left/Right/Reset wrote PageTurnStore with no undo. Each viewer (document
+  window, preview sheet) now keeps its own stack of turns (`DocumentViewerModel.TurnChange`: path, page, from, to,
+  date); Reset on an upright page records nothing. The Tags menu's one Undo/Redo (⌘Z/⇧⌘Z) takes the most recent
+  action first: the rotation when its date is at or after the newest tag-ledger group's newest line
+  (`NavigationModel.nextUndoDate`/`nextRedoDate`, read fresh at action time; the menu title from the history last
+  read), titled Undo/Redo Rotation while the rotation is next. An undone change moves to the other stack stamped
+  now, so redo takes the most recently undone first; a new turn clears the rotation redo stack (each side clears
+  only its own). A turn of a page no longer on screen is undone all the same and the status line names its file.
+  Off while Find has the keyboard, as the tag undo is. Not the window's NSUndoManager: the menu's Undo is the
+  Reader's own command (TextUndoGuard gives text fields theirs), so the order is decided in one place.
+  Unit: PageRotationTests (4 new: undo/redo order, off-screen page, the ordering rule, Find focus); VM:
+  RotationUITests.testRotationIsOnUndoAndRedo (⌃⌘R, menu names it, ⌘Z upright by pixels, ⇧⌘Z turned again) and
+  the existing rotation test pass; whole unit bundle green (919, DeepLinkTests skipped). No bench cache scratch.
+  <!-- /W40.reader-rotate-undo -->
