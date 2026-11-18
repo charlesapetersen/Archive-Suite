@@ -9,7 +9,7 @@ import ArchiveCore
 /// The call is the bench's image prompt (`segbench/item_fields_retruth.py`, PROMPT; `test_item_fields_app.py` compares
 /// the two): Gemini 3.7 Flash on the gateway, every page's image (the first 8 and the last 2 of a longer document, at
 /// 1,600 px on the long side) and the pages' text with page marks, temperature 0, low reasoning. Scored with the
-/// owner's three sheets folded in (`segbench-results/item-fields-score.md`, "The verdict"). No other route is measured
+/// owner's four sheets folded in (`segbench-results/item-fields-score.md`, "The verdict"). No other route is measured
 /// for it, so no other backend makes the call.
 enum ItemFieldExtractor {
     static let gatewayModel = DateRoute.gatewayModel
@@ -245,18 +245,12 @@ enum ItemFieldPolicy {
         case recipientPlace = "recipient_place"
     }
 
-    /// Too close on the third sheet (53/56 drawn pairs right, stratified 0.91 [0.83, 0.94]); its misses took a kicker
-    /// line into the headline and gave half of a title that runs over two pages. A further draw is one look sized in
-    /// advance, and a prompt change is judged on a fresh seeded draw (measurement review pass 12, P12-2).
-    static let titleBelowBar = "below the fill rule on this route: 0.91 [0.83, 0.94] (item-fields-score.md)"
-
-    /// The reason `field` is not filled on a document of `kind`, or nil when it fills.
+    /// The reason `field` is not filled on a document of `kind`, or nil when it fills. Title fills on every kind since
+    /// its last look (W47.item-fields-title: the fourth sheet, 72/76 right, stratified 0.91 [0.86, 0.94]).
     static func withheld(_ field: Field, kind: String?) -> String? {
         switch field {
-        case .kind, .publication:
+        case .kind, .publication, .title:
             return nil
-        case .title:
-            return titleBelowBar
         case .byline, .publicationDate:
             guard let kind, ItemFieldExtractor.published.contains(kind) else {
                 return "not measured on this kind"
@@ -315,15 +309,89 @@ struct ItemFieldResult: Equatable, Sendable, Codable {
     }
 
     /// The filled fields as the page-2 header's item-field lines give them (SPEC §2-page PDF): one display line each,
-    /// a list joined with `; `. Empty when nothing is filled.
+    /// a list joined with `; `, an all-capitals title in title case. Empty when nothing is filled.
     var headerFields: PDFItemFields {
         guard let f = filled else { return PDFItemFields() }
         func joined(_ list: [String]) -> String? { list.isEmpty ? nil : list.joined(separator: "; ") }
-        return PDFItemFields(documentKind: PDFItemFields.lineValue(f.kind), title: PDFItemFields.lineValue(f.title),
+        return PDFItemFields(documentKind: PDFItemFields.lineValue(f.kind),
+                             title: PDFItemFields.lineValue(f.title.map(Self.titleCased)),
                              byline: PDFItemFields.lineValue(joined(f.byline)),
                              publication: PDFItemFields.lineValue(f.publication),
                              publicationDate: PDFItemFields.lineValue(f.publicationDate),
                              recipientPlace: PDFItemFields.lineValue(joined(f.recipientPlace)))
+    }
+
+    /// Small words left lower case inside a title-cased title.
+    static let minorWords: Set<String> = ["a", "an", "the", "and", "but", "or", "nor", "for", "so", "yet", "of", "in",
+                                          "on", "at", "to", "by", "as", "up", "via", "per", "from", "with", "into"]
+
+    /// Abbreviations that keep their capitals although they have a vowel (the archive's agencies, unions, firms,
+    /// schools and states); an all-capitals title gives no other way to tell them from words.
+    static let keptAbbreviations: Set<String> = [
+        "fbi", "cia", "nasa", "nato", "afl", "cio", "hew", "gop", "ibm", "ucla", "usa", "usia", "ussr", "un", "unesco",
+        "iam", "ib", "irs", "rotc", "naacp", "epa", "omb", "hud", "nsf", "nih", "nea", "neh", "aaup", "sri", "parc",
+        "ge", "rca", "amd", "ncaa", "ymca", "ywca", "aclu", "opec", "oas", "aec", "ici", "ieee", "aauw", "ny",
+        "dod", "doe", "seato", "unicef", "acm", "asuc", "assu", "sat", "gre", "lsat", "mcat", "gmat",
+    ]
+
+    /// Roman numerals up to LXXXIX, which leaves the words a longer pattern would catch ("mix", "mid") alone.
+    static let romanNumeral = #"^(xl|l?x{0,3})(ix|iv|v?i{0,3})$"#
+
+    /// Whether a word or one hyphenated part of it keeps its capitals: one with a digit, a dotted abbreviation
+    /// ("U.S."), a roman numeral of two letters or more, one with no vowel ("TV") or a kept abbreviation.
+    static func keepsCapitals(_ part: String) -> Bool {
+        let bare = part.filter(\.isLetter).lowercased()
+        return part.contains(where: \.isNumber)
+            || part.range(of: #"[A-Z]\.[A-Z]"#, options: .regularExpression) != nil
+            || (bare.count > 1 && bare.range(of: romanNumeral, options: .regularExpression) != nil)
+            || (!bare.isEmpty && !bare.contains { "aeiouy".contains($0) })
+            || keptAbbreviations.contains(bare)
+    }
+
+    /// One part of a word capitalised: its first letter, and the letter after a leading "Mc" or "O'" ("McGovern",
+    /// "O'Brien").
+    static func capitalised(_ part: Substring) -> String {
+        var chars = Array(part.lowercased())
+        guard let first = chars.firstIndex(where: \.isLetter) else { return String(chars) }
+        chars[first] = Character(chars[first].uppercased())
+        let rest = String(chars[first...])
+        let inner = rest.hasPrefix("Mc") && rest.count > 3 ? first + 2
+            : (rest.hasPrefix("O'") || rest.hasPrefix("O’")) && rest.count > 3 ? first + 2 : nil
+        if let inner, chars[inner].isLetter { chars[inner] = Character(chars[inner].uppercased()) }
+        return String(chars)
+    }
+
+    /// A title as the header shows it: one printed in capitals throughout ("ECONOMICS OF PROGRAMMING PRODUCTION") in
+    /// title case, as the owner's sheet notes ask; any other title as read (the bench's matcher folds case, so this
+    /// changes no score). Every word capitalised, each part of a hyphenated one, the small words lower case unless
+    /// first, last or after a colon or dash; a part `keepsCapitals` names stays in capitals. An abbreviation not in
+    /// the list comes out capitalised ("UNRRA" as "Unrra"); the sidecar keeps the value as read.
+    static func titleCased(_ title: String) -> String {
+        guard title.contains(where: \.isUppercase), !title.contains(where: \.isLowercase) else { return title }
+        let words = title.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+        let last = words.lastIndex { $0.contains(where: \.isLetter) }
+        var opensClause = true
+        var out: [String] = []
+        for (i, word) in words.enumerated() {
+            if !opensClause, i != last, minorWords.contains(word.filter(\.isLetter).lowercased()),
+               !keepsCapitals(word) {
+                out.append(word.lowercased())
+            } else {
+                // Split on hyphens and dashes, keeping them, so each part is judged and capitalised on its own.
+                var shown = "", part = ""
+                func flush() {
+                    shown += keepsCapitals(part) ? part : capitalised(Substring(part))
+                    part = ""
+                }
+                for c in word {
+                    if "-—–/".contains(c) { flush(); shown.append(c) } else { part.append(c) }
+                }
+                flush()
+                out.append(shown)
+            }
+            if !word.isEmpty { opensClause = word.last.map { ":—–".contains($0) } ?? false || word == "-" }
+        }
+        return out.joined(separator: " ")
     }
 
     /// The sidecar's `item_fields` object: the route, then each filled field; `not_filled` names a field the reading

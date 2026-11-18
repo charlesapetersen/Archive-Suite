@@ -16597,3 +16597,31 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   need Vision OCR's testdocs on the OneDrive backup (owner, 2026-11-13); the five scans and the samples above stand in.
   Bench cache: the scratch in `~/Library/Caches/ArchiveSuiteRehearsal/W42.c41-newspaper-scans` moved to the Trash.
   <!-- /W42.c41-newspaper-scans -->
+- [x] **W47.item-fields-title — the title fills, or stays withheld, by one more look [S · Tier-2]** · §Archival containers — W47 · SHIPPED 2026-11-18
+  Title fills. Its last look (P12-2, the third on these pairs) was the fourth owner sheet: the whole of title's
+  remaining pool, every unsettled pair the image prompt (Gemini 3.7 Flash on the page images) filled, 77 of 133, sized
+  before any answer (checkpoint 1, a096d514: at a true 0.88 a 77-pair census fills 9% of the time against 14-20% for
+  13-60 pairs). The owner answered all 77 (2026-11-18): 72 confirmed, 4 typed, 1 left empty, 4 notes. Notes read into
+  sheet4/note-fixes.json: one title dropped (82dde75fbdc6b67c, a memo and a clipping in one document, dropped as on
+  the first sheet), the other three change no value. On the sheet's pairs alone 72/76 0.95 [0.87, 0.98]; its misses a
+  kicker line taken into the headline twice, an address line taken with a firm's name, a section line given where
+  only the publication's title is printed. Stratified, title is now 0.91 [0.86, 0.94] of 147 (was [0.83, 0.94]),
+  which clears the rule: `item-fields-score.md` lists title among the fields the image prompt fills.
+  App: `ItemFieldPolicy.withheld(.title)` returns nil on every kind (a letter or telegram still has none by the label
+  definitions), so the sidecar's `item_fields.title` and the page-2 `Title:` line are written; no migration because
+  nothing is written yet. The header shows a title printed in capitals throughout in title case
+  (`ItemFieldResult.titleCased`; the owner's sheet notes, four of them; the matcher folds case so no score moves): small
+  words lower case unless first, last or after a colon or dash, each hyphen or dash part capitalised, "Mc" and "O'"
+  names, and a word with a digit, a dotted abbreviation, a roman numeral to LXXXIX, no vowel or a listed abbreviation
+  (FBI, AFL-CIO, NASA, …) kept in capitals; an abbreviation not on the list comes out capitalised. Any other title and
+  the sidecar keep the value as read. Core `FieldStatusPolicy.itemField(.title)` is now Unchecked with 0.91 [0.86,
+  0.94]. SPEC §Field checks and §2-page PDF item fields, prompts.md §10 updated.
+  Tier-2: adversarial review (Opus) found no header-format break (lineValue keeps one line, the parser picks Title by
+  its prefix, the rewrite reads back and skips on any difference) and flagged acronyms and Mc names, fixed with the
+  abbreviation list and the Mc/O' rule before shipping. Tests: `test-item-fields.sh` ALL PASS (17 title-case checks,
+  the end-to-end article now carries an all-capitals title: sidecar as read, both headers in title case),
+  ArchiveCore FieldCheckTests, test_item_fields_score/more/app. Reader and Notes not rebuilt: Core's change is a value,
+  no type or signature. Not an OCR or segmentation result: ArchiveOCRBench unchanged. W47.item-fields-inference's
+  notes cite title's old 0.91 [0.83, 0.94] as its reproduction check; the score now gives [0.86, 0.94].
+  Bench cache: sheet4 (key, draw, the owner's answers and note-fixes) kept, it is truth; nothing rebuildable made.
+  <!-- /W47.item-fields-title -->

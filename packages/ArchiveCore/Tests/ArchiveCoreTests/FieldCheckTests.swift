@@ -101,11 +101,10 @@ final class FieldCheckTests: XCTestCase {
     // MARK: The status table
 
     func testItemFieldsThatFillAreUncheckedNotLower() {
-        for f in [CheckableField.documentKind, .byline, .publication, .publicationDate, .recipientPlace] {
+        for f in [CheckableField.documentKind, .title, .byline, .publication, .publicationDate, .recipientPlace] {
             XCTAssertEqual(FieldStatusPolicy.itemField(f, checked: false).level, .unchecked, "\(f)")
             XCTAssertEqual(FieldStatusPolicy.itemField(f, checked: true).level, .checked, "\(f)")
         }
-        XCTAssertEqual(FieldStatusPolicy.itemField(.title, checked: false).level, .lowerConfidence)
     }
 
     func testNoDateClassClearsTheRule() {

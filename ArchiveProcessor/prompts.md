@@ -370,8 +370,9 @@ reasoning, 8,192 tokens) and only with sidecars on. It sends every page's image 
 document, upright, 1,600 px on the long side) and the pages' text, each under `[page i of n]`, cut at 16,000
 characters, in `{text}`. The label definitions are applied to the reply (a letter, memo or telegram has no byline,
 publication or publication date; a letter or telegram no title), then `ItemFieldPolicy` fills only what the bench
-measured clearing the fill rule (`segbench-results/item-fields-score.md`): kind and publication on every kind, byline
-and publication date on the published kinds, recipient place on correspondence; title is read but not written. The
+measured clearing the fill rule (`segbench-results/item-fields-score.md`): kind, title and publication on every kind,
+byline and publication date on the published kinds, recipient place on correspondence (an all-capitals title in title
+case on the page-2 header, as read in the sidecar). The
 result goes to the sidecar's `item_fields` object and the page-2 header's item-field lines (SPEC §2-page PDF). The
 bench copy is `segbench/item_fields_retruth.py` PROMPT, which `test_item_fields_app.py` compares with the Swift.
 

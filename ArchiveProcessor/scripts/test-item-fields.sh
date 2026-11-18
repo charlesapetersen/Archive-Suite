@@ -1,6 +1,6 @@
 #!/bin/bash
 # Key-free ($0) self-test of the item fields (W47.item-fields-build): runs ItemFieldsTestDriver headless, which checks
-# reply parsing as the bench does it, the marked text, the fill policy (title withheld; each field on the kinds it was
+# reply parsing as the bench does it, the marked text, the fill policy (title case on the header; each field on the kinds it was
 # scored on), the sidecar's item_fields object, and the call end to end through performTaggingPhase with every request
 # answered by the injected test transport. No real network, no Keychain read, no window, never the corpus: scratch
 # outputs only.

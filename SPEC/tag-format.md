@@ -131,9 +131,9 @@ the container file (`SPEC/containers.md`).
   **Checked** (green), **Unchecked** (yellow; from a route the bench measured clearing the fill rule: Wilson lower
   bound 0.85, point 0.90, 40 owner-checked pairs) and **Unchecked, lower confidence** (red; below the rule or not
   measured). The cut is the rule the Processor writes item fields by, and every figure shown is a measured one:
-  the item fields written (kind, byline, publication, publication date, recipient place) clear it on the image
-  prompt's stratified precision, which the verdict rests on (`segbench-results/item-fields-score.md`); title is below
-  it (0.91 [0.83, 0.94]); no evidence
+  the item fields written (kind, title, byline, publication, publication date, recipient place) clear it on the image
+  prompt's stratified precision, which the verdict rests on (`segbench-results/item-fields-score.md`; title 0.91
+  [0.86, 0.94] after its last look, W47.item-fields-title); no evidence
   class of the dating route clears it (text 139/158 exact, image 10/12, estimate 35/51;
   `segbench-results/date-route-pipeline.md`; stamp 1/1 where it fired, a stamp's year 25/25 on documents carrying
   one, most also dated in their text, `segbench-results/date-stamp-fallback.md`), and the class comes from the page's `Date evidence:` line (none: text
@@ -402,10 +402,12 @@ Recipient place: <place>; <place>
   holds for them as for the other optional lines: a body that opens, with no separator, on `Title: …` is read as one. A field is written only where
   the bench measured the call clearing the fill rule (`segbench-results/item-fields-score.md`, "The verdict"): the kind
   (one of `letter`, `memo`, `telegram`, `newspaper article`, `magazine article`, `journal article`, `newsletter`,
-  `clipping`, `report`, `speech`, `press release`, `photograph`, `other`) and the publication on every kind, the
+  `clipping`, `report`, `speech`, `press release`, `photograph`, `other`), the title and the publication on every kind, the
   byline and publication date on the published kinds (the articles, newsletters, clippings and reports), the
-  recipient place on letters, memos and telegrams. **Title has its line but is not written** while it stays below the
-  rule (0.91 [0.83, 0.94]); a consumer must treat every line as possibly absent. A list is joined with `; `. Each
+  recipient place on letters, memos and telegrams (a letter or telegram has no title by the label definitions). A
+  title printed in capitals throughout is written in title case on the line (a word with a digit, a dotted
+  abbreviation, a roman numeral or one with no vowel stays in capitals); any other title as read, and the sidecar
+  keeps it as read. A consumer must treat every line as possibly absent. A list is joined with `; `. Each
   value is one physical line: control characters and runs of white space become one space, the middle dot a comma,
   cut to 120 characters with `…`, and the line is fitted like the evidence line. The publication date is the issue
   date printed with the piece; it is shown and exported apart from the document's date tags and never written over

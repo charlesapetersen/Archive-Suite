@@ -11,7 +11,7 @@ import PDFKit
 /// end part writes scratch images, PDFs and sidecars under a temporary folder and removes it.
 ///
 ///   1. Parsing a reply as the bench does (`item_fields.parse` and `by_definition`), and the marked text.
-///   2. The fill policy: which fields fill on which kinds, title withheld.
+///   2. The fill policy: which fields fill on which kinds; an all-capitals title in title case on the header.
 ///   3. The sidecar object, and `SegmentJSONBuilder` with and without it.
 ///   4. End to end through `performTaggingPhase` on a remote gateway: the call made with the page images and the
 ///      measured model, its lines in the outputs' page-2 headers; none on a route the bench did not measure, nor with
@@ -108,8 +108,29 @@ enum ItemFieldsTestDriver {
         typealias P = ItemFieldPolicy
         check("2 kind and publication fill on every kind",
               P.withheld(.kind, kind: nil) == nil && P.withheld(.publication, kind: "speech") == nil)
-        check("2 title is withheld on every kind", P.withheld(.title, kind: "newspaper article") == P.titleBelowBar
-              && P.withheld(.title, kind: "memo") != nil)
+        check("2 title fills on every kind",
+              P.withheld(.title, kind: "newspaper article") == nil && P.withheld(.title, kind: "memo") == nil
+              && P.withheld(.title, kind: nil) == nil)
+        let cases: [(String, String)] = [
+            ("ECONOMICS OF PROGRAMMING PRODUCTION", "Economics of Programming Production"),
+            ("ARE OUR UNIVERSITIES LETTING US DOWN?", "Are Our Universities Letting Us Down?"),
+            ("THE 100 MOST POWERFUL PEOPLE IN SILICON VALLEY", "The 100 Most Powerful People in Silicon Valley"),
+            ("A COLLEGE MYTH: 'PRESTIGE' ISN'T ALWAYS THE KEY", "A College Myth: 'Prestige' Isn't Always the Key"),
+            ("ASIAN-AMERICAN RATES AND THE U.S. TV PART II", "Asian-American Rates and the U.S. TV Part II"),
+            ("CORPORATE CULTURE: THE HARD VALUES", "Corporate Culture: The Hard Values"),
+            ("LETTERS TO THE", "Letters to The"),
+            ("How Harvard Finds Freshmen In a Deluge", "How Harvard Finds Freshmen In a Deluge"),
+            ("CORPORATE CULTURE The hard-to-change values", "CORPORATE CULTURE The hard-to-change values"),
+            ("1979", "1979"),
+            ("MCGOVERN AND O'BRIEN ON THE FBI AND AFL-CIO", "McGovern and O'Brien on the FBI and AFL-CIO"),
+            ("U.S.-SOVIET TRADE—AND MORE", "U.S.-Soviet Trade—And More"),
+            ("MY WAY: MIX", "My Way: Mix"),
+            ("", ""), ("- —", "- —"),
+        ]
+        for (read, shown) in cases {
+            let got = ItemFieldResult.titleCased(read)
+            check("2 title case: \(read)", got == shown, got)
+        }
         check("2 byline and publication date fill on published kinds only",
               P.withheld(.byline, kind: "report") == nil && P.withheld(.publicationDate, kind: "clipping") == nil
               && P.withheld(.byline, kind: "speech") != nil && P.withheld(.publicationDate, kind: nil) != nil)
@@ -135,9 +156,10 @@ enum ItemFieldsTestDriver {
               o["status"] as? String == "read" && o["kind"] as? String == "newspaper article"
               && o["byline"] as? [String] == ["John Smith"] && o["publication"] as? String == "The Times"
               && o["publication_date"] as? String == "1967-05" && o["route"] as? String == "Gateway · gemini-3.7-flash")
-        check("3 the title is not written, only why", o["title"] == nil
-              && (o["not_filled"] as? [String: String])?["title"] == ItemFieldPolicy.titleBelowBar)
-        check("3 a withheld field's quote is not written", (o["quotes"] as? [String: String]) == ["byline": "John Smith"])
+        check("3 the title is written as read, nothing withheld", o["title"] as? String == "A Headline"
+              && o["not_filled"] == nil)
+        check("3 the filled fields' quotes are written",
+              (o["quotes"] as? [String: String]) == ["title": "A Headline", "byline": "John Smith"])
         r.kind = "speech"
         let s = ItemFieldResult(route: "g", outcome: .read(r)).sidecarObject
         check("3 a byline on an unmeasured kind is not filled", s["byline"] == nil && s["publication_date"] == nil
@@ -196,10 +218,11 @@ enum ItemFieldsTestDriver {
             check("5 a generated pair", false); return
         }
         let fields = ItemFieldResult(route: "g", outcome: .read(.init(
-            kind: "newspaper article", title: "Senate Acts", byline: ["Mary Jones", "John Smith"], publication: "The Sun",
+            kind: "newspaper article", title: "SENATE ACTS", byline: ["Mary Jones", "John Smith"], publication: "The Sun",
             publicationDate: "1967-03-02"))).headerFields
-        check("5 the header fields: the filled ones, the byline joined, no title",
-              fields == PDFItemFields(documentKind: "newspaper article", byline: "Mary Jones; John Smith",
+        check("5 the header fields: the filled ones, the byline joined, the title in title case",
+              fields == PDFItemFields(documentKind: "newspaper article", title: "Senate Acts",
+                                      byline: "Mary Jones; John Smith",
                                       publication: "The Sun", publicationDate: "1967-03-02"), "\(fields)")
         let gen = PDFGenerator()
         guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, evidence: "image; page 1", itemFields: fields,
@@ -269,7 +292,7 @@ enum ItemFieldsTestDriver {
                 if text.contains("You are labelling catalogue fields") {
                     wire.fields.append((marker, body?["model"] as? String ?? "", images))
                     return marker == "DOCA"
-                        ? #"{"kind": "newspaper article", "title": "Senate Acts", "byline": ["Mary Jones"], "publication": "The Sun", "publication_date": "1967-03-02", "recipient_place": []}"#
+                        ? #"{"kind": "newspaper article", "title": "SENATE ACTS ON THE BUDGET", "byline": ["Mary Jones"], "publication": "The Sun", "publication_date": "1967-03-02", "recipient_place": []}"#
                         : #"{"kind": "letter", "title": null, "byline": [], "publication": null, "publication_date": null, "recipient_place": ["Boston, MA"]}"#
                 }
                 wire.other += 1
@@ -364,10 +387,10 @@ enum ItemFieldsTestDriver {
               calls.count == 2 && calls.allSatisfy { $0.1 == ItemFieldExtractor.gatewayModel }
               && calls.first { $0.0 == "DOCA" }?.2 == 2 && calls.first { $0.0 == "DOCL" }?.2 == 1, "\(calls)")
         let a = json(gOut["A"]), af = a["item_fields"] as? [String: Any] ?? [:]
-        check("4 A: the article's fields filled, the title withheld",
+        check("4 A: the article's fields filled, the title as read",
               af["status"] as? String == "read" && af["publication"] as? String == "The Sun"
               && af["byline"] as? [String] == ["Mary Jones"] && af["publication_date"] as? String == "1967-03-02"
-              && af["title"] == nil && (af["not_filled"] as? [String: String])?["title"] != nil, "\(af)")
+              && af["title"] as? String == "SENATE ACTS ON THE BUDGET" && af["not_filled"] == nil, "\(af)")
         check("4 A: the tagging call's publication left out, its format kept",
               a["publication_name"] == nil && a["format"] as? String == "newspaper article", "\(a.keys.sorted())")
         func header(_ name: String) -> PDFPageHeader? {
@@ -377,8 +400,9 @@ enum ItemFieldsTestDriver {
         }
         let ah = header("A"), a1 = PDFDocument(url: tmp.appendingPathComponent("gateway/A1.pdf"))?.page(at: 1)
             .flatMap { PDFHeaderParser.parse($0).header }
-        check("4 A: both pages' headers carry the filled fields, no title line",
-              ah?.itemFields == PDFItemFields(documentKind: "newspaper article", byline: "Mary Jones",
+        check("4 A: both pages' headers carry the filled fields, the title in title case",
+              ah?.itemFields == PDFItemFields(documentKind: "newspaper article", title: "Senate Acts on the Budget",
+                                              byline: "Mary Jones",
                                               publication: "The Sun", publicationDate: "1967-03-02")
               && a1?.itemFields == ah?.itemFields && ah?.originalFilename == "gateway-A0.jpg",
               "\(String(describing: ah)) \(String(describing: a1))")

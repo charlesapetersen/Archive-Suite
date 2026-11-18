@@ -61,8 +61,8 @@ public enum FieldStatusPolicy {
 
     /// A page-2 item field. Each one written is from the Processor's item-field call (Gemini 3.7 Flash, image
     /// prompt), which fills a field only where it cleared the rule. The figures are the stratified precision the
-    /// verdict rests on (`item-fields-score.md`, "Every route, field by field" and "The verdict"). Title is below the
-    /// rule; it has a line but is not written, so one present came from elsewhere.
+    /// verdict rests on (`item-fields-score.md`, "Every route, field by field" and "The verdict"). Title cleared it
+    /// on its last look (W47.item-fields-title). The date fields are not item fields and have no figure here.
     public static func itemField(_ field: CheckableField, checked: Bool) -> FieldStatus {
         let source = "Read by the Processor’s item-field call"
         let figure: String?
@@ -72,14 +72,15 @@ public enum FieldStatusPolicy {
         case .publication: figure = "0.94 [0.88, 0.94] on the bench"
         case .publicationDate: figure = "0.98 [0.88, 0.98] on the bench"
         case .recipientPlace: figure = "1.00 [0.92, 1.00] on the bench"
-        case .title, .date, .sentWith: figure = nil
+        case .title: figure = "0.91 [0.86, 0.94] on the bench"
+        case .date, .sentWith: figure = nil
         }
         if checked { return FieldStatus(level: .checked, source: source, measured: figure ?? "") }
         if let figure {
             return FieldStatus(level: .unchecked, source: source, measured: "Clears the fill rule: \(figure).")
         }
         return FieldStatus(level: .lowerConfidence, source: source,
-                           measured: "Below the fill rule: title is 0.91 [0.83, 0.94] on the bench.")
+                           measured: "Not measured as an item field.")
     }
 
     /// The item's own date, from its tags. `evidence` is the page-2 `Date evidence:` line, which the Processor's

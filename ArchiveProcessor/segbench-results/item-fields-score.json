@@ -117,8 +117,8 @@
    56
   ],
   "draft-gemini|base|title": [
-   81,
-   87
+   85,
+   92
   ],
   "draft-gemini|clippings|byline": [
    39,
@@ -141,8 +141,8 @@
    1
   ],
   "draft-gemini|clippings|title": [
-   45,
-   48
+   47,
+   53
   ],
   "draft-gemini|handwritten|kind": [
    19,
@@ -157,8 +157,8 @@
    2
   ],
   "draft-gemini|handwritten|title": [
-   1,
-   1
+   2,
+   2
   ],
   "draft-luna|base|byline": [
    36,
@@ -182,7 +182,7 @@
   ],
   "draft-luna|base|title": [
    83,
-   93
+   98
   ],
   "draft-luna|clippings|byline": [
    36,
@@ -205,8 +205,8 @@
    1
   ],
   "draft-luna|clippings|title": [
-   41,
-   48
+   43,
+   53
   ],
   "draft-luna|handwritten|kind": [
    19,
@@ -245,8 +245,8 @@
    102
   ],
   "extractor|base|title": [
-   46,
-   103
+   44,
+   102
   ],
   "tagging|base|byline": [
    31,
@@ -314,7 +314,7 @@
   ]
  },
  "counts": {
-  "answered": 430,
+  "answered": 507,
   "documents": 299,
   "kind_changed": 18,
   "note_answers": {
@@ -328,24 +328,24 @@
    "notes": 32,
    "owner date tag": 32
   },
-  "note_drops": 13,
+  "note_drops": 14,
   "note_sets": 15,
   "note_themes": {
-   "clipping or newspaper article": 9,
+   "clipping or newspaper article": 10,
    "entity or date asked": 32,
    "inference": 15,
    "kinds outside the list": 3,
    "letterhead or sending place": 4,
    "more fields": 9,
-   "several pieces in one document": 3,
-   "title case": 4,
+   "several pieces in one document": 4,
+   "title case": 5,
    "title over two pages": 1,
    "typed date": 4
   },
-  "notes": 68,
+  "notes": 72,
   "notes_by_sheet": {
    "first": 63,
-   "fourth": 0,
+   "fourth": 4,
    "second": 4,
    "third": 1
   },
@@ -355,7 +355,7 @@
    "publication": 11,
    "publication_date": 8,
    "recipient_place": 5,
-   "title": 15
+   "title": 19
   },
   "owner_checked": {
    "byline": 57,
@@ -363,7 +363,7 @@
    "publication": 80,
    "publication_date": 56,
    "recipient_place": 60,
-   "title": 90
+   "title": 166
   },
   "owner_n": {
    "byline": [
@@ -392,14 +392,14 @@
     32
    ],
    "title": [
-    90,
-    77,
-    56
+    166,
+    152,
+    131
    ]
   },
   "owner_tags_printed": 110,
   "printed": 126,
-  "questions": 457,
+  "questions": 534,
   "replies": {
    "app-gemini-3.8-flash": 147,
    "app-qwen3-vl-8b": 147,
@@ -412,7 +412,7 @@
   },
   "sheets": {
    "first": 174,
-   "fourth": 0,
+   "fourth": 77,
    "second": 195,
    "third": 88
   },
@@ -450,8 +450,8 @@
   },
   "title": {
    "empty": 10,
-   "filled": 56,
-   "right": 53,
+   "filled": 132,
+   "right": 125,
    "truly empty": 10
   }
  },
@@ -472,7 +472,17 @@
    "right": 29
   }
  },
- "draw4": {},
+ "draw4": {
+  "byline": {},
+  "kind": {},
+  "publication": {},
+  "publication_date": {},
+  "recipient_place": {},
+  "title": {
+   "filled": 76,
+   "right": 72
+  }
+ },
  "draw_routes": {
   "app-gemini-3.8-flash|byline": [
    7,
@@ -591,8 +601,8 @@
    32
   ],
   "draft-gemini|title": [
-   53,
-   56
+   125,
+   132
   ],
   "draft-luna|byline": [
    26,
@@ -615,8 +625,8 @@
    32
   ],
   "draft-luna|title": [
-   51,
-   58
+   118,
+   133
   ],
   "extractor|byline": [
    10,
@@ -639,8 +649,8 @@
    37
   ],
   "extractor|title": [
-   21,
-   33
+   43,
+   74
   ],
   "tagging|byline": [
    26,
@@ -667,7 +677,7 @@
    0
   ]
  },
- "fourth_sheet_open": true,
+ "fourth_sheet_open": false,
  "paired": {
   "drafted": {
    "byline": {
@@ -701,7 +711,7 @@
    },
    "title": {
     "both": 61,
-    "neither": 73
+    "neither": 78
    }
   },
   "owner": {
@@ -735,7 +745,7 @@
    },
    "title": {
     "both": 4,
-    "neither": 40
+    "neither": 78
    }
   }
  },
@@ -811,16 +821,16 @@
    "wrong_when_filled": 9
   },
   "app-gemini-3.8-flash|drafted|title": {
-   "docs": 134,
+   "docs": 139,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 73,
+   "null_when_truth": 78,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 73,
+   "truth_filled": 78,
    "wrong_when_filled": 0
   },
   "app-gemini-3.8-flash|owner|byline": {
@@ -889,16 +899,16 @@
    "wrong_when_filled": 3
   },
   "app-gemini-3.8-flash|owner|title": {
-   "docs": 44,
+   "docs": 82,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 40,
+   "null_when_truth": 78,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 40,
+   "truth_filled": 78,
    "wrong_when_filled": 0
   },
   "app-qwen3-vl-8b|drafted|byline": {
@@ -1045,16 +1055,16 @@
    "wrong_when_filled": 7
   },
   "app-qwen3-vl-8b|owner|title": {
-   "docs": 44,
+   "docs": 82,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 40,
+   "null_when_truth": 78,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 40,
+   "truth_filled": 78,
    "wrong_when_filled": 0
   },
   "app-qwen3.5-4b|drafted|byline": {
@@ -1201,16 +1211,16 @@
    "wrong_when_filled": 5
   },
   "app-qwen3.5-4b|owner|title": {
-   "docs": 44,
+   "docs": 82,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 40,
+   "null_when_truth": 78,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 40,
+   "truth_filled": 78,
    "wrong_when_filled": 0
   },
   "app-qwen3.6-27b|drafted|byline": {
@@ -1357,16 +1367,16 @@
    "wrong_when_filled": 4
   },
   "app-qwen3.6-27b|owner|title": {
-   "docs": 44,
+   "docs": 82,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 40,
+   "null_when_truth": 78,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 40,
+   "truth_filled": 78,
    "wrong_when_filled": 0
   },
   "draft-gemini|drafted|byline": {
@@ -1435,17 +1445,17 @@
    "wrong_when_filled": 0
   },
   "draft-gemini|drafted|title": {
-   "docs": 270,
-   "ed2": 127,
-   "exact": 127,
-   "fill_rate": 0.5037037037037037,
-   "filled_when_empty": 0,
+   "docs": 281,
+   "ed2": 134,
+   "exact": 134,
+   "fill_rate": 0.5231316725978647,
+   "filled_when_empty": 1,
    "null_when_truth": 6,
-   "precision_ed2": 0.9338235294117647,
-   "pred_filled": 136,
-   "recall_ed2": 0.8943661971830986,
-   "truth_filled": 142,
-   "wrong_when_filled": 9
+   "precision_ed2": 0.9115646258503401,
+   "pred_filled": 147,
+   "recall_ed2": 0.881578947368421,
+   "truth_filled": 152,
+   "wrong_when_filled": 13
   },
   "draft-gemini|owner|byline": {
    "docs": 57,
@@ -1513,17 +1523,17 @@
    "wrong_when_filled": 0
   },
   "draft-gemini|owner|title": {
-   "docs": 90,
-   "ed2": 62,
-   "exact": 62,
-   "fill_rate": 0.7888888888888889,
-   "filled_when_empty": 0,
+   "docs": 166,
+   "ed2": 134,
+   "exact": 134,
+   "fill_rate": 0.8855421686746988,
+   "filled_when_empty": 1,
    "null_when_truth": 6,
-   "precision_ed2": 0.8732394366197183,
-   "pred_filled": 71,
-   "recall_ed2": 0.8051948051948052,
-   "truth_filled": 77,
-   "wrong_when_filled": 9
+   "precision_ed2": 0.9115646258503401,
+   "pred_filled": 147,
+   "recall_ed2": 0.881578947368421,
+   "truth_filled": 152,
+   "wrong_when_filled": 13
   },
   "draft-luna|drafted|byline": {
    "docs": 115,
@@ -1591,17 +1601,17 @@
    "wrong_when_filled": 2
   },
   "draft-luna|drafted|title": {
-   "docs": 270,
-   "ed2": 126,
-   "exact": 124,
-   "fill_rate": 0.5296296296296297,
-   "filled_when_empty": 3,
-   "null_when_truth": 2,
-   "precision_ed2": 0.8811188811188811,
-   "pred_filled": 143,
-   "recall_ed2": 0.8873239436619719,
-   "truth_filled": 142,
-   "wrong_when_filled": 17
+   "docs": 281,
+   "ed2": 128,
+   "exact": 126,
+   "fill_rate": 0.5444839857651246,
+   "filled_when_empty": 4,
+   "null_when_truth": 3,
+   "precision_ed2": 0.8366013071895425,
+   "pred_filled": 153,
+   "recall_ed2": 0.8421052631578947,
+   "truth_filled": 152,
+   "wrong_when_filled": 25
   },
   "draft-luna|owner|byline": {
    "docs": 57,
@@ -1669,17 +1679,17 @@
    "wrong_when_filled": 2
   },
   "draft-luna|owner|title": {
-   "docs": 90,
-   "ed2": 61,
-   "exact": 59,
-   "fill_rate": 0.8666666666666667,
-   "filled_when_empty": 3,
-   "null_when_truth": 2,
-   "precision_ed2": 0.782051282051282,
-   "pred_filled": 78,
-   "recall_ed2": 0.7922077922077922,
-   "truth_filled": 77,
-   "wrong_when_filled": 17
+   "docs": 166,
+   "ed2": 128,
+   "exact": 126,
+   "fill_rate": 0.9216867469879518,
+   "filled_when_empty": 4,
+   "null_when_truth": 3,
+   "precision_ed2": 0.8366013071895425,
+   "pred_filled": 153,
+   "recall_ed2": 0.8421052631578947,
+   "truth_filled": 152,
+   "wrong_when_filled": 25
   },
   "extractor|drafted|byline": {
    "docs": 63,
@@ -1747,17 +1757,17 @@
    "wrong_when_filled": 60
   },
   "extractor|drafted|title": {
-   "docs": 208,
-   "ed2": 46,
-   "exact": 43,
-   "fill_rate": 0.4951923076923077,
+   "docs": 207,
+   "ed2": 44,
+   "exact": 41,
+   "fill_rate": 0.4927536231884058,
    "filled_when_empty": 19,
    "null_when_truth": 13,
-   "precision_ed2": 0.44660194174757284,
-   "pred_filled": 103,
-   "recall_ed2": 0.4742268041237113,
-   "truth_filled": 97,
-   "wrong_when_filled": 57
+   "precision_ed2": 0.43137254901960786,
+   "pred_filled": 102,
+   "recall_ed2": 0.4583333333333333,
+   "truth_filled": 96,
+   "wrong_when_filled": 58
   },
   "extractor|owner|byline": {
    "docs": 33,
@@ -1825,17 +1835,17 @@
    "wrong_when_filled": 15
   },
   "extractor|owner|title": {
-   "docs": 58,
-   "ed2": 22,
-   "exact": 21,
-   "fill_rate": 0.7758620689655172,
+   "docs": 105,
+   "ed2": 44,
+   "exact": 41,
+   "fill_rate": 0.819047619047619,
    "filled_when_empty": 3,
-   "null_when_truth": 7,
-   "precision_ed2": 0.4888888888888889,
-   "pred_filled": 45,
-   "recall_ed2": 0.4489795918367347,
-   "truth_filled": 49,
-   "wrong_when_filled": 23
+   "null_when_truth": 13,
+   "precision_ed2": 0.5116279069767442,
+   "pred_filled": 86,
+   "recall_ed2": 0.4583333333333333,
+   "truth_filled": 96,
+   "wrong_when_filled": 42
   },
   "tagging|drafted|byline": {
    "docs": 115,
@@ -1903,16 +1913,16 @@
    "wrong_when_filled": 19
   },
   "tagging|drafted|title": {
-   "docs": 270,
+   "docs": 281,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 142,
+   "null_when_truth": 152,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 142,
+   "truth_filled": 152,
    "wrong_when_filled": 0
   },
   "tagging|owner|byline": {
@@ -1981,16 +1991,16 @@
    "wrong_when_filled": 3
   },
   "tagging|owner|title": {
-   "docs": 90,
+   "docs": 166,
    "ed2": 0,
    "exact": 0,
    "fill_rate": 0.0,
    "filled_when_empty": 0,
-   "null_when_truth": 77,
+   "null_when_truth": 152,
    "precision_ed2": null,
    "pred_filled": 0,
    "recall_ed2": 0.0,
-   "truth_filled": 77,
+   "truth_filled": 152,
    "wrong_when_filled": 0
   }
  },
@@ -2683,9 +2693,9 @@
     9,
     15
    ],
-   "filled": 148,
-   "hi": 0.942937401523562,
-   "lo": 0.8281890028145211,
+   "filled": 147,
+   "hi": 0.9359066973022415,
+   "lo": 0.8645216046648274,
    "pool": {
     "image prompt empty": [
      0,
@@ -2693,12 +2703,12 @@
      0
     ],
     "image prompt filled": [
-     133,
-     56,
-     53
+     132,
+     132,
+     125
     ]
    },
-   "precision": 0.9113175675675675
+   "precision": 0.9115646258503401
   },
   "draft-luna|byline": {
    "census": [
@@ -2815,9 +2825,9 @@
     10,
     20
    ],
-   "filled": 158,
-   "hi": 0.8913410131894597,
-   "lo": 0.7378592619571556,
+   "filled": 157,
+   "hi": 0.8740636406761938,
+   "lo": 0.7625882525564487,
    "pool": {
     "image prompt empty": [
      6,
@@ -2825,12 +2835,12 @@
      0
     ],
     "image prompt filled": [
-     132,
-     56,
-     51
+     131,
+     131,
+     118
     ]
    },
-   "precision": 0.8241410488245932
+   "precision": 0.8152866242038217
   },
   "extractor|byline": {
    "census": [
@@ -2947,9 +2957,9 @@
     1,
     12
    ],
-   "filled": 103,
-   "hi": 0.7017647223538672,
-   "lo": 0.36507476173557357,
+   "filled": 102,
+   "hi": 0.6219434461107889,
+   "lo": 0.34990129595418457,
    "pool": {
     "image prompt empty": [
      18,
@@ -2957,12 +2967,12 @@
      0
     ],
     "image prompt filled": [
-     73,
-     31,
-     21
+     72,
+     72,
+     43
     ]
    },
-   "precision": 0.4898214844973379
+   "precision": 0.43137254901960786
   },
   "tagging|byline": {
    "census": [
@@ -3278,8 +3288,8 @@
    2
   ],
   "title": [
-   16,
-   10
+   4,
+   4
   ]
  },
  "verdicts": {
@@ -3312,7 +3322,7 @@
   "draft-gemini|publication": "fill",
   "draft-gemini|publication_date": "fill",
   "draft-gemini|recipient_place": "fill",
-  "draft-gemini|title": "waits on the fourth sheet",
+  "draft-gemini|title": "fill",
   "draft-luna|byline": "too close",
   "draft-luna|kind": "too close",
   "draft-luna|publication": "too close",
