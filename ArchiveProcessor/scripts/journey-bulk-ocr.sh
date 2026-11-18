@@ -8,6 +8,8 @@
 #                                     (the meter, the cap, the key hand-over and Automatic tagging's tags)
 #   ./scripts/journey-bulk-ocr.sh --route gateway --paid [--cap USD]  the Stanford gateway, Gemini 3.7 Flash,
 #                                                                     Automatic tagging (the journey itself)
+#   ./scripts/journey-bulk-ocr.sh --route openrouter --paid [--max N] [--cap USD]   OpenRouter, Qwen3.8 Flash
+#                                     (Alibaba), Automatic tagging, metered (the paid run, owner 2026-11-18)
 #   ./scripts/journey-bulk-ocr.sh --route anthropic|mistral --paid --max N   W40.d3: a direct provider's own
 #                                     client (Keychain key), No tagging, at most 5 photos, a few cents
 #   ./scripts/journey-bulk-ocr.sh --route anthropic|mistral --batch [--cancel] --paid --max N   W40.d4: the same
@@ -36,7 +38,7 @@ while [ $# -gt 0 ]; do
     --max) MAX="$2"; shift 2 ;;
     --cap) CAP="$2"; shift 2 ;;
     --completion) export W40D1_FAKE_COMPLETION="$2"; shift 2 ;;
-    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -81,6 +83,21 @@ case "$ROUTE" in
         || { echo "could not read the Gateway key (ops/autonomous/fix-keychain-access.sh)"; exit 1; }
       export W40D1_KEY_FILE="$KEYDIR/key"
     fi ;;
+  openrouter)
+    # Owner, 2026-11-18: the gateway's November budget is spent, so the journey runs on the cheapest route, Qwen3.8
+    # Flash through OpenRouter (the app's catalog entry, pinned to Alibaba, max_price $0.15 in / $0.47 out per 1M).
+    # OpenRouter's replies carry OpenAI-shaped usage, so the same meter prices them at that pinned ceiling.
+    awk -v c="$CAP" 'BEGIN { exit !(c > 0 && c <= 7) }' || { echo "--cap must be above 0 and at most 7 (the \$7 rule)"; exit 2; }
+    echo "route: OpenRouter, qwen/qwen3.8-flash (alibaba), Automatic tagging, $PAGES pages, metered to a cap of \$$CAP"
+    [ "$PAID" = 1 ] || { echo "not run: add --paid to spend it (the app's estimate is in estimate.txt)"; exit 0; }
+    export W40D1_PROVIDER=OpenRouter W40D1_MODEL="qwen/qwen3.8-flash" \
+      W40D1_METER=1 W40D1_CAP_USD="$CAP" W40D1_TAGGING=automatic MODE=automatic
+    if [ -z "${W40D1_KEY_FILE:-}" ]; then
+      KEYDIR="$(mktemp -d)"; chmod 700 "$KEYDIR"
+      ( umask 077; /usr/bin/security find-generic-password -s com.archiveprocessor.app -a OpenRouter -w > "$KEYDIR/key" ) \
+        || { echo "could not read the OpenRouter key"; exit 1; }
+      export W40D1_KEY_FILE="$KEYDIR/key"
+    fi ;;
   anthropic|mistral)
     # W40.d3: a direct provider through the app's own client, No tagging, on a few photos (--max, at most 5). The
     # cheapest built-in model: Claude Sonnet 4.6 ($3 in / $15 out per 1M, about $0.02 a photo) or Mistral OCR
@@ -100,7 +117,7 @@ case "$ROUTE" in
         || { echo "could not read the $ACCOUNT key (ops/autonomous/fix-keychain-access.sh)"; exit 1; }
       export W40D1_KEY_FILE="$KEYDIR/key"
     fi ;;
-  *) echo "--route vision|fake|gateway|anthropic|mistral" >&2; exit 2 ;;
+  *) echo "--route vision|fake|gateway|openrouter|anthropic|mistral" >&2; exit 2 ;;
 esac
 
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}/processor"
