@@ -181,10 +181,70 @@ Available memory guard whole-process rows (resumed collects may lack a row) (dat
 
 - 2026-10-31T12:08:00 · 0 · 11 · 1239 · 1313 · 0 · 1
 
+## HunyuanOCR-1.5 bf16 (`hunyuanocr-1.5-bf16`)
+
+96 of the panel's 96 accuracy pages (the three agreement-only letters excluded, as there). Failed or cut-off readings score as empty, as in the panel.
+
+| route | completed / n | NES % | chrF2 % | words missed % | words added % | kind correct |
+|---|---:|---:|---:|---:|---:|---:|
+| Mac MLX (hunyuanocr-1.5-bf16) | 96/96 | 85.34 | 87.62 | 10.00 | 4.01 | – |
+
+| kind | n | Mac MLX NES % |
+|---|---:|---:|
+| handwritten | 16 | 79.84 |
+| mixed | 2 | 65.80 |
+| printed | 28 | 80.53 |
+| typewritten | 50 | 90.57 |
+
+## Speed and memory: hunyuanocr-1.5-bf16
+
+99 of the 99 originals read, one at a time, one model load per collect invocation (3.6 s median recorded load time).
+
+| measure | median | 90th percentile | max |
+|---|---:|---:|---:|
+| seconds a page (prompt + generation) | 38.4 | 71.6 | 623.0 |
+| seconds to first token (image encoding + prefill) | 16.3 | 17.4 | 18.8 |
+| generation tokens/s | 16.9 | – | – |
+| input tokens (image + prompt) | 4136 | 4192 | 4192 |
+| output tokens | 373 | 805 | 8192 |
+| MLX peak memory, GB | 4.40 | 4.55 | 5.81 |
+
+Total reading time 95 min for 99 pages; 3 failed (3 hit max_tokens).
+
+## FastVLM 0.5B bf16 (`fastvlm-0.5b-bf16`)
+
+96 of the panel's 96 accuracy pages (the three agreement-only letters excluded, as there). Failed or cut-off readings score as empty, as in the panel.
+
+| route | completed / n | NES % | chrF2 % | words missed % | words added % | kind correct |
+|---|---:|---:|---:|---:|---:|---:|
+| Mac MLX (fastvlm-0.5b-bf16) | 51/96 | 28.06 | 29.02 | 81.00 | 4.30 | – |
+
+| kind | n | Mac MLX NES % |
+|---|---:|---:|
+| handwritten | 16 | 23.14 |
+| mixed | 2 | 32.28 |
+| printed | 28 | 17.38 |
+| typewritten | 50 | 35.45 |
+
+## Speed and memory: fastvlm-0.5b-bf16
+
+99 of the 99 originals read, one at a time, one model load per collect invocation (0.8 s median recorded load time).
+
+| measure | median | 90th percentile | max |
+|---|---:|---:|---:|
+| seconds a page (prompt + generation) | 4.5 | 38.6 | 39.0 |
+| seconds to first token (image encoding + prefill) | 0.3 | 0.4 | 1.5 |
+| generation tokens/s | 113.3 | – | – |
+| input tokens (image + prompt) | 39 | 39 | 39 |
+| output tokens | 482 | 4096 | 4096 |
+| MLX peak memory, GB | 2.00 | 2.05 | 2.05 |
+
+Total reading time 33 min for 99 pages; 48 failed (48 hit max_tokens).
+
 ## Measurement card
 
 - **Truth.** The owner's 96 pages (99 less the three agreement-only letters), truth drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner where they differed (`ocr-truth.md`), corrected on 2026-10-29 (W46.truth-edits). Words the two drafters wrote alike were not adjudicated; since then the owner has checked samples of them blind: 59 places on 20 pages where Qwen3.6-27B differs (answered 2026-10-21, `ocr-truth-bias-score.md`: 4 truth errors, the bias not material) and every place where Qwen3.6-27B or LightOnOCR-3 4B differs on the 16 hand pages, with 19 typed controls (answered 2026-10-31, `ocr-hands-rescore.md`: 12 corrections, 10 places unresolved). Agreed words that no third-family reader disputes stay unchecked, so a drafter-family route can still gain where the truth shares its mistake.
 - **Selection.** All 96 accuracy pages (the three agreement-only letters excluded), one reading each; none chosen by a route's reading.
-- **Comparison.** Each Mac route at its own quantisation and prompt: LightOnOCR-3-4B 8-bit (96 pages, its own prompt); Qwen3.5-9B 4-bit (96 pages, the panel prompt); Xiaomi-OCR-0 bf16 (96 pages, its own prompt); PaddleOCR-VL 1.6 bf16 (96 pages, its own prompt); granite-docling-258M bf16 (96 pages, its own prompt). The hosted bf16 row is qwen3.5-9b for Qwen3.5-9B 4-bit only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.
+- **Comparison.** Each Mac route at its own quantisation and prompt: LightOnOCR-3-4B 8-bit (96 pages, its own prompt); Qwen3.5-9B 4-bit (96 pages, the panel prompt); Xiaomi-OCR-0 bf16 (96 pages, its own prompt); PaddleOCR-VL 1.6 bf16 (96 pages, its own prompt); granite-docling-258M bf16 (96 pages, its own prompt); HunyuanOCR-1.5 bf16 (96 pages, its own prompt); FastVLM 0.5B bf16 (96 pages, its own prompt). The hosted bf16 row is qwen3.5-9b for Qwen3.5-9B 4-bit only. Speed and memory are one Apple M3 Pro with 18 GB, one page at a time.
 - **Noise.** Local greedy routes are deterministic on one machine (`ocr-rerun-noise.md`), so the paired interval alone tests a gap between them; the bf16 readers land Xiaomi-OCR-0 bf16 0.01 points from its Sherlock run and PaddleOCR-VL 1.6 bf16 0.08 points from its Sherlock run (`ocr-scorers.md`).
 - **Scope.** These Mac runs cover the 96 only; none read the public 895 on the Mac. Separate public counterparts: LightOnOCR-3-4B bf16 on FarmShare (`ocr-scorers.md`), also rerun on Sherlock; Qwen3.5-9B bf16 on Sherlock vLLM (`ocr-logprob.md`, 440 + 455 pages); Xiaomi-OCR-0 and PaddleOCR-VL 1.6 bf16 on Sherlock (`bench-corpus/new-open-sherlock-20261024.md`, 895 each). These are separate runtime/precision routes, not public-set scores of the Mac builds. Granite has no 895 score: its cluster pilot was refused after two of three diagnostic pages looped (`bench-corpus/new-open-boxes-20261031.md`); the cluster weights/runtime and context limit differ from the Mac build, so this is not a runtime penalty estimate.

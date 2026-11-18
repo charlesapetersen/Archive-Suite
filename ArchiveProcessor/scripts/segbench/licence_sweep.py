@@ -295,18 +295,27 @@ def gutenocr_lines() -> int:
     ps = [t for t in PH.pages() if PH.keep(t)]
     tls = {t["page"]: L.truth_lines(t) for t in ps}
     exps = {(t["page"], r): L.expected(t, r, tls[t["page"]]) for t in ps for r in L.READINGS}
-    jobs = [(t, d) for d in sorted((L.CACHE / "hyp").glob("gutenocr.*")) for t in ps
+    dirs = sorted((L.CACHE / "hyp").glob("gutenocr.*")) + sorted((L.CACHE / "hyp").glob(L.DEFAULT + ".*"))
+    jobs = [(t, d) for d in dirs for t in ps
             if (d / f"{PH.key(t)}.json").exists() and exps.get((t["page"], d.name.split(".", 2)[2])) is not None]
     work = Path(tempfile.mkdtemp(prefix="phl-lf-", dir=L.CACHE))
     with ThreadPoolExecutor(int(os.environ.get("PHL_WORKERS", "6"))) as ex:
         new = sum(ex.map(lambda td: L.score_one(td[0], td[1], tls[td[0]["page"]],
                                                 exps[(td[0]["page"], td[1].name.split(".", 2)[2])], work), jobs), [])
     work.rmdir()
+    # The shipped placer re-dragged with this build of the writer and drag tool must give its stored rows.
+    stored = {(r["page"], r["detector"], r["method"], r["reading"], r["writer"]): r["passed"] for r in L.load_rows()}
+    replay = [(stored.get((r["page"], r["detector"], r["method"], r["reading"], r["writer"])), r["passed"])
+              for r in new if r["detector"] != "gutenocr"]
+    same = sum(a == b for a, b in replay)
+    print(f"replay of {L.DEFAULT}: {same} of {len(replay)} page rows equal the stored ones")
+    new = [r for r in new if r["detector"] == "gutenocr"]
     (WORK / "gutenocr-lines-rows.jsonl").write_text("".join(json.dumps(r) + "\n" for r in new))
     rows = [r for r in L.load_rows() if r["detector"] != "gutenocr"] + new
     keep = {L.DEFAULT, "ppocrv6.ctc-mccatmus-conf", "surya.ctc-mccatmus-conf", "orli.ctc-mccatmus-conf"}
     out = {"item": "W46.licence-freed-sweep", "detector": f"{PH.GUTEN[0]}@{PH.GUTEN[1]} (CC BY-NC 4.0), LINES prompt",
-           "default": L.DEFAULT, "pairs": "pooled line pass, each route minus the default, page bootstrap", "tables": {}}
+           "default": L.DEFAULT, "pairs": "pooled line pass, each route minus the default, page bootstrap",
+           "replay": {"rows": len(replay), "equal": same}, "tables": {}}
     for w in L.WRITERS:
         for g in PH.GROUPS:
             for rd in L.READINGS:

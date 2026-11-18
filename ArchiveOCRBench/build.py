@@ -37,7 +37,8 @@ GATEWAY_CSV = RESULTS / "gemini37-vs-38-groups.csv"
 GATEWAY_ROUTES = {"gemini3.7-flash-gw"}
 # W46.ocr-new-open's Mac readers and W46.ocr-new-open-boxes's granite-docling, added after the difficulty fit was built:
 # on the headline and speed tables, not in the fit.
-LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx", "apple-fm-27"}
+LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx", "apple-fm-27",
+                   "hunyuanocr-1.5-bf16", "fastvlm-0.5b-bf16"}  # the last two: W46.licence-freed-sweep
 MAC_MD = RESULTS / "ocr-mac-local.md"
 MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
 FOUNDATION = RESULTS / "r1-foundation.json"  # W46.r1-foundation: fm_foundation.py report, Apple's on-device model
@@ -84,6 +85,7 @@ MARKS_DETECT = RESULTS / "marks-detect.json"  # W46.marks-detect: marks_detect.p
 MIXED_ROUTE = RESULTS / "mixed-route.json"    # W46.mixed-route: mixed_route.py report, marks read whole page or by box
 MIXED_BANDS = RESULTS / "mixed-route-bands.json"   # W46.mixed-route-bands: mixed_route_bands.py report
 LAYOUT_ORDER_PP = RESULTS / "layout-order-pp.json"  # W46.layout-order-newspapers-pp: orderers on PP-DocLayoutV3's L9 regions
+LAYOUT_ORDER_LR = RESULTS / "licence-sweep-layoutreader.json"  # W46.licence-freed-sweep: LayoutReader on the same boxes
 LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid: Gemini 3.7 Flash's blocks in its order
 DEWARP_GUARD_REAL5 = RESULTS / "dewarp-guard-real5.json"  # W46.dewarp-guard: Apple Vision on Real5 Warping, raw/quad/UVDoc
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
@@ -1048,9 +1050,13 @@ def layout_order():
     if not LAYOUT_ORDER.exists():
         return None
     d = json.loads(LAYOUT_ORDER.read_text())
-    return layout_order_paid({"guard": d["guard"], "sources": d["sources"],
-                              **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")},
-                              **layout_order_marks(), **layout_order_pp()})
+    lo = {"guard": d["guard"], "sources": d["sources"], **{k: d[k]["summary"] for k in ("bench_lines", "bench_regions", "l9")},
+          **layout_order_marks(), **layout_order_pp()}
+    if LAYOUT_ORDER_LR.exists():  # one more orderer, rerun beside the others on the same boxes (W46.licence-freed-sweep)
+        lr = json.loads(LAYOUT_ORDER_LR.read_text())
+        for k in ("bench_lines", "bench_regions", "l9"):
+            lo[k]["layoutreader"] = lr[k]["summary"]["layoutreader"]
+    return layout_order_paid(lo)
 
 
 def layout_order_pp():
