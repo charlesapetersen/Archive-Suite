@@ -408,14 +408,14 @@ def cmd_pages(a):
 
 # --- the gateway ----------------------------------------------------------------------------------------------
 
-def ledger():
-    f = os.path.join(CACHE, "calls.jsonl")
+def ledger(root=None):
+    f = os.path.join(root or CACHE, "calls.jsonl")
     return [json.loads(x) for x in open(f)] if os.path.exists(f) else []
 
 
-def spent():
+def spent(root=None):
     import gateway_gemini as G
-    return sum(G.charge(r) for r in ledger())
+    return sum(G.charge(r) for r in ledger(root))
 
 
 def cost(model, usage):
@@ -440,8 +440,8 @@ def request_of(model, images, text, effort):
     return b, settings, digest
 
 
-def reply_path(stage, doc_id):
-    return os.path.join(CACHE, stage, doc_id + ".json")
+def reply_path(stage, doc_id, root=None):
+    return os.path.join(root or CACHE, stage, doc_id + ".json")
 
 
 def cached(dest, settings, digest):
@@ -455,18 +455,20 @@ def cached(dest, settings, digest):
     return out
 
 
-def call(stage, doc_id, model, images, text, effort):
+def call(stage, doc_id, model, images, text, effort, root=None, cap=None):
     """One call, cached by destination, content hash and settings; the ledger line is written before the reply is
-    used, and the cap is checked against the worst case first."""
+    used, and the cap is checked against the worst case first. root and cap: another item's own cache, ledger and
+    cap (item_fields_infer), its images still read from this item's."""
     import gateway_gemini as G
-    dest = reply_path(stage, doc_id)
+    root, cap = root or CACHE, cap or CAP
+    dest = reply_path(stage, doc_id, root)
     b, settings, digest = request_of(model, images, text, effort)
     hit = cached(dest, settings, digest)
     if hit is not None:
         return hit
     worst = cost(model, {"prompt_tokens": 2000 * len(images) + len(text) // 3 + 1000, "completion_tokens": MAX_TOKENS})
-    if spent() + worst > CAP:
-        raise SystemExit(f"cap: ${spent():.4f} spent of ${CAP}")
+    if spent(root) + worst > cap:
+        raise SystemExit(f"cap: ${spent(root):.4f} spent of ${cap}")
     t = time.time()
     for attempt in range(3):
         try:
@@ -478,7 +480,7 @@ def call(stage, doc_id, model, images, text, effort):
             rec = {"stage": stage, "doc": doc_id, "http": None, "t": t, "model": model, "usage": {},
                    "cost": round(worst, 6), "images": len(images), "content_sha256": digest, "request": settings,
                    "note": "no reply; counted at the worst case, since the gateway may have billed it"}
-            with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
+            with open(os.path.join(root, "calls.jsonl"), "a") as fh:
                 fh.write(json.dumps(rec) + "\n")
             return {"meta": rec, "raw": None}
         if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
@@ -490,7 +492,7 @@ def call(stage, doc_id, model, images, text, effort):
            "model": got.get("model") or model, "usage": usage, "cost": round(cost(model, usage), 6),
            "images": len(images), "content_sha256": digest, "request": settings}
     rec = G.with_gateway_cost(rec, r)
-    with open(os.path.join(CACHE, "calls.jsonl"), "a") as fh:
+    with open(os.path.join(root, "calls.jsonl"), "a") as fh:
         fh.write(json.dumps(rec) + "\n")
     choice = (got.get("choices") or [{}])[0]
     out = {"meta": {**rec, "finish": choice.get("finish_reason")},
