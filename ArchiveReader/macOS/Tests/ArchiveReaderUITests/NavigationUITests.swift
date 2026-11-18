@@ -76,6 +76,27 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertTrue(name.contains("Fixture Project"), "the collection's project: \(name)")
     }
 
+    /// W40.reader-field-status: the Inspector's Checks show the date's state; "Mark checked" writes `Checked Date`, and
+    /// the same button takes it off again.
+    func testInspectorMarksTheDateChecked() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        typeInField("ar.filter.name", text: "00003")
+        XCTAssertTrue(waitForRowCount(1))
+        clickRow(0)
+        if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
+        let status = app.descendants(matching: .any)["ar.fieldStatus.date.status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5))
+        XCTAssertEqual(status.label, "Unchecked, lower confidence")
+        let check = app.buttons["ar.fieldStatus.date.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.click()
+        XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["842", "Checked Date"], excluding: []))
+        wait(for: [expectation(for: NSPredicate(format: "label == %@", "Checked"), evaluatedWith: status)], timeout: 5)
+        captureScreenshot("w40-inspector-date-checked")
+        check.click()
+        XCTAssertTrue(waitForTags(on: "00003 IMG — Brown.pdf", containing: ["842"], excluding: ["Checked Date"]))
+    }
+
     /// A departing field must commit to its original file, including when a filter removes that row.
     func testInspectorDraftTargetsAndHiddenInvalidDraft() throws {
         try requireGeneratedScratchFixtureForTagWrites()

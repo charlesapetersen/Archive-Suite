@@ -2,6 +2,25 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Field checks in the Inspector — the limits (W40.reader-field-status, 2026-11-18)
+
+Shipped: the Inspector's **Checks** section lists one file's dates and page-2 item fields, each Checked (green),
+Unchecked (yellow) or Unchecked, lower confidence (red), with its own label and symbol and a tooltip giving the
+source and the measured figure; "Mark checked" / "Uncheck" writes or removes a `Checked <Field>` tag through
+`TagWriter`, and typing a date checks it. Contract: `SPEC/tag-format.md` §Field checks.
+What it does not do, deliberately or not yet:
+- **Item fields can be checked, not edited.** The page-2 header is the Processor's output-time snapshot and the
+  Reader writes no file contents, so a corrected value has nowhere to go yet: `W40.reader-item-field-edit`, after
+  W47.ct-reader-edit gives the Reader its `.archivesuite` write class.
+- **Container fields are not shown yet**; W47.ct-reader-view shows them with the same badge
+  (`FieldStatusPolicy.container`, `FieldStatusBadge`).
+- **Sender and recipient have no row**: no route writes them where the Reader can read them (the bench's item-field
+  scope leaves them to W46), and the Reader does not read the JSON sidecar.
+- **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a
+  time.
+- **A check is not tied to the value it checked.** It names the field. Another writer that changes the value
+  without the user (a copied source tag set, a later Processor rewrite of page 2) leaves the check standing.
+
 ## Improve OCR in the Reader: flag, filter, hand-off, receipts — the limits (W44.reocr-reader, 2026-11-13)
 
 Shipped: Tags ▸ Flag as Poor OCR / Remove Poor OCR Flag (⌃⌘P, also in the row menu and the document window),
