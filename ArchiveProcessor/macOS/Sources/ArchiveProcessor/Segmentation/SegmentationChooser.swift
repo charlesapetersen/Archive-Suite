@@ -134,7 +134,7 @@ struct SegmentationRow: Equatable, Sendable {
         let n = max(0, pageCount)
         let entry = options.approach(approach)
         let label = entry?.label ?? approach.rawValue
-        let footnote = footnote(options)
+        let footnote = footnote(options, figures: entry?.figures?.test)
         guard let entry, entry.available, let fig = entry.figures?.test else {
             return SegmentationRow(approach: approach, label: label, pageCount: n, rightWithNoChecking: nil,
                                    toCheck: "", rightAfterChecking: "", unshownErrors: "", costLines: [],
@@ -318,10 +318,20 @@ struct SegmentationRow: Equatable, Sendable {
 
     // MARK: Formatting
 
-    static func footnote(_ o: SegmentationOptions) -> String {
+    static func footnote(_ o: SegmentationOptions, figures: SegmentationOptions.Figures? = nil) -> String {
         let test = o.approaches.compactMap { $0.figures?.test }.first
         let pages = test.map { " (\($0.pages) pages)" } ?? ""
-        return "Measured once on two boxes\(pages) of one archive, \(longDate(o.measured)). Your material may differ."
+        var text = "Measured once on two boxes\(pages) of one archive, \(longDate(o.measured)). Your material may differ."
+        if let x = figures?.exactness {
+            text += " Document figures cover the same \(x.resolvedDocPages) of \(x.docPages) document pages: "
+                + "documents beside unknown boundaries are left out. Checking counts every flagged boundary."
+            if let b = x.noReview {
+                text += " Across all document pages, the no-checking result is between \(percent(b.allDocPagesLow)) "
+                    + "and \(percent(b.conditionalUpper)), depending on those unknown boundaries."
+            }
+            text += " After-checking figures assume every known boundary is corrected perfectly."
+        }
+        return text
     }
 
     /// Whole percent, from a fraction.

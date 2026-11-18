@@ -273,6 +273,8 @@ def render(out) -> str:
           f"{gw['calls']} settled calls on the development boxes, ${gw['spent_usd']:.4f} counted of the "
           f"${CAP:.2f} cap ({gw['billed_note']}), {gw['invalid']} invalid. With W46.seg-magazine-rule-redo's "
           f"${REDO_SPENT:.4f} the work's total is ${gw['item_total_usd']:.4f}, inside the $7 rule.", ""]
+    import options as O
+    L += O.support_note({"g2, frozen level": t, "g1 on 3.8, replaced": g["test"]})
     L += seg_card.card(
         truth="The owner's development boxes (Dean, Deaver, Herrnstein) for the level and the test boxes (Stanton with "
               "the owner's 2026-10-31 newsletter rulings on the article rule, RG165), truth photo labels; no route "
@@ -288,8 +290,8 @@ def render(out) -> str:
               "personal-key run): the level shipped to 3.8 is fitted on 3.7's answers. Not the ChatGPT voter's c1, "
               "which keeps g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). The magazine figure "
               "the 3.8 card now ranks on (93.8%) is the Illustrated Review set g2 was adopted on, not a held-out one. "
-              "The settings solver's profile D5 now picks Gemini over Claude by 3.3 points, 0.1 past the 3.2 floor, "
-              "on this one run.")
+              "Current profile D5 keeps Claude: its common-support gap from the budget text tier is within their "
+              "5.0-point borrowed floor; the g2 image pair uses its own 10.4-point floor (07-segmentation.md).")
     return "\n".join(L) + "\n"
 
 

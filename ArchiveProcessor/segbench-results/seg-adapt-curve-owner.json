@@ -4526,30 +4526,48 @@
  "frozen": {
   "2B": {
    "level": 0.995,
-   "nocheck": 79.6969696969697,
+   "nocheck": 79.38461538461539,
    "checks": 78.78787878787878,
-   "after": 98.7878787878788,
+   "after": 98.76923076923076,
    "unflagged": 1,
    "unflagged_per_500": 1.3774104683195592,
-   "pages": 363
+   "pages": 363,
+   "resolved_doc_pages": 325,
+   "doc_pages": 330,
+   "nocheck_all_doc_lower": 78.18181818181819,
+   "nocheck_conditional_upper": 79.6969696969697,
+   "after_all_doc_lower": 97.27272727272728,
+   "after_conditional_upper": 98.7878787878788
   },
   "doc-split-v1, zero-shot": {
    "level": 0.9998139773830899,
-   "nocheck": 17.575757575757574,
+   "nocheck": 16.615384615384617,
    "checks": 83.19559228650138,
    "after": 100.0,
    "unflagged": 0,
    "unflagged_per_500": 0.0,
-   "pages": 363
+   "pages": 363,
+   "resolved_doc_pages": 325,
+   "doc_pages": 330,
+   "nocheck_all_doc_lower": 16.363636363636363,
+   "nocheck_conditional_upper": 17.575757575757574,
+   "after_all_doc_lower": 98.48484848484848,
+   "after_conditional_upper": 100.0
   },
   "doc-split-v1, dev refit": {
    "level": 0.9969207920557931,
-   "nocheck": 28.18181818181818,
+   "nocheck": 27.076923076923077,
    "checks": 86.77685950413223,
    "after": 100.0,
    "unflagged": 0,
    "unflagged_per_500": 0.0,
-   "pages": 363
+   "pages": 363,
+   "resolved_doc_pages": 325,
+   "doc_pages": 330,
+   "nocheck_all_doc_lower": 26.666666666666668,
+   "nocheck_conditional_upper": 28.18181818181818,
+   "after_all_doc_lower": 98.48484848484848,
+   "after_conditional_upper": 100.0
   }
  }
 }

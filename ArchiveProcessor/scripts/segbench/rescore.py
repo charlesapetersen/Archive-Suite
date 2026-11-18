@@ -202,7 +202,10 @@ def public(root: Path) -> None:
 
 # --- the report -----------------------------------------------------------------------------------
 
-COLS = [("pages_in_exact_doc", "pages exact", "%"), ("kappa", "kappa", "f"), ("pk", "Pk", "f"),
+COLS = [("pages_in_exact_doc_resolved", "pages exact, common support", "%"),
+        ("pages_in_exact_doc_low", "all-doc lower", "%"),
+        ("pages_in_exact_doc", "conditional upper", "%"),
+        ("kappa", "kappa", "f"), ("pk", "Pk", "f"),
         ("windowdiff", "WD", "f"), ("pq", "PQ", "f"), ("rq", "RQ", "f"), ("sq", "SQ", "f"),
         ("doc_f1", "doc F1", "f"), ("stp", "STP", "%"), ("mndd_per_100_pages", "MNDD/100 p", "f1")]
 
@@ -244,7 +247,7 @@ def pooled_rows(boxes: dict, names: list[str], prior: str | None = None) -> dict
 def table(rows: dict[str, dict], family: dict[str, str]) -> list[str]:
     head = "| source | family | " + " | ".join(c[1] for c in COLS) + " |"
     lines = [head, "|" + "---|" * (len(COLS) + 2)]
-    for s, m in sorted(rows.items(), key=lambda kv: (-(kv[1]["pages_in_exact_doc"] or 0), kv[0])):
+    for s, m in sorted(rows.items(), key=lambda kv: (-(kv[1]["pages_in_exact_doc_resolved"] or 0), kv[0])):
         lines.append(f"| {s} | {family.get(s, '')} | " + " | ".join(_fmt(m[k], f) for k, _, f in COLS) + " |")
     return lines
 
@@ -293,6 +296,9 @@ def render(owner_res: dict, public_res: dict) -> str:
            "no money: a cache miss is reported as incomplete and the process refuses the network. Definitions are in "
            "`score.py`'s docstring; the figures are pooled sums over the boxes named. Window and whole-folder sources "
            "take the truth's photo labels, so their figures measure boundaries; the spring runs keep their own. "
+           "Tables rank exactness on fixed resolvable documents only, excluding documents touching unknown gaps. "
+           "All-document lower and conditional upper bound the ambiguous truth; the upper differs by route and does "
+           "not rank them. Other segment scorers and the metric-choice/prior diagnostics below remain conditional. "
            "Higher is better except Pk, WindowDiff and MNDD. A source appears in a table only where its cache is "
            "complete on every box of that table. On the owner boxes Pk equals WindowDiff: k is half the mean truth "
            "segment length, and their documents average about 1.6 pages, so k rounds to 1 with or without the label "

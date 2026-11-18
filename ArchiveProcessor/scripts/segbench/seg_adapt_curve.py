@@ -401,9 +401,17 @@ def frozen_level(cols: dict, boxes: dict, src: str) -> dict:
                                        for n in data.DEV)), levels[-1])
     auto, rev, flagged, acc_err = pooled(data.TEST, v)
     pages = sum(cols[n].pages for n in data.TEST)
-    return {"level": v, "nocheck": 100 * derived(auto)["pages_in_exact_doc"], "checks": 100 * flagged / pages,
-            "after": 100 * derived(rev)["pages_in_exact_doc"], "unflagged": acc_err,
-            "unflagged_per_500": 500 * acc_err / pages, "pages": pages}
+    a, r = derived(auto), derived(rev)
+    # W46.seg-common-support: test figures rank on the documents touching no unknown gap, as options.py's; the
+    # all-document lower and the route-specific conditional upper are kept beside them and do not rank.
+    return {"level": v, "nocheck": 100 * a["pages_in_exact_doc_resolved"], "checks": 100 * flagged / pages,
+            "after": 100 * r["pages_in_exact_doc_resolved"], "unflagged": acc_err,
+            "unflagged_per_500": 500 * acc_err / pages, "pages": pages,
+            "resolved_doc_pages": auto.resolved_doc_pages, "doc_pages": auto.doc_pages,
+            "nocheck_all_doc_lower": 100 * a["pages_in_exact_doc_low"],
+            "nocheck_conditional_upper": 100 * a["pages_in_exact_doc"],
+            "after_all_doc_lower": 100 * r["pages_in_exact_doc_low"],
+            "after_conditional_upper": 100 * r["pages_in_exact_doc"]}
 
 
 def dev_items(names):
@@ -488,7 +496,12 @@ def render(boxes: dict, dev_fit: dict, frozen: dict, notes: str) -> str:
           "The flag level is the lowest that brings every development box to 98% after checking (ensemble.fit_level), "
           "then applied once to the test boxes, as options.py does; the 2B's row reproduces options.md's. For "
           "doc-split-v1's refit row the level is fitted on the dev boxes' leave-one-box-out scores and applied to the "
-          "test boxes' all-dev-fit scores, whose beta calibrations differ slightly.", "",
+          "test boxes' all-dev-fit scores, whose beta calibrations differ slightly. "
+          + (f"Pages exact rank on the same {next(iter(frozen.values()))['resolved_doc_pages']} of "
+             f"{next(iter(frozen.values()))['doc_pages']} document pages as options.md: documents touching no unknown "
+             "gap (W46.seg-common-support). Checks count every photographed page and every flagged gap; the "
+             "all-document lower and each source's conditional upper are kept in the JSON and do not rank."
+             if "resolved_doc_pages" in next(iter(frozen.values())) else ""), "",
           "| source | flag level | pages exact, no checking | checks per 100 pages | pages right after checking | "
           "unflagged errors per 500 pages (count) |", "|---|---|---|---|---|---|",
           *[f"| {ZNAMES.get(k, k)} | {_lvl(r['level'])} | {r['nocheck']:.1f}% | {r['checks']:.1f} | "

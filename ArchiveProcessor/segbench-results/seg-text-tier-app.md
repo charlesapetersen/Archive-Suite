@@ -19,11 +19,11 @@ Fitted on all three development boxes (551 pages): **<= 0.950**, against <= 0.96
 
 | | pages exact, no checking | checks per 100 pages | pages exact after checking | unflagged errors | API cost per 1,000 pages, list / batch |
 |---|---:|---:|---:|---:|---:|
-| text alone at <= 0.950 (the tier's figures) | 87.9% | 29.2 | 98.5% | 1 | $1.68 / $0.84 |
+| text alone at <= 0.950 (the tier's figures) | 87.7% | 29.2 | 98.5% | 1 | $1.68 / $0.84 |
 |   Stanton | 86.0% | 34.0 | 97.9% | 1 | — |
-|   RG165 | 93.1% | 18.6 | 100.0% | 0 | — |
-| text alone at the image level <= 0.965 (seg-text-tier-test.md) | 87.9% | 38.3 | 98.5% | 1 | — |
-| images and text, the Gemini only approach (options.json) | 87.6% | 25.3 | 100.0% | 0 | $3.61 / $1.81 |
+|   RG165 | 92.7% | 18.6 | 100.0% | 0 | — |
+| text alone at the image level <= 0.965 (seg-text-tier-test.md) | 87.7% | 38.3 | 98.5% | 1 | — |
+| images and text, the Gemini only approach (options.json) | 87.4% | 25.3 | 100.0% | 0 | $3.61 / $1.81 |
 
 Unflagged errors at its level: Stanton 144|145 (said continue, 0.985).
 
@@ -36,6 +36,18 @@ This item spent $0.9086 on the gateway of its $1.50 cap; with W46.seg-text-tier-
 ## Reading
 
 - **What the tier saves is money; what it costs is checking.** At its own level the user checks 29.2 boundaries per 100 pages against 25.3 with images; the app shows both figures beside the price.
+
+
+### Truth support and unknown-gap bounds
+
+Ranked exactness uses the same **325 of 330 document pages** for every row: only whole documents touching none of the 2 unknown gaps. Those gaps are neither right nor wrong. Checking work and money still count all photographed pages and every flagged unknown gap. After-checking figures assume perfect correction of known gaps; they are not observed human accuracy.
+
+The bounds below use **all document pages**. The upper is conditional on each route being right at every unknown gap, so it is an optimistic, route-specific figure and does not rank routes. These are truth-ambiguity bounds, not sampling intervals or offset ranges.
+
+| route | no checking: lower–conditional upper | ideal checking: lower–conditional upper |
+|---|---:|---:|
+| text, own level | 86.4%–87.9% | 97.0%–98.5% |
+| image | 86.1%–87.6% | 98.5%–100.0% |
 
 ## Measurement card
 

@@ -17,14 +17,14 @@ answered; 259 sent this run, Deaver's 51 from W41.farmshare-seg-run. No money.
 | Gemini 3.8 Flash (low), the bar | **dev pooled** | 551 | 90.7% | 8 | 1.5 | 94.2% | 9 | no |
 | Gemini 3.8 Flash (low), the bar | Stanton | 250 | 86.4% | 6 | 2.4 | 89.7% | 7 | |
 | Gemini 3.8 Flash (low), the bar | RG165 | 113 | 100.0% | 1 | 0.9 | 100.0% | 0 | |
-| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 90.0% | 7 | 1.9 | 92.4% | 7 | no |
+| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 89.8% | 7 | 1.9 | 92.3% | 7 | no |
 | Qwen3.5 27B | Dean | 202 | 84.2% | 4 | 2.0 | 86.2% | 5 | |
 | Qwen3.5 27B | Deaver | 149 | 96.5% | 5 | 3.4 | 96.5% | 2 | |
 | Qwen3.5 27B | Herrnstein | 200 | 91.7% | 4 | 2.0 | 93.4% | 6 | |
 | Qwen3.5 27B | **dev pooled** | 551 | 90.2% | 13 | 2.4 | 91.5% | 13 | no |
 | Qwen3.5 27B | Stanton | 250 | 80.2% | 7 | 2.8 | 85.2% | 17 | |
-| Qwen3.5 27B | RG165 | 113 | 85.1% | 4 | 3.5 | 100.0% | 0 | |
-| Qwen3.5 27B | **test pooled** | 363 | 81.5% | 11 | 3.0 | 89.1% | 17 | no |
+| Qwen3.5 27B | RG165 | 113 | 84.1% | 4 | 3.5 | 100.0% | 0 | |
+| Qwen3.5 27B | **test pooled** | 363 | 81.2% | 11 | 3.0 | 88.9% | 17 | no |
 
 ### The level fitted per model
 
@@ -33,14 +33,25 @@ the level fitted on all three, at the 99% and the 98% bars.
 
 | model | bar | dev, held out: after checking | flagged per 100 pages | level for the test boxes | test: no checking | after checking | flagged per 100 pages | unflagged errors |
 |---|---|---:|---:|---|---:|---:|---:|---:|
-| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 90.0% | 100.0% | 51.0 | 0 |
-| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 90.0% | 97.0% | 24.2 | 3 |
-| Qwen3.5 27B | 99% | 99.4% | 74.2 | flag all | 81.5% | 100.0% | 86.8 | 0 |
-| Qwen3.5 27B | 98% | 99.4% | 74.2 | flag all | 81.5% | 100.0% | 86.8 | 0 |
+| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 89.8% | 100.0% | 51.0 | 0 |
+| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 89.8% | 96.9% | 24.2 | 3 |
+| Qwen3.5 27B | 99% | 99.4% | 74.2 | flag all | 81.2% | 100.0% | 86.8 | 0 |
+| Qwen3.5 27B | 98% | 99.4% | 74.2 | flag all | 81.2% | 100.0% | 86.8 | 0 |
 
 | model | pages | calls | cost paid | per 1,000 pages, standard | per 1,000 pages, batch |
 |---|---:|---:|---:|---:|---:|
 | Qwen3.5 27B | 914 | 310 | $0.000 | $0.00 | none offered |
+
+### Truth support and unknown-gap bounds
+
+Ranked exactness uses the same **325 of 330 document pages** for every row: only whole documents touching none of the 2 unknown gaps. Those gaps are neither right nor wrong. Checking work and money still count all photographed pages and every flagged unknown gap. After-checking figures assume perfect correction of known gaps; they are not observed human accuracy.
+
+The bounds below use **all document pages**. The upper is conditional on each route being right at every unknown gap, so it is an optimistic, route-specific figure and does not rank routes. These are truth-ambiguity bounds, not sampling intervals or offset ranges.
+
+| route | no checking: lower–conditional upper | ideal checking: lower–conditional upper |
+|---|---:|---:|
+| Gemini 3.8 Flash (low), the bar | 88.5%–90.0% | 90.9%–92.4% |
+| Qwen3.5 27B | 80.0%–81.5% | 87.6%–89.1% |
 
 ## Reading
 

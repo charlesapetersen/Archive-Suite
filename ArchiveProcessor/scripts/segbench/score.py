@@ -140,6 +140,17 @@ def _groups(ids: list[int]) -> dict[int, frozenset]:
     return {k: frozenset(v) for k, v in g.items()}
 
 
+def resolved_documents(truth: list[str]) -> list[frozenset]:
+    """Fixed support: whole truth documents unaffected by either reading of any unknown gap."""
+    unsure = doc_unsure(truth)
+    joined = list(truth)
+    for i in unsure:
+        joined[i] = "Cont"
+    return [pages for pages in _groups(segment_ids(joined)).values()
+            if truth[min(pages)] not in PHOTO
+            and not any(min(pages) <= u <= max(pages) + 1 for u in unsure)]
+
+
 @dataclass
 class Counts:
     """Additive counts; percentages are derived so pooling is a plain sum."""
@@ -286,17 +297,9 @@ def score_labels(truth: list[str], pred: list[str], name: str = "") -> Counts:
             c.docs_exact += 1
             c.pages_exact += len(pages)
             exact_pages |= pages
-    exact_low = exact_pages
-    if unsure:
-        low = segment_ids(forgive(raw, pred, unsure, oppose=True))
-        exact_low = set()
-        for s, pages in _groups(low).items():
-            if is_doc[min(pages)] and not any(min(pages) <= u <= max(pages) + 1 for u in unsure):
-                c.resolved_doc_pages += len(pages)
-                if pages in p_sets:
-                    exact_low |= pages
-    else:
-        c.resolved_doc_pages = c.doc_pages
+    resolved = resolved_documents(raw)
+    c.resolved_doc_pages = sum(len(pages) for pages in resolved)
+    exact_low = {i for pages in resolved if pages in p_sets for i in pages}
     c.pages_exact_low = len(exact_low)
 
     # The field's segment scorers, over the truth's document pages (the module docstring).

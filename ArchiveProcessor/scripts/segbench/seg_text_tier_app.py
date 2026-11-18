@@ -291,6 +291,8 @@ def render(out) -> str:
           f"- **What the tier saves is money; what it costs is checking.** At its own level the user checks "
           f"{t['flagged_per_100_pages']:.1f} boundaries per 100 pages against {im['test']['flagged_per_100_pages']:.1f} "
           "with images; the app shows both figures beside the price.", ""]
+    import options as O
+    L += O.support_note({"text, own level": t, "image": im["test"]})
     L += seg_card.card(
         truth="The owner's development boxes (Dean, Deaver, Herrnstein) for the level and the ruled test boxes "
               "(Stanton with the owner's 2026-10-31 newsletter rulings, RG165), truth photo labels; no route drafted "

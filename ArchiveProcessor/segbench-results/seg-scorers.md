@@ -1,88 +1,88 @@
 # The field's segmentation scorers on every cached answer — W46.fix-seg-scorers
 
-Made by `scripts/segbench/rescore.py` (owner, public, report) from the response caches, with no call and no money: a cache miss is reported as incomplete and the process refuses the network. Definitions are in `score.py`'s docstring; the figures are pooled sums over the boxes named. Window and whole-folder sources take the truth's photo labels, so their figures measure boundaries; the spring runs keep their own. Higher is better except Pk, WindowDiff and MNDD. A source appears in a table only where its cache is complete on every box of that table. On the owner boxes Pk equals WindowDiff: k is half the mean truth segment length, and their documents average about 1.6 pages, so k rounds to 1 with or without the label photos counted, and at k = 1 the two measures are the same; on Lincoln and CREST k is 2.
+Made by `scripts/segbench/rescore.py` (owner, public, report) from the response caches, with no call and no money: a cache miss is reported as incomplete and the process refuses the network. Definitions are in `score.py`'s docstring; the figures are pooled sums over the boxes named. Window and whole-folder sources take the truth's photo labels, so their figures measure boundaries; the spring runs keep their own. Tables rank exactness on fixed resolvable documents only, excluding documents touching unknown gaps. All-document lower and conditional upper bound the ambiguous truth; the upper differs by route and does not rank them. Other segment scorers and the metric-choice/prior diagnostics below remain conditional. Higher is better except Pk, WindowDiff and MNDD. A source appears in a table only where its cache is complete on every box of that table. On the owner boxes Pk equals WindowDiff: k is half the mean truth segment length, and their documents average about 1.6 pages, so k rounds to 1 with or without the label photos counted, and at k = 1 the two measures are the same; on Lincoln and CREST k is 2.
 
 ## Development boxes (Dean, Deaver, Herrnstein; 551 pages)
 
-| source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| whole-gemini | whole folder, Gemini API | 93.1% | 0.941 | 0.026 | 0.026 | 0.963 | 0.969 | 0.994 | 0.950 | 66.7% | 2.7 |
-| window-or-fs-seg-4b-pilot | window, FarmShare | 92.5% | 0.929 | 0.031 | 0.031 | 0.940 | 0.945 | 0.995 | 0.929 | 58.3% | 2.9 |
-| window-cues-codex | window, subscription | 91.3% | 0.958 | 0.018 | 0.018 | 0.970 | 0.978 | 0.992 | 0.956 | 70.8% | 3.1 |
-| window-claude | window, subscription | 90.7% | 0.954 | 0.020 | 0.020 | 0.966 | 0.973 | 0.992 | 0.951 | 70.8% | 3.3 |
-| window-gemini-3.8-flash-low | window, Gemini API | 90.7% | 0.941 | 0.026 | 0.026 | 0.960 | 0.965 | 0.994 | 0.947 | 70.8% | 3.6 |
-| window-or-fs-seg-2b | window, FarmShare | 90.5% | 0.929 | 0.031 | 0.031 | 0.938 | 0.945 | 0.993 | 0.923 | 58.3% | 3.4 |
-| window-local-seg-2b-8bit | window, Mac local | 90.3% | 0.929 | 0.031 | 0.031 | 0.940 | 0.948 | 0.992 | 0.922 | 54.2% | 3.4 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
-| window-or-glm5.3-flash | window, OpenRouter | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
-| window-or-gpt5.6-luna | window, OpenRouter | 90.0% | 0.945 | 0.024 | 0.024 | 0.958 | 0.967 | 0.991 | 0.942 | 66.7% | 3.6 |
-| whole-gemini-c10 | whole folder, Gemini API | 89.4% | 0.941 | 0.026 | 0.026 | 0.954 | 0.962 | 0.991 | 0.937 | 62.5% | 3.8 |
-| window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
-| window-or-fs-seg-4b | window, FarmShare | 89.2% | 0.941 | 0.026 | 0.026 | 0.956 | 0.965 | 0.990 | 0.937 | 58.3% | 3.8 |
-| window-local-seg-4b-8bit | window, Mac local | 87.8% | 0.929 | 0.031 | 0.031 | 0.946 | 0.954 | 0.992 | 0.929 | 58.3% | 4.5 |
-| spring-v1 | spring 2026 Gemini (own photo labels) | 86.9% | 0.890 | 0.053 | 0.053 | 0.921 | 0.926 | 0.994 | 0.901 | 45.8% | 5.1 |
-| window-local-seg-4b | window, Mac local | 86.5% | 0.903 | 0.042 | 0.042 | 0.931 | 0.939 | 0.991 | 0.911 | 54.2% | 4.5 |
-| window-local-seg-2b | window, Mac local | 85.5% | 0.889 | 0.049 | 0.049 | 0.910 | 0.923 | 0.985 | 0.881 | 50.0% | 5.4 |
-| window-or-qwen3.5-flash | window, OpenRouter | 84.9% | 0.933 | 0.029 | 0.029 | 0.949 | 0.959 | 0.990 | 0.927 | 58.3% | 4.7 |
-| window-gemini-3.1-flash-lite-minimal | window, Gemini API | 84.6% | 0.872 | 0.055 | 0.055 | 0.896 | 0.903 | 0.992 | 0.881 | 58.3% | 6.7 |
-| spring-v2 | spring 2026 Gemini (own photo labels) | 81.1% | 0.866 | 0.069 | 0.069 | 0.894 | 0.900 | 0.993 | 0.872 | 54.2% | 7.4 |
-| spring-baseline | spring 2026 Gemini (own photo labels) | 76.8% | 0.856 | 0.077 | 0.077 | 0.880 | 0.894 | 0.984 | 0.832 | 37.5% | 8.2 |
-| window-or-fs-qwen3.5-4b | window, FarmShare | 67.6% | 0.611 | 0.159 | 0.159 | 0.735 | 0.745 | 0.986 | 0.712 | 33.3% | 15.6 |
-| rule-cues | baseline | 58.5% | 0.516 | 0.197 | 0.197 | 0.696 | 0.709 | 0.983 | 0.672 | 33.3% | 20.5 |
-| rule-cues-sketch | baseline | 57.9% | 0.381 | 0.241 | 0.241 | 0.641 | 0.642 | 0.997 | 0.637 | 29.2% | 24.5 |
-| all-new | baseline | 39.2% | 0.000 | 0.365 | 0.365 | 0.486 | 0.486 | 1.000 | 0.486 | 16.7% | 36.3 |
-| no-boundaries | baseline | 0.6% | 0.000 | 0.536 | 0.536 | 0.025 | 0.029 | 0.860 | 0.018 | 12.5% | 75.7 |
+| source | family | pages exact, common support | all-doc lower | conditional upper | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| whole-gemini | whole folder, Gemini API | 93.1% | 93.1% | 93.1% | 0.941 | 0.026 | 0.026 | 0.963 | 0.969 | 0.994 | 0.950 | 66.7% | 2.7 |
+| window-or-fs-seg-4b-pilot | window, FarmShare | 92.5% | 92.5% | 92.5% | 0.929 | 0.031 | 0.031 | 0.940 | 0.945 | 0.995 | 0.929 | 58.3% | 2.9 |
+| window-cues-codex | window, subscription | 91.3% | 91.3% | 91.3% | 0.958 | 0.018 | 0.018 | 0.970 | 0.978 | 0.992 | 0.956 | 70.8% | 3.1 |
+| window-claude | window, subscription | 90.7% | 90.7% | 90.7% | 0.954 | 0.020 | 0.020 | 0.966 | 0.973 | 0.992 | 0.951 | 70.8% | 3.3 |
+| window-gemini-3.8-flash-low | window, Gemini API | 90.7% | 90.7% | 90.7% | 0.941 | 0.026 | 0.026 | 0.960 | 0.965 | 0.994 | 0.947 | 70.8% | 3.6 |
+| window-or-fs-seg-2b | window, FarmShare | 90.5% | 90.5% | 90.5% | 0.929 | 0.031 | 0.031 | 0.938 | 0.945 | 0.993 | 0.923 | 58.3% | 3.4 |
+| window-local-seg-2b-8bit | window, Mac local | 90.3% | 90.3% | 90.3% | 0.929 | 0.031 | 0.031 | 0.940 | 0.948 | 0.992 | 0.922 | 54.2% | 3.4 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 90.2% | 90.2% | 90.2% | 0.933 | 0.029 | 0.029 | 0.956 | 0.963 | 0.993 | 0.941 | 66.7% | 3.8 |
+| window-or-glm5.3-flash | window, OpenRouter | 90.2% | 90.2% | 90.2% | 0.937 | 0.027 | 0.027 | 0.952 | 0.958 | 0.994 | 0.942 | 66.7% | 4.0 |
+| window-or-gpt5.6-luna | window, OpenRouter | 90.0% | 90.0% | 90.0% | 0.945 | 0.024 | 0.024 | 0.958 | 0.967 | 0.991 | 0.942 | 66.7% | 3.6 |
+| whole-gemini-c10 | whole folder, Gemini API | 89.4% | 89.4% | 89.4% | 0.941 | 0.026 | 0.026 | 0.954 | 0.962 | 0.991 | 0.937 | 62.5% | 3.8 |
+| window-local-seg-date-2b-8bit | window, Mac local | 89.4% | 89.4% | 89.4% | 0.921 | 0.035 | 0.035 | 0.935 | 0.941 | 0.993 | 0.919 | 50.0% | 4.2 |
+| window-or-fs-seg-4b | window, FarmShare | 89.2% | 89.2% | 89.2% | 0.941 | 0.026 | 0.026 | 0.956 | 0.965 | 0.990 | 0.937 | 58.3% | 3.8 |
+| window-local-seg-4b-8bit | window, Mac local | 87.8% | 87.8% | 87.8% | 0.929 | 0.031 | 0.031 | 0.946 | 0.954 | 0.992 | 0.929 | 58.3% | 4.5 |
+| spring-v1 | spring 2026 Gemini (own photo labels) | 86.9% | 86.9% | 86.9% | 0.890 | 0.053 | 0.053 | 0.921 | 0.926 | 0.994 | 0.901 | 45.8% | 5.1 |
+| window-local-seg-4b | window, Mac local | 86.5% | 86.5% | 86.5% | 0.903 | 0.042 | 0.042 | 0.931 | 0.939 | 0.991 | 0.911 | 54.2% | 4.5 |
+| window-local-seg-2b | window, Mac local | 85.5% | 85.5% | 85.5% | 0.889 | 0.049 | 0.049 | 0.910 | 0.923 | 0.985 | 0.881 | 50.0% | 5.4 |
+| window-or-qwen3.5-flash | window, OpenRouter | 84.9% | 84.9% | 84.9% | 0.933 | 0.029 | 0.029 | 0.949 | 0.959 | 0.990 | 0.927 | 58.3% | 4.7 |
+| window-gemini-3.1-flash-lite-minimal | window, Gemini API | 84.6% | 84.6% | 84.6% | 0.872 | 0.055 | 0.055 | 0.896 | 0.903 | 0.992 | 0.881 | 58.3% | 6.7 |
+| spring-v2 | spring 2026 Gemini (own photo labels) | 81.1% | 81.1% | 81.1% | 0.866 | 0.069 | 0.069 | 0.894 | 0.900 | 0.993 | 0.872 | 54.2% | 7.4 |
+| spring-baseline | spring 2026 Gemini (own photo labels) | 76.8% | 76.8% | 76.8% | 0.856 | 0.077 | 0.077 | 0.880 | 0.894 | 0.984 | 0.832 | 37.5% | 8.2 |
+| window-or-fs-qwen3.5-4b | window, FarmShare | 67.6% | 67.6% | 67.6% | 0.611 | 0.159 | 0.159 | 0.735 | 0.745 | 0.986 | 0.712 | 33.3% | 15.6 |
+| rule-cues | baseline | 58.5% | 58.5% | 58.5% | 0.516 | 0.197 | 0.197 | 0.696 | 0.709 | 0.983 | 0.672 | 33.3% | 20.5 |
+| rule-cues-sketch | baseline | 57.9% | 57.9% | 57.9% | 0.381 | 0.241 | 0.241 | 0.641 | 0.642 | 0.997 | 0.637 | 29.2% | 24.5 |
+| all-new | baseline | 39.2% | 39.2% | 39.2% | 0.000 | 0.365 | 0.365 | 0.486 | 0.486 | 1.000 | 0.486 | 16.7% | 36.3 |
+| no-boundaries | baseline | 0.6% | 0.6% | 0.6% | 0.000 | 0.536 | 0.536 | 0.025 | 0.029 | 0.860 | 0.018 | 12.5% | 75.7 |
 
 ## Locked test boxes (Stanton, RG165; 363 pages), answers already cached by the finalists' --final runs
 
-| source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| window-cues-codex | window, subscription | 90.3% | 0.941 | 0.025 | 0.025 | 0.954 | 0.969 | 0.985 | 0.920 | 73.3% | 2.5 |
-| window-or-gpt5.6-luna | window, OpenRouter | 90.3% | 0.915 | 0.036 | 0.036 | 0.924 | 0.936 | 0.988 | 0.902 | 73.3% | 3.6 |
-| window-gemini-3.8-flash-low | window, Gemini API | 90.0% | 0.928 | 0.030 | 0.030 | 0.929 | 0.942 | 0.986 | 0.901 | 73.3% | 3.3 |
-| window-claude | window, subscription | 89.1% | 0.921 | 0.033 | 0.033 | 0.929 | 0.945 | 0.983 | 0.897 | 80.0% | 3.6 |
-| whole-gemini | whole folder, Gemini API | 85.8% | 0.921 | 0.033 | 0.033 | 0.930 | 0.945 | 0.984 | 0.897 | 73.3% | 4.1 |
-| window-or-fs-seg-4b | window, FarmShare | 83.0% | 0.864 | 0.058 | 0.058 | 0.864 | 0.879 | 0.982 | 0.834 | 60.0% | 6.6 |
-| window-or-glm5.3-flash | window, OpenRouter | 83.0% | 0.908 | 0.039 | 0.039 | 0.927 | 0.945 | 0.981 | 0.883 | 66.7% | 4.7 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 81.5% | 0.839 | 0.069 | 0.069 | 0.853 | 0.867 | 0.983 | 0.822 | 53.3% | 7.4 |
-| window-or-qwen3.5-flash | window, OpenRouter | 81.5% | 0.889 | 0.047 | 0.047 | 0.897 | 0.915 | 0.980 | 0.854 | 60.0% | 5.5 |
-| window-or-fs-seg-2b | window, FarmShare | 79.7% | 0.839 | 0.069 | 0.069 | 0.840 | 0.861 | 0.976 | 0.796 | 66.7% | 7.4 |
-| spring-v1 | spring 2026 Gemini (own photo labels) | 79.1% | 0.889 | 0.053 | 0.053 | 0.887 | 0.897 | 0.988 | 0.850 | 46.7% | 6.1 |
-| spring-v2 | spring 2026 Gemini (own photo labels) | 59.1% | 0.779 | 0.133 | 0.133 | 0.778 | 0.799 | 0.974 | 0.700 | 6.7% | 13.2 |
-| spring-baseline | spring 2026 Gemini (own photo labels) | 58.2% | 0.839 | 0.108 | 0.108 | 0.828 | 0.867 | 0.956 | 0.726 | 0.0% | 12.4 |
-| rule-cues | baseline | 32.7% | 0.315 | 0.316 | 0.316 | 0.457 | 0.489 | 0.934 | 0.388 | 20.0% | 31.4 |
-| rule-cues-sketch | baseline | 21.8% | 0.094 | 0.452 | 0.452 | 0.306 | 0.309 | 0.989 | 0.300 | 13.3% | 46.0 |
-| all-new | baseline | 20.3% | 0.000 | 0.510 | 0.510 | 0.282 | 0.282 | 1.000 | 0.282 | 13.3% | 50.7 |
-| no-boundaries | baseline | 8.5% | 0.000 | 0.357 | 0.357 | 0.076 | 0.088 | 0.865 | 0.050 | 26.7% | 68.6 |
+| source | family | pages exact, common support | all-doc lower | conditional upper | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| window-cues-codex | window, subscription | 90.2% | 88.8% | 90.3% | 0.941 | 0.025 | 0.025 | 0.954 | 0.969 | 0.985 | 0.920 | 73.3% | 2.5 |
+| window-or-gpt5.6-luna | window, OpenRouter | 90.2% | 88.8% | 90.3% | 0.915 | 0.036 | 0.036 | 0.924 | 0.936 | 0.988 | 0.902 | 73.3% | 3.6 |
+| window-gemini-3.8-flash-low | window, Gemini API | 89.8% | 88.5% | 90.0% | 0.928 | 0.030 | 0.030 | 0.929 | 0.942 | 0.986 | 0.901 | 73.3% | 3.3 |
+| window-claude | window, subscription | 88.9% | 87.6% | 89.1% | 0.921 | 0.033 | 0.033 | 0.929 | 0.945 | 0.983 | 0.897 | 80.0% | 3.6 |
+| whole-gemini | whole folder, Gemini API | 85.5% | 84.2% | 85.8% | 0.921 | 0.033 | 0.033 | 0.930 | 0.945 | 0.984 | 0.897 | 73.3% | 4.1 |
+| window-or-fs-seg-4b | window, FarmShare | 82.8% | 81.5% | 83.0% | 0.864 | 0.058 | 0.058 | 0.864 | 0.879 | 0.982 | 0.834 | 60.0% | 6.6 |
+| window-or-glm5.3-flash | window, OpenRouter | 82.8% | 81.5% | 83.0% | 0.908 | 0.039 | 0.039 | 0.927 | 0.945 | 0.981 | 0.883 | 66.7% | 4.7 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 81.2% | 80.0% | 81.5% | 0.839 | 0.069 | 0.069 | 0.853 | 0.867 | 0.983 | 0.822 | 53.3% | 7.4 |
+| window-or-qwen3.5-flash | window, OpenRouter | 81.2% | 80.0% | 81.5% | 0.889 | 0.047 | 0.047 | 0.897 | 0.915 | 0.980 | 0.854 | 60.0% | 5.5 |
+| window-or-fs-seg-2b | window, FarmShare | 79.4% | 78.2% | 79.7% | 0.839 | 0.069 | 0.069 | 0.840 | 0.861 | 0.976 | 0.796 | 66.7% | 7.4 |
+| spring-v1 | spring 2026 Gemini (own photo labels) | 78.8% | 77.6% | 79.1% | 0.889 | 0.053 | 0.053 | 0.887 | 0.897 | 0.988 | 0.850 | 46.7% | 6.1 |
+| spring-v2 | spring 2026 Gemini (own photo labels) | 59.1% | 58.2% | 59.1% | 0.779 | 0.133 | 0.133 | 0.778 | 0.799 | 0.974 | 0.700 | 6.7% | 13.2 |
+| spring-baseline | spring 2026 Gemini (own photo labels) | 58.5% | 57.6% | 58.2% | 0.839 | 0.108 | 0.108 | 0.828 | 0.867 | 0.956 | 0.726 | 0.0% | 12.4 |
+| rule-cues | baseline | 32.6% | 32.1% | 32.7% | 0.315 | 0.316 | 0.316 | 0.457 | 0.489 | 0.934 | 0.388 | 20.0% | 31.4 |
+| rule-cues-sketch | baseline | 21.2% | 20.9% | 21.8% | 0.094 | 0.452 | 0.452 | 0.306 | 0.309 | 0.989 | 0.300 | 13.3% | 46.0 |
+| all-new | baseline | 19.7% | 19.4% | 20.3% | 0.000 | 0.510 | 0.510 | 0.282 | 0.282 | 1.000 | 0.282 | 13.3% | 50.7 |
+| no-boundaries | baseline | 8.6% | 8.5% | 8.5% | 0.000 | 0.357 | 0.357 | 0.076 | 0.088 | 0.865 | 0.050 | 26.7% | 68.6 |
 
 ## Lincoln (261 pages, 80 documents as stored, 78-81 with its 3 unsure gaps either way)
 
-| source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| window-cues-claude | window, subscription | 90.4% | 0.982 | 0.008 | 0.015 | 0.983 | 0.987 | 0.995 | 0.962 | 0.0% | 0.8 |
-| window-cues-claude-cue | window, subscription | 89.3% | 0.972 | 0.008 | 0.023 | 0.966 | 0.969 | 0.996 | 0.945 | 0.0% | 1.1 |
-| window-or-fs-seg-4b | window, FarmShare | 49.8% | 0.742 | 0.081 | 0.236 | 0.669 | 0.712 | 0.939 | 0.524 | 0.0% | 12.3 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 40.6% | 0.677 | 0.089 | 0.301 | 0.571 | 0.614 | 0.930 | 0.426 | 0.0% | 15.7 |
-| window-or-fs-seg-2b | window, FarmShare | 35.6% | 0.640 | 0.100 | 0.324 | 0.529 | 0.571 | 0.927 | 0.384 | 0.0% | 17.2 |
-| window-or-fs-seg-date-2b | window, FarmShare | 33.3% | 0.624 | 0.100 | 0.336 | 0.512 | 0.552 | 0.927 | 0.365 | 0.0% | 18.0 |
-| rule-cues | baseline | 16.9% | 0.269 | 0.274 | 0.537 | 0.276 | 0.313 | 0.881 | 0.191 | 0.0% | 39.5 |
-| all-new | baseline | 6.9% | 0.000 | 0.452 | 0.931 | 0.105 | 0.105 | 1.000 | 0.105 | 0.0% | 69.0 |
-| rule-cues-sketch | baseline | 6.9% | 0.000 | 0.452 | 0.931 | 0.105 | 0.105 | 1.000 | 0.105 | 0.0% | 69.0 |
-| no-boundaries | baseline | 0.0% | 0.000 | 0.541 | 0.541 | 0.000 | 0.000 | 0.000 | — | 0.0% | 91.6 |
+| source | family | pages exact, common support | all-doc lower | conditional upper | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| window-cues-claude | window, subscription | 91.2% | 87.7% | 90.4% | 0.982 | 0.008 | 0.015 | 0.983 | 0.987 | 0.995 | 0.962 | 0.0% | 0.8 |
+| window-cues-claude-cue | window, subscription | 89.6% | 86.2% | 89.3% | 0.972 | 0.008 | 0.023 | 0.966 | 0.969 | 0.996 | 0.945 | 0.0% | 1.1 |
+| window-or-fs-seg-4b | window, FarmShare | 47.8% | 46.0% | 49.8% | 0.742 | 0.081 | 0.236 | 0.669 | 0.712 | 0.939 | 0.524 | 0.0% | 12.3 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 39.0% | 37.5% | 40.6% | 0.677 | 0.089 | 0.301 | 0.571 | 0.614 | 0.930 | 0.426 | 0.0% | 15.7 |
+| window-or-fs-seg-2b | window, FarmShare | 33.1% | 31.8% | 35.6% | 0.640 | 0.100 | 0.324 | 0.529 | 0.571 | 0.927 | 0.384 | 0.0% | 17.2 |
+| window-or-fs-seg-date-2b | window, FarmShare | 31.5% | 30.3% | 33.3% | 0.624 | 0.100 | 0.336 | 0.512 | 0.552 | 0.927 | 0.365 | 0.0% | 18.0 |
+| rule-cues | baseline | 16.3% | 15.7% | 16.9% | 0.269 | 0.274 | 0.537 | 0.276 | 0.313 | 0.881 | 0.191 | 0.0% | 39.5 |
+| all-new | baseline | 5.6% | 5.4% | 6.9% | 0.000 | 0.452 | 0.931 | 0.105 | 0.105 | 1.000 | 0.105 | 0.0% | 69.0 |
+| rule-cues-sketch | baseline | 5.6% | 5.4% | 6.9% | 0.000 | 0.452 | 0.931 | 0.105 | 0.105 | 1.000 | 0.105 | 0.0% | 69.0 |
+| no-boundaries | baseline | 0.0% | 0.0% | 0.0% | 0.000 | 0.541 | 0.541 | 0.000 | 0.000 | 0.000 | — | 0.0% | 91.6 |
 
 ## CREST (128 pages, 30 documents as stored, 30-34 with its 4 unsure gaps either way)
 
-| source | family | pages exact | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| window-cues-claude | window, subscription | 89.1% | 0.978 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.955 | 0.0% | 0.8 |
-| window-or-fs-qwen3.5-27b | window, FarmShare | 88.3% | 0.978 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.954 | 0.0% | 0.8 |
-| window-or-fs-seg-4b | window, FarmShare | 88.3% | 0.978 | 0.008 | 0.016 | 0.982 | 0.984 | 0.998 | 0.952 | 0.0% | 0.8 |
-| window-or-fs-seg-date-2b | window, FarmShare | 85.9% | 0.933 | 0.024 | 0.040 | 0.938 | 0.952 | 0.984 | 0.889 | 0.0% | 2.3 |
-| window-or-fs-seg-2b | window, FarmShare | 81.2% | 0.910 | 0.040 | 0.056 | 0.890 | 0.903 | 0.986 | 0.839 | 0.0% | 3.9 |
-| rule-cues | baseline | 14.8% | 0.076 | 0.508 | 0.786 | 0.213 | 0.216 | 0.984 | 0.203 | 0.0% | 63.3 |
-| all-new | baseline | 10.2% | 0.000 | 0.579 | 0.905 | 0.160 | 0.160 | 1.000 | 0.160 | 0.0% | 73.4 |
-| rule-cues-sketch | baseline | 10.2% | 0.042 | 0.540 | 0.857 | 0.169 | 0.169 | 1.000 | 0.169 | 0.0% | 69.5 |
-| no-boundaries | baseline | 0.0% | 0.000 | 0.397 | 0.397 | 0.000 | 0.000 | 0.000 | — | 0.0% | 86.7 |
+| source | family | pages exact, common support | all-doc lower | conditional upper | kappa | Pk | WD | PQ | RQ | SQ | doc F1 | STP | MNDD/100 p |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| window-cues-claude | window, subscription | 100.0% | 78.9% | 89.1% | 0.978 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.955 | 0.0% | 0.8 |
+| window-or-fs-qwen3.5-27b | window, FarmShare | 100.0% | 78.9% | 88.3% | 0.978 | 0.008 | 0.016 | 0.983 | 0.985 | 0.998 | 0.954 | 0.0% | 0.8 |
+| window-or-fs-seg-4b | window, FarmShare | 100.0% | 78.9% | 88.3% | 0.978 | 0.008 | 0.016 | 0.982 | 0.984 | 0.998 | 0.952 | 0.0% | 0.8 |
+| window-or-fs-seg-date-2b | window, FarmShare | 97.0% | 76.6% | 85.9% | 0.933 | 0.024 | 0.040 | 0.938 | 0.952 | 0.984 | 0.889 | 0.0% | 2.3 |
+| window-or-fs-seg-2b | window, FarmShare | 91.1% | 71.9% | 81.2% | 0.910 | 0.040 | 0.056 | 0.890 | 0.903 | 0.986 | 0.839 | 0.0% | 3.9 |
+| rule-cues | baseline | 13.9% | 10.9% | 14.8% | 0.076 | 0.508 | 0.786 | 0.213 | 0.216 | 0.984 | 0.203 | 0.0% | 63.3 |
+| all-new | baseline | 7.9% | 6.2% | 10.2% | 0.000 | 0.579 | 0.905 | 0.160 | 0.160 | 1.000 | 0.160 | 0.0% | 73.4 |
+| rule-cues-sketch | baseline | 7.9% | 6.2% | 10.2% | 0.042 | 0.540 | 0.857 | 0.169 | 0.169 | 1.000 | 0.169 | 0.0% | 69.5 |
+| no-boundaries | baseline | 0.0% | 0.0% | 0.0% | 0.000 | 0.397 | 0.397 | 0.000 | 0.000 | 0.000 | — | 0.0% | 86.7 |
 
 ## What the metric choice changes
 

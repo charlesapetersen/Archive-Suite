@@ -20,11 +20,11 @@ Fitted on all three development boxes (Dean, Deaver, Herrnstein; 551 pages): **<
 
 | | pages exact, no checking | checks per 100 pages | pages exact after checking | unflagged errors | per 500 pages |
 |---|---:|---:|---:|---:|---:|
-| g2 on 3.7 at <= 0.965 (the app's figures now) | 87.6% | 25.3 | 100.0% | 0 | 0.0 |
+| g2 on 3.7 at <= 0.965 (the app's figures now) | 87.4% | 25.3 | 100.0% | 0 | 0.0 |
 |   Stanton | 86.8% | 32.4 | 100.0% | 0 | 0.0 |
-|   RG165 | 89.7% | 9.7 | 100.0% | 0 | 0.0 |
-| g2 on 3.7 at <= 0.965 (seg-magazine-rule.md) | 87.6% | 25.3 | 100.0% | 0 | 0.0 |
-| g1 on 3.8 at <= 0.965 (the figures it replaces) | 90.0% | 24.2 | 97.0% | 3 | 4.1 |
+|   RG165 | 89.0% | 9.7 | 100.0% | 0 | 0.0 |
+| g2 on 3.7 at <= 0.965 (seg-magazine-rule.md) | 87.4% | 25.3 | 100.0% | 0 | 0.0 |
+| g1 on 3.8 at <= 0.965 (the figures it replaces) | 89.8% | 24.2 | 96.9% | 3 | 4.1 |
 
 Unflagged errors at the refit level: none.
 
@@ -32,11 +32,23 @@ Unflagged errors at the refit level: none.
 
 187 settled calls on the development boxes, $1.9345 counted of the $2.60 cap (the gateway's own figure $1.9345 on 187 of 187 calls, 1.00 times the estimate on them), 0 invalid. With W46.seg-magazine-rule-redo's $1.9320 the work's total is $3.8665, inside the $7 rule.
 
+
+### Truth support and unknown-gap bounds
+
+Ranked exactness uses the same **325 of 330 document pages** for every row: only whole documents touching none of the 2 unknown gaps. Those gaps are neither right nor wrong. Checking work and money still count all photographed pages and every flagged unknown gap. After-checking figures assume perfect correction of known gaps; they are not observed human accuracy.
+
+The bounds below use **all document pages**. The upper is conditional on each route being right at every unknown gap, so it is an optimistic, route-specific figure and does not rank routes. These are truth-ambiguity bounds, not sampling intervals or offset ranges.
+
+| route | no checking: lower–conditional upper | ideal checking: lower–conditional upper |
+|---|---:|---:|
+| g2, frozen level | 86.1%–87.6% | 98.5%–100.0% |
+| g1 on 3.8, replaced | 88.5%–90.0% | 95.5%–97.0% |
+
 ## Measurement card
 
 - **Truth.** The owner's development boxes (Dean, Deaver, Herrnstein) for the level and the test boxes (Stanton with the owner's 2026-10-31 newsletter rulings on the article rule, RG165), truth photo labels; no route drafted any of it. The Illustrated Review's article rulings are seg-magazine-rule.md's.
 - **Selection.** The boxes options.py fits and scores on, fixed since 2026-10-11; nothing chosen by a route's answers or ABBYY text.
 - **Comparison.** g2 on Gemini 3.7 against g1 on Gemini 3.8: two changes at once (prompt and model). The 3.7 g1 against 3.7 g2 comparison, one change, is seg-magazine-rule.md's. Same windows, images, Vision text and scorer.
 - **Noise.** Single runs. The rerun floor is 1.4-3.2 points of pages exact a box (seg-boxes-score.md); the error counts are a few gaps, so a difference of one or two is within noise.
-- **Scope.** Gemini 3.7, not the 3.8 the app sends (the gateway does not serve 3.8; the owner declined the personal-key run): the level shipped to 3.8 is fitted on 3.7's answers. Not the ChatGPT voter's c1, which keeps g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). The magazine figure the 3.8 card now ranks on (93.8%) is the Illustrated Review set g2 was adopted on, not a held-out one. The settings solver's profile D5 now picks Gemini over Claude by 3.3 points, 0.1 past the 3.2 floor, on this one run.
+- **Scope.** Gemini 3.7, not the 3.8 the app sends (the gateway does not serve 3.8; the owner declined the personal-key run): the level shipped to 3.8 is fitted on 3.7's answers. Not the ChatGPT voter's c1, which keeps g1's rule 10 until the plan-route hold lifts (W46.gateway-models-ok). The magazine figure the 3.8 card now ranks on (93.8%) is the Illustrated Review set g2 was adopted on, not a held-out one. Current profile D5 keeps Claude: its common-support gap from the budget text tier is within their 5.0-point borrowed floor; the g2 image pair uses its own 10.4-point floor (07-segmentation.md).
 

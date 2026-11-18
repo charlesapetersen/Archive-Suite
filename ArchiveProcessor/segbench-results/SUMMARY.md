@@ -35,6 +35,8 @@ Development, held out per collection: C 99.0% after review at 5.8 flagged per 10
 
 Test (Stanton + RG 165, scored once, levels fitted on all three development collections): C 98.5% after review at 10.2 flagged per 100 pages, 1 errors left, 89.1% with no review; CW 98.5% after review at 10.7 flagged per 100 pages, 1 errors left, 90.3% with no review.
 
+W46.seg-common-support (2026-11-17): the test-box "pages exact" figures here are the old conditional uppers (each route counted right at the two unknown RG165 gaps), not a fixed-truth ranking; options.md and seg-common-support.md give the common-support figures (Claude 88.9%, Claude and ChatGPT 90.2%).
+
 ## W36.seg-features — on-device feature model (development set, leave-one-collection-out)
 
 Logistic regression on rule cues, TF-IDF similarity, length, blank, paper colour, ink, aspect and capture-time features; the -emb variants add on-device embedding similarities of adjacent pages (Apple Vision image feature print; NaturalLanguage sentence embedding of the whole page and of the seam, page n's last 400 characters against page n+1's first 400). Each development collection is predicted by a model fitted on the other two (Stanton and RG 165 untouched; photo labels from the truth). 551 pages is little data. Detail: features-lr-report.md.

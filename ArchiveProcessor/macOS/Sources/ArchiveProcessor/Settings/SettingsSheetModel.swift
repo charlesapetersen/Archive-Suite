@@ -431,6 +431,16 @@ struct SettingsSheetModel {
                         + "handwritten letters, so expect fewer.")
             }
         }
+        if stage.id == "segmentation", let r = route, let f = r.figures["test-boxes"],
+           let n = f["n"]?.double, let total = f["document_pages"]?.double {
+            labels.append("Grouping figures cover the same \(Int(n)) of \(Int(total)) document pages: documents beside "
+                          + "unknown boundaries are left out. Checking counts every flagged boundary, including unknown ones. "
+                          + "After checking assumes every known boundary is corrected perfectly.")
+            if let lo = f["all_doc_lower"]?.double, let hi = f["conditional_upper"]?.double {
+                labels.append(String(format: "Across all document pages, no checking gives %.1f%% to %.1f%%, "
+                                     + "depending on the two unknown boundaries; this is a truth-uncertainty bound.", lo, hi))
+            }
+        }
         // W46.seg-g2-offsets: a segmentation figure is one test run; where three were measured, the card gives the range.
         // On the 3.8 card the runs are Gemini 3.7's (owner, 2026-11-06 call 8: no 3.8 offsets run), and it says so.
         if stage.id == "segmentation", let r = route, let rg = r.figures["test-boxes.offset_range"],
@@ -438,7 +448,7 @@ struct SettingsSheetModel {
             let lent = r.id.contains("3.8") && r.caveats.contains { $0.contains("3.7") }
             labels.append("\(words.display(stage.id, r)): in three test runs " + (lent ? "of Gemini 3.7 Flash " : "")
                           + "that started the groups of pages at "
-                          + String(format: "different places, %.1f%% to %.1f%% of pages were in the right document; ", lo, hi)
+                          + String(format: "different places, %.1f%% to %.1f%% of the same settled document pages were in the right document; ", lo, hi)
                           + (lent ? "the figure shown is one of those runs, also Gemini 3.7's, and Gemini 3.8 has had a single run."
                               : "the figure shown is one of those runs."))
         }
@@ -722,10 +732,15 @@ struct SettingsSheetModel {
             let before = a.checkingMinutes > 0
                 ? "With the \(SettingsSolver.num(a.checkingMinutes)) minutes you will spend checking" : "Before you check anything"
             let per100 = r.figure("test-boxes.checks_per_100")
+            // A route with no test-box figure says nothing about pages rather than "0 settled document pages".
+            let test = r.figures["test-boxes"]
+            let sample = test?["n"]?.double.flatMap { n in test?["photographed_pages"]?.double.map { p in
+                "on the same \(Int(n)) settled document pages in two test boxes (\(Int(p)) photographed pages)" } }
+                ?? "on two test boxes checked by hand"
             var rows = [PartRow(id: "all", label: before, routeName: name(r),
                                 figure: r.family == .manual ? "nothing is proposed: you check every place yourself"
                                     : p.figure.map { String(format: "%.0f%% of pages in the right document", $0) } ?? "no figure",
-                                sample: r.family == .manual ? nil : "on two test boxes of typed letters, 363 pages checked by hand",
+                                sample: r.family == .manual ? nil : sample,
                                 label2: r.family == .manual ? nil : "the boxes below are separate tests: on other material it varies",
                                 warning: false)]
             if let per100 {
@@ -985,7 +1000,9 @@ struct SettingsSheetWords {
         case "segmentation":
             return "Pages are grouped into documents by a model reading seven pages at a time. The figure is pages in "
                 + "exactly the right document, measured on boxes of real papers checked by hand; it is not a forecast for your "
-                + "collection. Places the model is unsure of are shown to you to check, and checking every one is "
+                + "collection. All routes use the same documents whose boundaries could be settled; unknown documents "
+                + "are excluded from that figure, while checking still counts every flagged place. After checking "
+                + "assumes perfect correction of known boundaries. Places the model is unsure of are shown to you to check, and checking every one is "
                 + "always possible."
         case "dating":
             return "The year each document was written: from its text first, then from the page image where the text "

@@ -527,6 +527,7 @@ def collected_everywhere(key) -> bool:
 
 
 def report_five(wanted=None) -> str:
+    import options as O
     wanted = finalists() if wanted is None else wanted
     keys = [k for k in wanted if collected_everywhere(k)]
     codes = ["G"] + [f"X:{k}" for k in keys]
@@ -534,6 +535,7 @@ def report_five(wanted=None) -> str:
     label = {"G": "Gemini 3.8 Flash (low), the bar", **{f"X:{k}": entry(k)[1] for k in keys}}
     lines = ["| model | boxes | pages | no checking | flagged | per 100 pages | after checking | unflagged errors "
              "| reaches 99% |", "|---|---|---:|---:|---:|---:|---:|---:|---|"]
+    support = {}
     for c in codes:
         for split, names in (("dev", data.DEV), ("test", data.TEST)):
             rows = [E.evaluate(boxes[n], (c,), LEVEL) for n in names]
@@ -541,6 +543,8 @@ def report_five(wanted=None) -> str:
                 lines.append(f"| {label[c]} | {n} | {r['pages']} | {100 * E.pe(r['auto']):.1f}% | {r['flagged']} "
                              f"| {100 * r['flagged'] / r['pages']:.1f} | {100 * E.pe(r['rev']):.1f}% | {r['acc_err']} | |")
             p = E.pooled(rows)
+            if split == "test":
+                support[label[c]] = O.figures(p)
             lines.append(f"| {label[c]} | **{split} pooled** | {p['pages']} | {100 * E.pe(p['auto']):.1f}% "
                          f"| {p['flagged']} | {100 * p['flagged'] / p['pages']:.1f} | {100 * E.pe(p['rev']):.1f}% "
                          f"| {p['acc_err']} | {'yes' if E.pe(p['rev']) >= 0.99 else 'no'} |")
@@ -577,7 +581,7 @@ def report_five(wanted=None) -> str:
         E.BAR = bar0
     waiting = [entry(k)[1] for k in wanted if k not in keys]
     note = [f"", f"Not yet run on all five boxes: {', '.join(waiting)}."] if waiting else []
-    return "\n".join(lines + fit + cost + note)
+    return "\n".join(lines + fit + cost + O.support_note(support) + note)
 
 
 # W41.app-openrouter: GLM-5.3 Flash offered by the Processor as the budget approach, so options.json carries it

@@ -8,21 +8,21 @@ seg-window-gateway.md found Gemini 3.7 Flash's text-only K = 7 window 2.7 points
 
 | arm | pages in an exact document, no checking | boundaries to check per 100 pages | pages right after checking | unflagged errors per 500 pages (count) | API cost per 1,000 pages, list / batch |
 |---|---:|---:|---:|---:|---:|
-| Gemini only, images and text (the shipped approach) | 87.6% | 25.3 | 100.0% | 0.0 (0) | $3.61 / $1.81 |
-| Gemini only, text alone (the candidate budget tier) | 87.9% | 38.3 | 98.5% | 1.4 (1) | $1.73 / $0.87 |
+| Gemini only, images and text (the shipped approach) | 87.4% | 25.3 | 100.0% | 0.0 (0) | $3.61 / $1.81 |
+| Gemini only, text alone (the candidate budget tier) | 87.7% | 38.3 | 98.5% | 1.4 (1) | $1.73 / $0.87 |
 
 ## By test box
 
 | arm | box | pages | no checking | to check per 100 pages | after checking | unflagged errors |
 |---|---|---:|---:|---:|---:|---:|
 | images and text | Stanton | 250 | 86.8% | 32.4 | 100.0% | 0 |
-| images and text | RG165 | 113 | 89.7% | 9.7 | 100.0% | 0 |
+| images and text | RG165 | 113 | 89.0% | 9.7 | 100.0% | 0 |
 | text alone | Stanton | 250 | 86.0% | 44.0 | 97.9% | 1 |
-| text alone | RG165 | 113 | 93.1% | 25.7 | 100.0% | 0 |
+| text alone | RG165 | 113 | 92.7% | 25.7 | 100.0% | 0 |
 
 ## Text alone less images, paired over the truth's documents
 
-In points of pages in an exact document, with a 95% paired bootstrap interval over the 145 truth documents (330 document pages): **+0.3 (-3.4 to +4.2)** with no checking, **-1.5 (-4.0 to +0.0)** after checking.
+In points of pages in an exact document, with a 95% paired bootstrap interval over the 142 truth documents (325 document pages): **+0.3 (-3.4 to +4.2)** with no checking, **-1.5 (-4.1 to +0.0)** after checking.
 
 Of the 315 gaps between two document pages, the arms take a different automatic decision on 9; on 51 more the text arm flags a gap the image arm accepts, and on 4 the reverse (text alone is less sure: its confidences sit lower, so the image arm's level flags more of them).
 
@@ -63,9 +63,21 @@ Fixed before any answer: offer the tier if, at the frozen level, pages right aft
 - **Its one unflagged error is a gap other routes miss too.** Text alone accepts Stanton 144|145 as a continuation; Claude only and GLM-5.3 Flash only leave the same gap unflagged with images (options.md).
 - **The level is the image arm's.** Text alone is less sure of the same decisions, so a level fitted on its own development answers would differ (fewer checks, or more errors). Shipping the tier would fit one first, as options.py fits every approach's.
 
+
+### Truth support and unknown-gap bounds
+
+Ranked exactness uses the same **325 of 330 document pages** for every row: only whole documents touching none of the 2 unknown gaps. Those gaps are neither right nor wrong. Checking work and money still count all photographed pages and every flagged unknown gap. After-checking figures assume perfect correction of known gaps; they are not observed human accuracy.
+
+The bounds below use **all document pages**. The upper is conditional on each route being right at every unknown gap, so it is an optimistic, route-specific figure and does not rank routes. These are truth-ambiguity bounds, not sampling intervals or offset ranges.
+
+| route | no checking: lower–conditional upper | ideal checking: lower–conditional upper |
+|---|---:|---:|
+| image | 86.1%–87.6% | 98.5%–100.0% |
+| text | 86.4%–87.9% | 97.0%–98.5% |
+
 ## Measurement card
 
-- **Truth.** The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 newsletter rulings on the article rule) and RG165, truth photo labels; no unsure gaps, and no route drafted any of it.
+- **Truth.** The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 newsletter rulings on the article rule) and RG165, truth photo labels. Two RG165 gaps are unknown; rankings and the paired bootstrap use the same resolved documents. No route drafted any truth.
 - **Selection.** The two locked test boxes options.py scores on, whole, fixed since 2026-10-11; the level was frozen on the development boxes before this run; no ABBYY text.
 - **Comparison.** One model (Gemini 3.7 Flash), one route, prompt g2, the same windows, Vision text, settings and scorer; the text arm drops only the images and the one paragraph about them. The level is the image arm's, not refit for text alone.
 - **Noise.** One run per arm, 363 pages. Paired bootstrap intervals over truth documents cover document sampling, not rerun variation; the rerun floor is 1.4-3.2 points of pages exact a box (SEG-10), so a gap inside it is a tie. The error counts are a few gaps, so a difference of one or two is within noise.

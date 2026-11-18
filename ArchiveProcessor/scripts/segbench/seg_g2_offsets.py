@@ -261,6 +261,7 @@ def render(out) -> str:
     import ensemble as E
     import seg_card
     rows, rng, gw, sp = out["rows"], out["range"], out["gateway"], out["spread_points"]
+    borrowed = round(sp["g1"], 1)
     fmt = {"pages_exact_no_review": ("pages in an exact document, no checking", _p),
            "flagged_per_100_pages": ("boundaries to check per 100 pages", lambda x: f"{x:.1f}"),
            "pages_exact_after_review": ("pages right after checking", _p),
@@ -307,15 +308,18 @@ def render(out) -> str:
           + ", so a per-box figure is less settled than the pooled one.", "",
           "The settings layer's tie rule (07-segmentation.md §3; owner, 2026-11-13, W46.seg-tie-borrowed-range) "
           "takes twice the larger of the two routes' own offset ranges; a route with none measured borrows g1's "
-          "2.4 points. Two unmeasured routes therefore use 4.8 points, while pairs with g2's measured "
-          f"{sp['g2']:.1f} retain {2 * round(max(sp['g2'], 2.4), 1):.1f}. A route's own measured range replaces its "
+          f"{borrowed:.1f} points on the common support (formerly 2.4 on conditional uppers). Two unmeasured routes "
+          f"therefore use {2 * borrowed:.1f} points, while pairs with g2's measured "
+          f"{sp['g2']:.1f} retain {2 * round(max(sp['g2'], borrowed), 1):.1f}. A route's own measured range replaces its "
           "borrowed value when it lands. Profile D5 (a Claude plan and a Gemini key) still takes Claude on money: "
-          "89.1 against text alone's 87.9 is inside their 4.8 floor; the image g2 pair retains 10.4. Claude's w1 "
+          "the common-support Claude/text gap is inside their borrowed floor; the image g2 pair retains 10.4. Claude's w1 "
           "carries no article rule, so the gap is not like for like either way.", "",
           "## Gateway", "",
           f"{gw['calls']} settled calls, {gw['input_tokens']:,} input and {gw['output_tokens']:,} output tokens, "
           f"${gw['spent_usd']:.4f} counted of the ${CAP:.2f} cap ({gw['billed_note']}), {gw['invalid']} invalid. "
           "Offset 0's windows are W46.seg-magazine-rule-redo's, already counted there.", ""]
+    import options as O
+    L += O.support_note({k: r["figures"] for k, r in rows.items()})
     L += seg_card.card(
         truth="The test boxes as options.md scores them: Stanton with the owner's 2026-10-31 newsletter rulings on the "
               "article rule, RG165; truth photo labels; no route drafted any of it.",

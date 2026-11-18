@@ -387,11 +387,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 94,
-     "pages_exact_no_review": 0.8909090909090909,
+     "pages_exact_no_review": 0.8892307692307693,
      "flagged_per_100_pages": 25.895316804407713,
-     "pages_exact_after_review": 0.9696969696969697,
+     "pages_exact_after_review": 0.9692307692307692,
      "unflagged_errors": 3,
      "unflagged_errors_per_500_pages": 4.132231404958677,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 289,
+       "all_doc_pages_low": 0.8757575757575757,
+       "conditional_upper": 0.8909090909090909,
+       "conditional_upper_exact_pages": 294
+      },
+      "after_review": {
+       "resolved_exact_pages": 315,
+       "all_doc_pages_low": 0.9545454545454546,
+       "conditional_upper": 0.9696969696969697,
+       "conditional_upper_exact_pages": 320
+      }
+     },
      "usd_per_1000_pages": 3.5857727272727273,
      "usd_settled_per_1000_pages": 3.5857727272727273
     },
@@ -404,7 +422,25 @@
       "flagged_per_100_pages": 34.0,
       "pages_exact_after_review": 0.9588477366255144,
       "unflagged_errors": 3,
-      "unflagged_errors_per_500_pages": 6.0
+      "unflagged_errors_per_500_pages": 6.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 207,
+        "all_doc_pages_low": 0.8518518518518519,
+        "conditional_upper": 0.8518518518518519,
+        "conditional_upper_exact_pages": 207
+       },
+       "after_review": {
+        "resolved_exact_pages": 233,
+        "all_doc_pages_low": 0.9588477366255144,
+        "conditional_upper": 0.9588477366255144,
+        "conditional_upper_exact_pages": 233
+       }
+      }
      },
      "RG165": {
       "pages": 113,
@@ -414,7 +450,25 @@
       "flagged_per_100_pages": 7.964601769911504,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "cost_by_box": {
@@ -463,11 +517,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 96,
-     "pages_exact_no_review": 0.8939393939393939,
+     "pages_exact_no_review": 0.8923076923076924,
      "flagged_per_100_pages": 26.446280991735538,
-     "pages_exact_after_review": 0.9848484848484849,
+     "pages_exact_after_review": 0.9846153846153847,
      "unflagged_errors": 2,
      "unflagged_errors_per_500_pages": 2.7548209366391183,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 290,
+       "all_doc_pages_low": 0.8787878787878788,
+       "conditional_upper": 0.8939393939393939,
+       "conditional_upper_exact_pages": 295
+      },
+      "after_review": {
+       "resolved_exact_pages": 320,
+       "all_doc_pages_low": 0.9696969696969697,
+       "conditional_upper": 0.9848484848484849,
+       "conditional_upper_exact_pages": 325
+      }
+     },
      "usd_per_1000_pages": 3.820853305785124,
      "usd_settled_per_1000_pages": 3.5712417355371904
     },
@@ -480,7 +552,25 @@
       "flagged_per_100_pages": 34.4,
       "pages_exact_after_review": 0.9794238683127572,
       "unflagged_errors": 2,
-      "unflagged_errors_per_500_pages": 4.0
+      "unflagged_errors_per_500_pages": 4.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 208,
+        "all_doc_pages_low": 0.8559670781893004,
+        "conditional_upper": 0.8559670781893004,
+        "conditional_upper_exact_pages": 208
+       },
+       "after_review": {
+        "resolved_exact_pages": 238,
+        "all_doc_pages_low": 0.9794238683127572,
+        "conditional_upper": 0.9794238683127572,
+        "conditional_upper_exact_pages": 238
+       }
+      }
      },
      "RG165": {
       "pages": 113,
@@ -490,7 +580,25 @@
       "flagged_per_100_pages": 8.849557522123893,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "cost_by_box": {
@@ -533,11 +641,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 99,
-     "pages_exact_no_review": 0.8696969696969697,
+     "pages_exact_no_review": 0.8676923076923077,
      "flagged_per_100_pages": 27.272727272727273,
-     "pages_exact_after_review": 0.9696969696969697,
+     "pages_exact_after_review": 0.9692307692307692,
      "unflagged_errors": 3,
      "unflagged_errors_per_500_pages": 4.132231404958677,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 282,
+       "all_doc_pages_low": 0.8545454545454545,
+       "conditional_upper": 0.8696969696969697,
+       "conditional_upper_exact_pages": 287
+      },
+      "after_review": {
+       "resolved_exact_pages": 315,
+       "all_doc_pages_low": 0.9545454545454546,
+       "conditional_upper": 0.9696969696969697,
+       "conditional_upper_exact_pages": 320
+      }
+     },
      "usd_per_1000_pages": 3.56175,
      "usd_settled_per_1000_pages": 3.56175
     },
@@ -550,7 +676,25 @@
       "flagged_per_100_pages": 36.4,
       "pages_exact_after_review": 0.9588477366255144,
       "unflagged_errors": 3,
-      "unflagged_errors_per_500_pages": 6.0
+      "unflagged_errors_per_500_pages": 6.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 200,
+        "all_doc_pages_low": 0.823045267489712,
+        "conditional_upper": 0.823045267489712,
+        "conditional_upper_exact_pages": 200
+       },
+       "after_review": {
+        "resolved_exact_pages": 233,
+        "all_doc_pages_low": 0.9588477366255144,
+        "conditional_upper": 0.9588477366255144,
+        "conditional_upper_exact_pages": 233
+       }
+      }
      },
      "RG165": {
       "pages": 113,
@@ -560,7 +704,25 @@
       "flagged_per_100_pages": 7.079646017699115,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "cost_by_box": {
@@ -609,11 +771,29 @@
    "pages": 363,
    "gaps": 315,
    "flagged": 88,
-   "pages_exact_no_review": 0.9,
+   "pages_exact_no_review": 0.8984615384615384,
    "flagged_per_100_pages": 24.242424242424242,
-   "pages_exact_after_review": 0.9696969696969697,
+   "pages_exact_after_review": 0.9692307692307692,
    "unflagged_errors": 3,
    "unflagged_errors_per_500_pages": 4.132231404958677,
+   "exactness": {
+    "estimand": "common-resolved-document-pages",
+    "doc_pages": 330,
+    "resolved_doc_pages": 325,
+    "unscored_gaps": 2,
+    "no_review": {
+     "resolved_exact_pages": 292,
+     "all_doc_pages_low": 0.8848484848484849,
+     "conditional_upper": 0.9,
+     "conditional_upper_exact_pages": 297
+    },
+    "after_review": {
+     "resolved_exact_pages": 315,
+     "all_doc_pages_low": 0.9545454545454546,
+     "conditional_upper": 0.9696969696969697,
+     "conditional_upper_exact_pages": 320
+    }
+   },
    "usd_per_1000_pages": 3.6108848468271337
   },
   "gemini38_o0_by_box": {
@@ -625,7 +805,25 @@
     "flagged_per_100_pages": 30.8,
     "pages_exact_after_review": 0.9588477366255144,
     "unflagged_errors": 3,
-    "unflagged_errors_per_500_pages": 6.0
+    "unflagged_errors_per_500_pages": 6.0,
+    "exactness": {
+     "estimand": "common-resolved-document-pages",
+     "doc_pages": 243,
+     "resolved_doc_pages": 243,
+     "unscored_gaps": 0,
+     "no_review": {
+      "resolved_exact_pages": 210,
+      "all_doc_pages_low": 0.8641975308641975,
+      "conditional_upper": 0.8641975308641975,
+      "conditional_upper_exact_pages": 210
+     },
+     "after_review": {
+      "resolved_exact_pages": 233,
+      "all_doc_pages_low": 0.9588477366255144,
+      "conditional_upper": 0.9588477366255144,
+      "conditional_upper_exact_pages": 233
+     }
+    }
    },
    "RG165": {
     "pages": 113,
@@ -635,7 +833,25 @@
     "flagged_per_100_pages": 9.734513274336283,
     "pages_exact_after_review": 1.0,
     "unflagged_errors": 0,
-    "unflagged_errors_per_500_pages": 0.0
+    "unflagged_errors_per_500_pages": 0.0,
+    "exactness": {
+     "estimand": "common-resolved-document-pages",
+     "doc_pages": 87,
+     "resolved_doc_pages": 82,
+     "unscored_gaps": 2,
+     "no_review": {
+      "resolved_exact_pages": 82,
+      "all_doc_pages_low": 0.9425287356321839,
+      "conditional_upper": 1.0,
+      "conditional_upper_exact_pages": 87
+     },
+     "after_review": {
+      "resolved_exact_pages": 82,
+      "all_doc_pages_low": 0.9425287356321839,
+      "conditional_upper": 1.0,
+      "conditional_upper_exact_pages": 87
+     }
+    }
    }
   },
   "gemini38_o0_unflagged_gaps": {
@@ -910,5 +1126,5 @@
   "mean_seconds": 16.028489010989013
  },
  "status": "complete",
- "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 87.0%\u201389.4% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured."
+ "note": "On held-out Sasha the shipped Mac 2B scores 89.7% on 175 known gaps (pages exact 37.4%), against the teacher's 67.4% and its bf16 source's 89.1%. The source's pages exact is 46.6%: similar gap accuracy can leave different long documents wrong, and these single runs do not rank quantizations. The Illustrated Review and SC0122 are trained-on diagnostics for the students, not evidence of generalization. SC0122's supported comparison is its owner-ruled disagreement gaps plus controls weighted to the agreed strata; document-exact scores there remain conditional on tag/teacher-drafted truth. Gemini 3.7 Flash scores 96.0% on held-out Sasha (pages exact 82.2%); paired against the Mac 2B it is 6.3 points ahead on gap accuracy (sign test p 0.019), and far ahead on whole documents. On the Illustrated Review it merges 40 article gaps, against the teacher's 21 and the students' 29-31; g1 asks for the full magazine issue, and its pages exact there is no test of reading ability (prompt g2, on the article-within-issue rule, merges 0 there: seg-magazine-rule.md). Across three offsets of Gemini 3.7 at the shipped route's 3.8-fitted rule and level, no-check exact pages range 86.8%\u201389.2% and checks per 100 pages 25.9\u201327.3; the shipped 3.8 route's own offset range is unmeasured."
 }

@@ -720,6 +720,8 @@ def render(out) -> str:
                      f"{_p(f['pages_exact_after_review'])} | {f['unflagged_errors']} |")
         L += ["", unflagged_note(off, out["newsletter_gaps"])] + newsletter_table(out["newsletter_gaps"])
     L += ["", "## Reading", "", out["note"], ""]
+    import options as O
+    L += O.support_note({k: r["figures"] for k, r in (out["offsets"] or {}).get("rows", {}).items()})
     L += seg_card.card(
         truth="The three locked boxes' truths (Sasha owner-ruled from label tags, locked 2026-10-30; the Illustrated "
               "Review owner-ruled on the article-within-issue rule; SC0122 tags and teacher where they agreed, the "

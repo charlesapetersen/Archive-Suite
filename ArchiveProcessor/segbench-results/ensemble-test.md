@@ -14,6 +14,8 @@ Rescored 2026-11-13 (W46.seg-truth-owner-fixes) from the same cached calls: the 
 | CW | <= 0.850 | RG165 | 113 | 6 | 5.3 | 0 | 100.0% | 100.0% | 100.0% |
 | CW | <= 0.850 | pooled | 363 | 39 | 10.7 | 1 | 90.3% | 98.5% | 98.6% |
 
+W46.seg-common-support (2026-11-17): the test-box "pages exact" figures here are the old conditional uppers (each route counted right at the two unknown RG165 gaps), not a fixed-truth ranking; options.md and seg-common-support.md give the common-support figures (Claude 88.9%, Claude and ChatGPT 90.2%).
+
 ## Each voter alone on the test set (no review)
 
 | voter | collection | pages in exact doc | false splits | false merges |

@@ -56,6 +56,39 @@ def test_figures_scale():
     assert abs(f["unflagged_errors_per_500_pages"] - 500 / 5) < 1e-9
 
 
+def test_unknown_calls_share_support_and_keep_checking_cost():
+    from score import Truth
+    from test_ensemble import ToyBox
+    truth = Truth(["New", "Cont", "New", "New"], unsure=[1])
+    fs = []
+    for decision in ("new", "continue"):
+        b = ToyBox("unknown", truth, {"A": [(decision, .5), ("continue", .99), ("new", .99)]})
+        b.unsure = {0}
+        f = O.figures(E.evaluate(b, "A", .5))
+        assert f["pages_exact_no_review"] == f["pages_exact_after_review"] == .5
+        assert f["pages"] == 4 and f["gaps"] == 3 and f["flagged"] == 1
+        assert f["flagged_per_100_pages"] == 25 and f["unflagged_errors"] == 1
+        x = f["exactness"]
+        assert (x["doc_pages"], x["resolved_doc_pages"], x["unscored_gaps"]) == (4, 2, 1)
+        assert x["no_review"]["all_doc_pages_low"] == .25
+        fs.append(f)
+    assert [f["exactness"]["no_review"]["conditional_upper"] for f in fs] == [.5, .25]
+    # Pool counts, not percentages; the photographed-page checking denominator stays unchanged.
+    p = O.figures(E.pooled([E.evaluate(b, "A", .5), E.evaluate(b, "A", .5)]))
+    assert p["exactness"]["resolved_doc_pages"] == 4 and p["pages"] == 8
+    assert p["flagged_per_100_pages"] == 25
+
+
+def test_no_common_support_cannot_be_ranked():
+    from score import Truth, score_labels
+    try:
+        E.pe(score_labels(Truth(["New", "Cont"], unsure=[1]), ["New", "Cont"]))
+    except ValueError as e:
+        assert "no resolvable" in str(e)
+    else:
+        raise AssertionError("an empty support is not a measured zero or a perfect score")
+
+
 def test_mix_label_names_its_voters():
     assert O.label_of("mix", ("C", "G")) == "Claude and Gemini together"
     assert O.label_of("mix", ("C", "G", "O")) == "Claude, Gemini and ChatGPT together"

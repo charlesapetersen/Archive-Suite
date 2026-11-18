@@ -70,20 +70,25 @@ enum SegmentationChooserTestDriver {
         }
 
         // 2. Figures.
-        let footnote = "Measured once on two boxes (363 pages) of one archive, 11 Oct 2026. Your material may differ."
+        let footnote = "Measured once on two boxes (363 pages) of one archive, 11 Oct 2026. Your material may differ. Document figures cover the same 325 of 330 document pages: documents beside unknown boundaries are left out. Checking counts every flagged boundary. Across all document pages, the no-checking result is between 88% and 89%, depending on those unknown boundaries. After-checking figures assume every known boundary is corrected perfectly."
         let claude = row(.claude, 1000)
         eq("2 claude no checking", claude.rightWithNoChecking, "about 89% of pages")
         eq("2 claude to check @1000", claude.toCheck, "about 102 boundaries to check")
         eq("2 claude after checking", claude.rightAfterChecking, "about 98% of pages")
         eq("2 claude unshown", claude.unshownErrors, "about 1 in 360 pages")
         eq("2 footnote", claude.footnote, footnote)
+        let support = options.approach(.claude)?.figures?.test?.exactness
+        eq("2 every route ranks the fixed settled support", support?.resolvedDocPages, 325)
+        eq("2 bounds retain all document pages", support?.docPages, 330)
+        check("2 conditional upper is distinct from common-support exactness",
+              (support?.noReview?.conditionalUpper ?? 0) > (options.approach(.claude)?.figures?.test?.pagesExactNoReview ?? 1))
         eq("2 claude to check @363", row(.claude, 363).toCheck, "about 37 boundaries to check")
         eq("2 claude to check @1 (at least 1)", row(.claude, 1).toCheck, "about 1 boundary to check")
         eq("2 claude to check @0 (at least 1)", row(.claude, 0).toCheck, "about 1 boundary to check")
 
         let gemini = row(.gemini, 1000)
         // W46.seg-magazine-rule-app: Gemini's figures are Gemini 3.7 Flash's on prompt g2, and the row says so.
-        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 88% of pages")
+        eq("2 gemini no checking", gemini.rightWithNoChecking, "about 87% of pages")
         eq("2 gemini to check", gemini.toCheck, "about 253 boundaries to check")
         eq("2 gemini after checking", gemini.rightAfterChecking, "about 100% of pages")
         eq("2 gemini unshown", gemini.unshownErrors, "none in 363 test pages")
@@ -271,7 +276,7 @@ enum SegmentationChooserTestDriver {
         eq("7 local offers no key", local.missingKeys, [])
         eq("7 local no checking is the file's", local.rightWithNoChecking,
            localFig?.pagesExactNoReview.map { "about \(SegmentationRow.percent($0)) of pages" })
-        eq("7 local no checking", local.rightWithNoChecking, "about 80% of pages")
+        eq("7 local no checking", local.rightWithNoChecking, "about 79% of pages")
         eq("7 local after checking", local.rightAfterChecking, "about 99% of pages")
         eq("7 local cost", local.costLines, ["none: it runs on this Mac"])
         eq("7 local adds no dollars", local.apiDollars, 0)
@@ -335,7 +340,7 @@ enum SegmentationChooserTestDriver {
         check("6 no key, nothing saved: saves nothing",
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
-        // Unknown ranges borrow g1's 2.4: ChatGPT's 90.3 beats GLM's 83.0 beyond their 4.8 floor.
+        // Unknown ranges borrow g1's 2.5: ChatGPT's 90.2 beats GLM's 82.8 beyond their 5.0 floor.
         // Gemini alone still picks text, which ties the image window at about half the price.
         check("6 no Gemini key, nothing saved: saves the solver's pick",
               SegmentationApproach.preselect(noGemini, defaults: d))

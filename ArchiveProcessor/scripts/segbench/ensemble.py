@@ -172,7 +172,10 @@ def pooled(rows: list[dict]) -> dict:
 
 
 def pe(s) -> float:
-    return s.pages_exact / s.doc_pages
+    """Exactness on the same resolvable document pages for every route, never conditional truth."""
+    if not s.resolved_doc_pages:
+        raise ValueError("no resolvable document pages: cannot rank segmentation")
+    return s.pages_exact_low / s.resolved_doc_pages
 
 
 def levels(boxes, S) -> list[float]:

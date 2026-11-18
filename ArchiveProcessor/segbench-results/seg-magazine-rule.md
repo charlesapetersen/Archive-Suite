@@ -17,15 +17,15 @@ Paired on the same 146 gaps: only g2 right 40, only g1 right 7, +22.6 points, ex
 
 | Prompt | Pages exact, no checking | Checks per 100 pages | Pages exact after checking | Unflagged errors | per 500 pages |
 |---|---|---|---|---|---|
-| g1 | 89.1% | 25.9 | 97.0% | 3 | 4.1 |
-| g2 | 87.6% | 25.3 | 100.0% | 0 | 0.0 |
+| g1 | 88.9% | 25.9 | 96.9% | 3 | 4.1 |
+| g2 | 87.4% | 25.3 | 100.0% | 0 | 0.0 |
 
 By box:
 
 - g1 Stanton: pages exact 85.2% no checking, 34.0 checks per 100 pages, 95.9% after, unflagged 3
 - g1 RG165: pages exact 100.0% no checking, 8.0 checks per 100 pages, 100.0% after, unflagged 0
 - g2 Stanton: pages exact 86.8% no checking, 32.4 checks per 100 pages, 100.0% after, unflagged 0
-- g2 RG165: pages exact 89.7% no checking, 9.7 checks per 100 pages, 100.0% after, unflagged 0
+- g2 RG165: pages exact 89.0% no checking, 9.7 checks per 100 pages, 100.0% after, unflagged 0
 
 Unflagged errors:
 

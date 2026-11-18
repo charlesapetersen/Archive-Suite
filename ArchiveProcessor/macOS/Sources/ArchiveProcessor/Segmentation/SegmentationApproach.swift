@@ -118,6 +118,24 @@ struct SegmentationOptions: Decodable, Sendable {
     }
 
     struct Figures: Decodable, Sendable {
+        struct Exactness: Decodable, Sendable {
+            struct Bounds: Decodable, Sendable {
+                let allDocPagesLow: Double
+                let conditionalUpper: Double
+                enum CodingKeys: String, CodingKey {
+                    case allDocPagesLow = "all_doc_pages_low"
+                    case conditionalUpper = "conditional_upper"
+                }
+            }
+            let docPages: Int
+            let resolvedDocPages: Int
+            let noReview: Bounds?
+            let afterReview: Bounds
+            enum CodingKeys: String, CodingKey {
+                case docPages = "doc_pages", resolvedDocPages = "resolved_doc_pages"
+                case noReview = "no_review", afterReview = "after_review"
+            }
+        }
         let pages: Int
         let gaps: Int
         let flagged: Int
@@ -126,9 +144,10 @@ struct SegmentationOptions: Decodable, Sendable {
         let pagesExactAfterReview: Double
         let unflaggedErrors: Int
         let unflaggedErrorsPer500Pages: Double
+        let exactness: Exactness?
 
         enum CodingKeys: String, CodingKey {
-            case pages, gaps, flagged
+            case pages, gaps, flagged, exactness
             case pagesExactNoReview = "pages_exact_no_review"
             case flaggedPer100Pages = "flagged_per_100_pages"
             case pagesExactAfterReview = "pages_exact_after_review"

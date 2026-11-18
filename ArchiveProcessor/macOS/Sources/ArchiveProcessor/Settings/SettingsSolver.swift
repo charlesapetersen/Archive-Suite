@@ -180,10 +180,11 @@ struct SettingsSolver {
     static let readingHostedFloor = 0.49
     static let readingHandsFloor = 0.60
     /// Twice the larger of these routes' own window-offset ranges in pooled test-box pages exact.
-    /// An unmeasured route borrows g1's 2.4 points (owner, 2026-11-13, W46.seg-tie-borrowed-range),
+    /// An unmeasured route borrows g1's common-support range, 2.5 points (W46.seg-common-support;
+    /// owner construction, 2026-11-13, W46.seg-tie-borrowed-range),
     /// not g2's 5.2. Measured ranges in `test-boxes.offset_range` replace that borrowed value per route.
     static func segmentationTie(_ a: SettingsRouteTable.Route?, _ b: SettingsRouteTable.Route?) -> Double {
-        2 * max(a?.figure("test-boxes.offset_range") ?? 2.4, b?.figure("test-boxes.offset_range") ?? 2.4)
+        2 * max(a?.figure("test-boxes.offset_range") ?? 2.5, b?.figure("test-boxes.offset_range") ?? 2.5)
     }
     /// Dating: the rerun floor is the same year on 94% (85/90) of documents between identical runs, read as a gap of
     /// up to 6 points of exact year; reading the rate as points is the note's [I] (08-dating.md §3).

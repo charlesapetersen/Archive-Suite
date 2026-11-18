@@ -10,8 +10,8 @@
      miss is calibration more than ranking.
    - **Refit on the development boxes, it still trails the 2B.** The refit covers the six head and CRF parameters
      plus the beta calibration. It reaches 22.6-61.3% on the owner boxes, 32.2% on Lincoln and 28.1% on CREST.
-   - **On the test boxes, under options.md's rule, it does no better than checking every gap.** It reaches 28.2%
-     unchecked, and its fitted flag level checks nearly every gap (86.8 per 100 pages). The 2B gets 98.8% after
+   - **On the test boxes, under options.md's rule, it does no better than checking every gap.** It reaches 27.1%
+     unchecked on the common support (28.2% before W46.seg-common-support), and its fitted flag level checks nearly every gap (86.8 per 100 pages). The 2B gets 98.8% after
      78.8 checks.
    - **As a disagreement partner it flags too much.** It disagrees with the 2B on 11.5-27.6 gaps per 100 pages.
    - The laptop profile keeps the corpus-trained 2B.

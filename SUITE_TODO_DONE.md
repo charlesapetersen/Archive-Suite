@@ -16313,3 +16313,30 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   133,235,201-byte model download cache; kept committed numeric coverage evidence and the outline failure
   report, with other items' caches untouched. No migration: there is no app-produced production material.
   <!-- /W46.layout-newspapers -->
+- [x] **W46.seg-common-support — rank segmentation on common truth support and carry unknown-gap bounds [M · Tier-2]** · §Document processing review — W46 (owner, 2026-10-20) (lane: processor,segbench) — SHIPPED 2026-11-17.
+  Measurement review pass 15, P15-1. `score.resolved_documents` gives one route-independent support: whole truth
+  documents touching neither reading of an unknown gap (RG165 79|80 and 99|100), 325 of 330 test document pages.
+  `ensemble.pe` ranks exact pages on it (raises on an empty support); `options.figures` exports an `exactness` object
+  with the all-document lower and each route's conditional upper (the old figure, kept and labelled, never ranked).
+  Checks per 100 pages still divide by all 363 photographed pages and count flagged unknown gaps; after checking
+  assumes perfect correction of known gaps. No level refitted (the development boxes have no unknown gaps, so every
+  fit is unchanged; verified on data). Rescored offline from cached answers by `seg_common_support.py`, $0, no model
+  or upload. New figures: Claude 88.9, Gemini (3.7 g2) 87.4, ChatGPT 90.2, mix 90.2, GLM 82.8, Mac 2B 79.4, text
+  alone 87.7 (previously 89.1/87.6/90.3/90.3/83.0/79.7/87.9). Offsets on the same support: g1 2.462 points (rounded
+  2.5, was 2.4), g2 5.231 (5.2, range 84.6-89.8); the owner's per-pair construction stands, so unmeasured pairs use
+  5.0 and g2 pairs 10.4. Pick moves: documented profiles unchanged; two untested ones move on one 16-page gap
+  (text 285 against GLM and the cluster 4B 269 of 325, 4.9 against 5.0; on 330 pages 4.85 against 4.8): a Gemini
+  plus OpenRouter key now picks GLM-5.3 Flash, a cluster plus Gemini key the cluster 4B. Exactly twice g1's 8-page
+  spread, so the move is the denominator and rounding, not a measured change; SettingsSolverTestDriver pins both.
+  Regenerated options, seg-boxes-score (and its reading note), seg-g2-offsets, magazine-rule-app, magazine-rule,
+  text-tier app/test (paired bootstrap on resolved documents), seg-scorers, seg-adapt-curve (frozen rows; notes
+  27.1% for doc-split refit), cheap-models/teacher/students tables, settings-routes, the settings-design prototype
+  and ArchiveOCRBench (published copy now behind). W36 ensemble-test/SUMMARY figures labelled as conditional uppers.
+  App: chooser footnote and settings card give the support, the bounds and the perfect-correction caveat; a route
+  with no test figure no longer reads "0 settled pages". Tests: disagreeing synthetic routes at an unknown gap share
+  support and keep checking cost (test_options, test_seg_common_support, brute-forced support invariance); sheet,
+  solver, routes, chooser, openrouter, interviews, layers drivers all pass. Separate consistency audit and
+  adversarial review (opus): the scoring verified on 20,000 random cases; both found the two pick moves, now pinned
+  and disclosed; the empty-figure label fixed. No bench-cache scratch made. No migration: no production material.
+  Prior session's uncommitted work recovered from the retired worktree and continued.
+  <!-- /W46.seg-common-support -->

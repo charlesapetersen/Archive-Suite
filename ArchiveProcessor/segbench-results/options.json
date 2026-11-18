@@ -29,7 +29,20 @@
      "flagged_per_100_pages": 86.77685950413223,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
-     "unflagged_errors_per_500_pages": 0.0
+     "unflagged_errors_per_500_pages": 0.0,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": null,
+      "after_review": {
+       "resolved_exact_pages": 325,
+       "all_doc_pages_low": 0.9848484848484849,
+       "conditional_upper": 1.0,
+       "conditional_upper_exact_pages": 330
+      }
+     }
     },
     "dev_held_out": {
      "pages": 551,
@@ -40,6 +53,54 @@
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
      "unflagged_errors_per_500_pages": 0.0
+    },
+    "test_by_box": {
+     "Stanton": {
+      "pages": 250,
+      "gaps": 238,
+      "flagged": 238,
+      "pages_exact_no_review": null,
+      "flagged_per_100_pages": 95.2,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": null,
+       "after_review": {
+        "resolved_exact_pages": 243,
+        "all_doc_pages_low": 1.0,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 243
+       }
+      }
+     },
+     "RG165": {
+      "pages": 113,
+      "gaps": 77,
+      "flagged": 77,
+      "pages_exact_no_review": null,
+      "flagged_per_100_pages": 68.14159292035399,
+      "pages_exact_after_review": 1.0,
+      "unflagged_errors": 0,
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": null,
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
+     }
     }
    },
    "tokens_per_1000_pages": null,
@@ -61,11 +122,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 37,
-     "pages_exact_no_review": 0.8909090909090909,
+     "pages_exact_no_review": 0.8892307692307693,
      "flagged_per_100_pages": 10.192837465564738,
-     "pages_exact_after_review": 0.9848484848484849,
+     "pages_exact_after_review": 0.9846153846153847,
      "unflagged_errors": 1,
-     "unflagged_errors_per_500_pages": 1.3774104683195592
+     "unflagged_errors_per_500_pages": 1.3774104683195592,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 289,
+       "all_doc_pages_low": 0.8757575757575757,
+       "conditional_upper": 0.8909090909090909,
+       "conditional_upper_exact_pages": 294
+      },
+      "after_review": {
+       "resolved_exact_pages": 320,
+       "all_doc_pages_low": 0.9696969696969697,
+       "conditional_upper": 0.9848484848484849,
+       "conditional_upper_exact_pages": 325
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -76,7 +155,25 @@
       "flagged_per_100_pages": 12.8,
       "pages_exact_after_review": 0.9794238683127572,
       "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 2.0
+      "unflagged_errors_per_500_pages": 2.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 207,
+        "all_doc_pages_low": 0.8518518518518519,
+        "conditional_upper": 0.8518518518518519,
+        "conditional_upper_exact_pages": 207
+       },
+       "after_review": {
+        "resolved_exact_pages": 238,
+        "all_doc_pages_low": 0.9794238683127572,
+        "conditional_upper": 0.9794238683127572,
+        "conditional_upper_exact_pages": 238
+       }
+      }
      },
      "RG165": {
       "pages": 113,
@@ -86,7 +183,25 @@
       "flagged_per_100_pages": 4.424778761061947,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -154,11 +269,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 92,
-     "pages_exact_no_review": 0.8757575757575757,
+     "pages_exact_no_review": 0.8738461538461538,
      "flagged_per_100_pages": 25.34435261707989,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
-     "unflagged_errors_per_500_pages": 0.0
+     "unflagged_errors_per_500_pages": 0.0,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 284,
+       "all_doc_pages_low": 0.8606060606060606,
+       "conditional_upper": 0.8757575757575757,
+       "conditional_upper_exact_pages": 289
+      },
+      "after_review": {
+       "resolved_exact_pages": 325,
+       "all_doc_pages_low": 0.9848484848484849,
+       "conditional_upper": 1.0,
+       "conditional_upper_exact_pages": 330
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -169,17 +302,53 @@
       "flagged_per_100_pages": 32.4,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 211,
+        "all_doc_pages_low": 0.8683127572016461,
+        "conditional_upper": 0.8683127572016461,
+        "conditional_upper_exact_pages": 211
+       },
+       "after_review": {
+        "resolved_exact_pages": 243,
+        "all_doc_pages_low": 1.0,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 243
+       }
+      }
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 11,
-      "pages_exact_no_review": 0.896551724137931,
+      "pages_exact_no_review": 0.8902439024390244,
       "flagged_per_100_pages": 9.734513274336283,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 73,
+        "all_doc_pages_low": 0.8390804597701149,
+        "conditional_upper": 0.896551724137931,
+        "conditional_upper_exact_pages": 78
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -249,11 +418,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 88,
-     "pages_exact_no_review": 0.9,
+     "pages_exact_no_review": 0.8984615384615384,
      "flagged_per_100_pages": 24.242424242424242,
-     "pages_exact_after_review": 0.9696969696969697,
+     "pages_exact_after_review": 0.9692307692307692,
      "unflagged_errors": 3,
-     "unflagged_errors_per_500_pages": 4.132231404958677
+     "unflagged_errors_per_500_pages": 4.132231404958677,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 292,
+       "all_doc_pages_low": 0.8848484848484849,
+       "conditional_upper": 0.9,
+       "conditional_upper_exact_pages": 297
+      },
+      "after_review": {
+       "resolved_exact_pages": 315,
+       "all_doc_pages_low": 0.9545454545454546,
+       "conditional_upper": 0.9696969696969697,
+       "conditional_upper_exact_pages": 320
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -264,7 +451,25 @@
       "flagged_per_100_pages": 30.8,
       "pages_exact_after_review": 0.9588477366255144,
       "unflagged_errors": 3,
-      "unflagged_errors_per_500_pages": 6.0
+      "unflagged_errors_per_500_pages": 6.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 210,
+        "all_doc_pages_low": 0.8641975308641975,
+        "conditional_upper": 0.8641975308641975,
+        "conditional_upper_exact_pages": 210
+       },
+       "after_review": {
+        "resolved_exact_pages": 233,
+        "all_doc_pages_low": 0.9588477366255144,
+        "conditional_upper": 0.9588477366255144,
+        "conditional_upper_exact_pages": 233
+       }
+      }
      },
      "RG165": {
       "pages": 113,
@@ -274,7 +479,25 @@
       "flagged_per_100_pages": 9.734513274336283,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -298,15 +521,15 @@
     ],
     "range": {
      "pages_exact_no_review": [
-      0.8484848484848485,
-      0.9
+      0.8461538461538461,
+      0.8984615384615384
      ],
      "flagged_per_100_pages": [
       25.34435261707989,
       29.201101928374655
      ],
      "pages_exact_after_review": [
-      0.9848484848484849,
+      0.9846153846153847,
       1.0
      ],
      "unflagged_errors_per_500_pages": [
@@ -331,11 +554,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 287,
-     "pages_exact_no_review": 0.9030303030303031,
+     "pages_exact_no_review": 0.9015384615384615,
      "flagged_per_100_pages": 79.0633608815427,
      "pages_exact_after_review": 1.0,
      "unflagged_errors": 0,
-     "unflagged_errors_per_500_pages": 0.0
+     "unflagged_errors_per_500_pages": 0.0,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 293,
+       "all_doc_pages_low": 0.8878787878787879,
+       "conditional_upper": 0.9030303030303031,
+       "conditional_upper_exact_pages": 298
+      },
+      "after_review": {
+       "resolved_exact_pages": 325,
+       "all_doc_pages_low": 0.9848484848484849,
+       "conditional_upper": 1.0,
+       "conditional_upper_exact_pages": 330
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -346,17 +587,53 @@
       "flagged_per_100_pages": 88.4,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 217,
+        "all_doc_pages_low": 0.8930041152263375,
+        "conditional_upper": 0.8930041152263375,
+        "conditional_upper_exact_pages": 217
+       },
+       "after_review": {
+        "resolved_exact_pages": 243,
+        "all_doc_pages_low": 1.0,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 243
+       }
+      }
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 66,
-      "pages_exact_no_review": 0.9310344827586207,
+      "pages_exact_no_review": 0.926829268292683,
       "flagged_per_100_pages": 58.4070796460177,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 76,
+        "all_doc_pages_low": 0.8735632183908046,
+        "conditional_upper": 0.9310344827586207,
+        "conditional_upper_exact_pages": 81
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -429,11 +706,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 37,
-     "pages_exact_no_review": 0.9030303030303031,
+     "pages_exact_no_review": 0.9015384615384615,
      "flagged_per_100_pages": 10.192837465564738,
-     "pages_exact_after_review": 0.9848484848484849,
+     "pages_exact_after_review": 0.9846153846153847,
      "unflagged_errors": 1,
-     "unflagged_errors_per_500_pages": 1.3774104683195592
+     "unflagged_errors_per_500_pages": 1.3774104683195592,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 293,
+       "all_doc_pages_low": 0.8878787878787879,
+       "conditional_upper": 0.9030303030303031,
+       "conditional_upper_exact_pages": 298
+      },
+      "after_review": {
+       "resolved_exact_pages": 320,
+       "all_doc_pages_low": 0.9696969696969697,
+       "conditional_upper": 0.9848484848484849,
+       "conditional_upper_exact_pages": 325
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -444,17 +739,53 @@
       "flagged_per_100_pages": 12.8,
       "pages_exact_after_review": 0.9794238683127572,
       "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 2.0
+      "unflagged_errors_per_500_pages": 2.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 217,
+        "all_doc_pages_low": 0.8930041152263375,
+        "conditional_upper": 0.8930041152263375,
+        "conditional_upper_exact_pages": 217
+       },
+       "after_review": {
+        "resolved_exact_pages": 238,
+        "all_doc_pages_low": 0.9794238683127572,
+        "conditional_upper": 0.9794238683127572,
+        "conditional_upper_exact_pages": 238
+       }
+      }
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 5,
-      "pages_exact_no_review": 0.9310344827586207,
+      "pages_exact_no_review": 0.926829268292683,
       "flagged_per_100_pages": 4.424778761061947,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 76,
+        "all_doc_pages_low": 0.8735632183908046,
+        "conditional_upper": 0.9310344827586207,
+        "conditional_upper_exact_pages": 81
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -573,11 +904,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 120,
-     "pages_exact_no_review": 0.8303030303030303,
+     "pages_exact_no_review": 0.8276923076923077,
      "flagged_per_100_pages": 33.05785123966942,
-     "pages_exact_after_review": 0.9696969696969697,
+     "pages_exact_after_review": 0.9692307692307692,
      "unflagged_errors": 3,
-     "unflagged_errors_per_500_pages": 4.132231404958677
+     "unflagged_errors_per_500_pages": 4.132231404958677,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 269,
+       "all_doc_pages_low": 0.8151515151515152,
+       "conditional_upper": 0.8303030303030303,
+       "conditional_upper_exact_pages": 274
+      },
+      "after_review": {
+       "resolved_exact_pages": 315,
+       "all_doc_pages_low": 0.9545454545454546,
+       "conditional_upper": 0.9696969696969697,
+       "conditional_upper_exact_pages": 320
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -588,17 +937,53 @@
       "flagged_per_100_pages": 37.2,
       "pages_exact_after_review": 0.9588477366255144,
       "unflagged_errors": 3,
-      "unflagged_errors_per_500_pages": 6.0
+      "unflagged_errors_per_500_pages": 6.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 190,
+        "all_doc_pages_low": 0.7818930041152263,
+        "conditional_upper": 0.7818930041152263,
+        "conditional_upper_exact_pages": 190
+       },
+       "after_review": {
+        "resolved_exact_pages": 233,
+        "all_doc_pages_low": 0.9588477366255144,
+        "conditional_upper": 0.9588477366255144,
+        "conditional_upper_exact_pages": 233
+       }
+      }
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 27,
-      "pages_exact_no_review": 0.9655172413793104,
+      "pages_exact_no_review": 0.9634146341463414,
       "flagged_per_100_pages": 23.893805309734514,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 79,
+        "all_doc_pages_low": 0.9080459770114943,
+        "conditional_upper": 0.9655172413793104,
+        "conditional_upper_exact_pages": 84
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -668,11 +1053,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 286,
-     "pages_exact_no_review": 0.796969696969697,
+     "pages_exact_no_review": 0.7938461538461539,
      "flagged_per_100_pages": 78.78787878787878,
-     "pages_exact_after_review": 0.9878787878787879,
+     "pages_exact_after_review": 0.9876923076923076,
      "unflagged_errors": 1,
-     "unflagged_errors_per_500_pages": 1.3774104683195592
+     "unflagged_errors_per_500_pages": 1.3774104683195592,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 258,
+       "all_doc_pages_low": 0.7818181818181819,
+       "conditional_upper": 0.796969696969697,
+       "conditional_upper_exact_pages": 263
+      },
+      "after_review": {
+       "resolved_exact_pages": 321,
+       "all_doc_pages_low": 0.9727272727272728,
+       "conditional_upper": 0.9878787878787879,
+       "conditional_upper_exact_pages": 326
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -683,17 +1086,53 @@
       "flagged_per_100_pages": 85.2,
       "pages_exact_after_review": 0.9835390946502057,
       "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 2.0
+      "unflagged_errors_per_500_pages": 2.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 182,
+        "all_doc_pages_low": 0.7489711934156379,
+        "conditional_upper": 0.7489711934156379,
+        "conditional_upper_exact_pages": 182
+       },
+       "after_review": {
+        "resolved_exact_pages": 239,
+        "all_doc_pages_low": 0.9835390946502057,
+        "conditional_upper": 0.9835390946502057,
+        "conditional_upper_exact_pages": 239
+       }
+      }
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 73,
-      "pages_exact_no_review": 0.9310344827586207,
+      "pages_exact_no_review": 0.926829268292683,
       "flagged_per_100_pages": 64.60176991150442,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 76,
+        "all_doc_pages_low": 0.8735632183908046,
+        "conditional_upper": 0.9310344827586207,
+        "conditional_upper_exact_pages": 81
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -770,11 +1209,29 @@
      "pages": 363,
      "gaps": 315,
      "flagged": 106,
-     "pages_exact_no_review": 0.8787878787878788,
+     "pages_exact_no_review": 0.8769230769230769,
      "flagged_per_100_pages": 29.201101928374655,
-     "pages_exact_after_review": 0.9848484848484849,
+     "pages_exact_after_review": 0.9846153846153847,
      "unflagged_errors": 1,
-     "unflagged_errors_per_500_pages": 1.3774104683195592
+     "unflagged_errors_per_500_pages": 1.3774104683195592,
+     "exactness": {
+      "estimand": "common-resolved-document-pages",
+      "doc_pages": 330,
+      "resolved_doc_pages": 325,
+      "unscored_gaps": 2,
+      "no_review": {
+       "resolved_exact_pages": 285,
+       "all_doc_pages_low": 0.8636363636363636,
+       "conditional_upper": 0.8787878787878788,
+       "conditional_upper_exact_pages": 290
+      },
+      "after_review": {
+       "resolved_exact_pages": 320,
+       "all_doc_pages_low": 0.9696969696969697,
+       "conditional_upper": 0.9848484848484849,
+       "conditional_upper_exact_pages": 325
+      }
+     }
     },
     "test_by_box": {
      "Stanton": {
@@ -785,17 +1242,53 @@
       "flagged_per_100_pages": 34.0,
       "pages_exact_after_review": 0.9794238683127572,
       "unflagged_errors": 1,
-      "unflagged_errors_per_500_pages": 2.0
+      "unflagged_errors_per_500_pages": 2.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 243,
+       "resolved_doc_pages": 243,
+       "unscored_gaps": 0,
+       "no_review": {
+        "resolved_exact_pages": 209,
+        "all_doc_pages_low": 0.8600823045267489,
+        "conditional_upper": 0.8600823045267489,
+        "conditional_upper_exact_pages": 209
+       },
+       "after_review": {
+        "resolved_exact_pages": 238,
+        "all_doc_pages_low": 0.9794238683127572,
+        "conditional_upper": 0.9794238683127572,
+        "conditional_upper_exact_pages": 238
+       }
+      }
      },
      "RG165": {
       "pages": 113,
       "gaps": 77,
       "flagged": 21,
-      "pages_exact_no_review": 0.9310344827586207,
+      "pages_exact_no_review": 0.926829268292683,
       "flagged_per_100_pages": 18.58407079646018,
       "pages_exact_after_review": 1.0,
       "unflagged_errors": 0,
-      "unflagged_errors_per_500_pages": 0.0
+      "unflagged_errors_per_500_pages": 0.0,
+      "exactness": {
+       "estimand": "common-resolved-document-pages",
+       "doc_pages": 87,
+       "resolved_doc_pages": 82,
+       "unscored_gaps": 2,
+       "no_review": {
+        "resolved_exact_pages": 76,
+        "all_doc_pages_low": 0.8735632183908046,
+        "conditional_upper": 0.9310344827586207,
+        "conditional_upper_exact_pages": 81
+       },
+       "after_review": {
+        "resolved_exact_pages": 82,
+        "all_doc_pages_low": 0.9425287356321839,
+        "conditional_upper": 1.0,
+        "conditional_upper_exact_pages": 87
+       }
+      }
      }
     },
     "dev_held_out": {
@@ -890,5 +1383,10 @@
   "level": 0.95,
   "evidence": "Gemini 3.7 Flash through the Stanford gateway, prompt g2 with the images dropped (W46.seg-text-tier-test and W46.seg-text-tier-app; the gateway does not serve 3.8)",
   "result": "segbench-results/seg-text-tier-app.md"
+ },
+ "common_support": {
+  "item": "W46.seg-common-support",
+  "date": "2026-11-15",
+  "rule": "Rank only documents touching no unknown gap; costs count all pages. Full-document bounds keep each route's conditional upper separately; after checking assumes perfect correction on known gaps only."
  }
 }

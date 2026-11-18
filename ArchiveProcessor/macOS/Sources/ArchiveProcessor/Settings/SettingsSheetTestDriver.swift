@@ -144,7 +144,7 @@ enum SettingsSheetTestDriver {
         let gem = layer(.general, [(.keys, .strings(["gemini"])), (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
                                    (.batchCeilingUSD, .double(10)), (.staysOnMac, .bool(false)),
                                    (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue)))])
-        check("3 a Gemini key on a 16 GB Mac: Gemini text beats the Mac 2B beyond 4.8",
+        check("3 a Gemini key on a 16 GB Mac: Gemini text beats the Mac 2B beyond 5.0",
               card(sheet("gemini-16gb", general: gem), "segmentation")?.routeID == "gemini3.8-flash-text")
         let paid = sheet("gemini", general: gem)
         // W46.seg-text-tier-default: the text-only window ties the image window for half the price and is the pick; the
@@ -152,7 +152,7 @@ enum SettingsSheetTestDriver {
         if let s = card(paid, "segmentation") {
             check("3 a Gemini key: the text-only window is the segmentation pick", s.routeID == "gemini3.8-flash-text",
                   s.routeID ?? "nil")
-            // W46.seg-truth-owner-fixes: on the corrected truth the text alone (87.9) leads the image window (87.6), so
+            // W46.seg-truth-owner-fixes: on the corrected truth the text alone (87.7) leads the image window (87.4), so
             // the card calls it the best choice rather than a cheaper tie; the image window stays an alternative below.
             check("3 the pick says it is the best choice, its figures Gemini 3.7's",
                   s.why.contains("The best choice") && s.why.contains("Gemini 3.7"), s.why)
@@ -164,7 +164,7 @@ enum SettingsSheetTestDriver {
             check("3 the image window can be chosen", s.options.contains { $0.id == "gemini3.8-flash" && $0.blocked == nil })
         } else { check("3 segmentation card", false) }
         if let s = card(paid, "segmentation") {
-            check("3 the 2B alternative is outside the text pair's 4.8 floor",
+            check("3 the 2B alternative is outside the text pair's 5.0 floor",
                   s.alternatives.first { $0.id == "seg-qwen3.5-2b-8bit" }.map {
                       !$0.figure.contains("a tie with the pick")
                   } == true)
@@ -175,7 +175,7 @@ enum SettingsSheetTestDriver {
                                 (.staysOnMac, .bool(false))]))
         if let s = card(localChosen, "segmentation") {
             check("3 a zero ceiling keeps the 2B", s.routeID == "seg-qwen3.5-2b-8bit", s.routeID ?? "nil")
-            check("3 better text is outside the local pair's 4.8 floor",
+            check("3 better text is outside the local pair's 5.0 floor",
                   s.better.first { $0.id == "gemini3.8-flash-text" }.map {
                       !$0.reason.contains("no real gain")
                   } == true)
@@ -192,9 +192,9 @@ enum SettingsSheetTestDriver {
                 check("3 Gemini 3.8's segmentation card labels its figures as 3.7's", s.labels.contains { $0.contains("Gemini 3.7") })
                 check("3 Gemini 3.8's magazine figure ranks", s.parts.first { $0.id == "magazine" }?.label2 == nil)
                 check("3 Gemini 3.8's segmentation card gives the range over three offsets (W46.seg-g2-offsets)",
-                      s.labels.contains { $0.contains("84.8% to 90.0%") }, s.labels.joined(separator: " | "))
+                      s.labels.contains { $0.contains("84.6% to 89.8%") }, s.labels.joined(separator: " | "))
                 check("3 the range is labelled as Gemini 3.7's runs, the 3.8 run a single one (owner's call 8)",
-                      s.labels.contains { $0.contains("84.8% to 90.0%") && $0.contains("three test runs of Gemini 3.7")
+                      s.labels.contains { $0.contains("84.6% to 89.8%") && $0.contains("three test runs of Gemini 3.7")
                           && $0.contains("single run") }, s.labels.joined(separator: " | "))
                 check("3 Gemini's card carries no 2B label", !s.labels.contains { $0.contains("zero-shot") })
                 check("3 a chosen image window keeps no tie sentence of the app's pick", !s.why.contains("fewer boundaries"), s.why)

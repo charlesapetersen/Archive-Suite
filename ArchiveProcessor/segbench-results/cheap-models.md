@@ -36,28 +36,28 @@ Development boxes Dean, Deaver, Herrnstein; test boxes Stanton and RG 165, held 
 | Gemini 3.8 Flash (low), the bar | **dev pooled** | 551 | 90.7% | 8 | 1.5 | 94.2% | 9 | no |
 | Gemini 3.8 Flash (low), the bar | Stanton | 250 | 86.4% | 6 | 2.4 | 89.7% | 7 | |
 | Gemini 3.8 Flash (low), the bar | RG165 | 113 | 100.0% | 1 | 0.9 | 100.0% | 0 | |
-| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 90.0% | 7 | 1.9 | 92.4% | 7 | no |
+| Gemini 3.8 Flash (low), the bar | **test pooled** | 363 | 89.8% | 7 | 1.9 | 92.3% | 7 | no |
 | GLM-5.3 Flash | Dean | 202 | 85.2% | 8 | 4.0 | 96.4% | 3 | |
 | GLM-5.3 Flash | Deaver | 149 | 97.9% | 9 | 6.0 | 97.9% | 1 | |
 | GLM-5.3 Flash | Herrnstein | 200 | 89.5% | 15 | 7.5 | 93.4% | 2 | |
 | GLM-5.3 Flash | **dev pooled** | 551 | 90.2% | 32 | 5.8 | 95.8% | 6 | no |
 | GLM-5.3 Flash | Stanton | 250 | 78.2% | 26 | 10.4 | 92.6% | 5 | |
-| GLM-5.3 Flash | RG165 | 113 | 96.6% | 4 | 3.5 | 100.0% | 0 | |
-| GLM-5.3 Flash | **test pooled** | 363 | 83.0% | 30 | 8.3 | 94.5% | 5 | no |
+| GLM-5.3 Flash | RG165 | 113 | 96.3% | 4 | 3.5 | 100.0% | 0 | |
+| GLM-5.3 Flash | **test pooled** | 363 | 82.8% | 30 | 8.3 | 94.5% | 5 | no |
 | GPT-5.6 Luna | Dean | 202 | 85.2% | 3 | 1.5 | 87.2% | 5 | |
 | GPT-5.6 Luna | Deaver | 149 | 96.5% | 1 | 0.7 | 96.5% | 2 | |
 | GPT-5.6 Luna | Herrnstein | 200 | 90.1% | 2 | 1.0 | 91.7% | 4 | |
 | GPT-5.6 Luna | **dev pooled** | 551 | 90.0% | 6 | 1.1 | 91.3% | 11 | no |
 | GPT-5.6 Luna | Stanton | 250 | 86.8% | 11 | 4.4 | 88.9% | 10 | |
 | GPT-5.6 Luna | RG165 | 113 | 100.0% | 0 | 0.0 | 100.0% | 0 | |
-| GPT-5.6 Luna | **test pooled** | 363 | 90.3% | 11 | 3.0 | 91.8% | 10 | no |
+| GPT-5.6 Luna | **test pooled** | 363 | 90.2% | 11 | 3.0 | 91.7% | 10 | no |
 | Qwen3.5 Flash | Dean | 202 | 83.7% | 14 | 6.9 | 86.7% | 5 | |
 | Qwen3.5 Flash | Deaver | 149 | 95.7% | 25 | 16.8 | 97.9% | 1 | |
 | Qwen3.5 Flash | Herrnstein | 200 | 77.9% | 21 | 10.5 | 94.5% | 3 | |
 | Qwen3.5 Flash | **dev pooled** | 551 | 84.9% | 60 | 10.9 | 92.5% | 9 | no |
 | Qwen3.5 Flash | Stanton | 250 | 78.6% | 28 | 11.2 | 93.4% | 5 | |
-| Qwen3.5 Flash | RG165 | 113 | 89.7% | 5 | 4.4 | 97.7% | 1 | |
-| Qwen3.5 Flash | **test pooled** | 363 | 81.5% | 33 | 9.1 | 94.5% | 6 | no |
+| Qwen3.5 Flash | RG165 | 113 | 89.0% | 5 | 4.4 | 97.6% | 1 | |
+| Qwen3.5 Flash | **test pooled** | 363 | 81.2% | 33 | 9.1 | 94.5% | 6 | no |
 
 ### The level fitted per model, as options.py did
 
@@ -65,20 +65,33 @@ Development boxes Dean, Deaver, Herrnstein; test boxes Stanton and RG 165, held 
 
 | model | bar | dev, held out: after checking | flagged per 100 pages | level for the test boxes | test: no checking | after checking | flagged per 100 pages | unflagged errors |
 |---|---|---:|---:|---|---:|---:|---:|---:|
-| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 90.0% | 100.0% | 51.0 | 0 |
-| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 90.0% | 97.0% | 24.2 | 3 |
-| GLM-5.3 Flash | 99% | 99.4% | 60.1 | <= 0.975 | 83.0% | 100.0% | 81.0 | 0 |
-| GLM-5.3 Flash | 98% | 97.3% | 17.1 | <= 0.925 | 83.0% | 97.0% | 33.1 | 3 |
-| GPT-5.6 Luna | 99% | 100.0% | 86.0 | <= 0.990 | 90.3% | 100.0% | 86.2 | 0 |
-| GPT-5.6 Luna | 98% | 98.8% | 60.8 | <= 0.990 | 90.3% | 100.0% | 86.2 | 0 |
-| Qwen3.5 Flash | 99% | 99.6% | 69.5 | <= 0.975 | 81.5% | 100.0% | 82.4 | 0 |
-| Qwen3.5 Flash | 98% | 99.6% | 55.0 | <= 0.950 | 81.5% | 100.0% | 55.9 | 0 |
+| Gemini 3.8 Flash (low), the bar | 99% | 100.0% | 39.4 | <= 0.985 | 89.8% | 100.0% | 51.0 | 0 |
+| Gemini 3.8 Flash (low), the bar | 98% | 98.6% | 10.3 | <= 0.965 | 89.8% | 96.9% | 24.2 | 3 |
+| GLM-5.3 Flash | 99% | 99.4% | 60.1 | <= 0.975 | 82.8% | 100.0% | 81.0 | 0 |
+| GLM-5.3 Flash | 98% | 97.3% | 17.1 | <= 0.925 | 82.8% | 96.9% | 33.1 | 3 |
+| GPT-5.6 Luna | 99% | 100.0% | 86.0 | <= 0.990 | 90.2% | 100.0% | 86.2 | 0 |
+| GPT-5.6 Luna | 98% | 98.8% | 60.8 | <= 0.990 | 90.2% | 100.0% | 86.2 | 0 |
+| Qwen3.5 Flash | 99% | 99.6% | 69.5 | <= 0.975 | 81.2% | 100.0% | 82.4 | 0 |
+| Qwen3.5 Flash | 98% | 99.6% | 55.0 | <= 0.950 | 81.2% | 100.0% | 55.9 | 0 |
 
 | model | pages | calls | cost paid | per 1,000 pages, standard | per 1,000 pages, batch |
 |---|---:|---:|---:|---:|---:|
 | GLM-5.3 Flash | 914 | 313 | $1.056 | $1.16 | $0.46 |
 | GPT-5.6 Luna | 914 | 310 | $1.741 | $1.90 | $0.78 |
 | Qwen3.5 Flash | 914 | 337 | $0.436 | $0.48 | none offered |
+
+### Truth support and unknown-gap bounds
+
+Ranked exactness uses the same **325 of 330 document pages** for every row: only whole documents touching none of the 2 unknown gaps. Those gaps are neither right nor wrong. Checking work and money still count all photographed pages and every flagged unknown gap. After-checking figures assume perfect correction of known gaps; they are not observed human accuracy.
+
+The bounds below use **all document pages**. The upper is conditional on each route being right at every unknown gap, so it is an optimistic, route-specific figure and does not rank routes. These are truth-ambiguity bounds, not sampling intervals or offset ranges.
+
+| route | no checking: lower–conditional upper | ideal checking: lower–conditional upper |
+|---|---:|---:|
+| Gemini 3.8 Flash (low), the bar | 88.5%–90.0% | 90.9%–92.4% |
+| GLM-5.3 Flash | 81.5%–83.0% | 93.0%–94.5% |
+| GPT-5.6 Luna | 88.8%–90.3% | 90.3%–91.8% |
+| Qwen3.5 Flash | 80.0%–81.5% | 93.0%–94.5% |
 
 ## Verdict (2026-10-13)
 

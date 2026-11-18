@@ -148,20 +148,20 @@ def build(col, judge):
 
 
 def page_flags(box, S, level, r):
-    """Per page (None for a label photo): whether its document is exact with no checking and after checking, built
+    """Per page (None outside common support): whether its document is exact before/after checking, built
     from the same decisions ensemble.evaluate scores, and checked against its counts."""
     import ensemble as E
-    from score import doc_unsure, forgive
+    from score import resolved_documents
+    support = {i for doc in resolved_documents(box.labels) for i in doc}
     j = E.judge(box, S, level)
     auto = {i: a for i, (a, _, _, _) in j.items()}
     rev = {i: (box.truth[i] if f else a) for i, (a, f, _, _) in j.items()}
     out = []
     for dec, s in ((auto, r["auto"]), (rev, r["rev"])):
         pred = box.labels_from(dec)
-        # An unsure gap takes the route's own call, as the scorer counts it (score.py, UNSURE GAPS).
-        ex = SWG.exact_pages(forgive(list(box.labels), pred, doc_unsure(box.labels)), pred)
-        if sum(bool(x) for x in ex) != s.pages_exact:
-            raise SystemExit(f"{box.name}: per-page exact {sum(bool(x) for x in ex)} != scorer's {s.pages_exact}")
+        ex = [x if i in support else None for i, x in enumerate(SWG.exact_pages(box.labels, pred))]
+        if sum(bool(x) for x in ex) != s.pages_exact_low:
+            raise SystemExit(f"{box.name}: per-page exact != scorer's common-support count")
         out.append(ex)
     return out
 
@@ -220,7 +220,8 @@ def cmd_score(_a):
             auto += fa
             rev += fr
             if name == "image":
-                docs += [[k + off for k in d] for d in SWG.documents(col)]
+                from score import resolved_documents
+                docs += [[k + off for k in sorted(d)] for d in resolved_documents(col.labels)]
             off += len(col.labels)
         out_arms[name] = {"figures": O.figures(E.pooled(per)), "by_box": {r["name"]: O.figures(r) for r in per}}
         flags[name] = (auto, rev)
@@ -365,9 +366,12 @@ def render(out) -> str:
           "- **The level is the image arm's.** Text alone is less sure of the same decisions, so a level fitted on its "
           "own development answers would differ (fewer checks, or more errors). Shipping the tier would fit one "
           "first, as options.py fits every approach's.", ""]
+    import options as O
+    L += O.support_note({k: r["figures"] for k, r in A.items()})
     L += seg_card.card(
         truth="The owner's ruled test boxes, Stanton (with the owner's 2026-10-31 newsletter rulings on the article "
-              "rule) and RG165, truth photo labels; no unsure gaps, and no route drafted any of it.",
+              "rule) and RG165, truth photo labels. Two RG165 gaps are unknown; rankings and the paired bootstrap "
+              "use the same resolved documents. No route drafted any truth.",
         selection="The two locked test boxes options.py scores on, whole, fixed since 2026-10-11; the level was frozen "
                   "on the development boxes before this run; no ABBYY text.",
         comparison="One model (Gemini 3.7 Flash), one route, prompt g2, the same windows, Vision text, settings and "

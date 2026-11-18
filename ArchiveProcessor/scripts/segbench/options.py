@@ -164,7 +164,58 @@ def figures(rows_or_pooled: dict) -> dict:
     return {"pages": p["pages"], "gaps": p["gaps"], "flagged": p["flagged"],
             "pages_exact_no_review": E.pe(p["auto"]), "flagged_per_100_pages": 100 * p["flagged"] / p["pages"],
             "pages_exact_after_review": E.pe(p["rev"]), "unflagged_errors": p["acc_err"],
-            "unflagged_errors_per_500_pages": 500 * p["acc_err"] / p["pages"]}
+            "unflagged_errors_per_500_pages": 500 * p["acc_err"] / p["pages"],
+            "exactness": {"estimand": "common-resolved-document-pages",
+                          "doc_pages": p["auto"].doc_pages,
+                          "resolved_doc_pages": p["auto"].resolved_doc_pages,
+                          "unscored_gaps": p["auto"].unscored_gaps,
+                          **{name: {"resolved_exact_pages": s.pages_exact_low,
+                                    "all_doc_pages_low": s.pages_exact_low / s.doc_pages,
+                                    "conditional_upper": s.pages_exact / s.doc_pages,
+                                    "conditional_upper_exact_pages": s.pages_exact}
+                             for name, s in (("no_review", p["auto"]), ("after_review", p["rev"]))}}}
+
+
+def support_note(rows: dict) -> list[str]:
+    """Generator-owned disclosure of the ranking support and the distinct full-document bounds."""
+    scored = {name: f for name, f in rows.items() if f.get("exactness")}
+    if not scored:
+        return []
+    supports = {(f["exactness"]["resolved_doc_pages"], f["exactness"]["doc_pages"],
+                 f["exactness"]["unscored_gaps"]) for f in scored.values()}
+    if len(supports) != 1:
+        raise ValueError(f"comparison has different common supports: {supports}")
+    resolved, total, unknown = next(iter(supports))
+    lines = ["", "### Truth support and unknown-gap bounds", "",
+             f"Ranked exactness uses the same **{resolved} of {total} document pages** for every row: only whole "
+             f"documents touching none of the {unknown} unknown gaps. Those gaps are neither right nor wrong. "
+             "Checking work and money still count all photographed pages and every flagged unknown gap. "
+             "After-checking figures assume perfect correction of known gaps; they are not observed human accuracy.", "",
+             "The bounds below use **all document pages**. The upper is conditional on each route being right at "
+             "every unknown gap, so it is an optimistic, route-specific figure and does not rank routes. "
+             "These are truth-ambiguity bounds, not sampling intervals or offset ranges.", "",
+             "| route | no checking: lower–conditional upper | ideal checking: lower–conditional upper |",
+             "|---|---:|---:|"]
+    for name, f in scored.items():
+        x = f["exactness"]
+        cells = ["—" if x[k] is None else f"{E.pct(x[k]['all_doc_pages_low'])}–{E.pct(x[k]['conditional_upper'])}"
+                 for k in ("no_review", "after_review")]
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
+    return lines + [""]
+
+
+def manual_figures(boxes: dict) -> dict:
+    """Ideal manual correction on common support, retaining every gap's checking cost."""
+    rows = []
+    for name, b in boxes.items():
+        s = E.score_labels(b.labels, b.labels)
+        rows.append({"name": name, "pages": b.pages, "gaps": len(b.gaps), "flagged": len(b.gaps),
+                     "accepted": 0, "acc_err": 0, "auto_err": 0, "auto": s, "rev": s})
+    out = {"test": figures(E.pooled(rows)), "test_by_box": {r["name"]: figures(r) for r in rows}}
+    for f in [out["test"], *out["test_by_box"].values()]:
+        f["pages_exact_no_review"] = None
+        f["exactness"]["no_review"] = None
+    return out
 
 
 # --- tokens ---------------------------------------------------------------------------------------
@@ -545,6 +596,7 @@ def final() -> str:
         "tokens_per_1000_pages": None, "cost": None,
         "note": "Nothing is proposed: the user judges every gap between two document pages. 'After review' "
                 "assumes the user's own judgement is right."})
+    out["approaches"][-1]["figures"].update(manual_figures(test))
     for a, f in fz["approaches"].items():
         out["approaches"].append(approach_entry(a, f, test, use, fz["dev_held_out"][a]))
     out["approaches"].append({
@@ -753,13 +805,15 @@ def render(out: dict) -> str:
             if out.get("gemini_g2") else ""),
          "",
          "Denominators: 'per 100 pages', 'per 500 pages' and 'per 1,000 pages' count every page photographed, "
-         "box and folder photos included; 'pages in an exact document' counts document pages only.", "",
+         "box and folder photos included; 'pages in an exact document' uses the common resolvable document pages "
+         "described below.", "",
          "## The five figures, per approach (test boxes)", "",
          "| approach | pages in an exact document, no checking | boundaries to check per 100 pages | pages right "
          "after checking | unflagged errors per 500 pages (count) | API cost per 1,000 pages, list / batch |",
          "|---|---:|---:|---:|---:|---:|"]
     for ap in out["approaches"]:
         L.append(fig_row(ap) if ap["available"] else f"| {ap['label']} | not measured | | | | |")
+    L += support_note({a["label"]: a["figures"]["test"] for a in out["approaches"] if a["available"]})
     if out.get("gemini_g2"):
         g = aps["gemini"]
         L += ["", f"Gemini only is labelled: the app's voter is Gemini 3.8 Flash sending g2, and this row's level and "
@@ -865,7 +919,7 @@ def render(out: dict) -> str:
               "W46.seg-truth-rescore) and RG 165, with the truth's photo labels, and the owner's 2026-11-13 "
               "corrections (W46.seg-truth-owner-fixes: 8 gaps changed after he judged W46.seg-check-time's differing "
               "answers with three pages either side; seg-truth-owner-fixes.json). RG 165 79|80 and 99|100 he could "
-              "not tell and are left out of every count (score.py, UNSURE GAPS); only those 12 gaps were looked at "
+              "not tell: their documents are excluded from common-support exactness, but flagged unknown gaps still cost checks (score.py, UNSURE GAPS); only those 12 gaps were looked at "
               "again. Levels and the mix rule were frozen on the owner's development "
               "boxes (Dean, Deaver, Herrnstein). Gemini only is Gemini 3.7 Flash's g2 answers through the gateway, "
               "at the level fitted on its own development answers (0.965, the level 3.8 had on g1; "
@@ -886,8 +940,8 @@ def render(out: dict) -> str:
         noise="Single runs with no intervals. The error counts are a few gaps each, so a difference of one or two is "
               "within noise; the rerun floor (1.4-3.2 points of pages exact a box, SEG-10) applies to the "
               "no-review column. Gemini only's five figures are one g2 run on 3.7 at window offset 0; over three "
-              "offsets it scores 84.8%-90.0% no checking (seg-g2-offsets.md), and 3.7 on g1 at the same level "
-              "87.0%-89.4% (seg-boxes-score.md).",
+              "offsets the common-support range is in seg-g2-offsets.md, and 3.7 on g1 at the same level "
+              "in seg-boxes-score.md. Old all-document conditional uppers are separate from these rankings.",
         scope="The figures the Processor shows for one archive's two locked boxes (363 pages). Not other material "
               "(the three locked owner boxes are scored in seg-boxes-score.md; Lincoln and CREST are not scored "
               "here), and not a forecast for a user's own corpus.")
