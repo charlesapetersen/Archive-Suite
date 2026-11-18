@@ -110,6 +110,83 @@ final class PageRotationTests: XCTestCase {
         XCTAssertEqual(model.imageTurns, 3)
     }
 
+    // MARK: Undo and Redo (W40.reader-rotate-undo)
+
+    func testRotationUndoesAndRedoesMostRecentFirst() throws {
+        let dir = makeTempDir("turn-undo")
+        let pdf = try makeScanPDF(in: dir)
+        let before = try sha256(pdf)
+        let store = PageTurnStore(url: nil)
+        let model = DocumentViewerModel(persists: false, pageTurns: store, thumbnailer: nil)
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        XCTAssertFalse(model.canUndoRotation)
+        model.resetRotation()
+        XCTAssertFalse(model.canUndoRotation, "Reset on an upright page changes nothing, so there is nothing to undo")
+
+        model.rotateRight()
+        model.rotateRight()
+        model.rotateLeft()
+        XCTAssertEqual(model.imageTurns, 1)
+        model.undoRotation()
+        XCTAssertEqual(model.imageTurns, 2, "the left turn is undone first")
+        XCTAssertEqual(model.tagStatus, "Rotation undone.")
+        model.undoRotation()
+        model.undoRotation()
+        XCTAssertEqual(model.imageTurns, 0)
+        XCTAssertFalse(model.canUndoRotation)
+        XCTAssertEqual(store.turns(path: pdf.path, page: 0), 0, "the undo is written to the store")
+
+        model.redoRotation()
+        model.redoRotation()
+        XCTAssertEqual(model.imageTurns, 2)
+        XCTAssertEqual(model.tagStatus, "Rotation redone.")
+        XCTAssertTrue(model.canRedoRotation)
+        model.resetRotation()
+        XCTAssertFalse(model.canRedoRotation, "a new turn ends the redo history")
+        model.undoRotation()
+        XCTAssertEqual(model.imageTurns, 2, "Reset is undone back to the turn it cleared")
+        XCTAssertEqual(try sha256(pdf), before, "the file's bytes are unchanged")
+    }
+
+    func testUndoTurnsAPageNoLongerShownAndNamesItsFile() throws {
+        let dir = makeTempDir("turn-undo-away")
+        let pdf = try makeScanPDF(in: dir, pairs: 2)
+        let model = DocumentViewerModel(persists: false, pageTurns: PageTurnStore(url: nil), thumbnailer: nil)
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        model.rotateRight()
+        model.next()
+        model.undoRotation()
+        XCTAssertEqual(model.imageTurns, 0, "the pair on screen is not touched")
+        XCTAssertEqual(model.tagStatus, "Rotation undone on \(pdf.lastPathComponent).")
+        model.previous()
+        XCTAssertEqual(model.imageTurns, 0, "the first pair's turn was undone")
+    }
+
+    func testUndoTakesTheNewerOfRotationAndTagChange() {
+        let earlier = Date(timeIntervalSince1970: 100), later = Date(timeIntervalSince1970: 200)
+        XCTAssertFalse(DocumentViewerModel.undoTakesRotation(rotation: nil, tag: nil))
+        XCTAssertFalse(DocumentViewerModel.undoTakesRotation(rotation: nil, tag: later))
+        XCTAssertTrue(DocumentViewerModel.undoTakesRotation(rotation: earlier, tag: nil))
+        XCTAssertTrue(DocumentViewerModel.undoTakesRotation(rotation: later, tag: earlier))
+        XCTAssertFalse(DocumentViewerModel.undoTakesRotation(rotation: earlier, tag: later))
+    }
+
+    func testRotationUndoIsOffWhileFindHasTheKeyboard() throws {
+        let dir = makeTempDir("turn-undo-find")
+        let pdf = try makeScanPDF(in: dir)
+        let model = DocumentViewerModel(persists: false, pageTurns: PageTurnStore(url: nil), thumbnailer: nil)
+        model.load(DocumentSelection(filePaths: [pdf.path]))
+        model.rotateRight()
+        model.findFieldFocused = true
+        XCTAssertFalse(model.canUndoRotation)
+        XCTAssertNil(model.nextRotationUndoDate)
+        model.undoRotation()
+        XCTAssertEqual(model.imageTurns, 1)
+        model.findFieldFocused = false
+        model.undoRotation()
+        XCTAssertEqual(model.imageTurns, 0)
+    }
+
     // MARK: render guards — four turns, both sources
 
     func testPDFImagePageRendersTurnedWithItsTextLayer() throws {

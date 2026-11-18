@@ -48,6 +48,34 @@ struct ArchiveReaderCommands: Commands {
     /// The navigation window is in front with nothing over it, so Find… searches the library.
     private var findSearchesLibrary: Bool { nav.map { !$0.showingPreview } ?? false }
 
+    /// The tag ledger's undo is open to the window in front (the list's, or the document window's file).
+    private var tagCanUndo: Bool { nav != nil ? (nav?.undoDepth ?? 0) > 0 : (docTags?.canUndo ?? false) }
+    private var tagCanRedo: Bool { nav != nil ? (nav?.redoDepth ?? 0) > 0 : (docTags?.canRedo ?? false) }
+    private var tagModel: NavigationModel? { nav ?? docTags?.navigation }
+    /// W40.reader-rotate-undo: the menu's title, from the history last read. The action reads the ledger fresh.
+    private var undoTakesRotation: Bool {
+        DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationUndoDate,
+                                              tag: tagCanUndo ? tagModel?.knownUndoDate : nil)
+    }
+    private var redoTakesRotation: Bool {
+        DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationRedoDate,
+                                              tag: tagCanRedo ? tagModel?.knownRedoDate : nil)
+    }
+
+    private func undo() {
+        let tag = tagCanUndo ? tagModel?.nextUndoDate() : nil
+        if DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationUndoDate, tag: tag) {
+            doc?.undoRotation()
+        } else if let nav { nav.undoLast() } else { docTags?.undo() }
+    }
+
+    private func redo() {
+        let tag = tagCanRedo ? tagModel?.nextRedoDate() : nil
+        if DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationRedoDate, tag: tag) {
+            doc?.redoRotation()
+        } else if let nav { nav.redoLast() } else { docTags?.redo() }
+    }
+
     var body: some Commands {
         // View — panel toggles (placed in the system View menu)
         CommandGroup(before: .sidebar) {
@@ -228,12 +256,13 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.improveOCR.title) { if let nav { nav.improveOCR() } else { docTags?.improveOCR() } }
                 .disabled(noTagTarget)
             Divider()
-            Button(ReaderCommand.undoTagChange.title) { if let nav { nav.undoLast() } else { docTags?.undo() } }
+            // W40.reader-rotate-undo: one Undo for tag changes and the viewer's rotations, most recent first.
+            Button(undoTakesRotation ? "Undo Rotation" : ReaderCommand.undoTagChange.title) { undo() }
                 .keyboardShortcut(.undoTagChange)
-                .disabled(nav != nil ? (nav?.undoDepth ?? 0) == 0 : !(docTags?.canUndo ?? false))
-            Button(ReaderCommand.redoTagChange.title) { if let nav { nav.redoLast() } else { docTags?.redo() } }
+                .disabled(!tagCanUndo && !(doc?.canUndoRotation ?? false))
+            Button(redoTakesRotation ? "Redo Rotation" : ReaderCommand.redoTagChange.title) { redo() }
                 .keyboardShortcut(.redoTagChange)
-                .disabled(nav != nil ? (nav?.redoDepth ?? 0) == 0 : !(docTags?.canRedo ?? false))
+                .disabled(!tagCanRedo && !(doc?.canRedoRotation ?? false))
         }
 
         // View (nav window): sorting + clearing

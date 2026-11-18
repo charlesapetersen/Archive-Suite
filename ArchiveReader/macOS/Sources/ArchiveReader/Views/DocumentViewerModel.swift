@@ -528,9 +528,65 @@ final class DocumentViewerModel: ObservableObject {
 
     private func setImageTurns(_ turns: Int) {
         guard canRotate, let path = currentFilePath else { return }
+        let page = pagePairs.imagePageIndex(pair: pair)
+        let before = imageTurns, after = ((turns % 4) + 4) % 4
+        guard after != before else { return }   // Reset on an upright page is not an action to undo
+        writeTurns(after, path: path, page: page)
+        turnUndos.append(TurnChange(path: path, page: page, before: before, after: after, date: Date()))
+        turnRedos.removeAll()
+    }
+
+    private func writeTurns(_ turns: Int, path: String, page: Int) {
         objectWillChange.send()
         leftController.clearSelection()   // a selection's place on screen moves with the page; start clean
-        pageTurns.set(turns, path: path, page: pagePairs.imagePageIndex(pair: pair))
+        pageTurns.set(turns, path: path, page: page)
+    }
+
+    // MARK: Rotation on Undo and Redo (W40.reader-rotate-undo)
+
+    /// One turn the reader gave a page in this window: where, from and to, and when it was done (or, on the redo
+    /// stack, when it was undone). The date orders it against the tag ledger's changes, whose lines carry theirs,
+    /// so Edit's one Undo takes whichever of the two is newer (`undoTakesRotation`).
+    struct TurnChange: Equatable {
+        let path: String
+        let page: Int
+        let before: Int
+        let after: Int
+        var date: Date
+    }
+    private(set) var turnUndos: [TurnChange] = []
+    private(set) var turnRedos: [TurnChange] = []
+
+    /// Off while Find has the keyboard, as the tag undo is (`DocumentTagActions.canUndo`).
+    var canUndoRotation: Bool { !turnUndos.isEmpty && !findFieldFocused }
+    var canRedoRotation: Bool { !turnRedos.isEmpty && !findFieldFocused }
+    var nextRotationUndoDate: Date? { canUndoRotation ? turnUndos.last?.date : nil }
+    var nextRotationRedoDate: Date? { canRedoRotation ? turnRedos.last?.date : nil }
+
+    /// Most recent action first: the rotation when it is newer than the tag change Undo would otherwise revert,
+    /// or when there is none. The same rule serves redo, with each side's newest undo.
+    nonisolated static func undoTakesRotation(rotation: Date?, tag: Date?) -> Bool {
+        guard let rotation else { return false }
+        guard let tag else { return true }
+        return rotation >= tag
+    }
+
+    func undoRotation() { step(from: \.turnUndos, to: \.turnRedos, applying: \.before, verb: "undone") }
+    func redoRotation() { step(from: \.turnRedos, to: \.turnUndos, applying: \.after, verb: "redone") }
+
+    /// Puts the page back to the turn `applying` names and moves the change to the other stack, stamped now, so
+    /// a later Redo (or Undo) takes the most recently undone (or redone) first. A page this window no longer
+    /// shows is turned all the same, and the status line names its file.
+    private func step(from source: ReferenceWritableKeyPath<DocumentViewerModel, [TurnChange]>,
+                      to destination: ReferenceWritableKeyPath<DocumentViewerModel, [TurnChange]>,
+                      applying turns: KeyPath<TurnChange, Int>, verb: String) {
+        guard !findFieldFocused, var change = self[keyPath: source].popLast() else { return }
+        writeTurns(change[keyPath: turns], path: change.path, page: change.page)
+        change.date = Date()
+        self[keyPath: destination].append(change)
+        let onScreen = change.path == currentFilePath && change.page == pagePairs.imagePageIndex(pair: pair)
+        tagStatus = onScreen ? "Rotation \(verb)."
+            : "Rotation \(verb) on \(URL(fileURLWithPath: change.path).lastPathComponent)."
     }
 
     /// The text extracted from the current pair's image page, when that pair has no OCR text page (a

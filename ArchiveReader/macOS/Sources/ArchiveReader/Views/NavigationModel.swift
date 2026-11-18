@@ -2488,6 +2488,14 @@ final class NavigationModel: ObservableObject {
         return Self.fileNames(undoGroups.last ?? [])
     }
 
+    /// When the change the next `undoLast()` reverts was made, read fresh from the ledger; for `redoLast()`, when
+    /// its undo was. A window's rotations are ordered against these, most recent first (W40.reader-rotate-undo).
+    func nextUndoDate() -> Date? { refreshUndoHistory(); return knownUndoDate }
+    func nextRedoDate() -> Date? { refreshUndoHistory(); return knownRedoDate }
+    /// The same from the history last read, without reading the ledger: for a menu title drawn in a view update.
+    var knownUndoDate: Date? { undoGroups.last?.map(\.timestamp).max() }
+    var knownRedoDate: Date? { redoGroups.last?.map(\.timestamp).max() }
+
     /// `nextUndoFileNames()` for `redoLast()`.
     func nextRedoFileNames() -> [String] {
         refreshUndoHistory()
