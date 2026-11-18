@@ -211,6 +211,14 @@ It was written after the label sheet (W47.ct-truth-jpeg) showed 36 photos turned
 fields it did not ask were checked at all; once it had a notes box, he left notes on 127 photos. The item-field sheet had the
 same three gaps until it was fixed the same day.
 
+**A boundary sheet asks about the pair, not the page (2026-11-18).** On the agreed-gap segmentation sheet
+(`seg_truth_audit.py`) the owner ruled three one-page documents continuations (Stanton 80|81, 100|101, 138|139) and
+reversed all three when shown the gap alone. The asked page stood between the red "?" and a bare "│ new" that belonged
+to the next gap, and the question asked whether the page "starts" a document. Since then the asked pair is one boxed
+group, every unasked mark names its own pair ("81|82 │ new"), the question reads "Does p. 81 belong to the same
+document as p. 80?", and where the next gap already starts a document the sheet says the page would be a document of
+one page. `prove_seg_truth_audit_sheet.py` checks each of these. A new boundary sheet follows the same pattern.
+
 
 ## Worktree isolation record
 

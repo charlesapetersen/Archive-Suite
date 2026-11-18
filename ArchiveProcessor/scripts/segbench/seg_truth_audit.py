@@ -275,31 +275,48 @@ def cmd_sheet(_a):
 
 
 SEP_TEXT = {"new": "│ new", "same": "· same", "card": "· card", "ask": "?"}
+# Owner, 2026-11-18: on this sheet he called three one-page documents continuations (Stanton 80|81, 100|101, 138|139)
+# and reversed all three when shown the gap alone. The asked page stood between the red ? and a bare "│ new" that
+# belonged to the next gap, and the question asked whether it "starts" a document. So the asked pair is now one boxed
+# group, every unasked mark names its own pair, the question asks whether the right page belongs with the left one,
+# and a page the next gap already separates is said to be a one-page document if it does not continue.
 
 
 def render_sheet(items, turned, close) -> str:
     cards = []
     for it in items:
-        cells = []
-        for p in it["strip"]:
-            cls = "gapL" if p["n"] == it["left"] else "gapR" if p["n"] == it["right"] else ""
+        cells, strip = [], it["strip"]
+        L, R = it["left"], it["right"]
+        for k, p in enumerate(strip):
             cap = f"p. {p['n']}" + (" (label card)" if p["label_photo"] else "")
-            cells.append(f'<figure class="page {cls}"><img src="{p["src"]}" data-r="{p["rotation"]}" '
-                         f'style="transform:rotate({p["rotation"]}deg)" loading="lazy"><figcaption>{cap} '
-                         f'<button type="button" class="turn">turn</button></figcaption></figure>')
-            if p["sep"]:
-                cells.append(f'<div class="sep {p["sep"]}">{SEP_TEXT[p["sep"]]}</div>')
+            fig = (f'<figure class="page"><img src="{p["src"]}" data-r="{p["rotation"]}" '
+                   f'style="transform:rotate({p["rotation"]}deg)" loading="lazy"><figcaption>{cap} '
+                   f'<button type="button" class="turn">turn</button></figcaption></figure>')
+            if p["n"] == L:
+                cells.append(f'<div class="asked"><div class="askedlabel">asked: p. {L} | p. {R}</div><div class="pair">')
+            cells.append(fig)
+            if p["n"] == R:
+                cells.append('</div></div>')
+            if p["sep"] == "ask":
+                cells.append(f'<div class="sep ask">?</div>')
+            elif p["sep"]:
+                nxt = strip[k + 1]["n"]
+                cells.append(f'<div class="sep {p["sep"]}" title="the gap p. {p["n"]}|{nxt}, not asked">'
+                             f'{p["n"]}|{nxt} {SEP_TEXT[p["sep"]]}</div>')
+        after = next((a["sep"] for a in strip if a["n"] == R), None)
+        alone = (f'<p class="alone">p. {R + 1} is already marked as starting another document, so if p. {R} does not '
+                 f'belong with p. {L} it is a document of one page.</p>') if after in ("new", "card") else ""
         listed = [f"p. {a['n']}|{b['n']}: {a['sep']}" for a, b in zip(it["strip"], it["strip"][1:])
                   if a["sep"] not in ("ask", None)]
         name = html.escape(it["id"])
         cards.append(f'''<section class="card" id="{name}">
-  <h2>{html.escape(it["box"])} {it["left"]}|{it["right"]} <span class="sub">is p. {it["right"]} the start of a new document,
-  or does it continue the document p. {it["left"]} is in? (outlined)</span></h2>
+  <h2>{html.escape(it["box"])} {L}|{R} <span class="sub">Does p. {R} belong to the same document as p. {L}?
+  (the boxed pair)</span></h2>
   <div class="strip">{"".join(cells)}</div>
-  <p class="unasked">Not asked, going in as listed (the truth as it stands): {html.escape("; ".join(listed)) or "none"}.</p>
+  {alone}  <p class="unasked">Not asked, going in as listed (the truth as it stands): {html.escape("; ".join(listed)) or "none"}.</p>
   <fieldset>
-    <label><input type="radio" name="{name}" value="new"> new document</label>
-    <label><input type="radio" name="{name}" value="continue"> continues</label>
+    <label><input type="radio" name="{name}" value="continue"> same document as p. {L}</label>
+    <label><input type="radio" name="{name}" value="new"> p. {R} starts a new document</label>
     <label><input type="radio" name="{name}" value="unsure"> can't tell</label>
     <input class="note" type="text" data-id="{name}" placeholder="note (optional): anything wrong here, a listed gap included">
   </fieldset>
@@ -318,10 +335,14 @@ h2 {{ font-size:17px; margin:0 0 8px; }} .sub {{ font-weight:400; color:var(--mu
 .strip {{ display:flex; align-items:center; gap:4px; overflow-x:auto; padding-bottom:6px; }}
 .page {{ margin:0; flex:0 0 auto; text-align:center; }}
 .page img {{ height:320px; width:auto; display:block; border:2px solid transparent; border-radius:4px; }}
-.gapL img, .gapR img {{ border-color:var(--gap); }}
+.asked {{ flex:0 0 auto; border:3px solid var(--gap); border-radius:8px; padding:4px 6px; }}
+.askedlabel {{ font-size:12px; font-weight:700; color:var(--gap); text-align:center; }}
+.pair {{ display:flex; align-items:center; gap:4px; }}
+.alone {{ font-size:13px; margin:4px 0; }}
 figcaption {{ font-size:12px; color:var(--muted); }} .turn {{ font-size:11px; }}
 .sep {{ flex:0 0 auto; font-size:11px; color:var(--muted); writing-mode:vertical-rl; padding:0 2px; }}
-.sep.new {{ color:var(--new); font-weight:600; }} .sep.ask {{ color:var(--gap); font-weight:700; font-size:16px; }}
+.sep {{ opacity:.75; }} .sep.new {{ color:var(--new); font-weight:600; }}
+.sep.ask {{ color:var(--gap); font-weight:700; font-size:16px; opacity:1; }}
 .unasked {{ font-size:13px; color:var(--muted); margin:4px 0; }}
 fieldset {{ border:0; padding:0; margin:8px 0 0; display:flex; flex-wrap:wrap; gap:6px 18px; }}
 .note, #snote {{ flex:1 1 260px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); }}
@@ -330,10 +351,11 @@ fieldset {{ border:0; padding:0; margin:8px 0 0; display:flex; flex-wrap:wrap; g
 </style></head><body>
 <h1>Segmentation truth audit: gaps every model agreed on</h1>
 <p class="intro">{len(items)} gaps from the Stanton and RG165 test boxes where all eleven segmentation routes made the
-same call. Until now the truth was re-checked only where a model disagreed. For each gap, outlined in red with a
-<b>?</b>, say whether the right-hand page starts a new document. The pages either side are context; the marks between
-them (<b>│ new</b>, <b>· same</b>, <b>· card</b> for a label photo) are the truth as it stands, not asked, and go in as
-listed: if one is wrong, say so in the note. The sheet does not show what the truth or the models say at the asked gap.
+same call. Until now the truth was re-checked only where a model disagreed. For each gap, the two pages in the red box
+are asked: does the right one belong to the same document as the left one? A page can be a document of one page. The
+pages either side are context; each mark between them names its own pair (<b>81|82 │ new</b>, <b>· same</b>,
+<b>· card</b> for a label photo), is the truth as it stands, not asked, and goes in as listed: if one is wrong, say so in
+the note. The sheet does not show what the truth or the models say at the asked gap.
 Pages were turned upright where Apple Vision was clear ({len(turned)} turned{": " + ", ".join(turned) if turned else ""});
 use "turn" on any still sideways. Answers save in this browser as you go; "Save answers" downloads them.</p>
 {"".join(cards)}

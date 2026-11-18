@@ -53,11 +53,21 @@ def main():
     check("unasked marks listed", "p. 8|9: same; p. 9|10: new; p. 11|12: same; p. 12|13: same" in page_html)
     check("label card listed", "p. 21|22: card" in page_html)
     check("no truth or consensus in the page", '"truth"' not in page_html and "consensus" not in page_html)
+    # The one-page trap (owner, 2026-11-18): the asked pair is one box, marks name their pair, the question asks
+    # whether the right page belongs with the left one, and a page the next gap separates is called a one-page document.
+    check("each asked pair is one box", page_html.count('class="asked"') == 3)
+    check("the question asks whether the right page belongs with the left",
+          "Does p. 11 belong to the same document as p. 10?" in page_html and "start of a new document" not in page_html)
+    check("an unasked mark names its own pair", "9|10 │ new" in page_html and "21|22 · card" in page_html)
+    check("the one-page note only where the next gap separates", page_html.count('class="alone"') == 1
+          and "if p. 21 does not belong with p. 20 it is a document of one page" in page_html)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(channel="chrome", headless=True)
         ctx = browser.new_context(accept_downloads=True)
         pg = ctx.new_page()
         pg.goto((out / "sheet/index.html").as_uri())
+        check("the box holds the two asked pages and the ?",
+              pg.locator("#a01 .asked figure").count() == 2 and pg.locator("#a01 .asked .sep.ask").count() == 1)
         pg.check('input[name="a01"][value="new"]')
         pg.check('input[name="a02"][value="continue"]')
         pg.check('input[name="a03"][value="unsure"]')
