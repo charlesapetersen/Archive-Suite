@@ -281,8 +281,81 @@ def signature() -> int:
     return 0
 
 
+def gutenocr_lines() -> int:
+    """GutenOCR-3B's lines (place_hands.py detect gutenocr; align gutenocr ctc-mccatmus) scored as place_hands_lines
+    scores every hypothesis, without rewriting its rows: only the gutenocr hypotheses are dragged here, and each is
+    paired page by page with the shipped placer's rows already in lines-rows.jsonl (DEFAULT, blla + McCATMuS conf)."""
+    import tempfile
+    from concurrent.futures import ThreadPoolExecutor
+    import place_hands as PH
+    import place_hands_lines as L
+    import subprocess
+    if not L.FUNCTIONAL.exists():
+        subprocess.run(["swiftc", "-O", str(HERE / "place_functional.swift"), "-o", str(L.FUNCTIONAL)], check=True)
+    ps = [t for t in PH.pages() if PH.keep(t)]
+    tls = {t["page"]: L.truth_lines(t) for t in ps}
+    exps = {(t["page"], r): L.expected(t, r, tls[t["page"]]) for t in ps for r in L.READINGS}
+    jobs = [(t, d) for d in sorted((L.CACHE / "hyp").glob("gutenocr.*")) for t in ps
+            if (d / f"{PH.key(t)}.json").exists() and exps.get((t["page"], d.name.split(".", 2)[2])) is not None]
+    work = Path(tempfile.mkdtemp(prefix="phl-lf-", dir=L.CACHE))
+    with ThreadPoolExecutor(int(os.environ.get("PHL_WORKERS", "6"))) as ex:
+        new = sum(ex.map(lambda td: L.score_one(td[0], td[1], tls[td[0]["page"]],
+                                                exps[(td[0]["page"], td[1].name.split(".", 2)[2])], work), jobs), [])
+    work.rmdir()
+    (WORK / "gutenocr-lines-rows.jsonl").write_text("".join(json.dumps(r) + "\n" for r in new))
+    rows = [r for r in L.load_rows() if r["detector"] != "gutenocr"] + new
+    keep = {L.DEFAULT, "ppocrv6.ctc-mccatmus-conf", "surya.ctc-mccatmus-conf", "orli.ctc-mccatmus-conf"}
+    out = {"item": "W46.licence-freed-sweep", "detector": f"{PH.GUTEN[0]}@{PH.GUTEN[1]} (CC BY-NC 4.0), LINES prompt",
+           "default": L.DEFAULT, "pairs": "pooled line pass, each route minus the default, page bootstrap", "tables": {}}
+    for w in L.WRITERS:
+        for g in PH.GROUPS:
+            for rd in L.READINGS:
+                tb = L.table([r for r in rows if r["writer"] == w], g, rd)
+                if tb:
+                    out["tables"][f"{w}|{g}|{rd}"] = [x for x in tb if x["route"] in keep or x["route"].startswith("gutenocr.")]
+    (RES / "licence-sweep-gutenocr.json").write_text(json.dumps(out, indent=1) + "\n")
+    for k, tb in out["tables"].items():
+        print(k)
+        for x in tb:
+            d = x["delta"]
+            print(f"  {x['route']:<34} {100 * x['passed'] / max(1, x['lines']):5.1f} ({x['passed']}/{x['lines']})"
+                  + (f"  {d[0]:+.1f} ({d[1]:+.1f} to {d[2]:+.1f})" if d else ""))
+    return 0
+
+
+def gutenocr_prep() -> int:
+    """GutenOCR-3B for mlx-vlm (run from the lab venv): its two bf16 shards hold no lm_head while the config says
+    untied; the repo's single-file copy carries one, range-read on 18 Nov and byte-identical to the shards'
+    embed_tokens. So a folder that links the shards, copies the small files (writable: the converter rewrites the
+    tokenizer) and declares the embeddings tied is exact. bf16 needs 7.5 GB and swapped past run-guarded's limit beside
+    other sessions, so mlx-vlm converts it to 8-bit (vision tower left in bf16: 9.8 bits a weight, 4.3 GB)."""
+    import shutil
+    import subprocess
+    import model_store
+    import place_hands as PH
+    src = model_store.snapshot(*PH.GUTEN)
+    tied = WORK / "gutenocr-3b-tied"
+    tied.mkdir(parents=True, exist_ok=True)
+    for f in src.iterdir():
+        if f.name == "config.json" or (tied / f.name).exists():
+            continue
+        if f.suffix == ".safetensors":
+            (tied / f.name).symlink_to(f.resolve())
+        else:
+            shutil.copyfile(f.resolve(), tied / f.name)
+    cfg = json.loads((src / "config.json").read_text())
+    cfg["tie_word_embeddings"] = True
+    cfg.setdefault("text_config", {})["tie_word_embeddings"] = True
+    (tied / "config.json").write_text(json.dumps(cfg, indent=1) + "\n")
+    if not (PH.GUTEN_MLX / "config.json").exists():
+        subprocess.run([sys.executable, "-m", "mlx_vlm", "convert", "--hf-path", str(tied), "--mlx-path",
+                        str(PH.GUTEN_MLX), "-q", "--q-bits", "8"], check=True)
+    print(PH.GUTEN_MLX)
+    return 0
+
+
 if __name__ == "__main__":
-    cmds = {"signature": signature, "layoutreader": layoutreader, "hunyuan-prep": hunyuan_prep, "readers": readers, "bln600": bln600}
+    cmds = {"gutenocr-prep": gutenocr_prep, "gutenocr-lines": gutenocr_lines, "signature": signature, "layoutreader": layoutreader, "hunyuan-prep": hunyuan_prep, "readers": readers, "bln600": bln600}
     if len(sys.argv) == 2 and sys.argv[1] in cmds:
         sys.exit(cmds[sys.argv[1]]())
     print(__doc__)

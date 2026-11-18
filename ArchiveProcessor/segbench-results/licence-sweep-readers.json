@@ -10,155 +10,155 @@
  "readers": {
   "hunyuanocr-1.5-bf16": {
    "name": "HunyuanOCR-1.5 bf16",
-   "pages": 9,
+   "pages": 25,
    "failed": 0,
-   "nes": 0.9055,
-   "wall_s_median": 37.21,
+   "nes": 0.8483,
+   "wall_s_median": 37.24,
    "mlx_peak_gb_max": 4.5,
    "by_kind": {
     "handwritten": {
-     "pages": 1,
-     "nes": 0.9149
+     "pages": 3,
+     "nes": 0.9172
     },
     "mixed": {
      "pages": 1,
      "nes": 0.3793
     },
     "printed": {
-     "pages": 1,
-     "nes": 0.9793
+     "pages": 5,
+     "nes": 0.7639
     },
     "typewritten": {
-     "pages": 6,
-     "nes": 0.9793
+     "pages": 16,
+     "nes": 0.8911
     }
    },
    "against": {
     "apple-vision": {
-     "pages": 9,
-     "base_nes": 0.8703,
-     "diff": 0.0352,
-     "lo": -0.048,
-     "hi": 0.1417
+     "pages": 25,
+     "base_nes": 0.8534,
+     "diff": -0.0051,
+     "lo": -0.0761,
+     "hi": 0.0713
     },
     "lightonocr-3-4b-mlx8": {
-     "pages": 9,
-     "base_nes": 0.9026,
-     "diff": 0.0029,
-     "lo": -0.0081,
-     "hi": 0.0166
+     "pages": 25,
+     "base_nes": 0.8559,
+     "diff": -0.0075,
+     "lo": -0.0476,
+     "hi": 0.0334
     },
     "paddleocr-vl1.6-bf16": {
-     "pages": 9,
-     "base_nes": 0.9274,
-     "diff": -0.0219,
-     "lo": -0.0846,
-     "hi": 0.0231
+     "pages": 25,
+     "base_nes": 0.8134,
+     "diff": 0.0349,
+     "lo": -0.0372,
+     "hi": 0.1132
     },
     "xiaomi-ocr-0-bf16": {
-     "pages": 9,
-     "base_nes": 0.9073,
-     "diff": -0.0019,
-     "lo": -0.0103,
-     "hi": 0.0046
+     "pages": 25,
+     "base_nes": 0.8477,
+     "diff": 0.0006,
+     "lo": -0.039,
+     "hi": 0.0442
     },
     "qwen3-vl-8b-mlx4": {
-     "pages": 9,
-     "base_nes": 0.8997,
-     "diff": 0.0057,
-     "lo": -0.0112,
-     "hi": 0.0255
+     "pages": 25,
+     "base_nes": 0.8243,
+     "diff": 0.024,
+     "lo": -0.0662,
+     "hi": 0.1229
     },
     "granite-docling-258m-mlx": {
-     "pages": 9,
-     "base_nes": 0.6232,
-     "diff": 0.2823,
-     "lo": 0.0589,
-     "hi": 0.5297
+     "pages": 25,
+     "base_nes": 0.6146,
+     "diff": 0.2337,
+     "lo": 0.1296,
+     "hi": 0.3482
     },
     "ppocrv6-medium": {
-     "pages": 9,
-     "base_nes": 0.8152,
-     "diff": 0.0902,
-     "lo": -0.0238,
-     "hi": 0.2393
+     "pages": 25,
+     "base_nes": 0.8239,
+     "diff": 0.0244,
+     "lo": -0.0479,
+     "hi": 0.1025
     }
    }
   },
   "fastvlm-0.5b-bf16": {
    "name": "FastVLM 0.5B bf16",
-   "pages": 52,
-   "failed": 26,
-   "nes": 0.2579,
-   "wall_s_median": 38.27,
+   "pages": 96,
+   "failed": 45,
+   "nes": 0.2806,
+   "wall_s_median": 3.71,
    "mlx_peak_gb_max": 2.05,
    "by_kind": {
     "handwritten": {
-     "pages": 13,
-     "nes": 0.25
+     "pages": 16,
+     "nes": 0.2314
     },
     "mixed": {
      "pages": 2,
      "nes": 0.3228
     },
     "printed": {
-     "pages": 11,
-     "nes": 0.0864
+     "pages": 28,
+     "nes": 0.1738
     },
     "typewritten": {
-     "pages": 26,
-     "nes": 0.3294
+     "pages": 50,
+     "nes": 0.3545
     }
    },
    "against": {
     "apple-vision": {
-     "pages": 52,
-     "base_nes": 0.8302,
-     "diff": -0.5724,
-     "lo": -0.6716,
-     "hi": -0.4775
+     "pages": 96,
+     "base_nes": 0.8307,
+     "diff": -0.5501,
+     "lo": -0.6278,
+     "hi": -0.469
     },
     "lightonocr-3-4b-mlx8": {
-     "pages": 52,
-     "base_nes": 0.8889,
-     "diff": -0.631,
-     "lo": -0.7255,
-     "hi": -0.5395
+     "pages": 96,
+     "base_nes": 0.8917,
+     "diff": -0.6111,
+     "lo": -0.6867,
+     "hi": -0.5314
     },
     "paddleocr-vl1.6-bf16": {
-     "pages": 52,
-     "base_nes": 0.8553,
-     "diff": -0.5975,
-     "lo": -0.7035,
-     "hi": -0.495
+     "pages": 96,
+     "base_nes": 0.8881,
+     "diff": -0.6075,
+     "lo": -0.6842,
+     "hi": -0.5278
     },
     "xiaomi-ocr-0-bf16": {
-     "pages": 52,
-     "base_nes": 0.8801,
-     "diff": -0.6222,
-     "lo": -0.7185,
-     "hi": -0.5295
+     "pages": 96,
+     "base_nes": 0.887,
+     "diff": -0.6064,
+     "lo": -0.6822,
+     "hi": -0.5267
     },
     "qwen3-vl-8b-mlx4": {
-     "pages": 52,
-     "base_nes": 0.8686,
-     "diff": -0.6107,
-     "lo": -0.7184,
-     "hi": -0.4989
+     "pages": 96,
+     "base_nes": 0.8967,
+     "diff": -0.6161,
+     "lo": -0.6937,
+     "hi": -0.5366
     },
     "granite-docling-258m-mlx": {
-     "pages": 52,
-     "base_nes": 0.5512,
-     "diff": -0.2933,
-     "lo": -0.4239,
-     "hi": -0.1665
+     "pages": 96,
+     "base_nes": 0.6207,
+     "diff": -0.3401,
+     "lo": -0.4319,
+     "hi": -0.2473
     },
     "ppocrv6-medium": {
-     "pages": 52,
-     "base_nes": 0.7604,
-     "diff": -0.5025,
-     "lo": -0.5993,
-     "hi": -0.407
+     "pages": 96,
+     "base_nes": 0.7685,
+     "diff": -0.4879,
+     "lo": -0.5616,
+     "hi": -0.4126
     }
    }
   }
