@@ -57,6 +57,7 @@ enum TagChangeStatus {
                 if parsed.sentWithUncertain { return .sentWithUncertain }
                 if parsed.qualityToken != nil { return .quality }
                 if parsed.itemTypeToken != nil { return .itemType }
+                if !parsed.checkedFields.isEmpty { return .checks }
                 if markerTokens.contains(where: { isSameTag($0, token) }) { return .colorTags }
                 return .subjects
             }
@@ -84,7 +85,8 @@ enum TagChangeStatus {
     private enum Field: String, CaseIterable {
         case readState = "Read state", year = "Year", month = "Month", day = "Day", decade = "Decade"
         case dateUncertain = "Date uncertain", sentWith = "Sent with", sentWithUncertain = "Sent with uncertain"
-        case quality = "Quality", itemType = "Item type", colorTags = "Color tags", subjects = "Subjects"
+        case quality = "Quality", itemType = "Item type", checks = "Checks", colorTags = "Color tags"
+        case subjects = "Subjects"
     }
 
     private static func values(_ tokens: [String]) -> String {

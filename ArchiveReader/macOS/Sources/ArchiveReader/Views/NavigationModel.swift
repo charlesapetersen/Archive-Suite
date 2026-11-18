@@ -2643,7 +2643,7 @@ final class NavigationModel: ObservableObject {
         let group = UUID()                       // §12: one ledger group, as it is one undo
         AuditLedger.withContext(group: group) {
             for f in files {
-                let delta = TagEditing.delta(for: op, given: f.tags)
+                let delta = TagEditing.userDelta(for: op, given: f.tags)   // a date edit is its check too
                 if delta.isEmpty { continue }
                 let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
                 do {
@@ -2739,7 +2739,7 @@ final class NavigationModel: ObservableObject {
 
     func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {
         guard let file = reverifyCacheRow(file) else { return }
-        applyDelta(TagEditing.delta(for: inLibrarySpelling(op), given: file.tags), to: file)
+        applyDelta(TagEditing.userDelta(for: inLibrarySpelling(op), given: file.tags), to: file)
     }
 
     /// An added subject is written in the library's spelling of it (`spellingForNewTag`).

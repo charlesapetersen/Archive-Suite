@@ -24,11 +24,60 @@ public enum TagEditOp: Sendable, Equatable {
     /// clears its uncertain flag, which means nothing on its own.
     case setSentWith(ArchiveDate?)
     case setSentWithUncertain(Bool)
+    /// W40.reader-field-status: mark a field checked (its `Checked <Field>` tag) or not, without changing its value.
+    case setChecked(CheckableField, Bool)
 }
 
 public enum TagEditing {
+    /// The delta for a user's own edit in an editor (the Reader's Inspector): `delta(for:given:)`, plus the check a
+    /// change to a date is (SPEC §"Field checks"). A change that leaves a date adds its `Checked …` tag; one that
+    /// clears it, or marks it uncertain, removes it; an op that writes nothing checks nothing. One delta, so one
+    /// write and one undo.
+    public static func userDelta(for op: TagEditOp, given tags: DocumentTags) -> TagDelta {
+        let delta = delta(for: op, given: tags)
+        guard !delta.isEmpty, let (field, leavesValue) = checkEffect(of: op, given: tags) else { return delta }
+        return leavesValue ? adding(check: field, to: delta, given: tags) : removing(check: field, from: delta, given: tags)
+    }
+
+    /// Which date an op changes, and whether that date still has a value after it.
+    private static func checkEffect(of op: TagEditOp, given tags: DocumentTags) -> (CheckableField, Bool)? {
+        switch op {
+        case .setDate(let d): return (.date, d != nil)
+        case .setYear(let y): return (.date, y != nil || tags.decade != nil)
+        case .setMonth, .setDay: return (.date, tags.year != nil || tags.decade != nil)
+        // Saying a date is uncertain takes back its check; saying it is certain checks it.
+        case .setDateUncertain(let on): return (.date, !on && (tags.year != nil || tags.decade != nil))
+        case .setSentWith(let d): return (.sentWith, d != nil)
+        case .setSentWithUncertain(let on): return (.sentWith, !on && tags.sentWith != nil)
+        default: return nil
+        }
+    }
+
+    private static func adding(check field: CheckableField, to delta: TagDelta, given tags: DocumentTags) -> TagDelta {
+        guard !tags.checkedFields.contains(field) else { return delta }
+        var d = delta
+        d.add.append(field.token)
+        return d
+    }
+
+    private static func removing(check field: CheckableField, from delta: TagDelta, given tags: DocumentTags) -> TagDelta {
+        var d = delta
+        d.remove += tokens(in: tags) { CheckableField(token: $0) == field }
+        return d
+    }
+
+    /// The delta for one op: the value change alone, with no check added or removed (`setChecked` aside).
     public static func delta(for op: TagEditOp, given tags: DocumentTags) -> TagDelta {
         switch op {
+        case .setChecked(let field, let on):
+            if on {
+                // A date is checked only where there is one, so a group's "check all" skips the undated files.
+                // Item fields are on page 2, which tags cannot see: the caller checks only a value it shows.
+                let hasNoValue = (field == .date && tags.year == nil && tags.decade == nil)
+                    || (field == .sentWith && tags.sentWith == nil)
+                return tags.checkedFields.contains(field) || hasNoValue ? TagDelta() : TagDelta(add: [field.token])
+            }
+            return TagDelta(remove: tokens(in: tags) { CheckableField(token: $0) == field })
         case .addSubject(let s):
             let t = s.trimmingCharacters(in: .whitespaces)
             return t.isEmpty ? TagDelta() : TagDelta(add: [t])

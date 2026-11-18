@@ -45,6 +45,8 @@ struct TagEditorView: View {
                     Divider()
                     dateSection(s, files)
                     Divider()
+                    FieldStatusSection(files: files, apply: apply)
+                    Divider()
                     qualitySection(s)
                     Divider()
                     itemTypeSection(s, files)

@@ -107,7 +107,8 @@ final class PhantomSelectionTests: XCTestCase {
         selectAll(in: model)
         XCTAssertEqual(model.selectedFiles.map(\.url.lastPathComponent), ["beta.pdf"])
         model.applyEdit(.setYear(1962), paths: draftPaths)
-        XCTAssertEqual(try tagsOnDisk(fixture.files[0]), ["Unread", "Smith", "1962"])
+        // The user's date edit checks the date too (W40.reader-field-status).
+        XCTAssertEqual(try tagsOnDisk(fixture.files[0]), ["Unread", "Smith", "1962", "Checked Date"])
         XCTAssertEqual(try tagsOnDisk(fixture.files[1]), ["Unread", "Smith"], "old draft never writes the new selection")
         XCTAssertTrue(model.showingEditor, "the inspector stays open while browsing")
         model.undoLast()

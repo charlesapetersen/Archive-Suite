@@ -423,6 +423,7 @@ struct FacetState: Equatable, CustomStringConvertible {
         case .setItemType(let t): itemType = t
         case .setSentWith(let d): sentWith = d
         case .setSentWithUncertain: break
+        case .setChecked: break   // a check is its own facet; no value changes
         case .addSubject(let s):
             let t = s.trimmingCharacters(in: .whitespaces)
             if !t.isEmpty, !subjects.contains(t) { subjects = (subjects + [t]).sorted() }

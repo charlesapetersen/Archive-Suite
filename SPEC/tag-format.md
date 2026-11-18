@@ -90,6 +90,7 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Sent With Date Uncertain** | literal `Sent With Date Uncertain` (exact case) | 0–1 | Speculative sent-with date. Independent of `Date Uncertain`; written only beside a `Sent With` value, and cleared with it. |
 | **Quality** *(the rating facet)* | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **The single importance/quality rating (W19, 2026-07-18) — MERGED with + supersedes the legacy Priority facet** (`Q3` = old `P10`). A human 0–3 rating; **`Q0`/unrated writes NO tag** (absence *is* 0 stars, so the wire only ever carries `Q1`/`Q2`/`Q3`). Human-set everywhere, **never LLM-emitted**: Notes (front-matter `quality`), Reader (edit), Processor's interactive tagging (Live Capture tag card + Process Files manual tagging), and the **phone companions** (per-page/segment — the old priority control now emits `Q`). Q-prefix can never collide with the digits-only Year test. |
 | **Priority** *(legacy → Quality)* | `P7`–`P10`, on pre-W19 files only | 0–1 | **RETIRED — merged into Quality (W19, 2026-07-18).** No longer written by any app or companion. **Read-only alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3` and `P7` as unrated, so pre-W19 phone-captured files still resolve without a corpus rewrite. |
+| **Field check** *(W40.reader-field-status)* | `Checked <Field>`: `Checked Date`, `Checked Sent With`, `Checked Document Kind`, `Checked Title`, `Checked Byline`, `Checked Publication`, `Checked Publication Date`, `Checked Recipient Place` | 0–8 | The user has checked that field's current value (§Field checks). Whole token, case-insensitive, surrounding spaces ignored, like `Date Uncertain`; any other `Checked …` stays a subject. Never a subject, never in the tag cloud. Core: `CheckableField` (`Tags/FieldCheck.swift`), `DocumentTags.checkedFields`. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
 | **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). OCR failures carry `OCR Failed`; a person flags inadequate transcription with `OCR Poor` (below). |
 | **Item type** | literal `Box` or `Folder` (exact spelling) | 0–1 | A photo of a box label or of a folder label (§Item type). Last token wins; an earlier one reads as a subject, but the words are reserved, so setting the type removes every `Box`/`Folder` token. `box`, `BOX`, `" Box "` are subjects. |
@@ -110,6 +111,38 @@ empty list. Removal targets only that token's identity, preserving unrelated sub
 the shared flag-generation protocol and acceptance clearing (the Processor) are in
 [`improve-ocr.md`](improve-ocr.md); this contract alone does not authorize an automatic flag clear. Acceptance may clear only the reviewed generation;
 cancel/reject/failure leaves the flag. Improve OCR also works without a flag and never adds it implicitly.
+
+**Field checks (W40.reader-field-status, owner 2026-11-13).** A `Checked <Field>` tag says the user has looked at
+that field's current value and accepts it; it never holds the value. The fields are the item's dates (from its tags)
+and the page-2 item fields (§2-page PDF, "Item fields"). Container fields carry no tag: their check is a `user` value in
+the container file (`SPEC/containers.md`).
+- **Only a person's action writes one**: "Mark checked" in the Reader's Inspector, or the user's own change to a date's
+  value there (`TagEditing.userDelta`), which checks that date in the same write and undo step. Clearing a date, or
+  marking it uncertain, removes its check; marking it certain checks it. A date is checked only on a file that has one. Models, routes and imports never
+  write a check, and a writer that sets a value other than by the user's edit writes none. `TagEditing.delta` (the
+  value change alone) never adds one.
+- **Unchecking** removes every spelling of that one token (the writer matches case-insensitively, which is why every
+  spelling reads as the check). No other edit touches a check. "Copy source tags" passes them through verbatim with
+  the rest, so a check copied onto new output is the source's; the output's own item fields are not re-checked by it
+  in any sense but the tag's (an accepted limit: sources are rarely checked PDFs). A check whose field has no value
+  shows nothing and is left as it is.
+- **What an app shows** for each value (`FieldStatusPolicy`, ArchiveCore; `FieldStatusBadge`, ArchiveCoreUI): one of
+  three states, each a label and a symbol of its own as well as a colour, so the state never rests on colour alone:
+  **Checked** (green), **Unchecked** (yellow; from a route the bench measured clearing the fill rule: Wilson lower
+  bound 0.85, point 0.90, 40 owner-checked pairs) and **Unchecked, lower confidence** (red; below the rule or not
+  measured). The cut is the rule the Processor writes item fields by, and every figure shown is a measured one:
+  the item fields written (kind, byline, publication, publication date, recipient place) clear it on the image
+  prompt's stratified precision, which the verdict rests on (`segbench-results/item-fields-score.md`); title is below
+  it (0.91 [0.83, 0.94]); no evidence
+  class of the dating route clears it (text 139/158 exact, image 10/12, estimate 35/51;
+  `segbench-results/date-route-pipeline.md`), and the class comes from the page's `Date evidence:` line (none: text
+  or not recorded); the covering letter's date is not measured on its own. Of the container label reads
+  (`segbench-results/ct-read.md`) only Vision + parser's box number on a box photo clears it (70 of 71, upright photos);
+  its box number on a folder photo is 28 of 35, and every other field and reader falls short. Path values are not
+  measured on the owner's folders. A `user` container value is checked. A value's own `confidence` is shown as a hint and never ranks it. When a new measurement moves a
+  field across the rule, the table moves with it, in the same commit.
+- Display only for every other purpose: a check never drives a write of anything but itself. No migration is written
+  because there is nothing to migrate.
 
 **Two tokens for one date facet.** Year, Month, Day, Decade and Sent With are 0–1. When a file carries
 two tokens that parse as the same one, the **last wins** and each earlier one is demoted to a subject,

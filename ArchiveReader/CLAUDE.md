@@ -19,7 +19,7 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
   or **location** — ever.
 - The app **MUST NOT** mangle, drop, or lose any tag *unintentionally*.
 - The app **MAY edit macOS Finder tags** — add / remove / change subject, date, quality, color,
-  and read-state tags, for a single file **or a group** — but **only** as a *deliberate user
+  read-state and field-check (`Checked <Field>`) tags, for a single file **or a group** — but **only** as a *deliberate user
   action*, routed through one audited choke-point (`TagWriter`), applied as a precise **delta**
   (add-set / remove-set) to a **freshly-read** tag array, and **verified** afterward. Finder-tag
   (extended-attribute) metadata is the only change to existing archive files; their **bytes and

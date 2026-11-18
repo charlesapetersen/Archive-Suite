@@ -92,6 +92,9 @@ public struct DocumentTags: Sendable, Equatable {
     public var sentWithUncertain: Bool
     public var sentWithToken: String?
 
+    /// W40.reader-field-status: the fields whose `Checked <Field>` tag the file carries (`CheckableField`).
+    public var checkedFields: Set<CheckableField>
+
     public init(
         raw: [String], labelNumber: Int?,
         year: Int?, month: Month?, day: Int?, dateUncertain: Bool, decade: Int?,
@@ -99,7 +102,8 @@ public struct DocumentTags: Sendable, Equatable {
         yearToken: String?, monthToken: String?, dayToken: String?, decadeToken: String?,
         qualityToken: String?,
         sentWith: ArchiveDate? = nil, sentWithUncertain: Bool = false, sentWithToken: String? = nil,
-        itemTypeToken: String? = nil, itemTypeFromColour: ItemType? = nil
+        itemTypeToken: String? = nil, itemTypeFromColour: ItemType? = nil,
+        checkedFields: Set<CheckableField> = []
     ) {
         self.raw = raw; self.labelNumber = labelNumber
         self.year = year; self.month = month; self.day = day
@@ -115,6 +119,7 @@ public struct DocumentTags: Sendable, Equatable {
         self.qualityToken = qualityToken
         self.sentWith = sentWith; self.sentWithUncertain = sentWithUncertain
         self.sentWithToken = sentWithToken
+        self.checkedFields = checkedFields
     }
 
     /// Chronological sort key. **No epoch limit** (medieval-safe). The item's OWN date sorts; when it
@@ -231,6 +236,7 @@ public struct DocumentTags: Sendable, Equatable {
             if ReadState.allCases.contains(where: { $0.rawValue.caseInsensitiveCompare(s) == .orderedSame }) { return false }
             if s.caseInsensitiveCompare("Date Uncertain") == .orderedSame { return false }
             if s == SentWithTag.uncertainToken { return false }
+            if CheckableField(token: s) != nil { return false }
             if excluded.contains(token) { return false }
             return true
         }
@@ -279,6 +285,7 @@ extension DocumentTags {
 
         var itemTypeToken: String?
         var tokenType: ItemType?
+        var checkedFields = Set<CheckableField>()
         let label = FinderLabel(labelNumber: labelNumber)
 
         for token in raw {
@@ -298,6 +305,11 @@ extension DocumentTags {
             if let d = SentWithTag.parse(s) {
                 if let prev = sentWithToken { subjects.append(prev) }
                 sentWith = d; sentWithToken = token
+                continue
+            }
+            // A field check (W40.reader-field-status): `Checked Date`, `Checked Publication`.
+            if let f = CheckableField(token: s) {
+                checkedFields.insert(f)
                 continue
             }
             // Date Uncertain.
@@ -363,7 +375,8 @@ extension DocumentTags {
             yearToken: yearToken, monthToken: monthToken, dayToken: dayToken, decadeToken: decadeToken,
             qualityToken: qualityToken,
             sentWith: sentWith, sentWithUncertain: sentWithUncertain, sentWithToken: sentWithToken,
-            itemTypeToken: itemTypeToken, itemTypeFromColour: fromColour
+            itemTypeToken: itemTypeToken, itemTypeFromColour: fromColour,
+            checkedFields: checkedFields
         )
     }
 
