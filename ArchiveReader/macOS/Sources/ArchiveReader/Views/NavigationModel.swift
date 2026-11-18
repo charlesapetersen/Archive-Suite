@@ -1928,18 +1928,22 @@ final class NavigationModel: ObservableObject {
     /// rows and scrolls to the first. A read filter left by the default that would hide one of them is
     /// lifted too, since a row not shown is not among its neighbours. A move for Back, which returns to the
     /// search with its selection.
+    /// The list is built off main at corpus size, as choosing All Files is; the selection is put back as a Back's
+    /// is, once the list is presented. It is emptied first so that putting it back scrolls to it.
     func showInAllFiles() {
         let ids = selection
         guard !ids.isEmpty else { return }
+        let leaving = visit, files = selectedFiles
         clearUserFilters(recompute: false)
-        setFolderScope(nil)
-        recompute()
-        if filter.read != .all, !ids.isSubset(of: Set(displayed.lazy.map(\.id))) {
-            filter.read = .all
-            recompute()
-        }
-        selection = ids.intersection(displayed.lazy.map(\.id))
-        if let first = displayed.first(where: { ids.contains($0.id) }) { requestScroll(to: first.id) }
+        if scope != nil { exitScope() }
+        filter.pathPrefix = nil
+        if !files.allSatisfy(filter.matches) { filter.read = .all }
+        selection = []
+        recomputeInBackground()
+        recordMove(leaving: leaving)
+        pendingVisitSelection = (.folder(nil), ids, selection)
+        visitAwaitsList = listBuildPending
+        reapplyVisitSelection()
     }
 
     // MARK: Back and Forward (W40.reader-back-forward)

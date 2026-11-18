@@ -60,6 +60,39 @@ final class BackForwardUITests: FixtureUITestCase {
         XCTAssertTrue(waitForRowCount(1), "and its Forward forward")
     }
 
+    /// W40.reader-show-in-all-files: a row's menu ▸ Show in All Files lists it among its neighbours, still selected,
+    /// and ⌘[ goes back to where it was found.
+    func testShowInAllFilesFromAFolderSelectsTheRowAmongItsNeighbours() throws {
+        waitForRows(minimum: 5, timeout: 10)
+        let allFiles = app.staticTexts.matching(identifier: "ar.sidebar.allFiles").firstMatch
+        if !allFiles.exists { toolbarButton("ar.toolbar.sidebar").click() }
+        XCTAssertTrue(allFiles.waitForExistence(timeout: 5))
+        allFiles.click()
+        settle(1)
+        let everything = table.tableRows.count
+        XCTAssertGreaterThan(everything, 1)
+        let showItem = app.menuItems["Show in All Files"]
+        visiblePoint(of: clickRow(0)).rightClick()
+        XCTAssertTrue(app.menuItems["Reveal in Finder"].waitForExistence(timeout: 5), "the row's menu opens")
+        XCTAssertFalse(showItem.exists, "All Files with nothing narrowing it does not offer the item")
+        app.typeKey(.escape, modifierFlags: [])
+
+        let folder = app.descendants(matching: .any).matching(identifier: "ar.sidebar.folder").firstMatch
+        XCTAssertTrue(folder.waitForExistence(timeout: 5))
+        folder.click()
+        XCTAssertTrue(waitForRowCount(1), "Box 2 contains one fixture file")
+        visiblePoint(of: clickRow(0)).rightClick()
+        XCTAssertTrue(showItem.waitForExistence(timeout: 5), "the row's menu offers Show in All Files")
+        captureScreenshot("w40-show-in-all-files-menu")
+        showItem.click()
+        XCTAssertTrue(waitForRowCount(everything), "All Files is listed")
+        wait("with the file still selected") { selectedRows.count == 1 }
+        captureScreenshot("w40-show-in-all-files-shown")
+
+        pressKey("[", modifiers: .command)
+        XCTAssertTrue(waitForRowCount(1), "⌘[ returns to the folder")
+    }
+
     func testBackAndForwardRetraceAThumbnailJumpInTheDocumentWindow() throws {
         waitForRows(minimum: 3, timeout: 10)
         clickRow(0)

@@ -128,6 +128,32 @@ final class SmartFolderDeleteTests: XCTestCase {
         await indexer.closeForTesting()
     }
 
+    /// W40.reader-show-in-all-files: Show in All Files from an open smart folder builds All Files off the main
+    /// thread too, and selects the same rows and scrolls to the first once it is presented.
+    func testShowInAllFilesBuildsOffTheMainThreadAndSelectsTheRowsOnceListed() async throws {
+        let (model, indexer) = await makeModel()
+        let open = try XCTUnwrap(model.savedSearches.add(name: "Box 12", search: box12()))
+        model.applyScope(try XCTUnwrap(model.savedSearches.searches.first { $0.id == open }))
+        await model.listPresented()
+        XCTAssertEqual(model.displayed.count, 500, "precondition: the folder is open")
+        let picked = Set(model.displayed[200...201].map(\.id))
+        model.selection = picked
+        let backBefore = model.placeHistory.back.count
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        ReaderStages.recorder.reset(recording: true)
+        model.showInAllFiles()
+        XCTAssertNil(model.scope, "the folder is left at once")
+        await model.listPresented()
+        XCTAssertEqual(model.displayed.count, 1_500, "the list shows All Files")
+        XCTAssertEqual(stage("presentation.build", onMain: true), 0, "no whole-list build on the main thread")
+        XCTAssertEqual(model.selection, picked, "the same rows are selected among their neighbours")
+        let first = try XCTUnwrap(model.displayed.first { picked.contains($0.id) })
+        XCTAssertEqual(model.scrollTargetID, first.id, "and the first is scrolled to")
+        XCTAssertEqual(model.placeHistory.back.count, backBefore + 1, "a move for Back")
+        await indexer.closeForTesting()
+    }
+
     /// A folder with a text rule opens sorted by relevance, and leaving it puts the sort back. The window's
     /// change handler for the sort then ran a whole-list build on the main thread, undoing the background one.
     func testDeletingAnOpenRelevanceSortedFolderStaysOffTheMainThread() async throws {
