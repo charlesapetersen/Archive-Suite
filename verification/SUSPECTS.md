@@ -757,6 +757,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-18 W40.d1 — raised.
+  - 2026-11-18 W40.d1 — still `open`: the paid run went through OpenRouter (Qwen3.8 Flash), not the gateway; there the
+    metered ceiling, $0.1056 for 113 photos in 195 calls, ran under the estimate of $0.1267. The gateway's dating and
+    item-field calls are still unmeasured.
 
 ### S-042 · A failed tagging call leaves a document untagged, and the run still reports it tagged
 

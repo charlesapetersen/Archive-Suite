@@ -8,7 +8,8 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b3`, 2026-10-21.
   checklist §2.0-2.14, Tier 2D driver list), `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` (Runs A-C, Mac side
   only), and `SPEC/tag-format.md` (§Invariants 3, 5, 6, 7 and §2-page PDF structure).
 - **Sources read at:** `8a03097c`; code traced at the same commit.
-- **Count:** `unproven 51 · works 2` (works: P-45, taken in from `W40.d6`; P-53, `W48.appearance-verify`).
+- **Count:** `unproven 42 · works 8 · broken 2 · unverifiable-here 1` (2026-11-18, after `W40.d1`; works: P-19, P-27,
+  P-33, P-34, P-45, P-47, P-50, P-53; broken: P-23, P-29).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first, before any
 implementation file was opened (`d3db14f3`). The rest was traced afterwards by four read-only passes, and every
@@ -515,10 +516,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-tier2.sh` with `scripts/tier2_assert.py:88-90` (two pages, page-2 header) — paid,
   live key. `scripts/test-dual-date.sh` covers the source-date lines. Not covered: the no-text body, Recitation,
   a long text on one page. (Reader's render guards read Processor's format, not this generator's output.)
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** W40.d1, 2026-11-18: 113 two-page PDFs from the whole RG 165 box (OpenRouter, Qwen3.8 Flash), all with the
+  sentinel and provenance line; the 18 that got a `Date evidence:` line have their source-name line changed (U+00A0
+  to a space) and a broken xref entry ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
+- **Status:** `broken` — `W40.fix-processor-evidence-rewrite-name` (S3)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d1 — `unproven` → `broken`: the date-evidence rewrite changes the source-name line on 18 of 113 outputs.
 
 ### P-24 · Multi-page documents merged into one PDF
 
@@ -582,10 +586,11 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `SegmentJSONBuilder.buildData`. Live: `Capture/LiveCaptureProcessor.swift:1164`.
 - **Real-path test:** `scripts/test-segment-json.sh` (builder byte-identity), `scripts/test-dual-date.sh` (W37 keys);
   `scripts/tier2_assert.py:93` checks the sidecar exists (paid). Nothing runs with the toggle off.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** W40.d1, 2026-11-18: every document start of the 113-photo run has its sidecar ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
+- **Status:** `works`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d1 — `unproven` → `works`: the bulk run, toggle on (the default).
 - **Notes:** ships on, though README says "optional". The two write sites disagree about box and folder segments:
   `:622` writes them with a label override, the late path (`:1174`) skips them.
 
@@ -623,10 +628,12 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`OCR/MistralClient.swift:60`).
 - **Real-path test:** `scripts/test-tier2.sh` cases 03-04 (paid; ground truth only warns below 60%). Nothing
   exercises the Mistral heuristic.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** W40.d1, 2026-11-18: 110 of 113 photos classified, 97 as the truth has them; 3 replies that were not a
+  reading kept as the page text with no classification and the job `succeeded` ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
+- **Status:** `broken` — `W40.fix-processor-non-reading-reply` (S3)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d1 — `unproven` → `broken`: a non-reading reply leaves the image unclassified and counted as succeeded.
 - **Notes:** **Drift.** For pre-OCRed PDFs Mistral classifies with a `mistral-small-latest` chat call
   (`OCR/OCRProcessor+OCR.swift:614-615`), not heuristics. Apple Vision returns no classification
   (`OCR/VisionClient.swift:112-114`) unless its LLM judgement is on.
@@ -712,10 +719,12 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-tier2.sh` cases 03-05 with `scripts/tier2_assert.py:113-121` (paid; month and
   subject count only warn). ArchiveCore `GeneratedTagsTests` covers ordering. Nothing covers the prompt or the
   reply parse.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** W40.d1, 2026-11-18: 62 segments tagged; every document has a year or `Date Uncertain`, one month at
+  most in its exact form, and 2-6 subjects ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
+- **Status:** `works`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d1 — `unproven` → `works`: Automatic tagging on the whole box (S-042, the failed-call path, stays open).
 - **Notes:** "never an estimated month" and "2-6 subjects" are prompt rules only (`Tagging/TagGenerator.swift:61`,
   `:64`); code enforces only the cap of 6 (`Tagging/ControlledVocabulary.swift:14`). Suspect `S-033`.
 
@@ -733,11 +742,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   trailing `Unread`, a "Red Scare" subject stays a subject, copy-source is verbatim, a missing file throws.
   `scripts/test-processfiles-tagwarn.sh` covers `writeOutputTags`, a refused write and the colour helpers.
   `scripts/test-tier2.sh` + `tier2_assert.py:103-111` checks a whole run (paid).
-- **Runtime evidence:** partial, Live Capture only: `W40.a3-phone-e2e.md` checked Finder tags on three real outputs
-  (`evidence/capture/W40.a3-phone-e2e.md`). Process Files has none.
-- **Status:** `unproven`
+- **Runtime evidence:** Live Capture: `W40.a3-phone-e2e.md` (`evidence/capture/W40.a3-phone-e2e.md`). Process Files: W40.d1,
+  2026-11-18, 113 outputs: tag xattrs equal the guest's reading byte for byte, `Unread` once and last, label photos
+  their `Box`/`Folder` token and no colour ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
+- **Status:** `works`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d1 — `unproven` → `works` for Process Files. The promise's Red and Purple are drift (the SPEC dropped them with W40.suite-item-types).
 - **Notes:** ArchiveCore `MacOSTaggerParityTests` tests a copy of the transform, not the Processor adapter, so it is
   not a real-path test.
 
@@ -849,6 +860,7 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d1 — stays `unproven`: the headless driver answers the gate with no sheet drawn; `W40.d2` drives the dialogs.
 - **Notes:** it lists only pages already classed box or folder, so a box photo misread as a document is caught only
   by the per-page dialog. Skipped in the manual window, for Live Capture pre-grouped runs and in a resumed batch
   (S-035).
