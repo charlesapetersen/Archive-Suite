@@ -538,11 +538,27 @@ class FingerprintAndCompleted(Fixture):
     def test_completed_matches_the_daemon(self):
         r = self.hook("completed")
         self.assertEqual((r.returncode, r.stdout), (0, "3\n"))   # A.done, T.0, T.old
-        script = 'REPO="$1"; PLAN="$2"\n%s\ncompleted_items\n' % self.daemon_function("_tracker_ticks",
+        script = 'REPO="$1"; PLAN="$2"\n%s\ncompleted_items\n' % self.daemon_function("_tracker_body",
                                                                                       "completed_items")
         theirs = run(["/bin/bash", "-c", script, "x", self.repo,
                       os.path.join(self.repo, ".maintenance", "AUTONOMOUS_PLAN.md")]).stdout
         self.assertEqual(r.stdout, theirs)
+
+    def test_completed_counts_an_item_once(self):
+        # 2026-11-17: a finished item is ticked in the WORK QUEUE and moved to SUITE_TODO_DONE.md in one commit;
+        # adding the trackers' tick counts reported 12 finished for 6. Tag or title, an item counts once; a
+        # second archive entry for a reopened item still counts.
+        self.write("SUITE_TODO_DONE.md", "- [x] **T.old — archived**\n- [x] **`A.done` — finished**\n"
+                                         "- [x] **T.0 — done**\n- [x] **T.old — reopened, done again**\n")
+        self.assertEqual(self.hook("completed").stdout, "4\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md",
+                   PLAN.replace("- [x] **A.done — finished**",
+                                "- [x] **A.done — finished**\n- [x] **Untagged sweep — remainder** shipped"))
+        self.assertEqual(self.hook("completed").stdout, "5\n")
+        self.write("SUITE_TODO_DONE.md", "- [x] **T.old — archived**\n- [x] **`A.done` — finished**\n"
+                                         "- [x] **T.0 — done**\n- [x] **T.old — reopened, done again**\n"
+                                         "- [x] **Untagged sweep — remainder** · §Ops\n")
+        self.assertEqual(self.hook("completed").stdout, "5\n")
 
 
 class Gate(Fixture):
