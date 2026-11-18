@@ -1,0 +1,350 @@
+{
+ "sets": {
+  "owner": 272,
+  "undated": 90
+ },
+ "threshold": 3,
+ "owner_scored": 227,
+ "owner_no_candidate": 55,
+ "owner_with_candidate": 172,
+ "missing_8b": [],
+ "eight_b_replies_no_candidate": 115,
+ "no_candidate_all": 115,
+ "arms": {
+  "a": {
+   "no_candidate": {
+    "n": 55,
+    "exact": {
+     "k": 33,
+     "n": 55,
+     "pct": 60.0,
+     "ci": [
+      46.8,
+      71.9
+     ]
+    },
+    "wrong_explicit": 0,
+    "wrong_flagged": 19,
+    "no_year": 3
+   },
+   "all_owner": {
+    "n": 227,
+    "exact": {
+     "k": 161,
+     "n": 227,
+     "pct": 70.9,
+     "ci": [
+      64.7,
+      76.4
+     ]
+    },
+    "wrong_explicit": 44,
+    "wrong_flagged": 19,
+    "no_year": 3
+   },
+   "du_vs_owner": {
+    "certain_flagged": {
+     "k": 27,
+     "n": 183,
+     "pct": 14.8,
+     "ci": [
+      10.3,
+      20.6
+     ]
+    },
+    "uncertain_unflagged": {
+     "k": 16,
+     "n": 41,
+     "pct": 39.0,
+     "ci": [
+      25.7,
+      54.3
+     ]
+    }
+   },
+   "undated": {
+    "n": 90,
+    "by_class": {
+     "estimate": 31,
+     "text": 55,
+     "none": 4
+    },
+    "explicit": 55,
+    "owner_ruled": {
+     "documents_ruled": 20,
+     "explicit_ruled": 17,
+     "false": 6
+    },
+    "model_scored": {
+     "explicit_unruled": 38,
+     "false": 14
+    },
+    "false_year": {
+     "k": 20,
+     "n": 90,
+     "pct": 22.2,
+     "ci": [
+      14.9,
+      31.8
+     ]
+    },
+    "estimates": 31
+   }
+  },
+  "c_strict": {
+   "no_candidate": {
+    "n": 55,
+    "exact": {
+     "k": 32,
+     "n": 55,
+     "pct": 58.2,
+     "ci": [
+      45.0,
+      70.3
+     ]
+    },
+    "wrong_explicit": 1,
+    "wrong_flagged": 19,
+    "no_year": 3
+   },
+   "all_owner": {
+    "n": 227,
+    "exact": {
+     "k": 160,
+     "n": 227,
+     "pct": 70.5,
+     "ci": [
+      64.2,
+      76.0
+     ]
+    },
+    "wrong_explicit": 45,
+    "wrong_flagged": 19,
+    "no_year": 3
+   },
+   "du_vs_owner": {
+    "certain_flagged": {
+     "k": 26,
+     "n": 183,
+     "pct": 14.2,
+     "ci": [
+      9.9,
+      20.0
+     ]
+    },
+    "uncertain_unflagged": {
+     "k": 17,
+     "n": 41,
+     "pct": 41.5,
+     "ci": [
+      27.8,
+      56.6
+     ]
+    }
+   },
+   "undated": {
+    "n": 90,
+    "by_class": {
+     "estimate": 30,
+     "text": 55,
+     "none": 4,
+     "image": 1
+    },
+    "explicit": 56,
+    "owner_ruled": {
+     "documents_ruled": 20,
+     "explicit_ruled": 18,
+     "false": 6
+    },
+    "model_scored": {
+     "explicit_unruled": 38,
+     "false": 14
+    },
+    "false_year": {
+     "k": 20,
+     "n": 90,
+     "pct": 22.2,
+     "ci": [
+      14.9,
+      31.8
+     ]
+    },
+    "estimates": 30
+   },
+   "paired_no_candidate": {
+    "n": 55,
+    "a_exact": 32,
+    "b_exact": 33,
+    "a_only": 0,
+    "b_only": 1,
+    "sign_p": 1.0,
+    "changed": 1,
+    "wrong_to_wrong": 0,
+    "none_to_wrong": 0,
+    "flagged_right_to_explicit_right": 1
+   },
+   "image_years": {
+    "n": 2,
+    "right": 1
+   }
+  },
+  "c_quote": {
+   "no_candidate": {
+    "n": 55,
+    "exact": {
+     "k": 32,
+     "n": 55,
+     "pct": 58.2,
+     "ci": [
+      45.0,
+      70.3
+     ]
+    },
+    "wrong_explicit": 3,
+    "wrong_flagged": 17,
+    "no_year": 3
+   },
+   "all_owner": {
+    "n": 227,
+    "exact": {
+     "k": 160,
+     "n": 227,
+     "pct": 70.5,
+     "ci": [
+      64.2,
+      76.0
+     ]
+    },
+    "wrong_explicit": 47,
+    "wrong_flagged": 17,
+    "no_year": 3
+   },
+   "du_vs_owner": {
+    "certain_flagged": {
+     "k": 19,
+     "n": 183,
+     "pct": 10.4,
+     "ci": [
+      6.7,
+      15.6
+     ]
+    },
+    "uncertain_unflagged": {
+     "k": 18,
+     "n": 41,
+     "pct": 43.9,
+     "ci": [
+      29.9,
+      59.0
+     ]
+    }
+   },
+   "undated": {
+    "n": 90,
+    "by_class": {
+     "estimate": 28,
+     "text": 55,
+     "none": 4,
+     "image": 3
+    },
+    "explicit": 58,
+    "owner_ruled": {
+     "documents_ruled": 20,
+     "explicit_ruled": 18,
+     "false": 6
+    },
+    "model_scored": {
+     "explicit_unruled": 40,
+     "false": 15
+    },
+    "false_year": {
+     "k": 21,
+     "n": 90,
+     "pct": 23.3,
+     "ci": [
+      15.8,
+      33.1
+     ]
+    },
+    "estimates": 28
+   },
+   "paired_no_candidate": {
+    "n": 55,
+    "a_exact": 32,
+    "b_exact": 33,
+    "a_only": 1,
+    "b_only": 2,
+    "sign_p": 1.0,
+    "changed": 4,
+    "wrong_to_wrong": 1,
+    "none_to_wrong": 0,
+    "flagged_right_to_explicit_right": 6
+   },
+   "image_years": {
+    "n": 10,
+    "right": 7
+   }
+  }
+ },
+ "strata": {
+  "8B quotes a year, propagation reaches": {
+   "n": 10,
+   "a": 8,
+   "c_strict": 7,
+   "c_quote": 7
+  },
+  "8B quotes a year, propagation does not reach": {
+   "n": 0,
+   "a": 0,
+   "c_strict": 0,
+   "c_quote": 0
+  },
+  "8B quotes no year, propagation reaches": {
+   "n": 42,
+   "a": 25,
+   "c_strict": 25,
+   "c_quote": 25
+  },
+  "8B quotes no year, propagation does not reach": {
+   "n": 3,
+   "a": 0,
+   "c_strict": 0,
+   "c_quote": 0
+  }
+ },
+ "changed_documents": [
+  {
+   "id": "o:9a73f1b3b4b8d971",
+   "truth": 1967,
+   "a": 1968,
+   "a_du": true,
+   "strict": null,
+   "quote": 1967
+  },
+  {
+   "id": "o:723df4da10d243e3",
+   "truth": 1959,
+   "a": 1959,
+   "a_du": true,
+   "strict": null,
+   "quote": 1962
+  },
+  {
+   "id": "o:bb15eb97ea131bb3",
+   "truth": 1935,
+   "a": 1937,
+   "a_du": true,
+   "strict": null,
+   "quote": 1926
+  },
+  {
+   "id": "o:28102e895f9918d0",
+   "truth": 1937,
+   "a": 1937,
+   "a_du": true,
+   "strict": 1979,
+   "quote": 1979
+  }
+ ],
+ "condition_met": false
+}

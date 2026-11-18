@@ -179,7 +179,7 @@ JPEG original) or `reread-107` (the 107 whose year neither the ABBYY nor the Vis
   "time": {"per_unit_s": 12.05, "measured": true, "measured_on": "M3 Pro 18 GB, median a document", "source": {"file": "segbench-results/date-image.md", "route": "Qwen3-VL 8B, image", "attribute": "median s", "value": "12.05"}},
   "memory": {"peak_gb": 7.64, "measured_on": "M3 Pro 18 GB (OCR run)", "source": {"file": "ocr-mac-local.md", "route": "Qwen3-VL 8B 4-bit", "attribute": "MLX peak memory, GB, max", "value": "7.64"}},
   "caveats": ["as step 2 in the restated route it adds no year: 0 documents gained over no step 2 on either trace, and as a quote source (its single quoted year) 1 gained and 1 lost on Gemini's trace, 2 and 1 on the 27B's (W46.date-route-pipeline-8b)", "names an own date on 3 of the 115 documents step 2 runs on, where Gemini 3.7 names 23 and the 27B 20", "1,400 px and 4-bit not separated (DAT-11)", "3 of 99 OCR pages looped (build_figures.py)"],
-  "kind_rules": [], "fallback": "step 4", "conditions": ["not offered: its quotes do not improve the year as step 2 (W46.date-route-pipeline-8b; call 7.5 (c) not added)"]},
+  "kind_rules": [], "fallback": "step 4", "conditions": ["not offered: its quotes do not improve the year as step 2 on the traces (W46.date-route-pipeline-8b) or on the laptop route (a) itself, 0/1 strict and 1/2 quote source gained/lost on 55 documents (W46.date-8b-local-baseline, date-8b-local.md); call 7.5 (c) not added"]},
  {"id": "vision-2b-chooser-t3", "name": "Apple Vision text, rules, the trained 2B as chooser, propagation (Mac, no key)", "family": "mac",
   "app_route": null, "status": "measured", "step": [1, 4],
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 8, "gpus": 0},
@@ -285,7 +285,8 @@ string figure values ("86 / 45", "7 of 12", "96.9% coverage, 4.5 y") and `memory
   `qwen3.6-27b-route` (W46.date-route-pipeline-27b, 2026-11-13): 37.4% not in text, 96.3% in text, 17.8% false years
   on the undated 90; behind Gemini's route on the same documents (p 0.0002). The Mac 8B as step 2 on either model's
   trace (W46.date-route-pipeline-8b, 2026-11-14) gains no document over no step 2 and loses 5 (Gemini) and 4 (27B) to
-  the model's own image reader; its figures are on the `qwen3-vl-8b-image-mac` row, which is no longer offered.
+  the model's own image reader; its figures are on the `qwen3-vl-8b-image-mac` row, which is no longer offered. On the laptop route (a) itself it
+  gains 1 and loses 2 as a quote source (W46.date-8b-local-baseline, `date-8b-local.md`).
 - **F-2.** `cluster-27b-image`'s "not in text 39.0" and `mac-8b-image`'s "16.0" are document-year exact on the 122, not
   the 131; relabelled `unprinted_122_doc_year`. **F-3.** `mac-2b`'s peak 2.7 GB is the build size; the measured peak is
   3.784 GB (`date-model.md`). **F-4.** `uncertain_marked 88` is plain agreement on owner-uncertain documents; replaced by
@@ -383,10 +384,13 @@ default. Decided as recommended (`14-owner-calls.md` section 2). Item 8.1's 8B h
 2026-11-14, `date-route-pipeline.md` §"The Mac 8B as step 2"): on the two strong trace baselines, as step 2 it gains
 no document on Gemini's or the 27B's trace replies; taken as a quote source (its own date, else its one quoted year)
 it gains 1 and loses 1 on Gemini's, gains 2 and loses 1 on the 27B's (p 1.0 both), and adds one undated false year.
-The actual (a) baseline was not measured with those quotes. Measurement review pass 15 (2026-11-15, P15-3)
-therefore leaves its gain unresolved under `W46.date-8b-local-baseline`. Pending that comparison, (c) is not
-added: the 16 GB route stays (a), with no image pass, and `qwen3-vl-8b-image-mac` is not offered; the owner
-required a measured gain before adding it.
+Measurement review pass 15 (2026-11-15, P15-3) noted that the actual (a) baseline was not measured with those
+quotes; W46.date-8b-local-baseline (2026-11-18, `date-8b-local.md`) measured it on the same JPEG/Vision documents. On
+the 55 owner documents whose own Vision text has no year candidate (the only ones where (a) and (c) differ; the 2B
+chooser acts elsewhere and cancels), (a) is exact on 33; the strict 8B reading gains 0 and loses 1, the quote source
+gains 1 and loses 2 (p 1.0 both), its 10 image years 7 right, with wrong explicit years 0 to 3 and undated false years
+20 to 21 of 90. The owner's condition is not met: (c) is not added, the 16 GB route stays (a) with no image pass, and
+`qwen3-vl-8b-image-mac` is not offered.
 
 7.6 **What happens to an estimate whose evidence fails.** The owner's rule forbids writing it. Whether it is offered to
 the user as an unwritten suggestion is not settled. Evidence: 45 of 131 Gemini trace-neigh replies fail the check,
@@ -400,7 +404,7 @@ originals and macOS 27.2 Vision text: steps 1, 2 and 4 with `Date Uncertain` set
 report `not_in_text` redefined from the image pass, the false-year rate on the undated 90, and cost and seconds per
 1,000. Done when the combined rows replace F-1. Waits on nothing. Done for Gemini 2026-11-12 (`date-route-pipeline.md`);
 the 27B half is W46.date-route-pipeline-27b (done 2026-11-13); the Mac 8B as step 2 is W46.date-route-pipeline-8b
-(done 2026-11-14, no gain, call 7.5). Under step 1 as written the undated get 15.6% false years (14/90), 5.6% if
+(done 2026-11-14, no gain, call 7.5), and on the local route (a) W46.date-8b-local-baseline (done 2026-11-18, no gain). Under step 1 as written the undated get 15.6% false years (14/90), 5.6% if
 the model's own flag may add Date Uncertain to an explicit text year: owner gate W46.date-route-owner-ok.
 8.2 `W46.date-image-intext` [S, about $0.35, I]: the image pass on the 119 in-text documents; how often it changes the
 year, finds a second-role date or adds evidence. Settles 7.3. Measured inside W46.date-route-pipeline (2026-11-12): on 172
@@ -425,8 +429,8 @@ gateway tagging call's own cost per 1,000; batch prices measured, not halved by 
 ## 9. Profile test expectations
 
 - **Laptop, 16 GB, no key:** step 1 and 4 `vision-2b-chooser-t3` (47.3 not in text, 89.9 in text, over
-  `mlx-date-2b-8bit` 38.9 with no evidence); no step 2: `qwen3-vl-8b-image-mac` is not offered pending
-  `W46.date-8b-local-baseline` (7.5, P15-3); its gain on this local route is unmeasured. The solver flags "no image pass".
+  `mlx-date-2b-8bit` 38.9 with no evidence); no step 2: `qwen3-vl-8b-image-mac` is not offered; on this
+  route its quotes gain 1 and lose 2 (`W46.date-8b-local-baseline`, 7.5, P15-3). The solver flags "no image pass".
 - **Laptop, 32 GB and 64 GB:** as 16 GB until item 8.4 measures the 27B on a Mac; the solver must not borrow the
   cluster rows' figures [?].
 - **Laptop, under 8 GB:** `vision-rules-t3` (48.1, 85.7); a tie with the 2B row on `not_in_text`, broken on in-text.
@@ -458,9 +462,9 @@ estimate that fails the evidence check is not shown at all until item 8.3 (7.6).
 owner's veto: the image pass runs only where the app's own text gives no year candidate (7.3); the trained 2B and 4B
 are not dating defaults (7.4); the no-key laptop route is Vision text, rules, the 2B chooser and propagation at t=3,
 every propagated year `Date Uncertain` with its source document. The Mac 8B image pass was conditional on item 8.1
-showing its quotes help (7.5); the completed 8B measure (a7068d5f, 2026-11-14) tested Gemini and 27B traces,
-not this local route. The pass stays unoffered pending `W46.date-8b-local-baseline` (P15-3); the implementation
-item W46.date-route-image-routes closed 2026-11-15, but the local measurement question remains open. Section 3 carries these rules; the inherited
+showing its quotes help (7.5); the 8B measure (a7068d5f, 2026-11-14) tested Gemini and 27B traces, and
+`W46.date-8b-local-baseline` (2026-11-18, P15-3) this local route: no gain on either, so the pass stays unoffered; the
+implementation item W46.date-route-image-routes closed 2026-11-15. Section 3 carries these rules; the inherited
 flag on a dated folder stays with
 `W47.ct-folder-date`.
 

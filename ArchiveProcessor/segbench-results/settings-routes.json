@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-17",
+ "built": "2026-11-18",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -10306,7 +10306,7 @@
      "kind_rules": [],
      "fallback": "step 4",
      "conditions": [
-      "not offered: its quotes do not improve the year as step 2 (W46.date-route-pipeline-8b; call 7.5 (c) not added)"
+      "not offered: its quotes do not improve the year as step 2 on the traces (W46.date-route-pipeline-8b) or on the laptop route (a) itself, 0/1 strict and 1/2 quote source gained/lost on 55 documents (W46.date-8b-local-baseline, date-8b-local.md); call 7.5 (c) not added"
      ],
      "step": [
       2
