@@ -285,6 +285,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Reader</th><th>Reader alone</th><th>Mean</th><th>Cap or error, then mean</th><th>Cap or error alone</th><th>Length</th><th>Disagreement</th><th>Best 20%, hindsight</th><th>Escalate all</th></tr></thead><tbody id="dif-logprob-budget"></tbody></table></div>
     <p class="note" id="dif-logprob-note"></p>
   </section>
+  <section class="panel" id="dif-postread">
+    <div class="head"><h2>A "this photo read poorly" flag with few false alarms</h2><span class="meta">poor reading = under 70 NES; ceiling 5% of good readings</span></div>
+    <p class="note">W46.post-read-quality-flag fitted each signal's cut so that it flags at most 5% of the readings at 70 NES or above, and scored it by repeated five-fold cross-validation (counts pooled over 20 splits). Own confidence is the mean token log-probability for the open readers and the character-weighted line confidence for Apple Vision; against Vision is this reading's disagreement with Vision's reading of the same image, with handwritten pages left out. The ladder rows are the capture ladder's 48 Gemini pages, the plain photograph and ten synthetic defects each. A failed reading is always flagged.</p>
+    <div class="tbl"><table><thead><tr><th>Reader</th><th>Images</th><th>Signal</th><th>AUC</th><th>Poor caught</th><th>Good flagged</th></tr></thead><tbody id="dif-postread-rows"></tbody></table></div>
+    <p class="note" id="dif-postread-note"></p>
+  </section>
   <section class="panel" id="dif-postcorrect">
     <div class="head"><h2>Correcting a cheap reading in the 70-90 band</h2><span class="meta">corrector: Qwen3.6-27B on Sherlock</span></div>
     <p class="note">W46.ocr-postcorrect sent cheap readings that scored NES 70-90 to Qwen3.6-27B to correct, once with the page image and once as text only; the easy pages, readings already at 97 or more, are the check that it leaves clean text alone. Image is cap-guarded: a reply that hit the token cap keeps the reading. Trimmed is the image reply cut to the span aligned with the reading. Direct is the same 27B reading the page from scratch, the escalation a correction stage competes with.</p>
@@ -69297,6 +69303,93 @@ true,
 }
 ]
 },
+"postread":{
+"rows":[
+{
+"reader":"Gemini 3.7 Flash, gateway",
+"set":"the 96, plain",
+"signal":"against Vision",
+"auc":0.9390681003584229,
+"poor":3,
+"hit_rate":0.3333333333333333,
+"fa_rate":0.03602150537634408
+},
+{
+"reader":"LightOnOCR-3 4B, Mac 8-bit",
+"set":"the 96, plain",
+"signal":"own confidence",
+"auc":0.6449197860962567,
+"poor":11,
+"hit_rate":0.00909090909090909,
+"fa_rate":0.04647058823529412
+},
+{
+"reader":"LightOnOCR-3 4B, Mac 8-bit",
+"set":"the 96, plain",
+"signal":"against Vision",
+"auc":0.9818181818181818,
+"poor":11,
+"hit_rate":0.8227272727272728,
+"fa_rate":0.0488235294117647
+},
+{
+"reader":"Qwen3.5-9B, Mac 4-bit",
+"set":"the 96, plain",
+"signal":"own confidence",
+"auc":0.9080459770114943,
+"poor":9,
+"hit_rate":0.3388888888888889,
+"fa_rate":0.04770114942528736
+},
+{
+"reader":"Qwen3.5-9B, Mac 4-bit",
+"set":"the 96, plain",
+"signal":"against Vision",
+"auc":0.7522349936143039,
+"poor":9,
+"hit_rate":0.3333333333333333,
+"fa_rate":0.039655172413793106
+},
+{
+"reader":"Apple Vision",
+"set":"the 96, plain",
+"signal":"own confidence",
+"auc":0.8025396825396826,
+"poor":21,
+"hit_rate":0.4595238095238095,
+"fa_rate":0.058
+},
+{
+"reader":"Gemini 3.7 Flash, gateway",
+"set":"ladder, 528",
+"signal":"against Vision",
+"auc":0.786900296921394,
+"poor":54,
+"hit_rate":0.3861111111111111,
+"fa_rate":0.05042194092827004
+},
+{
+"reader":"Apple Vision",
+"set":"ladder, 528",
+"signal":"own confidence",
+"auc":0.901667749620966,
+"poor":243,
+"hit_rate":0.7835390946502058,
+"fa_rate":0.04894736842105263
+}
+],
+"app_rule":{
+"flag_below":0.9815,
+"hits_96":10,
+"poor_96":21,
+"fa_96":3,
+"good_96":75,
+"hits_lad":179,
+"poor_lad":231,
+"fa_lad":7,
+"good_lad":249
+}
+},
 "postcorrect":{
 "corrector":"Qwen3.6-27B FP8 (Sherlock vLLM, thinking off, temperature 0)",
 "rows":[
@@ -70081,6 +70174,13 @@ if (LGP) {
   document.getElementById('dif-logprob-budget').innerHTML = LGP.budget.map(b => '<tr><td>' + b.route + '</td><td>' + p2(b.first) + '</td><td>' + p2(b.mean) + '</td><td>' + p2(b['fail+mean']) + '</td><td>' + p2(b.failure) + '</td><td>' + p2(b.length) + '</td><td>' + p2(b.disagreement) + '</td><td>' + p2(b.oracle) + '</td><td>' + p2(b.all) + '</td></tr>').join('');
   document.getElementById('dif-logprob-note').textContent = 'What it shows: on answered pages, mean log-probability ranks a reader\'s poor readings about as well as a second reader\'s disagreement, for the cost of one reading; the first token and length do not. It misses loops, which are confident, so caps and errors have to go first. And it does not pick the pages worth escalating: low confidence marks pages that are hard for every reader, so escalating them gains less than escalating others, and with caps first it does no better than caps alone. It is a "check this reading" flag, not an escalation trigger; the cascade rule above is unchanged. Limits: two readers and one escalation route; the Mac\'s 4-bit log-probabilities come in steps of an eighth of a nat. Full report: segbench-results/ocr-logprob.md.';
 } else document.getElementById('dif-logprob').hidden = true;
+const PRF = DATA.postread;
+if (PRF) {
+  const pc = v => v === null ? '—' : (100 * v).toFixed(0) + '%';
+  document.getElementById('dif-postread-rows').innerHTML = PRF.rows.map(r => '<tr><td>' + r.reader + '</td><td>' + r.set + '</td><td>' + r.signal + '</td><td>' + f2(r.auc) + '</td><td>' + pc(r.hit_rate) + ' of ' + r.poor + '</td><td>' + pc(r.fa_rate) + '</td></tr>').join('');
+  const a = PRF.app_rule;
+  document.getElementById('dif-postread-note').textContent = 'What it shows: Apple Vision\'s own confidence is the only flag that keeps false alarms near 5% on plain and damaged photographs alike. The app ships it for pages Vision reads: under ' + a.flag_below + ' it flags ' + a.hits_96 + ' of Vision\'s ' + a.poor_96 + ' poor readings of the 96 with ' + a.fa_96 + ' false alarms in ' + a.good_96 + ', and ' + a.hits_lad + ' of ' + a.poor_lad + ' on the ladder\'s defect images with ' + a.fa_lad + ' in ' + a.good_lad + '. Disagreement with Vision ranks the other readers\' errors well on plain photographs, but Vision loses far more to blur than they do, so a cut fitted there flags about a fifth of Gemini\'s good readings of damaged images, and a cut strict enough for both catches almost nothing on plain ones; the other readers get no flag until real captures exist. Full report: segbench-results/post-read-flag.md.';
+} else document.getElementById('dif-postread').hidden = true;
 const PCR = DATA.postcorrect;
 if (PCR) {
   const p1 = v => v === null || v === undefined ? '—' : (100 * v).toFixed(1);

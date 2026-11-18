@@ -77,6 +77,7 @@ COLOUR_DROPOUT = RESULTS / "ocr-colour-dropout.json"  # W46.ocr-input-colour-dro
 ENH_MARKS = RESULTS / "enh-ocr-marks.json"  # W46.enh-ocr-input-marks: the mark-region ink check
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
+POSTREAD = RESULTS / "post-read-flag.json"  # W46.post-read-quality-flag: post_read_flag.py report, the read-poorly flag
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-marks: the 96 and the marks core
 MARKS_DETECT = RESULTS / "marks-detect.json"  # W46.marks-detect: marks_detect.py report, trained marks detectors
@@ -956,6 +957,34 @@ def logprob():
     return {"escalation_route": d["escalation_route"], "rows": rows, "budget": budget}
 
 
+def postread():
+    """W46.post-read-quality-flag: per reader, image set and signal, the cross-validated share of poor readings caught
+    and of good readings flagged at a 5% false-alarm ceiling, and the app's Vision rule. None until it has run."""
+    if not POSTREAD.exists():
+        return None
+    d = json.loads(POSTREAD.read_text())
+    names = {"lightonocr-3-4b-mlx8": "LightOnOCR-3 4B, Mac 8-bit", "qwen3.5-9b-mlx4": "Qwen3.5-9B, Mac 4-bit",
+             "gemini3.7-flash": "Gemini 3.7 Flash, gateway", "vision": "Apple Vision"}
+    shown = {"conf": "own confidence", "vs vision, typed": "against Vision"}
+    sets = {"96": "the 96, plain", "ladder": "ladder, 528"}
+    rows = []
+    for s, readers in d["sets"].items():
+        if s not in sets:
+            continue
+        for k, sigs in readers.items():
+            for g, e in sigs.items():
+                if g in shown:
+                    cv = e["crossval"]
+                    rows.append({"reader": names[k], "set": sets[s], "signal": shown[g], "auc": e["auc"],
+                                 "poor": e["in_sample"]["poor"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
+    a = d["app_rule"]
+    rule = {"flag_below": a["flag_below"], "hits_96": a["96"]["hits"], "poor_96": a["96"]["poor"],
+            "fa_96": a["96"]["false_alarms"], "good_96": a["96"]["good"], "hits_lad": a["ladder_defects"]["hits"],
+            "poor_lad": a["ladder_defects"]["poor"], "fa_lad": a["ladder_defects"]["false_alarms"],
+            "good_lad": a["ladder_defects"]["good"]}
+    return {"rows": rows, "app_rule": rule}
+
+
 def ppocrv6_hands(sweep):
     """W46.ocr-ppocrv6-hands: kraken's PP-OCRv6 medium on kraken blla lines and on Apple Vision's line boxes (and
     Vision's own text of those lines), on the public L1-L3 and the owner's hand and mixed pages, and its fine-tunes on
@@ -1585,7 +1614,7 @@ def main():
              "capture_ladder": json.loads(CAPTURE.read_text()) if CAPTURE.exists() else None,
              "vision_reread": vision_reread(), "vision_unfiltered": vision_unfiltered(), "rotation": rotation(),
              "loops": json.loads(LOOPS.read_text()) if LOOPS.exists() else None, "regions": regions,
-             "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "layout_partition": layout_partition(), "dewarp_real5": dewarp_real5(), "logprob": logprob(), "postcorrect": postcorrect()}
+             "layout_order": layout_order(), "layout_photo": layout_photo(layout_photo_data), "layout_partition": layout_partition(), "dewarp_real5": dewarp_real5(), "logprob": logprob(), "postread": postread(), "postcorrect": postcorrect()}
     # indent=0: one value per line, so a grep over site/ prints a matching line, not the whole ~1 MB blob
     page = TEMPLATE.read_text().replace("__DATA__", json.dumps(built, indent=0, separators=(",", ":")))
     outputs = {OUT_DATA: json.dumps(built, indent=1) + "\n", OUT_PAGE: page, OUT_DIFFICULTY: difficulty.report(diff)}

@@ -68758,6 +68758,93 @@
    }
   ]
  },
+ "postread": {
+  "rows": [
+   {
+    "reader": "Gemini 3.7 Flash, gateway",
+    "set": "the 96, plain",
+    "signal": "against Vision",
+    "auc": 0.9390681003584229,
+    "poor": 3,
+    "hit_rate": 0.3333333333333333,
+    "fa_rate": 0.03602150537634408
+   },
+   {
+    "reader": "LightOnOCR-3 4B, Mac 8-bit",
+    "set": "the 96, plain",
+    "signal": "own confidence",
+    "auc": 0.6449197860962567,
+    "poor": 11,
+    "hit_rate": 0.00909090909090909,
+    "fa_rate": 0.04647058823529412
+   },
+   {
+    "reader": "LightOnOCR-3 4B, Mac 8-bit",
+    "set": "the 96, plain",
+    "signal": "against Vision",
+    "auc": 0.9818181818181818,
+    "poor": 11,
+    "hit_rate": 0.8227272727272728,
+    "fa_rate": 0.0488235294117647
+   },
+   {
+    "reader": "Qwen3.5-9B, Mac 4-bit",
+    "set": "the 96, plain",
+    "signal": "own confidence",
+    "auc": 0.9080459770114943,
+    "poor": 9,
+    "hit_rate": 0.3388888888888889,
+    "fa_rate": 0.04770114942528736
+   },
+   {
+    "reader": "Qwen3.5-9B, Mac 4-bit",
+    "set": "the 96, plain",
+    "signal": "against Vision",
+    "auc": 0.7522349936143039,
+    "poor": 9,
+    "hit_rate": 0.3333333333333333,
+    "fa_rate": 0.039655172413793106
+   },
+   {
+    "reader": "Apple Vision",
+    "set": "the 96, plain",
+    "signal": "own confidence",
+    "auc": 0.8025396825396826,
+    "poor": 21,
+    "hit_rate": 0.4595238095238095,
+    "fa_rate": 0.058
+   },
+   {
+    "reader": "Gemini 3.7 Flash, gateway",
+    "set": "ladder, 528",
+    "signal": "against Vision",
+    "auc": 0.786900296921394,
+    "poor": 54,
+    "hit_rate": 0.3861111111111111,
+    "fa_rate": 0.05042194092827004
+   },
+   {
+    "reader": "Apple Vision",
+    "set": "ladder, 528",
+    "signal": "own confidence",
+    "auc": 0.901667749620966,
+    "poor": 243,
+    "hit_rate": 0.7835390946502058,
+    "fa_rate": 0.04894736842105263
+   }
+  ],
+  "app_rule": {
+   "flag_below": 0.9815,
+   "hits_96": 10,
+   "poor_96": 21,
+   "fa_96": 3,
+   "good_96": 75,
+   "hits_lad": 179,
+   "poor_lad": 231,
+   "fa_lad": 7,
+   "good_lad": 249
+  }
+ },
  "postcorrect": {
   "corrector": "Qwen3.6-27B FP8 (Sherlock vLLM, thinking off, temperature 0)",
   "rows": [
