@@ -43,7 +43,8 @@ final class BulkOCRJourneyUITests: XCTestCase {
         ]
         // Passed through as the runner named them (TEST_RUNNER_W40D1_<NAME> → PROCESSFILES_<NAME>).
         for name in ["PROVIDER", "MODEL", "TAGGING", "MAXIMAGES", "GATEWAY_URL", "GATEWAY_MODEL",
-                     "GATEWAY_IN_PER_1M", "GATEWAY_OUT_PER_1M", "GATEWAY_UPSTREAM", "CAP_USD", "METER"] {
+                     "GATEWAY_IN_PER_1M", "GATEWAY_OUT_PER_1M", "GATEWAY_UPSTREAM", "CAP_USD", "METER", "BATCH",
+                     "BATCH_CANCEL"] {
             if let v = env["W40D1_\(name)"], !v.isEmpty { launch["PROCESSFILES_\(name)"] = v }
         }
         if env["W40D1_KEYFILE"] == "1" {

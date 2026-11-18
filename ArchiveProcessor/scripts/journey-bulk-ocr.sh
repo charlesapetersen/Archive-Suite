@@ -10,6 +10,10 @@
 #                                                                     Automatic tagging (the journey itself)
 #   ./scripts/journey-bulk-ocr.sh --route anthropic|mistral --paid --max N   W40.d3: a direct provider's own
 #                                     client (Keychain key), No tagging, at most 5 photos, a few cents
+#   ./scripts/journey-bulk-ocr.sh --route anthropic|mistral --batch [--cancel] --paid --max N   W40.d4: the same
+#                                     through the provider's batch path (submit, poll, collect), half price;
+#                                     --cancel presses Stop once the submission is journaled. Afterwards the
+#                                     provider is asked what became of each batch ID (batch-status.txt)
 #
 # The box is the W40.c1 rehearsal copy (verification/rehearsal.md; default RG 165 — War Department, a held-out
 # test box: score on it, never tune on it). The app's own estimator states the cost in the run's estimate.txt
@@ -21,16 +25,18 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 APPDIR="$PWD"; REPO="$(cd .. && pwd)"
-ROUTE=""; PAID=0; MAX=1000; CAP="5.00"
+ROUTE=""; PAID=0; MAX=1000; CAP="5.00"; BATCH=0; CANCEL=0
 COLLECTION="${W40D1_COLLECTION:-RG 165 — War Department}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --route) ROUTE="$2"; shift 2 ;;
     --paid) PAID=1; shift ;;
+    --batch) BATCH=1; shift ;;
+    --cancel) CANCEL=1; shift ;;
     --max) MAX="$2"; shift 2 ;;
     --cap) CAP="$2"; shift 2 ;;
     --completion) export W40D1_FAKE_COMPLETION="$2"; shift 2 ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -45,6 +51,8 @@ trap '[ -n "$KEYDIR" ] && rm -rf "$KEYDIR"' EXIT
 trap 'exit 143' TERM HUP; trap 'exit 130' INT   # so a kill still runs the EXIT trap that deletes the key
 # A long run prints a line a minute; this only keeps the VM lane's stall guard from ending a slow paid run early.
 export TART_TEST_STALL="${TART_TEST_STALL:-3600}"
+case "$ROUTE" in anthropic|mistral) ;; *) [ "$BATCH$CANCEL" = 00 ] || { echo "--batch is for --route anthropic|mistral"; exit 2; } ;; esac
+[ "$CANCEL" = 1 ] && [ "$BATCH" = 0 ] && { echo "--cancel needs --batch"; exit 2; }
 case "$ROUTE" in
   vision)
     export W40D1_PROVIDER="Apple Vision" W40D1_TAGGING=none MODE=none
@@ -80,9 +88,12 @@ case "$ROUTE" in
     [ "$MAX" -le 5 ] || { echo "--max must be 5 or fewer for a direct-provider route"; exit 2; }
     if [ "$ROUTE" = anthropic ]; then ACCOUNT=Anthropic MODEL_ID=claude-sonnet-4-6 PER=0.02
     else ACCOUNT=Mistral MODEL_ID=mistral-ocr-latest PER=0.001; fi
-    echo "route: $ACCOUNT direct, $MODEL_ID, No tagging, $PAGES pages, about \$$(awk -v n="$PAGES" -v p="$PER" 'BEGIN { printf "%.3f", n * p }')"
+    [ "$BATCH" = 1 ] && PER="$(awk -v p="$PER" 'BEGIN { print p / 2 }')"   # batch is half price at both
+    echo "route: $ACCOUNT direct$([ "$BATCH" = 1 ] && echo ", batch$([ "$CANCEL" = 1 ] && echo ' then Stop')"), $MODEL_ID, No tagging, $PAGES pages, about \$$(awk -v n="$PAGES" -v p="$PER" 'BEGIN { printf "%.3f", n * p }')"
     [ "$PAID" = 1 ] || { echo "not run: add --paid to spend it"; exit 0; }
     export W40D1_PROVIDER="$ACCOUNT" W40D1_MODEL="$MODEL_ID" W40D1_TAGGING=none MODE=none
+    [ "$BATCH" = 1 ] && export W40D1_BATCH=1
+    [ "$CANCEL" = 1 ] && export W40D1_BATCH_CANCEL=1
     if [ -z "${W40D1_KEY_FILE:-}" ]; then
       KEYDIR="$(mktemp -d)"; chmod 700 "$KEYDIR"
       ( umask 077; /usr/bin/security find-generic-password -s com.archiveprocessor.app -a "$ACCOUNT" -w > "$KEYDIR/key" ) \
@@ -94,6 +105,22 @@ esac
 
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}/processor"
 "$REPO/ops/gui/vm-gui-runner.sh" processor xcuitest; rc=$?
+# W40.d4: ask the provider, with the same key, what became of each batch the app submitted. The key goes to curl
+# in a header file (never on a command line) and the reply is cut to the status fields.
+if [ "$BATCH" = 1 ]; then
+  ids="$(cat "$ART"/bulk-ocr/run-*/batch.tsv 2>/dev/null | sed -n 's/.*ids=\([^	]*\).*/\1/p' | head -1)"
+  [ -n "$KEYDIR" ] || { KEYDIR="$(mktemp -d)"; chmod 700 "$KEYDIR"; }
+  hdr="$KEYDIR/hdr"
+  if [ "$ROUTE" = anthropic ]; then
+    ( umask 077; printf 'x-api-key: %s\nanthropic-version: 2023-06-01\n' "$(cat "$W40D1_KEY_FILE")" > "$hdr" ); base=https://api.anthropic.com/v1/messages/batches
+  else
+    ( umask 077; printf 'Authorization: Bearer %s\n' "$(cat "$W40D1_KEY_FILE")" > "$hdr" ); base=https://api.mistral.ai/v1/batch/jobs
+  fi
+  for id in ${ids//,/ }; do
+    curl -s -H @"$hdr" "$base/$id" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({k: d.get(k) for k in ("id","processing_status","request_counts","status","total_requests","succeeded_requests","failed_requests","cancelled_at","ended_at","completed_at") if k in d}))'
+  done | tee "$ART/bulk-ocr/batch-status.txt"
+  [ -n "$ids" ] || echo "no batch ID came back (batch.tsv)" | tee "$ART/bulk-ocr/batch-status.txt"
+fi
 [ -n "$KEYDIR" ] && rm -rf "$KEYDIR" && KEYDIR=""
 grep -h '\[w40d1\] driver:' "$ART/xcuitest.log" 2>/dev/null | tail -1
 [ -d "$ART/bulk-ocr" ] || { echo "no output came back from the guest (runner exit $rc)"; exit 1; }

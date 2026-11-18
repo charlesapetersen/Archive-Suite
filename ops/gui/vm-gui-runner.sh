@@ -750,7 +750,7 @@ prepare_bulk_ocr() {
   fi
   local v val
   for v in PROVIDER MODEL TAGGING MAXIMAGES GATEWAY_URL GATEWAY_MODEL GATEWAY_IN_PER_1M GATEWAY_OUT_PER_1M \
-           GATEWAY_UPSTREAM CAP_USD METER TIMEOUT_S; do
+           GATEWAY_UPSTREAM CAP_USD METER TIMEOUT_S BATCH BATCH_CANCEL; do
     val="$(printenv "W40D1_$v" || true)"
     [ -n "$val" ] || continue
     [[ "$val" =~ ^[A-Za-z0-9._:/\ -]+$ ]] || die "W40D1_$v has characters this runner will not pass on"

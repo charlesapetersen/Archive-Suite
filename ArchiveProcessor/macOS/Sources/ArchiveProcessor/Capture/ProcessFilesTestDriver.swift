@@ -139,6 +139,15 @@ enum ProcessFilesTestDriver {
         }
         let model = gateway?.asLLMModel() ?? provider.models.first { $0.id == modelId } ?? provider.models[0]
 
+        // W40.d4: the provider's batch path (submit, poll, collect), as Process Files takes it with Batch mode on;
+        // PROCESSFILES_BATCH_CANCEL=1 presses Stop once the submission is journaled, which cancels it server-side.
+        let batch = env["PROCESSFILES_BATCH"] == "1"
+        let cancelAfterSubmit = env["PROCESSFILES_BATCH_CANCEL"] == "1"
+        if batch && (gateway != nil || !provider.supportsBatch) {
+            return fail("\(provider.rawValue) has no batch path here (gateway or provider without batch)", marker: donePath)
+        }
+        if cancelAfterSubmit && !batch { return fail("PROCESSFILES_BATCH_CANCEL needs PROCESSFILES_BATCH=1", marker: donePath) }
+
         // State the cost first, with the app's own estimator and the same inputs the Cost Estimate box uses, and
         // refuse a run whose estimate is over the spend cap. A metered run (PROCESSFILES_METER=1) must name its cap.
         let estimate = CostEstimator.estimate(
@@ -150,7 +159,9 @@ enum ProcessFilesTestDriver {
         let capUSD = env["PROCESSFILES_CAP_USD"].flatMap(Double.init)
         writeMarker(runDir.appendingPathComponent("estimate.txt").path,
                     "files=\(inputs.count)\tmodel=\(model.id)\tocr=\(estimate.ocrFormatted)\tclassification=\(estimate.classificationFormatted)"
-                    + "\ttagging=\(estimate.taggingFormatted)\ttotal=\(estimate.totalStandardFormatted)\tcap=\(capUSD.map(CostEstimate.money) ?? "none")\n")
+                    + "\ttagging=\(estimate.taggingFormatted)\ttotal=\(estimate.totalStandardFormatted)"
+                    + (batch ? "\tbatch=\(CostEstimate.money(estimate.totalBatch))" : "")
+                    + "\tcap=\(capUSD.map(CostEstimate.money) ?? "none")\n")
         if gateway != nil && !metered {
             return fail("a gateway run must be metered (\(Self.meterEnvKey)=1 with PROCESSFILES_CAP_USD)", marker: donePath)
         }
@@ -220,16 +231,17 @@ enum ProcessFilesTestDriver {
 
         NSLog("PFDRIVER: start \(inputs.count) files, \(provider.rawValue)/\(model.id), mode=\(mode.rawValue), out=\(runDir.path)")
 
-        // The `await` returning is the authoritative completion signal (isProcessing briefly
+        // The run is held in `processingTask`, as `OCRView` holds it, so a Stop (`cancel()`) reaches it.
+        // The run finishing is the authoritative completion signal (isProcessing briefly
         // lies mid-run because tagging clears it before suspending on the final-review gate).
-        await processor.startProcessing(
+        let run = Task { @MainActor in await processor.startProcessing(
             files: inputs,
             provider: provider,
             model: model,
             thinkingLevel: nil,
             apiKey: key,
             outputDirectory: runDir,
-            batchMode: false,
+            batchMode: batch,
             enableTagging: mode.enablesTagging,
             enableSegmentJSON: true,
             enableCollectionSegmentation: false,
@@ -238,7 +250,34 @@ enum ProcessFilesTestDriver {
             preOCRedInput: false,
             segmentationContext: SegmentationContext(
                 previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, imageScale: 1.0),
-            gatewayConfig: gateway)
+            gatewayConfig: gateway) }
+        processor.processingTask = run
+
+        // W40.d4: the provider's batch IDs, read from the recovery journal once the submission is marked complete,
+        // go into batch.tsv so the host can ask the provider what became of the job. With the cancel switch, Stop is
+        // pressed at that moment and the outcome the app reached is written beside them.
+        if batch {
+            var ids: [String] = []
+            let watchStart = Date()
+            while Date().timeIntervalSince(watchStart) < 600 {
+                if let pending = processor.activePendingBatch, pending.submissionComplete {
+                    ids = pending.effectiveChunkIds
+                    break
+                }
+                if processor.activeBatch == nil && !processor.isProcessing { break }
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+            var lines = ["provider=\(provider.rawValue)\tmodel=\(model.id)\tids=\(ids.joined(separator: ","))"
+                         + "\tsubmitted_after_s=\(Int(Date().timeIntervalSince(watchStart)))"]
+            if cancelAfterSubmit && !ids.isEmpty {
+                processor.cancel()
+                await processor.batchCancellationTask?.value
+                let journalKept = FileManager.default.fileExists(atPath: OCRProcessor.pendingBatchURL.path)
+                lines.append("cancel=pressed\tjournal_kept=\(journalKept)\tstatus=\(processor.statusMessage)")
+            }
+            writeMarker(runDir.appendingPathComponent("batch.tsv").path, lines.joined(separator: "\n") + "\n")
+        }
+        await run.value
 
         autopilot.cancel()
         if metered {
