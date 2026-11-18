@@ -435,6 +435,19 @@ def seg_adapt_lora():
                              "err_per_100": t["err_per_100"], "false_splits": t["fs"], "false_merges": t["fm"],
                              "starts": [t["catalogue"][0] + t["internal"][0], t["catalogue"][1] + t["internal"][1]],
                              "paired": s["paired"].get(arm), "rerun": s.get("rerun", {}).get("paired") if arm == "base" else None})
+    # W46.kit-continuation-replay: the k = 200 continuation without the corpus replay set, on the same scoring windows.
+    replay = RESULTS / "seg-adapt-replay.json"
+    if replay.exists():
+        r = json.loads(replay.read_text())
+        if any(r["failed_windows"].values()):
+            sys.exit(f"seg-adapt-replay.json has failed windows: {r['failed_windows']}")
+        for box, b in r["boxes"].items():
+            for arm in ("none", "public"):
+                t = b["arms"][arm]
+                rows.append({"box": box, "set": b["gaps"], "arm": arm, "gaps": t["gaps"], "errors": t["errors"],
+                             "err_per_100": t["err_per_100"], "false_splits": t["fs"], "false_merges": t["fm"],
+                             "starts": [t["catalogue"][0] + t["internal"][0], t["catalogue"][1] + t["internal"][1]],
+                             "paired": b["against_base"][arm], "rerun": None})
     return {"rows": rows}
 
 

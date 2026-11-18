@@ -260,12 +260,13 @@ class Rows(Fixture):
 
     def test_targets_carry_the_persons_calls(self):
         calls = {t["n"]: t["final"] for t in map(json.loads, (self.train / "truth.jsonl").read_text().splitlines())}
+        # no replay is the default (W46.kit-continuation-replay): the corrections alone are a measured recipe
         self.run_kc("rows", "--pack", self.train, "--answers", self.answers(lambda x: "continue", broken={0}),
-                    "--no-replay", "--out", self.root / "data")
+                    "--out", self.root / "data")
         data = json.loads((self.root / "data" / "data.json").read_text())
-        self.assertEqual((data["corrections"], data["replay"], data["measured_recipe"]), (len(self.wins) - 1, 0, False))
-        self.assertEqual(data["dropped"]["reply not usable"], 1)
-        self.assertIn("not the measured recipe", data["note"])
+        self.assertEqual((data["corrections"], data["replay"], data["measured_recipe"]), (len(self.wins) - 1, 0, True))
+        self.assertEqual((data["rule"], data["dropped"]["reply not usable"]), ("corrections only", 1))
+        self.assertNotIn("note", data)
         rows = [json.loads(l) for l in (self.root / "data" / "train.jsonl").read_text().splitlines()]
         for r in rows:
             for bd in json.loads(r["target"])["boundaries"]:

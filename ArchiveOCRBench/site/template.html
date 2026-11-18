@@ -154,7 +154,7 @@ footer p { font-size: 13px; }
   <section class="panel" id="seg-adapt-lora" hidden>
     <div class="head"><h2>Adapting the 2B to a new material from a user's corrections</h2><span class="meta">LoRA continuation · two Lincoln boxes · Sherlock</span></div>
     <div class="tbl"><table><thead><tr><th>Box and gaps scored</th><th>Model</th><th>Gaps</th><th>Errors per 100 gaps</th><th>False splits</th><th>False merges</th><th>Starts found</th><th>Change against the 2B (95% interval)</th></tr></thead><tbody id="seg-adapt-lora-rows"></tbody></table></div>
-    <p class="note">The corpus-trained Qwen3.5 2B, and the same model after a LoRA continuation on a user's corrections of the first k gaps of one Lincoln Papers box (k = 50 and 200, three corpus windows replayed for each correction window), all served the same way on Sherlock. Box 1's rows count only the gaps after each arm's k, which no training row saw; box 2 is the next 70 catalogue items of the same series, which nothing trained on. Box 2's truth is the catalogue's starts and Gemini 3.7 Flash's continuation calls, so it scores catalogue starts and continuations but no start inside an item. The interval resamples catalogue items; the base row's interval is a rerun of the same requests against FarmShare's earlier answers, the noise floor. Source: <code>seg-adapt-lora.md</code> and <code>seg-adapt-lora.json</code>.</p>
+    <p class="note">The corpus-trained Qwen3.5 2B, and the same model after a LoRA continuation on a user's corrections of the first k gaps of one Lincoln Papers box (k = 50 and 200, three corpus windows replayed for each correction window), all served the same way on Sherlock. The two k = 200 rows marked no replay and TABME++ replay are what a kit user without the owner's corpus can train: the corrections alone, or with three public TABME++ windows for each; the kit's default is no replay (<code>seg-adapt-replay.md</code>). Box 1's rows count only the gaps after each arm's k, which no training row saw; box 2 is the next 70 catalogue items of the same series, which nothing trained on. Box 2's truth is the catalogue's starts and Gemini 3.7 Flash's continuation calls, so it scores catalogue starts and continuations but no start inside an item. The interval resamples catalogue items; the base row's interval is a rerun of the same requests against FarmShare's earlier answers, the noise floor. Source: <code>seg-adapt-lora.md</code> and <code>seg-adapt-lora.json</code>.</p>
   </section>
 
   <section class="panel" id="seg-tabme" hidden>
@@ -732,7 +732,8 @@ if (segContext) {
 
 const sal = DATA.seg_adapt_lora;
 if (sal) {
-  const salNames = {base: 'Trained Qwen3.5 2B', k50: 'LoRA on 50 corrected gaps', k200: 'LoRA on 200 corrected gaps'};
+  const salNames = {base: 'Trained Qwen3.5 2B', k50: 'LoRA on 50 corrected gaps', k200: 'LoRA on 200 corrected gaps',
+                    none: 'LoRA on 200 corrected gaps, no replay', public: 'LoRA on 200 corrected gaps, TABME++ replay'};
   const ci = p => (p.diff > 0 ? '+' : '') + p.diff.toFixed(1) + ' (' + p.lo.toFixed(1) + ' to ' + p.hi.toFixed(1) + ')';
   document.getElementById('seg-adapt-lora-rows').innerHTML = sal.rows.map(r => '<tr><td>' + (r.box === 'Lincoln2' ? 'Box 2, whole' : 'Box 1, ' + r.set) +
     '</td><td>' + salNames[r.arm] + '</td><td>' + r.gaps + '</td><td>' + r.err_per_100.toFixed(1) + '</td><td>' + r.false_splits + '</td><td>' +

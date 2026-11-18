@@ -6,7 +6,7 @@ one material's corrected gaps, for the next boxes of that material, past the kit
                               [--text pdf|none] --out PACK          # on the Mac: the correction windows
   kit_continuation.py heldout DIR [DIR ...] --sources DIR [--pool NAME] [--material ID] [--text pdf|none]
                               --train PACK --out HELDOUT            # on the Mac: the next box, for the gate
-  kit_continuation.py rows    --pack PACK --answers RUN/answers.jsonl (--replay DATA | --no-replay) --out DATA
+  kit_continuation.py rows    --pack PACK --answers RUN/answers.jsonl [--replay DATA] --out DATA
                                                                     # on the cluster: train_seg.py train's data
 
 THE TRIGGER (owner, 2026-11-06, call 7; notes 07 and 12 §7.5). The review records (kit_corrections.py, SPEC/
@@ -27,10 +27,12 @@ gaps, so a page the records do not name (a box or folder photo, a removed page) 
 THE ROWS follow W46.seg-adapt-lora (segbench-results/seg-adapt-lora.md, k = 200: Lincoln box 2's errors 17.2 to 4.9
 per 100 gaps, measured on one material). The shipped 2B answers the training pack on the cluster (cluster_seg.py
 run, IC_SEG_KEY=fs-seg-2b); each window it answered is a row whose target is its own reply with every boundary set
-to the person's call, a changed one at confidence 0.95 with the cue "corrected by the reviewer". Three corpus windows
-are replayed for each correction window (`--replay`, a train_seg.py data set of no-text windows, as the measured
-run replayed the corpus 2B's own training set). Without one (`--no-replay`) the rows are the corrections alone, which
-data.json records as not the measured recipe. Then train_seg.py train onto the merged shipped 2B (two epochs,
+to the person's call, a changed one at confidence 0.95 with the cue "corrected by the reviewer". By default the rows
+are the corrections alone (W46.kit-continuation-replay, segbench-results/seg-adapt-replay.md: on box 2 they scored
+4.5 errors per 100 gaps against the corpus-replay run's 4.9, the change -0.4 with interval -1.9 to +0.9, and kept
+the same 67 of 69 catalogue starts; three TABME++ windows for each lost five more starts). `--replay` mixes in three
+windows of a train_seg.py data set of no-text windows for each correction window, the corpus-replay recipe
+W46.seg-adapt-lora measured with the corpus 2B's own training set. Then train_seg.py train onto the merged shipped 2B (two epochs,
 rank 16, lr 1e-4, --max-len 20480), merge, serve on the held-out pack and the anchor twice each beside the shipped
 2B, train_seg.py check, train_seg.py mac (README, "The continuation").
 
@@ -469,14 +471,14 @@ def cmd_rows(a):
     body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in all_rows)
     (tmp / "train.jsonl").write_text(body)
     summary = {"item": "W46.kit-continuation", "rule": "corrections+replay" if replay else "corrections only",
-               "measured_recipe": len(replay) == REPLAY_RATIO * len(rows), "ruled_gaps_trained": ruled, "material": meta["material"], "material_name": meta["material_name"],
+               "measured_recipe": len(replay) in (0, REPLAY_RATIO * len(rows)), "ruled_gaps_trained": ruled, "material": meta["material"], "material_name": meta["material_name"],
                "corrections": len(rows), "flipped_decisions": flips, "replay": len(replay),
                "replay_from": str(src) if src else None, "dropped": why, "windows": len(all_rows),
                "images": str(out.resolve() / "images"), "pack_made": meta["made"],
                "train_sha256": hashlib.sha256(body.encode()).hexdigest()}
     if not summary["measured_recipe"]:
-        summary["note"] = (f"{len(replay)} replay windows for {len(rows)} correction windows: W46.seg-adapt-lora "
-                           f"replayed {REPLAY_RATIO} corpus windows for each, so these rows are not the measured recipe")
+        summary["note"] = (f"{len(replay)} replay windows for {len(rows)} correction windows: the measured recipes are "
+                           f"the corrections alone and {REPLAY_RATIO} corpus windows for each, so these rows are neither")
     (tmp / "data.json").write_text(json.dumps(summary, indent=1) + "\n")
     tmp.rename(out)
     print(json.dumps(summary, indent=1))
@@ -497,9 +499,9 @@ def main(argv=None):
             p.add_argument("--train", required=True, help="the training pack, whose pages the held-out box may not hold")
     p = sub.add_parser("rows")
     p.add_argument("--pack", required=True); p.add_argument("--answers", required=True); p.add_argument("--out", required=True)
-    g = p.add_mutually_exclusive_group(required=True)
+    g = p.add_mutually_exclusive_group()
     g.add_argument("--replay", help="a train_seg.py data set (train.jsonl, data.json) whose no-text windows are replayed")
-    g.add_argument("--no-replay", action="store_true")
+    g.add_argument("--no-replay", action="store_true", help="the corrections alone, the default (measured: seg-adapt-replay.md)")
     p.add_argument("--replay-images", help="where the replay set's images are now, if not where its data.json says")
     a = ap.parse_args(argv)
     return {"pack": cmd_pack, "heldout": cmd_heldout, "rows": cmd_rows}[a.cmd](a)

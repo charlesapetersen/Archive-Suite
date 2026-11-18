@@ -312,17 +312,20 @@ packs, and an anchor pack (`public_segmentation.py pack --key fs-seg-2b`), every
 ```bash
 # 1. the shipped 2B answers the training windows
 IC_STUDENT=/path/to/seg-2b-merged IC_STUDENT_NAME=seg-2b IC_SEG_KEY=fs-seg-2b bash submit.sh seg seg-student --pack ~/kit/train
-# 2. its replies, with every boundary set to your call, plus three corpus windows replayed for each (the measured recipe)
-python3 kit_continuation.py rows --pack ~/kit/train --answers RUNS/<label>/answers.jsonl --replay /path/to/a/train_seg/data --out ~/kit/rows
+# 2. its replies, with every boundary set to your call: the corrections alone (the default, measured)
+python3 kit_continuation.py rows --pack ~/kit/train --answers RUNS/<label>/answers.jsonl --out ~/kit/rows
 # 3. train onto the merged 2B (train.sbatch, as above) with TRAIN_DATA=~/kit/rows TRAIN_MODEL=/path/to/seg-2b-merged
 #    TRAIN_ARGS='--epochs 2 --max-len 20480'; it merges at the end
 # 4. serve the merged continuation and the shipped 2B on ~/kit/heldout and the anchor pack, twice each (submit.sh seg seg-student)
 ```
 
-The replay set is a `train_seg.py data` set whose no-text windows are mixed in, three for each correction window, so
-the continuation keeps what the 2B knew. The measured run replayed the corpus 2B's own training set. The kit does not
-distribute that set, since it is one owner's archive. `--no-replay` trains on the corrections alone, and `data.json`
-then records that this is not the measured recipe. On a container profile (Sherlock), `train.sbatch` refuses to run,
+The rows are your corrections alone. That was measured against the first run, which also replayed three windows of
+the corpus 2B's own training set for each correction window, a set the kit does not distribute since it is one owner's
+archive. On the same Lincoln box 2, the corrections alone made 4.5 errors per 100 gaps against that run's 4.9 (the
+change -0.4, interval -1.9 to +0.9) and found the same 67 of 69 catalogue starts. Replaying three public TABME++
+windows for each instead did no better and lost five more starts, 62 of 69, so do not add a public set
+(`segbench-results/seg-adapt-replay.md`). `--replay DATA` still mixes in a `train_seg.py data` set's no-text windows,
+three for each correction window, if you have such a set of your own material. On a container profile (Sherlock), `train.sbatch` refuses to run,
 and training goes as `../sherlock/seg-adapt-lora/train-job.sh` does it: the rows at `ROOT/data/k200` are used as
 they are. Then, on the Mac, `train_seg.py mac` on the merged continuation, and `train_seg.py check` (above) with
 `--labels ~/kit/heldout/labels.jsonl --ruled ~/kit/heldout/ruled.csv` and both runs of each model. The manifest the
