@@ -45,7 +45,7 @@ class CellsL4(unittest.TestCase):
     def read_all(self, disagree=()):
         for c in D.load(self.store / 'picked.json')['pages'][0]['cells']:
             for route in D.MODELS:
-                text = f'v{c["id"]}' + ('x' if route == 'glm' and c['id'] in disagree else '')
+                text = f'v{c["id"]}' + ('x' if route == 'gpt' and c['id'] in disagree else '')
                 D.dump(self.store / 'read' / route / 'pA' / f'{c["id"]}.json',
                        reply({'text': text, 'box': 'fits', 'medium': 'hand', 'type': 'free_text'}))
 
@@ -66,13 +66,13 @@ class CellsL4(unittest.TestCase):
         D.pick()
         self.read_all()
         self.assertEqual(D.cell_state('pA', 'c01')[0], 'agreed')
-        D.dump(self.store / 'read' / 'glm' / 'pA' / 'c02.json',
+        D.dump(self.store / 'read' / 'gpt' / 'pA' / 'c02.json',
                reply({'text': ' VC02 ', 'box': 'fits', 'medium': 'hand', 'type': 'free_text'}))
         self.assertEqual(D.cell_state('pA', 'c02')[0], 'agreed')
-        D.dump(self.store / 'read' / 'glm' / 'pA' / 'c03.json',
+        D.dump(self.store / 'read' / 'gpt' / 'pA' / 'c03.json',
                reply({'text': 'vc03', 'box': 'cut', 'medium': 'hand', 'type': 'free_text'}))
         self.assertEqual(D.cell_state('pA', 'c03')[0], 'disputed')
-        (self.store / 'read' / 'glm' / 'pA' / 'c04.json').unlink()
+        (self.store / 'read' / 'gpt' / 'pA' / 'c04.json').unlink()
         self.assertEqual(D.cell_state('pA', 'c04')[0], 'missing')
 
     def test_sheet_and_fold_make_a_draft_the_bank_accepts_after_freeze_checks(self):

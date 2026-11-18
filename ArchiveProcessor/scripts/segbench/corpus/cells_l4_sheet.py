@@ -7,7 +7,7 @@
 
 Reads what cells_l4_draft.py saved: no model, no network, no money, and no Claude reader looks at a page.
 
-Asked: every cell the two drafting readers (Gemini 3.7 Flash, GLM 5.3 Flash) read differently or either called
+Asked: every cell the two drafting readers (Gemini 3.7 Flash, GPT-5 mini) read differently or either called
 badly boxed, with the distinct readings unlabelled in a seeded random order; and CONTROLS agreed cells drawn at
 random (seed), each showing its one reading to confirm or correct, so the agreed part has a measured error rate.
 Each item can also be dropped (the box does not hold one field) or marked unreadable (unknown truth, excluded from
@@ -76,7 +76,7 @@ def labels(r):
     out, differ = {}, []
     for k in ('medium', 'type'):
         vals = {route: (r[route] or {}).get(k) for route in D.MODELS}
-        out[k] = vals['gemini'] if vals['gemini'] is not None else vals['glm']
+        out[k] = vals['gemini'] if vals['gemini'] is not None else vals['gpt']
         if len(set(vals.values())) > 1:
             differ.append(k)
     return out, differ

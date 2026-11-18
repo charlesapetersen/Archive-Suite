@@ -4,7 +4,7 @@
   python3 cells_l4_draft.py draw        # 20 L4 pages of the 895, seeded hash order, the 4 already inspected left out
   python3 cells_l4_draft.py propose     # Gemini 3.7 Flash: is there a front-side table, and its column/row grid
   python3 cells_l4_draft.py pick        # 3 heading + 6 entry cells per table page, at random (seed) from the grid
-  python3 cells_l4_draft.py read        # Gemini 3.7 Flash and GLM 5.3 Flash each read every picked cell
+  python3 cells_l4_draft.py read        # Gemini 3.7 Flash and GPT-5 mini each read every picked cell
   python3 cells_l4_draft.py status      # counts, agreement and spend; prints nothing from a page
 
 The only L4 cell truth was the frozen bank's 3 register pages (27 fields, regions-cells-20261025.md), read by a
@@ -49,9 +49,12 @@ N_PAGES = 20
 INSPECTED = {'si__NMAAHC-007630087_00447', 'si__NMAAHC-007630088_00156', 'si__NMAAHC-007630088_00337',
              'si__NMAAHC-007630087_00354'}    # the first bank's four seeds (three kept, one paired prose)
 HEADINGS, ENTRIES = 3, 6
-MODELS = {'gemini': 'gemini-3.7-flash', 'glm': 'GLM 5.3 Flash'}
-PRICES = {'gemini': (.75, 3.75), 'glm': (.15, .50)}   # $/M estimates as seg_lincoln_gateway; not a gateway bill
-MAX_OUT = {'gemini': 8192, 'glm': 16384}             # GLM spends its first thousands on reasoning
+# GLM 5.3 Flash was the planned second reader, but on 2026-11-18 the gateway listed it in /v1/models and refused every
+# call ("Invalid model name"; it last answered on 2026-10-25), so GPT-5 mini reads instead. It is not under test: the
+# GPT gateway readers (W46.gateway-gpt-claude-readers) wait behind nice-to-have, and would be GPT-5.6, not mini.
+MODELS = {'gemini': 'gemini-3.7-flash', 'gpt': 'gpt-5-mini'}
+PRICES = {'gemini': (.75, 3.75), 'gpt': (.25, 2.00)}   # $/M list estimates; not a gateway bill
+MAX_OUT = {'gemini': 8192, 'gpt': 8192}
 CAP = 2.50
 LOCK = threading.Lock()
 INFLIGHT = [0.0]   # worst-case dollars of calls sent and not yet in the ledger
@@ -160,7 +163,8 @@ def call(route, key, image: bytes, prompt: str, dest: Path):
     body = {'model': MODELS[route], 'temperature': 0, 'max_tokens': MAX_OUT[route], 'reasoning_effort': 'low',
             'response_format': {'type': 'json_object'},
             'messages': [{'role': 'user', 'content': [
-                {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(image).decode()}},
+                {'type': 'image_url', 'image_url': {'url': 'data:image/jpeg;base64,' + base64.b64encode(image).decode(),
+                                                    **({'detail': 'high'} if route == 'gpt' else {})}},
                 {'type': 'text', 'text': prompt}]}]}
     bound = worst(route, body)
     with LOCK:   # calls still in flight count at their worst case, so parallel threads cannot pass the cap together
@@ -177,8 +181,15 @@ def call(route, key, image: bytes, prompt: str, dest: Path):
 def send(route, key, body, dest):
     gateway_key()
     t = time.time()
+    import requests
     for attempt in range(3):
-        r = G.request('/chat/completions', body)
+        try:
+            r = G.request('/chat/completions', body)
+        except (requests.ConnectionError, requests.Timeout) as e:   # the gateway drops connections under load
+            if attempt == 2:
+                print(key, route, 'no answer:', type(e).__name__)
+                return {'meta': {'route': route, 'key': key, 'http': None}, 'raw': None}
+            time.sleep(10 * (attempt + 1)); continue
         if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
             time.sleep(10 * (attempt + 1)); continue
         break
