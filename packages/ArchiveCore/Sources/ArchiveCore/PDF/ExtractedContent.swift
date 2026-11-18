@@ -42,7 +42,57 @@ public struct PDFPageHeader: Sendable, Equatable {
     public var sentWith: String?
     /// W46.date-route-header — the evidence behind a non-explicit document date, as one display line.
     public var dateEvidence: String?
+    /// W47.item-fields-build — the document's own catalogue fields, as the item-field lines give them.
+    public var itemFields = PDFItemFields()
     public var diagnostics: [PDFHeaderDiagnostic] = []
+}
+
+/// W47.item-fields-build — the item-field lines of a text page's header (SPEC §2-page PDF, "Item fields"): display
+/// strings, each one physical line, a list joined with `; `. An output-time snapshot of the Processor's item-field
+/// call; the publication date is the printed issue date, never the document's own date.
+public struct PDFItemFields: Sendable, Equatable {
+    public var documentKind: String?
+    public var title: String?
+    public var byline: String?
+    public var publication: String?
+    public var publicationDate: String?
+    public var recipientPlace: String?
+
+    public init(documentKind: String? = nil, title: String? = nil, byline: String? = nil, publication: String? = nil,
+                publicationDate: String? = nil, recipientPlace: String? = nil) {
+        self.documentKind = documentKind
+        self.title = title
+        self.byline = byline
+        self.publication = publication
+        self.publicationDate = publicationDate
+        self.recipientPlace = recipientPlace
+    }
+
+    public var isEmpty: Bool { self == PDFItemFields() }
+
+    /// Each line's prefix, in SPEC order, with its value.
+    public var lines: [(prefix: String, value: String)] {
+        [(PDFHeaderParser.documentKindPrefix, documentKind), (PDFHeaderParser.titlePrefix, title),
+         (PDFHeaderParser.bylinePrefix, byline), (PDFHeaderParser.publicationPrefix, publication),
+         (PDFHeaderParser.publicationDatePrefix, publicationDate),
+         (PDFHeaderParser.recipientPlacePrefix, recipientPlace)]
+            .compactMap { p, v in v.map { (p, $0) } }
+    }
+
+    /// The header lines, in SPEC order, each with Core's exact prefix.
+    public var headerLines: [String] { lines.map { $0.prefix + $0.value } }
+
+    /// A value as a line holds it: control characters and runs of white space one space, the middle dot a comma (it
+    /// is the provenance separator), cut to `maxValue` characters with `…`. Nil when nothing is left.
+    public static let maxValue = 120
+    public static func lineValue(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        var s = raw.unicodeScalars.map { CharacterSet.controlCharacters.contains($0) ? " " : String($0) }.joined()
+        s = s.replacingOccurrences(of: "·", with: ",")
+        s = s.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        guard !s.isEmpty else { return nil }
+        return s.count > maxValue ? String(s.prefix(maxValue - 1)) + "…" : s
+    }
 }
 
 public struct ParsedPDFTextPage: Sendable, Equatable {
@@ -142,6 +192,15 @@ public enum PDFHeaderParser {
     public static let sentWithPrefix = "Sent with: "
     public static let dateEvidencePrefix = "Date evidence: "
     public static let kindPrefix = "Kind: "
+    /// W47.item-fields-build — the item-field lines, after the date-evidence line, in this order.
+    public static let documentKindPrefix = "Document kind: "
+    public static let titlePrefix = "Title: "
+    public static let bylinePrefix = "Byline: "
+    public static let publicationPrefix = "Publication: "
+    public static let publicationDatePrefix = "Publication date: "
+    public static let recipientPlacePrefix = "Recipient place: "
+    public static let itemFieldPrefixes = [documentKindPrefix, titlePrefix, bylinePrefix, publicationPrefix,
+                                    publicationDatePrefix, recipientPlacePrefix]
 
     public static func extract(_ url: URL) -> ExtractedContent? {
         guard let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
@@ -306,6 +365,8 @@ public enum PDFHeaderParser {
                 field = 3; value = String(line.dropFirst(sentWithPrefix.count))
             } else if line.hasPrefix(dateEvidencePrefix) {
                 field = 4; value = String(line.dropFirst(dateEvidencePrefix.count))
+            } else if let n = itemFieldPrefixes.firstIndex(where: { line.hasPrefix($0) }) {
+                field = 5 + n; value = String(line.dropFirst(itemFieldPrefixes[n].count))
             } else { break }
             // Repeated or late Kind is consumed, diagnosed and never trusted. Other out-of-order
             // fields start the body; this preserves an archival Classification: security marking.
@@ -318,6 +379,12 @@ public enum PDFHeaderParser {
             case 2: header.documentDate = value
             case 3: header.sentWith = value
             case 4: header.dateEvidence = value
+            case 5: header.itemFields.documentKind = value
+            case 6: header.itemFields.title = value
+            case 7: header.itemFields.byline = value
+            case 8: header.itemFields.publication = value
+            case 9: header.itemFields.publicationDate = value
+            case 10: header.itemFields.recipientPlace = value
             default: break
             }
             lastField = max(lastField, field)
@@ -392,7 +459,8 @@ public enum PDFHeaderParser {
     }
 
     private static func isField(_ line: String) -> Bool {
-        ["Classification:", "Kind:", documentDatePrefix, sentWithPrefix, dateEvidencePrefix].contains { line.hasPrefix($0) }
+        (["Classification:", "Kind:", documentDatePrefix, sentWithPrefix, dateEvidencePrefix] + itemFieldPrefixes)
+            .contains { line.hasPrefix($0) }
     }
 
     private static func endsWithYear(_ text: String) -> Bool {

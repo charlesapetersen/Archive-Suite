@@ -41,8 +41,9 @@ enum SegmentJSONBuilder {
     ///     evidence class, the quote and its place, the interval where measured, second-role dates. `nil` → no key.
     ///
     ///   - itemFields: W47.item-fields-build — the item-field call's `item_fields` object (`ItemFieldResult.sidecarObject`),
-    ///     when it ran on this document. When it read the document, it answers the publication and where the addressee
-    ///     is, so the tagging call's `publication_name` and `recipient_location` are left out: one answer per field.
+    ///     when it ran on this document. When it read the document, it answers the publication, and on correspondence
+    ///     where the addressee is, so the tagging call's `publication_name` (and there `recipient_location`) are left
+    ///     out: one answer per field. On another kind the recipient place is not filled, so the tagging call's stays.
     ///     `nil` → no key, and the sidecar is byte-identical to the output before the feature.
     ///
     /// The output is `[.prettyPrinted, .sortedKeys]` JSON, so it is byte-for-byte deterministic.
@@ -84,7 +85,9 @@ enum SegmentJSONBuilder {
             dict["item_fields"] = itemFields
             if itemFields["status"] as? String == "read" {
                 dict["publication_name"] = nil
-                dict["recipient_location"] = nil
+                if let kind = itemFields["kind"] as? String, ItemFieldExtractor.correspondence.contains(kind) {
+                    dict["recipient_location"] = nil
+                }
             }
         }
         // Box/folder label override wins over tags.format (Process-Files path); nil-op for documents.

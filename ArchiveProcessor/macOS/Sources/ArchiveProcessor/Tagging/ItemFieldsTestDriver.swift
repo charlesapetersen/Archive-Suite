@@ -3,6 +3,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 import ArchiveCore
+import PDFKit
 
 /// Headless, key-free ($0) self-test of the item fields (W47.item-fields-build), gated by `ITEM_FIELDS_TEST=1`
 /// (`scripts/test-item-fields.sh`). No real network: every request goes to `NetworkSession.testTransport`, and the
@@ -13,7 +14,10 @@ import ArchiveCore
 ///   2. The fill policy: which fields fill on which kinds, title withheld.
 ///   3. The sidecar object, and `SegmentJSONBuilder` with and without it.
 ///   4. End to end through `performTaggingPhase` on a remote gateway: the call made with the page images and the
-///      measured model; none on a route the bench did not measure, nor with sidecars off.
+///      measured model, its lines in the outputs' page-2 headers; none on a route the bench did not measure, nor with
+///      sidecars off.
+///   5. The page-2 header lines (SPEC §2-page PDF): written at render time and by the after-the-call rewrite, read
+///      back by Core's parser with every other line and the body unchanged.
 @MainActor
 enum ItemFieldsTestDriver {
     nonisolated static let envKey = "ITEM_FIELDS_TEST"
@@ -36,6 +40,7 @@ enum ItemFieldsTestDriver {
         parsing()
         policy()
         sidecar()
+        headerLines()
         await endToEnd()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
         let text = lines.joined(separator: "\n") + "\n"
@@ -156,12 +161,84 @@ enum ItemFieldsTestDriver {
               && SegmentJSONBuilder.buildData(fileURLs: [url], texts: ["t"], tags: tags)
               == SegmentJSONBuilder.buildData(fileURLs: [url], texts: ["t"], tags: tags, itemFields: nil))
         let read = built(o)
-        check("3 a read replaces the tagging call's publication and recipient place, the format kept",
-              read["item_fields"] != nil && read["publication_name"] == nil && read["recipient_location"] == nil
+        check("3 a read replaces the tagging call's publication, the format kept; off correspondence its place stays",
+              read["item_fields"] != nil && read["publication_name"] == nil
+              && read["recipient_location"] as? String == "Tagging Place"
               && read["format"] as? String == "newspaper article")
+        let letterRead = built(ItemFieldResult(route: "g", outcome: .read(.init(kind: "letter", recipientPlace: ["Boston, MA"])))
+            .sidecarObject)
+        check("3 on a letter the item call's recipient place replaces the tagging call's",
+              letterRead["recipient_location"] == nil
+              && (letterRead["item_fields"] as? [String: Any])?["recipient_place"] as? [String] == ["Boston, MA"])
         let failed = built(f)
         check("3 a failed call leaves the tagging call's fields", failed["item_fields"] != nil
               && failed["publication_name"] as? String == "Tagging Paper")
+    }
+
+    // MARK: 5. The page-2 header lines
+
+    private static func headerLines() {
+        let fm = FileManager.default
+        let tmp = fm.temporaryDirectory.appendingPathComponent("APItemHeader-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: tmp) }
+        try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
+        guard let model = OpenRouterRoute.catalog.first?.model else { check("5 a model", false); return }
+        let image = tmp.appendingPathComponent("scan_001.jpg")
+        writeJPEG(image)
+        let text = "SENATE ACTS\nBy Mary Jones\n\nThe Senate passed the bill."
+        let result = OCRResult(text: text, classification: .documentStart, errorMessage: nil, errorCode: nil)
+        let pdf = tmp.appendingPathComponent("scan_001.pdf")
+        _ = try? PDFGenerator().generate(imageURL: image, result: result, model: model, outputURL: pdf,
+                                         originalFileName: "scan_001.jpg",
+                                         sourceDates: PDFSourceDates(documentDate: "1967"), pageKind: .printed)
+        guard let original = try? Data(contentsOf: pdf),
+              let oldHeader = PDFDocument(data: original)?.page(at: 1).map({ PDFHeaderParser.parse($0) })?.header else {
+            check("5 a generated pair", false); return
+        }
+        let fields = ItemFieldResult(route: "g", outcome: .read(.init(
+            kind: "newspaper article", title: "Senate Acts", byline: ["Mary Jones", "John Smith"], publication: "The Sun",
+            publicationDate: "1967-03-02"))).headerFields
+        check("5 the header fields: the filled ones, the byline joined, no title",
+              fields == PDFItemFields(documentKind: "newspaper article", byline: "Mary Jones; John Smith",
+                                      publication: "The Sun", publicationDate: "1967-03-02"), "\(fields)")
+        let gen = PDFGenerator()
+        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, evidence: "image; page 1", itemFields: fields,
+                                                                body: text, textColumns: 1) else {
+            check("5 the rewrite adds the lines", false); return
+        }
+        let back = PDFDocument(data: added)?.page(at: 1).map { PDFHeaderParser.parse($0) }
+        var expected = oldHeader
+        expected.dateEvidence = "image; page 1"
+        expected.itemFields = fields
+        check("5 the rewrite adds them after the evidence line; every other line and the body read back unchanged",
+              back?.header == expected && PDFGenerator.squashed(back?.body ?? "") == PDFGenerator.squashed(text)
+              && back?.header?.documentDate == "1967", "\(String(describing: back))")
+        check("5 the same lines again: unchanged",
+              gen.dateEvidenceRewrite(of: added, evidence: "image; page 1", itemFields: fields, body: text,
+                                      textColumns: 1) == .unchanged)
+        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, evidence: nil, body: text, textColumns: 1) {
+            check("5 none removes stale lines", PDFDocument(data: removed)?.page(at: 1)
+                    .map { PDFHeaderParser.parse($0) }?.header == oldHeader)
+        } else { check("5 none removes stale lines", false) }
+        let long = PDFItemFields(documentKind: "report", publication: PDFItemFields.lineValue(String(repeating: "Long ", count: 40)))
+        if case .rewrite(let l) = gen.dateEvidenceRewrite(of: original, evidence: nil, itemFields: long, body: text,
+                                                          textColumns: 2) {
+            let lp = PDFDocument(data: l)?.page(at: 1).map { PDFHeaderParser.parse($0) }
+            check("5 a long value is fitted to one line and reads back whole (two text columns)",
+                  lp?.header?.itemFields == long && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text),
+                  "\(String(describing: lp?.header?.itemFields))")
+        } else { check("5 a long value is fitted to one line and reads back whole (two text columns)", false) }
+
+        // At render time (Live Capture's path): the lines after the source dates.
+        let live = tmp.appendingPathComponent("live.pdf")
+        var dates = PDFSourceDates(documentDate: "1958")
+        dates.itemFields = PDFItemFields(documentKind: "letter", recipientPlace: "Boston, MA")
+        _ = try? PDFGenerator().generate(imageURL: image, result: result, model: model, outputURL: live,
+                                         originalFileName: "scan_001.jpg", sourceDates: dates, pageKind: .typewritten)
+        let lh = PDFDocument(url: live)?.page(at: 1).map { PDFHeaderParser.parse($0) }
+        check("5 render time: the lines read back after the document date, the body whole",
+              lh?.header?.itemFields == dates.itemFields && lh?.header?.documentDate == "1958"
+              && PDFGenerator.squashed(lh?.body ?? "") == PDFGenerator.squashed(text), "\(String(describing: lh))")
     }
 
     // MARK: 4. End to end
@@ -256,7 +333,11 @@ enum ItemFieldsTestDriver {
                     job.classification = cls
                     jobs.append(job)
                     let pdf = outDir.appendingPathComponent("\(name)\(page).pdf")
-                    fm.createFile(atPath: pdf.path, contents: Data("%PDF-1.4\n%%EOF\n".utf8))
+                    // A real pair, so the header lines can be checked on the written file.
+                    if let model = OpenRouterRoute.catalog.first?.model, let result = job.result {
+                        _ = try? PDFGenerator().generate(imageURL: src, result: result, model: model, outputURL: pdf,
+                                                         originalFileName: src.lastPathComponent)
+                    }
                     map[src] = pdf
                     if page == 0 { outputs[name] = pdf.deletingPathExtension().appendingPathExtension("json") }
                 }
@@ -289,6 +370,20 @@ enum ItemFieldsTestDriver {
               && af["title"] == nil && (af["not_filled"] as? [String: String])?["title"] != nil, "\(af)")
         check("4 A: the tagging call's publication left out, its format kept",
               a["publication_name"] == nil && a["format"] as? String == "newspaper article", "\(a.keys.sorted())")
+        func header(_ name: String) -> PDFPageHeader? {
+            guard let u = gOut[name]?.deletingPathExtension().appendingPathExtension("pdf"),
+                  let page = PDFDocument(url: u)?.page(at: 1) else { return nil }
+            return PDFHeaderParser.parse(page).header
+        }
+        let ah = header("A"), a1 = PDFDocument(url: tmp.appendingPathComponent("gateway/A1.pdf"))?.page(at: 1)
+            .flatMap { PDFHeaderParser.parse($0).header }
+        check("4 A: both pages' headers carry the filled fields, no title line",
+              ah?.itemFields == PDFItemFields(documentKind: "newspaper article", byline: "Mary Jones",
+                                              publication: "The Sun", publicationDate: "1967-03-02")
+              && a1?.itemFields == ah?.itemFields && ah?.originalFilename == "gateway-A0.jpg",
+              "\(String(describing: ah)) \(String(describing: a1))")
+        check("4 L: the letter's header carries its kind and recipient place",
+              header("L")?.itemFields == PDFItemFields(documentKind: "letter", recipientPlace: "Boston, MA"))
         let lf = json(gOut["L"])["item_fields"] as? [String: Any] ?? [:]
         check("4 L: the letter's recipient place filled", lf["kind"] as? String == "letter"
               && lf["recipient_place"] as? [String] == ["Boston, MA"] && lf["not_filled"] == nil, "\(lf)")
@@ -303,6 +398,9 @@ enum ItemFieldsTestDriver {
         await key.performTaggingPhase(provider: .openrouter, model: route.model, apiKey: "test-key",
                                       outputDirectory: tmp, enableSegmentJSON: true)
         let ka = json(keyOut["A"])
+        let keyHeader = PDFDocument(url: tmp.appendingPathComponent("key/A0.pdf"))?.page(at: 1)
+            .flatMap { PDFHeaderParser.parse($0).header }
+        check("4 a key route: no item-field lines", keyHeader != nil && keyHeader?.itemFields.isEmpty == true)
         check("4 a key route: no item-field call, the tagging call's publication kept",
               wire.lock.withLock { wire.fields.isEmpty } && ka["item_fields"] == nil
               && ka["publication_name"] as? String == "Tagging Paper", "\(ka.keys.sorted())")

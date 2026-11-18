@@ -15,8 +15,17 @@ struct PDFSourceDates: Sendable, Equatable {
     var sentWith: String?
     /// W46.date-route-header — the evidence behind a non-explicit document date (`DateRoute.Decision.headerEvidence`).
     var dateEvidence: String? = nil
+    /// W47.item-fields-build — the filled item fields (`ItemFieldResult.headerFields`), after the evidence line.
+    var itemFields = PDFItemFields()
 
-    var isEmpty: Bool { documentDate == nil && sentWith == nil && dateEvidence == nil }
+    var isEmpty: Bool { documentDate == nil && sentWith == nil && dateEvidence == nil && itemFields.isEmpty }
+
+    /// Whether `line` is fitted to one physical line, like provenance: the evidence and item-field lines quote the
+    /// document, so they must never wrap into the body.
+    static func isFitted(_ line: String) -> Bool {
+        line.hasPrefix(PDFHeaderParser.dateEvidencePrefix)
+            || PDFHeaderParser.itemFieldPrefixes.contains { line.hasPrefix($0) }
+    }
 
     /// The header lines, in SPEC order, each with Core's exact prefix.
     var headerLines: [String] {
@@ -24,7 +33,7 @@ struct PDFSourceDates: Sendable, Equatable {
         if let documentDate { lines.append(PDFHeaderParser.documentDatePrefix + documentDate) }
         if let sentWith { lines.append(PDFHeaderParser.sentWithPrefix + sentWith) }
         if let dateEvidence { lines.append(PDFHeaderParser.dateEvidencePrefix + dateEvidence) }
-        return lines
+        return lines + itemFields.headerLines
     }
 }
 
@@ -766,8 +775,8 @@ struct PDFGenerator {
         // before the blank separator, only when known at render time (see `PDFSourceDates`).
         var fitRanges = provenanceRange.map { [$0] } ?? []
         for line in sourceDates?.headerLines ?? [] {
-            // W46.date-route-header: the evidence line quotes the document, so it is fitted to one line like provenance.
-            if line.hasPrefix(PDFHeaderParser.dateEvidencePrefix) {
+            // W46.date-route-header, W47.item-fields-build: these quote the document, fitted to one line like provenance.
+            if PDFSourceDates.isFitted(line) {
                 fitRanges.append(NSRange(location: headerLine.utf16.count + 1, length: line.utf16.count))
             }
             headerLine += "\n\(line)"

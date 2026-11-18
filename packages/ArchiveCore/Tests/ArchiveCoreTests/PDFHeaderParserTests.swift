@@ -233,6 +233,61 @@ final class PDFHeaderParserTests: XCTestCase {
         XCTAssertNil(parsed.header?.classification)
     }
 
+    // MARK: W47.item-fields-build — the item-field lines
+
+    func testItemFieldLinesAfterDateEvidence() {
+        let pageText = """
+        Extracted text.
+        scan_001.jpg
+        Anthropic \u{00B7} Claude \u{00B7} 6 October 2026
+        Kind: printed
+        Date evidence: image; page 1
+        Document kind: newspaper article
+        Byline: Mary Jones; John Smith
+        Publication: The Sun
+        Publication date: 1967-03-02
+
+        Senate acts on the tax bill.
+        """
+        let parsed = PDFHeaderParser.parse(pageText)
+        XCTAssertEqual(parsed.body, "Senate acts on the tax bill.")
+        XCTAssertEqual(parsed.header?.dateEvidence, "image; page 1")
+        XCTAssertEqual(parsed.header?.itemFields, PDFItemFields(documentKind: "newspaper article",
+                                                                byline: "Mary Jones; John Smith",
+                                                                publication: "The Sun", publicationDate: "1967-03-02"))
+        XCTAssertNil(parsed.header?.documentDate, "the printed issue date is never the document's own date")
+        let letter = "Extracted text.\nscan_002.jpg\nAnthropic \u{00B7} Claude \u{00B7} 6 October 2026\n"
+            + "Kind: typewritten\nDocument kind: letter\nTitle: Re: the budget\nRecipient place: Boston, MA\nDear Sir,"
+        let l = PDFHeaderParser.parse(letter)
+        XCTAssertEqual(l.body, "Dear Sir,", "consumed without a separator, as the other header lines are")
+        XCTAssertEqual(l.header?.itemFields.title, "Re: the budget")
+        XCTAssertEqual(l.header?.itemFields.recipientPlace, "Boston, MA")
+        XCTAssertEqual(PDFItemFields(documentKind: "letter", recipientPlace: "Boston, MA").headerLines,
+                       ["Document kind: letter", "Recipient place: Boston, MA"])
+    }
+
+    func testItemFieldLookalikesInBodyOrOutOfOrderAreKept() {
+        let inBody = page("Classification: Continuation", body: "Title: The Annual Report")
+        XCTAssertEqual(PDFHeaderParser.stripHeader(from: inBody), "Title: The Annual Report")
+        XCTAssertEqual(PDFHeaderParser.parse(inBody).header?.itemFields, PDFItemFields())
+        // A field before one it follows starts the body; so does a date line after the item fields.
+        let late = "Extracted text.\nscan_001.jpg\nAnthropic \u{00B7} Claude \u{00B7} 6 October 2026\n"
+            + "Publication: The Sun\nByline: Mary Jones\nDocument date: 1957\n\nBody."
+        let parsed = PDFHeaderParser.parse(late)
+        XCTAssertEqual(parsed.header?.itemFields, PDFItemFields(publication: "The Sun"))
+        XCTAssertEqual(parsed.body, "Byline: Mary Jones\nDocument date: 1957\n\nBody.")
+        XCTAssertEqual(PDFHeaderParser.stripHeader(from: page("title: lower case")), "title: lower case\n\nThe quick brown fox.")
+    }
+
+    func testItemFieldLineValue() {
+        XCTAssertEqual(PDFItemFields.lineValue(" The \u{00B7} Sun\n\tDaily "), "The , Sun Daily")
+        XCTAssertNil(PDFItemFields.lineValue(" \n "))
+        XCTAssertNil(PDFItemFields.lineValue(nil))
+        let long = PDFItemFields.lineValue(String(repeating: "a", count: 300))
+        XCTAssertEqual(long?.count, PDFItemFields.maxValue)
+        XCTAssertEqual(long?.last, "…")
+    }
+
     func testDateEvidenceLookalikeInBodyOrOutOfOrderIsKept() {
         // After the separator it is body; a source-date line after it is out of order and starts the body.
         let inBody = page("Classification: Continuation", body: "Date evidence: none here.")

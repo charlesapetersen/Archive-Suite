@@ -1303,6 +1303,8 @@ extension OCRProcessor {
             if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false; headerEvidence = nil }
             if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
         }
+        // W47.item-fields-build: the filled item fields, for the outputs' header lines.
+        let headerFields = itemFields?.headerFields ?? PDFItemFields()
         // W37: the tagger never proposes a sent-with date; only a relation does.
         tags.sentWith = nil
         tags.sentWithUncertain = false
@@ -1314,8 +1316,9 @@ extension OCRProcessor {
         for sourceURL in segment.pdfURLs {
             appliedGeneratedTags[sourceURL] = tags
             if let outputPDF = outputURLMap[sourceURL] {
-                if dating != nil {
-                    writeDateEvidence(headerEvidence, to: outputPDF, source: sourceURL, runConfig: runConfig)
+                if dating != nil || !headerFields.isEmpty {
+                    writeDateEvidence(headerEvidence, itemFields: headerFields, to: outputPDF, source: sourceURL,
+                                      runConfig: runConfig)
                 }
                 tagOutput(tags, at: outputPDF, source: sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
@@ -1338,22 +1341,24 @@ extension OCRProcessor {
     /// carries the line, so a later merge keeps it. An output it cannot safely rewrite is left as it is and logged: the
     /// sidecar's `dating` object still carries the evidence.
     @discardableResult
-    func writeDateEvidence(_ evidence: String?, to outputPDF: URL, source: URL,
-                           runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
+    /// W47.item-fields-build: the item-field lines go in the same rewrite (`itemFields`; empty removes stale ones).
+    func writeDateEvidence(_ evidence: String?, itemFields: PDFItemFields = PDFItemFields(), to outputPDF: URL,
+                           source: URL, runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
         guard let text = jobs.first(where: { $0.sourceURL == source })?.result?.text, !text.isEmpty else {
             return .skipped("no text")
         }
         // Most documents have an explicit year and no old line: settle that from the text page alone, unread bytes.
-        if evidence == nil, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2,
+        if evidence == nil, itemFields.isEmpty, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2,
            PDFPageRole.roles(of: doc) == [.image, .text], let page = doc.page(at: 1),
-           let header = PDFHeaderParser.parse(page).header, header.dateEvidence == nil {
+           let header = PDFHeaderParser.parse(page).header, header.dateEvidence == nil, header.itemFields.isEmpty {
             return .unchanged
         }
         guard !OutputFileSafety.isSameFile(outputPDF, source), let data = try? Data(contentsOf: outputPDF) else {
             return .skipped("not a readable generated output")
         }
         let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
-        let outcome = PDFGenerator().dateEvidenceRewrite(of: data, evidence: evidence, body: text, textColumns: columns)
+        let outcome = PDFGenerator().dateEvidenceRewrite(of: data, evidence: evidence, itemFields: itemFields, body: text,
+                                                         textColumns: columns)
         switch outcome {
         case .rewrite(let new):
             do {

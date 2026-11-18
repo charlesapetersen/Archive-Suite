@@ -314,6 +314,18 @@ struct ItemFieldResult: Equatable, Sendable, Codable {
         return f
     }
 
+    /// The filled fields as the page-2 header's item-field lines give them (SPEC §2-page PDF): one display line each,
+    /// a list joined with `; `. Empty when nothing is filled.
+    var headerFields: PDFItemFields {
+        guard let f = filled else { return PDFItemFields() }
+        func joined(_ list: [String]) -> String? { list.isEmpty ? nil : list.joined(separator: "; ") }
+        return PDFItemFields(documentKind: PDFItemFields.lineValue(f.kind), title: PDFItemFields.lineValue(f.title),
+                             byline: PDFItemFields.lineValue(joined(f.byline)),
+                             publication: PDFItemFields.lineValue(f.publication),
+                             publicationDate: PDFItemFields.lineValue(f.publicationDate),
+                             recipientPlace: PDFItemFields.lineValue(joined(f.recipientPlace)))
+    }
+
     /// The sidecar's `item_fields` object: the route, then each filled field; `not_filled` names a field the reading
     /// had but the fill rule leaves empty, with the reason and without the value. The publication date is the printed
     /// issue date, apart from the document's own date (`date`), which it never replaces.

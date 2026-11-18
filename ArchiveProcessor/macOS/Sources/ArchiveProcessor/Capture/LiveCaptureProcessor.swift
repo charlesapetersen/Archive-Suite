@@ -1590,6 +1590,11 @@ final class LiveCaptureProcessor: ObservableObject {
         // W46.date-route-header — the evidence of a non-explicit year, on the same pages as the dates (a year implies
         // the document-date line, so there is a header to carry it).
         if sourceDates != nil, let evidence = dating?.headerEvidence { sourceDates?.dateEvidence = evidence }
+        // W47.item-fields-build — the filled item fields, on the same documents' pages.
+        if type == .document, taggingMode.stampsUnread, let fields = itemFields?.headerFields, !fields.isEmpty {
+            sourceDates = sourceDates ?? PDFSourceDates()
+            sourceDates?.itemFields = fields
+        }
 
         for page in pages {
             // W40.fix-processor-failed-ocr-filed-image-only — a document page whose OCR FAILED (`ocrFailed`:

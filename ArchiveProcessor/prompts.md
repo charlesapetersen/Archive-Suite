@@ -359,6 +359,50 @@ Respond with ONLY a JSON object:
 Use null for an unknown month or year, and "document_date": null if the pages do not show the document's own date.
 ```
 
+
+## 10. Item-Field Prompt (kind, title, byline, publication, issue date, recipient place)
+
+**Source:** `ItemFieldExtractor.swift` — `template`, `prompt(texts:)` (W47.item-fields-build)
+
+A dedicated call after the tagging and dating calls, on every document with text (never a box or folder label, nor a
+Mac-tagged or human-tagged segment), only on a remote gateway (the measured route: Gemini 3.7 Flash, temperature 0, low
+reasoning, 8,192 tokens) and only with sidecars on. It sends every page's image (the first 8 and the last 2 of a longer
+document, upright, 1,600 px on the long side) and the pages' text, each under `[page i of n]`, cut at 16,000
+characters, in `{text}`. The label definitions are applied to the reply (a letter, memo or telegram has no byline,
+publication or publication date; a letter or telegram no title), then `ItemFieldPolicy` fills only what the bench
+measured clearing the fill rule (`segbench-results/item-fields-score.md`): kind and publication on every kind, byline
+and publication date on the published kinds, recipient place on correspondence; title is read but not written. The
+result goes to the sidecar's `item_fields` object and the page-2 header's item-field lines (SPEC §2-page PDF). The
+bench copy is `segbench/item_fields_retruth.py` PROMPT, which `test_item_fields_app.py` compares with the Swift.
+
+```
+You are labelling catalogue fields for a test set built from a historical archive. You get images of the pages of one document (all of them, or for a long document the first 8 and the last 2) and the text machine OCR read from them, with page marks (it may be noisy). Read the images as well as the text.
+
+Reply with JSON only, in this form:
+{"kind": one of "letter", "memo", "telegram", "newspaper article", "magazine article", "journal article", "newsletter", "clipping", "report", "speech", "press release", "photograph", "other",
+ "title": "..." or null,
+ "byline": ["...", ...],
+ "publication": "..." or null,
+ "publication_date": "YYYY-MM-DD" or "YYYY-MM" or "YYYY" or null,
+ "recipient_place": ["...", ...],
+ "quotes": {"title": "...", "byline": "...", "publication": "...", "publication_date": "...", "recipient_place": "..."}}
+
+Definitions.
+- kind: what the document is. "clipping" is a printed cutting whose kind of periodical cannot be told.
+- title: the title or headline the document itself states, OCR errors corrected (a memo's subject line counts; a report's title page). null for a letter, telegram or note, and when no title is printed. A letterhead (the sender's organisation printed at the top) is not a title.
+- byline: the authors credited on a published piece or a report ("By ...", an author line), as "Given Surname" without titles. A report, press release or speech that names no person as its author: the organisation that issued it. An unsigned newspaper or magazine piece: []. [] for correspondence (its sender is not a byline).
+- publication: the newspaper, magazine, journal or newsletter the piece was printed in, as named in its masthead, running head, or a note written on the clipping. null when not stated, or when the document was not printed in one (a letterhead is not a publication; a column's or section's name is not the publication).
+- publication_date: the issue date printed with the piece (masthead, running head, or a note on the clipping). null when not stated, and always null for a letter, memo or telegram (its own date is not a publication date).
+- recipient_place: where the addressee is, from the inside address, a "To:" line or an envelope, on any page, as "City, State" for the United States or "City, Country" elsewhere. [] when not written or not correspondence.
+- quotes: for each field you filled, the words in the OCR text it was read from, copied exactly as the OCR text has them (errors included); null when it is not in the OCR text (read from the image only).
+- Do not guess from general knowledge. Use only this document.
+
+OCR text:
+---
+{text}
+---
+```
+
 ---
 
 ## Notes

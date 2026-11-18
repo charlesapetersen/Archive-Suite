@@ -101,7 +101,7 @@ enum ReOCRPairs {
                              errorCode: result.errorCode, secondReader: result.secondReader,
                              pageReader: result.pageReader, imported: result.imported)
         let dates = PDFSourceDates(documentDate: pair.header.documentDate, sentWith: pair.header.sentWith,
-                                   dateEvidence: pair.header.dateEvidence)
+                                   dateEvidence: pair.header.dateEvidence, itemFields: pair.header.itemFields)
         // PDFKit reads a wrapped or underscore-split filename back as several lines; the written name never holds a
         // line break (`makeTextPage` turns control characters into spaces), so the lines join with nothing between.
         let filename = pair.header.originalFilename?.replacingOccurrences(of: "\n", with: "")
@@ -122,6 +122,7 @@ enum ReOCRPairs {
         if h.documentDate != old.documentDate || h.sentWith != old.sentWith || h.dateEvidence != old.dateEvidence {
             throw Refusal.headerNotKept(page: pair.textIndex, "document dates")
         }
+        if h.itemFields != old.itemFields { throw Refusal.headerNotKept(page: pair.textIndex, "item fields") }
         if let kind, h.kind != kind { throw Refusal.headerNotKept(page: pair.textIndex, "kind") }
         return page
     }

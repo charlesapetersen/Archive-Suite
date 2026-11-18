@@ -251,7 +251,7 @@ keeps its text page (owner, 2026-11-17). Readers need nothing new; a file may mi
   through Quartz) and the run log says so. Readers see no difference: the roles, the list and the layer are the same.
 - Still PDF/A-2b; veraPDF validates the extension schema. No migration is written because there is nothing to migrate.
 
-**Page-2 header** (built by `PDFGenerator.makeTextPage`, lines 212–224; parsed by both
+**Page-2 header** (built by `PDFGenerator.headerBlock`; parsed by both
 Processor `OCR/PDFTextExtractor.swift` and Reader `Search/PDFTextExtractor.swift`):
 
 ```
@@ -263,6 +263,12 @@ Kind: <kind>                   ← OPTIONAL: handwritten, typewritten, printed o
 Document date: <display>       ← OPTIONAL (W37); the document's OWN date, e.g. "Nov 3, 1957"
 Sent with: <display>           ← OPTIONAL (W37); the covering letter's date, e.g. "Mar 12, 1958"
 Date evidence: <evidence>      ← OPTIONAL (W46.date-route-header); what a non-explicit document year rests on
+Document kind: <kind>          ← OPTIONAL (W47.item-fields-build); the item fields, each optional, in this order
+Title: <title>
+Byline: <name>; <name>
+Publication: <name>
+Publication date: <YYYY[-MM[-DD]]>   ← the PRINTED issue date, never the document's own date
+Recipient place: <place>; <place>
                                ← blank line
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
@@ -353,6 +359,26 @@ Date evidence: <evidence>      ← OPTIONAL (W46.date-route-header); what a non-
   output through a verified sibling write and one rename, never a file that aliases its source. An output of more
   than one pair, or one that does not read back cleanly, is left as it is. Improve OCR keeps the line. No
   migration is written because there is nothing to migrate.
+- **Item fields (W47.item-fields-build, owner 2026-10-21).** The document's own catalogue fields, from the Processor's
+  item-field call (Gemini 3.7 Flash on the gateway, the bench's image prompt; `Tagging/ItemFieldExtractor.swift`).
+  Optional lines after the date-evidence line, in the order `Document kind: `, `Title: `, `Byline: `, `Publication: `,
+  `Publication date: `, `Recipient place: ` (exact case-sensitive prefixes; a line before one it follows, or after a
+  blank separator, starts the body; Core `PDFItemFields` on `PDFPageHeader.itemFields`). The separator ambiguity below
+  holds for them as for the other optional lines: a body that opens, with no separator, on `Title: …` is read as one. A field is written only where
+  the bench measured the call clearing the fill rule (`segbench-results/item-fields-score.md`, "The verdict"): the kind
+  (one of `letter`, `memo`, `telegram`, `newspaper article`, `magazine article`, `journal article`, `newsletter`,
+  `clipping`, `report`, `speech`, `press release`, `photograph`, `other`) and the publication on every kind, the
+  byline and publication date on the published kinds (the articles, newsletters, clippings and reports), the
+  recipient place on letters, memos and telegrams. **Title has its line but is not written** while it stays below the
+  rule (0.91 [0.83, 0.94]); a consumer must treat every line as possibly absent. A list is joined with `; `. Each
+  value is one physical line: control characters and runs of white space become one space, the middle dot a comma,
+  cut to 120 characters with `…`, and the line is fitted like the evidence line. The publication date is the issue
+  date printed with the piece; it is shown and exported apart from the document's date tags and never written over
+  them. An output-time snapshot: the sidecar's `item_fields` object carries the same fields with the quotes they were
+  read from and, under `not_filled`, the fields read but left empty and why (never their values). Process Files writes
+  the lines in the date-evidence rewrite (one pass for both); Live Capture at render time, on the same documents'
+  pages as the source dates; Improve OCR keeps them, and refuses a page that would lose them. No migration is written
+  because there is nothing to migrate.
 - **Per-page metadata and mixed summaries.** `ExtractedContent.textPages` records zero-based physical
   text slots 1, 3, 5… (in a file with searchable pages, each text page and searchable page by its `pageRoles`, §"The
   searchable form") with optional `PDFPageHeader`. Missing headers stay represented. Kind and full
@@ -449,7 +475,7 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 | Item type (`Box`/`Folder`) + the user's colour | `Tagging/TagGenerator.swift`, `OCR/OCRProcessor+Tagging.swift` (`structureTag`, `authoritativeColor`), `Tagging/ItemTypeColourSetting.swift`, `Tagging/MacOSTagger.swift` (`finderLabelIndex`) | ArchiveCore `Tags/ItemType.swift` (`ItemType`, `FinderLabel`, `ItemTypeColors`) + `DocumentTags.itemType`; Reader `Core/ItemTypePreferences.swift`, `Core/TagWriter.swift`, `Views/TagEditorView.swift` (Item type) |
 | **Sent With** date (W37) | `Tagging/DocumentSegmenter.swift` (`enclosureOf`), `OCR/OCRProcessor+Tagging.swift` (cover date → `GeneratedTags.sentWith`), `Views/ManualTaggingSheet.swift` | ArchiveCore `Tags/ArchiveDate.swift` (`ArchiveDate`, `SentWithTag`, `DateRangeFilter`) + `DocumentTags.sentWith`; Reader `Core/LibraryFilter.swift` (year range), `Views/TagEditorView.swift` (⌘I sheet); Notes front-matter `additional_dates` → `NotesTagProjector` |
 | Chronological sort key | (n/a — Reader-derived) | `Core/DocumentTags.swift` (`sortDate`; own date, sent-with fallback) |
-| 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`, structured per-page metadata and summaries). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
+| 2-page PDF + page-2 header | `OCR/PDFGenerator.swift` (`makeTextPage`, `PDFSourceDates`), `OCR/PDFGenerator+DateEvidence.swift` (evidence and item-field lines after the call), `Tagging/ItemFieldExtractor.swift` (the item fields) | **Shared:** `ArchiveCore` `PDFHeaderParser` (extract, `fullBody`/`strippedBody` split, `parseClassification`, structured per-page metadata and summaries). Reader indexes `fullBody`; Processor shim uses `strippedBody`. `PDFFormatStatus` also in Core. |
 | Classification enum / values | `Models/ProviderModels.swift` (`DocumentClassification`), `OCR/PDFTextExtractor.swift` (shim maps string→enum) | `ArchiveCore` `PDFHeaderParser` returns raw `String?`; `Core/DocumentRuns.swift`, `Search/ContentIndex.swift` |
 
 ---
