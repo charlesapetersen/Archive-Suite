@@ -156,10 +156,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** none through the UI. `scripts/test-ocr-refusal.sh` asserts `gemini-3.8-flash` is the Gemini
   default; `scripts/test-openrouter.sh` the OpenRouter pinning; `scripts/test-thinking-budgets.sh` the budget
   mapping. The Anthropic, Mistral and OpenAI lists, `gpt-5-nano` as default and the picker's show/hide are untested.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-11-18 W40.d3 (`verification/evidence/processor/W40.d3-providers.md`): the Anthropic
+  (`claude-sonnet-4-6`) and Mistral (`mistral-ocr-latest`) clients each read three RG 165 photos through Process Files
+  in the VM, every PDF passing the checker. OpenAI is `unverifiable-here` (no key, by the owner's 2026-10-11 ruling).
+  The pickers and thinking levels are still unexercised.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d3 — Anthropic and Mistral clients work on real photos; OpenAI unverifiable here; the pickers
+    keep the row `unproven`.
 - **Notes:** **Drift.** README's provider table says four cloud providers with no OpenRouter, a Gemini default of
   3.1 Flash Lite, and a list without `gemini-3.8-flash` or `gemini-3.5-flash-lite`; the code and `CLAUDE.md` make
   `gemini-3.8-flash` the default (`Models/ProviderModels.swift:229`). `TESTING.md` §2.1 lists three providers.
@@ -243,10 +248,12 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   text in both places, CLI picker, wizard). `scripts/test-localagent.sh` (`LOCALAGENT_TEST=1`, fake CLI) drives the
   real `LocalAgentClient` and resume. `scripts/test-processing-history.sh` checks the PDF header and history name
   `Local CLI Agent (claude)` at $0. Not covered: a real signed-in CLI, Detect & Verify, Gemini or Codex.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** none. 2026-11-18 W40.d3: an unattended session cannot run the app on the host, and the VM
+  lane carries no CLI login (`verification/evidence/processor/W40.d3-providers.md`).
+- **Status:** `unverifiable-here` (needs a signed-in `claude` CLI beside a running app: the owner's guided session)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d3 — `unverifiable-here`.
 - **Notes:** **Drift.** README says the guided wizard covers Claude Code, Gemini CLI and Codex; it offers Claude and
   Gemini only (`Models/LocalAgentSpec.swift:11`, `:63`). The Batch toggle stays enabled under the Local Agent
   (`Views/SettingsView.swift:758`) and is silently ignored at run time.
@@ -265,10 +272,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-vision-hybrid.sh` (`VISIONHYBRID_TEST=1`) checks the judgement request carries
   no image; `scripts/test-vision-ocr.sh` compiles the real `VisionClient` against two generated PNGs. Not covered:
   the Settings controls and a whole offline run through Process Files.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-11-18 W40.d3 (`verification/evidence/processor/W40.d3-providers.md`): the shipped
+  `VisionClient` read three RG 165 photos on the host with the default settings (`scripts/test-vision-ocr.sh
+  <images>`: 19, 28 and 24 lines). A whole Process Files run cannot be shown here: Vision fails in the VM guest
+  (`KNOWN_ISSUES.md`; W40.d1 saw it on six photos).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-18 W40.d3 — the client reads real photos on the host; the whole offline run stays unshown.
 
 ### P-12 · A second reader for a page Gemini refuses
 

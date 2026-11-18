@@ -14,6 +14,7 @@ struct OCRResult: Sendable {
     var rotationDegrees: Int?
     var errorMessage: String?
     var errorCode: String?
+    var readPoorly: ReadQualityFlag? = nil
 }
 
 enum OCRError: Error { case imageLoadFailed }
@@ -21,6 +22,10 @@ enum OCRError: Error { case imageLoadFailed }
 @main
 struct VisionOCRHeadlessDriver {
     static func main() async {
+        // W40.d3: given image paths, read each real photo with the shipped default settings and print what came
+        // back (read-only on the inputs; nothing is written). Without arguments, the synthetic checks below.
+        let paths = Array(CommandLine.arguments.dropFirst())
+        if !paths.isEmpty { await readReal(paths); return }
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("APVisionOCR-\(UUID().uuidString)", isDirectory: true)
         try? fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -94,6 +99,28 @@ struct VisionOCRHeadlessDriver {
         let passed = !results.contains { $0.hasPrefix("FAIL") }
         print((passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n"))
         exit(passed ? 0 : 1)
+    }
+
+    private static func readReal(_ paths: [String]) async {
+        let client = VisionClient(settings: .default)
+        var failed = 0
+        for path in paths {
+            let name = (path as NSString).lastPathComponent
+            do {
+                let result = try await client.ocr(imageURL: URL(fileURLWithPath: path))
+                let lines = (result.text ?? "").split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+                let ok = !lines.isEmpty && result.errorCode == nil
+                if !ok { failed += 1 }
+                print("\(ok ? "READ" : "FAIL"): \(name): \(lines.count) lines, \(lines.joined().count) characters"
+                      + (result.errorCode.map { ", error \($0): \(result.errorMessage ?? "")" } ?? ""))
+                for line in lines.prefix(4) { print("    | \(line.prefix(100))") }
+            } catch {
+                failed += 1
+                print("FAIL: \(name) threw \(error.localizedDescription)")
+            }
+        }
+        exit(failed == 0 ? 0 : 1)
     }
 
     private static func makePNG(text: String, at url: URL) -> Bool {

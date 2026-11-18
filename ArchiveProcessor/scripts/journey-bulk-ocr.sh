@@ -8,6 +8,8 @@
 #                                     (the meter, the cap, the key hand-over and Automatic tagging's tags)
 #   ./scripts/journey-bulk-ocr.sh --route gateway --paid [--cap USD]  the Stanford gateway, Gemini 3.7 Flash,
 #                                                                     Automatic tagging (the journey itself)
+#   ./scripts/journey-bulk-ocr.sh --route anthropic|mistral --paid --max N   W40.d3: a direct provider's own
+#                                     client (Keychain key), No tagging, at most 5 photos, a few cents
 #
 # The box is the W40.c1 rehearsal copy (verification/rehearsal.md; default RG 165 — War Department, a held-out
 # test box: score on it, never tune on it). The app's own estimator states the cost in the run's estimate.txt
@@ -71,7 +73,23 @@ case "$ROUTE" in
         || { echo "could not read the Gateway key (ops/autonomous/fix-keychain-access.sh)"; exit 1; }
       export W40D1_KEY_FILE="$KEYDIR/key"
     fi ;;
-  *) echo "--route vision|fake|gateway" >&2; exit 2 ;;
+  anthropic|mistral)
+    # W40.d3: a direct provider through the app's own client, No tagging, on a few photos (--max, at most 5). The
+    # cheapest built-in model: Claude Sonnet 4.6 ($3 in / $15 out per 1M, about $0.02 a photo) or Mistral OCR
+    # (about $0.001 a page). Not metered: the page count is the bound, and the app's estimate is in estimate.txt.
+    [ "$MAX" -le 5 ] || { echo "--max must be 5 or fewer for a direct-provider route"; exit 2; }
+    if [ "$ROUTE" = anthropic ]; then ACCOUNT=Anthropic MODEL_ID=claude-sonnet-4-6 PER=0.02
+    else ACCOUNT=Mistral MODEL_ID=mistral-ocr-latest PER=0.001; fi
+    echo "route: $ACCOUNT direct, $MODEL_ID, No tagging, $PAGES pages, about \$$(awk -v n="$PAGES" -v p="$PER" 'BEGIN { printf "%.3f", n * p }')"
+    [ "$PAID" = 1 ] || { echo "not run: add --paid to spend it"; exit 0; }
+    export W40D1_PROVIDER="$ACCOUNT" W40D1_MODEL="$MODEL_ID" W40D1_TAGGING=none MODE=none
+    if [ -z "${W40D1_KEY_FILE:-}" ]; then
+      KEYDIR="$(mktemp -d)"; chmod 700 "$KEYDIR"
+      ( umask 077; /usr/bin/security find-generic-password -s com.archiveprocessor.app -a "$ACCOUNT" -w > "$KEYDIR/key" ) \
+        || { echo "could not read the $ACCOUNT key (ops/autonomous/fix-keychain-access.sh)"; exit 1; }
+      export W40D1_KEY_FILE="$KEYDIR/key"
+    fi ;;
+  *) echo "--route vision|fake|gateway|anthropic|mistral" >&2; exit 2 ;;
 esac
 
 ART="${ART_DIR:-$HOME/.tart-mirror/vm-artifacts}/processor"

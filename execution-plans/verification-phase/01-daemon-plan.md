@@ -191,7 +191,9 @@ where it can.
 - **`W40.d2` — Processor review dialogs by hand [M].** In the VM, drive segmentation review, box/folder confirm,
   manual tagging and rotation review with real choices (not the auto-pilot), and check the output reflects them.
 - **`W40.d3` — every provider through the app's own client [S-M].** Anthropic, Mistral, OpenAI and Apple Vision
-  on two to five real images each; Local Agent if a CLI is installed, otherwise `unverifiable-here`.
+  on two to five real images each; Local Agent if a CLI is installed, otherwise `unverifiable-here`. *(SHIPPED
+  2026-11-18: evidence `verification/evidence/processor/W40.d3-providers.md`; OpenAI and Local Agent
+  `unverifiable-here`.)*
 - **`W40.d4` — one tiny real batch job per batch-capable provider [S-M].** Submit, poll, collect; and a cancel.
   State the cost first.
 - **`W40.d5` — live capture with hand-driven review [M].** Emulator, real images from `Test Files` through the
