@@ -9,7 +9,7 @@ the found lines by character error, two ways (`s1`, one found line a reading lin
 found lines, for a reader that reflows); each matched run's text is force-aligned on the run's CTC output, so a reading
 line over several written lines is split where the ink says; and the matcher whose alignment is the surer (`conf`, ties
 to `s1`) is kept. The page's confidence is the mean aligned-character score over the reading's characters, an unaligned
-character counting 0. The 0.67 gate is the caller's (`HandPlacer.gate`).
+character counting 0. The 0.9 gate is the caller's (`HandPlacer.gate`).
 
 Writes {"lines": [{"text", "box": [x, y, w, h]}], "confidence", "span", "detected", "reading_lines", "fallback_lines",
 "seconds": {...}, "peak_rss": bytes}: every found line that holds text, its box normalised to the image (top-left

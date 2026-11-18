@@ -9,7 +9,8 @@ import VisionOCRKit
 ///
 /// Every output keeps its text page (page 2), which carries the header; the layer is the text a second time, on the
 /// image, where it can be placed. A page that gets no layer is still searchable through its text page, and the
-/// outcome says why it got none.
+/// outcome says why it got none. A handwritten page always keeps its text page, even where the searchable form is
+/// chosen (owner, 2026-11-17, `OutputForm.searchableRefusal`).
 enum TextLayerRoute: String, Codable, Sendable {
     /// Print: Vision's lines with the reader's words aligned onto them.
     case visionLinesAligned = "vision-lines-aligned"
@@ -46,7 +47,8 @@ enum TextLayerRule {
         /// Place Vision's lines with the reading aligned. `requireAligned`: a page of unknown kind gets a layer only
         /// when the reading aligns, since Vision's own words on a handwritten page would be a second, worse reading.
         case place(requireAligned: Bool)
-        /// Handwriting: the hand placer's lines (`HandPlacer`), the text page when its confidence is under the gate.
+        /// Handwriting: the hand placer's lines (`HandPlacer`) beside the text page, the text page alone when its
+        /// confidence is under the gate.
         case placeHands
         case textPage(String)
     }
@@ -59,6 +61,21 @@ enum TextLayerRule {
     }
     static func gateReason(_ confidence: Double) -> String {
         String(format: "handwriting: the placer was unsure of the page (confidence %.2f, under %.2f)", confidence, HandPlacer.gate)
+    }
+
+    /// The hand kinds: their pages go to the hand placer and always keep a text page. A register is a handwritten ledger
+    /// (the classifier calls it handwritten; `03-layout.md` keeps it with hands).
+    static func isHand(_ kind: PageKindName?) -> Bool {
+        switch kind {
+        case .handwritten?, .mixed?, .registers?: return true
+        default: return false
+        }
+    }
+
+    /// Whether a page keeps its text page whatever the form (owner, 2026-11-17): its layout kind is a hand kind, or it
+    /// was read as handwriting (a tagged clipping keeps the layout kind clippings when its hand is handwritten).
+    static func keepsTextPage(kind: PageKindName?, result: OCRResult) -> Bool {
+        isHand(kind) || isHand(result.pageReader?.readingKind)
     }
 
     /// The readers `05-placement.md` §3 flags `reflows` (W46.reader-keeps-lines: their median page keeps 0.12 to 0.46
@@ -89,9 +106,9 @@ enum TextLayerRule {
         if let reading, let script = unplaceableScript(reading) { return .textPage(script) }
         switch kind {
         case .handwritten?, .mixed?, .registers?:
-            // §3: switch on, `hand-blla-ctc` with the text page per page under 0.67 (the caller's, once the placer has
-            // run); switch off, the text page; a reader that reflows, the text page on every hand page. A register is a
-            // handwritten ledger (the classifier calls it handwritten; `03-layout.md` keeps it with hands).
+            // §3: switch on, `hand-blla-ctc` beside the text page, the layer withheld under the 0.9 gate (the caller's,
+            // once the placer has run; owner, 2026-11-17); switch off, the text page; a reader that reflows, the text page
+            // on every hand page. A register is a handwritten ledger (`isHand`).
             guard placeHandOnImage else { return .textPage(switchOffReason) }
             guard let reading, !reading.isEmpty else { return .textPage(noReadingReason) }
             if let readerModel, reflows(readerModel) { return .textPage(reflowReason(readerModel)) }

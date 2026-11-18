@@ -36,9 +36,15 @@ enum OutputForm: String, Codable, Sendable {
         }
     }
 
-    /// Why a page chosen for the searchable form is written as a pair: no reading (the text page says what failed), or a
-    /// script the writer cannot hold even unplaced (`TextLayerRule.unplaceableScript`). Nil when it can be written.
-    static func searchableRefusal(reading: String?) -> String? {
+    /// Said of a handwritten page chosen for the searchable form, which is written as a pair.
+    static let handKeepsTextPage = "handwriting: every handwritten page keeps its text page"
+
+    /// Why a page chosen for the searchable form is written as a pair: a handwritten page (`handwritten`,
+    /// `TextLayerRule.keepsTextPage`: every handwritten page keeps its text page, the placed layer only beside it;
+    /// owner, 2026-11-17), no reading (the text page says what failed), or a script the writer cannot hold even
+    /// unplaced (`TextLayerRule.unplaceableScript`). Nil when it can be written.
+    static func searchableRefusal(reading: String?, handwritten: Bool) -> String? {
+        if handwritten { return handKeepsTextPage }
         guard let reading, !reading.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return "no text was read, so the text page says why"
         }

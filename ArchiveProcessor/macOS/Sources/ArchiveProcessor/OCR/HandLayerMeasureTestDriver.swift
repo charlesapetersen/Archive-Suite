@@ -11,7 +11,7 @@ import VisionOCRKit
 /// `VISIONOCR_MODEL_HOME`. Then each image in `HAND_MEASURE_IN` (a scratch copy, never the corpus) is written as a
 /// handwritten page through `PDFGenerator`, its reading the `<name>.txt` beside it when there is one, else Apple Vision's,
 /// and read back through PDFKit: two pages with the text page second, a layer on the image page exactly when the page
-/// passed the 0.67 gate, every word on the image page one of the reading's, and the time and memory of each page.
+/// passed the 0.9 gate, every word on the image page one of the reading's, and the time and memory of each page.
 /// Writes into `HAND_MEASURE_OUT` only.
 @MainActor
 enum HandLayerMeasureTestDriver {

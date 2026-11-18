@@ -137,9 +137,12 @@ blocked-TERM real-driver runs recorded in SUITE_TODO_DONE.md; the existing smoke
 
 Handwritten, mixed and register pages get the placed layer when the "Place handwritten text on the page image" switch
 is on and the handwriting placer is downloaded: VisionOCRKit `HandPlacer` runs kraken blla and McCATMuS (CTC forced
-alignment, `place-hands.py`) in its own process, and a page under the 0.67 confidence gate keeps the text page alone.
+alignment, `place-hands.py`) in its own process. Every hand page keeps its separate text page, in the searchable form
+too; the layer goes on the image beside it only at 0.9 alignment confidence or more (owner, 2026-11-17,
+W46.place-hands-textpage; it was 0.67, under which a page kept the text page alone).
 Measured with `scripts/measure-hands.sh` on 21 owner hand pages (qwen3.6-27b readings) and 3 public ledger pages
-(Apple Vision readings): 21 placed, 3 to the text page by the gate. Open:
+(Apple Vision readings) at the earlier 0.67 gate: 21 placed, 3 to the text page by the gate; at 0.9 the bench keeps the
+layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
 - **The download is not published yet.** The app pins `hands.tgz` (286,946,670 B, sha256 `f835149b…`) at the
   `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the handwriting
   placer" fails until the owner uploads the archive kept in the autonomous state's `model-files/hands-build/`
@@ -151,7 +154,12 @@ Measured with `scripts/measure-hands.sh` on 21 owner hand pages (qwen3.6-27b rea
 - **The gate reads the reading copy, not the camera original.** The placer runs on the image page as written (the 2 MB
   JPEG copy, straightened when it slopes), where the bench measured the originals: on 5 of 21 owner pages the
   confidence rose (p031 0.70 to 0.89, p096 0.57 to 0.72), and p096 is placed where the bench gated it (20 of 21 on the
-  same side). The 0.67 gate was fitted on the originals; its refit waits on more hand truth (`05-placement.md` §6).
+  same side). The 0.9 gate was read off the originals' line-pass table; its refit waits on more hand truth
+  (`05-placement.md` §6).
+- **A handwritten page of no known kind can still go without a text page**: under "Every page" (`*/*`) of the
+  searchable form, a page no classifier called and no tag named is not known to be handwritten, so it is written as
+  one searchable page with its reading unplaced (W46.place-hands-textpage keeps the text page on every page whose
+  kind, or whose reading's hand, is handwritten, mixed or registers).
 - **Cancelling a run does not stop a page's placer**: it finishes its page (up to 600 s) or its wait for a slot.
 - **The reflow rule is by name**: a reader whose model name holds Infinity-Parser, LightOnOCR, PaddleOCR-VL or
   Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught.

@@ -334,14 +334,15 @@ struct SettingsSheetPage: View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Write as one searchable page, with no text page").padding(.top, 4)
             Text("Search and select the reading on the page image. If the words cannot be placed, search still works "
-                 + "but selections may not line up. Unchecked kinds keep a separate page of text after each image. "
+                 + "but selections may not line up. Unchecked kinds keep a separate page of text after each image, "
+                 + "and so do handwritten, mixed and register pages, always. "
                  + "Searchable images use less space when the compression tools are available.")
                 .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text(forms.source).font(.caption2).foregroundStyle(.secondary)
             Toggle("Every page, pages of no known kind too", isOn: Binding(get: { forms.all },
                                                set: { setStrings(.searchableFor, forms.settingAll($0)) }))
                 .accessibilityIdentifier("ap.sheet.forms.all")
-            ForEach(PageKindName.allCases, id: \.self) { kind in
+            ForEach(SettingsSheetModel.FormsRow.kinds, id: \.self) { kind in
                 Toggle(kind.label, isOn: Binding(get: { forms.isOn(kind) },
                                                  set: { setStrings(.searchableFor, forms.setting(kind, $0)) }))
                     .padding(.leading, 16)

@@ -87,12 +87,12 @@ enum SettingsSheetTestDriver {
               && free.ruleStages.filter { $0.forms != nil }.map(\.id) == ["placement"])
         let forms = SettingsSheetModel.FormsRow(entries: ["jpeg/printed", "*/handwritten"], source: "")
         check("E forms: a kind switched on is added for any format, a format's own entry kept",
-              forms.setting(.typewritten, true) == ["jpeg/printed", "*/handwritten", "*/typewritten"]
+              forms.setting(.typewritten, true) == ["jpeg/printed", "*/typewritten"]
               && forms.isOn(.handwritten) && !forms.isOn(.printed) && forms.others == ["jpeg/printed"])
         check("E forms: every page, and one kind off under it keeps the rest",
               forms.settingAll(true) == ["jpeg/printed", "*/*"]
               && SettingsSheetModel.FormsRow(entries: ["*/*"], source: "").setting(.forms, false)
-                  == PageKindName.allCases.filter { $0 != .forms }.map { "*/" + $0.rawValue }
+                  == SettingsSheetModel.FormsRow.kinds.filter { $0 != .forms }.map { "*/" + $0.rawValue }
               && SettingsSheetModel.FormsRow(entries: ["*/*"], source: "").settingAll(false).isEmpty)
         let chosen = sheet("searchable-on", general: SettingsLayer(kind: .general, name: "General"),
                            collection: layer(.collection, [(.searchableFor, .strings(["*/printed"]))]))

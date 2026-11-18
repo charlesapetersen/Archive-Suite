@@ -215,6 +215,8 @@ Processor emits **one PDF per input image**, same base filename (`PDFGenerator`)
 The Processor's other output form: **one page per source page**, the page image with the reading as its invisible
 layer, and **no text page**. Chosen per input format and page kind by the `searchableFor` setting
 (`SPEC/collection-settings.md`); empty by default, so every page is the pair above unless a user picks this form.
+A handwritten, mixed or register page is always written as the pair, whatever the setting: every handwritten page
+keeps its text page (owner, 2026-11-17). Readers need nothing new; a file may mix the two forms already.
 
 - **The header's carrier is the document's XMP**, not a text page and not the Info dictionary (PDF/A-2 requires
   every Info entry to match an XMP property anyway, and the header is per page). Property `archivesuite:pageHeaders`

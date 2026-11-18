@@ -143,6 +143,9 @@ struct SettingsSheetModel {
         let source: String
         /// Every page of every kind and format (`*/*`).
         var all: Bool { entries.contains { Self.parts($0) == ["*", "*"] } }
+        /// The kinds the sheet offers: not the hand kinds, whose pages always keep their text page
+        /// (`OutputForm.searchableRefusal`).
+        static let kinds = PageKindName.allCases.filter { !TextLayerRule.isHand($0) }
         /// A kind's pages of any format (`*/<kind>`), or every page.
         func isOn(_ kind: PageKindName) -> Bool { all || entries.contains { Self.parts($0) == ["*", kind.rawValue] } }
         /// The entries the switches do not show.
@@ -152,9 +155,10 @@ struct SettingsSheetModel {
         /// The list with every page switched `on` or off; the others kept.
         func settingAll(_ on: Bool) -> [String] { others + (on ? ["*/*"] : []) }
         /// The list with `kind` switched `on` or off. Switching one kind off under "every page" keeps the other kinds on
-        /// (and no longer pages of no known kind, which only "every page" takes); every kind on is not "every page".
+        /// (and no longer pages of no known kind, which only "every page" takes); every kind on is not "every page". A
+        /// hand kind's entry does nothing (`kinds`), so it is not written, and one already there is dropped.
         func setting(_ kind: PageKindName, _ on: Bool) -> [String] {
-            let kinds = PageKindName.allCases.filter { $0 == kind ? on : isOn($0) }
+            let kinds = Self.kinds.filter { $0 == kind ? on : isOn($0) }
             return others + kinds.map { "*/" + $0.rawValue }
         }
         static func parts(_ entry: String) -> [String] {
@@ -913,14 +917,16 @@ struct SettingsSheetModel {
     /// Said on the hand placement switch until the placer is downloaded: nothing is fetched at install.
     static var handDownloadNote: String {
         "Needs the handwriting placer, a \(HandPlacer.downloadMB) MB download (about 1 GB installed); until it is "
-            + "downloaded, handwritten pages get a separate text page."
+            + "downloaded, handwritten pages get only their separate text page."
     }
     static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
 
     static func switchLabel(_ key: SettingsKey) -> String? {
         switch key {
         case .straightenReadingCopy: return "Straighten sloping pages"
-        case .placeHandOnImage: return "Put handwritten text on the page image (a page where the fit is unsure gets a separate text page)"
+        case .placeHandOnImage:
+            return "Also put handwritten text on the page image, where it fits closely (every handwritten page gets a "
+                + "separate text page either way)"
         case .dateImageEveryDocument:
             return "Search the page image on every document, not only those whose text has no year: finds stamp dates "
                 + "(kept beside the document's own date); about $1.93 more per 1,000 documents"
@@ -1043,9 +1049,10 @@ struct SettingsSheetWords {
                 + "Everything else reads whole. Handwriting, registers, ledgers and uncertain kinds are never split."
         case "placement":
             return "On typed and printed pages the text is laid over the page image line by line, so you can select and "
-                + "search it where it sits; this is free. On handwritten pages the lines are found on the page and the "
-                + "text is fitted to them; a page where the fit is unsure, or where the program cannot say where each line is, "
-                + "gets a separate text page instead."
+                + "search it where it sits; this is free. Every handwritten page gets a separate text page. The lines are "
+                + "also found on the page and the text fitted to them; that layer stays on the image only where the fit "
+                + "is close (an alignment of 0.9 or more), and is left off where the fit is unsure or the program cannot "
+                + "say where each line is."
         case "marks":
             return "Finding and listing marks (stamps, signatures, handwritten notes) is not offered yet. Your page images are never altered to "
                 + "hide them, and the page's text includes them where the reading program can read them."

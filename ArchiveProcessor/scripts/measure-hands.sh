@@ -2,7 +2,7 @@
 # Key-free ($0) measurement of the hand placer in the app (W42.int-s5-hands): runs HandLayerMeasureTestDriver headless.
 # Each image in <in-dir> (a scratch copy, never the corpus) is written as a handwritten page through PDFGenerator, read
 # by the <name>.txt beside it when there is one, else by Apple Vision, and read back through PDFKit; the report gives
-# each page's route (placed or the text page by the 0.67 gate), confidence, seconds and peak memory.
+# each page's route (placed beside the text page, or the text page alone by the 0.9 gate), confidence, seconds and peak memory.
 #
 #   scripts/measure-hands.sh <in-dir> <out-dir> [<model home> [<model source>]]
 #

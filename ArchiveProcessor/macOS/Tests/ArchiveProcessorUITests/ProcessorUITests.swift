@@ -401,7 +401,8 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertEqual(printed.value as? Int, 1)
         printed.click()
         XCTAssertTrue(waitUntil { (printed.value as? Int) == 0 && (allForms.value as? Int) == 0 })
-        XCTAssertEqual(element("ap.sheet.forms.handwritten").value as? Int, 1)
+        XCTAssertEqual(element("ap.sheet.forms.typewritten").value as? Int, 1)
+        XCTAssertFalse(element("ap.sheet.forms.handwritten").exists, "handwritten pages always keep their text page")
         allForms.click()
         allForms.click() // restore the empty choice in this guest's scratch settings
         attachScreenshot("processor-settings-sheet-rules")

@@ -1106,7 +1106,7 @@ section("the hand placer places only when downloaded, and reads its script's lin
     }
     // The script's arguments: -I <script> <image> <reading> <out> --model M --device cpu; the stand-in writes <out>.
     let json = #"{"lines":[{"text":"Dear Sir","box":[0.1,0.2,0.5,0.04]},{"text":"","box":[0.1,0.3,0.5,0.04]},"#
-        + #"{"text":"bad box","box":[0.1,0.3,0,0.04]}],"confidence":0.81,"span":8,"detected":3,"reading_lines":1,"#
+        + #"{"text":"bad box","box":[0.1,0.3,0,0.04]}],"confidence":0.93,"span":8,"detected":3,"reading_lines":1,"#
         + #""fallback_lines":0,"seconds":{},"peak_rss":3221225472}"#
     standIn("grep -q 'Dear Sir' \"$4\" && [ -s \"$3\" ] || exit 3\nprintf '%s' '\(json)' > \"$5\"\n")
     try? Data().write(to: models.appendingPathComponent("McCATMuS_nfd_nofix_V1.mlmodel"))
@@ -1122,12 +1122,12 @@ section("the hand placer places only when downloaded, and reads its script's lin
         do { placed = try HandPlacer.place(image: image, reading: "Dear Sir", environment: env) } catch { failure = "\(error)" }
     }
     check("the hand placer reads back the lines that hold text, the matcher, the confidence and the peak memory",
-          placed?.lines.lines.map(\.text) == ["Dear Sir"] && placed?.span == 8 && placed?.confidence == 0.81
+          placed?.lines.lines.map(\.text) == ["Dear Sir"] && placed?.span == 8 && placed?.confidence == 0.93
               && placed?.peakMB == 3072 && placed?.passesGate == true
               && placed?.lines.lines.first?.box == CGRect(x: 0.1, y: 0.2, width: 0.5, height: 0.04),
           "\(failure) \(placed?.lines.lines ?? [])")
-    let low = try? HandPlacer.decode(Data(json.replacingOccurrences(of: "0.81", with: "0.66").utf8), seconds: 1)
-    check("a page under the 0.67 gate does not pass it", low?.passesGate == false && HandPlacer.gate == 0.67)
+    let low = try? HandPlacer.decode(Data(json.replacingOccurrences(of: "0.93", with: "0.89").utf8), seconds: 1)
+    check("a page under the 0.9 gate does not pass it", low?.passesGate == false && HandPlacer.gate == 0.9)
     standIn("exit 1\n")
     var failed: Error?
     DispatchQueue.global().sync {

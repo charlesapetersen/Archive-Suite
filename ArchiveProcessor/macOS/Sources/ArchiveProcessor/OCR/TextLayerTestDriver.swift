@@ -245,16 +245,34 @@ enum TextLayerTestDriver {
             archivalChecks("searchable output", typed)
         } else { check("7 print: written and read back", false) }
 
-        // Handwriting: the reading as an unplaced layer, named for the run report.
+        // Handwriting (owner, 2026-11-17): chosen for the searchable form, still a pair, since every handwritten page
+        // keeps its text page; the placed layer only beside it, at the 0.9 gate.
         let hand = dir.appendingPathComponent("searchable-hand.pdf")
         let h = await write(reading, kind: .handwritten, name: "hand.jpg", to: hand)
-        check("7 hand: the searchable form, unplaced (or placed, once the placer is downloaded)", h?.form == .searchable
-              && (h?.layer.route == .unplaced || (HandPlacer.isInstalled() && h?.layer.route == .handBllaCtc))
-              && (HandPlacer.isInstalled() || h?.layer.reason == TextLayerRule.notDownloadedReason), "\(String(describing: h))")
-        let handText = PDFDocument(url: hand)?.page(at: 0)?.string ?? ""
-        check("7 hand: one page holding every word", PDFDocument(url: hand)?.pageCount == 1 && words.allSatisfy { handText.contains($0) })
-        check("7 hand: the unplaced layer compressed too", !tools || (h?.compression == nil && compressed(hand)),
-              "\(String(describing: h?.compression))")
+        check("7 hand: written as a pair, and says why", h?.form == .imageAndText
+              && h?.formFallback == OutputForm.handKeepsTextPage && h?.compression == nil, "\(String(describing: h))")
+        check("7 hand: the layer only from the hand placer (none until it is downloaded)",
+              HandPlacer.isInstalled() ? [.handBllaCtc, .textPage].contains(h?.layer.route)
+                  : h?.layer == .textPage(TextLayerRule.notDownloadedReason), "\(String(describing: h?.layer))")
+        if let doc = PDFDocument(url: hand), let content = PDFHeaderParser.extract(hand) {
+            let handText = doc.page(at: 1)?.string ?? ""
+            check("7 hand: two pages, the text page holding every word", doc.pageCount == 2
+                  && words.allSatisfy { handText.contains($0) } && handText.contains("Extracted text."), "\(doc.pageCount)")
+            check("7 hand: Core reads an image and its text page", content.pageRoles == [.image, .text], "\(content.pageRoles)")
+        } else { check("7 hand: written and read back", false) }
+        let plain = OCRResult(text: reading, classification: nil, rotationDegrees: 0, errorMessage: nil, errorCode: nil)
+        var handClipping = plain
+        handClipping.pageReader = PageReaderRecord(kind: PageKindName.clippings.rawValue, confidence: 0.9, reason: .kind,
+                                                   provider: "Gemini", model: "m", readingKind: .handwritten)
+        check("7 every hand kind, and a page read as handwriting, keeps its text page; other kinds may go without",
+              [PageKindName.handwritten, .mixed, .registers].allSatisfy { TextLayerRule.keepsTextPage(kind: $0, result: plain) }
+              && TextLayerRule.keepsTextPage(kind: .clippings, result: handClipping)
+              && ([nil] + [PageKindName.typewritten, .printed, .forms, .newspapers, .clippings]).allSatisfy {
+                  !TextLayerRule.keepsTextPage(kind: $0, result: plain) }
+              && OutputForm.searchableRefusal(reading: reading, handwritten: true) == OutputForm.handKeepsTextPage
+              && OutputForm.searchableRefusal(reading: reading, handwritten: false) == nil)
+        check("7 the sheet offers no hand kind for the searchable form",
+              Set(SettingsSheetModel.FormsRow.kinds) == Set(PageKindName.allCases).subtracting([.handwritten, .mixed, .registers]))
 
         // Words Vision never found (a note it missed): the placed layer would lose them, so the reading goes unplaced.
         let extra = dir.appendingPathComponent("searchable-extra.pdf")
@@ -280,9 +298,10 @@ enum TextLayerTestDriver {
         do {
             try PDFGenerator().mergeDocumentPDFs(sourcePDFs: [typed, pair, hand], outputURL: mixed)
             let content = PDFHeaderParser.extract(mixed)
-            check("7 merge: pages in order", content?.pageRoles == [.searchable, .image, .text, .searchable],
+            // The hand source is a pair (every handwritten page keeps its text page), the typed one searchable.
+            check("7 merge: pages in order", content?.pageRoles == [.searchable, .image, .text, .image, .text],
                   "\(String(describing: content?.pageRoles))")
-            check("7 merge: a header for each source page", content?.textPages.map(\.pageIndex) == [0, 2, 3]
+            check("7 merge: a header for each source page", content?.textPages.map(\.pageIndex) == [0, 2, 4]
                   && content?.textPages.map { $0.header?.kind } == [.typewritten, .typewritten, .handwritten],
                   "\(String(describing: content?.textPages))")
             check("7 merge: the Reader's summary reads every header",
@@ -402,8 +421,10 @@ enum TextLayerTestDriver {
         check("1 handwritten with no reading: text page", d(.handwritten, nil, installed: true) == .textPage(TextLayerRule.noReadingReason))
         check("1 handwritten, switch off, placer downloaded: text page",
               d(.handwritten, hand: false, installed: true) == .textPage(TextLayerRule.switchOffReason))
-        check("1 the gate is 0.67 and names the confidence", HandPlacer.gate == 0.67
-              && TextLayerRule.gateReason(0.612).contains("0.61") && TextLayerRule.gateReason(0.612).contains("0.67"))
+        check("1 the gate is 0.9 (owner, 2026-11-17) and names the confidence", HandPlacer.gate == 0.9
+              && TextLayerRule.gateReason(0.872).contains("0.87") && TextLayerRule.gateReason(0.872).contains("0.90"))
+        check("1 the hand kinds", Set(PageKindName.allCases.filter(TextLayerRule.isHand)) == [.handwritten, .mixed, .registers]
+              && !TextLayerRule.isHand(nil))
         check("1 hand placement is no longer pending on the sheet", !SettingsSheetModel.switchPending.contains(.placeHandOnImage))
         for k in [PageKindName.typewritten, .printed, .forms, .newspapers, .clippings] {
             check("1 \(k.rawValue) placed", d(k) == .place(requireAligned: false))

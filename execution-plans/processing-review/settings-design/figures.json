@@ -2352,7 +2352,7 @@
    "source": "kind-atrium.md §Verdict; K-kinds.md; kind-classifier.md; mixed-route-bands.md; 10-kinds-and-routing.md §3. The rule for the settings layer"
   },
   "placement": {
-   "rule": "Print: Vision's line geometry with the reader's words aligned onto it, one run per line. Handwriting: kraken blla lines, CTC forced alignment, conf pick; a page under 0.67 confidence, or read by a reflowing reader, gets a text page. Text page only for RTL scripts, CJK and Thai, model-normalised readings and mark transcripts.",
+   "rule": "Print: Vision's line geometry with the reader's words aligned onto it, one run per line. Handwriting: every hand page gets a text page; kraken blla lines, CTC forced alignment and the conf pick also lay the layer on the image where confidence is 0.9 or more, never for a reflowing reader. Text page only for RTL scripts, CJK and Thai, model-normalised readings and mark transcripts.",
    "source": "place-print.md §Verdict; place-hands-lines.md §Verdict; F-placement.md §6"
   },
   "enhancement": {

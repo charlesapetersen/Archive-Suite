@@ -7542,11 +7542,11 @@
     },
     {
      "id": "place-hands",
-     "text": "Handwriting: kraken blla lines, CTC forced alignment, conf pick; a page under 0.67 confidence, or read by a reflowing reader, gets a text page.",
+     "text": "Handwriting: every hand page gets a text page; kraken blla lines, CTC forced alignment and the conf pick also lay the layer on the image where confidence is 0.9 or more, never for a reflowing reader.",
      "source": "place-hands-lines.md §Verdict",
      "switch": {
       "id": "place.hand_on_image",
-      "label": "Place handwritten text on the page image (pages the aligner is unsure of get a text page)",
+      "label": "Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)",
       "default": true
      }
     },
@@ -7723,7 +7723,7 @@
     },
     {
      "id": "hand-blla-ctc",
-     "name": "kraken blla lines, McCATMuS forced alignment, conf pick, 0.67 gate",
+     "name": "kraken blla lines, McCATMuS forced alignment, conf pick, 0.9 gate",
      "family": "mac",
      "app_route": null,
      "status": "shipped",
@@ -7749,14 +7749,14 @@
        }
       },
       "handwritten-kept": {
-       "value": 46.3,
-       "n": 18,
-       "truth": "owner-hand, 432 lines on kept pages",
+       "value": 55.3,
+       "n": 9,
+       "truth": "owner-hand, 199 lines on kept pages",
        "source": {
         "file": "place-hands-lines.md",
         "route": "blla.ctc-mccatmus-conf, Qwen3.6-27B",
-        "attribute": "pass % on kept pages at 0.670",
-        "value": "46.3 (200/432)"
+        "attribute": "pass % on kept pages at 0.900",
+        "value": "55.3 (110/199)"
        }
       },
       "bentham": {
@@ -7796,7 +7796,7 @@
       }
      },
      "caveats": [
-      "gate chosen on per-word Find (OCR-11); rescored on line pass, it only lowers it: -0.8 (-2.8 to 0.0) with Qwen, 39 failing drags spared",
+      "0.9 gate set by the owner on the line-pass table (2026-11-17): the layer stays on 9 of 20 pages, the text page holds every page's reading; the earlier 0.67 gate was chosen on per-word Find (OCR-11)",
       "a reflowing reader stays on the text page (LightOnOCR-3 21.5%)",
       "on Bentham PP-OCRv6 lines pass +17.5 (+6.6 to +27.8) more: the detector is collection-dependent",
       "gate fitted on 20 pages; refit when more hand truth is drawn"

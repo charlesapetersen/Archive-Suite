@@ -2,7 +2,7 @@
 // for the searchable layer on the page image (`execution-plans/processing-review/13-stage-rules/05-placement.md` §3,
 // `hand-blla-ctc`). kraken's blla finds the lines; McCATMuS's CTC output force-aligns the reading's lines onto them,
 // the surer of a one-to-one and a reflow-tolerant match kept (`Resources/place-hands.py`, which says how). The page's
-// confidence decides, against `gate`, whether the caller lays the layer or keeps the text page.
+// confidence decides, against `gate`, whether the caller also lays the layer; the page keeps its text page either way.
 //
 // It runs in its own download (`ModelDownloads.Item.hands`, `Hands/` under the model home): a Python with kraken and
 // PyTorch, nothing at install, fetched when the user asks (`download`). Like a model reader it runs as a separate
@@ -16,8 +16,10 @@ import ImageIO
 import UniformTypeIdentifiers
 
 public enum HandPlacer {
-    /// The alignment confidence under which a page gets the text page instead (owner, 2026-11-06, option a).
-    public static let gate = 0.67
+    /// The alignment confidence under which a page's layer is withheld; its text page carries the reading either way
+    /// (owner, 2026-11-17, review of the pipeline doc: at 0.9 or more 9 of 20 owner hand pages keep the layer and 55.3%
+    /// of their lines pass, against 46.3% at the earlier 0.67; `place-hands-lines.md`, owner-hand, Qwen3.6-27B).
+    public static let gate = 0.9
     /// A page's limit, the model readers' 540 s and a margin for loading.
     static let seconds: Double = 600
     /// The footprint cap, the placer's own: its physical footprint passed 6 GB on 4 of 24 smoke pages (W42.int-s5-hands;
@@ -40,7 +42,7 @@ public enum HandPlacer {
         /// physical footprint sampled while it ran.
         public let seconds: Double
         public let peakMB: Int
-        /// Whether the layer is laid (`gate`): a page under it, or with no line placed, gets the text page.
+        /// Whether the layer is laid (`gate`): a page under it, or with no line placed, has the text page alone.
         public var passesGate: Bool { confidence >= HandPlacer.gate && !lines.isEmpty }
     }
 

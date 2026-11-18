@@ -33,7 +33,9 @@ a page [M] `place-hands-cost.md`):
 - Print kinds (typewritten, printed, clippings, forms): `vision-lines-aligned`. The aligner keeps Vision's words on a
   page where under half of them anchor (F-placement §6.4) [M]. Fallback: `vision-own`.
 - Handwritten and mixed pages, switch on: `hand-blla-ctc`, the `conf` matcher pick (the higher mean CTC confidence of
-  `s1` and `s8` per page), the 0.67 gate. Fallback per page: `text-page`, named in the run report. A reader flagged
+  `s1` and `s8` per page), the 0.9 gate (owner, 2026-11-17, was 0.67). Every hand page gets a separate text page; the
+  layer stays on the image beside it only at 0.9 alignment or more, withheld below and named in the run report
+  (W46.place-hands-textpage). A reader flagged
   `reflows` in stage 04's table goes to `text-page` on every hand page, since the gate does not rescue it (LightOnOCR-3
   4B: 21.5% line pass, 8 of 20 pages gated) [M] `place-hands-lines.md`, `place-hands.md`. Measured for every hands
   reader (W46.reader-keeps-lines): 7 of 28 reflow, their median page keeping 0.12 to 0.46 of blla's lines
@@ -61,7 +63,7 @@ not a level, so the field is kept and the schema needs it or the level.
  "metric":{"id":"line_pass_strict","label":"strict line pass rate, PDFKit drag","higher_is_better":true},
  "kinds":["typewritten","printed","handwritten"],
  "rules":[{"id":"place-print-aligned","text":"Print: Vision's line geometry with the reader's words aligned onto it, one run per line.","source":"place-print.md §Verdict","switch":null},
-  {"id":"place-hands","text":"Handwriting: kraken blla lines, CTC forced alignment, conf pick; a page under 0.67 confidence, or read by a reflowing reader, gets a text page.","source":"place-hands-lines.md §Verdict","switch":{"id":"place.hand_on_image","label":"Place handwritten text on the page image (pages the aligner is unsure of get a text page)","default":true}},
+  {"id":"place-hands","text":"Handwriting: every hand page gets a text page; kraken blla lines, CTC forced alignment and the conf pick also lay the layer on the image where confidence is 0.9 or more, never for a reflowing reader.","source":"place-hands-lines.md §Verdict","switch":{"id":"place.hand_on_image","label":"Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)","default":true}},
   {"id":"place-text-only-scripts","text":"Text page only for RTL scripts, CJK and Thai, model-normalised readings and mark transcripts.","source":"F-placement.md §6","switch":null}],
  "fallback":"text-page"}
 ```
@@ -87,14 +89,14 @@ not a level, so the field is kept and the schema needs it or the level.
  "caveats":["handwritten figure counts only lines whose every word Vision read; Find locates 585 of 1,405 distinct truth words in Vision's own hand layer and 922 in the aligned layer (F-placement §3, HW-PLACE row)",
   "RecognizeDocumentsRequest lines lose -10.8 (-15.3 to -6.5) and are not offered (place-print.md)","pages whose lines fan most (the cue's top 1%, covers, display type and some handwriting among them; not classed as bound or curled) pass -15.7 (-23.4 to -8.9) on its own lines against same-collection flat pages (place-curved-owner.md)"],
  "kind_rules":["handwritten: not chosen"],"fallback":"text-page","conditions":[]}
-{"id":"hand-blla-ctc","name":"kraken blla lines, McCATMuS forced alignment, conf pick, 0.67 gate","family":"mac","app_route":null,"status":"shipped",
+{"id":"hand-blla-ctc","name":"kraken blla lines, McCATMuS forced alignment, conf pick, 0.9 gate","family":"mac","app_route":null,"status":"shipped",
  "needs":{"key":[],"plan":[],"cluster":false,"mac_gb":16,"gpus":0},
  "figures":{"handwritten":{"value":42.9,"n":20,"truth":"owner-hand, 475 lines","source":{"file":"place-hands-lines.md","route":"blla.ctc-mccatmus-conf, Qwen3.6-27B","attribute":"line pass %, lab writer","value":"42.9 (204/475)"}},
-  "handwritten-kept":{"value":46.3,"n":18,"truth":"owner-hand, 432 lines on kept pages","source":{"file":"place-hands-lines.md","route":"blla.ctc-mccatmus-conf, Qwen3.6-27B","attribute":"pass % on kept pages at 0.670","value":"46.3 (200/432)"}},
+  "handwritten-kept":{"value":55.3,"n":9,"truth":"owner-hand, 199 lines on kept pages","source":{"file":"place-hands-lines.md","route":"blla.ctc-mccatmus-conf, Qwen3.6-27B","attribute":"pass % on kept pages at 0.900","value":"55.3 (110/199)"}},
   "bentham":{"value":35.7,"n":14,"truth":"L2 PAGE-XML, 314 lines","source":{"file":"place-hands-lines.md","route":"Qwen3.6-27B","attribute":"line pass %","value":"35.7 (112/314)"}}},
  "cost":{"usd_1000_list":0},"time":{"per_unit_s":7.52,"measured":true,"measured_on":"the whole route (blla, McCATMuS recognition, both matchers, the conf pick, the lab writer), median of 40 page runs on the 20 owner hand pages, CPU, M3 Pro 18 GB; mean 9.0 s, most 17.5 s; models load once in about 1 s","source":{"file":"place-hands-cost.md","route":"whole route","attribute":"s a page median","value":"7.52"}},
  "memory":{"peak_gb":8.51,"measured_on":"the highest measured: one CPU process over 60 pages, not levelled off; a page alone needs at most 4.64 GB, MPS with the cache emptied after each page 4.39 GB (M3 Pro 18 GB; no 16 GB Mac run, the fit is the solver's rule)","source":{"file":"place-hands-cost.md","route":"cpu-x3","attribute":"peak footprint GB","value":"8.51"}},
- "caveats":["gate chosen on per-word Find (OCR-11); rescored on line pass, it only lowers it: -0.8 (-2.8 to 0.0) with Qwen, 39 failing drags spared",
+ "caveats":["0.9 gate set by the owner on the line-pass table (2026-11-17): the layer stays on 9 of 20 pages, the text page holds every page's reading; the earlier 0.67 gate was chosen on per-word Find (OCR-11)",
   "a reflowing reader stays on the text page (LightOnOCR-3 21.5%)","on Bentham PP-OCRv6 lines pass +17.5 (+6.6 to +27.8) more: the detector is collection-dependent",
   "gate fitted on 20 pages; refit when more hand truth is drawn"],
  "kind_rules":["print: not used"],"fallback":"text-page","conditions":["reading keeps the page's line breaks","memory bounded per page: MPS with the cache emptied after each page, or a worker restarted every few pages (place-hands-cost.md)"]}
@@ -129,7 +131,7 @@ line layer [M] `place-print.md`; no row. R6 services (Azure, Textract, Document 
   1,484 scored words outside every line) [M] `place-truth-lines.md`, pass 1. The aligned rows share Vision's lines, so
   the favour cancels between them (pass 6 summary).
 - OCR-11 (gate chosen on Find): rescored on line pass with a non-drafter reading (`place-hands-lines.md`); the shipped
-  placer stays first or tied first; the 0.67 gate is a product call (pass 4 summary). Carried in the row's caveats.
+  placer stays first or tied first; the gate is a product call (pass 4 summary), 0.9 since the owner's 2026-11-17 review. Carried in the row's caveats.
 - P6-1, P7-7, P9-6 (test 7 partly made by the fold): test 7 is now reported unfolded and untouched. PP-OCRv6 det leads
   Vision +20.9 (+12.6 to +30.0) unfolded and +21.8 (+13.2 to +31.2) untouched among all; blla's lead is a tie on every
   truth (+10.4, −2.6 to +22.1 unfolded); the fold made about 1 point (1.31, pass 7) [M] `place-print.md`. No row
