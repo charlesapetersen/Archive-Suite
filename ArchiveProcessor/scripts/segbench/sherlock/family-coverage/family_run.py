@@ -15,11 +15,12 @@ must match), with two adapters it does not have (prepared.json `adapter`):
           extra_args); `max_side` scales the
           image down to the card's longest side first (olmOCR's 1,288 px), sent as PNG so nothing is re-compressed.
   mineru  MinerU2.5 through mineru-vl-utils' two-step client (layout, then each block) on the same offline engine.
-          The client does not report a finish reason, so a block cut at its token limit is not visible: every
-          answered page is recorded as a stop, and the contract says so.
+          The client reports no finish reason; a block cut at its token limit raises in the client, so that page
+          is an error record and scores 0, as a cap does for the other readers.
 `raw` is the reply reduced to text (family_parse; the scorers read it as a native reply), `model_raw` the reply as
 written. A batch that raises is read again page by page; a page that still raises is recorded as an error, which
-scores 0, and the run goes on (one bad page does not cost the model its set).
+scores 0, and the run goes on (one bad page does not cost the model its set), unless the engine itself failed
+(one_by_one): then the run stops, and a resubmitted run reads those pages again.
 """
 from pathlib import Path
 import base64
@@ -36,20 +37,37 @@ import boxes_run as R  # noqa: E402
 import family_parse as P  # noqa: E402
 
 MAX_MODEL_LEN = 16384
+LEN_KEYS = ('max_position_embeddings', 'max_sequence_length', 'seq_length', 'model_max_length')
 
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def load_image(path, max_side=None):
+def model_len(snapshot):
+    """The 16,384-token context of the sweep, or the model's own if smaller: vLLM refuses a max_model_len over the
+    one it derives (DeepSeek-OCR-2 and MinerU2.5-Pro have 8,192). The language model's config wins over the top
+    level, as in vLLM."""
+    try:
+        cfg = json.loads(Path(snapshot, 'config.json').read_text())
+    except (OSError, ValueError):
+        return MAX_MODEL_LEN
+    for sub in ('text_config', 'language_config', 'llm_config'):
+        if isinstance(cfg.get(sub), dict) and any(isinstance(cfg[sub].get(k), int) for k in LEN_KEYS):
+            cfg = cfg[sub]
+            break
+    found = [cfg[k] for k in LEN_KEYS if isinstance(cfg.get(k), int) and cfg[k] > 0]
+    return min([MAX_MODEL_LEN] + found)
+
+
+def load_image(path, max_side=None, upscale=False):
     """The page as PIL RGB and as the URL the chat message carries: the file's own JPEG bytes, or a PNG of the image
-    scaled down so its longest side is max_side (never up)."""
+    scaled so its longest side is max_side (down only, unless upscale: olmOCR renders every page to 1,288 px)."""
     from PIL import Image
     data = Path(path).read_bytes()
     im = Image.open(io.BytesIO(data)).convert('RGB')
     size = im.size
-    if max_side and max(size) > max_side:
+    if max_side and (max(size) > max_side or (upscale and max(size) < max_side)):
         k = max_side / max(size)
         im = im.resize((max(1, round(size[0] * k)), max(1, round(size[1] * k))), Image.LANCZOS)
         buf = io.BytesIO()
@@ -61,10 +79,15 @@ def load_image(path, max_side=None):
 
 
 def messages(cfg, url):
+    """The chat message: image then prompt (the sweep's collector), or the prompt first where the card's own client
+    sends it so (`text_first`: olmOCR's build_page_query), or the prompt as the system message and the image alone
+    (`prompt_role` system: CHURRO). `prompt_prefix` goes before the prompt as the card's client adds it (dots.ocr
+    writes its image tokens into the text, so vLLM inserts no placeholder and newline of its own)."""
     image = {'type': 'image_url', 'image_url': {'url': url}}
     if cfg.get('prompt_role') == 'system':
         return [{'role': 'system', 'content': cfg['prompt']}, {'role': 'user', 'content': [image]}]
-    return [{'role': 'user', 'content': [image, {'type': 'text', 'text': cfg['prompt']}]}]
+    text = {'type': 'text', 'text': (cfg.get('prompt_prefix') or '') + cfg['prompt']}
+    return [{'role': 'user', 'content': [text, image] if cfg.get('text_first') else [image, text]}]
 
 
 def engine_kwargs(cfg):
@@ -72,7 +95,7 @@ def engine_kwargs(cfg):
     'module:Class' and imported here."""
     v = dict(cfg.get('vllm') or {})
     kw = {'model': cfg['snapshot'], 'limit_mm_per_prompt': {'image': 1}, 'seed': 0, 'max_num_seqs': 16,
-          'max_model_len': MAX_MODEL_LEN, 'gpu_memory_utilization': 0.85}
+          'max_model_len': model_len(cfg['snapshot']), 'gpu_memory_utilization': 0.85}
     procs = v.pop('logits_processors', None)
     kw.update(v)
     if procs:
@@ -96,6 +119,25 @@ def describe(kw):
                                  else getattr(o, '__name__', repr(o))))
 
 
+def one_by_one(pages, read, size_at):
+    """Each page read alone after its batch failed. A page that raises is an error record (scores 0) and the rest go
+    on; but if the engine died, or every page of a batch of two or more failed, the cause is the engine, not a page:
+    raise, so boxes_run writes .error.json records (a resubmitted run reads them again) and the run stops rather than
+    recording the rest of the set as zeros."""
+    out, errors = [], []
+    for page in pages:
+        try:
+            out.append(read(page))
+        except Exception as exc:  # noqa: BLE001
+            if 'EngineDead' in type(exc).__name__ or 'EngineDead' in str(exc):
+                raise
+            errors.append(exc)
+            out.append(('', '', [], page[size_at], {'error': f'{type(exc).__name__}: {exc}'[:500]}, 'error'))
+    if len(pages) > 1 and len(errors) == len(pages):
+        raise RuntimeError(f'every page of a batch of {len(pages)} failed: {type(errors[0]).__name__}: {errors[0]}')
+    return out
+
+
 class Vllm:
     kind = 'vllm'
 
@@ -115,7 +157,9 @@ class Vllm:
 
     def settings(self):
         return {'engine': describe(self.engine), 'sampling': describe(self.sampling), 'mode': self.cfg['mode'],
-                'prompt_role': self.cfg.get('prompt_role', 'user'), 'max_side': self.cfg.get('max_side'),
+                'prompt_role': self.cfg.get('prompt_role', 'user'), 'text_first': bool(self.cfg.get('text_first')),
+                'prompt_prefix': self.cfg.get('prompt_prefix'), 'max_side': self.cfg.get('max_side'),
+                'upscale': bool(self.cfg.get('upscale')),
                 'chat_template_kwargs': {'enable_thinking': False} if self.cfg['mode'] == 'chat' else None,
                 'chat_kwargs': self.cfg.get('chat_kwargs'),
                 'reduce': self.cfg['reduce'], 'family_run_sha256': sha(__file__), 'family_parse_sha256': sha(P.__file__),
@@ -137,7 +181,7 @@ class Vllm:
         return c.text, text, boxes, size, usage, finish
 
     def read_many(self, paths):
-        pages = [load_image(p, self.cfg.get('max_side')) for p in paths]
+        pages = [load_image(p, self.cfg.get('max_side'), self.cfg.get('upscale')) for p in paths]
         try:  # every record built before any is yielded, so a failure part-way never repeats a page
             done = [self._record(out, size) for out, (_, _, size) in zip(self._generate(pages), pages, strict=True)]
         except Exception:  # noqa: BLE001  read again one at a time, so only the page that fails is lost
@@ -145,11 +189,7 @@ class Vllm:
         if done is not None:
             yield from done
             return
-        for page in pages:
-            try:
-                yield self._record(self._generate([page])[0], page[2])
-            except Exception as exc:  # noqa: BLE001
-                yield '', '', [], page[2], {'error': f'{type(exc).__name__}: {exc}'[:500]}, 'error'
+        yield from one_by_one(pages, lambda page: self._record(self._generate([page])[0], page[2]), 2)
 
 
 class MinerU:
@@ -174,7 +214,7 @@ class MinerU:
             if isinstance(v, (int, float, bool, str)) or k.endswith(('prompts', 'sampling_params', 'image_size')):
                 seen[k] = repr(v)[:2000]
         return {'engine': describe(self.engine), 'client': 'mineru-vl-utils MinerUClient, backend vllm-engine, '
-                'two_step_extract; finish reasons not reported (an answered page is a stop)',
+                'two_step_extract; finish reasons not reported (a truncated block raises: an error record)',
                 'client_settings': seen, 'mineru_vl_utils': R.version('mineru-vl-utils'),
                 'family_run_sha256': sha(__file__), 'family_parse_sha256': sha(P.__file__),
                 'vllm_worker_multiproc_method': os.environ['VLLM_WORKER_MULTIPROC_METHOD']}
@@ -197,11 +237,7 @@ class MinerU:
             if done is not None:
                 yield from done
                 return
-        for im, size in pages:
-            try:
-                yield self._one(self.client.two_step_extract(im), size)
-            except Exception as exc:  # noqa: BLE001
-                yield '', '', [], size, {'error': f'{type(exc).__name__}: {exc}'[:500]}, 'error'
+        yield from one_by_one(pages, lambda page: self._one(self.client.two_step_extract(page[0]), page[1]), 1)
 
 
 R.ADAPTERS.update(vllm=Vllm, mineru=MinerU)

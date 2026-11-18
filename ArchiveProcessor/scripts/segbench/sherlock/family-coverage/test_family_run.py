@@ -140,6 +140,59 @@ class Adapter(unittest.TestCase):
         self.assertNotIn('logits_processors', m.engine)
 
 
+class Review(unittest.TestCase):
+    """The adversarial review's findings, 2026-11-17."""
+
+    def test_context_from_the_model_config(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d, 'config.json')
+            cfg.write_text(json.dumps({'max_position_embeddings': 8192, 'language_config': {'max_position_embeddings': 8192}}))
+            self.assertEqual(F.model_len(d), 8192)                     # DeepSeek-OCR-2
+            cfg.write_text(json.dumps({'max_position_embeddings': 32768, 'text_config': {'max_position_embeddings': 8192}}))
+            self.assertEqual(F.model_len(d), 8192)                     # MinerU2.5-Pro: the text config wins
+            cfg.write_text(json.dumps({'text_config': {'max_position_embeddings': 262144}}))
+            self.assertEqual(F.model_len(d), 16384)
+            self.assertEqual(F.engine_kwargs({'snapshot': d})['max_model_len'], 16384)
+        self.assertEqual(F.model_len('/nonexistent'), 16384)
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, 'config.json').write_text(json.dumps({'max_position_embeddings': 8192}))
+            self.assertEqual(F.engine_kwargs({'snapshot': d})['max_model_len'], 8192)
+
+    def test_dead_engine_stops_the_run(self):
+        def fail(page):
+            raise RuntimeError('CUDA error: out of memory')
+        with self.assertRaises(RuntimeError):
+            F.one_by_one([(1, 2, 'a'), (3, 4, 'b')], fail, 2)
+        out = F.one_by_one([(1, 2, 'a')], fail, 2)                    # one page alone: its own error record
+        self.assertEqual(out[0][5], 'error')
+
+        class EngineDeadError(Exception):
+            pass
+
+        calls = []
+
+        def dead(page):
+            calls.append(page)
+            if len(calls) == 2:
+                raise EngineDeadError('engine core died')
+            return ('r', 't', [], page[2], {}, 'stop')
+        with self.assertRaises(EngineDeadError):
+            F.one_by_one([(0, 0, 's1'), (0, 0, 's2'), (0, 0, 's3')], dead, 2)
+
+    def test_text_first_and_prefix(self):
+        c = {'prompt': 'Attached is one page.', 'text_first': True}
+        self.assertEqual([x['type'] for x in F.messages(c, 'u')[0]['content']], ['text', 'image_url'])
+        c = {'prompt': 'Please output the layout.', 'prompt_prefix': '<|img|><|imgpad|><|endofimg|>'}
+        self.assertEqual(F.messages(c, 'u')[0]['content'][1]['text'], '<|img|><|imgpad|><|endofimg|>Please output the layout.')
+
+    def test_upscale_only_when_asked(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d, 'a.jpg')
+            p.write_bytes(jpeg(600, 300))
+            self.assertEqual(F.load_image(p, 1288)[0].size, (600, 300))
+            self.assertEqual(F.load_image(p, 1288, upscale=True)[0].size, (1288, 644))
+
+
 class EndToEnd(unittest.TestCase):
     """boxes_run.main with the vllm adapter on a fake engine: pilot, full run, records the scorers read."""
 

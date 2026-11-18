@@ -7,10 +7,12 @@ kept beside it as `model_raw`. Markdown is left as written, as it was for every 
 Infinity-Parser2-Pro); HTML is reduced to its text, because a tag is not a word on the page. Page furniture
 (headers, footers, page numbers) is kept wherever the model wrote it: the truth includes it.
 
-  olmocr    YAML front matter removed (olmocr's PageResponse.natural_text), HTML tables to text, figure links removed
+  olmocr    YAML front matter removed (olmocr's PageResponse.natural_text), each <table> to text (nothing else, so a
+            `<` in the page's own text stays), figure links removed
   chandra   HTML to text (block tags and <br> end lines, cells joined by spaces; <img> dropped)
   dots      the layout JSON's elements in emitted order (the prompt asks for reading order), Picture left out,
-            Table HTML to text; a reply that does not parse (a cap cut mid-string) keeps every complete "text" value
+            Table HTML to text; a reply that does not parse (a cap cut mid-string), or parses to no text (an
+            unexpected wrapper), keeps every complete "text" value
   deepseek  DeepSeek-OCR's <|ref|>/<|det|> grounding tags removed (Unlimited-OCR's rule, boxes_parse.unlimited)
   churro    CHURRO's reference XML extraction (farmshare_results.churro_text, copied: the pack carries no corpus code)
   mineru    MinerU2.5's two-step blocks in emitted order, image blocks left out, table HTML to text
@@ -84,10 +86,13 @@ FRONT = re.compile(r'\A\s*---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)', re.S)
 FIGURE = re.compile(r'!\[[^\]]*\]\([^)]*\)')
 
 
+TABLE = re.compile(r'<table\b.*?</table>', re.S | re.I)
+
+
 def olmocr(raw):
     m = FRONT.match(raw)
-    body = raw[m.end():] if m else raw
-    return html_if_any(FIGURE.sub('', body)), []
+    body = FIGURE.sub('', raw[m.end():] if m else raw)
+    return tidy(TABLE.sub(lambda t: '\n' + html_text(t.group(0)) + '\n', body)), []
 
 
 def chandra(raw):
@@ -110,13 +115,7 @@ def dots(raw):
             raise ValueError('not a list')
     except (ValueError, json.JSONDecodeError):
         # A reply cut at the token cap: every complete text value, in order; no boxes, since a box may lack its text.
-        texts = []
-        for m in DOTS_TEXT.finditer(s):
-            try:
-                texts.append(json.loads(m.group(1)))
-            except json.JSONDecodeError:
-                continue
-        return tidy('\n\n'.join(html_if_any(t) for t in texts if t.strip())), []
+        return dots_texts(s), []
     blocks, boxes = [], []
     for it in items:
         if not isinstance(it, dict):
@@ -130,7 +129,19 @@ def dots(raw):
             boxes.append({'cls': cls, 'box': it['bbox'], 'units': 'dots-px', 'text': text})
         if text:
             blocks.append(text)
+    if not blocks:  # parsed, but no element where it was looked for (an unexpected wrapper): the text values
+        return dots_texts(s), boxes
     return tidy('\n\n'.join(blocks)), boxes
+
+
+def dots_texts(s):
+    texts = []
+    for m in DOTS_TEXT.finditer(s):
+        try:
+            texts.append(json.loads(m.group(1)))
+        except json.JSONDecodeError:
+            continue
+    return tidy('\n\n'.join(html_if_any(t) for t in texts if isinstance(t, str) and t.strip()))
 
 
 def deepseek(raw):

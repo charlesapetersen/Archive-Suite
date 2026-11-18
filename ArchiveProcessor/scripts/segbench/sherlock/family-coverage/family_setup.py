@@ -116,8 +116,19 @@ def check(key, roots):
         if not set(archs) & set(ModelRegistry.get_supported_archs()):
             raise RuntimeError(f'architecture {archs} unsupported by the installed vLLM {vllm.__version__}; '
                                'no environment upgrade')
+        notes = {}
         for p in (rec.get('vllm') or {}).get('logits_processors', []):
-            getattr(importlib.import_module(p.split(':')[0]), p.split(':')[1])
+            # Recorded, not fatal: a model module may need the GPU platform this CPU node lacks.
+            try:
+                getattr(importlib.import_module(p.split(':')[0]), p.split(':')[1])
+            except Exception as exc:  # noqa: BLE001
+                notes['logits_processor_import'] = f'{type(exc).__name__}: {exc}'[:300]
+        if rec.get('check_processor', True):
+            # The processor and tokenizer vLLM will load (remote code included), without a weight. Not for
+            # DeepSeek-OCR-2, whose processor is vLLM's own, nor MinerU, whose client builds the engine.
+            from transformers import AutoProcessor
+            AutoProcessor.from_pretrained(rec['snapshot'], local_files_only=True,
+                                          trust_remote_code=bool((rec.get('vllm') or {}).get('trust_remote_code')))
         if rec['adapter'] == 'mineru':
             import mineru_vl_utils
             from mineru_vl_utils import MinerUClient, MinerULogitsProcessor  # noqa: F401
@@ -126,7 +137,7 @@ def check(key, roots):
             if drift:
                 raise RuntimeError('the overlay moved packages vLLM needs: ' + ', '.join(drift))
         used = Path(sys.prefix, 'constraints-used')
-        rec.update(state='ready', python=sys.executable, check_versions=versions,
+        rec.update(state='ready', python=sys.executable, check_versions=versions, check_notes=notes,
                    constraints_used=used.read_text().strip() if used.exists() else None)
     except Exception:  # noqa: BLE001
         rec.update(state='skipped', reason='check failed: ' + traceback.format_exc()[-1500:])

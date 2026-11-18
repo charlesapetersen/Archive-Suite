@@ -1,0 +1,55 @@
+{
+  "tag": "W46.ocr-family-coverage",
+  "pack": "ocr-family-coverage-20261117",
+  "mac": "artifacts/ocr-family-coverage-20261117",
+  "submit": "support/sherlock/family-coverage/submit.sh",
+  "jobs": 12,
+  "gpu_hours": 40,
+  "review": "execution-plans/items/W46.ocr-family-coverage.md",
+  "imports": [
+    {
+      "dir": "support/sherlock/family-coverage",
+      "modules": [
+        "family_parse",
+        "family_run",
+        "family_setup"
+      ]
+    },
+    {
+      "modules": [
+        "vllm",
+        "huggingface_hub"
+      ]
+    }
+  ],
+  "creates": [
+    "$FS_ROOT/ocr-family-coverage-20261117",
+    "$FS_ROOT/family-895",
+    "$FS_ROOT/family-96",
+    "$HF_HOME/hub/models--allenai--olmOCR-2-7B-1025-FP8",
+    "$HF_HOME/hub/models--datalab-to--chandra-ocr-2",
+    "$HF_HOME/hub/models--rednote-hilab--dots.ocr",
+    "$HF_HOME/hub/models--deepseek-ai--DeepSeek-OCR-2",
+    "$HF_HOME/hub/models--opendatalab--MinerU2.5-Pro-2605-1.2B",
+    "$HF_HOME/hub/models--stanford-oval--churro-3B",
+    "$GROUP_HOME/$USER/envs/family-mineru25-pro",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-family-coverage-20261117"
+  ],
+  "provenance": [],
+  "requires": [
+    "$SH_IMG",
+    "$SH_SHIM",
+    "$FS_ROOT/open-sweep-20261019/public895.jsonl",
+    "$FS_ROOT/open-sweep-20261019/pilot3.jsonl",
+    "$FS_ROOT/truth96-20261020/truth99.jsonl",
+    "$FS_ROOT/truth96-20261020/pilot3.jsonl"
+  ],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/ocr-family-coverage-20261117",
+  "collect": [
+    "$FS_ROOT/ocr-family-coverage-20261117/jobs.tsv",
+    "$FS_ROOT/ocr-family-coverage-20261117/logs",
+    "$FS_ROOT/family-895",
+    "$FS_ROOT/family-96"
+  ],
+  "release": "olmOCR-2, Chandra-2, dots.ocr, DeepSeek-OCR-2 and MinerU2.5-Pro readings on the 895 and the 96, and CHURRO-3B on its 455 (895/ and 96/ session folders), collected into the Mac artifact; score as W46.ocr-new-open's were (item notes)"
+}

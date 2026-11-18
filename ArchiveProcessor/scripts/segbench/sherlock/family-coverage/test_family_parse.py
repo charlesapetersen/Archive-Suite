@@ -32,6 +32,16 @@ class Olmocr(unittest.TestCase):
         self.assertEqual(P.olmocr('# Title\n\n*Dear* Sir')[0], '# Title\n\n*Dear* Sir')
 
 
+class Review(unittest.TestCase):
+    def test_olmocr_reduces_only_its_tables(self):
+        raw = '---\nprimary_language: en\n---\nIf a<b then x</p>y\n\n<table><tr><td>1</td></tr></table>\nEnd'
+        self.assertEqual(P.olmocr(raw)[0], 'If a<b then x</p>y\n\n1\n\nEnd')
+
+    def test_dots_unexpected_wrapper_falls_back_to_texts(self):
+        raw = json.dumps({'layout_dets': [{'bbox': [1, 2, 3, 4], 'category': 'Text', 'text': 'Kept words'}]})
+        self.assertEqual(P.dots(raw)[0], 'Kept words')
+
+
 class Dots(unittest.TestCase):
     def test_layout_json_in_order(self):
         raw = json.dumps([

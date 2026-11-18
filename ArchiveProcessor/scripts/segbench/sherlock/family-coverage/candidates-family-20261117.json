@@ -15,7 +15,7 @@
   },
   "max_side": 1288,
   "reduce": "olmocr",
-  "card": "https://huggingface.co/allenai/olmOCR-2-7B-1025-FP8 (the olmocr pipeline's default model; pipeline.py: target_longest_image_dim 1288, max_tokens 8000)",
+  "card": "https://huggingface.co/allenai/olmOCR-2-7B-1025-FP8 (the olmocr pipeline's default model; pipeline.py: target_longest_image_dim 1288, max_tokens 8000); build_page_query sends the prompt, then the image",
   "pip": [],
   "weight_limit_bytes": 13000000000,
   "sets": [
@@ -23,7 +23,9 @@
    "96"
   ],
   "hours_895": 6,
-  "hours_96": 2
+  "hours_96": 2,
+  "text_first": true,
+  "upscale": true
  },
  {
   "key": "chandra-ocr-2",
@@ -77,7 +79,7 @@
    "chat_template_content_format": "string"
   },
   "reduce": "dots",
-  "card": "https://huggingface.co/rednote-hilab/dots.ocr (vLLM serve: --trust-remote-code --chat-template-content-format string; the layout-and-text prompt, whose JSON is reduced to its texts)",
+  "card": "https://huggingface.co/rednote-hilab/dots.ocr (vLLM serve: --trust-remote-code --chat-template-content-format string; the layout-and-text prompt, whose JSON is reduced to its texts); inference_with_vllm writes its image tokens before the prompt",
   "pip": [],
   "weight_limit_bytes": 8000000000,
   "sets": [
@@ -86,7 +88,8 @@
   ],
   "hours_895": 6,
   "hours_96": 2,
-  "expected_sha_read": "2026-11-17"
+  "expected_sha_read": "2026-11-17",
+  "prompt_prefix": "<|img|><|imgpad|><|endofimg|>"
  },
  {
   "key": "deepseek-ocr-2",
@@ -126,7 +129,8 @@
   ],
   "hours_895": 6,
   "hours_96": 2,
-  "expected_sha_read": "2026-11-17"
+  "expected_sha_read": "2026-11-17",
+  "check_processor": false
  },
  {
   "key": "mineru25-pro",
@@ -149,7 +153,8 @@
   ],
   "hours_895": 4,
   "hours_96": 1,
-  "expected_sha_read": "2026-11-17"
+  "expected_sha_read": "2026-11-17",
+  "check_processor": false
  },
  {
   "key": "churro-3b",
