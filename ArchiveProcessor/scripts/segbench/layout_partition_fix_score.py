@@ -159,8 +159,29 @@ def render(plan: dict, arms: dict, comps: dict, verdict: dict) -> str:
     return '\n'.join(lines) + '\n' + CARD
 
 
-# Written after the scores were read; the figures are in the tables below, generated.
-FINDINGS: list[str] = []
+# Written after the scores were read (the tables below are generated from the reads).
+FINDINGS = [
+    '## What this says', '',
+    '- **The fix restores the region gain.** The fixed partition scores 78.7 strict NES against 20.2 for the shipped',
+    '  one, +58.5 [+49.4, +66.1], ahead on all 15 pages, and ties the raw regions it was built to match: strict -5.9',
+    '  [-15.8, +1.6], order-free 91.2 against 91.5, -0.3 [-9.2, +7.5], missed words 5.7 against 5.8 per 100, added',
+    '  22.7 against 17.7, +5.0 [-21.2, +37.0]. The predeclared pass is met on all three.',
+    '- **Why it works.** 930 of 9,635 Vision lines (10%) cross a region edge; each is now read whole by the region',
+    '  holding most of it instead of moving, with its neighbours, into a whole-page fill (8,037 lines before). Only',
+    '  244 lines touch no region; they are read as 80 small crops carrying 2.3% of the words. 17 of 980 regions were',
+    '  masked blank and not read. No page needed a whole-page image, and reading took 791 s against 1,643.',
+    '- **The outside crops find words and cost a little order.** Without them the partition misses 7.0 words per 100',
+    '  against 5.7 with them (-1.3 [-2.0, -0.7]), but strict NES is 1.4 points higher (80.1): text read after every',
+    '  region is out of place. Order-free they tie. Kept, since a missed word is lost while a misplaced one is not.',
+    '- **The strict gap that remains is one page.** On mss3413201819-6 the partition scores 26.8 against 91.0 for the',
+    '  raw regions: one wide region crop (1,665 x 255 px) and one small outside',
+    '  crop sent the reader into a repetition loop to its 4,096-token cap, adding 188 words per 100. Raw regions have',
+    '  such pages too (two pages capped; 111 and 126 added words per 100 on its two worst). The bench loop has no repetition guard for',
+    '  any arm; the app\'s Mac route stops a repeating stream and re-reads once with a repetition penalty, which this',
+    '  bench does not exercise. On the other 14 pages the partition is within a few points of the raw regions.',
+    '- **The owner\'s choices stand.** The detector, its native order, pictures kept and regions for every reader are',
+    '  unchanged; only what each crop holds changed.',
+]
 
 CARD = """## Measurement card
 

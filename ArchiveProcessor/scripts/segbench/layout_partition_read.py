@@ -14,7 +14,8 @@ Arms, all cut from the same frozen original:
              pictures, a region 90% inside a larger one dropped (regions_cluster.keep_regions), unmasked, the
              detector's order, no fill; 4,096 tokens a crop.
   partition  the app's plan images, exactly as NewspaperPagePlan.prepare wrote them (layout_partition_plans.sh):
-             its regions, then the masked whole-page fill; 4,096 tokens a region, 8,192 for the fill.
+             its regions, then its fill: since W46.layout-partition-fix small outside crops (4,096 tokens), or the
+             masked whole-page fill (8,192) on a page with no Vision line; 4,096 tokens a region.
 One JSON a request under WORK/reads/<arm>/<page>/<nnn>.json, written atomically; an existing one is not read again.
 Raw text stays in the private cache; the committed results are scores only. No network, no money.
 """

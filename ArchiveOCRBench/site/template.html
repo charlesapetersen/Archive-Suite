@@ -1339,14 +1339,14 @@ if (LPH) {
 const LPART = DATA.layout_partition;
 if (LPART) {
   document.getElementById('pub-layout-partition').hidden = false;
-  const NAME = {whole: 'Whole page', raw: 'Raw PP-DocLayoutV3 regions (the measured baseline)', partition: "The app's partition (regions, then the masked fill)", app: 'As the app routes it (one page whole by the kind gate)'};
+  const NAME = {whole: 'Whole page', raw: 'Raw PP-DocLayoutV3 regions (the measured baseline)', partition: "The shipped partition (regions, then the masked fill)", fixed: 'The fixed partition (each line read once by its region)', app: 'As the app routes it (one page whole by the kind gate)'};
   const pct = x => (100 * x).toFixed(1);
   const dv = x => x ? (x[0] >= 0 ? '+' : '') + x[0].toFixed(1) + ' [' + x[1].toFixed(1) + ', ' + x[2].toFixed(1) + ']' : '–';
-  document.getElementById('lpart-rows').innerHTML = ['whole', 'raw', 'partition', 'app'].map(a => {
+  document.getElementById('lpart-rows').innerHTML = ['whole', 'raw', 'partition', 'app', 'fixed'].filter(a => LPART.arms[a]).map(a => {
     const e = LPART.arms[a], v = LPART.vs_raw[a];
     return '<tr><td>' + NAME[a] + '</td><td>' + pct(e.nes) + '</td><td>' + dv(v && v.nes) + '</td><td>' + pct(e.bowf1) + '</td><td>' + dv(v && v.bowf1) + '</td><td>' + e.missed.toFixed(1) + '</td><td>' + e.added.toFixed(1) + '</td><td>' + e.requests + '</td><td>' + e.pages_capped + '</td><td>' + Math.round(e.seconds) + '</td></tr>';
   }).join('');
-  document.getElementById('lpart-note').textContent = 'The images the app itself hands a reader on newspaper pages (W46.layout-newspapers), read beside the whole page and the raw regions earlier tables measured, all with the same reader, prompt and 2,048 px ceiling. The boundary guard moved ' + LPART.plan.fill_lines.toLocaleString() + ' of ' + LPART.plan.vision_lines.toLocaleString() + ' Vision lines into a masked whole-page fill, on ' + LPART.plan.filled + ' of ' + LPART.plan.pages + ' pages; the fill reads like a whole page and ran to its token cap on every page, so the partition reads about as badly as the whole page. One small reader; larger readers unmeasured. The fix is W46.layout-partition-fix. Detail: segbench-results/layout-partition-score.md.';
+  document.getElementById('lpart-note').textContent = 'The images the app itself hands a reader on newspaper pages (W46.layout-newspapers), read beside the whole page and the raw regions earlier tables measured, all with the same reader, prompt and 2,048 px ceiling. The boundary guard moved ' + LPART.plan.fill_lines.toLocaleString() + ' of ' + LPART.plan.vision_lines.toLocaleString() + ' Vision lines into a masked whole-page fill, on ' + LPART.plan.filled + ' of ' + LPART.plan.pages + ' pages; the fill reads like a whole page and ran to its token cap on every page, so the partition reads about as badly as the whole page. One small reader; larger readers unmeasured.' + (LPART.fix_plan ? ' The fix (W46.layout-partition-fix) gives each line to the region holding most of it (' + LPART.fix_plan.split_lines.toLocaleString() + ' lines cross a region edge) and reads the ' + LPART.fix_plan.fill_lines.toLocaleString() + ' lines no region touches as ' + LPART.fix_plan.outside_crops + ' small crops; detail: segbench-results/layout-partition-fix.md.' : ' The fix is W46.layout-partition-fix.') + ' Detail: segbench-results/layout-partition-score.md.';
 }
 const DR5 = DATA.dewarp_real5;
 if (DR5) {

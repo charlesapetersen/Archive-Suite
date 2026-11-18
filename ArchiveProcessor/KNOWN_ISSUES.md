@@ -2,16 +2,18 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## ⚠️ OPEN (W46.layout-partition-score, 2026-11-17): the newspaper fill reads like a whole page
+## FIXED (W46.layout-partition-fix, 2026-11-17): the newspaper fill read like a whole page
 
-Measured on the 15 L9 scans with the shipped Mac PaddleOCR-VL 1.6 4-bit (`segbench-results/layout-partition-score.md`):
-the app's partition scores 20.2 strict NES against 84.6 for raw detector regions (−64.4 [−70.3, −57.1], behind on
-all 15 pages) and ties the whole page (21.5). The cause is the boundary guard below: with the app's own Vision lines
-it moves 8,037 of 9,635 lines (83%), transitively overlapping ones included, out of the regions into the masked
-whole-page fill. That fill is read at whole-page size and runs to its token cap on every page, as the whole page
-does; the masked crops left almost blank draw invented text. So newspapers get roughly whole-page quality at about
-2.5 times the raw regions' reading time. Fix: W46.layout-partition-fix. Larger readers are unmeasured; for a reader
-whose whole page ties its regions the loss would be small.
+W46.layout-partition-score found the shipped partition scoring 20.2 strict NES on the 15 L9 scans against 84.6 for
+raw detector regions, because the boundary guard moved 8,037 of 9,635 Vision lines into a whole-page-sized fill.
+Now each Vision line is read once, whole, by the region holding most of its pixels: that crop widens to hold it,
+other crops whiten it, overlapping line boxes across owners leave the shared pixels with the earlier region, a
+region masking leaves blank and owning no line is not read, and lines touching no region are read as small crops
+of their own lines (at most 32 a page). A whole-page masked fill remains only when Vision finds no line. Same
+reader and settings: 78.7 strict NES, tying the raw regions (−5.9 [−15.8, +1.6]; order-free 91.2 against 91.5),
++58.5 over the shipped partition, 791 s of reading against 1,643 (`segbench-results/layout-partition-fix.md`).
+Residual: one page loses to a reader repetition loop on two crops, which the app's Mac route guards and the bench
+loop does not. Ink outside every region that Vision does not see as a line is no longer read.
 
 ## FIXED (W46.layout-newspapers, 2026-11-15): newspapers read in detector regions with every reader
 
@@ -22,13 +24,10 @@ newspaper kinds run PP-DocLayoutV3, in native order, with pictures retained. Dow
 whole and say why in the file row. Typed single-column pages, clippings, tables, handwriting, registers, mixed and
 uncertain kinds stay whole. Photographs get perspective correction before detection; failure reads whole.
 
-The coverage floor is 95% of Vision line-box union area (7/15 cached L9 pages below it). This is a conservative
-geometry policy, not an OCR-accuracy optimum. A stronger boundary guard keeps split lines intact in the fill,
-including transitively overlapping lines: all 15 cached pages need fill under that guard. Region pixels have one
-owner; the fill reads uncovered pixels plus complete boundary lines. No textual deduplication. See
-`segbench-results/layout-coverage-fallback.md` for sensitivity and limits; the partition's OCR accuracy was
-measured afterwards and is poor (the OPEN entry above, W46.layout-partition-score). A failed region replaces partial text with one whole-page reading;
-Stop starts no new fallback. At most 128 regions, one fill and one whole fallback per attempt.
+Line coverage is recorded, not a fill trigger: since W46.layout-partition-fix (the entry above) each Vision line has
+one reading region and the masked whole-page fill is gone. No textual deduplication. A failed region replaces
+partial text with one whole-page reading; Stop starts no new fallback. At most 128 regions, 32 outside crops and
+one whole fallback per attempt.
 
 Batch regions retain their original-file identities, previous-page context and all partial replies in the
 fingerprinted recovery journal before chunks are consumed. Only complete pages produce output. Missing/failed

@@ -87,6 +87,7 @@ LAYOUT_ORDER_PAID = RESULTS / "layout-order-paid.json"  # W46.layout-order-paid:
 DEWARP_GUARD_REAL5 = RESULTS / "dewarp-guard-real5.json"  # W46.dewarp-guard: Apple Vision on Real5 Warping, raw/quad/UVDoc
 LAYOUT_PHOTO = RESULTS / "layout-photo.json"  # W46.layout-photo: layout_photo.py score, four detectors feeding GLM-OCR
 LAYOUT_PARTITION = RESULTS / "layout-partition-score.json"  # W46.layout-partition-score: the app's newspaper partition on L9
+LAYOUT_PARTITION_FIX = RESULTS / "layout-partition-fix.json"  # W46.layout-partition-fix: the fixed partition, same reads
 RERUN_NOISE = RESULTS / "ocr-rerun-noise.json"  # W46.ocr-rerun-noise: ocr_rerun_noise.py report, the 96 read three times
 LOOPS = PUBLIC / "loop-rerun-20261021.json"  # W46.ocr-loops: corpus/loop_rerun.py report, the capped pages read again
 REGIONS = PUBLIC / "regions-20261021.json"  # W46.ocr-regions: whole page, detector regions and overlapping tiles
@@ -1157,8 +1158,15 @@ def layout_partition():
     vs = {a: {m: c(m, f"{a} − raw") for m in ("nes", "bowf1")} for a in ("partition", "app")}
     # whole − raw is raw − whole negated: the delta's sign flips and the interval's ends swap
     vs["whole"] = {m: [-c(m, "raw − whole")[0], -c(m, "raw − whole")[2], -c(m, "raw − whole")[1]] for m in ("nes", "bowf1")}
-    return {"arms": {a: {k: d["arms"][a][k] for k in keep} for a in ("whole", "raw", "partition", "app")},
-            "vs_raw": vs, "plan": {k: d["plan"][k] for k in ("fill_lines", "vision_lines", "filled", "pages")}}
+    out = {"arms": {a: {k: d["arms"][a][k] for k in keep} for a in ("whole", "raw", "partition", "app")},
+           "vs_raw": vs, "plan": {k: d["plan"][k] for k in ("fill_lines", "vision_lines", "filled", "pages")}}
+    if LAYOUT_PARTITION_FIX.exists():
+        f = json.loads(LAYOUT_PARTITION_FIX.read_text())
+        out["arms"]["fixed"] = {k: f["arms"]["partition"][k] for k in keep}
+        out["vs_raw"]["fixed"] = {m: [f["comparisons"][m]["partition − raw"][x] for x in ("delta", "lo", "hi")]
+                                  for m in ("nes", "bowf1")}
+        out["fix_plan"] = {k: f["plan"][k] for k in ("split_lines", "fill_lines", "vision_lines", "outside_crops")}
+    return out
 
 
 def dewarp_real5():
