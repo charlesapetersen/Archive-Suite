@@ -1,0 +1,176 @@
+[
+ {
+  "key": "olmocr-2-7b-fp8",
+  "model": "allenai/olmOCR-2-7B-1025-FP8",
+  "ref": "main",
+  "expected_sha": null,
+  "licence": "Apache-2.0",
+  "adapter": "vllm",
+  "mode": "chat",
+  "prompt": "Attached is one page of a document that you must process. Just return the plain text representation of this document as if you were reading it naturally. Convert equations to LateX and tables to HTML.\nIf there are any figures or charts, label them with the following markdown syntax ![Alt text describing the contents of the figure](page_startx_starty_width_height.png)\nReturn your output as markdown, with a front matter section on top specifying values for the primary_language, is_rotation_valid, rotation_correction, is_table, and is_diagram parameters.",
+  "prompt_from": {
+   "pypi": "olmocr",
+   "file": "olmocr/prompts/prompts.py",
+   "expr": "build_no_anchoring_v4_yaml_prompt()"
+  },
+  "max_side": 1288,
+  "reduce": "olmocr",
+  "card": "https://huggingface.co/allenai/olmOCR-2-7B-1025-FP8 (the olmocr pipeline's default model; pipeline.py: target_longest_image_dim 1288, max_tokens 8000)",
+  "pip": [],
+  "weight_limit_bytes": 13000000000,
+  "sets": [
+   "895",
+   "96"
+  ],
+  "hours_895": 6,
+  "hours_96": 2
+ },
+ {
+  "key": "chandra-ocr-2",
+  "model": "datalab-to/chandra-ocr-2",
+  "ref": "main",
+  "expected_sha": "af93b47dba1b47b6640c86ccf487ed2260ab9a09",
+  "licence": "modified OpenRAIL-M (weights); allowed as an optional download by the owner's licence call, 2026-11-17",
+  "adapter": "vllm",
+  "mode": "chat",
+  "prompt": null,
+  "prompt_from": {
+   "pypi": "chandra-ocr",
+   "file": "chandra/prompts.py",
+   "expr": "OCR_PROMPT"
+  },
+  "vllm": {
+   "mm_processor_kwargs": {
+    "min_pixels": 3136,
+    "max_pixels": 6291456
+   }
+  },
+  "reduce": "chandra",
+  "card": "https://huggingface.co/datalab-to/chandra-ocr-2 (chandra/scripts/vllm.py: max_pixels 6291456; the plain `ocr` prompt, HTML without layout boxes)",
+  "pip": [],
+  "weight_limit_bytes": 14000000000,
+  "sets": [
+   "895",
+   "96"
+  ],
+  "hours_895": 6,
+  "hours_96": 2,
+  "expected_sha_read": "2026-11-17"
+ },
+ {
+  "key": "dots-ocr",
+  "model": "rednote-hilab/dots.ocr",
+  "ref": "main",
+  "expected_sha": "c0111ce6bc07803dbc267932ffef0ae3a51dc951",
+  "licence": "MIT",
+  "adapter": "vllm",
+  "mode": "chat",
+  "prompt": "Please output the layout information from the PDF image, including each layout element's bbox, its category, and the corresponding text content within the bbox.\n\n1. Bbox format: [x1, y1, x2, y2]\n\n2. Layout Categories: The possible categories are ['Caption', 'Footnote', 'Formula', 'List-item', 'Page-footer', 'Page-header', 'Picture', 'Section-header', 'Table', 'Text', 'Title'].\n\n3. Text Extraction & Formatting Rules:\n    - Picture: For the 'Picture' category, the text field should be omitted.\n    - Formula: Format its text as LaTeX.\n    - Table: Format its text as HTML.\n    - All Others (Text, Title, etc.): Format their text as Markdown.\n\n4. Constraints:\n    - The output text must be the original text from the image, with no translation.\n    - All layout elements must be sorted according to human reading order.\n\n5. Final Output: The entire output must be a single JSON object.\n",
+  "prompt_from": {
+   "url": "https://raw.githubusercontent.com/rednote-hilab/dots.ocr/master/dots_ocr/utils/prompts.py",
+   "expr": "dict_promptmode_to_prompt['prompt_layout_all_en']"
+  },
+  "vllm": {
+   "trust_remote_code": true
+  },
+  "chat_kwargs": {
+   "chat_template_content_format": "string"
+  },
+  "reduce": "dots",
+  "card": "https://huggingface.co/rednote-hilab/dots.ocr (vLLM serve: --trust-remote-code --chat-template-content-format string; the layout-and-text prompt, whose JSON is reduced to its texts)",
+  "pip": [],
+  "weight_limit_bytes": 8000000000,
+  "sets": [
+   "895",
+   "96"
+  ],
+  "hours_895": 6,
+  "hours_96": 2,
+  "expected_sha_read": "2026-11-17"
+ },
+ {
+  "key": "deepseek-ocr-2",
+  "model": "deepseek-ai/DeepSeek-OCR-2",
+  "ref": "main",
+  "expected_sha": "aaa02f3811945a91062062994c5c4a3f4c0af2b0",
+  "licence": "Apache-2.0",
+  "adapter": "vllm",
+  "mode": "generate",
+  "prompt": "<image>\nFree OCR.",
+  "vllm": {
+   "trust_remote_code": true,
+   "enable_prefix_caching": false,
+   "mm_processor_cache_gb": 0,
+   "logits_processors": [
+    "vllm.model_executor.models.deepseek_ocr:NGramPerReqLogitsProcessor"
+   ]
+  },
+  "sampling": {
+   "skip_special_tokens": false,
+   "extra_args": {
+    "ngram_size": 30,
+    "window_size": 90,
+    "whitelist_token_ids": [
+     128821,
+     128822
+    ]
+   }
+  },
+  "reduce": "deepseek",
+  "card": "https://recipes.vllm.ai/deepseek-ai/DeepSeek-OCR-2 (vLLM 0.16 or later; its n-gram logits processor and per-request extra_args; the plain-text prompt)",
+  "pip": [],
+  "weight_limit_bytes": 8000000000,
+  "sets": [
+   "895",
+   "96"
+  ],
+  "hours_895": 6,
+  "hours_96": 2,
+  "expected_sha_read": "2026-11-17"
+ },
+ {
+  "key": "mineru25-pro",
+  "model": "opendatalab/MinerU2.5-Pro-2605-1.2B",
+  "ref": "main",
+  "expected_sha": "08aaea840498d49ce16247b6263196cf02814885",
+  "licence": "Apache-2.0",
+  "adapter": "mineru",
+  "prompt": "mineru-vl-utils MinerUClient.two_step_extract (its DEFAULT_PROMPTS: layout detection, then each block)",
+  "reduce": "mineru",
+  "card": "https://huggingface.co/opendatalab/MinerU2.5-Pro-2605-1.2B (MinerUClient backend vllm-engine with MinerULogitsProcessor)",
+  "pip": [
+   "mineru-vl-utils"
+  ],
+  "constraints": "image",
+  "weight_limit_bytes": 4000000000,
+  "sets": [
+   "895",
+   "96"
+  ],
+  "hours_895": 4,
+  "hours_96": 1,
+  "expected_sha_read": "2026-11-17"
+ },
+ {
+  "key": "churro-3b",
+  "model": "stanford-oval/churro-3B",
+  "ref": "main",
+  "expected_sha": "ca2150ea465d5a3d67818c50e234b9422619c75d",
+  "licence": "Qwen research (scoring only)",
+  "adapter": "vllm",
+  "mode": "chat",
+  "prompt_role": "system",
+  "prompt": "Transcribe the entirety of this historical document to XML format.",
+  "reduce": "churro",
+  "card": "https://huggingface.co/stanford-oval/churro-3B (its XML preset: this system message and the image alone, as the FarmShare collector's churro mode sent it)",
+  "pip": [],
+  "weight_limit_bytes": 10000000000,
+  "sets": [
+   "895"
+  ],
+  "subset": "churro-added455.txt",
+  "hours_895": 3,
+  "hours_96": 0,
+  "expected_sha_read": "2026-11-17"
+ }
+]

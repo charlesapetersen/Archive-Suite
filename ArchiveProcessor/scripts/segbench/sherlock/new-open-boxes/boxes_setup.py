@@ -48,7 +48,8 @@ def download(cands, roots):
                 raise RuntimeError('gated or private')
             rec['revision'] = info.sha
             rec['sha_check'] = ('matches' if info.sha == c.get('expected_sha') else
-                                f"resolved {c['ref']} to {info.sha}; the Mac read {c.get('expected_sha')} on 2026-10-31")
+                                f"resolved {c['ref']} to {info.sha}; the Mac read {c.get('expected_sha')} on "
+                                f"{c.get('expected_sha_read', '2026-10-31')}")
             names = [s.rfilename for s in info.siblings]
             keep = [n for n in names if not any(fnmatch.fnmatch(n, g) for g in c.get('ignore', []))]
             heavy = ('.safetensors', '.bin', '.pt', '.pth', '.onnx', '.gguf', '.msgpack', '.h5', '.whl')
