@@ -124,6 +124,17 @@ func plantedRaw(_ path: String, _ value: Data) {
 SWIFT
 expect 1 "planted raw setxattr in ArchiveCore FAILS" "PlantedRawXattr.swift"
 
+echo "── rule 4: raw POSIX writes, the descriptor-relative spellings included ─────"
+# gate-fix (2026-11-18): rule 4 had no case here, and its list lacked `renameatx_np`, so the container store's two
+# renames were never seen. Each spelling is planted alone, so one the rule drops fails its own case.
+for plant in 'renameatx_np(dirfd, "a", dirfd, "b", 0)' 'unlinkat(dirfd, "a", 0)' 'mkdirat(dirfd, "a", 0o755)' \
+             'openat(dirfd, "a", O_WRONLY | O_CREAT, 0o644)'; do
+  fresh_tree
+  printf 'import Darwin\nfunc plantedPosix(_ dirfd: Int32) {\n    _ = %s\n}\n' "$plant" \
+    > "$SCRATCH/$CORE_SRC/Corpus/PlantedPosix.swift"
+  expect 1 "planted ${plant%%(*} in ArchiveCore FAILS" "Corpus/PlantedPosix.swift"
+done
+
 echo "── vacuous-pass guards: a renamed source root must not read as clean ────────"
 fresh_tree
 mv "$SCRATCH/$CORE_SRC" "$SCRATCH/$(dirname "$CORE_SRC")/ArchiveCoreRenamed"

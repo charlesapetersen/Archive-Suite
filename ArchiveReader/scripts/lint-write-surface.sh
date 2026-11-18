@@ -161,6 +161,17 @@ ALLOW=(
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}let fd = open(temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}defer { unlink(temp) }"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRFlagStore.swift${SEP}guard link(temp, url.path) == 0 else { throw StoreError.io(\"\\(url.lastPathComponent): \\(String(cString: strerror(errno)))\") }"
+  # W47.ct-spec (b62ac1e1, two Opus adversarial passes), audited for gate-fix 2026-11-18: the container file and level
+  # map, the corpus write class `SPEC/containers.md` §File safety names — new files only, inside a directory's hidden
+  # `.archivesuite` folder. `mkdirat` makes only that folder; every later step goes through its O_NOFOLLOW descriptor.
+  # The temporary is created O_EXCL beside the document, removed only if the rename did not happen, and renamed over
+  # the document (RENAME_EXCL for a first one); a document this build cannot keep is renamed aside, never deleted.
+  # W47.ct-spec did not run this lint, and rule 4 did not yet spell `renameatx_np`; both renames are pinned here.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}if create, mkdirat(dfd, ContainerFile.folderName, 0o755) != 0 {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}let fd = openat(sfd, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}defer { if !renamed { unlinkat(sfd, temp, 0) } }"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}while renameatx_np(sfd, temp, sfd, name, flags) != 0 {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}guard renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {"
 
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
@@ -292,7 +303,7 @@ scan destructive \
 #    saw — opening for writing, creating, linking, renaming, removing, truncating, copying metadata. Same trees as
 #    rule 2. A comment line and a Swift method declaration (`func rename(`) are not calls.
 posix_write_hits() {   # <source root…>
-  local re='(^|[^A-Za-z0-9_.]|Darwin\.|Glibc\.)(unlink|unlinkat|link|linkat|symlink|rmdir|mkdir|mkdirat|rename|renameat|renamex_np|truncate|ftruncate|removexattr|fremovexattr|copyfile|fcopyfile|clonefile|exchangedata|chmod|chflags|utimes|utimensat|setattrlist)\(|O_CREAT|O_TRUNC|O_WRONLY|O_RDWR'
+  local re='(^|[^A-Za-z0-9_.]|Darwin\.|Glibc\.)(unlink|unlinkat|link|linkat|symlink|rmdir|mkdir|mkdirat|rename|renameat|renamex_np|renameatx_np|truncate|ftruncate|removexattr|fremovexattr|copyfile|fcopyfile|clonefile|exchangedata|chmod|chflags|utimes|utimensat|setattrlist)\(|O_CREAT|O_TRUNC|O_WRONLY|O_RDWR'
   grep -rnE "$re" "$@" --include='*.swift' 2>/dev/null \
     | LINT_RE="$re" /usr/bin/perl -ne 'next if /^[^:]+:\d+:\s*(?:\/\/|\/\*|\*)/; my $code = $_; $code =~ s/^[^:]+:\d+://; $code =~ s/\bfunc\s+\w+\s*\(//g; print if $code =~ /$ENV{LINT_RE}/' || true
 }
