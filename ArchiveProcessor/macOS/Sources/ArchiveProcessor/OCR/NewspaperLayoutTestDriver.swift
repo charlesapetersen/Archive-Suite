@@ -11,8 +11,83 @@ import VisionOCRKit
 @MainActor
 enum NewspaperLayoutTestDriver {
     static func runIfRequested() {
-        guard ProcessInfo.processInfo.environment["NEWSPAPER_TEST"] == "1" else { return }
+        let env = ProcessInfo.processInfo.environment
+        if let list = env["NEWSPAPER_PLAN_DUMP"], let out = env["NEWSPAPER_PLAN_OUT"] {
+            Task { await dumpPlans(list: URL(fileURLWithPath: list), out: URL(fileURLWithPath: out)) }
+            return
+        }
+        guard env["NEWSPAPER_TEST"] == "1" else { return }
         Task { await run() }
+    }
+
+    /// W46.layout-partition-score: the exact images `NewspaperPagePlan.prepare` gives the reader, copied out for a
+    /// bench reader, with the kind gate, the raw detector regions (for the raw-region control) and the partition's
+    /// counts. Input pages are only read; everything is written under `out`, which the script makes in scratch.
+    private static func dumpPlans(list: URL, out: URL) async {
+        var log: [String] = [], failures = 0
+        let pages = ((try? String(contentsOf: list, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+        for line in pages where !line.isEmpty {
+            let parts = line.split(separator: "\t").map(String.init)
+            guard parts.count == 2 else { log.append("FAIL bad line \(line)"); failures += 1; continue }
+            let (id, url) = (parts[0], URL(fileURLWithPath: parts[1]))
+            let dest = out.appendingPathComponent(id)
+            do {
+                try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
+                let kind = await PageKindClassifier.classify(url: url)
+                let started = Date()
+                let plan = try await NewspaperPageReader.queue.run {
+                    try NewspaperPagePlan.prepare(url, photographed: false, isCancelled: { false })
+                }
+                let prepareSeconds = Date().timeIntervalSince(started)
+                defer { plan.removeScratch() }
+                var names: [String] = []
+                for image in plan.images {
+                    try FileManager.default.copyItem(at: image, to: dest.appendingPathComponent(image.lastPathComponent))
+                    names.append(image.lastPathComponent)
+                }
+                // Diagnostics only, recomputed with the plan's own static functions on a second detection.
+                let geometry = try await NewspaperPageReader.queue.run { () throws -> Data in
+                    guard let image = PageKindClassifier.loadImage(url) else { throw NewspaperPagePlan.Failure.image }
+                    let regions = try NewspaperLayout.detect(image: image)
+                    let raw = regions.compactMap { NewspaperPagePlan.pixelBox($0.box, width: image.width, height: image.height) }
+                    var kept: [CGRect] = []
+                    for box in raw where NewspaperPagePlan.unionArea(kept.map { box.intersection($0) }) < box.width * box.height - 0.5 {
+                        kept.append(box)
+                    }
+                    let crops = kept.map { CGRect(x: $0.minX / Double(image.width), y: $0.minY / Double(image.height),
+                                                  width: $0.width / Double(image.width), height: $0.height / Double(image.height)) }
+                    let vision = TextLayer.visionLines(of: image)?.lines.map(\.box) ?? []
+                    let record: [String: Any] = [
+                        "width": image.width, "height": image.height, "vision_lines": vision.count,
+                        "fill_lines": NewspaperPagePlan.boundaryLines(vision, crops: crops).count, "kept": kept.count,
+                        "regions": regions.map { ["box": [$0.box.minX, $0.box.minY, $0.box.maxX, $0.box.maxY],
+                                                  "order": $0.order, "label": $0.label, "score": $0.score] as [String: Any] }]
+                    return try JSONSerialization.data(withJSONObject: record)
+                }
+                guard var record = try JSONSerialization.jsonObject(with: geometry) as? [String: Any] else {
+                    throw NewspaperPagePlan.Failure.geometry
+                }
+                record["id"] = id
+                record["kind"] = kind?.kind.rawValue ?? NSNull()
+                record["kind_confidence"] = kind?.confidence ?? NSNull()
+                record["uses_regions"] = NewspaperPagePlan.usesRegions(kind)
+                record["plan_regions"] = plan.regionCount
+                record["coverage"] = plan.coverage ?? NSNull()
+                record["has_fill"] = plan.hasFill
+                record["images"] = names
+                record["prepare_seconds"] = prepareSeconds
+                let data = try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+                try data.write(to: dest.appendingPathComponent("plan.json"))
+                let same = (record["kept"] as? Int) == plan.regionCount
+                log.append("\(same ? "PASS" : "FAIL") \(id) regions \(plan.regionCount) fill \(plan.hasFill)")
+                if !same { failures += 1 }
+            } catch {
+                log.append("FAIL \(id): \(error)"); failures += 1
+            }
+        }
+        log.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
+        try? (log.joined(separator: "\n") + "\n").write(to: out.appendingPathComponent("report.txt"),
+                                                         atomically: true, encoding: .utf8)
     }
 
     private actor Fake: PageReader {
