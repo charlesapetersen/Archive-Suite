@@ -340,7 +340,11 @@ final class AuditLedger: @unchecked Sendable {
     /// a full file is closed off as a segment and kept, and undo stops reading once the window is full.
     static let undoGroupLimit = 100
 
-    func undoGroups(in root: URL) -> [[Entry]] {
+    func undoGroups(in root: URL) -> [[Entry]] { undoGroups(in: [root]) }
+
+    /// `undoGroups(in:)` over every tree Reader may tag: MAIN, and the JPEGS tree for read state
+    /// (W40.reader-jpeg-read).
+    func undoGroups(in roots: [URL]) -> [[Entry]] {
         guard !hasRecordingGap else { return [] }
         var consumed = Set<UUID>()
         var closed = Set<UUID>()
@@ -362,8 +366,7 @@ final class AuditLedger: @unchecked Sendable {
             }
             if let undone = entry.undoes { consumed.insert(undone); continue }
             guard entry.op != .undo && entry.op != .undoAttempt && entry.op != .redoAttempt,
-                  (ReaderArchiveLayout.isContained(URL(fileURLWithPath: entry.path), inRootPath: root.path)
-                    || Self.bookmarkURL(entry).map { ReaderArchiveLayout.isContained($0, inRootPath: root.path) } == true)
+                  Self.isContained(entry, in: roots)
             else { continue }
             if groups[entry.group] == nil {
                 guard order.count < Self.undoGroupLimit else { break history }
@@ -386,7 +389,9 @@ final class AuditLedger: @unchecked Sendable {
     /// members re-recorded by `keepForRetry`) is part of that undo, not a new change. The same barriers
     /// stop it as stop undo: a recording gap, a history barrier, an unclosed action. Each group holds the
     /// undo's verified lines in reverse write order; a redo applies each line's `inverse`.
-    func redoGroups(in root: URL) -> [[Entry]] {
+    func redoGroups(in root: URL) -> [[Entry]] { redoGroups(in: [root]) }
+
+    func redoGroups(in roots: [URL]) -> [[Entry]] {
         guard !hasRecordingGap else { return [] }
         var consumed = Set<UUID>()
         var closed = Set<UUID>()
@@ -408,7 +413,7 @@ final class AuditLedger: @unchecked Sendable {
             // A redo (its lines, its marker, or a retry of an undo of one) consumes the undo it reverses.
             if let redone = entry.redoes { consumed.insert(redone); continue }
             if entry.op == .undo, entry.undoes != nil {
-                guard entry.unverified == nil, Self.isContained(entry, in: root) else { continue }
+                guard entry.unverified == nil, Self.isContained(entry, in: roots) else { continue }
                 if groups[entry.group] == nil {
                     guard order.count < Self.undoGroupLimit else { break history }
                     order.append(entry.group)
@@ -426,9 +431,12 @@ final class AuditLedger: @unchecked Sendable {
         return order.reversed().filter { !consumed.contains($0) }.compactMap { groups[$0] }
     }
 
-    private static func isContained(_ entry: Entry, in root: URL) -> Bool {
-        ReaderArchiveLayout.isContained(URL(fileURLWithPath: entry.path), inRootPath: root.path)
-            || bookmarkURL(entry).map { ReaderArchiveLayout.isContained($0, inRootPath: root.path) } == true
+    private static func isContained(_ entry: Entry, in roots: [URL]) -> Bool {
+        let path = URL(fileURLWithPath: entry.path)
+        if roots.contains(where: { ReaderArchiveLayout.isContained(path, inRootPath: $0.path) }) { return true }
+        // Resolving the bookmark touches the filesystem, so only when the recorded path is not inside.
+        guard let bookmark = bookmarkURL(entry) else { return false }
+        return roots.contains { ReaderArchiveLayout.isContained(bookmark, inRootPath: $0.path) }
     }
 
     /// Consume BEFORE applying an occurrence inverse: replay can append duplicate occurrences. If the

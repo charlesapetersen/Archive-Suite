@@ -29,6 +29,17 @@ What it does not do, deliberately or not yet:
   the test VM, so `ImproveOCRUITests` uses the DEBUG hand-off recorder) and the Connect panel itself (the test connects
   the fixture's folder by path). The hand-off link and manifest are unit-tested against the Processor's decoder rules.
 
+## ✅ CLOSED (W40.reader-jpeg-read, 2026-11-17) — Mark Read and Unread work on JPEGs; the status line says why a file was left alone
+
+Read state may now be written in the `Archival Photos JPEGS` tree beside MAIN: Mark Read/Unread (menu, R, row menu,
+document window), the Read cell and Clear Read State. Every other tag change still stays inside MAIN, and so does every
+undo or redo line that changes anything but Read/Unread, even when its file has since moved into JPEGS (judged by the
+line's inverse). Undo history covers both trees. What stays as it was: **Mark Read never adds a read-state tag to a file
+that has none** (Safety §10, hard-coded); the status line now says so ("1 has no Read or Unread tag, so it was left
+alone."), and likewise for files already in that state and files outside both trees, instead of "Marked 0 Read.". The
+Read cell still adds one on a click, as before. A cached row that lost its tag on disk still counts as "could not
+update", because re-verification needs a read-state tag to track the file.
+
 ## ✅ CLOSED (W40.fix-reader-inspector-narrow, 2026-11-11) — the window makes room for the Inspector
 
 At the navigation window's 900-pt minimum with the sidebar shown, the Inspector ran past the window's right edge and its

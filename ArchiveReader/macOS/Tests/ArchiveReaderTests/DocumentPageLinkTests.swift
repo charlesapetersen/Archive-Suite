@@ -258,6 +258,8 @@ final class DocumentPageLinkTests: XCTestCase {
         XCTAssertEqual(model.openViewerRequest, 0, "but opens no window — that is not what it asked for")
     }
 
+    /// W40.reader-jpeg-read: the owner marks JPEGs Read and Unread, so read state may be written in the JPEGS
+    /// tree under the common-parent grant; every other tag change still stays inside MAIN.
     func testTagWritesStayInsideMainWhenTheGrantedRootContainsSiblingJPEGs() throws {
         let root = try scratchDir().appendingPathComponent("dual-root-\(UUID().uuidString)", isDirectory: true)
         let main = root.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName, isDirectory: true)
@@ -272,13 +274,19 @@ final class DocumentPageLinkTests: XCTestCase {
                                tags: DocumentTags.parse(raw: ["Unread"], labelNumber: nil),
                                contentModified: nil)
 
-        model.setReadStateInline(.read, for: file)
-
+        XCTAssertFalse(model.commitSubjectEdit(from: [], to: ["Escaped"], for: file))
         guard case let .success(tags, _) = TagReading.read(jpegPDF) else {
             return XCTFail("the scratch partner PDF should remain readable")
         }
         XCTAssertEqual(tags, ["Unread"],
-                       "the common-parent grant must not extend Reader's tag-write lane into JPEGS")
+                       "the common-parent grant must not extend Reader's subject writes into JPEGS")
+
+        model.setReadStateInline(.read, for: file)
+        guard case let .success(readTags, _) = TagReading.read(jpegPDF) else {
+            return XCTFail("the scratch partner PDF should remain readable")
+        }
+        XCTAssertEqual(readTags, ["Read"], "read state may be written in JPEGS under the common-parent grant")
+        try (jpegPDF as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
 
         let jpegRootModel = navModel(root: jpegs)
         jpegRootModel.setReadStateInline(.read, for: file)
@@ -286,7 +294,7 @@ final class DocumentPageLinkTests: XCTestCase {
             return XCTFail("the scratch partner PDF should remain readable")
         }
         XCTAssertEqual(tagsAfterJPEGRootSelection, ["Unread"],
-                       "selecting JPEGS directly must still leave its files outside MAIN's write lane")
+                       "selecting JPEGS directly must still leave its files outside every write lane")
     }
 
     func testRevealForTheWrongArchiveRequestsNothing() throws {

@@ -2270,15 +2270,21 @@ final class NavigationModel: ObservableObject {
     /// cache-provenance subset before a bulk operation derives its selection/deltas; disk rows from
     /// this process can proceed directly. A now-untracked/unreadable/missing path is omitted, never
     /// coerced into an empty tag array and never written merely because an old cache row named it.
-    func reverifyCacheRows(_ files: [ArchiveFile]) -> (files: [ArchiveFile], rejected: Int) {
+    /// `readState` widens the write boundary from MAIN to the read-state trees (MAIN and JPEGS): the
+    /// owner marks JPEGs Read and Unread (W40.reader-jpeg-read). `outside` counts the rows refused for
+    /// lying outside that boundary; it is part of `rejected`.
+    func reverifyCacheRows(_ files: [ArchiveFile], readState: Bool = false)
+        -> (files: [ArchiveFile], rejected: Int, outside: Int) {
         var verified: [ArchiveFile] = []
         var rejected = 0
+        var outside = 0
         for file in files {
             // The granted root now covers the sibling JPEGS tree as well. Reader may discover rows
-            // there, but tag mutations stay inside MAIN, whose ownership contract predates the wider
+            // there; other tag mutations stay inside MAIN, whose ownership contract predates the wider
             // bookmark. Apply this before provenance handling so fresh and cached rows share the gate.
-            guard isInsideMainArchive(file.url) else {
+            guard readState ? isInsideReadStateTree(file.url) : isInsideMainArchive(file.url) else {
                 rejected += 1
+                outside += 1
                 continue
             }
             guard file.provenance.isCache else { verified.append(file); continue }
@@ -2300,13 +2306,15 @@ final class NavigationModel: ObservableObject {
             verified.append(ArchiveLibrary.row(entry, tagNames: entry.tagNames,
                                                labelNumber: entry.labelNumber))
         }
-        return (verified, rejected)
+        return (verified, rejected, outside)
     }
 
-    private func reverifyCacheRow(_ file: ArchiveFile) -> ArchiveFile? {
-        let result = reverifyCacheRows([file])
+    private func reverifyCacheRow(_ file: ArchiveFile, readState: Bool = false) -> ArchiveFile? {
+        let result = reverifyCacheRows([file], readState: readState)
         guard let verified = result.files.first else {
-            statusMessage = "Could not verify \(file.name)."
+            statusMessage = result.outside > 0
+                ? "\(file.name) is outside the folders whose tags Reader changes, so it was not changed."
+                : "Could not verify \(file.name)."
             announce(statusMessage)
             return nil
         }
@@ -2319,6 +2327,19 @@ final class NavigationModel: ObservableObject {
         guard !layout.needsCommonParentGrant else { return false }
         let mainRoot = layout.mainRoot
         return ReaderArchiveLayout.isContained(url, inRootPath: mainRoot.path)
+    }
+
+    /// The trees whose Read and Unread tags Reader may change: MAIN and, beside it under the granted
+    /// parent, the JPEGS tree (W40.reader-jpeg-read). Every other tag change stays inside MAIN.
+    func readStateRoots() -> [URL] {
+        guard let root = rootStore.root else { return [] }
+        let layout = ReaderArchiveLayout(grantedRoot: root)
+        guard !layout.needsCommonParentGrant else { return [] }
+        return layout.mainRoot == layout.grantedRoot ? [layout.mainRoot] : [layout.mainRoot, layout.jpegRoot]
+    }
+
+    func isInsideReadStateTree(_ url: URL) -> Bool {
+        readStateRoots().contains { ReaderArchiveLayout.isContained(url, inRootPath: $0.path) }
     }
 
     /// The library rows for these paths, in the order given; a path the library does not hold is left out.
@@ -2347,47 +2368,82 @@ final class NavigationModel: ObservableObject {
     func mark(_ target: ReadState, paths: [String]? = nil) {
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
-        let reverified = ReaderStages.measure("model.reverifyCacheRows") { reverifyCacheRows(targets) }
+        let reverified = ReaderStages.measure("model.reverifyCacheRows") {
+            reverifyCacheRows(targets, readState: true)
+        }
         let files = reverified.files
+        var counts = MarkCounts(outside: reverified.outside, failed: reverified.rejected - reverified.outside)
         guard !files.isEmpty else {
             if reverified.rejected > 0 {
-                statusMessage = "Could not verify \(reverified.rejected) selected file"
-                    + (reverified.rejected == 1 ? "." : "s.")
+                statusMessage = reverified.outside == 0
+                    ? "Could not verify \(reverified.rejected) selected file" + (reverified.rejected == 1 ? "." : "s.")
+                    : Self.markStatus(target, counts)
                 announce(statusMessage)
             }
             return
         }
-        var changed = 0
         var verified: [TagWriteResult] = []
-        var failures = reverified.rejected
         let group = UUID()                       // §12: the whole action is one ledger group, as it is one undo
         ReaderStages.measure("tagWriter.writes") { AuditLedger.withContext(group: group) {
             for f in files {
                 let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
                 do {
+                    // No `addIfMissing`: "Mark Read" never adds a read-state tag to a marker/neither file
+                    // (Safety §10, hard-coded); the status line says how many it left alone.
                     let r = try TagWriter.setReadState(target, on: f.url, expecting: identity)
                     verified.append(r)               // verified ground truth (incl. no-op) — safe to display
-                    if !r.isNoOp { changed += 1 }  // real changes → undo
-                } catch { failures += 1 }
+                    if !r.isNoOp { counts.changed += 1 }  // real changes → undo
+                    else if r.after.contains(where: isReadStateWord) { counts.already += 1 }
+                    else { counts.noReadState += 1 }
+                } catch { counts.failed += 1 }
             }
         } }
         // Only verified (non-throwing) writes move a row — a failed write keeps the last-discovered value and
         // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
         library.applyVerifiedWrites(verified)
         refreshUndoHistory()
-        statusMessage = failures == 0
-            ? "Marked \(changed) \(target.rawValue)."
-            : "Marked \(changed); \(failures) could not update."
+        statusMessage = Self.markStatus(target, counts)
         announce(statusMessage)
+    }
+
+    /// What one Mark Read / Mark Unread did, file by file.
+    struct MarkCounts: Equatable {
+        var changed = 0, already = 0, noReadState = 0, outside = 0, failed = 0
+    }
+
+    /// The status line for a mark: what changed, and why each file that did not change was left alone
+    /// (W40.reader-jpeg-read: a bare "Marked 0 Read." told the owner nothing).
+    static func markStatus(_ target: ReadState, _ c: MarkCounts) -> String {
+        func isAre(_ n: Int, _ one: String, _ many: String) -> String { n == 1 ? one : many }
+        var parts: [String] = []
+        if c.failed > 0 {
+            parts.append("Marked \(c.changed); \(c.failed) could not update.")
+        } else if c.changed > 0 || c.already + c.noReadState + c.outside == 0 {
+            parts.append("Marked \(c.changed) \(target.rawValue).")
+        }
+        if c.already > 0 {
+            parts.append("\(c.already) \(isAre(c.already, "was", "were")) already \(target.rawValue).")
+        }
+        if c.noReadState > 0 {
+            parts.append("\(c.noReadState) \(isAre(c.noReadState, "has", "have")) no Read or Unread tag, so "
+                + "\(isAre(c.noReadState, "it was", "they were")) left alone.")
+        }
+        if c.outside > 0 {
+            parts.append("\(c.outside) \(isAre(c.outside, "is", "are")) outside the folders whose tags Reader "
+                + "changes, so \(isAre(c.outside, "it was", "they were")) not changed.")
+        }
+        return parts.joined(separator: " ")
     }
 
     func refreshUndoHistory() { ReaderStages.measure("model.refreshUndoHistory") { refreshUndoHistoryStage() } }
 
     private func refreshUndoHistoryStage() {
         if let root = rootStore.root {
-            let main = ReaderArchiveLayout(grantedRoot: root).mainRoot
-            undoGroups = AuditLedger.shared.undoGroups(in: main)
-            redoGroups = AuditLedger.shared.redoGroups(in: main)
+            // MAIN, and the JPEGS tree whose read state Reader also changes (W40.reader-jpeg-read).
+            let readStateRoots = readStateRoots()
+            let roots = readStateRoots.isEmpty ? [ReaderArchiveLayout(grantedRoot: root).mainRoot] : readStateRoots
+            undoGroups = AuditLedger.shared.undoGroups(in: roots)
+            redoGroups = AuditLedger.shared.redoGroups(in: roots)
         } else { undoGroups = []; redoGroups = [] }
         undoDepth = undoGroups.count
         redoDepth = redoGroups.count
@@ -2454,7 +2510,12 @@ final class NavigationModel: ObservableObject {
                 }
                 do {
                     let target = try AuditLedger.undoTarget(entry)
-                    guard isInsideMainArchive(target.url) else {
+                    // A line that changes only Read/Unread may be reversed in the JPEGS tree too; any other
+                    // line only inside MAIN, even when its file has since moved into JPEGS. Judged by the
+                    // inverse, not the op: a redo line's op is `.undo` whatever it changed.
+                    let readStateOnly = entry.inverse.label == nil
+                        && (entry.inverse.add + entry.inverse.remove).allSatisfy(isReadStateWord)
+                    guard readStateOnly ? isInsideReadStateTree(target.url) : isInsideMainArchive(target.url) else {
                         throw TagWriteError.identityMismatch("file is outside the current archive")
                     }
                     let inverse = TagOccurrenceDelta(add: entry.inverse.add, remove: entry.inverse.remove,
@@ -2702,7 +2763,7 @@ final class NavigationModel: ObservableObject {
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
-        guard let file = reverifyCacheRow(file) else { return }
+        guard let file = reverifyCacheRow(file, readState: true) else { return }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
         let group = UUID()
         do {
@@ -2716,21 +2777,22 @@ final class NavigationModel: ObservableObject {
 
     /// A click on the Read cell: Read → Unread; Unread/none → Read.
     func toggleReadState(for file: ArchiveFile) {
-        guard let file = reverifyCacheRow(file) else { return }
+        guard let file = reverifyCacheRow(file, readState: true) else { return }
         setReadStateInline(file.readState == .read ? .unread : .read, for: file)
     }
 
     /// The Read cell's Clear Read State. Both tokens are named, not the row's: `TagWriter` re-reads the file and
     /// matches Read/Unread in any case, so a row that is behind the file still clears whatever the file holds.
     func clearReadState(for file: ArchiveFile) {
-        guard let file = reverifyCacheRow(file) else { return }
-        applyDelta(TagDelta(remove: ReadState.allCases.map(\.rawValue)), to: file)
+        guard let file = reverifyCacheRow(file, readState: true) else { return }
+        applyDelta(TagDelta(remove: ReadState.allCases.map(\.rawValue)), to: file, readState: true)
     }
 
+    /// `readState`: the delta touches only Read/Unread, so the JPEGS tree is in bounds too.
     @discardableResult
-    private func applyDelta(_ delta: TagDelta, to file: ArchiveFile) -> Bool {
+    private func applyDelta(_ delta: TagDelta, to file: ArchiveFile, readState: Bool = false) -> Bool {
         guard !delta.isEmpty else { return true }
-        guard let file = reverifyCacheRow(file) else { return false }
+        guard let file = reverifyCacheRow(file, readState: readState) else { return false }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
         let group = UUID()
         do {
