@@ -193,7 +193,7 @@ extension DateRoute.Decision {
     }
 
     /// W46.date-route-header — the PDF header's `Date evidence:` value (owner call 9): for a non-explicit date only (read
-    /// off the page image, estimated, or inherited from the cover), its class, source, place and quote, and the 90%
+    /// off the page image, taken from a stamp on it, estimated, or inherited from the cover), its class, source, place and quote, and the 90%
     /// interval where the route measured it. Nil for an explicit text year and for no year. One line, never holding the
     /// provenance separator, the quote cut to `headerQuoteChars`.
     var headerEvidence: String? {
@@ -204,8 +204,8 @@ extension DateRoute.Decision {
             return nil
         case .inherited:
             parts = ["inherited", "from " + Self.headerSafe(sourceFile ?? "the covering letter", limit: 80)]
-        case .image:
-            parts = ["image"]
+        case .image, .stamp:
+            parts = [evidenceClass.rawValue]
             if let page { parts.append("page \(page)") }
             if let place, !Self.headerSafe(place, limit: 40).isEmpty { parts.append(Self.headerSafe(place, limit: 40)) }
         case .estimate:

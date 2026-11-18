@@ -254,6 +254,24 @@ enum DateRouteTestDriver {
               && io["quote"] as? String == "March 30, 1961" && io["where"] as? String == "dateline"
               && roles.count == 1 && roles[0]["quote"] as? String == "RECEIVED APR 4 1961" && roles[0]["role"] as? String == "stamp")
 
+        // W46.date-stamp-fallback: no own date on the page, a stamp: its year with Date Uncertain, before the estimate.
+        let stampOnly = DateRoute.readImage(#"{"dates": [{"quote": "RECEIVED MAY 2 1960", "page": 1, "where": "stamp", "kind": "stamped", "year": 1960, "month": 5}], "document_date": null}"#)
+        let byStamp = DateRoute.decide(text: memo, near: near, traceRaw: #"{"year": 1957, "lo": 1956, "hi": 1958, "date_uncertain": true, "evidence": {"neighbour": "P1", "quote": "June 2, 1957"}}"#,
+                                       image: stampOnly, imageNote: DateRoute.imageSent)
+        var t7 = GeneratedTags(year: "1960", month: "5 May", day: "Day 2")
+        byStamp.apply(to: &t7)
+        let so = byStamp.with(measured: true).sidecarObject()
+        check("2 stamp: the stamp's year over the estimate, Date Uncertain, no month or day; its quote in the sidecar and header",
+              t7.year == "1960" && t7.dateUncertain && t7.month == nil && t7.day == nil && byStamp.evidenceClass == .stamp
+              && so["class"] as? String == "stamp" && so["quote"] as? String == "RECEIVED MAY 2 1960"
+              && so["where"] as? String == "stamp" && so["page"] as? Int == 1 && so["interval_90"] == nil
+              && byStamp.with(measured: true).headerEvidence == "stamp; page 1; stamp; \"RECEIVED MAY 2 1960\"",
+              "\(t7.allTags) \(so) \(String(describing: byStamp.headerEvidence))")
+        var stampCovered = byStamp
+        stampCovered.inherit(fromCover: GeneratedTags(year: "1958"), coverFile: "L.pdf")
+        check("2 stamp: a covering document's year wins over a stamp (step 3a)",
+              stampCovered.year == 1958 && stampCovered.evidenceClass == .inherited && stampCovered.quote == nil)
+
         let url = URL(fileURLWithPath: "/scratch/page1.jpg")
         let tags = GeneratedTags(year: "1958", subjectTags: ["Harbours"], format: "letter")
         check("2 no dating object: the sidecar is unchanged",

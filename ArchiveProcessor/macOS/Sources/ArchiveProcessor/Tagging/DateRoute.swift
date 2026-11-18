@@ -545,6 +545,9 @@ enum DateRoute {
         let year: Int?
         /// The year is written in the quote (a year the model supplied from elsewhere is not).
         let written: Bool
+
+        /// A stamp (a received stamp, a postmark): placed on a stamp or stamped (`date_route_pipeline.is_stamp`).
+        var isStamp: Bool { place == "stamp" || kind == "stamped" }
     }
 
     struct ImageReading: Equatable, Sendable, Codable {
@@ -571,7 +574,18 @@ enum DateRoute {
         /// Second-role dates for the sidecar (owner call 9): received stamps, postmarks and other stamped dates, each
         /// with its quote and place, never a second bare year. The bench counts them so (`date_route_pipeline`).
         var secondRole: [PageDate] {
-            dates.filter { $0.written && ($0.place == "stamp" || $0.kind == "stamped") }
+            dates.filter { $0.written && $0.isStamp }
+        }
+
+        /// W46.date-stamp-fallback (`date_route_pipeline.stamp_evidence`): the stamped date a document with no own date
+        /// takes, the earliest year of the second-role dates, the first quoted of that year (a document predates the
+        /// stamps put on it).
+        var stampEvidence: PageDate? {
+            secondRole.reduce(nil) { best, x in
+                guard let y = x.year else { return best }
+                if let b = best, let by = b.year, by <= y { return b }
+                return x
+            }
         }
     }
 
@@ -650,7 +664,7 @@ enum DateRoute {
     // MARK: The decision (date_route_pipeline.route)
 
     enum EvidenceClass: String, Sendable, Codable {
-        case text, image, estimate, inherited, none
+        case text, image, stamp, estimate, inherited, none
     }
 
     struct Decision: Equatable, Sendable, Codable {
@@ -732,12 +746,25 @@ enum DateRoute {
             return d
         }
         if let image, let y = image.ownYear {
-            d.year = y; d.dateUncertain = false; d.evidenceClass = .image; d.step = 2
             let ev = image.ownEvidence
             d.quote = ev?.quote; d.page = ev?.page; d.place = ev?.place
+            // W46.date-stamp-fallback: a stamped own date dates the stamping, so it is the stamp step, Date Uncertain.
+            if let ev, ev.isStamp {
+                d.year = y; d.dateUncertain = true; d.evidenceClass = .stamp; d.step = 2
+                return d
+            }
+            d.year = y; d.dateUncertain = false; d.evidenceClass = .image; d.step = 2
             // The month and day of the quoted date the year rests on, unless the reply's document month names another.
             let (m, day) = monthDay(datedIn(ev?.quote, year: y))
             if let m, image.docMonth == nil || image.docMonth == m { d.month = m; d.day = day }
+            return d
+        }
+        // W46.date-stamp-fallback: no own date on the page either, but a stamp or postmark: its year, Date Uncertain,
+        // ahead of the neighbour estimate (owner, 2026-11-17; date-stamp-fallback.md). No month or day: the stamp dates
+        // the stamping. A covering document's year still wins (step 3a, `inherit(fromCover:)`).
+        if let image, let st = image.stampEvidence, let y = st.year {
+            d.year = y; d.dateUncertain = true; d.evidenceClass = .stamp; d.step = 2
+            d.quote = st.quote; d.page = st.page; d.place = st.place
             return d
         }
         if let y = tr.year, check.verdict == "valid" { estimate(y) }

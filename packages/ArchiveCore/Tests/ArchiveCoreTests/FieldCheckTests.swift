@@ -110,11 +110,12 @@ final class FieldCheckTests: XCTestCase {
 
     func testNoDateClassClearsTheRule() {
         for evidence in [nil, "image; page 1; top right; \"1958\"", "estimate; from a.pdf; line 3; \"x\"",
-                         "inherited; from a.pdf", "something new"] {
+                         "inherited; from a.pdf", "stamp; page 1; stamp; \"MAY 2 1960\"", "something new"] {
             XCTAssertEqual(FieldStatusPolicy.date(checked: false, evidence: evidence).level, .lowerConfidence)
             XCTAssertEqual(FieldStatusPolicy.date(checked: true, evidence: evidence).level, .checked)
         }
         XCTAssertTrue(FieldStatusPolicy.date(checked: false, evidence: "Image; page 1").source.contains("image"))
+        XCTAssertTrue(FieldStatusPolicy.date(checked: false, evidence: "stamp; page 1").source.contains("stamp"))
         XCTAssertEqual(FieldStatusPolicy.sentWith(checked: false).level, .lowerConfidence)
     }
 

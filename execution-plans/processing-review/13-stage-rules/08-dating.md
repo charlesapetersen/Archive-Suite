@@ -40,6 +40,13 @@ it rests on. A guess with no evidence is never written."
    undated documents in its run: this is the fold-in point for `W47.ct-folder-date` (owner, 2026-10-31), not
    designed here; its open questions (the tag a range becomes, whether `Date Uncertain` is kept, the month) go to the
    owner at `W47.ct-design-ok`. A document's own date always wins over either inheritance.
+   3c. *A stamp* (`W46.date-stamp-fallback`, owner 2026-11-17: a stamp is better than no date). Where the image pass
+   finds no own date but a written stamped date (a received stamp, a postmark), and no cover gives a year, the
+   earliest such year is the document's, with `Date Uncertain`, evidence class `stamp` and its quote and place; no
+   month or day. An own date the image pass quotes from a stamp takes the same class (the stamp dates the stamping).
+   It comes before step 4, a judgement that the document's own page beats a neighbour's: a stamp's year was the
+   owner's on 25 of 25 owner documents carrying one, most of them also dated in their text, against 35 of 51 for the
+   estimate on other documents; it fired on 1 of the 362 dating documents, right (`date-stamp-fallback.md`) [M].
 4. *Estimated from neighbours, on what is left.* The trace prompt with neighbour dates (`trace-neigh`): the reply names
    the year, the cited neighbouring document and a quote from it, and a 90% interval. It is written only when the
    evidence check passes (`date_scorers.evidence_check`: the cited neighbour is in the context, the quote is a

@@ -16503,3 +16503,28 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   for the fold); swift-cases.json in date-route-pipeline/ regenerated in place (rebuildable). ArchiveOCRBench carries
   no dating-route section (date-route-pipeline.md is not on it), so nothing there to update.
   <!-- /W46.date-full-date -->
+- [x] **W46.date-stamp-fallback — a stamp or postmark date sets an approximate date when nothing better exists [S-M · Tier-2]** · §Document processing review — W46 (owner, 2026-10-20) · (lane: processor,segbench) — Owner, 2026-11-17 (review follow-up): a document stamp is better than no date at all. SHIPPED 2026-11-18.
+  The route (segbench `date_route_pipeline.route` + `stamp_evidence`/`is_stamp`, mirrored in `DateRoute.decide`,
+  `ImageReading.stampEvidence`, `PageDate.isStamp`) gives a document whose text has no year candidate and whose image
+  pass finds no own date, but a written stamped date (where `stamp` or kind `stamped`), the earliest such year with Date
+  Uncertain, evidence class `stamp` (new `EvidenceClass.stamp`), its quote, page and place, step 2, no month or day (the
+  stamp dates the stamping). An own date the image pass quotes from a stamp takes the same class instead of `image`
+  (Tier-2 review finding: the owner asked for stamps to carry Date Uncertain). Before the neighbour estimate; a covering
+  document's year still wins (`inherit(fromCover:)`, step 3a). PDF header `Date evidence: stamp; page <n>; <place>;
+  "<quote>"` (SPEC/tag-format.md); the Reader's field status names the stamp source (ArchiveCore FieldStatus);
+  08-dating.md step 3c. No migration: nothing to migrate.
+  Measured for $0 on W46.date-route-pipeline's cached replies (date_stamp_fallback.py, segbench-results/
+  date-stamp-fallback.md with its measurement card). The step fires on 1 of the 362 dating documents (owner's, right:
+  the image pass had named a stamp as the document date). A stamp's year was the owner's year on 25 of 25 owner
+  documents whose Gemini 3.7 Flash image pass quotes one (Wilson 87-100; the 27B's image pass 19/19), but 24 of them
+  also carry a year in their text; the estimate is 35 of 51 (55-80) on other documents. So "stamp before estimate" is
+  a judgement (the document's own page over a neighbour's) with indirect support, as the report says. Undated set: the
+  stamp agrees with the route's explicit year on 9 of 9. date-route-pipeline.md was not regenerated: its image class
+  (10/12) would become 9/11 with the one document moved to stamp, and its by-class table has no stamp column.
+  Tier-2: an Opus adversarial review found nothing blocking; fixed from it the stamped own date above, the verdict's
+  overstatement, a hand-typed count and the bench's missing page/place. test-date-route.sh ALL PASS (289 checks; all
+  362 real pipeline documents in parity), date_route_cases.py --check PASS, the segbench date-route unit tests OK,
+  ArchiveCore FieldCheckTests OK, Processor Debug build clean (only VisionOCRKit's existing warnings). Bench cache:
+  nothing new kept; date-route-pipeline/swift-cases.json regenerated in place (rebuildable). ArchiveOCRBench has no
+  dating-route section, so nothing there to update.
+  <!-- /W46.date-stamp-fallback -->

@@ -135,7 +135,8 @@ the container file (`SPEC/containers.md`).
   prompt's stratified precision, which the verdict rests on (`segbench-results/item-fields-score.md`); title is below
   it (0.91 [0.83, 0.94]); no evidence
   class of the dating route clears it (text 139/158 exact, image 10/12, estimate 35/51;
-  `segbench-results/date-route-pipeline.md`), and the class comes from the page's `Date evidence:` line (none: text
+  `segbench-results/date-route-pipeline.md`; stamp 1/1 where it fired, a stamp's year 25/25 on documents carrying
+  one, most also dated in their text, `segbench-results/date-stamp-fallback.md`), and the class comes from the page's `Date evidence:` line (none: text
   or not recorded); the covering letter's date is not measured on its own. Of the container label reads
   (`segbench-results/ct-read.md`) only Vision + parser's box number on a box photo clears it (70 of 71, upright photos);
   its box number on a folder photo is 28 of 35, and every other field and reader falls short. Path values are not
@@ -378,9 +379,10 @@ Recipient place: <place>; <place>
 - **Date evidence (W46.date-route-header; owner call 9, 2026-11-06).** The evidence behind a NON-explicit document
   year: one line, exact case-sensitive prefix `Date evidence: `, after the source-date lines in the same ordered
   header block (a source-date line after it starts the body). Written only for a year read off the page image,
-  estimated from a neighbour, or inherited from the covering letter; never for an explicit year in the document's
+  taken from a stamp or postmark on it (W46.date-stamp-fallback), estimated from a neighbour, or inherited from the
+  covering letter; never for an explicit year in the document's
   own text, nor when there is no year. The value is `; `-separated parts, class first:
-  `image; page <n>; <place>; "<quote>"`, `estimate; from <file>; line <n>; "<quote>"; 90% interval <lo>-<hi>`,
+  `image; page <n>; <place>; "<quote>"`, `stamp; page <n>; <place>; "<quote>"`, `estimate; from <file>; line <n>; "<quote>"; 90% interval <lo>-<hi>`,
   `inherited; from <file>` (parts absent when unknown). The interval appears only where the route measured it
   (the gateway's Gemini 3.7 Flash). Control characters and runs of white space become one space, the middle dot a
   comma, the quote is cut to 60 characters with `…`, and the line is fitted to one physical line, so it never

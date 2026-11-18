@@ -1,0 +1,131 @@
+{
+ "gemini3.7-flash-gw": {
+  "name": "Gemini 3.7 Flash (gateway)",
+  "documents": 362,
+  "image_replies": 362,
+  "fires": {
+   "owner": 1,
+   "undated": 0
+  },
+  "fired": [
+   {
+    "id": "o:fb0e9fdd858b7428",
+    "set": "owner",
+    "truth_y": 1975,
+    "year": 1975,
+    "without_stamp": 1975,
+    "stamp_quote": "THU JUL 31 1975"
+   }
+  ],
+  "owner_stamp": {
+   "exact": {
+    "k": 25,
+    "n": 25,
+    "pct": 100.0,
+    "ci": [
+     86.7,
+     100.0
+    ]
+   },
+   "later": 0,
+   "earlier": 0,
+   "route_wrong_stamp_right": [
+    "o:78d4ccf6f37af029"
+   ],
+   "no_own_date": {
+    "k": 1,
+    "n": 1,
+    "pct": 100.0,
+    "ci": [
+     20.7,
+     100.0
+    ]
+   },
+   "no_text_year": {
+    "k": 1,
+    "n": 1,
+    "pct": 100.0,
+    "ci": [
+     20.7,
+     100.0
+    ]
+   }
+  },
+  "fired_owner_exact": {
+   "k": 1,
+   "n": 1,
+   "pct": 100.0,
+   "ci": [
+    20.7,
+    100.0
+   ]
+  },
+  "undated_stamp": {
+   "n": 9,
+   "agrees_explicit": {
+    "k": 9,
+    "n": 9,
+    "pct": 100.0,
+    "ci": [
+     70.1,
+     100.0
+    ]
+   },
+   "no_own_date": 3
+  }
+ },
+ "qwen3.6-27b": {
+  "name": "Qwen3.6 27B (Sherlock)",
+  "documents": 362,
+  "image_replies": 189,
+  "fires": {
+   "owner": 0,
+   "undated": 0
+  },
+  "fired": [],
+  "owner_stamp": {
+   "exact": {
+    "k": 19,
+    "n": 19,
+    "pct": 100.0,
+    "ci": [
+     83.2,
+     100.0
+    ]
+   },
+   "later": 0,
+   "earlier": 0,
+   "route_wrong_stamp_right": [
+    "o:78d4ccf6f37af029"
+   ],
+   "no_own_date": {
+    "k": 0,
+    "n": 0,
+    "pct": null,
+    "ci": null
+   },
+   "no_text_year": {
+    "k": 0,
+    "n": 0,
+    "pct": null,
+    "ci": null
+   }
+  },
+  "fired_owner_exact": {
+   "k": 0,
+   "n": 0,
+   "pct": null,
+   "ci": null
+  },
+  "undated_stamp": {
+   "n": 0,
+   "agrees_explicit": {
+    "k": 0,
+    "n": 0,
+    "pct": null,
+    "ci": null
+   },
+   "no_own_date": 0
+  }
+ }
+}

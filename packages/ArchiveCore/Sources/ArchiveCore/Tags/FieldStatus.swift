@@ -94,6 +94,9 @@ public enum FieldStatusPolicy {
         case "image":
             source = "Read off the page image by the Processor’s dating route"
             figure = "10 of 12 exact"
+        case "stamp":
+            source = "Taken from a stamp or postmark on the page by the Processor’s dating route"
+            figure = "1 of 1 exact where it fired; a stamp’s year was the owner’s on 25 of 25 documents carrying one, most also dated in their text"
         case "estimate":
             source = "Estimated from a neighbouring document by the Processor’s dating route"
             figure = "35 of 51 exact"

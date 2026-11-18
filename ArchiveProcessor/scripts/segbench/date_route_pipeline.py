@@ -740,17 +740,37 @@ def image_evidence(image_rec, year):
     return ev, mo if mo is not None and 1 <= mo <= 12 else None
 
 
+def stamp_evidence(image_rec):
+    """W46.date-stamp-fallback: the stamp or postmark date a document with no own date of its own takes, or None: of
+    the image pass's written stamped dates (where "stamp" or kind "stamped", as the stamp count reads them), the earliest
+    year, the first quoted of that year (a document predates the stamps put on it). DateRoute.ImageReading.stampEvidence."""
+    st = [x for x in DI.read(image_rec)["dates"] if x["written"] and is_stamp(x)]
+    return min(st, key=lambda x: x["year"]) if st else None
+
+
+def is_stamp(x):
+    """A quoted page date that is a stamp (a received stamp, a postmark): placed on a stamp or stamped."""
+    return x["where"] == "stamp" or x["kind"] == "stamped"
+
+
 def route(doc, trace_raw, image_rec, self_only=False):
     """The route's answer for one document: {year, month, day, du, cls, evidence, ...}. cls is the evidence class:
-    "text" (explicit from the own text), "image" (explicit from the page image), "estimate" (from a neighbour, checked,
-    Date Uncertain), or "none" (no year written). image_rec is None where the image pass was not sent. self_only: step 1
+    "text" (explicit from the own text), "image" (explicit from the page image), "stamp" (a stamp or postmark date on
+    the page image, Date Uncertain), "estimate" (from a neighbour, checked, Date Uncertain), or "none" (no year written). image_rec is None where the image pass was not sent. self_only: step 1
     also needs the reply to cite the document itself ("self"), as the trace prompt asks for a printed own date; by
     default a year any own rule candidate carries is explicit whatever the reply cites (08-dating.md section 3, step 1).
 
     W46.date-full-date: an explicit year also gets the month and day written in the date it rests on. From the text,
     that is the reply's own quote when it cites "self" and passes the check and holds a dated form of the year, else the
     rule's dated form of that year; from the image, the quoted date its year rests on, unless the reply's document
-    month names another month. An estimate or no year gets neither, as the document does not print its own date."""
+    month names another month. An estimate or no year gets neither, as the document does not print its own date.
+
+    W46.date-stamp-fallback: a document whose text has no year and whose image pass finds no own date, but a stamped date
+    (a received stamp, a postmark), takes that stamp's year with Date Uncertain, ahead of the neighbour estimate (owner,
+    2026-11-17: a stamp is better than no date; date-stamp-fallback.md). So does a document whose image pass names a
+    stamped date as its own: the stamp dates the stamping, so it is class "stamp" with Date Uncertain, not "image".
+    No month or day: the stamp dates the stamping, not the writing. A covering document's year still wins in the app
+    (step 3a, inherit(fromCover:)), as no step here measures it."""
     cands = T.candidates(doc["text"])
     own = {c["year"] for c in cands}
     tr = T.parse_trace(trace_raw)
@@ -782,11 +802,18 @@ def route(doc, trace_raw, image_rec, self_only=False):
         ok, own_y, _ = DU.own_date(image_rec)
         if own_y is not None:
             ev, doc_mo = image_evidence(image_rec, own_y)
+            if ev is not None and is_stamp(ev):     # the page's own date is a stamp: the stamp step, Date Uncertain
+                return {**base, "year": own_y, "du": True, "cls": "stamp", "step": 2, "quote": ev["quote"],
+                        "page": ev["page"], "where": ev["where"]}
             m, d = month_day(dated_in(ev["quote"], own_y) if ev else None)
             if m is not None and doc_mo is not None and doc_mo != m:
                 m = d = None
             return {**base, "year": own_y, "du": False, "cls": "image", "step": 2, "month": m, "day": d,
                     "date_from": "image" if m else None}
+        st = stamp_evidence(image_rec)
+        if st is not None:
+            return {**base, "year": st["year"], "du": True, "cls": "stamp", "step": 2, "quote": st["quote"],
+                    "page": st["page"], "where": st["where"]}
     if tr["y"] is not None and verdict == "valid":
         return {**base, "year": tr["y"], "du": True, "cls": "estimate", "step": 4}
     return {**base, "year": None, "du": True, "cls": "none", "step": None}

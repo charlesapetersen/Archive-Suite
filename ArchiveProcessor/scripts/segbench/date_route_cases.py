@@ -140,12 +140,30 @@ def synthetic():
         case("full-date-unicode-digits", "Memo\nMarch \u0663, 1947 and \uff14 May 1948\nfile", [],
              j(year=1947, lo=1947, hi=1947, date_uncertain=False, evidence={"neighbour": "self", "quote": "March \u0663, 1947"}),
              None),
-        case("full-date-image-day", MEMO, NEAR, None, j(dates=[{"quote": "Rec'd APR 4 1961", "page": 1, "where": "stamp",
-                                                                "kind": "stamped", "year": 1961}],
-                                                         document_date={"year": 1961, "month": 4, "quote": "Rec'd APR 4 1961"})),
+        case("full-date-image-day", MEMO, NEAR, None, j(dates=[{"quote": "APR 4 1961", "page": 1, "where": "dateline",
+                                                                "kind": "typed", "year": 1961}],
+                                                         document_date={"year": 1961, "month": 4, "quote": "APR 4 1961"})),
         case("full-date-image-month-disagrees", MEMO, NEAR, None, j(
             dates=[{"quote": "March 30, 1961", "page": 1, "where": "dateline", "kind": "typed", "year": 1961}],
             document_date={"year": 1961, "month": 4, "quote": "March 30, 1961"})),
+        # W46.date-stamp-fallback: no own date on the page, a stamped one: its year, Date Uncertain, before the estimate.
+        case("stamp-over-estimate", MEMO, NEAR,
+             j(year=1958, lo=1957, hi=1959, date_uncertain=True, evidence={"neighbour": "P1", "quote": "12/4/58"}),
+             j(dates=[{"quote": "RECEIVED MAY 2 1960", "page": 1, "where": "stamp", "kind": "stamped", "year": 1960},
+                      {"quote": "the 1955 budget", "page": 1, "where": "body", "kind": "typed", "year": 1955}],
+               document_date=None)),
+        case("stamp-earliest-of-two", MEMO, [], None,
+             j(dates=[{"quote": "FILED JAN 9 1963", "page": 2, "where": "stamp", "kind": "stamped", "year": 1963},
+                      {"quote": "DEC 30 1962", "page": 1, "where": "other", "kind": "stamped", "year": 1962},
+                      {"quote": "Rec'd 1962", "page": 1, "where": "stamp", "kind": "stamped", "year": 1962}],
+               document_date={"year": 1959, "month": None, "quote": "1959"})),
+        case("stamp-as-own-date", MEMO, NEAR, None, j(dates=[{"quote": "Rec'd APR 4 1961", "page": 1, "where": "other",
+                                                              "kind": "stamped", "year": 1961}],
+                                                       document_date={"year": 1961, "month": 4, "quote": "Rec'd APR 4 1961"})),
+        case("stamp-year-unwritten-estimate", MEMO, NEAR,
+             j(year=1958, lo=1957, hi=1959, date_uncertain=True, evidence={"neighbour": "P1", "quote": "12/4/58"}),
+             j(dates=[{"quote": "RECEIVED MAY 2", "page": 1, "where": "stamp", "kind": "stamped", "year": 1960}],
+               document_date=None)),
     ]
 
 
