@@ -340,11 +340,12 @@ enum SegmentationChooserTestDriver {
         check("6 no key, nothing saved: saves nothing",
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
-        // Unknown ranges borrow g1's 2.5: ChatGPT's 90.2 beats GLM's 82.8 beyond their 5.0 floor.
+        // W46.seg-truth-audit: ChatGPT's 90.2 and GLM's 82.8 tie on the paired comparison (+7.4 [-1.0, +16.9] over 142
+        // documents; 7 documents only ChatGPT has right, 2 only GLM, sign test p 0.18), so the cheaper GLM is picked.
         // Gemini alone still picks text, which ties the image window at about half the price.
         check("6 no Gemini key, nothing saved: saves the solver's pick",
               SegmentationApproach.preselect(noGemini, defaults: d))
-        eq("6 no Gemini key, nothing saved: ChatGPT", SegmentationApproach.stored(d), .openai)
+        eq("6 no Gemini key, nothing saved: GLM-5.3 Flash", SegmentationApproach.stored(d), .glm)
         d.removeObject(forKey: key)
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini-text", SegmentationApproach.stored(d), .geminiText)

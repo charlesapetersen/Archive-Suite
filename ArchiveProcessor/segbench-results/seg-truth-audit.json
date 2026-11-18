@@ -1,0 +1,103 @@
+{
+ "tag": "W46.seg-truth-audit",
+ "date": "2026-11-18",
+ "seed": 20261118,
+ "counts": {
+  "document_gaps": 313,
+  "agreed": 270,
+  "answered_before": 56,
+  "routes": [
+   "chatgpt-gpt6.1-sol",
+   "claude-sonnet5.5",
+   "gemini3.7-flash-gateway",
+   "gemini3.8-flash",
+   "gemini3.8-flash-text",
+   "glm5.3-flash",
+   "mix-claude-chatgpt",
+   "qwen3.5-27b-teacher",
+   "seg-qwen3.5-2b-8bit",
+   "seg-qwen3.5-2b-bf16-cluster",
+   "seg-qwen3.5-4b-cluster"
+  ]
+ },
+ "pool": 214,
+ "strata": [
+  {
+   "stratum": "RG165 continue",
+   "N": 45,
+   "n": 10,
+   "weight": 4.5
+  },
+  {
+   "stratum": "RG165 new",
+   "N": 21,
+   "n": 10,
+   "weight": 2.1
+  },
+  {
+   "stratum": "Stanton continue",
+   "N": 50,
+   "n": 15,
+   "weight": 3.333
+  },
+  {
+   "stratum": "Stanton new",
+   "N": 98,
+   "n": 15,
+   "weight": 6.533
+  }
+ ],
+ "drawn": 50,
+ "keys": [
+  "RG165 5|6",
+  "RG165 6|7",
+  "RG165 13|14",
+  "RG165 32|33",
+  "RG165 33|34",
+  "RG165 51|52",
+  "RG165 52|53",
+  "RG165 55|56",
+  "RG165 62|63",
+  "RG165 101|102",
+  "RG165 3|4",
+  "RG165 7|8",
+  "RG165 9|10",
+  "RG165 10|11",
+  "RG165 12|13",
+  "RG165 14|15",
+  "RG165 15|16",
+  "RG165 28|29",
+  "RG165 95|96",
+  "RG165 100|101",
+  "Stanton 42|43",
+  "Stanton 62|63",
+  "Stanton 68|69",
+  "Stanton 69|70",
+  "Stanton 79|80",
+  "Stanton 84|85",
+  "Stanton 87|88",
+  "Stanton 93|94",
+  "Stanton 95|96",
+  "Stanton 99|100",
+  "Stanton 114|115",
+  "Stanton 160|161",
+  "Stanton 177|178",
+  "Stanton 217|218",
+  "Stanton 230|231",
+  "Stanton 14|15",
+  "Stanton 18|19",
+  "Stanton 19|20",
+  "Stanton 80|81",
+  "Stanton 100|101",
+  "Stanton 125|126",
+  "Stanton 138|139",
+  "Stanton 148|149",
+  "Stanton 152|153",
+  "Stanton 159|160",
+  "Stanton 164|165",
+  "Stanton 176|177",
+  "Stanton 196|197",
+  "Stanton 212|213",
+  "Stanton 236|237"
+ ]
+}

@@ -64,6 +64,34 @@ struct SettingsRouteTable: Decodable, Sendable {
         let metric: Metric?
         /// The stage's rules, as the settings sheet's rules tab shows them (W46.settings-sheet).
         let rules: [Rule]
+        /// Segmentation: every pair of routes compared page by page on the same windows, with its paired interval
+        /// (`segbench-results/seg-pair-ties.json`, W46.seg-truth-audit). Empty on every other stage.
+        let pairs: [Pair]
+
+        /// `a` minus `b` in points of test-box pages exact, its paired 95% interval over the truth's documents, and
+        /// whether that interval holds 0 (the tie).
+        struct Pair: Decodable, Sendable {
+            let a: String
+            let b: String
+            let delta: Double
+            let lo: Double
+            let hi: Double
+            let documents: Int
+            let tie: Bool
+
+            /// "+1.23 [−4.23, +6.29] over 142 documents"
+            var citation: String {
+                func f(_ x: Double) -> String { (x < 0 ? "−" : "+") + String(format: "%.2f", abs(x)) }
+                return "\(f(delta)) [\(f(lo)), \(f(hi))] over \(documents) documents"
+            }
+        }
+
+        /// The pair read as `a` minus `b`, whichever way the table holds it; nil when it was not measured.
+        func pair(_ a: String, _ b: String) -> Pair? {
+            if let p = pairs.first(where: { $0.a == a && $0.b == b }) { return p }
+            guard let p = pairs.first(where: { $0.a == b && $0.b == a }) else { return nil }
+            return Pair(a: a, b: b, delta: -p.delta, lo: -p.hi, hi: -p.lo, documents: p.documents, tie: p.tie)
+        }
 
         struct Metric: Decodable, Sendable {
             let id: String
@@ -95,7 +123,7 @@ struct SettingsRouteTable: Decodable, Sendable {
         }
 
         enum CodingKeys: String, CodingKey {
-            case id, name, unit, choice, kinds, fallback, routes, note, metric, rules
+            case id, name, unit, choice, kinds, fallback, routes, note, metric, rules, pairs
             case kindStrataTable = "kind_strata"
         }
 
@@ -112,6 +140,7 @@ struct SettingsRouteTable: Decodable, Sendable {
             note = try c.decodeIfPresent(String.self, forKey: .note)
             metric = try c.decodeIfPresent(Metric.self, forKey: .metric)
             rules = try c.decodeIfPresent([Rule].self, forKey: .rules) ?? []
+            pairs = try c.decodeIfPresent([Pair].self, forKey: .pairs) ?? []
         }
 
         var kindStrata: [String: [String]] {

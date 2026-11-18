@@ -119,8 +119,8 @@ The solver behind the picks: a route is feasible when its needs are met (a key o
 against its measured peak plus 5 GB); the ceiling and the hours apply to the batch as a whole, with Mac stages
 running one after another and network stages overlapping them; within the feasible combinations it maximises the
 weighted accuracy, or, under "cheapest within a point" and "fastest within a point", trades a point of accuracy for
-money or time; a difference under the bench's tie threshold (half a point of NES; the segmentation rerun floor of
-1.4 to 3.2 points of pages exact) is a tie and the cheaper route wins it. The segmentation figure a user sees is the
+money or time; a difference under the bench's tie threshold (half a point of NES; for segmentation, a pair whose paired 95%
+interval of pages exact holds 0, seg-pair-ties.md) is a tie and the cheaper route wins it. The segmentation figure a user sees is the
 no-checking figure moved toward the after-checking figure by the share of the needed checks their minutes cover
 (3.2 s a boundary, the owner's mean over 92 flagged gaps, `segbench-results/seg-check-time.md`).
 

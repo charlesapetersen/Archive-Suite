@@ -353,7 +353,7 @@ struct SettingsSheetModel {
             let cmp = Self.comparable(p.stage, s, words: words)
             for b in p.better where b.isLimit && seen.insert("\(p.stage)|\(b.id)").inserted {
                 guard let r = words.table.stage(p.stage)?.route(b.id), let v = cmp.of(r), let base = cmp.base,
-                      v - base >= Self.tieFloor(p.stage, p.route, r, answers: a) else { continue }
+                      !Self.isTie(words.table.stage(p.stage), p.route, r, gap: v - base, answers: a) else { continue }
                 let change = b.reason.hasPrefix("raise the ceiling by ")
                     ? "Spending " + b.reason.dropFirst("raise the ceiling by ".count) + " more"
                     : b.reason.hasPrefix("allow about ") ? "Allowing about " + b.reason.dropFirst("allow about ".count) : words.limitPhrase(b.reason)
@@ -391,14 +391,17 @@ struct SettingsSheetModel {
         }
     }
 
-    /// The margin under which two figures count as a tie, as the solver reads it (`SettingsSolver`).
-    static func tieFloor(_ stage: String, _ a: SettingsRouteTable.Route?, _ b: SettingsRouteTable.Route?,
-                         answers: SettingsAnswers) -> Double {
-        switch stage {
-        case "reading": return SettingsSolver.readingHostedFloor
-        case "segmentation": return max(SettingsSolver.segmentationTie(a, b), answers.preference == .bestMeasured ? 0 : 1)
-        case "dating": return SettingsSolver.datingTie
-        default: return SettingsSolver.entitiesTie
+    /// Whether a gain of `gap` between two routes is a tie, as the solver reads it (`SettingsSolver`): under the
+    /// stage's floor, or for segmentation a paired interval holding 0 (or under a point when the user trades one).
+    static func isTie(_ stage: SettingsRouteTable.Stage?, _ a: SettingsRouteTable.Route?, _ b: SettingsRouteTable.Route?,
+                      gap: Double, answers: SettingsAnswers) -> Bool {
+        switch stage?.id {
+        case "reading": return gap < SettingsSolver.readingHostedFloor
+        case "segmentation":
+            return gap < (answers.preference == .bestMeasured ? 0 : 1)
+                || SettingsSolver.segmentationPair(stage, a, b)?.tie == true
+        case "dating": return gap < SettingsSolver.datingTie
+        default: return gap < SettingsSolver.entitiesTie
         }
     }
 
@@ -505,7 +508,7 @@ struct SettingsSheetModel {
             let v = stage.route(b.id).flatMap(cmp.of) ?? b.figure
             let gain = base.map { v - $0 }
             if let gain, gain <= 0 { return nil }   // not better on the user's own mix
-            let tie = gain.map { $0 < Self.tieFloor(stage.id, route, stage.route(b.id), answers: a) } ?? false
+            let tie = gain.map { Self.isTie(stage, route, stage.route(b.id), gap: $0, answers: a) } ?? false
             return Better(id: b.id, name: words.name(stage.id, b.id), order: gain ?? v,
                           gain: stage.id == "segmentation" && base == 0
                             ? String(format: "about %.0f%% of pages in the right document before you check (by hand: none)", v)
@@ -548,7 +551,7 @@ struct SettingsSheetModel {
             .sorted { abs($0.1 - (pickFigure ?? 0)) < abs($1.1 - (pickFigure ?? 0)) }
             .prefix(3)
             .map { r, v in
-                let tie = pickFigure.map { abs(v - $0) < Self.tieFloor(stage.id, route, r, answers: a) } ?? false
+                let tie = pickFigure.map { Self.isTie(stage, route, r, gap: abs(v - $0), answers: a) } ?? false
                 let units = stage.unit == "documents" ? Double(a.documentCount) : Double(a.pages)
                 let pace = r.family == .mac ? r.secondsPerUnit.map { sec -> String in
                     let h = sec * units / 3600
@@ -732,7 +735,7 @@ struct SettingsSheetModel {
             return "Keeping your pages out of training costs no accuracy here: the best route it hides, \(name), is not "
                 + "better than the pick, at \(price)" + (pickPrice.map { " against \($0) for the pick" } ?? "") + "." + why
         }
-        if gain < Self.tieFloor(stage.id, route, best, answers: a) {
+        if Self.isTie(stage, route, best, gap: gain, answers: a) {
             return "Keeping your pages out of training costs no measured accuracy here: the best route it hides, \(name), "
                 + "is better by less than the margin of error, at \(price)"
                 + (pickPrice.map { " against \($0) for the pick" } ?? "") + "." + why

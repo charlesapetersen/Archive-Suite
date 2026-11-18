@@ -3,7 +3,7 @@
  "table_built": "2026-11-18",
  "noise": {
   "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
-  "seg_rerun_pages_exact_points": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none borrows g1's common-support 2.5 points: 5.0 when neither is measured, 10.4 for a pair involving g2's measured 5.2; owner, 2026-11-13, W46.seg-tie-borrowed-range, 07-segmentation.md §3); in gap accuracy the paired interval decides",
+  "seg_rerun_pages_exact_points": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before",
   "truth_note": "The 96's truth was drafted by Claude Opus 5.5 and Gemini 3.8 Flash and adjudicated by the owner; close rows among those families are provisional. Ties: on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3 (ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair)."
  },
  "ocr": [
@@ -1631,7 +1631,7 @@
    "s_page": 5.33,
    "s_est": true,
    "peak_gb": 0,
-   "note": "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key); the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.6-89.8% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its measured 5.2-point range gives its own pairs a 10.4-point floor; unmeasured routes borrow g1's 2.5, not this range (W46.seg-tie-borrowed-range)",
+   "note": "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key); the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.6-89.8% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its pairs tie by their paired intervals, not by this range (W46.seg-truth-audit, seg-pair-ties.md)",
    "source": "settings-routes.json, stage segmentation, row gemini3.8-flash",
    "nocheck": 87.4,
    "checks_per_100": 25.3,

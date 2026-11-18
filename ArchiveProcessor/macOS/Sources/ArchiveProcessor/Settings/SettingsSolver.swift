@@ -184,12 +184,14 @@ struct SettingsSolver {
     /// Mac routes, 0.60 for hands) and falls back to these floors where a pair has no per-page scores.
     static let readingHostedFloor = 0.49
     static let readingHandsFloor = 0.60
-    /// Twice the larger of these routes' own window-offset ranges in pooled test-box pages exact.
-    /// An unmeasured route borrows g1's common-support range, 2.5 points (W46.seg-common-support;
-    /// owner construction, 2026-11-13, W46.seg-tie-borrowed-range),
-    /// not g2's 5.2. Measured ranges in `test-boxes.offset_range` replace that borrowed value per route.
-    static func segmentationTie(_ a: SettingsRouteTable.Route?, _ b: SettingsRouteTable.Route?) -> Double {
-        2 * max(a?.figure("test-boxes.offset_range") ?? 2.5, b?.figure("test-boxes.offset_range") ?? 2.5)
+    /// Segmentation: two routes tie when their paired 95% interval in test-box pages exact holds 0, the routes compared
+    /// page by page on the same windows and the truth's documents resampled (owner review of the pipeline doc,
+    /// 2026-11-17, W46.seg-truth-audit; `seg-pair-ties.md`). It replaced twice the larger window-offset range (5.0 or
+    /// 10.4 points). Nil when the pair was not measured (a route with no test-boxes figure).
+    static func segmentationPair(_ stage: SettingsRouteTable.Stage?, _ a: SettingsRouteTable.Route?,
+                                 _ b: SettingsRouteTable.Route?) -> SettingsRouteTable.Stage.Pair? {
+        guard let a, let b else { return nil }
+        return stage?.pair(a.id, b.id)
     }
     /// Dating: the rerun floor is the same year on 94% (85/90) of documents between identical runs, read as a gap of
     /// up to 6 points of exact year; reading the rate as points is the note's [I] (08-dating.md §3).
@@ -728,21 +730,23 @@ struct SettingsSolver {
         let cands = stage.routes.filter { !$0.afterTraining }
             .compactMap { r in segmentationFigure(r).map { cand(r, stage: "segmentation", value: $0, units: pages) } }
         guard let ch = choose(cands, state, tie: {
-            abs($0.value - $1.value) < max(Self.segmentationTie($0.route, $1.route), withinPoint)
+            abs($0.value - $1.value) < withinPoint || Self.segmentationPair(stage, $0.route, $1.route)?.tie == true
         }, prefer: { a, b in
             if abs(a.usd - b.usd) > 1e-9 || a.hours != b.hours { return defaultPrefer(a, b) }
             if a.value != b.value { return a.value > b.value }
             // Equal cost, time and figure: the fewer checks a user is asked for.
             return (a.route.figure("test-boxes.checks_per_100") ?? 100) < (b.route.figure("test-boxes.checks_per_100") ?? 100)
         }) else { return [] }
-        let tie = max(Self.segmentationTie(ch.pick.route, ch.best.route), withinPoint)
+        let pair = Self.segmentationPair(stage, ch.pick.route, ch.best.route)
         let before = state
         state.add(ch.pick)
         return [SettingsPick(stage: "segmentation", part: "all", route: ch.pick.route,
                              figure: segmentationShown(ch.pick.route), flag: nil,
                              reason: explain(ch, metric: "test-boxes pages exact", unit: "pages", gap: nil,
                                              tieText: "test-boxes \(Self.num(ch.pick.value)) against "
-                                                + "\(Self.num(ch.best.value)), under the \(Self.num(tie))-point floor"),
+                                                + "\(Self.num(ch.best.value)), "
+                                                + (pair.map { "paired \($0.citation), an interval holding 0" }
+                                                   ?? "within a point")),
                              gap: nil, better: betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: before),
                              fallbackRouteID: nil, shown: true, usd: ch.pick.usd, hours: ch.pick.hours)]
     }

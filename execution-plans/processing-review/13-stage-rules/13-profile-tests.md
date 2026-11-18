@@ -23,7 +23,7 @@ detected; detected keys and plans listed on the sheet, none spent. Picks: as cas
 switch off; straighten on; the reading-copy and OCR-input rules of notes 01 and 02; no entity extraction on the Mac
 until names are ranked.
 
-Segmentation figures below were rescored by W46.seg-common-support on the same 325 of 330 document pages. Checking cost retains all 363 photographed pages and flagged unknown gaps; bounds on all document pages are separate in options.md. The profiles below keep their picks. Two untested profiles move, both on one 16-page gap: on the 325 pages text alone has 285 exact and GLM-5.3 Flash and the cluster 4B 269 each, 4.9 points against a 5.0 floor (twice g1's 8-page spread, rounded 2.5), where on 330 pages the same 16 pages read 4.85 against 4.8. So a Gemini plus OpenRouter key now picks `glm5.3-flash` ($1.16) over `gemini3.8-flash-text` ($1.68), and a cluster plus a Gemini key picks `seg-qwen3.5-4b-cluster` ($0); SettingsSolverTestDriver asserts both. The move follows the denominator and the owner's tie construction, not a measured change in either route.
+Segmentation figures below were rescored by W46.seg-common-support on the same 325 of 330 document pages. Checking cost retains all 363 photographed pages and flagged unknown gaps; bounds on all document pages are separate in options.md. The profiles below keep their picks. Two untested profiles move, both on one 16-page gap: on the 325 pages text alone has 285 exact and GLM-5.3 Flash and the cluster 4B 269 each, 4.9 points against a 5.0 floor (twice g1's 8-page spread, rounded 2.5), where on 330 pages the same 16 pages read 4.85 against 4.8. So a Gemini plus OpenRouter key now picks `glm5.3-flash` ($1.16) over `gemini3.8-flash-text` ($1.68), and a cluster plus a Gemini key picks `seg-qwen3.5-4b-cluster` ($0); SettingsSolverTestDriver asserts both. The move follows the denominator and the owner's tie construction, not a measured change in either route. Since W46.seg-truth-audit (2026-11-18) the tie is each pair's paired interval, and both picks stand: text alone against GLM +4.9 [−4.0, +14.4], against the 4B +4.9 [−3.5, +13.8] (seg-pair-ties.md).
 
 ## B. A laptop only, open weights
 
@@ -64,7 +64,7 @@ hollow with the reason "stays on the Mac"; picks as B1.
   to `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16 92.61); `mistral-large4` ties it (−0.42 [−1.45, +0.68], n 16,
   owner96/hands16/strict, floor 0.60) at $2.69, dearer, and every other OpenRouter route without Gemini trails beyond
   the floor (note 04 §9 profile 2). Not pending: every OpenRouter route has a hands16 figure.
-- Segmentation: `glm5.3-flash` (82.8%, $1.16) ties the 2B (79.4%; under their 5.0 floor, 07 §3) and the 2B wins on cost
+- Segmentation: `glm5.3-flash` (82.8%, $1.16) ties the 2B (79.4%; +3.4 [−5.7, +12.0] paired, 07 §3) and the 2B wins on cost
   when the Mac has 16 GB; GLM when it does not.
 - Dating: steps 1 and 4 `gemini3.7-flash-trace-neigh` only if the key reaches Gemini, else the Mac route of B1 (no
   trace row for an OpenRouter-only model; pending `W46.date-route-pipeline`).
@@ -77,7 +77,7 @@ hollow with the reason "stays on the Mac"; picks as B1.
 **D1. A Gemini key.** Reading `gemini3.8-flash` ($3.22, batch $1.61; 96.47) over `gemini3.1-pro` (96.85, $21.92), a
 tie, cheaper wins; handwritten `gemini3.8-flash` labelled "conditional on the truth" (OCR-1). Segmentation
 on both 16 GB and 8 GB Macs `gemini3.8-flash-text` (87.7%, $1.68): its 8.3-point lead over the free 2B's 79.4
-exceeds their 5.0 floor (both borrow g1's 2.5, W46.seg-tie-borrowed-range). Text alone is ahead
+differs on the paired comparison (+8.3 [+2.6, +15.0], seg-pair-ties.md, W46.seg-truth-audit). Text alone is ahead
 of `gemini3.8-flash` (87.4%, 84.6-89.8% over three window offsets, $3.61; 25.3 checks per 100 pages, 25.3-29.2; 100.0%
 after checking; prompt g2, every figure Gemini 3.7's g2 answers, W46.seg-magazine-rule-app, W46.seg-g2-offsets), which
 the user may choose, with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
@@ -98,15 +98,15 @@ handwritten 92.50 labelled a drafter family. Segmentation `claude-sonnet5.5` (88
 no plan rows (the Claude arms were dropped, owner 2026-10-30), so the Mac route of B1 with the card saying why.
 
 **D4. The ChatGPT plan only.** Reading: no measured row; the sheet says so and falls to B1. Segmentation
-`chatgpt-only` as the app's table carries it. **Both plans:** segmentation `claude-sonnet5.5` (88.9%, 10.2 checks): the mix's 90.2% is 1.2 points over it, under
-their 5.0 floor, so a tie and the one plan wins on cost (W46.seg-tie-borrowed-range).
-With Anthropic, OpenAI and OpenRouter keys but no Gemini key, ChatGPT (90.2%) beats GLM's 82.8 beyond their 5.0 floor
-and is picked; GLM no longer ties it.
+`chatgpt-only` as the app's table carries it. **Both plans:** segmentation `claude-sonnet5.5` (88.9%, 10.2 checks): the mix's 90.2% is 1.2 points over it
+(+1.2 [−4.2, +6.3] paired), a tie, and the one plan wins on cost.
+With Anthropic, OpenAI and OpenRouter keys but no Gemini key, GLM-5.3 Flash (82.8%, $1.16) is picked: ChatGPT's 90.2 is
+7.4 points ahead, but their paired interval holds 0 (+7.4 [−1.0, +16.9]; sign test on the 9 documents only one has
+right, 7 to 2, p 0.18), so the cheaper route wins the tie (W46.seg-truth-audit; ChatGPT under the old 5.0 floor).
 
 **D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Segmentation: `claude-sonnet5.5`
-still wins on money. Claude's 88.9 and Gemini text's 87.7 tie under their 5.0 floor (neither has a measured range,
-so each borrows g1's 2.5). The pair with Gemini's image g2 route retains 10.4, twice its measured 5.2. A measured
-range replaces only that route's borrowed value, even if below 2.5; Claude's waits on W46.gateway-models-ok.
+still wins on money. Claude's 88.9 and Gemini text's 87.7 tie (+1.2 [−4.8, +7.9] paired), as do Claude and the
+image g2 route (+1.5 [−4.0, +7.7]).
 
 ## E. A cluster (Sherlock), no key
 

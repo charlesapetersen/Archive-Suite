@@ -37,8 +37,8 @@
   },
   "segmentation": {
    "metric": "pages_exact",
-   "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none borrows g1's common-support 2.5 points: 5.0 when neither is measured, 10.4 for a pair involving g2's measured 5.2; owner, 2026-11-13, W46.seg-tie-borrowed-range, 07-segmentation.md §3); in gap accuracy the paired interval decides",
-   "source": "seg-g2-offsets.md §Reading; seg-boxes-score.md §Paired differences"
+   "tie": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before",
+   "source": "seg-pair-ties.md §Every pair, a minus b, in points of pages exact; seg-boxes-score.md §Paired differences"
   },
   "dating": {
    "metric": "not_in_text",
@@ -8273,7 +8273,7 @@
      },
      "caveats": [
       "the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)",
-      "the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.6-89.8% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its measured 5.2-point range gives its own pairs a 10.4-point floor; unmeasured routes borrow g1's 2.5, not this range (W46.seg-tie-borrowed-range)",
+      "the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.6-89.8% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its pairs tie by their paired intervals, not by this range (W46.seg-truth-audit, seg-pair-ties.md)",
       "introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1",
       "no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)",
       "the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"
@@ -9633,6 +9633,503 @@
       "the kit's gate passes on a held-out box of the same material holding at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, in at least 10 documents, its interval resampling that box's documents (note 12, seg-kit-gate.md)"
      ],
      "licence": "Apache-2.0, its base model's (Qwen3.5 2B); the Mac build is converted with mlx-vlm (MIT)"
+    }
+   ],
+   "pairs": [
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "mix-claude-chatgpt",
+     "delta": 0.0,
+     "lo": 0.0,
+     "hi": 0.0,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "claude-sonnet5.5",
+     "delta": 1.23,
+     "lo": -4.23,
+     "hi": 6.29,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "gemini3.7-flash-gateway",
+     "delta": 1.23,
+     "lo": -4.09,
+     "hi": 6.33,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "gemini3.8-flash-text",
+     "delta": 2.46,
+     "lo": -2.57,
+     "hi": 7.88,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "gemini3.8-flash",
+     "delta": 2.77,
+     "lo": -1.69,
+     "hi": 7.84,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "glm5.3-flash",
+     "delta": 7.38,
+     "lo": -1.03,
+     "hi": 16.88,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 7.38,
+     "lo": -1.31,
+     "hi": 16.56,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 8.92,
+     "lo": 2.01,
+     "hi": 16.87,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "chatgpt-gpt6.1-sol",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "claude-sonnet5.5",
+     "delta": 1.23,
+     "lo": -4.23,
+     "hi": 6.29,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "gemini3.7-flash-gateway",
+     "delta": 1.23,
+     "lo": -4.09,
+     "hi": 6.33,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "gemini3.8-flash-text",
+     "delta": 2.46,
+     "lo": -2.57,
+     "hi": 7.88,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "gemini3.8-flash",
+     "delta": 2.77,
+     "lo": -1.69,
+     "hi": 7.84,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "glm5.3-flash",
+     "delta": 7.38,
+     "lo": -1.03,
+     "hi": 16.88,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 7.38,
+     "lo": -1.31,
+     "hi": 16.56,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 8.92,
+     "lo": 2.01,
+     "hi": 16.87,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "mix-claude-chatgpt",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "gemini3.7-flash-gateway",
+     "delta": 0.0,
+     "lo": -4.78,
+     "hi": 4.76,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "gemini3.8-flash-text",
+     "delta": 1.23,
+     "lo": -4.79,
+     "hi": 7.86,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "gemini3.8-flash",
+     "delta": 1.54,
+     "lo": -3.96,
+     "hi": 7.67,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "glm5.3-flash",
+     "delta": 6.15,
+     "lo": 0.0,
+     "hi": 14.37,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 6.15,
+     "lo": -0.64,
+     "hi": 13.92,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 7.69,
+     "lo": 0.92,
+     "hi": 15.59,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 9.54,
+     "lo": 2.83,
+     "hi": 17.08,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "claude-sonnet5.5",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 9.54,
+     "lo": 2.83,
+     "hi": 17.08,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "gemini3.8-flash-text",
+     "delta": 1.23,
+     "lo": -4.65,
+     "hi": 7.62,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "gemini3.8-flash",
+     "delta": 1.54,
+     "lo": -3.55,
+     "hi": 7.38,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "glm5.3-flash",
+     "delta": 6.15,
+     "lo": -1.39,
+     "hi": 14.78,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 6.15,
+     "lo": -1.22,
+     "hi": 14.2,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 7.69,
+     "lo": 0.33,
+     "hi": 15.91,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 9.54,
+     "lo": 2.3,
+     "hi": 17.43,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.7-flash-gateway",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 9.54,
+     "lo": 2.3,
+     "hi": 17.43,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.8-flash-text",
+     "b": "gemini3.8-flash",
+     "delta": 0.31,
+     "lo": -3.48,
+     "hi": 4.09,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash-text",
+     "b": "glm5.3-flash",
+     "delta": 4.92,
+     "lo": -4.0,
+     "hi": 14.43,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash-text",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 4.92,
+     "lo": -3.54,
+     "hi": 13.76,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash-text",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 6.46,
+     "lo": 0.0,
+     "hi": 14.0,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash-text",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 8.31,
+     "lo": 2.55,
+     "hi": 14.97,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.8-flash-text",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 8.31,
+     "lo": 2.55,
+     "hi": 14.97,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.8-flash",
+     "b": "glm5.3-flash",
+     "delta": 4.62,
+     "lo": -3.48,
+     "hi": 13.62,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 4.62,
+     "lo": -3.44,
+     "hi": 12.96,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 6.15,
+     "lo": -0.33,
+     "hi": 13.64,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "gemini3.8-flash",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 8.0,
+     "lo": 2.4,
+     "hi": 14.61,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "gemini3.8-flash",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 8.0,
+     "lo": 2.4,
+     "hi": 14.61,
+     "documents": 142,
+     "tie": false
+    },
+    {
+     "a": "glm5.3-flash",
+     "b": "seg-qwen3.5-4b-cluster",
+     "delta": 0.0,
+     "lo": -9.06,
+     "hi": 8.81,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "glm5.3-flash",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 1.54,
+     "lo": -7.81,
+     "hi": 10.65,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "glm5.3-flash",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 3.38,
+     "lo": -5.73,
+     "hi": 11.97,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "glm5.3-flash",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 3.38,
+     "lo": -5.73,
+     "hi": 11.97,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "seg-qwen3.5-4b-cluster",
+     "b": "qwen3.5-27b-teacher",
+     "delta": 1.54,
+     "lo": -3.51,
+     "hi": 7.32,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "seg-qwen3.5-4b-cluster",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 3.38,
+     "lo": -4.08,
+     "hi": 10.6,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "seg-qwen3.5-4b-cluster",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 3.38,
+     "lo": -4.08,
+     "hi": 10.6,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "qwen3.5-27b-teacher",
+     "b": "seg-qwen3.5-2b-8bit",
+     "delta": 1.85,
+     "lo": -4.71,
+     "hi": 7.69,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "qwen3.5-27b-teacher",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 1.85,
+     "lo": -4.71,
+     "hi": 7.69,
+     "documents": 142,
+     "tie": true
+    },
+    {
+     "a": "seg-qwen3.5-2b-8bit",
+     "b": "seg-qwen3.5-2b-bf16-cluster",
+     "delta": 0.0,
+     "lo": 0.0,
+     "hi": 0.0,
+     "documents": 142,
+     "tie": true
     }
    ]
   },

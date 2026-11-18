@@ -213,7 +213,7 @@ struct SegmentationRow: Equatable, Sendable {
     }
 
     /// Why the text-only Gemini window is the pick when Gemini is the only key, and what the image window buys over it:
-    /// the two tie under the settings solver's 4.2-point floor, so the cheaper one is picked (owner,
+    /// the two tie on the settings solver's paired comparison (seg-pair-ties.md), so the cheaper one is picked (owner,
     /// W46.seg-text-tier-default). The price is a ratio, which the 2027 doubling of both leaves as it is.
     static func geminiTierNote(_ approach: SegmentationApproach, options: SegmentationOptions) -> String? {
         guard approach == .gemini || approach == .geminiText,

@@ -408,7 +408,7 @@ NOISE = {
  "reading": {"metric": "nes", "tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"},
  "placement": {"metric": "line_pass_strict", "tie": "paired page-bootstrap 95% interval holding 0; about 2 points on 20 owner hand pages, about 10 on 14 Bentham pages", "source": "place-print.md §Measurement card"},
  "marks": {"metric": "marks_read_nes08", "tie": "a gap inside the page-bootstrap interval, about 20 marks-read points", "source": "marks-read.md §Measurement card"},
- "segmentation": {"metric": "pages_exact", "tie": "pooled test-box pages exact under twice the larger window-offset range of the two routes (a route with none borrows g1's common-support 2.5 points: 5.0 when neither is measured, 10.4 for a pair involving g2's measured 5.2; owner, 2026-11-13, W46.seg-tie-borrowed-range, 07-segmentation.md §3); in gap accuracy the paired interval decides", "source": "seg-g2-offsets.md §Reading; seg-boxes-score.md §Paired differences"},
+ "segmentation": {"metric": "pages_exact", "tie": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before", "source": "seg-pair-ties.md §Every pair, a minus b, in points of pages exact; seg-boxes-score.md §Paired differences"},
  "dating": {"metric": "not_in_text", "tie": "the rerun floor, same year 94% (85/90), or no paired sign-test difference", "source": "date-undated.md §Rerun"},
  "entities": {"metric": "sender_ed2_f1", "tie": "paired 95% bootstrap interval containing zero, or inside the rerun floor", "source": "ent-place-rule.md §Paired differences in ed2 F1, b minus a (95% bootstrap interval)"},
  "kinds": {"metric": "pages_right", "tie": "paired bootstrap intervals that overlap", "source": "kind-atrium.md §3. The 96: the hand, and what routing by each costs"},
@@ -493,6 +493,31 @@ def norm_row(r):
     return out
 
 
+def seg_pairs():
+    """seg-pair-ties.json's pairs as the solver reads them: a minus b in points of test-box pages exact, its paired
+    95% interval, and whether the interval holds 0 (the tie)."""
+    m = json.load(open(os.path.join(R, "ArchiveProcessor/segbench-results/seg-pair-ties.json")))
+    return [{k: p[k] for k in ("a", "b", "delta", "lo", "hi", "documents", "tie")} for p in m["pairs"]]
+
+
+def check_seg_pairs(table):
+    """Every segmentation row with a test-boxes figure is paired with every other, at the figures the table holds."""
+    st = next(s for s in table["stages"] if s["id"] == "segmentation")
+    have = {r["id"]: r["figures"]["test-boxes"]["value"] for r in st["routes"] if "test-boxes" in r["figures"]}
+    m = json.load(open(os.path.join(R, "ArchiveProcessor/segbench-results/seg-pair-ties.json")))
+    bad = 0
+    got = {frozenset((p["a"], p["b"])) for p in st.get("pairs", [])}
+    want = {frozenset((a, b)) for a in have for b in have if a < b}
+    if got != want:
+        print(f"FAIL segmentation pairs: {len(want - got)} missing, {len(got - want)} extra (rerun seg_pair_ties.py)"); bad += 1
+    for k, v in have.items():
+        if k not in m["routes"] or abs(m["routes"][k]["pct"] - v) > 0.05:
+            print(f"FAIL segmentation pairs: {k} is {v} in the table, {m['routes'].get(k)} in seg-pair-ties.json"); bad += 1
+    if not bad:
+        print(f"PASS segmentation pairs: {len(have)} rows, each paired with every other ({len(got)} pairs)")
+    return bad
+
+
 def build(built):
     stages = []
     for note, sid in ORDER:
@@ -510,10 +535,12 @@ def build(built):
         head["note"] = f"{NOTES}/{note}"
         head["metric"] = dict(head["metric"], figure=METRIC_FIGURE[sid])
         head["routes"] = [norm_row(r) for r in (head.get("routes") or []) + rows]
+        if sid == "segmentation":  # W46.seg-truth-audit: the tie is read per pair, from the paired comparisons
+            head["pairs"] = seg_pairs()
         for k in ("rules", "kinds"):
             head.setdefault(k, [])
         head.setdefault("fallback", None)
-        order = ["id", "name", "note", "unit", "choice", "metric", "kinds", "kind_strata", "rules", "fallback", "routes_role", "routes"]
+        order = ["id", "name", "note", "unit", "choice", "metric", "kinds", "kind_strata", "rules", "fallback", "routes_role", "routes", "pairs"]
         stages.append({k: head[k] for k in order if k in head} | {k: v for k, v in head.items() if k not in order})
     ids = [r["id"] for s in stages for r in s["routes"]]
     return {"version": 1, "built": built, "item": ITEM, "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
@@ -717,6 +744,7 @@ def check(table):
         if why:
             print(f"FAIL noise {sid}: {why}"); bad += 1
     bad += check_pair_cover(table)
+    bad += check_seg_pairs(table)
     shared = [r for st in table["stages"] for r in st["routes"] if r["id"] == "seg-2b-lora-k200"]
     if len(shared) == 2 and shared[0] != shared[1]:
         print("FAIL seg-2b-lora-k200 differs between notes 07 and 12 (one row shared)"); bad += 1

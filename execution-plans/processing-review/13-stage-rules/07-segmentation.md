@@ -30,20 +30,20 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   pages), `after_checking` and `unflagged_per_500`, and moves the shown figure from no-checking toward after-checking
   by the share of checks the user's minutes cover (12-settings-design.md §3.3). Figure keys are `<kind>` for pages
   exact and `<kind>.<attribute>` for the others.
-- **Tie rule.** A difference in pooled test-box pages exact under twice the larger window-offset range of the two
-  routes compared is a tie and the cheaper route wins (12-settings-design.md §3.3; figures.json
-  `noise.seg_rerun_pages_exact_points`). **A route with no measured range borrows g1's 2.5 points** (owner,
-  walkthrough 2026-11-13, option b, W46.seg-tie-borrowed-range). Measured: Gemini 3.7 on g2 5.2 points
-  (84.6-89.8%, seg-g2-offsets.md) and on g1 2.5 (86.8-89.2%, seg-boxes-score.md), on the owner's corrected truth
-  (W46.seg-truth-owner-fixes). Thus two routes with none measured tie under **5.0 points**, a pair involving g2's
-  measured 5.2 keeps **10.4**, and a route's own measured range replaces its borrowed value when available, even
-  below 2.5 (`SettingsSolver.segmentationTie`, checked against `test-boxes.offset_range`). This retains twice the
-  larger of the two ranges, but no longer lends g2's spread to unrelated routes. The borrowed 2.5 is an owner-chosen
-  estimate, not a measurement of those routes. The window offset is segmentation's rerun:
-  at temperature 0 the answers are fixed for fixed windows, and the offset is what a real batch varies. Per box the
-  ranges are wider (g2: Stanton 4.5, RG165 7.3 points on common support), so a per-box comparison would need its own floor.
-  The floor is in pages exact; a gap-accuracy difference has no measured floor, so there the paired interval
-  decides (seg-boxes-score.md Noise). Error counts differ by one or two within noise (options.md Reading).
+- **Tie rule.** Two routes tie when the paired 95% interval of their difference in pooled test-box pages exact holds
+  0, and the cheaper route wins (owner review of the pipeline doc, 2026-11-17; W46.seg-truth-audit, seg-pair-ties.md).
+  Both routes are compared page by page on the same windows (offset 0, the cached answers every figure is), each at its
+  own frozen rule and level, and the interval resamples the truth's 142 common-support documents (10,000 rounds). The
+  table carries every pair of the 11 ranked rows (`pairs` in the stage, `SettingsSolver.segmentationPair`); a pair not
+  measured ties only within the user's point. On two boxes the intervals are wide: 39 of 55 pairs tie, among them
+  ChatGPT against GLM-5.3 Flash (+7.4 [−1.0, +16.9]); the 2B on the Mac differs from every cloud route but GLM, and
+  the teacher from ChatGPT, the mix, Claude and Gemini 3.7 on the gateway. Gap accuracy's own paired form, McNemar's
+  exact sign test on the documents only one route has right, separates none of the 39 (reference column in
+  seg-pair-ties.md). This replaced twice the larger window-offset range, a route with none borrowing g1's 2.5 points
+  (5.0 or, with g2, 10.4 points; W46.seg-tie-borrowed-range): pairing on fixed windows takes window placement out of
+  the comparison instead of adding it to a floor. The offset ranges stay on the cards (Gemini 3.7 on g2 84.6-89.8%,
+  seg-g2-offsets.md; on g1 86.8-89.2%, seg-boxes-score.md). In gap accuracy the paired sign test decides as before
+  (seg-boxes-score.md Noise). Error counts differ by one or two within noise (options.md Reading).
   The rule applies to the text-only window too (owner, 2026-11-13, W46.seg-text-tier-default): with a Gemini key,
   `gemini3.8-flash-text` (87.7%, 29.2 checks per 100 pages, $1.68) leads Gemini 3.8 Flash with the images (87.4%,
   25.3, $3.61) and is the pick; the image window stays offered for a user who wants fewer checks.
@@ -117,7 +117,7 @@ segment figures conditional on each route's call at unsure gaps.
  "cost":{"usd_1000_list":3.61,"usd_1000_batch":1.81,"price_read":"2026-10-05","source":{"file":"options.md","route":"gemini-3.8-flash/low","attribute":"list $ / batch $","value":"$3.61 / $1.81"}},
  "time":{"per_unit_s":5.33,"per_window_s":16.0,"measured":false,"measured_on":"Gemini 3.7's gateway window call, lent to 3.8 (not timed on 3.8)","derived":"seconds a seven-page window call over 3, a window every 3 pages at stride 3","source":{"file":"seg-boxes-score.md","route":"Gateway line","attribute":"s a call","value":"16.0 s"}},
  "memory":{"peak_gb":0,"measured_on":null,"source":null},
- "caveats":["the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)","the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.6-89.8% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its measured 5.2-point range gives its own pairs a 10.4-point floor; unmeasured routes borrow g1's 2.5, not this range (W46.seg-tie-borrowed-range)","introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1","no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)","the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"],
+ "caveats":["the app sends prompt g2 to 3.8; every figure and the level (0.965) are Gemini 3.7 Flash's g2 answers through the gateway, labelled as 3.7's, the level fitted on them (seg-magazine-rule-app.md; owner, 2026-11-10: no 3.8 run on the personal key)","the figures are g2's window offset 0; over offsets 0, 1 and 2 it scores 84.6-89.8% no checking, 25.3-29.2 checks per 100 pages, 98.5-100.0% after checking and 0.0-1.4 unflagged errors per 500 pages (seg-g2-offsets.md); its pairs tie by their paired intervals, not by this range (W46.seg-truth-audit, seg-pair-ties.md)","introductory price to 31 Dec 2026; then $7.22 list, $3.61 batch (options.md); tokens measured on 3.8 with g1","no locked-box figure at 3.8; the locked boxes were scored on 3.7 (SEG-9)","the magazine figure is the Illustrated Review set g2 was adopted on (seg-magazine-rule.md), not a held-out one"],
  "kind_rules":[],"fallback":"manual","conditions":[]},
 
 {"id":"gemini3.7-flash-gateway","name":"Gemini 3.7 Flash (Stanford gateway)","family":"cloud","app_route":null,"status":"measured","needs":{"key":["gateway"],"plan":[],"cluster":false,"mac_gb":0,"gpus":0},
@@ -306,12 +306,12 @@ adaptation row).
 
 ## 6. What would change the rule
 
-- A 3.8 offsets run on the test boxes (declined for now, 14-owner-calls.md call 8): if its range moves the 3.8 pages exact more
-  than 10.4 points from 87.4% (3.7's g2 figure on common support, the card's), the cheap-API and premium picks are rechecked. The card
+- A 3.8 offsets run on the test boxes (declined for now, 14-owner-calls.md call 8): if it moves the 3.8 pages exact from 87.4%
+  (3.7's g2 figure on common support, the card's) far enough to change a paired tie, the cheap-API and premium picks are rechecked. The card
   already shows 3.7's g2 range, 84.6-89.8% over three offsets (W46.seg-g2-offsets, seg-g2-offsets.md; rescored on the
   owner's 2026-11-13 corrections, W46.seg-truth-owner-fixes).
-- A measured offset range for any other route, Claude's w1 first (it waits on W46.gateway-models-ok): it replaces
-  the borrowed 2.5 for that route in the already per-pair floor.
+- A new route's cached test-box answers: `seg_pair_ties.py` pairs it with every ranked row (Claude's w1 on the article
+  rule first; it waits on W46.gateway-models-ok). More test boxes would narrow the paired intervals.
 - The text-only Gemini window on the test boxes within 3.2 points of the image window, at about half the tokens
   (seg-window-gateway.md, 46% of the cost on dev): a text tier row becomes `shipped` for a budget setting.
 - W46.seg-magazine-rule-redo (done 2026-11-10, seg-magazine-rule.md): on Gemini 3.7, g2 splits Stanton 101|102 and
@@ -381,6 +381,7 @@ Every call below was decided on 2026-11-06 (14-owner-calls.md); each ends with i
    W46.seg-g2-offsets (2026-11-13): twice the larger measured offset range, 4.2 points (section 3, Tie rule); 10.4
    points once the owner corrected the test boxes' truth the same day (W46.seg-truth-owner-fixes). Now per pair,
    borrowing 2.4 only where unmeasured (W46.seg-tie-borrowed-range, section 3; 2.5 on common support since W46.seg-common-support).
+   Replaced 2026-11-18 by each pair's paired interval holding 0 (W46.seg-truth-audit, section 3; owner review, 2026-11-17).
 
 ## 8. Items to file
 
@@ -411,9 +412,8 @@ Every call below was decided on 2026-11-06 (14-owner-calls.md); each ends with i
 
 ## 9. Profile test expectations
 
-Pooled test boxes unless named; zero checking budget unless named; tie under twice the larger of each route's own
-offset range, borrowing g1's 2.5 where none is measured (5.0 for two unmeasured routes, 10.4 for g2 pairs; section 3),
-cheaper wins (W46.seg-tie-borrowed-range).
+Pooled test boxes unless named; zero checking budget unless named; a tie when the pair's paired 95% interval holds 0
+(section 3, seg-pair-ties.md), cheaper wins (W46.seg-truth-audit).
 
 - **Laptop, 16 GB.** `seg-qwen3.5-2b-8bit` (79.4% against manual's none; $0; 4.4 GB). Manuscripts: same pick with the
   warning (35.6%). Letters: same (89.7% gaps). Magazine: same, shown with "ranks nothing yet". Clippings mixed: same
@@ -423,17 +423,18 @@ cheaper wins (W46.seg-tie-borrowed-range).
 - **Cheap API (OpenRouter only).** `glm5.3-flash` (82.8%, $1.16) against the 2B (79.4%): a tie, and the 2B wins on
   cost if the Mac has 16 GB [I]; without the Mac's memory, GLM. Manuscripts: no GLM figure, so the sheet shows the gap.
 - **Premium API (Gemini key).** `gemini3.8-flash-text` (87.7%, $1.68) on both 16 GB and 8 GB Macs: its 8.3-point
-  lead over the 2B's 79.4 is beyond their 5.0 floor, so the free 2B no longer ties it. The image window
-  `gemini3.8-flash` (87.4%, $3.61; 84.6-89.8% over three offsets) stays the user's choice; its own pairs retain 10.4.
+  lead over the 2B's 79.4 differs on the paired comparison (+8.3 [+2.6, +15.0]), so the free 2B does not tie it. The
+  image window `gemini3.8-flash` (87.4%, $3.61; 84.6-89.8% over three offsets) stays the user's choice; it too is ahead
+  of the 2B (+8.0 [+2.4, +14.6]).
   Both show Gemini 3.7's g2 figures labelled as 3.7's. Full checking gives text alone 98.5%, images 100.0%.
   Letters: no 3.8 figure; the 3.7 figure 96.0% gaps is shown on the card labelled as 3.7's and decides no pick.
 - **Plans.** Claude only: `claude-sonnet5.5` (88.9%, 10.2 checks). Both plans: **Claude alone still wins**: the mix's
-  90.2% is only 1.2 points over it, inside their 5.0 floor, so a tie and one plan wins on cost. D5, Claude plan and a
-  Gemini key: **Claude still wins on money**; its 88.9 versus text alone's 87.7 ties under 5.0, while its pair with
-  the image window keeps 10.4. Claude's w1 carries no article rule, which g2 states, so a like-for-like Claude arm
-  (W46.gateway-models-ok) could move the gap either way; its measured offset range will replace the borrowed 2.5.
-- **Keys for Anthropic, OpenAI and OpenRouter, no Gemini key.** `chatgpt-gpt6.1-sol` (90.2%) replaces GLM-5.3 Flash
-  (82.8%, $1.16): the 7.4-point lead is beyond their 5.0 floor, so the cheaper route no longer ties it.
+  90.2% is 1.2 points over it (+1.2 [−4.2, +6.3]), a tie, and one plan wins on cost. D5, Claude plan and a Gemini key:
+  **Claude still wins on money**; its 88.9 against text alone's 87.7 ties (+1.2 [−4.8, +7.9]). Claude's w1 carries no
+  article rule, which g2 states, so a like-for-like Claude arm (W46.gateway-models-ok) could move the gap either way.
+- **Keys for Anthropic, OpenAI and OpenRouter, no Gemini key.** `glm5.3-flash` (82.8%, $1.16): ChatGPT's 90.2% is 7.4
+  points ahead, but the paired interval holds 0 (+7.4 [−1.0, +16.9]; 7 documents only ChatGPT has right, 2 only GLM,
+  sign test p 0.18), so the cheaper route wins the tie (W46.seg-truth-audit; ChatGPT under the old 5.0 floor).
 - **Cluster.** `seg-qwen3.5-2b-bf16-cluster`: 79.4% against the 4B's 82.8% and the teacher's 81.2%, ties, and the 2B is
   fastest (0.5 s a window); on Sasha it leads the teacher by 21.7 points on gap accuracy (44 gaps against 6, p 3.24e-08,
   seg-kit-gate-sherlock.md).
@@ -460,7 +461,8 @@ with a timing measure filed for an owner session after the redo; the 2B is offer
 zero-shot card and the manuscript warning, and as an optional disagreement partner beside a cloud voter; the tie
 threshold is 3.2 points, the top of the rerun floor, until a measured range exists (replaced 2026-11-13 by twice the
 larger measured offset range, 4.2 points: W46.seg-g2-offsets, section 3; 10.4 on the owner's corrected truth,
-W46.seg-truth-owner-fixes; now per pair with 2.5 borrowed where unmeasured, W46.seg-tie-borrowed-range).
+W46.seg-truth-owner-fixes; then per pair with 2.5 borrowed where unmeasured, W46.seg-tie-borrowed-range; now each
+pair's paired interval, W46.seg-truth-audit).
 
 Files read: execution-plans/processing-review/00-plan.md (1-105), STATE.md ("Locked boxes named"); the worktree's
 13-stage-rules/00-index.md and 14-owner-calls.md; segbench-results/seg-kit-gate-sherlock.md (paired table);

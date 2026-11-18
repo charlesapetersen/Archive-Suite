@@ -201,7 +201,8 @@ enum SettingsSheetTestDriver {
             check("3 the image window can be chosen", s.options.contains { $0.id == "gemini3.8-flash" && $0.blocked == nil })
         } else { check("3 segmentation card", false) }
         if let s = card(paid, "segmentation") {
-            check("3 the 2B alternative is outside the text pair's 5.0 floor",
+            // W46.seg-truth-audit: the tie is each pair's paired interval (seg-pair-ties.md).
+            check("3 the 2B alternative differs from the text pick on the paired comparison",
                   s.alternatives.first { $0.id == "seg-qwen3.5-2b-8bit" }.map {
                       !$0.figure.contains("a tie with the pick")
                   } == true)
@@ -212,13 +213,15 @@ enum SettingsSheetTestDriver {
                                 (.staysOnMac, .bool(false))]))
         if let s = card(localChosen, "segmentation") {
             check("3 a zero ceiling keeps the 2B", s.routeID == "seg-qwen3.5-2b-8bit", s.routeID ?? "nil")
-            check("3 better text is outside the local pair's 5.0 floor",
+            check("3 better text differs from the local pick on the paired comparison",
                   s.better.first { $0.id == "gemini3.8-flash-text" }.map {
                       !$0.reason.contains("no real gain")
                   } == true)
-            check("3 better image remains inside g2's own 10.4 floor",
+            // Under g2's old 10.4-point floor the image window was "no real gain"; paired, it is 8.0 points ahead
+            // of the 2B [+2.4, +14.6], so it is a real gain too.
+            check("3 better image differs from the local pick on the paired comparison",
                   s.better.first { $0.id == "gemini3.8-flash" }.map {
-                      $0.reason.contains("no real gain")
+                      !$0.reason.contains("no real gain")
                   } == true)
         } else { check("3 custom local segmentation card", false) }
         let paidImage = sheet("gemini-image", general: gem,

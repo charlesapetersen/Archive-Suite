@@ -436,39 +436,36 @@ enum SettingsSolverTestDriver {
         let seg = table.stage("segmentation")!
         let g2 = seg.route("gemini3.8-flash")!, g1 = seg.route("gemini3.7-flash-gateway")!
         let text = seg.route("gemini3.8-flash-text")!, local = seg.route("seg-qwen3.5-2b-8bit")!
-        for (name, a, b, want) in [("neither measured", text, local, 5.0), ("g1 measured", g1, local, 5.0),
-                                    ("g2 measured", g2, local, 10.4), ("both measured", g1, g2, 10.4)] {
-            check("segmentation pair floor: \(name)", abs(SettingsSolver.segmentationTie(a, b) - want) < 1e-9)
-            check("segmentation pair floor symmetric: \(name)",
-                  SettingsSolver.segmentationTie(a, b) == SettingsSolver.segmentationTie(b, a))
+        let gpt = seg.route("chatgpt-gpt6.1-sol")!, glm = seg.route("glm5.3-flash")!, manual = seg.route("manual")!
+        // W46.seg-truth-audit (owner review of the pipeline doc, 2026-11-17): the tie is each pair's paired interval
+        // in test-box pages exact on the same windows (seg-pair-ties.md), not twice the larger offset range.
+        let ranked = seg.routes.filter { $0.figure("test-boxes") != nil }
+        check("segmentation every ranked pair is measured", ranked.allSatisfy { a in
+            ranked.allSatisfy { b in a.id == b.id || seg.pair(a.id, b.id) != nil } }, "\(ranked.count) rows")
+        for (name, a, b, tie) in [("text against the 2B", text, local, false), ("g2 against the 2B", g2, local, false),
+                                  ("g1 against g2", g1, g2, true), ("ChatGPT against GLM", gpt, glm, true)] {
+            let p = SettingsSolver.segmentationPair(seg, a, b), q = SettingsSolver.segmentationPair(seg, b, a)
+            check("segmentation pair: \(name) \(tie ? "ties" : "differs")", p?.tie == tie, p?.citation ?? "not measured")
+            check("segmentation pair read either way: \(name)", p != nil && q != nil && p!.tie == q!.tie
+                  && abs(p!.delta + q!.delta) < 1e-9 && abs(p!.lo + q!.hi) < 1e-9 && abs(p!.hi + q!.lo) < 1e-9)
+            check("segmentation pair interval holds 0 exactly when it ties: \(name)",
+                  p.map { ($0.lo <= 0 && 0 <= $0.hi) == $0.tie } == true)
+            check("segmentation pair figures match the rows: \(name)", p.map {
+                abs($0.delta - (a.figure("test-boxes")! - b.figure("test-boxes")!)) < 0.06 } == true, p?.citation ?? "")
         }
-
-        // A future measured range replaces the borrowed value, even below 2.5; it is not a minimum.
-        do {
-            let url = Bundle.main.url(forResource: SettingsRouteTable.resourceName, withExtension: "json")!
-            let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
-            let stages = raw["stages"] as! [[String: Any]]
-            var row = (stages.first { $0["id"] as? String == "segmentation" }!["routes"] as! [[String: Any]])[0]
-            func measured(_ range: Double) throws -> SettingsRouteTable.Route {
-                row["figures"] = ["test-boxes.offset_range": ["value": range]]
-                return try JSONDecoder().decode(SettingsRouteTable.Route.self, from: JSONSerialization.data(withJSONObject: row))
-            }
-            let small = try measured(0.4), other = try measured(0.8)
-            check("segmentation newly measured ranges replace the borrowed range below 2.5",
-                  abs(SettingsSolver.segmentationTie(small, other) - 1.6) < 1e-9)
-            check("segmentation sheet keeps the smaller measured pair floor at best measured",
-                  abs(SettingsSheetModel.tieFloor("segmentation", small, other, answers: SettingsAnswers()) - 1.6) < 1e-9)
-            let tiny = try measured(0.3)
-            check("segmentation sheet shares the solver's within-point preference for a smaller measured pair",
-                  abs(SettingsSheetModel.tieFloor("segmentation", small, tiny, answers: cheap) - 1.0) < 1e-9)
-            check("segmentation only the unmeasured side borrows 2.5",
-                  abs(SettingsSolver.segmentationTie(small, text) - 5.0) < 1e-9)
-        } catch { check("segmentation synthetic measured ranges decode", false, "\(error)") }
+        check("segmentation a route with no test-boxes figure has no pair", SettingsSolver.segmentationPair(seg, manual, text) == nil)
+        // The sheet reads the same rule: a differing pair is no tie at any gap over a point, a tied one at any gap.
+        check("segmentation sheet: text against the 2B is no tie",
+              !SettingsSheetModel.isTie(seg, text, local, gap: 8.3, answers: SettingsAnswers()))
+        check("segmentation sheet: g1 against g2 ties", SettingsSheetModel.isTie(seg, g1, g2, gap: 1.5, answers: SettingsAnswers()))
+        check("segmentation sheet: an unmeasured pair ties only within the user's point",
+              SettingsSheetModel.isTie(seg, manual, text, gap: 0.5, answers: cheap)
+              && !SettingsSheetModel.isTie(seg, manual, text, gap: 0.5, answers: SettingsAnswers()))
         var imagePair = SettingsAnswers()
         imagePair.onlyRoutes["segmentation"] = [g2.id, local.id]
         let imageTie = solve("D1-image-local", gem, imagePair)
-        eq("D1 g2 against the 2B still ties under g2's 10.4", pick(imageTie, "segmentation"), local.id)
-        check("D1 g2 pair explanation keeps 10.4", imageTie.pick("segmentation", "all")?.reason.contains("10.4-point") == true)
+        // Under the old 10.4-point floor the 2B tied g2 here; paired, g2 is 8.0 points ahead [2.4, 14.6].
+        eq("D1 g2 against the 2B: g2 is ahead on the paired comparison", pick(imageTie, "segmentation"), g2.id)
 
         // E. A cluster (Sherlock), two GPUs a job, no key; nothing downloaded to the Mac.
         var cl = mac(16, downloads: false)
