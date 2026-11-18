@@ -174,6 +174,31 @@ final class AdvancedSearchUITests: FixtureUITestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    /// W40.reader-search-filetype (owner, 2026-11-17: leave out everything that is only a JPEG): a File type row
+    /// offers the kinds, and "is not JPEG" leaves out the fixture's one JPEG, "is JPEG" keeps only it.
+    func testFileTypeRowLeavesOutTheJPEG() throws {
+        XCTAssertTrue(table.waitForExistence(timeout: 10))
+        waitForRows(minimum: 2, timeout: 15)
+        let all = rowCount
+        app.buttons["ar.filter.advanced"].click()
+        let count = app.staticTexts["ar.advanced.count"]
+        XCTAssertTrue(count.waitForExistence(timeout: 5), "the form opens")
+        app.popUpButtons.matching(identifier: "ar.advanced.rule.field").element(boundBy: 0).click()
+        app.menuItems["File type"].click()
+        let kind = app.popUpButtons["ar.advanced.rule.fileType"]
+        XCTAssertTrue(kind.waitForExistence(timeout: 3))
+        XCTAssertEqual(kind.value as? String, "PDF", "a new row starts on PDF")
+        kind.click()
+        app.menuItems["JPEG"].click()
+        XCTAssertTrue(waitFor(count, toRead: "1 document matches"), "File type is JPEG keeps the fixture's JPEG")
+        let op = app.popUpButtons.matching(identifier: "ar.advanced.rule.op").element(boundBy: 0)
+        op.click()
+        app.menuItems["is not"].click()
+        XCTAssertTrue(waitFor(count, toRead: "\(all - 1) documents match"), "is not JPEG leaves it out")
+        _ = captureScreenshot("w40-advanced-filetype-row")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     /// W40.fix-reader-advanced-many-rules (owner, 2026-11-10: rules past about seven "get added for a little bit
     /// and then dropped"): twelve rules added one by one, each from the last row's +, all stay in the form while
     /// it counts, and all come back when the form reopens on the search in effect.

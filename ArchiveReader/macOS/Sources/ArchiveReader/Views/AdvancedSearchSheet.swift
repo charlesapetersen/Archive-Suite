@@ -285,6 +285,13 @@ private struct RuleValueView: View {
                 Text("No read state").tag(ReadFilter.noReadState)
             }
             .labelsHidden().fixedSize()
+        case .fileType:
+            Picker("File type", selection: $rule.fileType) {
+                ForEach(AdvancedSearch.fileTypeChoices, id: \.self) { Text($0).tag($0) }
+            }
+            .labelsHidden().fixedSize()
+            .help("JPEG includes .jpg files, TIFF .tif files")
+            .accessibilityIdentifier("ar.advanced.rule.fileType")
         case .date:
             HStack(spacing: 6) {
                 if rule.op != .undated {
@@ -336,6 +343,7 @@ extension RuleField {
         case .tags: return "Tags"
         case .quality: return "Quality"
         case .readState: return "Read state"
+        case .fileType: return "File type"
         case .date: return "Date"
         case .folder: return "Folder"
         case .needsAttention: return "Needs attention"

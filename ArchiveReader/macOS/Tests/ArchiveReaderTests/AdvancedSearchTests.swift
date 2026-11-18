@@ -142,6 +142,30 @@ final class AdvancedSearchTests: XCTestCase {
         XCTAssertTrue(hit(.endsWith, "1981.PDF"))
     }
 
+    /// W40.reader-search-filetype: is / is not on the file's kind, with JPG folded into JPEG and TIF into TIFF.
+    func testFileTypeIsAndIsNot() throws {
+        func typed(_ name: String, _ type: String) -> ArchiveFile {
+            let url = URL(fileURLWithPath: "/c/" + name)
+            return ArchiveFile(url: url, name: name, fileType: type, tags: DocumentTags.parse(raw: [], labelNumber: nil),
+                               contentModified: nil)
+        }
+        let files = [typed("a.pdf", "PDF"), typed("b.jpg", "JPG"), typed("c.jpeg", "JPEG"), typed("d.tif", "TIF"),
+                     typed("e.png", "PNG")]
+        func hits(_ op: RuleOperator, _ type: String) -> [Bool] {
+            let s = search(.all, rule(.fileType, op) { $0.fileType = type })
+            return files.map { s.matches($0, RuleContext()) && s.prepared().matchesPrepared($0, RuleContext()) }
+        }
+        XCTAssertEqual(rule(.fileType).fileType, "PDF")
+        XCTAssertEqual(rule(.fileType).op, .is)
+        XCTAssertEqual(hits(.is, "PDF"), [true, false, false, false, false])
+        XCTAssertEqual(hits(.isNot, "JPEG"), [true, false, false, true, true])
+        XCTAssertEqual(hits(.is, "TIFF"), [false, false, false, true, false])
+        let bare = try JSONDecoder().decode(SearchRule.self, from: Data(#"{"field":"fileType","op":"isNot"}"#.utf8))
+        XCTAssertEqual(bare.fileType, "PDF")
+        let s = search(.all, rule(.fileType, .isNot) { $0.fileType = "JPEG" })
+        XCTAssertEqual(try JSONDecoder().decode(AdvancedSearch.self, from: JSONEncoder().encode(s)), s)
+    }
+
     func testContextRulesAndGroups() {
         let a = file("/c/a.pdf", ["Unread"]), b = file("/c/b.pdf", ["Read"])
         let ctx = RuleContext(needsAttention: ["/c/a.pdf"], flagged: ["/c/b.pdf"])

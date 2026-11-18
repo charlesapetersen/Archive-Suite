@@ -26,6 +26,9 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     case tags
     case quality
     case readState
+    /// The file's kind: PDF or an image format (`ArchiveFile.fileType`), so a search can leave out the JPEGs
+    /// (W40.reader-search-filetype). Not the Box/Folder item type, which is a tag.
+    case fileType
     case date
     case folder
     case needsAttention
@@ -53,7 +56,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
         case .text, .ocrText: return [.allWords, .phrase, .anyWords, .noWords]
         case .fileName: return [.contains, .doesNotContain, .beginsWith, .endsWith]
         case .tags: return [.hasAll, .hasAny, .hasNone]
-        case .quality, .readState, .folder: return [.is, .isNot]
+        case .quality, .readState, .fileType, .folder: return [.is, .isNot]
         case .date: return [.between, .after, .before, .undated]
         case .needsAttention, .ambiguousDate, .flagged: return [.is, .isNot]
         case .group: return [.is]
@@ -75,6 +78,8 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// Quality levels (`QualityLevels.all`); 0 stands for "no quality tag".
     var qualities: Set<Int> = []
     var read: ReadFilter = .unread
+    /// A file-type row's kind, one of `AdvancedSearch.fileTypeChoices`.
+    var fileType: String = "PDF"
     /// Which date a date row tests. A new row tests the document's own date (W40.suite-date-design: Date means the
     /// own date; the sent-with date is searched on its own). A row saved without the key keeps `either`, what it
     /// meant when saved; every row written since W37 carries the key.
@@ -103,6 +108,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         qualities = (try c.decodeIfPresent(Set<Int>.self, forKey: .qualities) ?? [])
             .filter { $0 == 0 || QualityLevels.all.contains($0) }
         read = try c.decodeIfPresent(ReadFilter.self, forKey: .read) ?? .unread
+        fileType = try c.decodeIfPresent(String.self, forKey: .fileType) ?? "PDF"
         dateRole = try c.decodeIfPresent(DateRoleChoice.self, forKey: .dateRole) ?? .either
         combine = try c.decodeIfPresent(RuleCombine.self, forKey: .combine) ?? .all
         children = try c.decodeIfPresent([SearchRule].self, forKey: .children) ?? []
@@ -122,6 +128,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         case .tags: return !tags.isEmpty
         case .quality: return !qualities.isEmpty
         case .readState: return read != .all
+        case .fileType: return !fileType.isEmpty
         case .date: return op == .undated || dateBounds != nil
         case .needsAttention, .ambiguousDate, .flagged: return true
         case .group: return children.contains(where: \.isActive)
@@ -260,6 +267,8 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
             case .noReadState: state = file.readState == nil
             }
             return state == positive
+        case .fileType:
+            return (Self.fileTypeChoice(file.fileType) == rule.fileType) == positive
         case .date:
             return AdvancedSearchText.dateMatches(op: rule.op, bounds: rule.dateBounds, role: rule.dateRole,
                                                   keys: file.tags.dateKeysByRole)
@@ -270,6 +279,21 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
         case .ambiguousDate: return file.dateIsAmbiguous == positive
         case .flagged: return context.flagged.contains(file.path) == positive
         case .group: return evaluate(rule.children, rule.combine, file, context, prepared: prepared)
+        }
+    }
+
+    /// The kinds a file-type row offers. The library labels a file by its extension in capitals ("PDF", "JPG"),
+    /// so spellings of one format are folded together by `fileTypeChoice`.
+    static let fileTypeChoices = ["PDF", "JPEG", "PNG", "TIFF", "HEIC", "GIF", "BMP"]
+
+    /// The choice a file's `fileType` label falls under: JPG is JPEG, TIF is TIFF, HEIF is HEIC; any other label
+    /// is itself, so it matches no choice and passes every "is not".
+    static func fileTypeChoice(_ label: String) -> String {
+        switch label.uppercased() {
+        case "JPG", "JPE": return "JPEG"
+        case "TIF": return "TIFF"
+        case "HEIF": return "HEIC"
+        case let other: return other
         }
     }
 

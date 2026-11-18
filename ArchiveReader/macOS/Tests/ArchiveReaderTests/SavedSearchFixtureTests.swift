@@ -103,8 +103,23 @@ enum SavedSearchFixtures {
         ]
     }
 
+    /// November's folders plus one for the File type field (W40.reader-search-filetype): each operator with
+    /// every kind the form offers, in `saved-searches-2026-11-filetype.json`.
+    static var november2026FileType: [SavedSearch] {
+        var n = 1000
+        func next() -> Int { n += 1; return n }
+        var rows: [SearchRule] = []
+        for op in RuleField.fileType.operators {
+            for kind in AdvancedSearch.fileTypeChoices {
+                rows.append(rule(next(), .fileType, op) { $0.fileType = kind })
+            }
+        }
+        return november2026 + [SavedSearch(id: id(7), name: "Every file type",
+                                           search: AdvancedSearch(combine: .any, rules: rows))]
+    }
+
     /// The newest builder; the coverage test holds it to everything the form offers today.
-    static var newest: [SavedSearch] { november2026 }
+    static var newest: [SavedSearch] { november2026FileType }
 }
 
 @MainActor
@@ -151,6 +166,10 @@ final class SavedSearchFixtureTests: XCTestCase {
         try assertLoads("saved-searches-2026-11", as: asLoadedToday(SavedSearchFixtures.november2026))
     }
 
+    func testTheFileTypeFixtureLoadsUnchanged() throws {
+        try assertLoads("saved-searches-2026-11-filetype", as: asLoadedToday(SavedSearchFixtures.november2026FileType))
+    }
+
     /// W40.reader-quality-levels: the November fixture saved Quality rows with 0, 2 and 5; they load, keeping
     /// none and 2. A row of only 4 and 5 loads too, empty, so it is inactive rather than undecodable.
     func testQualityLevelsTheSuiteNeverWritesAreDroppedOnLoad() throws {
@@ -167,7 +186,7 @@ final class SavedSearchFixtureTests: XCTestCase {
         XCTAssertFalse(rule.isActive)
     }
 
-    /// The newest fixture covers every field, operator, read state, date role and combine the form offers. A new
+    /// The newest fixture covers every field, operator, read state, file type, date role and combine the form offers. A new
     /// case fails here: add a new fixture with it (never edit an old one).
     func testTheNewestFixtureCoversEveryRuleKind() {
         func walk(_ rules: [SearchRule], depth: Int) -> [(SearchRule, Int)] {
@@ -183,6 +202,9 @@ final class SavedSearchFixtureTests: XCTestCase {
         }
         for read in ReadFilter.allCases {
             XCTAssertTrue(rules.contains { $0.field == .readState && $0.read == read }, "read state \(read)")
+        }
+        for kind in AdvancedSearch.fileTypeChoices {
+            XCTAssertTrue(rules.contains { $0.field == .fileType && $0.fileType == kind }, "file type \(kind)")
         }
         for role in DateRoleChoice.allCases {
             XCTAssertTrue(rules.contains { $0.field == .date && $0.dateRole == role }, "date role \(role)")
