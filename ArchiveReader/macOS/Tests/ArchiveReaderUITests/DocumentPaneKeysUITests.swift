@@ -120,6 +120,56 @@ final class DocumentPaneKeysUITests: XCTestCase {
         XCTAssertEqual(find.value as? String, "brx", "typing after the cycle still goes into the Find field")
     }
 
+    /// W40.reader-page-nav: on a fitted page ← / → turn the page from either pane, and a scroll past the page's
+    /// edge turns it too; on a zoomed page → pans first and turns only from the right edge.
+    func testArrowsAndScrollTurnThePage() throws {
+        let app = try openAllDocuments()
+        app.typeKey("0", modifierFlags: [.command, .option])    // Reset Zoom: a zoom another run left behind
+        settle()
+        XCTAssertTrue(showing("alpha"), "the first document opens")
+        imagePane.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        settle()
+
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(showing("bravo"), "→ on a fitted page turns to the next document")
+        captureScreenshot("page-nav-1-right")
+        app.typeKey(.leftArrow, modifierFlags: [])
+        XCTAssertTrue(showing("alpha"), "← turns back")
+        clickTextPane()
+        app.typeKey(.rightArrow, modifierFlags: [])
+        XCTAssertTrue(showing("bravo"), "→ in the extracted-text pane turns too")
+
+        // A scroll on the fitted image page, each way: one turns on, the other back. XCUITest's scroll sign is
+        // reported rather than assumed; a turn either way shows the scroll reached the page.
+        for (dy, label) in [(CGFloat(-300), "down"), (300, "up")] {
+            imagePane.scroll(byDeltaX: 0, deltaY: dy)
+            settle()
+            let shown = Self.words.first { docWindow.title.contains($0) } ?? "?"
+            print("[page-nav] scroll \(label) (\(dy)) on bravo's image page shows \(shown)")
+            captureScreenshot("page-nav-2-scroll-\(label)")
+            XCTAssertNotEqual(shown, "bravo", "a scroll past a fitted page's edge (\(label)) turns the page")
+            app.typeKey(shown == "alpha" ? .rightArrow : .leftArrow, modifierFlags: [])
+            XCTAssertTrue(showing("bravo"), "back to bravo")
+        }
+
+        // Zoomed: → pans until the right edge, then the next → turns.
+        imagePane.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+        settle()
+        try zoomImageBeyondFit()
+        let before = try pageFrame()
+        app.typeKey(.rightArrow, modifierFlags: [])
+        settle()
+        XCTAssertLessThan(try pageFrame().minX, before.minX - 5, "→ pans the zoomed page")
+        XCTAssertTrue(showing("bravo"), "and stays on it")
+        var turned = false
+        for _ in 0..<40 {
+            app.typeKey(.rightArrow, modifierFlags: [])
+            if docWindow.title.contains("charlie") { turned = true; break }
+        }
+        XCTAssertTrue(turned, "→ at the zoomed page's right edge turns to the next document")
+        captureScreenshot("page-nav-3-zoomed-edge-turn")
+    }
+
     // MARK: - Panes
 
     private enum Pane { case left, right }

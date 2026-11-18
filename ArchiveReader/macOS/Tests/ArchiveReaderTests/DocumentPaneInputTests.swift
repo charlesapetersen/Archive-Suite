@@ -6,11 +6,12 @@ import XCTest
 /// Real AppKit responders and PDFKit scroll geometry; windows are never ordered onto the host display.
 @MainActor
 final class DocumentPaneInputTests: XCTestCase {
-    private func key(_ code: Int, modifiers: NSEvent.ModifierFlags = [.numericPad, .function]) -> NSEvent {
+    private func key(_ code: Int, modifiers: NSEvent.ModifierFlags = [.numericPad, .function],
+                     repeating: Bool = false) -> NSEvent {
         let chars = String(UnicodeScalar(code)!)
         return NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
                                 windowNumber: 0, context: nil, characters: chars,
-                                charactersIgnoringModifiers: chars, isARepeat: false, keyCode: 0)!
+                                charactersIgnoringModifiers: chars, isARepeat: repeating, keyCode: 0)!
     }
 
     private func window(_ view: NSView) -> NSWindow {
@@ -159,5 +160,135 @@ final class DocumentPaneInputTests: XCTestCase {
         container.addSubview(text)
         settle()
         XCTAssertTrue(win.firstResponder === fieldEditor, "neither pane steals the find field's caret")
+    }
+
+    // MARK: Page turns (W40.reader-page-nav)
+
+    /// A zoomed page pans with ← / →; at the edge, a fresh press turns the page and a held one does not.
+    /// A fitted page turns at once. ↑ / ↓ never turn.
+    func testHorizontalArrowsTurnThePageOnlyWhenThePanHasNowhereToGo() throws {
+        let model = DocumentViewerModel(persists: false)
+        var turns: [Bool] = []
+        model.leftController.turnPage = { turns.append($0) }
+        let view = ReaderPDFView(frame: NSRect(x: 0, y: 0, width: 600, height: 500))
+        view.paneController = model.leftController
+        let win = window(view)
+        view.document = TestPDFBuilder.textPDF(pages: ["A page large enough to pan"])
+        view.displayMode = .singlePage
+        view.autoScales = false
+        view.scaleFactor = 3
+        view.layoutDocumentView()
+        settle()
+        let clip = try XCTUnwrap(view.documentView?.enclosingScrollView?.contentView)
+        let doc = try XCTUnwrap(clip.documentView)
+        clip.scroll(to: NSPoint(x: (doc.bounds.width - clip.bounds.width) / 2,
+                                y: (doc.bounds.height - clip.bounds.height) / 2))
+        XCTAssertTrue(win.makeFirstResponder(view))
+        XCTAssertEqual(PageEdge.reached(by: clip), [], "a centred zoomed page is at no edge")
+
+        view.keyDown(with: key(NSRightArrowFunctionKey))
+        view.keyDown(with: key(NSLeftArrowFunctionKey))
+        XCTAssertEqual(turns, [], "with room to pan, the arrows pan")
+        for _ in 0..<100 { view.keyDown(with: key(NSRightArrowFunctionKey, repeating: true)) }
+        XCTAssertTrue(PageEdge.reached(by: clip).contains(.right))
+        XCTAssertEqual(turns, [], "holding → stops at the edge")
+        view.keyDown(with: key(NSRightArrowFunctionKey))
+        XCTAssertEqual(turns, [true], "a fresh → at the right edge turns to the next page")
+        for _ in 0..<100 { view.keyDown(with: key(NSLeftArrowFunctionKey, repeating: true)) }
+        view.keyDown(with: key(NSLeftArrowFunctionKey))
+        XCTAssertEqual(turns, [true, false], "a fresh ← at the left edge turns back")
+        for _ in 0..<100 { view.keyDown(with: key(NSDownArrowFunctionKey)) }
+        for _ in 0..<100 { view.keyDown(with: key(NSUpArrowFunctionKey)) }
+        view.keyDown(with: key(NSRightArrowFunctionKey, modifiers: [.command, .shift]))
+        XCTAssertEqual(turns, [true, false], "↑ / ↓ at an edge and modified arrows never turn")
+
+        view.autoScales = true
+        view.layoutDocumentView()
+        settle()
+        clip.scroll(to: clip.constrainBoundsRect(clip.bounds).origin)
+        XCTAssertEqual(PageEdge.reached(by: clip), Set(PageEdge.allCases), "a fitted page is at every edge")
+        turns = []
+        view.keyDown(with: key(NSRightArrowFunctionKey))
+        view.keyDown(with: key(NSLeftArrowFunctionKey))
+        XCTAssertEqual(turns, [true, false], "a fitted page turns at once")
+    }
+
+    func testExtractedTextArrowsTurnThePageAndLeaveModifiedArrows() {
+        let model = DocumentViewerModel(persists: false)
+        var turns: [Bool] = []
+        model.textController.turnPage = { turns.append($0) }
+        let text = ExtractedTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 400))
+        text.controller = model.textController
+        text.isEditable = false
+        text.isSelectable = true
+        text.string = "Some extracted text"
+        let win = window(text)
+        XCTAssertTrue(win.makeFirstResponder(text))
+        text.keyDown(with: key(NSRightArrowFunctionKey))
+        text.keyDown(with: key(NSRightArrowFunctionKey, repeating: true))
+        text.keyDown(with: key(NSLeftArrowFunctionKey))
+        text.keyDown(with: key(NSRightArrowFunctionKey, modifiers: [.shift, .numericPad, .function]))
+        text.keyDown(with: key(NSDownArrowFunctionKey))
+        XCTAssertEqual(turns, [true, false], "plain ← / → turn once per press; ⇧→ and ↓ stay the text view's")
+    }
+
+    func testPushedEdgeFollowsTheDominantAxis() {
+        XCTAssertEqual(PageEdge.pushed(dx: 0, dy: 5), .top)
+        XCTAssertEqual(PageEdge.pushed(dx: 1, dy: -5), .bottom)
+        XCTAssertEqual(PageEdge.pushed(dx: 6, dy: -5), .left)
+        XCTAssertEqual(PageEdge.pushed(dx: -6, dy: 2), .right)
+        XCTAssertNil(PageEdge.pushed(dx: 0, dy: 0))
+        XCTAssertTrue(PageEdge.bottom.isNext && PageEdge.right.isNext)
+        XCTAssertFalse(PageEdge.top.isNext || PageEdge.left.isNext)
+    }
+
+    /// A trackpad gesture turns only past an edge it began at, once, and swallows its own rest and momentum.
+    func testScrollGestureTurnsOncePastAnEdgeItBeganAt() {
+        let all = Set(PageEdge.allCases)
+        var scroll = PageTurnScroll()
+        XCTAssertEqual(scroll.handle(phase: .began, momentum: [], dx: 0, dy: -2, time: 0, edges: all), .scroll)
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 0, dy: -30, time: 0.01, edges: all), .scroll,
+                       "short of the overscroll, the scroll view bounces as usual")
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 0, dy: -40, time: 0.02, edges: all),
+                       .turn(next: true), "past the bottom edge: the next page")
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 0, dy: -40, time: 0.03, edges: all), .swallow)
+        XCTAssertEqual(scroll.handle(phase: .ended, momentum: [], dx: 0, dy: 0, time: 0.04, edges: all), .swallow)
+        XCTAssertEqual(scroll.handle(phase: [], momentum: .changed, dx: 0, dy: -20, time: 0.05, edges: all), .swallow,
+                       "its momentum does not turn a second page")
+
+        // A swipe to the right on a fitted page (fingers right: content toward the left edge) turns back.
+        XCTAssertEqual(scroll.handle(phase: .began, momentum: [], dx: 1, dy: 0, time: 1, edges: all), .scroll)
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 70, dy: 3, time: 1.01, edges: all),
+                       .turn(next: false))
+
+        // A zoomed page scrolled to its bottom edge in this gesture stops there; only the next gesture turns.
+        XCTAssertEqual(scroll.handle(phase: .began, momentum: [], dx: 0, dy: -2, time: 2, edges: []), .scroll)
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 0, dy: -200, time: 2.1, edges: [.bottom]),
+                       .scroll)
+        XCTAssertEqual(scroll.handle(phase: [], momentum: .changed, dx: 0, dy: -50, time: 2.2, edges: [.bottom]), .scroll)
+        XCTAssertEqual(scroll.handle(phase: .began, momentum: [], dx: 0, dy: -2, time: 3, edges: [.bottom]), .scroll)
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 0, dy: 100, time: 3.1, edges: [.bottom]),
+                       .scroll, "scrolling back up, away from the edge, pans")
+        XCTAssertEqual(scroll.handle(phase: .changed, momentum: [], dx: 0, dy: -100, time: 3.2, edges: [.bottom]),
+                       .turn(next: true))
+
+        // A pane rebuilt mid-gesture never saw it begin: it scrolls, and never turns.
+        var rebuilt = PageTurnScroll()
+        XCTAssertEqual(rebuilt.handle(phase: .changed, momentum: [], dx: 0, dy: -200, time: 0, edges: all), .scroll)
+        XCTAssertEqual(rebuilt.handle(phase: [], momentum: .changed, dx: 0, dy: -200, time: 0.1, edges: all), .scroll)
+    }
+
+    /// A mouse wheel has no phases: a run of clicks that begins at an edge turns once.
+    func testWheelRunTurnsOnceFromAnEdge() {
+        var scroll = PageTurnScroll()
+        XCTAssertEqual(scroll.handle(phase: [], momentum: [], dx: 0, dy: -3, time: 0, edges: []), .scroll)
+        XCTAssertEqual(scroll.handle(phase: [], momentum: [], dx: 0, dy: -3, time: 0.1, edges: [.bottom]), .scroll,
+                       "the run that reaches the edge stops there")
+        XCTAssertEqual(scroll.handle(phase: [], momentum: [], dx: 0, dy: -3, time: 1, edges: [.bottom]),
+                       .turn(next: true))
+        XCTAssertEqual(scroll.handle(phase: [], momentum: [], dx: 0, dy: -3, time: 1.1, edges: [.bottom]), .swallow)
+        XCTAssertEqual(scroll.handle(phase: [], momentum: [], dx: 0, dy: -3, time: 1.2, edges: [.bottom]), .swallow)
+        XCTAssertEqual(scroll.handle(phase: [], momentum: [], dx: 0, dy: 3, time: 2, edges: Set(PageEdge.allCases)),
+                       .turn(next: false))
     }
 }

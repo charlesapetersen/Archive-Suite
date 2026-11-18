@@ -21,6 +21,8 @@ final class ExtractedTextController {
     /// `PDFPaneController.tookFocus` / `holdsFocus` (W40.fix-reader-doc-keys-focus).
     var tookFocus: (() -> Void)?
     var holdsFocus: (() -> Bool)?
+    /// A page turn from this pane, as `PDFPaneController.turnPage` (W40.reader-page-nav).
+    var turnPage: ((Bool) -> Void)?
 
     /// The selected text, verbatim (nil if nothing is selected here).
     func plainSelection() -> String? {
@@ -181,6 +183,39 @@ final class ExtractedTextView: NSTextView {
         let became = super.becomeFirstResponder()
         if became { controller?.tookFocus?() }
         return became
+    }
+
+    /// W40.reader-page-nav: the text wraps, so ← / → have no pan to do and turn the page, as on a fitted PDF
+    /// page (a held key turns once). A swipe turns it, and so does a scroll past the text's top or bottom.
+    override func keyDown(with event: NSEvent) {
+        guard let next = event.plainHorizontalArrow, let turn = controller?.turnPage else {
+            super.keyDown(with: event)
+            return
+        }
+        if !event.isARepeat { turn(next) }
+    }
+
+    private var scrollTurn = PageTurnScroll()
+
+    override func scrollWheel(with event: NSEvent) {
+        guard let turn = controller?.turnPage, let clip = enclosingScrollView?.contentView else {
+            super.scrollWheel(with: event)
+            return
+        }
+        switch scrollTurn.handle(phase: event.phase, momentum: event.momentumPhase, dx: event.scrollingDeltaX,
+                                 dy: event.scrollingDeltaY, time: event.timestamp, edges: PageEdge.reached(by: clip)) {
+        case .scroll: super.scrollWheel(with: event)
+        case .swallow: break
+        case .turn(let next): turn(next)
+        }
+    }
+
+    override func swipe(with event: NSEvent) {
+        if let next = event.swipeTurnsToNext, let turn = controller?.turnPage {
+            turn(next)
+        } else {
+            super.swipe(with: event)
+        }
     }
 
     /// Takes the focus back when the text pane is the focused one and nothing holds it, as `ReaderPDFView`

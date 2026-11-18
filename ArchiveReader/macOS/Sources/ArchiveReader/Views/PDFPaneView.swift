@@ -65,6 +65,9 @@ final class PDFPaneController {
     /// W40.fix-reader-doc-keys-focus.
     var tookFocus: (() -> Void)?
     var holdsFocus: (() -> Bool)?
+    /// A page turn from this pane's arrows, swipe or scroll (`true` = next), as ⌘⇧↓ / ⌘⇧↑. Set by
+    /// `DocumentViewerModel`; nil turns nothing (W40.reader-page-nav).
+    var turnPage: ((Bool) -> Void)?
     /// Called after the zoom is recorded or reset, so the viewer can republish what depends on it (whether
     /// Reset Zoom has anything to do). Set by `DocumentViewerModel`.
     var zoomChanged: (() -> Void)?
@@ -726,9 +729,41 @@ final class ReaderPDFView: PDFView {
     /// The owner's Reader session 2 (rows 6, 7): the arrow keys did nothing in the document window, and a
     /// click in the text pane did not move the focus border. PDFKit's single-page mode reads ←/→ as page
     /// turns, which a one-page document never has, so the arrows alone pan the page here instead.
+    /// W40.reader-page-nav: ← / → turn the page when the pan has nowhere to go that way (the page fits, or it
+    /// has reached that edge). A held key only pans, so holding → across a zoomed page stops at its edge.
     override func keyDown(with event: NSEvent) {
-        if let direction = Self.panKey(event) { pan(direction); return }
+        if let direction = Self.panKey(event) {
+            if !pan(direction), !event.isARepeat, let next = event.plainHorizontalArrow {
+                paneController?.turnPage?(next)
+            }
+            return
+        }
         super.keyDown(with: event)
+    }
+
+    // MARK: Swipe and scroll past the edge turn the page (W40.reader-page-nav)
+
+    private var scrollTurn = PageTurnScroll()
+
+    override func scrollWheel(with event: NSEvent) {
+        guard let turn = paneController?.turnPage, let clip = documentView?.enclosingScrollView?.contentView else {
+            super.scrollWheel(with: event)
+            return
+        }
+        switch scrollTurn.handle(phase: event.phase, momentum: event.momentumPhase, dx: event.scrollingDeltaX,
+                                 dy: event.scrollingDeltaY, time: event.timestamp, edges: PageEdge.reached(by: clip)) {
+        case .scroll: super.scrollWheel(with: event)
+        case .swallow: break
+        case .turn(let next): turn(next)
+        }
+    }
+
+    override func swipe(with event: NSEvent) {
+        if let next = event.swipeTurnsToNext, let turn = paneController?.turnPage {
+            turn(next)
+        } else {
+            super.swipe(with: event)
+        }
     }
 
     /// How far one arrow press moves the page: a tenth of the pane, and never less than `minPanStep` points.
@@ -751,18 +786,20 @@ final class ReaderPDFView: PDFView {
     }
 
     /// Scroll the page one step in `direction`, clamped to its edges. A page that fits the pane has nowhere
-    /// to go, so nothing moves.
-    func pan(_ direction: CGVector) {
-        guard let clip = documentView?.enclosingScrollView?.contentView else { return }
+    /// to go, so nothing moves; the result says whether anything did.
+    @discardableResult
+    func pan(_ direction: CGVector) -> Bool {
+        guard let clip = documentView?.enclosingScrollView?.contentView else { return false }
         let visible = clip.bounds
         let dx = direction.dx * max(Self.minPanStep, visible.width * Self.panFraction)
         let dy = direction.dy * max(Self.minPanStep, visible.height * Self.panFraction)
         let moved = NSRect(origin: CGPoint(x: visible.minX + dx, y: visible.minY + (clip.isFlipped ? -dy : dy)),
                            size: visible.size)
         let origin = clip.constrainBoundsRect(moved).origin
-        guard origin != visible.origin else { return }
+        guard abs(origin.x - visible.minX) >= 0.5 || abs(origin.y - visible.minY) >= 0.5 else { return false }
         clip.scroll(to: origin)
         clip.enclosingScrollView?.reflectScrolledClipView(clip)
+        return true
     }
 
     // MARK: Right-click on the image page (W40.reader-image-context-menu)

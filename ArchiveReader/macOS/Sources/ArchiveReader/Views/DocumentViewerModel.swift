@@ -202,6 +202,9 @@ final class DocumentViewerModel: ObservableObject {
         textController.userSelected = { [weak self] in self?.userSelected(in: .right) }
         textController.tookFocus = { [weak self] in self?.paneTookFocus(.right) }
         textController.holdsFocus = { [weak self] in self?.focusedPane == .right }
+        // ← / →, a swipe or a scroll past the edge, from any pane, turn the page (W40.reader-page-nav).
+        let turnPage: (Bool) -> Void = { [weak self] next in if next { self?.next() } else { self?.previous() } }
+        textController.turnPage = turnPage
         for controller in [leftController, rightController] {
             controller.copySelection = { [weak self] in self?.copyPlainSelection() }
             controller.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
@@ -209,6 +212,7 @@ final class DocumentViewerModel: ObservableObject {
             controller.userSelected = { [weak self] in self?.userSelected(in: pane) }
             controller.tookFocus = { [weak self] in self?.paneTookFocus(pane) }
             controller.holdsFocus = { [weak self] in self?.focusedPane == pane }
+            controller.turnPage = turnPage
             // ⌘= / ⌘↑ / ⌘↓ reaching either pane zoom the FOCUSED pane (`ReaderPDFView.performKeyEquivalent`).
             controller.zoomFocused = { [weak self] zoomIn in
                 if zoomIn { self?.zoomFocusedIn() } else { self?.zoomFocusedOut() }
