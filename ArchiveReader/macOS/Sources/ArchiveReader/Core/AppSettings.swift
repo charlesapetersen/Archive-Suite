@@ -43,8 +43,9 @@ enum AppSettings {
     }
 
     /// W40.reader-copy-shortcut-swap (owner, 2026-11-17): on, ⌘C in the page and text panes copies cleaned for
-    /// prose and ⇧⌘C copies the text exactly. Off (a fresh install) keeps ⌘C the exact copy.
-    static var copyCleanedOnCommandC: Bool { bool(SettingsKey.copyCleanedOnCommandC, false) }
+    /// prose and ⇧⌘C copies the text exactly. Off (a fresh install) keeps ⌘C the exact copy. `bool(forKey:)`, as
+    /// `@AppStorage` reads it, so a `-copyCleanedOnCommandC YES` launch argument (a string) counts too.
+    static var copyCleanedOnCommandC: Bool { d.bool(forKey: SettingsKey.copyCleanedOnCommandC) }
 
     static var viewerSplitFraction: Double {
         let v = d.object(forKey: SettingsKey.viewerSplit) as? Double ?? 0.667

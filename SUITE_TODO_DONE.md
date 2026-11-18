@@ -16450,3 +16450,12 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   row feeds it now. No migration: nothing to migrate. test-settings-sheet, -solver, -routes, -review-corrections and
   test_kit_corrections.py all pass; Processor Debug build clean. No bench cache scratch.
   <!-- /W46.kit-hands-retire -->
+- [x] **W40.reader-copy-shortcut-swap — a setting for which copy is Cmd-C and which Shift-Cmd-C** · §W40 — verification phase · SHIPPED 2026-11-18
+  Owner's Reader notes, 2026-11-17. Settings ▸ Copying text has "⌘C copies cleaned for prose, ⇧⌘C copies exactly"
+  (`SettingsKey.copyCleanedOnCommandC`, off by default). On: Edit ▸ Copy reaching a page or text pane copies cleaned
+  (`DocumentViewerModel.copyForCommandC`), and the Edit item on ⇧⌘C becomes "Copy Exact Text". The command table's
+  keys and titles follow the switch, so the menu, tooltips and the menu-bar test agree. The find field still takes
+  ⌘C first. Read with `bool(forKey:)` so a `-copyCleanedOnCommandC YES` launch argument counts (the VM run caught
+  `as? Bool` missing it). Unit: DocumentCopyTextPaneTests.testTheSwapSettingMakesCommandCTheCleanedCopy, whole
+  bundle green (915). VM: CopyShortcutSwapUITests and the existing CopyShortcutUITests pass. No bench cache scratch.
+  <!-- /W40.reader-copy-shortcut-swap -->
