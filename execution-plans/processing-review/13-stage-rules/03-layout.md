@@ -150,6 +150,18 @@ pictures, the padded crop union covers 93.77% of Vision line-box area on average
 The engineering floor is 95%, with 7/15 pages below it. Boundary ownership also requires fill: lines split between
 crops move intact into the masked whole-page fill, with their overlapping lines; earlier crop pixels are whitened
 in later crops. That stronger guard requires fill on all 15 cached pages and moves 5,022 line boxes. No text
-deduplication is used. Accuracy and speed of this partition on the truth set remain unmeasured; the old 69.4%
+deduplication is used. Accuracy and speed of this partition were unmeasured when it shipped (measured below); the old 69.4%
 dark-pixel figure excluded pictures and is not Vision coverage. This implements the fallback policy, without
 claiming an accuracy-optimal threshold or changing the detector comparison above.
+
+**The partition, read (W46.layout-partition-score, 2026-11-17).** Evidence scope first: every region figure above
+(L9 86.2, the pair, the order results) is for raw regions (pictures dropped, no masking, no fill), not for the
+partition the app ships. Read on the 15 L9 scans with the app's own plan images and the shipped Mac PaddleOCR-VL
+1.6 4-bit, beside fresh matched controls, the partition scores 20.2 strict NES against 84.6 for raw regions from the
+same detection (−64.4 [−70.3, −57.1], behind on all 15 pages; order-free 19.5 against 91.5) and ties the whole page
+(21.5, −1.2 [−5.3, +3.1]) [M, layout-partition-score.md]. With the app's Vision lines the guard moves 8,037 of 9,635
+lines (83%; the cached-geometry 5,022/8,135 above understated it) into the whole-page-sized fill, which ran to its
+token cap on all 15 pages; nearly blank masked crops draw invented text. It costs 995 requests and 1,643 s of
+reading against 969 and 650 s. The detector, native order and regions for every reader stand; the fill policy is
+the defect, fixed under W46.layout-partition-fix. One small reader; larger readers unmeasured, and the inference
+that the fill reads like a whole page for any reader is from the geometry [I].

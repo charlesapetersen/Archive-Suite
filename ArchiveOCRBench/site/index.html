@@ -508,6 +508,12 @@ footer p { font-size: 13px; }
     <div class="tbl"><table><thead><tr><th>Pages</th><th>Whole page</th><th>DocLayout-YOLO, app sort</th><th>PP-DocLayoutV3</th><th>docling-layout-heron</th><th>Apple Vision document</th><th>DocLayout-YOLO, newspaper-ocr</th></tr></thead><tbody id="lp-rows"></tbody></table></div>
   </section>
 
+  <section class="panel" id="pub-layout-partition" hidden>
+    <div class="head"><h2>The app's newspaper partition on L9</h2><span class="meta">PaddleOCR-VL 1.6 4-bit on this Mac, 15 L9 scans · Δ in points against raw regions, 95% page interval · free (W46.layout-partition-score)</span></div>
+    <p class="note" id="lpart-note"></p>
+    <div class="tbl"><table><thead><tr><th>Arm</th><th>Strict NES</th><th>Δ NES</th><th>Order-free F1</th><th>Δ F1</th><th>Missed /100 words</th><th>Added /100 words</th><th>Requests</th><th>Capped pages</th><th>Reading s</th></tr></thead><tbody id="lpart-rows"></tbody></table></div>
+  </section>
+
   <section class="panel" id="pub-dewarp-real5" hidden>
     <div class="head"><h2>Dewarping Real5's warped photographs for Apple Vision</h2><span class="meta">Apple Vision NES % · Δ in NES points against the raw photograph, 95% page interval · free (W46.dewarp-guard)</span></div>
     <p class="note" id="dr5-note"></p>
@@ -68915,6 +68921,90 @@ true,
 "gpu_hours":0.9,
 "caps":95
 },
+"layout_partition":{
+"arms":{
+"whole":{
+"nes":0.21464777332519763,
+"bowf1":0.07943074602071963,
+"missed":88.62231121905559,
+"added":159.0789545523119,
+"requests":15,
+"pages_capped":15,
+"seconds":602.78
+},
+"raw":{
+"nes":0.8460714710228067,
+"bowf1":0.9148824620904367,
+"missed":5.847763039125674,
+"added":17.68692335287948,
+"requests":969,
+"pages_capped":2,
+"seconds":649.86
+},
+"partition":{
+"nes":0.20220199113920667,
+"bowf1":0.19501816827312787,
+"missed":68.59210915342271,
+"added":222.45474115251804,
+"requests":995,
+"pages_capped":15,
+"seconds":1643.05
+},
+"app":{
+"nes":0.208891049821572,
+"bowf1":0.1895372080540722,
+"missed":69.96906356151626,
+"added":218.59716658938572,
+"requests":925,
+"pages_capped":15,
+"seconds":1553.28
+}
+},
+"vs_raw":{
+"partition":{
+"nes":[
+-64.38694798835999,
+-70.3168192462236,
+-57.06013968962316
+],
+"bowf1":[
+-71.98642938173089,
+-79.84681673368976,
+-62.81189678427234
+]
+},
+"app":{
+"nes":[
+-63.71804212012346,
+-69.5195789317282,
+-56.55721376995574
+],
+"bowf1":[
+-72.53452540363645,
+-80.70772366576685,
+-63.076585126627975
+]
+},
+"whole":{
+"nes":[
+-63.1423697697609,
+-71.03000361783351,
+-53.697089672029946
+],
+"bowf1":[
+-83.5451716069717,
+-89.89330763002732,
+-75.5115276556081
+]
+}
+},
+"plan":{
+"fill_lines":8037,
+"vision_lines":9635,
+"filled":15,
+"pages":15
+}
+},
 "dewarp_real5":{
 "pages":155,
 "raw":78.5,
@@ -70190,6 +70280,18 @@ if (LPH) {
   const row = (k, arms) => '<tr><td>' + NAME[k] + '</td>' + ARMS.map(a => '<td>' + c(arms[a]) + '</td>').join('') + '</tr>';
   document.getElementById('lp-rows').innerHTML = [...Object.entries(LPH.real5), ...Object.entries(LPH.staged), ...Object.entries(LPH.bench)].map(([k, a]) => row(k, a)).join('');
   document.getElementById('lp-note').textContent = 'Four layout detectors, each at its shipped or maker setting, cut regions that GLM-OCR reads with W46.ocr-regions\' request; a page with no region read scores 0. Real5-OmniDocBench: the 155 English OmniDocBench v1.5 pages whose truth is plain text, photographed again in each condition; Δ is against the same arm on Scanning (Real5), against the raw photograph (after the quad or UVDoc), or against the whole page (bench pages). On Skew, DocLayout-YOLO keeps no region on 58 of 155 pages; a quad correction first restores most of it. The whole page is best everywhere except on newspapers. Reading took ' + LPH.gpu_hours + ' GPU-hours; ' + LPH.caps + ' crops hit the token cap. Detail: segbench-results/layout-photo.md.';
+}
+const LPART = DATA.layout_partition;
+if (LPART) {
+  document.getElementById('pub-layout-partition').hidden = false;
+  const NAME = {whole: 'Whole page', raw: 'Raw PP-DocLayoutV3 regions (the measured baseline)', partition: "The app's partition (regions, then the masked fill)", app: 'As the app routes it (one page whole by the kind gate)'};
+  const pct = x => (100 * x).toFixed(1);
+  const dv = x => x ? (x[0] >= 0 ? '+' : '') + x[0].toFixed(1) + ' [' + x[1].toFixed(1) + ', ' + x[2].toFixed(1) + ']' : '–';
+  document.getElementById('lpart-rows').innerHTML = ['whole', 'raw', 'partition', 'app'].map(a => {
+    const e = LPART.arms[a], v = LPART.vs_raw[a];
+    return '<tr><td>' + NAME[a] + '</td><td>' + pct(e.nes) + '</td><td>' + dv(v && v.nes) + '</td><td>' + pct(e.bowf1) + '</td><td>' + dv(v && v.bowf1) + '</td><td>' + e.missed.toFixed(1) + '</td><td>' + e.added.toFixed(1) + '</td><td>' + e.requests + '</td><td>' + e.pages_capped + '</td><td>' + Math.round(e.seconds) + '</td></tr>';
+  }).join('');
+  document.getElementById('lpart-note').textContent = 'The images the app itself hands a reader on newspaper pages (W46.layout-newspapers), read beside the whole page and the raw regions earlier tables measured, all with the same reader, prompt and 2,048 px ceiling. The boundary guard moved ' + LPART.plan.fill_lines.toLocaleString() + ' of ' + LPART.plan.vision_lines.toLocaleString() + ' Vision lines into a masked whole-page fill, on ' + LPART.plan.filled + ' of ' + LPART.plan.pages + ' pages; the fill reads like a whole page and ran to its token cap on every page, so the partition reads about as badly as the whole page. One small reader; larger readers unmeasured. The fix is W46.layout-partition-fix. Detail: segbench-results/layout-partition-score.md.';
 }
 const DR5 = DATA.dewarp_real5;
 if (DR5) {
