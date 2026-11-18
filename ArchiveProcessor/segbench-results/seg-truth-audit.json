@@ -99,5 +99,67 @@
   "Stanton 196|197",
   "Stanton 212|213",
   "Stanton 236|237"
- ]
+ ],
+ "fold": {
+  "item": "W46.seg-truth-audit-fold",
+  "date": "2026-11-18",
+  "ruled": 50,
+  "differs": 3,
+  "unsure": 0,
+  "weighted_truth_error": 0.0916,
+  "interval95": [
+   0.0043,
+   0.1789
+  ],
+  "strata": {
+   "RG165 continue": {
+    "asked": 10,
+    "ruled": 10,
+    "differs": 0,
+    "unsure": 0,
+    "blank": 0
+   },
+   "RG165 new": {
+    "asked": 10,
+    "ruled": 10,
+    "differs": 0,
+    "unsure": 0,
+    "blank": 0
+   },
+   "Stanton continue": {
+    "asked": 15,
+    "ruled": 15,
+    "differs": 0,
+    "unsure": 0,
+    "blank": 0
+   },
+   "Stanton new": {
+    "asked": 15,
+    "ruled": 15,
+    "differs": 3,
+    "unsure": 0,
+    "blank": 0
+   }
+  },
+  "changed": [
+   {
+    "key": "Stanton 80|81",
+    "truth_before": "New",
+    "answer": "continue",
+    "truth_after": "Cont"
+   },
+   {
+    "key": "Stanton 100|101",
+    "truth_before": "New",
+    "answer": "continue",
+    "truth_after": "Cont"
+   },
+   {
+    "key": "Stanton 138|139",
+    "truth_before": "New",
+    "answer": "continue",
+    "truth_after": "Cont"
+   }
+  ]
+ }
 }

@@ -13,11 +13,24 @@ Of the two boxes' 313 document gaps (both pages document pages, the two unknown 
 
 **50 gaps** (seed 20261118). Each box's two labels get equal quotas, so the scarcer label of each box is drawn more heavily than its share, and RG165 more heavily than its size. The sheet shows three pages either side, hides the truth and the routes at the asked gap, and lists the unasked gaps in view with the truth as it stands (correctable in a note). Pages turned upright where Apple Vision was clear (none needed it); the twelve close calls were looked at and are upright as taken. `fold` weights each answer by its stratum's N/n, so the error rate it prints estimates the whole pool, and writes the rulings beside the truth in the bench cache; W46.seg-truth-audit-fold applies any change to the truth and rescores.
 
+## The owner's answers (W46.seg-truth-audit-fold, 2026-11-18)
+
+The owner answered all 50 gaps (0 can't tell, no notes or turns). **3 differ from the truth**, all in one stratum; the truth and all eleven routes called each a new document and the owner a continuation. Weighted by N/n, the truth is wrong on an estimated **9.2%** of the agreed pool (95% interval about 0.4-17.9%, n 50).
+
+| stratum | asked | differ |
+|---|---:|---:|
+| RG165 continue | 10 | 0 |
+| RG165 new | 10 | 0 |
+| Stanton continue | 15 | 0 |
+| Stanton new | 15 | 3 |
+
+Changed in the truth (`seg_truth_audit.py apply`, the CSVs copied first to the bench cache): Stanton 80|81 New -> Cont; Stanton 100|101 New -> Cont; Stanton 138|139 New -> Cont. Every test-box result is rescored from cached answers in the same item.
+
 ## Measurement card
 
-- **Truth.** None scored here. The sheet asks the owner about gaps whose truth came from his own capture labels and that no later check reached.
+- **Truth.** The owner's untimed answers, three pages either side, are the truth for the asked gaps; they replace his capture labels where they differ.
 - **Selection.** The population is chosen by route agreement (that is the audit's definition: agreed gaps were never re-judged); within it the draw is seeded and stratified by box and truth label, not by any route's confidence or answer. No ABBYY text.
-- **Comparison.** Not applicable until the answers are folded.
-- **Noise.** 50 answers against a pool of 214: an error rate near zero will carry a wide interval (no error in 50 bounds the rate at about 6% with 95% confidence before weighting); report it with its n.
-- **Scope.** Does not re-rule the agreed gaps the owner already answered (56), the 43 gaps where the routes split (those the app's Gemini route did not flag were never asked), the unknown RG165 gaps, or any other box.
+- **Comparison.** Every ranked route made the truth's call at each asked gap, so a changed gap counts against all of them at that gap: the routes' figures move together, though not by the same amount (a page counts exact only when its whole document is, so the other gaps of the document matter).
+- **Noise.** 3 of 50 answers differ, all in Stanton's new stratum (3 of 15, weight 6.533): the pool estimate rests on three gaps and its interval is wide. The interval is a normal one on the weighted rate, each stratum's variance from its Wilson interval, with a finite-pool correction.
+- **Scope.** Only the asked gaps change. If the estimate holds, about 17 more of the 164 unasked agreed gaps are wrong, most of them Stanton gaps called new; like these they would move every route alike. Does not re-rule the agreed gaps the owner already answered (56), the 43 gaps where the routes split (those the app's Gemini route did not flag were never asked), the unknown RG165 gaps, or any other box.
 

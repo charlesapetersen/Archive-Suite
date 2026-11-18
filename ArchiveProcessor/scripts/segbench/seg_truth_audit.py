@@ -9,6 +9,7 @@ calls the same way has never been looked at again (owner review of the pipeline 
   python3 seg_truth_audit.py draw [--preview]   # the agreed pool and a seeded stratified draw of about 50 gaps
   python3 seg_truth_audit.py sheet              # the sheet in the bench cache, pages copied and turned upright
   python3 seg_truth_audit.py fold ANSWERS.json  # rulings beside the truth, and the weighted error estimate
+  python3 seg_truth_audit.py apply              # the ruled changes into the truth CSVs (copied first), the record
 
 Run each under the heavy lock with the shared torch-env Python (the routes' answers are rebuilt from the cache; no
 model call, upload or key: `rescore.no_network()`). Owner images stay on this Mac: the pack and the sheet are in
@@ -171,18 +172,46 @@ def render_record(r) -> str:
           "taken. `fold` weights each answer by its stratum's N/n, so the error rate it prints estimates the whole "
           "pool, and writes the rulings beside the truth in the bench cache; W46.seg-truth-audit-fold applies any "
           "change to the truth and rescores.", ""]
+    f = r.get("fold")
+    if f:
+        lo, hi = f["interval95"]
+        L += [f"## The owner's answers ({FOLD_TAG}, {f['date']})", "",
+              f"The owner answered all {f['ruled']} gaps ({f['unsure']} can't tell, no notes or turns). "
+              f"**{f['differs']} differ from the truth**, all in one stratum; the truth and all eleven routes called "
+              "each a new document and the owner a continuation. Weighted by N/n, the truth is wrong on an estimated "
+              f"**{100 * f['weighted_truth_error']:.1f}%** of the agreed pool (95% interval about "
+              f"{100 * lo:.1f}-{100 * hi:.1f}%, n {f['ruled']}).", "",
+              "| stratum | asked | differ |", "|---|---:|---:|"]
+        for s, v in sorted(f["strata"].items()):
+            L.append(f"| {s} | {v['asked']} | {v['differs']} |")
+        L += ["", "Changed in the truth (`seg_truth_audit.py apply`, the CSVs copied first to the bench cache): " +
+              "; ".join(f"{c['key']} {c['truth_before']} -> {c['truth_after']}" for c in f["changed"]) +
+              ". Every test-box result is rescored from cached answers in the same item.", ""]
     L += seg_card.card(
-        truth="None scored here. The sheet asks the owner about gaps whose truth came from his own capture labels and "
-              "that no later check reached.",
+        truth=("The owner's untimed answers, three pages either side, are the truth for the asked gaps; they replace "
+               "his capture labels where they differ." if f else
+               "None scored here. The sheet asks the owner about gaps whose truth came from his own capture labels and "
+               "that no later check reached."),
         selection="The population is chosen by route agreement (that is the audit's definition: agreed gaps were never "
                   "re-judged); within it the draw is seeded and stratified by box and truth label, not by any route's "
                   "confidence or answer. No ABBYY text.",
-        comparison="Not applicable until the answers are folded.",
-        noise=f"{r['drawn']} answers against a pool of {r['pool']}: an error rate near zero will carry a wide interval "
-              "(no error in 50 bounds the rate at about 6% with 95% confidence before weighting); report it with its n.",
-        scope=f"Does not re-rule the agreed gaps the owner already answered ({c['answered_before']}), the "
-              f"{c['document_gaps'] - c['agreed']} gaps where the routes split (those the app's Gemini route did not flag "
-              "were never asked), the unknown RG165 gaps, or any other box.")
+        comparison=("Every ranked route made the truth's call at each asked gap, so a changed gap counts against all "
+                    "of them at that gap: the routes' figures move together, though not by the same amount (a page counts "
+                    "exact only when its whole document is, so the other gaps of the document matter)." if f else
+                    "Not applicable until the answers are folded."),
+        noise=(f"{f['differs']} of {f['ruled']} answers differ, all in Stanton's new stratum (3 of 15, weight "
+               f"{next(s['weight'] for s in r['strata'] if s['stratum'] == 'Stanton new')}): the pool estimate rests on "
+               "three gaps and its interval is wide. The interval is a normal one on the weighted rate, each stratum's "
+               "variance from its Wilson interval, with a finite-pool correction." if f else
+               f"{r['drawn']} answers against a pool of {r['pool']}: an error rate near zero will carry a wide interval "
+               "(no error in 50 bounds the rate at about 6% with 95% confidence before weighting); report it with its n."),
+        scope=(("Only the asked gaps change. If the estimate holds, about "
+                f"{round(f['weighted_truth_error'] * r['pool']) - f['differs']} more of the {r['pool'] - r['drawn']} "
+                "unasked agreed gaps are wrong, most of them Stanton gaps called new; like these they would move every "
+                "route alike. " if f else "") +
+               f"Does not re-rule the agreed gaps the owner already answered ({c['answered_before']}), the "
+               f"{c['document_gaps'] - c['agreed']} gaps where the routes split (those the app's Gemini route did not "
+               "flag were never asked), the unknown RG165 gaps, or any other box."))
     return "\n".join(L) + "\n"
 
 
@@ -375,6 +404,88 @@ def cmd_fold(a):
             print(f"  {r['key']}: truth {r['truth']}, answer {r['answer']}  {r['note']}")
 
 
+# --- apply (W46.seg-truth-audit-fold) -----------------------------------------------------------------------------
+
+FOLD_TAG = "W46.seg-truth-audit-fold"
+FOLD_DATE = "2026-11-18"
+BACKUP = OUT / "truth-before-audit-fold"
+LABEL = {"new": "New", "continue": "Cont"}
+# The owner's answers file (2026-11-18 08:40, 50 of 50, no notes or turns), checked so a misread file cannot fold
+# silently: three Stanton gaps the truth and all eleven routes called new continue. 100|101 is the gap before the
+# magazine cover; 101|102 keeps its New (W46.seg-truth-sheet, the article-within-issue rule).
+EXPECTED = {"Stanton": {81: "Cont", 101: "Cont", 139: "Cont"}}
+
+
+def flips(rows: list[dict]) -> dict[str, dict[int, str]]:
+    """box -> {right page: the owner's label} for every ruled answer that differs from the truth."""
+    if any(r["answer"] not in ("new", "continue") for r in rows):
+        raise SystemExit("an answer is blank or can't tell: no fold rule here, add it to the box's lock.json unsure by hand")
+    out: dict[str, dict[int, str]] = {}
+    for r in rows:
+        if r["differs"]:
+            box, gap = r["key"].split()
+            out.setdefault(box, {})[int(gap.split("|")[1])] = LABEL[r["answer"]]
+    return out
+
+
+def stratified_interval(folded: dict, strata: list[dict], z: float = 1.96) -> tuple[float, float]:
+    """A normal interval for the N/n-weighted error, each stratum's variance from its Wilson-adjusted rate."""
+    from seg_truth_rescore import wilson
+    total = sum(s["N"] for s in strata)
+    rate = var = 0.0
+    for s in strata:
+        v = folded["strata"][s["stratum"]]
+        lo, hi = wilson(v["differs"], v["ruled"], z)
+        p, n, W = v["differs"] / v["ruled"], v["ruled"], s["N"] / total
+        rate += W * p
+        half = (hi - lo) / 2
+        var += (W * half / z) ** 2 * (1 - n / s["N"])
+    sd = var ** 0.5
+    return max(0.0, rate - z * sd), min(1.0, rate + z * sd)
+
+
+def cmd_apply(_a):
+    from seg_truth_owner_fixes import fold_csv
+    folded = json.loads(RULINGS.read_text())
+    want = flips(folded["rows"])
+    if want != EXPECTED:
+        raise SystemExit(f"the answers do not match the owner's file as checked: {want}")
+    before = {}
+    for box in ("Stanton", "RG165"):
+        folder = data.DATA_DIR / data.COLLECTIONS[box]
+        (csv_path,) = [p for p in folder.iterdir() if p.suffix.lower() == ".csv"]
+        raw = csv_path.read_bytes()
+        bom = raw.startswith(b"\xef\xbb\xbf")
+        text = raw.decode("utf-8-sig")
+        keep = BACKUP / f"{box}-{csv_path.name}"
+        after = fold_csv(text, want.get(box, {}))
+        if after != text and not keep.exists():
+            BACKUP.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(csv_path, keep)
+        before[box] = dict(data.read_truth(keep if keep.exists() else csv_path))
+        if after != text:
+            csv_path.write_bytes((b"\xef\xbb\xbf" if bom else b"") + after.encode("utf-8"))
+    for box in ("Stanton", "RG165"):
+        got = {p.n: p.label for p in data.load(box, with_exif=False).pages}
+        for n, lab in want.get(box, {}).items():
+            assert got[n] == lab, (box, n, got[n])
+        moved = {n for n in got if got[n] != before[box][n]}
+        assert moved <= set(want.get(box, {})), (box, moved)
+    record = json.loads(RECORD.read_text())
+    lo, hi = stratified_interval(folded, record["strata"])
+    record["fold"] = {
+        "item": FOLD_TAG, "date": FOLD_DATE, "ruled": folded["ruled"], "differs": folded["differs"],
+        "unsure": sum(v["unsure"] for v in folded["strata"].values()),
+        "weighted_truth_error": round(folded["weighted_truth_error"], 4), "interval95": [round(lo, 4), round(hi, 4)],
+        "strata": folded["strata"],
+        "changed": [{"key": r["key"], "truth_before": before[r["key"].split()[0]][int(r["key"].split("|")[1])],
+                     "answer": r["answer"], "truth_after": LABEL[r["answer"]]} for r in folded["rows"] if r["differs"]]}
+    RECORD.write_text(json.dumps(record, indent=1) + "\n")
+    RECORD.with_suffix(".md").write_text(render_record(record))
+    print(f"folded {want}; weighted error {100 * folded['weighted_truth_error']:.1f}% "
+          f"({100 * lo:.1f}-{100 * hi:.1f}%); {RECORD}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -384,8 +495,9 @@ def main():
     sub.add_parser("report")
     f = sub.add_parser("fold")
     f.add_argument("answers")
+    sub.add_parser("apply", help="the folded rulings into the Stanton and RG165 truth CSVs, and the record")
     a = ap.parse_args()
-    {"draw": cmd_draw, "sheet": cmd_sheet, "fold": cmd_fold, "report": cmd_report}[a.cmd](a)
+    {"draw": cmd_draw, "sheet": cmd_sheet, "fold": cmd_fold, "report": cmd_report, "apply": cmd_apply}[a.cmd](a)
 
 
 if __name__ == "__main__":
