@@ -9,6 +9,78 @@
     "cut": 0,
     "broken": 117
    },
+   "dvd-copy": {
+    "own_lines": 1095,
+    "own_pass": 59.7,
+    "cut": 255,
+    "broken": 74,
+    "vs_route": {
+     "lines": 1095,
+     "arm": 59.7,
+     "route": 71.6,
+     "delta": [
+      -11.9,
+      -25.4,
+      0.0
+     ],
+     "better": 6,
+     "worse": 18
+    }
+   },
+   "dvd-guarded": {
+    "own_lines": 1095,
+    "own_pass": 71.5,
+    "cut": 0,
+    "broken": 118,
+    "vs_route": {
+     "lines": 1095,
+     "arm": 71.5,
+     "route": 71.6,
+     "delta": [
+      -0.1,
+      -0.3,
+      0.0
+     ],
+     "better": 0,
+     "worse": 1
+    }
+   },
+   "dvd-place-chunk": {
+    "own_lines": 1086,
+    "own_pass": 64.6,
+    "cut": 0,
+    "broken": 272,
+    "vs_route": {
+     "lines": 1034,
+     "arm": 65.1,
+     "route": 72.2,
+     "delta": [
+      -7.2,
+      -13.0,
+      -1.0
+     ],
+     "better": 12,
+     "worse": 11
+    }
+   },
+   "dvd-place-line": {
+    "own_lines": 1086,
+    "own_pass": 62.5,
+    "cut": 0,
+    "broken": 200,
+    "vs_route": {
+     "lines": 1034,
+     "arm": 63.3,
+     "route": 72.2,
+     "delta": [
+      -8.9,
+      -13.8,
+      -4.6
+     ],
+     "better": 4,
+     "worse": 18
+    }
+   },
    "uvdoc-copy": {
     "own_lines": 1095,
     "own_pass": 66.6,
@@ -81,6 +153,8 @@
      "worse": 13
     }
    },
+   "dvd-guard_pass": 1,
+   "dvd-filled_words": 1375,
    "uvdoc-guard_pass": 12,
    "uvdoc-filled_words": 1120
   },
@@ -91,6 +165,78 @@
     "own_pass": 93.5,
     "cut": 0,
     "broken": 25
+   },
+   "dvd-copy": {
+    "own_lines": 851,
+    "own_pass": 82.3,
+    "cut": 62,
+    "broken": 25,
+    "vs_route": {
+     "lines": 851,
+     "arm": 82.3,
+     "route": 93.5,
+     "delta": [
+      -11.3,
+      -17.1,
+      -4.9
+     ],
+     "better": 2,
+     "worse": 19
+    }
+   },
+   "dvd-guarded": {
+    "own_lines": 851,
+    "own_pass": 93.4,
+    "cut": 0,
+    "broken": 25,
+    "vs_route": {
+     "lines": 851,
+     "arm": 93.4,
+     "route": 93.5,
+     "delta": [
+      -0.1,
+      -0.4,
+      0.0
+     ],
+     "better": 0,
+     "worse": 1
+    }
+   },
+   "dvd-place-chunk": {
+    "own_lines": 828,
+    "own_pass": 90.8,
+    "cut": 0,
+    "broken": 49,
+    "vs_route": {
+     "lines": 821,
+     "arm": 91.0,
+     "route": 94.0,
+     "delta": [
+      -3.0,
+      -7.1,
+      -0.1
+     ],
+     "better": 5,
+     "worse": 13
+    }
+   },
+   "dvd-place-line": {
+    "own_lines": 828,
+    "own_pass": 90.7,
+    "cut": 0,
+    "broken": 47,
+    "vs_route": {
+     "lines": 821,
+     "arm": 90.9,
+     "route": 94.0,
+     "delta": [
+      -3.2,
+      -7.3,
+      -0.4
+     ],
+     "better": 5,
+     "worse": 14
+    }
    },
    "uvdoc-copy": {
     "own_lines": 851,
@@ -164,6 +310,8 @@
      "worse": 10
     }
    },
+   "dvd-guard_pass": 3,
+   "dvd-filled_words": 400,
    "uvdoc-guard_pass": 10,
    "uvdoc-filled_words": 185
   },
@@ -174,6 +322,78 @@
     "own_pass": 87.8,
     "cut": 0,
     "broken": 13
+   },
+   "dvd-copy": {
+    "own_lines": 221,
+    "own_pass": 81.0,
+    "cut": 17,
+    "broken": 6,
+    "vs_route": {
+     "lines": 221,
+     "arm": 81.0,
+     "route": 87.8,
+     "delta": [
+      -6.8,
+      -17.5,
+      -0.8
+     ],
+     "better": 1,
+     "worse": 5
+    }
+   },
+   "dvd-guarded": {
+    "own_lines": 221,
+    "own_pass": 86.4,
+    "cut": 7,
+    "broken": 12,
+    "vs_route": {
+     "lines": 221,
+     "arm": 86.4,
+     "route": 87.8,
+     "delta": [
+      -1.4,
+      -3.8,
+      0.0
+     ],
+     "better": 0,
+     "worse": 1
+    }
+   },
+   "dvd-place-chunk": {
+    "own_lines": 225,
+    "own_pass": 86.7,
+    "cut": 0,
+    "broken": 18,
+    "vs_route": {
+     "lines": 216,
+     "arm": 88.0,
+     "route": 88.0,
+     "delta": [
+      0.0,
+      -7.1,
+      3.8
+     ],
+     "better": 3,
+     "worse": 1
+    }
+   },
+   "dvd-place-line": {
+    "own_lines": 225,
+    "own_pass": 86.7,
+    "cut": 0,
+    "broken": 17,
+    "vs_route": {
+     "lines": 216,
+     "arm": 88.0,
+     "route": 88.0,
+     "delta": [
+      0.0,
+      -5.5,
+      3.0
+     ],
+     "better": 4,
+     "worse": 1
+    }
    },
    "uvdoc-copy": {
     "own_lines": 221,
@@ -247,6 +467,8 @@
      "worse": 2
     }
    },
+   "dvd-guard_pass": 1,
+   "dvd-filled_words": 113,
    "uvdoc-guard_pass": 1,
    "uvdoc-filled_words": 81
   },
@@ -257,6 +479,78 @@
     "own_pass": 83.5,
     "cut": 0,
     "broken": 165
+   },
+   "dvd-copy": {
+    "own_lines": 2448,
+    "own_pass": 72.0,
+    "cut": 356,
+    "broken": 116,
+    "vs_route": {
+     "lines": 2448,
+     "arm": 72.0,
+     "route": 83.5,
+     "delta": [
+      -11.4,
+      -17.7,
+      -5.3
+     ],
+     "better": 10,
+     "worse": 49
+    }
+   },
+   "dvd-guarded": {
+    "own_lines": 2448,
+    "own_pass": 83.3,
+    "cut": 7,
+    "broken": 164,
+    "vs_route": {
+     "lines": 2448,
+     "arm": 83.3,
+     "route": 83.5,
+     "delta": [
+      -0.2,
+      -0.5,
+      0.1
+     ],
+     "better": 1,
+     "worse": 3
+    }
+   },
+   "dvd-place-chunk": {
+    "own_lines": 2419,
+    "own_pass": 78.9,
+    "cut": 0,
+    "broken": 357,
+    "vs_route": {
+     "lines": 2347,
+     "arm": 79.5,
+     "route": 84.2,
+     "delta": [
+      -4.7,
+      -8.0,
+      -1.8
+     ],
+     "better": 21,
+     "worse": 30
+    }
+   },
+   "dvd-place-line": {
+    "own_lines": 2419,
+    "own_pass": 77.9,
+    "cut": 0,
+    "broken": 282,
+    "vs_route": {
+     "lines": 2347,
+     "arm": 78.7,
+     "route": 84.2,
+     "delta": [
+      -5.5,
+      -8.3,
+      -3.1
+     ],
+     "better": 14,
+     "worse": 38
+    }
    },
    "uvdoc-copy": {
     "own_lines": 2448,
@@ -330,6 +624,8 @@
      "worse": 30
     }
    },
+   "dvd-guard_pass": 6,
+   "dvd-filled_words": 2009,
    "uvdoc-guard_pass": 28,
    "uvdoc-filled_words": 1433
   }
@@ -337,11 +633,20 @@
  "owner_pages": {
   "uiuc-00233": {
    "route": "21/27",
+   "dvd-copy": "23/27",
+   "dvd-place-line": "20/27",
+   "dvd-place-chunk": "24/27",
+   "dvd-guarded": "21/27",
    "uvdoc-copy": "26/27",
    "uvdoc-place-line": "19/27",
    "uvdoc-place-chunk": "23/27",
    "uvdoc-guarded": "21/27",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 8,
@@ -351,11 +656,20 @@
   },
   "uiuc-00149": {
    "route": "33/33",
+   "dvd-copy": "23/33",
+   "dvd-place-line": "23/32",
+   "dvd-place-chunk": "23/32",
+   "dvd-guarded": "33/33",
    "uvdoc-copy": "24/33",
    "uvdoc-place-line": "29/34",
    "uvdoc-place-chunk": "29/34",
    "uvdoc-guarded": "33/33",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 12,
@@ -372,6 +686,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 8,
@@ -379,10 +698,39 @@
     }
    },
    "filled": {
+    "dvd": 13,
     "uvdoc": 8
    },
    "arms": {
     "route": {
+     "n": 27,
+     "pass": 21,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 27,
+     "pass": 23,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 2
+    },
+    "dvd-place-line": {
+     "n": 27,
+     "pass": 20,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 27,
+     "pass": 24,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 27,
      "pass": 21,
      "broken": 3,
@@ -426,6 +774,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 14,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 12,
@@ -433,10 +786,39 @@
     }
    },
    "filled": {
+    "dvd": 14,
     "uvdoc": 12
    },
    "arms": {
     "route": {
+     "n": 33,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 33,
+     "pass": 23,
+     "broken": 1,
+     "cut": 5,
+     "ends_moved": 10
+    },
+    "dvd-place-line": {
+     "n": 32,
+     "pass": 23,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 32,
+     "pass": 23,
+     "broken": 8,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 33,
      "pass": 33,
      "broken": 0,
@@ -480,6 +862,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 4
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 5,
@@ -487,10 +874,39 @@
     }
    },
    "filled": {
+    "dvd": 13,
     "uvdoc": 9
    },
    "arms": {
     "route": {
+     "n": 4,
+     "pass": 3,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 4,
+     "pass": 2,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 4,
+     "pass": 3,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 4,
+     "pass": 3,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 4,
      "pass": 3,
      "broken": 0,
@@ -534,6 +950,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 6,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 3,
@@ -541,10 +962,39 @@
     }
    },
    "filled": {
+    "dvd": 6,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 1,
+     "pass": 0,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 1,
+     "pass": 1,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 1,
      "pass": 1,
      "broken": 0,
@@ -588,6 +1038,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 451,
+     "lost_neighbour": 92
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 296,
@@ -595,10 +1050,39 @@
     }
    },
    "filled": {
+    "dvd": 543,
     "uvdoc": 367
    },
    "arms": {
     "route": {
+     "n": 159,
+     "pass": 133,
+     "broken": 18,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 159,
+     "pass": 61,
+     "broken": 11,
+     "cut": 82,
+     "ends_moved": 3
+    },
+    "dvd-place-line": {
+     "n": 137,
+     "pass": 99,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 137,
+     "pass": 100,
+     "broken": 28,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 159,
      "pass": 133,
      "broken": 18,
@@ -642,6 +1126,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 24,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 5,
@@ -649,10 +1138,39 @@
     }
    },
    "filled": {
+    "dvd": 24,
     "uvdoc": 5
    },
    "arms": {
     "route": {
+     "n": 143,
+     "pass": 90,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 143,
+     "pass": 112,
+     "broken": 9,
+     "cut": 5,
+     "ends_moved": 23
+    },
+    "dvd-place-line": {
+     "n": 139,
+     "pass": 83,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 139,
+     "pass": 93,
+     "broken": 28,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 143,
      "pass": 90,
      "broken": 10,
@@ -696,6 +1214,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 11
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 2,
@@ -703,10 +1226,39 @@
     }
    },
    "filled": {
+    "dvd": 20,
     "uvdoc": 13
    },
    "arms": {
     "route": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 26,
+     "pass": 11,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 29,
+     "pass": 16,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 29,
+     "pass": 15,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 26,
      "pass": 20,
      "broken": 3,
@@ -750,6 +1302,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 270,
+     "lost_neighbour": 3
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 273,
@@ -757,10 +1314,39 @@
     }
    },
    "filled": {
+    "dvd": 273,
     "uvdoc": 276
    },
    "arms": {
     "route": {
+     "n": 148,
+     "pass": 82,
+     "broken": 27,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 148,
+     "pass": 80,
+     "broken": 12,
+     "cut": 39,
+     "ends_moved": 18
+    },
+    "dvd-place-line": {
+     "n": 150,
+     "pass": 72,
+     "broken": 35,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 150,
+     "pass": 60,
+     "broken": 73,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 148,
      "pass": 82,
      "broken": 27,
@@ -804,6 +1390,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 9
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 5,
@@ -811,10 +1402,39 @@
     }
    },
    "filled": {
+    "dvd": 22,
     "uvdoc": 14
    },
    "arms": {
     "route": {
+     "n": 21,
+     "pass": 17,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 21,
+     "pass": 7,
+     "broken": 0,
+     "cut": 11,
+     "ends_moved": 3
+    },
+    "dvd-place-line": {
+     "n": 21,
+     "pass": 9,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 21,
+     "pass": 10,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 21,
      "pass": 17,
      "broken": 1,
@@ -858,6 +1478,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 86,
+     "lost_neighbour": 8
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 90,
@@ -865,10 +1490,39 @@
     }
    },
    "filled": {
+    "dvd": 94,
     "uvdoc": 98
    },
    "arms": {
     "route": {
+     "n": 105,
+     "pass": 73,
+     "broken": 15,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 105,
+     "pass": 60,
+     "broken": 6,
+     "cut": 30,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 110,
+     "pass": 69,
+     "broken": 21,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 110,
+     "pass": 74,
+     "broken": 20,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 105,
      "pass": 73,
      "broken": 15,
@@ -912,6 +1566,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 10
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -919,10 +1578,39 @@
     }
    },
    "filled": {
+    "dvd": 18,
     "uvdoc": 10
    },
    "arms": {
     "route": {
+     "n": 33,
+     "pass": 18,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 33,
+     "pass": 24,
+     "broken": 3,
+     "cut": 3,
+     "ends_moved": 6
+    },
+    "dvd-place-line": {
+     "n": 33,
+     "pass": 17,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 33,
+     "pass": 19,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 33,
      "pass": 18,
      "broken": 10,
@@ -966,6 +1654,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -973,6 +1666,7 @@
     }
    },
    "filled": {
+    "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
@@ -982,6 +1676,34 @@
      "broken": 0,
      "cut": 0,
      "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 24,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 3
+    },
+    "dvd-place-line": {
+     "n": 27,
+     "pass": 22,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 27,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
+     "n": 24,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 3
     },
     "uvdoc-copy": {
      "n": 24,
@@ -1020,6 +1742,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1027,10 +1754,39 @@
     }
    },
    "filled": {
+    "dvd": 8,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 34,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 34,
+     "pass": 28,
+     "broken": 2,
+     "cut": 2,
+     "ends_moved": 4
+    },
+    "dvd-place-line": {
+     "n": 34,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 34,
+     "pass": 24,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 34,
      "pass": 22,
      "broken": 1,
@@ -1074,6 +1830,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 12,
+     "lost_neighbour": 3
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1081,10 +1842,39 @@
     }
    },
    "filled": {
+    "dvd": 15,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 25,
+     "pass": 14,
+     "broken": 1,
+     "cut": 4,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 28,
+     "pass": 16,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 28,
+     "pass": 18,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 25,
      "pass": 16,
      "broken": 4,
@@ -1128,6 +1918,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 3
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 11,
@@ -1135,10 +1930,39 @@
     }
    },
    "filled": {
+    "dvd": 14,
     "uvdoc": 14
    },
    "arms": {
     "route": {
+     "n": 10,
+     "pass": 6,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 10,
+     "pass": 5,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 10,
+     "pass": 5,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 10,
+     "pass": 8,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 10,
      "pass": 6,
      "broken": 0,
@@ -1182,6 +2006,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 3
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1189,10 +2018,39 @@
     }
    },
    "filled": {
+    "dvd": 4,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 31,
+     "pass": 20,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 31,
+     "pass": 16,
+     "broken": 4,
+     "cut": 2,
+     "ends_moved": 27
+    },
+    "dvd-place-line": {
+     "n": 31,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 31,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 31,
      "pass": 20,
      "broken": 2,
@@ -1236,6 +2094,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 2,
@@ -1243,10 +2106,39 @@
     }
    },
    "filled": {
+    "dvd": 5,
     "uvdoc": 2
    },
    "arms": {
     "route": {
+     "n": 18,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 18,
+     "pass": 10,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 10
+    },
+    "dvd-place-line": {
+     "n": 16,
+     "pass": 12,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 16,
+     "pass": 12,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 18,
      "pass": 14,
      "broken": 0,
@@ -1290,6 +2182,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 12,
+     "lost_neighbour": 42
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1297,10 +2194,39 @@
     }
    },
    "filled": {
+    "dvd": 54,
     "uvdoc": 42
    },
    "arms": {
     "route": {
+     "n": 35,
+     "pass": 21,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 35,
+     "pass": 16,
+     "broken": 12,
+     "cut": 5,
+     "ends_moved": 25
+    },
+    "dvd-place-line": {
+     "n": 35,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 35,
+     "pass": 24,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 35,
      "pass": 21,
      "broken": 5,
@@ -1344,6 +2270,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 13,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 1,
@@ -1351,10 +2282,39 @@
     }
    },
    "filled": {
+    "dvd": 13,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 36,
+     "pass": 23,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 36,
+     "pass": 29,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 37,
+     "pass": 22,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 37,
+     "pass": 27,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 36,
      "pass": 23,
      "broken": 6,
@@ -1398,6 +2358,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 5,
@@ -1405,10 +2370,39 @@
     }
    },
    "filled": {
+    "dvd": 7,
     "uvdoc": 5
    },
    "arms": {
     "route": {
+     "n": 18,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 18,
+     "pass": 16,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 2
+    },
+    "dvd-place-line": {
+     "n": 17,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 17,
+     "pass": 15,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 18,
      "pass": 15,
      "broken": 1,
@@ -1452,6 +2446,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 6,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 7,
@@ -1459,10 +2458,39 @@
     }
    },
    "filled": {
+    "dvd": 6,
     "uvdoc": 7
    },
    "arms": {
     "route": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 38,
+     "pass": 36,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 38,
      "pass": 38,
      "broken": 0,
@@ -1506,6 +2534,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 53,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 74,
@@ -1513,10 +2546,39 @@
     }
    },
    "filled": {
+    "dvd": 53,
     "uvdoc": 74
    },
    "arms": {
     "route": {
+     "n": 36,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 36,
+     "pass": 8,
+     "broken": 2,
+     "cut": 26,
+     "ends_moved": 2
+    },
+    "dvd-place-line": {
+     "n": 43,
+     "pass": 12,
+     "broken": 24,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 43,
+     "pass": 13,
+     "broken": 26,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 36,
      "pass": 26,
      "broken": 0,
@@ -1560,6 +2622,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 1
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 7,
@@ -1567,10 +2634,39 @@
     }
    },
    "filled": {
+    "dvd": 9,
     "uvdoc": 8
    },
    "arms": {
     "route": {
+     "n": 37,
+     "pass": 34,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 37,
+     "pass": 34,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 39,
+     "pass": 37,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 39,
+     "pass": 36,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 37,
      "pass": 34,
      "broken": 1,
@@ -1614,6 +2710,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 35
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1621,6 +2722,7 @@
     }
    },
    "filled": {
+    "dvd": 35,
     "uvdoc": 35
    },
    "arms": {
@@ -1630,6 +2732,34 @@
      "broken": 4,
      "cut": 0,
      "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 52,
+     "pass": 40,
+     "broken": 3,
+     "cut": 7,
+     "ends_moved": 2
+    },
+    "dvd-place-line": {
+     "n": 52,
+     "pass": 44,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 52,
+     "pass": 45,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
+     "n": 52,
+     "pass": 40,
+     "broken": 3,
+     "cut": 7,
+     "ends_moved": 2
     },
     "uvdoc-copy": {
      "n": 52,
@@ -1668,6 +2798,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1675,10 +2810,39 @@
     }
    },
    "filled": {
+    "dvd": 5,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 23,
+     "pass": 19,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 23,
+     "pass": 18,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 23,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 23,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 23,
      "pass": 19,
      "broken": 0,
@@ -1722,6 +2886,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 70,
+     "lost_neighbour": 111
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 79,
@@ -1729,10 +2898,39 @@
     }
    },
    "filled": {
+    "dvd": 181,
     "uvdoc": 190
    },
    "arms": {
     "route": {
+     "n": 42,
+     "pass": 29,
+     "broken": 9,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 42,
+     "pass": 6,
+     "broken": 2,
+     "cut": 31,
+     "ends_moved": 3
+    },
+    "dvd-place-line": {
+     "n": 41,
+     "pass": 14,
+     "broken": 24,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 41,
+     "pass": 12,
+     "broken": 25,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 42,
      "pass": 29,
      "broken": 9,
@@ -1776,6 +2974,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 17,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 1,
@@ -1783,10 +2986,39 @@
     }
    },
    "filled": {
+    "dvd": 17,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 45,
+     "pass": 40,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 45,
+     "pass": 40,
+     "broken": 2,
+     "cut": 1,
+     "ends_moved": 6
+    },
+    "dvd-place-line": {
+     "n": 45,
+     "pass": 41,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 45,
+     "pass": 42,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 45,
      "pass": 40,
      "broken": 4,
@@ -1830,6 +3062,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 4,
+     "lost_neighbour": 1
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1837,10 +3074,39 @@
     }
    },
    "filled": {
+    "dvd": 5,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 19,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 24,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 24,
+     "pass": 18,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 24,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 24,
      "pass": 19,
      "broken": 5,
@@ -1884,6 +3150,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1891,10 +3162,39 @@
     }
    },
    "filled": {
+    "dvd": 3,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 11,
+     "pass": 11,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 11,
+     "pass": 10,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 11,
+     "pass": 8,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 11,
+     "pass": 8,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 11,
      "pass": 11,
      "broken": 0,
@@ -1938,6 +3238,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1945,10 +3250,39 @@
     }
    },
    "filled": {
+    "dvd": 8,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 15,
+     "pass": 10,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 15,
+     "pass": 7,
+     "broken": 1,
+     "cut": 4,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 15,
+     "pass": 12,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 15,
+     "pass": 12,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 15,
      "pass": 10,
      "broken": 1,
@@ -1992,6 +3326,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -1999,10 +3338,39 @@
     }
    },
    "filled": {
+    "dvd": 5,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 28,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 28,
+     "pass": 24,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 28,
+     "pass": 26,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 28,
+     "pass": 20,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 28,
      "pass": 25,
      "broken": 0,
@@ -2046,6 +3414,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2053,10 +3426,39 @@
     }
    },
    "filled": {
+    "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 34,
+     "pass": 34,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 34,
+     "pass": 30,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 6
+    },
+    "dvd-place-line": {
+     "n": 34,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 34,
+     "pass": 33,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 34,
      "pass": 34,
      "broken": 0,
@@ -2100,6 +3502,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 11,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 1,
@@ -2107,10 +3514,39 @@
     }
    },
    "filled": {
+    "dvd": 11,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 17,
+     "pass": 15,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 2
+    },
+    "dvd-place-line": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 17,
      "pass": 17,
      "broken": 0,
@@ -2154,6 +3590,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 17,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 4,
@@ -2161,10 +3602,39 @@
     }
    },
    "filled": {
+    "dvd": 17,
     "uvdoc": 4
    },
    "arms": {
     "route": {
+     "n": 38,
+     "pass": 38,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 38,
+     "pass": 25,
+     "broken": 1,
+     "cut": 4,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 36,
+     "pass": 36,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 36,
+     "pass": 36,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 38,
      "pass": 38,
      "broken": 0,
@@ -2208,6 +3678,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2215,6 +3690,7 @@
     }
    },
    "filled": {
+    "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
@@ -2222,6 +3698,34 @@
      "n": 26,
      "pass": 25,
      "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 26,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 26,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 26,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
+     "n": 26,
+     "pass": 26,
+     "broken": 0,
      "cut": 0,
      "ends_moved": 0
     },
@@ -2262,6 +3766,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2269,10 +3778,39 @@
     }
    },
    "filled": {
+    "dvd": 3,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 23,
+     "pass": 23,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 23,
+     "pass": 22,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 23,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 23,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 23,
      "pass": 23,
      "broken": 0,
@@ -2316,6 +3854,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2323,10 +3866,39 @@
     }
    },
    "filled": {
+    "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 10,
+     "pass": 10,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 10,
+     "pass": 7,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 10,
+     "pass": 9,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 10,
+     "pass": 9,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 10,
      "pass": 10,
      "broken": 0,
@@ -2370,6 +3942,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 4,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 2,
@@ -2377,10 +3954,39 @@
     }
    },
    "filled": {
+    "dvd": 4,
     "uvdoc": 2
    },
    "arms": {
     "route": {
+     "n": 52,
+     "pass": 48,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 52,
+     "pass": 42,
+     "broken": 1,
+     "cut": 2,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 49,
+     "pass": 47,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 49,
+     "pass": 47,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 52,
      "pass": 48,
      "broken": 0,
@@ -2424,6 +4030,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 19,
+     "lost_neighbour": 38
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 5,
@@ -2431,10 +4042,39 @@
     }
    },
    "filled": {
+    "dvd": 57,
     "uvdoc": 43
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 23,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 24,
+     "pass": 15,
+     "broken": 1,
+     "cut": 7,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 25,
+     "pass": 20,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 25,
+     "pass": 20,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 24,
      "pass": 23,
      "broken": 1,
@@ -2478,6 +4118,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 42,
+     "lost_neighbour": 88
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 35,
@@ -2485,10 +4130,39 @@
     }
    },
    "filled": {
+    "dvd": 130,
     "uvdoc": 123
    },
    "arms": {
     "route": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 40,
+     "pass": 35,
+     "broken": 0,
+     "cut": 5,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 40,
+     "pass": 37,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 40,
+     "pass": 37,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 40,
      "pass": 38,
      "broken": 1,
@@ -2532,6 +4206,11 @@
    "class": "flat",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 12,
+     "lost_neighbour": 1
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 5,
@@ -2539,10 +4218,39 @@
     }
    },
    "filled": {
+    "dvd": 13,
     "uvdoc": 6
    },
    "arms": {
     "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 17,
+     "pass": 7,
+     "broken": 0,
+     "cut": 9,
+     "ends_moved": 5
+    },
+    "dvd-place-line": {
+     "n": 18,
+     "pass": 8,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 18,
+     "pass": 8,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 17,
      "pass": 17,
      "broken": 0,
@@ -2586,6 +4294,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2593,10 +4306,39 @@
     }
    },
    "filled": {
+    "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 25,
+     "pass": 25,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 25,
      "pass": 25,
      "broken": 0,
@@ -2640,6 +4382,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 4,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 4,
@@ -2647,10 +4394,39 @@
     }
    },
    "filled": {
+    "dvd": 4,
     "uvdoc": 4
    },
    "arms": {
     "route": {
+     "n": 27,
+     "pass": 20,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 27,
+     "pass": 21,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 6
+    },
+    "dvd-place-line": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 26,
+     "pass": 20,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 27,
      "pass": 20,
      "broken": 0,
@@ -2694,6 +4470,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 18,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 1,
@@ -2701,10 +4482,39 @@
     }
    },
    "filled": {
+    "dvd": 18,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 32,
+     "pass": 32,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 32,
+     "pass": 28,
+     "broken": 0,
+     "cut": 3,
+     "ends_moved": 2
+    },
+    "dvd-place-line": {
+     "n": 32,
+     "pass": 29,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 32,
+     "pass": 29,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 32,
      "pass": 32,
      "broken": 0,
@@ -2748,6 +4558,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 18,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 1,
@@ -2755,10 +4570,39 @@
     }
    },
    "filled": {
+    "dvd": 18,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 29,
+     "pass": 28,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 29,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 29,
+     "pass": 25,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 29,
      "pass": 29,
      "broken": 0,
@@ -2802,6 +4646,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 1
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 3,
@@ -2809,10 +4658,39 @@
     }
    },
    "filled": {
+    "dvd": 6,
     "uvdoc": 4
    },
    "arms": {
     "route": {
+     "n": 33,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 33,
+     "pass": 25,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 4
+    },
+    "dvd-place-line": {
+     "n": 34,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 34,
+     "pass": 28,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 33,
      "pass": 26,
      "broken": 0,
@@ -2856,6 +4734,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 10,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2863,10 +4746,39 @@
     }
    },
    "filled": {
+    "dvd": 10,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 22,
+     "pass": 22,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 22,
+     "pass": 21,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 22,
+     "pass": 20,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 22,
+     "pass": 21,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 22,
      "pass": 22,
      "broken": 0,
@@ -2910,6 +4822,11 @@
    "class": "flat",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -2917,10 +4834,39 @@
     }
    },
    "filled": {
+    "dvd": 7,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 29,
+     "pass": 25,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 29,
+     "pass": 24,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 29,
+     "pass": 29,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 29,
      "pass": 25,
      "broken": 2,
@@ -2964,6 +4910,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 17,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 8,
@@ -2971,10 +4922,39 @@
     }
    },
    "filled": {
+    "dvd": 17,
     "uvdoc": 8
    },
    "arms": {
     "route": {
+     "n": 26,
+     "pass": 19,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 26,
+     "pass": 17,
+     "broken": 2,
+     "cut": 3,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 25,
+     "pass": 16,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 26,
      "pass": 19,
      "broken": 4,
@@ -3018,6 +4998,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 6,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 3,
@@ -3025,10 +5010,39 @@
     }
    },
    "filled": {
+    "dvd": 6,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 24,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 24,
+     "pass": 18,
+     "broken": 0,
+     "cut": 5,
+     "ends_moved": 3
+    },
+    "dvd-place-line": {
+     "n": 25,
+     "pass": 20,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 25,
+     "pass": 20,
+     "broken": 5,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 24,
      "pass": 24,
      "broken": 0,
@@ -3072,6 +5086,11 @@
    "class": "bound",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 7,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 7,
@@ -3079,10 +5098,39 @@
     }
    },
    "filled": {
+    "dvd": 7,
     "uvdoc": 7
    },
    "arms": {
     "route": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 42,
+     "pass": 38,
+     "broken": 0,
+     "cut": 2,
+     "ends_moved": 3
+    },
+    "dvd-place-line": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 40,
+     "pass": 38,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 42,
      "pass": 41,
      "broken": 0,
@@ -3126,6 +5174,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3133,10 +5186,39 @@
     }
    },
    "filled": {
+    "dvd": 3,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 30,
+     "pass": 29,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 30,
+     "pass": 27,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 29,
+     "pass": 27,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 29,
+     "pass": 27,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 30,
      "pass": 29,
      "broken": 1,
@@ -3180,6 +5262,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 3,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 1,
@@ -3187,10 +5274,39 @@
     }
    },
    "filled": {
+    "dvd": 3,
     "uvdoc": 1
    },
    "arms": {
     "route": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 28,
+     "pass": 24,
+     "broken": 1,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 31,
+     "pass": 29,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 31,
+     "pass": 29,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 28,
      "pass": 27,
      "broken": 0,
@@ -3234,6 +5350,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 9,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3241,10 +5362,39 @@
     }
    },
    "filled": {
+    "dvd": 9,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 17,
+     "pass": 17,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 17,
+     "pass": 15,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 1
+    },
+    "dvd-place-line": {
+     "n": 17,
+     "pass": 16,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 17,
+     "pass": 16,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 17,
      "pass": 17,
      "broken": 0,
@@ -3288,6 +5438,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 5,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3295,10 +5450,39 @@
     }
    },
    "filled": {
+    "dvd": 5,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 14,
+     "pass": 14,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 14,
+     "pass": 9,
+     "broken": 0,
+     "cut": 1,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 14,
+     "pass": 12,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 14,
+     "pass": 12,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 14,
      "pass": 14,
      "broken": 0,
@@ -3342,6 +5526,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 34,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3349,10 +5538,39 @@
     }
    },
    "filled": {
+    "dvd": 34,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 108,
+     "pass": 101,
+     "broken": 7,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 108,
+     "pass": 90,
+     "broken": 5,
+     "cut": 4,
+     "ends_moved": 27
+    },
+    "dvd-place-line": {
+     "n": 104,
+     "pass": 101,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 104,
+     "pass": 101,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 108,
      "pass": 101,
      "broken": 7,
@@ -3396,6 +5614,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3403,10 +5626,39 @@
     }
    },
    "filled": {
+    "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 45,
+     "pass": 35,
+     "broken": 10,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 45,
+     "pass": 44,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 45,
+     "pass": 34,
+     "broken": 11,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 45,
+     "pass": 32,
+     "broken": 13,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 45,
      "pass": 35,
      "broken": 10,
@@ -3450,6 +5702,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3457,12 +5714,41 @@
     }
    },
    "filled": {
+    "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
      "n": 27,
      "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 27,
+     "pass": 26,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 27,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
+     "n": 27,
+     "pass": 26,
      "broken": 0,
      "cut": 0,
      "ends_moved": 0
@@ -3504,6 +5790,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 16,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 3,
@@ -3511,10 +5802,39 @@
     }
    },
    "filled": {
+    "dvd": 16,
     "uvdoc": 3
    },
    "arms": {
     "route": {
+     "n": 28,
+     "pass": 27,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 28,
+     "pass": 17,
+     "broken": 3,
+     "cut": 7,
+     "ends_moved": 13
+    },
+    "dvd-place-line": {
+     "n": 28,
+     "pass": 22,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 28,
+     "pass": 22,
+     "broken": 6,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 28,
      "pass": 27,
      "broken": 0,
@@ -3558,6 +5878,11 @@
    "class": "bound",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 1,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3565,10 +5890,39 @@
     }
    },
    "filled": {
+    "dvd": 1,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 41,
+     "pass": 38,
+     "broken": 2,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 36,
+     "pass": 35,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 36,
+     "pass": 34,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 41,
      "pass": 38,
      "broken": 2,
@@ -3612,6 +5966,11 @@
    "class": "curled",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": true,
+     "lost_own": 0,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3619,10 +5978,39 @@
     }
    },
    "filled": {
+    "dvd": 0,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 36,
+     "pass": 35,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 36,
      "pass": 35,
      "broken": 1,
@@ -3666,6 +6054,11 @@
    "class": "flat",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 80,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 15,
@@ -3673,10 +6066,39 @@
     }
    },
    "filled": {
+    "dvd": 80,
     "uvdoc": 15
    },
    "arms": {
     "route": {
+     "n": 156,
+     "pass": 150,
+     "broken": 4,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 156,
+     "pass": 122,
+     "broken": 7,
+     "cut": 15,
+     "ends_moved": 32
+    },
+    "dvd-place-line": {
+     "n": 147,
+     "pass": 142,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 147,
+     "pass": 142,
+     "broken": 3,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 156,
      "pass": 150,
      "broken": 4,
@@ -3720,6 +6142,11 @@
    "class": "curled",
    "route": "raw",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 8,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": true,
      "lost_own": 0,
@@ -3727,10 +6154,39 @@
     }
    },
    "filled": {
+    "dvd": 8,
     "uvdoc": 0
    },
    "arms": {
     "route": {
+     "n": 42,
+     "pass": 41,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 42,
+     "pass": 25,
+     "broken": 7,
+     "cut": 2,
+     "ends_moved": 11
+    },
+    "dvd-place-line": {
+     "n": 40,
+     "pass": 40,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 40,
+     "pass": 40,
+     "broken": 0,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 42,
      "pass": 41,
      "broken": 0,
@@ -3774,6 +6230,11 @@
    "class": "flat",
    "route": "deskew",
    "guard": {
+    "dvd": {
+     "pass": false,
+     "lost_own": 32,
+     "lost_neighbour": 0
+    },
     "uvdoc": {
      "pass": false,
      "lost_own": 6,
@@ -3781,10 +6242,39 @@
     }
    },
    "filled": {
+    "dvd": 32,
     "uvdoc": 6
    },
    "arms": {
     "route": {
+     "n": 24,
+     "pass": 22,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-copy": {
+     "n": 24,
+     "pass": 19,
+     "broken": 1,
+     "cut": 3,
+     "ends_moved": 0
+    },
+    "dvd-place-line": {
+     "n": 23,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-place-chunk": {
+     "n": 23,
+     "pass": 21,
+     "broken": 1,
+     "cut": 0,
+     "ends_moved": 0
+    },
+    "dvd-guarded": {
      "n": 24,
      "pass": 22,
      "broken": 1,

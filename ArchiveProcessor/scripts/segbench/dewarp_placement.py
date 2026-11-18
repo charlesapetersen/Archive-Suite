@@ -52,7 +52,7 @@ from place_geom import (PT, carried_layer, deskew_map, identity_map, lattice_inv
 RESULTS = HERE.parents[1] / 'segbench-results'
 CACHE = DCS.REH / 'dewarp-placement'
 DCS.CACHE = CACHE                 # its upright copies, HEIC conversions and quads go to this item's cache
-EXTRA = CACHE / 'src'             # DvD and DocTr++ code, weights and arms_extra.py (downloaded, never bundled)
+EXTRA = CACHE / 'src'             # DvD and DocTr++ code and weights (downloaded, never bundled; dewarp_extra_arms.py)
 DEWARPERS = ('uvdoc', 'dvd', 'doctrpp')
 CHUNK_TALL = 1.4
 
@@ -62,8 +62,7 @@ def dewarp_fn(d):
     import dewarp_arms as A
     if d == 'uvdoc':
         return lambda img: A.uvdoc_arm(img, DCS.UVDOC_SRC)
-    sys.path.insert(0, str(EXTRA))
-    import arms_extra as X
+    import dewarp_extra_arms as X
     return {'dvd': lambda img: X.dvd_arm(img, EXTRA), 'doctrpp': lambda img: X.doctrpp_arm(img, EXTRA)}[d]
 
 

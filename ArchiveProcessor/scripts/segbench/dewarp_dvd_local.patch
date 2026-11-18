@@ -1,0 +1,47 @@
+diff --git a/train_settings/dvd/improved_diffusion/cross_model.py b/train_settings/dvd/improved_diffusion/cross_model.py
+index 1a19625..94ea17c 100644
+--- a/train_settings/dvd/improved_diffusion/cross_model.py
++++ b/train_settings/dvd/improved_diffusion/cross_model.py
+@@ -613,6 +613,7 @@ class DiT(nn.Module):
+             # cond = torch.cat([src_feat, init_flow_cat], dim=2)  # [3, 1024, 384]
+         if iter is True or tv is True: # true
+             # for block in self.blocks:
++            block = self.blocks[-1]  # local patch: released code leaves `block` unbound; only blocks[11] is trained (the other 11 have zero adaLN weights)
+             x4, x3, x2, x1  = block(x, t, tv, cond, msk6, msk_line, r)  # 4*(N, T, D) -> [N, 1024, 384]
+             n, _, d = x3.size()
+             if feat.shape[-1]==16:
+diff --git a/train_settings/models/geotr/geotr_core.py b/train_settings/models/geotr/geotr_core.py
+index b832ab1..8f10b58 100644
+--- a/train_settings/models/geotr/geotr_core.py
++++ b/train_settings/models/geotr/geotr_core.py
+@@ -502,7 +502,7 @@ class TransDecoder(nn.Module):
+ 
+     def forward(self, imgf, query_embed):
+         pos = self.position_embedding(
+-            torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().cuda()
++            torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().to(imgf.device)
+         )  # torch.Size([1, 128, 36, 36])
+ 
+         bs, c, h, w = imgf.shape
+@@ -526,7 +526,7 @@ class TransEncoder(nn.Module):
+ 
+     def forward(self, imgf):
+         pos = self.position_embedding(
+-            torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().cuda()
++            torch.ones(imgf.shape[0], imgf.shape[2], imgf.shape[3]).bool().to(imgf.device)
+         )  # torch.Size([1, 128, 36, 36])
+         bs, c, h, w = imgf.shape
+         imgf = imgf.flatten(2).permute(2, 0, 1)
+diff --git a/train_settings/models/geotr/position_encoding.py b/train_settings/models/geotr/position_encoding.py
+index 98f7ffe..b237249 100644
+--- a/train_settings/models/geotr/position_encoding.py
++++ b/train_settings/models/geotr/position_encoding.py
+@@ -61,7 +61,7 @@ class PositionEmbeddingSine(nn.Module):
+             y_embed = y_embed / (y_embed[:, -1:, :] + eps) * self.scale
+             x_embed = x_embed / (x_embed[:, :, -1:] + eps) * self.scale
+ 
+-        dim_t = torch.arange(self.num_pos_feats, dtype=torch.float32).cuda()
++        dim_t = torch.arange(self.num_pos_feats, dtype=torch.float32, device=mask.device)
+         dim_t = self.temperature ** (2 * (dim_t // 2) / self.num_pos_feats)
+ 
+         pos_x = x_embed[:, :, :, None] / dim_t
