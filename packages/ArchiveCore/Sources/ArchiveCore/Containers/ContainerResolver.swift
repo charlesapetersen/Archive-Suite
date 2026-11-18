@@ -39,7 +39,8 @@ public enum ContainerResolver {
     /// The runs live at `fileName`, shallow to deep: at most one per level, each starting after the one before.
     public static func liveRuns(at fileName: String, in runs: [ContainerRun]) -> [ContainerRun] {
         var live: [ContainerRun] = []
-        for run in ContainerFile.normalised(runs) {
+        // `runs` is in `ContainerFile.normalised` order, as `ContainerFile` keeps it.
+        for run in runs {
             guard ContainerOrder.atOrBefore(run.start, fileName) else { break }
             live.removeAll { $0.level >= run.level }
             live.append(run)
@@ -71,7 +72,10 @@ public enum ContainerResolver {
         for (field, list) in candidates {
             // The highest source; among equals the first, which is the most specific.
             var best: ContainerValue?
-            for value in list where best == nil || value.source > best!.source { best = value }
+            // An empty value hides the others only when the user set it ("none here"); an empty read is no read.
+            for value in list where value.source == .user || value.shown != nil {
+                if best == nil || value.source > best!.source { best = value }
+            }
             values[field] = best
         }
         return ResolvedContainer(values: values, candidates: candidates)

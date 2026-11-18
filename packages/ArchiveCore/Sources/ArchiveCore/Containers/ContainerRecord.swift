@@ -119,13 +119,15 @@ public struct ContainerValue: Equatable, Sendable, Codable {
     }
 
     public init(from decoder: Decoder) throws {
+        decoder.noteUnknownKeys(["value", "source", "reader", "confidence", "at"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let confidence = try? c.decodeIfPresent(Double.self, forKey: .confidence)
+        var confidence = decoder.optional(Double.self, c, .confidence)
+        if let x = confidence, !x.isFinite || x < 0 || x > 1 { decoder.noteDrop(); confidence = nil }
         self.init(try c.decode(String.self, forKey: .value),
                   source: try c.decode(ContainerSource.self, forKey: .source),
-                  reader: try? c.decodeIfPresent(String.self, forKey: .reader),
-                  confidence: confidence.flatMap { $0.isFinite ? $0 : nil },
-                  at: try? c.decodeIfPresent(Date.self, forKey: .at))
+                  reader: decoder.optional(String.self, c, .reader),
+                  confidence: confidence,
+                  at: decoder.optional(Date.self, c, .at))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -157,9 +159,9 @@ public struct ContainerFieldSet: Equatable, Sendable, Codable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: ContainerJSONKey.self)
         var values: [ContainerField: ContainerValue] = [:]
-        for key in c.allKeys {
+        for key in c.allKeys where !((try? c.decodeNil(forKey: key)) ?? false) {
             guard let field = ContainerField(rawValue: key.stringValue),
-                  let value = try? c.decode(ContainerValue.self, forKey: key) else { continue }
+                  let value = try? c.decode(ContainerValue.self, forKey: key) else { decoder.noteDrop(); continue }
             values[field] = value
         }
         self.values = values
@@ -188,10 +190,11 @@ public struct ContainerRun: Equatable, Sendable, Codable {
     private enum CodingKeys: String, CodingKey { case start, level, fields }
 
     public init(from decoder: Decoder) throws {
+        decoder.noteUnknownKeys(["start", "level", "fields"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(start: try c.decode(String.self, forKey: .start),
                   level: try c.decode(ContainerLevel.self, forKey: .level),
-                  fields: (try? c.decodeIfPresent(ContainerFieldSet.self, forKey: .fields)) ?? ContainerFieldSet())
+                  fields: decoder.optional(ContainerFieldSet.self, c, .fields) ?? ContainerFieldSet())
     }
 }
 
@@ -204,8 +207,9 @@ public struct ContainerFile: Equatable, Sendable {
 
     /// Values for every file in this directory and below.
     public var directory: ContainerFieldSet
-    /// In `start` order, shallow to deep at one start; one run per start and level (`normalised`).
-    public var runs: [ContainerRun]
+    /// In `start` order, shallow to deep at one start; one run per start and level (`normalised`). Assigning
+    /// re-sorts, so edit a copy and assign it once rather than changing runs in place by index.
+    public var runs: [ContainerRun] { didSet { runs = ContainerFile.normalised(runs) } }
     public var updatedAt: Date?
 
     public init(directory: ContainerFieldSet = ContainerFieldSet(), runs: [ContainerRun] = [], updatedAt: Date? = nil) {
@@ -233,12 +237,23 @@ extension ContainerFile: Codable {
     private enum CodingKeys: String, CodingKey { case schemaVersion, directory, runs, updatedAt }
     private enum DirectoryKeys: String, CodingKey { case fields }
 
+    // Lenient, but every value dropped is noted (`ContainerDropLog`), so a writer never overwrites it.
     public init(from decoder: Decoder) throws {
+        decoder.noteUnknownKeys(["schemaVersion", "directory", "runs", "updatedAt"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let directory = (try? c.nestedContainer(keyedBy: DirectoryKeys.self, forKey: .directory))
-            .flatMap { try? $0.decodeIfPresent(ContainerFieldSet.self, forKey: .fields) } ?? ContainerFieldSet()
-        let runs = ((try? c.decodeIfPresent([LenientRun].self, forKey: .runs)) ?? []).compactMap(\.value)
-        self.init(directory: directory, runs: runs, updatedAt: try? c.decodeIfPresent(Date.self, forKey: .updatedAt))
+        var directory = ContainerFieldSet()
+        if c.contains(.directory), !((try? c.decodeNil(forKey: .directory)) ?? false) {
+            if let d = try? c.nestedContainer(keyedBy: DirectoryKeys.self, forKey: .directory) {
+                if let sub = try? c.superDecoder(forKey: .directory) { sub.noteUnknownKeys(["fields"]) }
+                directory = decoder.optional(ContainerFieldSet.self, d, .fields) ?? ContainerFieldSet()
+            } else {
+                decoder.noteDrop()
+            }
+        }
+        let read = (decoder.optional([LenientRun].self, c, .runs) ?? []).compactMap(\.value)
+        let runs = ContainerFile.normalised(read)
+        if runs.count != read.count { decoder.noteDrop() }   // a duplicate or an empty start
+        self.init(directory: directory, runs: runs, updatedAt: decoder.optional(Date.self, c, .updatedAt))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -252,7 +267,9 @@ extension ContainerFile: Codable {
 
     private struct LenientRun: Decodable {
         let value: ContainerRun?
-        init(from decoder: Decoder) throws { value = try? ContainerRun(from: decoder) }
+        init(from decoder: Decoder) throws {
+            do { value = try ContainerRun(from: decoder) } catch { decoder.noteDrop(); value = nil }
+        }
     }
 }
 
@@ -268,6 +285,31 @@ public enum ContainerOrder {
 
     /// `a` sorts at or before `b`.
     public static func atOrBefore(_ a: String, _ b: String) -> Bool { a == b || precedes(a, b) }
+}
+
+/// Collects, while one document is decoded, whether reading dropped anything (`ContainerFileStamp.droppedOnReading`).
+/// Decoding is single-threaded; the log is made and read by `ContainerFileStore.read`.
+final class ContainerDropLog: @unchecked Sendable {
+    var dropped = false
+    static let key = CodingUserInfoKey(rawValue: "archivesuite.container.drops")!
+}
+
+extension Decoder {
+    func noteDrop() { (userInfo[ContainerDropLog.key] as? ContainerDropLog)?.dropped = true }
+
+    /// Notes a drop for each key outside `known` that holds anything but null.
+    func noteUnknownKeys(_ known: Set<String>) {
+        guard let c = try? container(keyedBy: ContainerJSONKey.self) else { return }
+        for key in c.allKeys where !known.contains(key.stringValue) {
+            if !((try? c.decodeNil(forKey: key)) ?? false) { noteDrop() }
+        }
+    }
+
+    /// An optional value: absent or null is nil; present but unreadable is nil and noted as a drop.
+    func optional<T: Decodable, K: CodingKey>(_ type: T.Type, _ c: KeyedDecodingContainer<K>, _ key: K) -> T? {
+        guard c.contains(key), !((try? c.decodeNil(forKey: key)) ?? true) else { return nil }
+        do { return try c.decode(T.self, forKey: key) } catch { noteDrop(); return nil }
+    }
 }
 
 private struct ContainerJSONKey: CodingKey {

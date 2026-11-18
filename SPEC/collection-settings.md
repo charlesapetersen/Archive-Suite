@@ -17,8 +17,8 @@ that an older build leaves a newer document alone. It is not there to carry a mi
 `<output folder>/.archivesuite/runs/<yyyyMMdd-HHmmss UTC>-<run id>.json`. The output folder is the collection. Live
 Capture files each collection into its own subfolder, so each of those is a collection and gets its own record. The
 `.archivesuite` folder is hidden and holds only the Suite's own files about the collection. Its `corrections` folder
-holds the review records for the training kit (§"The review records"). The W47 container file is to live beside
-this one (`execution-plans/containers/00-plan.md`; not written yet).
+holds the review records for the training kit (§"The review records"). The W47 container file, `containers.json`, and a
+tree's level map, `container-levels.json`, live in the same hidden folder (`SPEC/containers.md`).
 
 ## What it holds
 

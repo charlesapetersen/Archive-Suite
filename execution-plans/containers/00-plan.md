@@ -182,7 +182,8 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
    "box number goes backwards" warning in Design 4 is for the design review to drop.
 4. `W47.ct-read-paid` — the gateway arm.
 5. `W47.ct-design-ok` — OWNER GATE: the figures and this design, before app code.
-6. `W47.ct-spec` — `SPEC/containers.md` and the ArchiveCore model.
+6. `W47.ct-spec` — `SPEC/containers.md` and the ArchiveCore model. Done 2026-11-17: the SPEC is now the contract
+   for the record, the inheritance rule, the container file and the level map (`packages/ArchiveCore/Sources/ArchiveCore/Containers/`).
 7. `W47.ct-infer` — the inference in ArchiveCore: both routes, the level map, the name patterns, merging.
 8. `W47.ct-reader-view` — the column and facets.
 9. `W47.ct-reader-edit` — the editor.

@@ -62,10 +62,12 @@ public struct ContainerLevelMap: Equatable, Sendable {
             let path = components[0...i].joined(separator: "/")
             if let o = overrides[path] {
                 roles.append(o.role)
-                if let children = o.children, let at = levels.firstIndex(of: children) {
+                // The depth after the override's own; an ignored folder holds no depth of its own.
+                let after = o.role == .ignore ? next : (index(of: o.role, from: next) ?? next) + 1
+                if let children = o.children, let at = index(of: children, from: after) {
                     next = at
-                } else if o.role != .ignore {
-                    next = (levels.firstIndex(of: o.role) ?? next) + 1
+                } else {
+                    next = after
                 }
             } else {
                 roles.append(next < levels.count ? levels[next] : nil)
@@ -74,19 +76,24 @@ public struct ContainerLevelMap: Equatable, Sendable {
         }
         return roles
     }
+
+    /// The first depth at or after `from` with `role`, else the first anywhere (a role repeated in `levels`, such as
+    /// two series depths, resolves to the one at hand).
+    private func index(of role: ContainerLevelRole, from: Int) -> Int? {
+        levels.indices.first { $0 >= from && levels[$0] == role } ?? levels.firstIndex(of: role)
+    }
 }
 
 extension ContainerLevelMap: Codable {
     private enum CodingKeys: String, CodingKey { case schemaVersion, levels, overrides, updatedAt }
 
+    // Strict: a role this build does not know makes the whole map unreadable, so it is left alone rather than
+    // read wrongly or overwritten.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        // A level this build does not know names nothing but keeps its depth; an unknown override is dropped.
-        let levels = try c.decode([String].self, forKey: .levels)
-        self.levels = levels.map { ContainerLevelRole(rawValue: $0) ?? .ignore }
-        let raw = (try? c.decodeIfPresent([String: LenientOverride].self, forKey: .overrides)) ?? [:]
-        self.overrides = raw.compactMapValues(\.value)
-        self.updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
+        self.levels = try c.decode([ContainerLevelRole].self, forKey: .levels)
+        self.overrides = try c.decodeIfPresent([String: Override].self, forKey: .overrides) ?? [:]
+        self.updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -95,10 +102,5 @@ extension ContainerLevelMap: Codable {
         try c.encode(levels, forKey: .levels)
         try c.encode(overrides, forKey: .overrides)
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
-    }
-
-    private struct LenientOverride: Decodable {
-        let value: Override?
-        init(from decoder: Decoder) throws { value = try? Override(from: decoder) }
     }
 }

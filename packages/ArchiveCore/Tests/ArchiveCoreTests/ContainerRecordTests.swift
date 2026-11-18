@@ -89,6 +89,27 @@ final class ContainerRecordTests: XCTestCase {
         XCTAssertNil(r.shown(.series))
     }
 
+    func testAnEmptyReadIsNoRead() {
+        let f = ContainerFile(runs: [run("0001", .box, [.container: label("Box 10")]),
+                                     run("0002", .folder, [.folder: label(""), .collectionTitle: label("")])])
+        let r = ContainerResolver.resolve(fileName: "0003", scopes: [ContainerScope(file: f, pathFields:
+            ContainerFieldSet([.collectionTitle: path("Glotzer")]))])
+        XCTAssertEqual(r.shown(.collectionTitle), "Glotzer", "an empty label value does not hide the tree")
+        XCTAssertNil(r.shown(.folder))
+        XCTAssertEqual(r.shown(.container), "Box 10")
+    }
+
+    func testRunsAtOneStartGivenInAnyOrderAndACollectionRunEndsTheBox() {
+        var f = ContainerFile()
+        f.runs = [run("0001", .box, [.container: label("Box 1")]), run("0001", .collection, [.repository: label("A")]),
+                  run("0004", .collection, [.repository: label("B")])]
+        XCTAssertEqual(f.runs.map(\.level), [.collection, .box, .collection], "re-sorted when assigned")
+        XCTAssertEqual(ContainerResolver.resolve(fileName: "0002", scopes: [ContainerScope(file: f)]).shown(.container), "Box 1")
+        let after = ContainerResolver.resolve(fileName: "0005", scopes: [ContainerScope(file: f)])
+        XCTAssertNil(after.shown(.container))
+        XCTAssertEqual(after.shown(.repository), "B")
+    }
+
     func testRunsCoverOnlyTheirOwnDirectory() {
         let parent = ContainerScope(file: ContainerFile(runs: [run("0001", .box, [.container: label("Box 4")])]))
         let r = ContainerResolver.resolve(fileName: "0005", scopes: [ContainerScope(), parent])
@@ -154,11 +175,15 @@ final class ContainerRecordTests: XCTestCase {
                        "an override continues after its own role in levels")
     }
 
-    func testLevelMapDecodesAnUnknownLevelAsIgnoreKeepingItsDepth() throws {
-        let json = #"{"schemaVersion": 1, "levels": ["repository", "shelf", "box"], "overrides": {"a": {"role": "nope"}, "b": {"role": "ignore"}}}"#
-        let map = try ContainerFileStore.decoder.decode(ContainerLevelMap.self, from: Data(json.utf8))
-        XCTAssertEqual(map.levels, [.repository, .ignore, .box])
-        XCTAssertEqual(Array(map.overrides.keys), ["b"])
+    func testLevelMapIsStrictAboutRolesItDoesNotKnow() throws {
+        let unknown = #"{"schemaVersion": 1, "levels": ["repository", "shelf", "box"]}"#
+        XCTAssertThrowsError(try ContainerFileStore.decoder.decode(ContainerLevelMap.self, from: Data(unknown.utf8)))
+        let ok = #"{"schemaVersion": 1, "levels": ["series", "box", "series"], "overrides": {"b": {"role": "ignore"}}}"#
+        let map = try ContainerFileStore.decoder.decode(ContainerLevelMap.self, from: Data(ok.utf8))
+        XCTAssertEqual(map.overrides, ["b": .init(role: .ignore)])
+        // A repeated role is taken at the depth at hand: the override on the third depth continues after it.
+        let repeated = ContainerLevelMap(levels: [.series, .box, .series, .folder], overrides: ["a/b/c": .init(role: .series)])
+        XCTAssertEqual(repeated.roles(for: ["a", "b", "c", "d"]), [.series, .box, .series, .folder])
     }
 
     // MARK: CSL

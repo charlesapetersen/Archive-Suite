@@ -5,9 +5,12 @@ import Darwin
 //
 // A new write class in the corpus (`SPEC/containers.md` §File safety): only `<directory>/.archivesuite/containers.json`
 // and `<root>/.archivesuite/container-levels.json` are ever written, through a temporary file in `.archivesuite`
-// renamed over the old one. Nothing outside `.archivesuite` is touched, and nothing is deleted but the writer's own
-// temporary file. Links, files of the wrong kind, documents this build cannot read or of a newer `schemaVersion`, and
-// documents changed since the writer read them are refused, never overwritten.
+// renamed over the old one. Every step after opening `.archivesuite` goes through its file descriptor (`openat`,
+// `renameatx_np`, `unlinkat`), so a link swapped in for it or for the document cannot send a write elsewhere. Writers
+// hold `flock` on that descriptor from the check to the rename, so two apps never overwrite each other unnoticed.
+// Nothing outside `.archivesuite` is touched, and nothing is deleted but the writer's own temporary file. Links, files
+// of the wrong kind, documents without a readable `schemaVersion` or of a newer one, documents holding values this
+// build does not read, and documents changed since the writer read them are refused, never overwritten.
 
 /// What a file was when it was read: a writer passes it back so a change in between is caught.
 public struct ContainerFileStamp: Equatable, Sendable {
@@ -15,6 +18,9 @@ public struct ContainerFileStamp: Equatable, Sendable {
     public let size: Int64
     public let modifiedSeconds: Int
     public let modifiedNanoseconds: Int
+    /// The document held something this build drops on reading (a field, source or level it does not know). Such a
+    /// document is shown but never overwritten, so a newer build's values are not erased.
+    public let droppedOnReading: Bool
 }
 
 public enum ContainerLoad<Document: Equatable & Sendable>: Equatable, Sendable {
@@ -38,17 +44,22 @@ public enum ContainerLoad<Document: Equatable & Sendable>: Equatable, Sendable {
 }
 
 public enum ContainerWriteError: Error, Equatable {
-    /// `.archivesuite` or the document is a link or not of the expected kind.
+    /// The directory, `.archivesuite` or the document is a link or not of the expected kind.
     case notOrdinary(String)
-    /// The document on disk is newer, unreadable or too big; it is left as it is.
+    /// The document on disk is newer, unreadable, too big or holds values this build drops; it is left as it is.
     case refusedExisting(String)
     /// The document changed (or appeared) since the writer read it.
     case changedSinceRead
+    /// Another writer held the lock for longer than `lockWait`.
+    case busy
     case tooBig
     case io(String, Int32)
 }
 
 public enum ContainerFileStore {
+    /// How long a writer waits for another's lock before giving up with `.busy`.
+    public static let lockWait: TimeInterval = 5
+
     public static func containerFileURL(in directory: URL) -> URL {
         directory.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
             .appendingPathComponent(ContainerFile.fileName)
@@ -60,59 +71,114 @@ public enum ContainerFileStore {
     }
 
     public static func load(directory: URL) -> ContainerLoad<ContainerFile> {
-        read(containerFileURL(in: directory), version: ContainerFile.schemaVersion)
+        load(directory, ContainerFile.fileName, version: ContainerFile.schemaVersion)
     }
 
     public static func loadLevelMap(root: URL) -> ContainerLoad<ContainerLevelMap> {
-        read(levelMapURL(in: root), version: ContainerLevelMap.schemaVersion)
+        load(root, ContainerLevelMap.fileName, version: ContainerLevelMap.schemaVersion)
     }
 
     /// Writes `file` as `directory`'s container file. `expecting` is the stamp of the load it was edited from, or
-    /// nil when that load found none.
-    public static func write(_ file: ContainerFile, directory: URL, expecting: ContainerFileStamp?) throws {
-        try write(file, to: containerFileURL(in: directory), version: ContainerFile.schemaVersion, expecting: expecting)
+    /// nil when that load found none. Pass resolved URLs (`resolvingSymlinksInPath`): a directory that is itself a
+    /// link is refused. Call it off the main thread; it may wait up to `lockWait` for another writer.
+    ///
+    /// `settingAside`: only on the user's explicit say-so, when the document on disk is unreadable or holds values
+    /// this build drops. That document is renamed, not deleted, to `<name>.set-aside-<UTC stamp>-<id>` in
+    /// `.archivesuite`, and the new one written in its place. A newer document is never set aside.
+    public static func write(_ file: ContainerFile, directory: URL, expecting: ContainerFileStamp?,
+                             settingAside: Bool = false) throws {
+        try write(file, in: directory, name: ContainerFile.fileName, version: ContainerFile.schemaVersion,
+                  expecting: expecting, settingAside: settingAside)
     }
 
     public static func writeLevelMap(_ map: ContainerLevelMap, root: URL, expecting: ContainerFileStamp?) throws {
-        try write(map, to: levelMapURL(in: root), version: ContainerLevelMap.schemaVersion, expecting: expecting)
+        try write(map, in: root, name: ContainerLevelMap.fileName, version: ContainerLevelMap.schemaVersion,
+                  expecting: expecting)
     }
 
-    /// The nearest level map at or above `directory`, stopping at `root` (inclusive); nil outside it.
+    /// The nearest folder at or above `directory` holding a level map, stopping at `root` (inclusive); nil outside it.
     public static func locateLevelMap(from directory: URL, within root: URL) -> URL? {
         var folder = directory.resolvingSymlinksInPath().standardizedFileURL
         let rootParts = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
         for _ in 0..<64 {
             let parts = folder.pathComponents
             guard parts.count >= rootParts.count, Array(parts.prefix(rootParts.count)) == rootParts else { return nil }
-            if fileType(levelMapURL(in: folder)) == S_IFREG { return folder }
+            let suite = folder.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+            if fileType(suite) == S_IFDIR, fileType(levelMapURL(in: folder)) == S_IFREG { return folder }
             if parts.count == rootParts.count { return nil }
             folder = folder.deletingLastPathComponent()
         }
         return nil
     }
 
+    // MARK: The `.archivesuite` descriptor
+
+    private enum SuiteFolderError: Error { case missing, notOrdinary(String), io(String, Int32) }
+
+    /// Reads one document. A linked or misshapen directory or `.archivesuite` reads as unreadable, not as missing.
+    private static func load<D: Codable & Equatable & Sendable>(_ directory: URL, _ name: String,
+                                                               version: Int) -> ContainerLoad<D> {
+        switch openSuiteFolder(directory, create: false) {
+        case .success(let sfd):
+            defer { close(sfd) }
+            return read(sfd, name, version: version)
+        case .failure(.missing): return .missing
+        case .failure(.notOrdinary(let what)): return .unreadable("\(what) is a link or not a folder")
+        case .failure(.io(let what, let e)): return .unreadable("\(what) failed (errno \(e))")
+        }
+    }
+
+    /// Opens `directory` and its `.archivesuite` without following a link at either. With `create`, makes
+    /// `.archivesuite` (and only it) when it is missing.
+    private static func openSuiteFolder(_ directory: URL, create: Bool) -> Result<Int32, SuiteFolderError> {
+        let dfd = open(directory.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard dfd >= 0 else {
+            let e = errno
+            return .failure(e == ENOENT ? .missing : e == ELOOP || e == ENOTDIR ? .notOrdinary("the directory")
+                                                                                  : .io("open directory", e))
+        }
+        defer { close(dfd) }
+        if create, mkdirat(dfd, ContainerFile.folderName, 0o755) != 0 {
+            let e = errno
+            if e != EEXIST { return .failure(.io("mkdir", e)) }
+        }
+        let sfd = openat(dfd, ContainerFile.folderName, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+        guard sfd >= 0 else {
+            let e = errno
+            return .failure(e == ENOENT ? .missing : e == ELOOP || e == ENOTDIR
+                            ? .notOrdinary(ContainerFile.folderName) : .io("open", e))
+        }
+        return .success(sfd)
+    }
+
     // MARK: Reading
 
     private struct VersionDTO: Decodable { let schemaVersion: Int }
 
-    static func read<D: Decodable & Equatable & Sendable>(_ url: URL, version: Int) -> ContainerLoad<D> {
-        var st = stat()
-        guard lstat(url.path, &st) == 0 else {
-            return errno == ENOENT ? .missing : .unreadable("cannot look at \(url.lastPathComponent) (errno \(errno))")
+    static func read<D: Codable & Equatable & Sendable>(_ sfd: Int32, _ name: String, version: Int) -> ContainerLoad<D> {
+        let fd = openat(sfd, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+        guard fd >= 0 else {
+            let e = errno
+            return e == ENOENT ? .missing : .unreadable(e == ELOOP ? "a link" : "cannot open (errno \(e))")
         }
+        defer { close(fd) }
+        var st = stat()
+        guard fstat(fd, &st) == 0 else { return .unreadable("cannot look at it") }
         guard (st.st_mode & S_IFMT) == S_IFREG else { return .unreadable("not an ordinary file") }
         guard st.st_size <= Int64(ContainerFile.maxFileBytes) else { return .unreadable("over 1 MB") }
-        guard let data = readNoFollow(url) else { return .unreadable("cannot read") }
-        let stamp = makeStamp(st)
-        if let v = try? decoder.decode(VersionDTO.self, from: data), v.schemaVersion > version { return .newer }
-        guard let doc = try? decoder.decode(D.self, from: data) else { return .unreadable("not a document this build reads") }
-        return .loaded(doc, stamp)
+        guard let data = readAll(fd) else { return .unreadable("cannot read") }
+        guard let v = try? decoder.decode(VersionDTO.self, from: data) else { return .unreadable("no schemaVersion") }
+        if v.schemaVersion > version { return .newer }
+        let log = ContainerDropLog()
+        let d = decoder
+        d.userInfo[ContainerDropLog.key] = log
+        guard v.schemaVersion >= 1, let doc = try? d.decode(D.self, from: data) else {
+            return .unreadable("not a document this build reads")
+        }
+        return .loaded(doc, makeStamp(st, dropped: log.dropped))
     }
 
-    private static func readNoFollow(_ url: URL) -> Data? {
-        let fd = open(url.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-        guard fd >= 0 else { return nil }
-        defer { close(fd) }
+    private static func readAll(_ fd: Int32) -> Data? {
         var data = Data()
         var buffer = [UInt8](repeating: 0, count: 64 * 1024)
         while true {
@@ -126,42 +192,65 @@ public enum ContainerFileStore {
 
     // MARK: Writing
 
-    static func write<D: Encodable & Decodable & Equatable & Sendable>(
-        _ document: D, to url: URL, version: Int, expecting: ContainerFileStamp?
+    static func write<D: Codable & Equatable & Sendable>(
+        _ document: D, in directory: URL, name: String, version: Int, expecting: ContainerFileStamp?,
+        settingAside: Bool = false
     ) throws {
         let data = try encoder.encode(document)
         guard data.count <= ContainerFile.maxFileBytes else { throw ContainerWriteError.tooBig }
-        let dir = url.deletingLastPathComponent()
 
-        switch fileType(dir) {
-        case nil:
-            if mkdir(dir.path, 0o755) != 0 && errno != EEXIST { throw ContainerWriteError.io("mkdir", errno) }
-            guard fileType(dir) == S_IFDIR else { throw ContainerWriteError.notOrdinary(ContainerFile.folderName) }
-        case S_IFDIR?: break
-        default: throw ContainerWriteError.notOrdinary(ContainerFile.folderName)
+        let sfd: Int32
+        switch openSuiteFolder(directory, create: true) {
+        case .success(let fd): sfd = fd
+        case .failure(.missing): throw ContainerWriteError.io("open directory", ENOENT)
+        case .failure(.notOrdinary(let what)): throw ContainerWriteError.notOrdinary(what)
+        case .failure(.io(let what, let e)): throw ContainerWriteError.io(what, e)
         }
+        defer { close(sfd) }
 
-        func checkCurrent() throws {
-            let current: ContainerLoad<D> = read(url, version: version)
-            switch current {
-            case .missing:
-                if expecting != nil { throw ContainerWriteError.changedSinceRead }
-            case .loaded(_, let stamp):
-                if stamp != expecting { throw ContainerWriteError.changedSinceRead }
-            case .newer:
-                throw ContainerWriteError.refusedExisting("of a newer schemaVersion")
-            case .unreadable(let why):
-                if fileType(url) != S_IFREG { throw ContainerWriteError.notOrdinary(url.lastPathComponent) }
-                throw ContainerWriteError.refusedExisting(why)
+        // Held from the check to the rename; advisory, and every writer goes through here.
+        let deadline = Date().addingTimeInterval(lockWait)
+        while flock(sfd, LOCK_EX | LOCK_NB) != 0 {
+            let e = errno
+            if e == ENOTSUP || e == EOPNOTSUPP { break }   // a volume without locks: the checks below still hold
+            guard e == EWOULDBLOCK || e == EINTR else { throw ContainerWriteError.io("flock", e) }
+            guard Date() < deadline else { throw ContainerWriteError.busy }
+            usleep(20_000)
+        }
+        defer { flock(sfd, LOCK_UN) }
+
+        var exists = true
+        let current: ContainerLoad<D> = read(sfd, name, version: version)
+        switch current {
+        case .missing:
+            if expecting != nil { throw ContainerWriteError.changedSinceRead }
+            exists = false
+        case .loaded(_, let stamp):
+            guard let expecting, stamp == expecting else { throw ContainerWriteError.changedSinceRead }
+            if stamp.droppedOnReading {
+                guard settingAside else {
+                    throw ContainerWriteError.refusedExisting("holds values this build does not read")
+                }
+                try setAside(sfd, name)
+                exists = false
             }
+        case .newer:
+            throw ContainerWriteError.refusedExisting("of a newer schemaVersion")
+        case .unreadable(let why):
+            var st = stat()
+            if fstatat(sfd, name, &st, AT_SYMLINK_NOFOLLOW) == 0, (st.st_mode & S_IFMT) != S_IFREG {
+                throw ContainerWriteError.notOrdinary(name)
+            }
+            guard settingAside else { throw ContainerWriteError.refusedExisting(why) }
+            try setAside(sfd, name)
+            exists = false
         }
-        try checkCurrent()
 
-        let temp = dir.appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
-        let fd = open(temp.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)
+        let temp = ".\(name).\(UUID().uuidString).tmp"
+        let fd = openat(sfd, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)
         guard fd >= 0 else { throw ContainerWriteError.io("create", errno) }
-        var ok = false
-        defer { if !ok { unlink(temp.path) } }
+        var renamed = false
+        defer { if !renamed { unlinkat(sfd, temp, 0) } }
         do {
             defer { close(fd) }
             try data.withUnsafeBytes { raw in
@@ -174,10 +263,32 @@ public enum ContainerFileStore {
             }
             guard fsync(fd) == 0 else { throw ContainerWriteError.io("fsync", errno) }
         }
-        // Checked again just before the rename, so the window for another writer is the rename itself.
-        try checkCurrent()
-        guard rename(temp.path, url.path) == 0 else { throw ContainerWriteError.io("rename", errno) }
-        ok = true
+        // A first document is put in place only if none appeared meanwhile, even from a writer that skips the lock.
+        var flags: UInt32 = exists ? 0 : UInt32(RENAME_EXCL)
+        while renameatx_np(sfd, temp, sfd, name, flags) != 0 {
+            let e = errno
+            if e == EEXIST { throw ContainerWriteError.changedSinceRead }
+            // A volume without exclusive rename: the check above, under the lock where there is one, stands in.
+            guard flags != 0, e == ENOTSUP || e == EOPNOTSUPP || e == EINVAL else {
+                throw ContainerWriteError.io("rename", e)
+            }
+            var st = stat()
+            if fstatat(sfd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 { throw ContainerWriteError.changedSinceRead }
+            flags = 0
+        }
+        renamed = true
+    }
+
+    /// Renames the document in place to `<name>.set-aside-<UTC stamp>-<id>`, never over another file.
+    private static func setAside(_ sfd: Int32, _ name: String) throws {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        let aside = "\(name).set-aside-\(f.string(from: Date()))-\(UUID().uuidString.prefix(8))"
+        guard renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {
+            throw ContainerWriteError.io("set aside", errno)
+        }
     }
 
     // MARK: Helpers
@@ -188,10 +299,10 @@ public enum ContainerFileStore {
         return st.st_mode & S_IFMT
     }
 
-    private static func makeStamp(_ st: stat) -> ContainerFileStamp {
+    private static func makeStamp(_ st: stat, dropped: Bool) -> ContainerFileStamp {
         ContainerFileStamp(inode: UInt64(st.st_ino), size: Int64(st.st_size),
                            modifiedSeconds: Int(st.st_mtimespec.tv_sec),
-                           modifiedNanoseconds: Int(st.st_mtimespec.tv_nsec))
+                           modifiedNanoseconds: Int(st.st_mtimespec.tv_nsec), droppedOnReading: dropped)
     }
 
     static var encoder: JSONEncoder {
