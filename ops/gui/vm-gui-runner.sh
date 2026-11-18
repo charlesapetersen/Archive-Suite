@@ -23,6 +23,9 @@
 #                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
 #                PROCESSOR_JOURNEY=livecapture (W40.d5: hand-driven live capture against the real Android
 #                companion on a headless AVD on the host; xcuitest lane only).
+#                PROCESSOR_JOURNEY=bulkocr (W40.d1: Process Files on a guest copy of a rehearsal box, through the
+#                  app's headless driver; run it through ArchiveProcessor/scripts/journey-bulk-ocr.sh, which states the
+#                  cost, hands over the key file (W40D1_KEY_FILE, a host path) and checks the output).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
 #                VM_KEEP=1 (W40.vm-macos27-runtime (4)): leave the guest booted for the next call, for a run of
@@ -93,6 +96,11 @@ cleanup() {
   # the trap early and leave the VM lock and the guest behind (it did, on a missing state file).
   set +e
   tart_sampler_stop
+  # W40.d1: the key file never outlives the run, whatever ended it.
+  [ "$VM_BOOTED" = 1 ] && [ "${PROCESSOR_BULKOCR:-0}" = 1 ] && tart exec "$VM" rm -f "$BULK_GDIR/key" >/dev/null 2>&1
+  if [ -n "${FAKE_GW_PID:-}" ]; then
+    tart exec "$VM" pkill -f fake_gateway.py >/dev/null 2>&1; kill "$FAKE_GW_PID" 2>/dev/null
+  fi
   if [ "$VM_BOOTED" = 1 ] && [ "$VM_KEEP" = 1 ] && [ "$LANE" = xcuitest ]; then
     keep_guest; VM_BOOTED=0
   fi
@@ -212,6 +220,9 @@ fi
 # (ArchiveProcessor/scripts/live-capture-journey-phone.sh, started in the background below). The test reads
 # TEST_RUNNER_W40D5_DIR and skips itself in every other run, because nothing else starts a phone.
 PROCESSOR_LIVECAPTURE=0
+PROCESSOR_BULKOCR=0
+BULK_GDIR="$GUEST_HOME/w40d1-bulk-ocr"
+FAKE_GW_PID=""
 LIVE_GDIR="$GUEST_HOME/w40d5-live-capture"
 if [ "${PROCESSOR_JOURNEY:-}" = "livecapture" ]; then
   [ "$APP" = processor ] || die "PROCESSOR_JOURNEY is supported only for processor."
@@ -222,8 +233,20 @@ if [ "${PROCESSOR_JOURNEY:-}" = "livecapture" ]; then
   if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
     die "PROCESSOR_JOURNEY=livecapture runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
   fi
+elif [ "${PROCESSOR_JOURNEY:-}" = "bulkocr" ]; then
+  [ "$APP" = processor ] || die "PROCESSOR_JOURNEY is supported only for processor."
+  [ "$LANE" = xcuitest ] || die "PROCESSOR_JOURNEY=bulkocr runs on the xcuitest lane only."
+  [ -n "$CORRUPT_TEST_SELECTOR" ] && die "PROCESSOR_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
+  PROCESSOR_BULKOCR=1
+  CORRUPT_TEST_SELECTOR="ArchiveProcessorUITests/BulkOCRJourneyUITests"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "PROCESSOR_JOURNEY=bulkocr runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  fi
+  BULK_SET="$REHEARSAL/processor-set/${W40D1_COLLECTION:-RG 165 — War Department}"
+  [ -d "$BULK_SET" ] || die "no rehearsal box at $BULK_SET (python3 ArchiveProcessor/scripts/make-processor-rehearsal.py)"
+  if [ -n "${W40D1_KEY_FILE:-}" ]; then [ -r "$W40D1_KEY_FILE" ] || die "W40D1_KEY_FILE is not readable"; fi
 elif [ -n "${PROCESSOR_JOURNEY:-}" ]; then
-  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture)"
+  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture, bulkocr)"
 fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
@@ -594,6 +617,7 @@ run_xcuitest() {
   fi
   TEST_ENV=""
   if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then start_phone_leg; TEST_ENV="TEST_RUNNER_W40D5_DIR='$LIVE_GDIR'"; fi
+  [ "$PROCESSOR_BULKOCR" = 1 ] && prepare_bulk_ocr
   rm -f "$APP_ART"/sampler-*.tsv "$APP_ART"/chunk*.log
   if [ "$VM_SPLIT" -gt 0 ]; then
     run_split
@@ -606,6 +630,7 @@ run_xcuitest() {
     tart_crash_mark "$VM"
     run_tests test "$TEST_ARGS" xcuitest "$(tart_selector_bundles "$ONLY_TESTING")"
     [ "$PROCESSOR_LIVECAPTURE" = 1 ] && stop_phone_leg
+    [ "$PROCESSOR_BULKOCR" = 1 ] && collect_bulk_ocr
     video_stop
     # Clear the flag straight away: the health gate's gui-vm-gate.sh shares this VM but not this script.
     tart exec "$VM" bash -lc "rm -f $vflags" >/dev/null 2>&1 || true
@@ -705,6 +730,57 @@ stop_phone_leg() {
     "$LIVE_GDIR/started" "$out" "$backup" > "$run/mac-files.txt" 2>&1 \
     || warn "guest file record incomplete (see $run/mac-files.txt)"
   log "guest file record: $run/mac-files.txt"
+}
+
+# --- PROCESSOR_JOURNEY=bulkocr: the box onto the guest disk before, the output back to the host after ---
+# The share is read-only, so the box is copied onto the guest disk with `ditto`. The key goes in through stdin
+# (never a command line) to a 0600 file the app reads (PROCESSFILES_TESTKEYFILE), and is deleted after the test
+# and again in cleanup. The output comes back by `ditto` with its xattrs, and with the guest's own reading of
+# every PDF's tag xattr, so the host checker can tell a tag the app never wrote from one the copy lost.
+prepare_bulk_ocr() {
+  local name; name="$(basename "$BULK_SET")"
+  tart exec "$VM" bash -lc "rm -rf '$BULK_GDIR' && mkdir -p '$BULK_GDIR/out' \
+      && ditto '/Volumes/My Shared Files/rehearsal/processor-set/$name' '$BULK_GDIR/in'" \
+    || die "could not copy the box into $BULK_GDIR in the guest"
+  TEST_ENV="TEST_RUNNER_W40D1_DIR='$BULK_GDIR'"
+  if [ -n "${W40D1_KEY_FILE:-}" ]; then
+    tart exec -i "$VM" bash -c "umask 077; cat > '$BULK_GDIR/key'" < "$W40D1_KEY_FILE" \
+      || die "could not hand the key file to the guest"
+    TEST_ENV="$TEST_ENV TEST_RUNNER_W40D1_KEYFILE=1"
+  fi
+  local v val
+  for v in PROVIDER MODEL TAGGING MAXIMAGES GATEWAY_URL GATEWAY_MODEL GATEWAY_IN_PER_1M GATEWAY_OUT_PER_1M \
+           GATEWAY_UPSTREAM CAP_USD METER TIMEOUT_S; do
+    val="$(printenv "W40D1_$v" || true)"
+    [ -n "$val" ] || continue
+    [[ "$val" =~ ^[A-Za-z0-9._:/\ -]+$ ]] || die "W40D1_$v has characters this runner will not pass on"
+    TEST_ENV="$TEST_ENV TEST_RUNNER_W40D1_$v='$val'"
+  done
+  # W40D1_FAKE_GATEWAY=1: the $0 proof of the gateway route, against scripts/fake_gateway.py on the guest's loopback.
+  if [ "${W40D1_FAKE_GATEWAY:-0}" = 1 ]; then
+    [[ "${W40D1_FAKE_COMPLETION:-500}" =~ ^[0-9]+$ ]] || die "W40D1_FAKE_COMPLETION must be a number"
+    tart exec "$VM" bash -lc "exec python3 '$GUEST_REPO/ArchiveProcessor/scripts/fake_gateway.py' 18471 \
+        '$BULK_GDIR/out/fake-gateway.log' ${W40D1_FAKE_COMPLETION:-500}" > "$APP_ART/fake-gateway.out" 2>&1 &
+    FAKE_GW_PID=$!
+    sleep 2
+    kill -0 "$FAKE_GW_PID" 2>/dev/null || die "the stand-in gateway did not start ($(tr '\n' ' ' < "$APP_ART/fake-gateway.out"))"
+    log "stand-in gateway on the guest's 127.0.0.1:18471"
+  fi
+  log "bulk OCR: $name copied to $BULK_GDIR/in in the guest"
+}
+collect_bulk_ocr() {
+  local dest="$APP_ART/bulk-ocr"
+  tart exec "$VM" rm -f "$BULK_GDIR/key" >/dev/null 2>&1 || warn "could not delete the guest key file"
+  if [ -n "$FAKE_GW_PID" ]; then
+    tart exec "$VM" pkill -f fake_gateway.py >/dev/null 2>&1 || true
+    kill "$FAKE_GW_PID" 2>/dev/null || true; wait "$FAKE_GW_PID" 2>/dev/null || true; FAKE_GW_PID=""
+  fi
+  rm -rf "$dest"
+  tart exec "$VM" bash -lc "cd '$BULK_GDIR/out' && for f in run-*/*.pdf; do [ -e \"\$f\" ] || continue; \
+      printf '%s\t%s\n' \"\$f\" \"\$(xattr -px com.apple.metadata:_kMDItemUserTags \"\$f\" 2>/dev/null | tr -d ' \n')\"; \
+      done > tags-guest.tsv; ditto '$BULK_GDIR/out' '/Volumes/My Shared Files/out/$APP/bulk-ocr'" \
+    || warn "could not bring the bulk OCR output back (guest: $BULK_GDIR/out)"
+  log "bulk OCR output: $dest"
 }
 
 # --- bring the tests' screenshots back to the host (STEP 3.5's "READ the screenshot") ---------------

@@ -103,12 +103,15 @@ def main():
             unread_last = (len(tags) > 0 and tags[-1] == 'Unread')
             check(unread_last, f"{name}: Unread not last (tags={tags})")
             cls = e['classification']
+            # SPEC §Item type and invariant 7 (W40.suite-item-types): the type is the `Box`/`Folder` token, and the
+            # colour is the user's choice, none for a new user, so a driver run (no colour chosen) writes label 0.
+            # Red/Purple were the type's only mark before that change (W40.d1 found this asserter still wanted them).
             if cls == 'box_label':
-                check(lbl == 6 and 'Red' in tags and 'Box' in tags,
-                      f"{name}: box should be Red(6)+Box, got label={lbl} tags={tags}")
+                check(lbl == 0 and 'Box' in tags and 'Red' not in tags,
+                      f"{name}: box should carry the Box token and no colour, got label={lbl} tags={tags}")
             elif cls == 'folder_label':
-                check(lbl == 3 and 'Purple' in tags and 'Folder' in tags,
-                      f"{name}: folder should be Purple(3)+Folder, got label={lbl} tags={tags}")
+                check(lbl == 0 and 'Folder' in tags and 'Purple' not in tags,
+                      f"{name}: folder should carry the Folder token and no colour, got label={lbl} tags={tags}")
             else:  # document (start or continuation)
                 uncertain = 'Date Uncertain' in tags
                 check(any(YEAR.match(t) for t in tags) or uncertain,

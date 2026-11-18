@@ -725,8 +725,17 @@ struct GatewayConfig: Codable, Equatable {
     }
 
     var apiKey: String {
-        Self.storedKey(localModel: isLocalModel)
+#if DEBUG
+        if !isLocalModel, let key = Self.testKeyOverride { return key }
+#endif
+        return Self.storedKey(localModel: isLocalModel)
     }
+
+#if DEBUG
+    /// W40.d1: the key a headless `ProcessFilesTestDriver` run hands the gateway, since a headless launch never opens
+    /// the Keychain (`KeychainHelper.isHeadlessTestMode`). Set by that driver for its run only, and cleared after.
+    nonisolated(unsafe) static var testKeyOverride: String?
+#endif
 
     /// The gateway key from the Keychain. A local model always gets the placeholder: a saved key belongs to a remote
     /// gateway, and is never sent in plain http to whatever listens on this Mac's port.

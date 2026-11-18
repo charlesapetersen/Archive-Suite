@@ -103,15 +103,29 @@ clicking**, via a headless hook built into the app (`Capture/ProcessFilesTestDri
 | `PROCESSFILES_TESTOUT` | output root (refuses `Test Files/`; writes only a fresh `run-<epoch>/`) |
 | `PROCESSFILES_TAGGING` | `automatic` \| `none` \| `copySource` (manual modes rejected — need human input) |
 | `PROCESSFILES_MAXIMAGES` | image cap (default 8) · `PROCESSFILES_PROVIDER`/`_MODEL` · `PROCESSFILES_EXPORTORIGINALS=1` |
+| `PROCESSFILES_TESTKEYFILE` | a file holding the key, instead of `PROCESSFILES_TESTKEY` (W40.d1: never on a command line) |
+| `PROCESSFILES_GATEWAY_URL`/`_MODEL` | the gateway route, built as Process Files builds it; `_IN_PER_1M`/`_OUT_PER_1M` price it, `_UPSTREAM` names the image-token provider for the estimate. The key reaches every gateway call through `GatewayConfig.testKeyOverride` |
+| `PROCESSFILES_METER=1` + `PROCESSFILES_CAP_USD` | required on the gateway route: the app's estimate goes to `estimate.txt` and a run estimated over the cap is refused; every request passes through a meter that reads the reply's `usage`, refuses to send unless spent plus the requests in flight stay inside the cap, stops after a reply it cannot price, and writes `spend.tsv` |
 
 **What each mode verifies** (asserted from disk): every output is a **2-page PDF** with the `Extracted
 text.` page-2 header; **`none`** → no tags; **`copySource`** → source tags copied, no `Unread`;
-**`automatic`** → date (`YYYY` + `MM Month`) + 2–6 subjects, box → **Red**+`Box`, folder → **Purple**+`Folder`,
+**`automatic`** → date (`YYYY` + `M Month`) + 2–6 subjects, box → the `Box` token and no colour label, folder → the
+`Folder` token and no colour label (SPEC §Item type: the colour is the user's choice, none by default),
 **`Unread` stamped last**, JSON sidecar per document; and **segmentation classification vs the
 `Ground Truth Segmentation/*/…csv`** (reported as a match rate). Cost: cheapest models + small caps ≈ cents.
 
 The default suite runs `none` + `copySource` + `automatic` across the Dean and RG-165 ground-truth sets
 plus a dual-output (`exportOriginals`) case. Add lines / raise `MAXIMAGES` for a larger confidence run.
+
+**The W40.d1 journey (`scripts/journey-bulk-ocr.sh`)** runs the same driver on a whole rehearsal box in the Tart VM
+(`PROCESSOR_JOURNEY=bulkocr ops/gui/vm-gui-runner.sh processor xcuitest`, `BulkOCRJourneyUITests`), never on this
+Mac's screen, and checks the output with `scripts/journey_bulk_ocr_check.py`: `qpdf --check` and `pdfcpu validate`
+on every PDF, the page-2 header, every tag xattr decoded with `xattr -px` and `plutil` against SPEC/tag-format.md
+(and against the guest's own reading, so a copy that lost a tag is told from one never written), and the split
+into documents scored against the box's truth CSV. `--route gateway --paid` is the paid journey (Gemini 3.7 Flash
+on the Stanford gateway; cap $5 by default, never above $7). `--route fake` is the same route for $0 against
+`scripts/fake_gateway.py` in the guest, which refuses a wrong key and can inflate usage to test the cap. Apple
+Vision cannot be the free route: it fails inside the macOS 27.2 guest (`KNOWN_ISSUES.md`).
 
 ---
 

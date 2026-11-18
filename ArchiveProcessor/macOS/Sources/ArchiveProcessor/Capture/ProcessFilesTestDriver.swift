@@ -67,10 +67,17 @@ enum ProcessFilesTestDriver {
             writeMarker(marker, "ERROR: \(msg)")
         }
 
-        guard let key = env["PROCESSFILES_TESTKEY"],
+        // The key comes from PROCESSFILES_TESTKEY or, so it never sits on a command line, a file named by
+        // PROCESSFILES_TESTKEYFILE (W40.d1: the VM journey writes one in the guest and deletes it after).
+        // Apple Vision needs none.
+        let provider = LLMProvider(rawValue: env["PROCESSFILES_PROVIDER"] ?? "Gemini") ?? .gemini
+        let fileKey = env["PROCESSFILES_TESTKEYFILE"].flatMap { try? String(contentsOfFile: $0, encoding: .utf8) }?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = env["PROCESSFILES_TESTKEY"] ?? fileKey ?? (provider == .appleVision ? "" : nil)
+        guard let key,
               let inPath = env["PROCESSFILES_TESTIN"],
               let outPath = env["PROCESSFILES_TESTOUT"] else {
-            return fail("missing required env (PROCESSFILES_TESTKEY/TESTIN/TESTOUT)", marker: safeFallbackMarker)
+            return fail("missing required env (PROCESSFILES_TESTKEY or TESTKEYFILE, TESTIN, TESTOUT)", marker: safeFallbackMarker)
         }
 
         // --- resolve + safety-guard the locations BEFORE deriving any in-tree marker path ---
@@ -116,12 +123,42 @@ enum ProcessFilesTestDriver {
         guard !inputs.isEmpty else { return fail("no accepted inputs in \(inDir.path)", marker: donePath) }
 
         // --- config (rejecting modes that need real human input) ---
-        let provider = LLMProvider(rawValue: env["PROCESSFILES_PROVIDER"] ?? "Gemini") ?? .gemini
         let modelId = env["PROCESSFILES_MODEL"] ?? "gemini-2.5-flash-lite"
-        let model = provider.models.first { $0.id == modelId } ?? provider.models[0]
         let mode = TaggingMode(rawValue: env["PROCESSFILES_TAGGING"] ?? "automatic") ?? .automatic
         guard mode == .automatic || mode == .none || mode == .copySource else {
             return fail("tagging mode '\(mode.rawValue)' needs human input; unsupported headless", marker: donePath)
+        }
+        // W40.d1: the gateway route, as Process Files builds it with Use gateway on (`OCRView.startProcessing`):
+        // the configured provider stays, the model is the gateway's (`asLLMModel`), and the config goes in whole.
+        var gateway: GatewayConfig?
+        if let url = env["PROCESSFILES_GATEWAY_URL"], let gwModel = env["PROCESSFILES_GATEWAY_MODEL"] {
+            gateway = GatewayConfig(
+                baseURL: GatewayConfig.normalizedBaseURL(url), modelID: gwModel, displayName: "API Gateway",
+                inputCostPer1M: env["PROCESSFILES_GATEWAY_IN_PER_1M"].flatMap(Double.init),
+                outputCostPer1M: env["PROCESSFILES_GATEWAY_OUT_PER_1M"].flatMap(Double.init))
+        }
+        let model = gateway?.asLLMModel() ?? provider.models.first { $0.id == modelId } ?? provider.models[0]
+
+        // State the cost first, with the app's own estimator and the same inputs the Cost Estimate box uses, and
+        // refuse a run whose estimate is over the spend cap. A metered run (PROCESSFILES_METER=1) must name its cap.
+        let estimate = CostEstimator.estimate(
+            fileCount: inputs.count, model: model, enableTagging: mode.llmTags,
+            sendPreviousImage: false, contextCharCount: 0, imageScale: 1.0, rotationMode: .off,
+            useGateway: gateway != nil || provider == .appleVision,
+            imageTokenProvider: gateway != nil ? (LLMProvider(rawValue: env["PROCESSFILES_GATEWAY_UPSTREAM"] ?? "") ?? .gemini) : nil)
+        let metered = env[Self.meterEnvKey] == "1"
+        let capUSD = env["PROCESSFILES_CAP_USD"].flatMap(Double.init)
+        writeMarker(runDir.appendingPathComponent("estimate.txt").path,
+                    "files=\(inputs.count)\tmodel=\(model.id)\tocr=\(estimate.ocrFormatted)\tclassification=\(estimate.classificationFormatted)"
+                    + "\ttagging=\(estimate.taggingFormatted)\ttotal=\(estimate.totalStandardFormatted)\tcap=\(capUSD.map(CostEstimate.money) ?? "none")\n")
+        if gateway != nil && !metered {
+            return fail("a gateway run must be metered (\(Self.meterEnvKey)=1 with PROCESSFILES_CAP_USD)", marker: donePath)
+        }
+        if metered {
+            guard let capUSD, capUSD > 0 else { return fail("\(Self.meterEnvKey)=1 needs PROCESSFILES_CAP_USD", marker: donePath) }
+            guard estimate.totalStandard <= capUSD else {
+                return fail("estimate \(estimate.totalStandardFormatted) is over the cap \(CostEstimate.money(capUSD))", marker: donePath)
+            }
         }
 
         // Set pipeline config on the instance (no UserDefaults/Keychain writes). `taggingMode` is the
@@ -158,6 +195,29 @@ enum ProcessFilesTestDriver {
             }
         }
 
+        // The meter: every request still goes to the real wire (`NetworkSession.shared`), behind the same limiter
+        // and retry code (each attempt passes through here); this only reads each reply's `usage`, and refuses to send
+        // a request unless what is spent plus every request in flight, each priced at the dearest call so far, stays
+        // inside the cap.
+        let meter = SpendMeter(inPer1M: model.inputCostPer1M, outPer1M: model.outputCostPer1M, cap: capUSD ?? 0)
+        if metered {
+            NetworkSession.testTransport = { request in
+                try meter.admit()
+                do {
+                    let (data, response) = try await NetworkSession.shared.data(for: request)
+                    meter.record(data, status: (response as? HTTPURLResponse)?.statusCode ?? 0)
+                    return (data, response)
+                } catch {
+                    meter.record(nil, status: 0)
+                    throw error
+                }
+            }
+        }
+        defer { if metered { NetworkSession.testTransport = nil } }
+        // Every gateway call takes its key from `GatewayConfig.apiKey`, not from `apiKey:` below.
+        if gateway != nil { GatewayConfig.testKeyOverride = key }
+        defer { GatewayConfig.testKeyOverride = nil }
+
         NSLog("PFDRIVER: start \(inputs.count) files, \(provider.rawValue)/\(model.id), mode=\(mode.rawValue), out=\(runDir.path)")
 
         // The `await` returning is the authoritative completion signal (isProcessing briefly
@@ -178,9 +238,12 @@ enum ProcessFilesTestDriver {
             preOCRedInput: false,
             segmentationContext: SegmentationContext(
                 previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, imageScale: 1.0),
-            gatewayConfig: nil)
+            gatewayConfig: gateway)
 
         autopilot.cancel()
+        if metered {
+            writeMarker(runDir.appendingPathComponent("spend.tsv").path, meter.summary + "\n")
+        }
 
         // Write the completion marker FIRST (a plain String write, which the pipeline's own file
         // writes just proved works on this actor), so the harness always sees completion. Then a
@@ -202,6 +265,61 @@ enum ProcessFilesTestDriver {
         try? lines.joined(separator: "\n").write(
             toFile: runDir.appendingPathComponent("manifest.tsv").path, atomically: true, encoding: .utf8)
         NSLog("PFDRIVER: done — \(succeeded) succeeded, \(failed) failed → \(runDir.path)")
+    }
+
+    /// The flag that lets this driver's meter use `NetworkSession`'s seam (`activeTestTransport`).
+    nonisolated static let meterEnvKey = "PROCESSFILES_METER"
+}
+
+/// W40.d1: what a metered run spent, priced from each reply's OpenAI-shaped `usage` at the model's rates. A 2xx
+/// reply without `usage` is counted as unmetered, so the journey's checker can refuse a run it cannot price; a
+/// non-2xx reply or a transport error is counted as rejected (a provider does not bill a 429 or a 5xx it refused).
+final class SpendMeter: @unchecked Sendable {
+    private let lock = NSLock()
+    private let inPer1M: Double, outPer1M: Double, cap: Double
+    private var calls = 0, unmetered = 0, rejected = 0, refused = 0, inputTokens = 0, outputTokens = 0
+    private var inFlight = 0, dearest = 0.0, blind = false
+
+    init(inPer1M: Double, outPer1M: Double, cap: Double) {
+        self.inPer1M = inPer1M; self.outPer1M = outPer1M; self.cap = cap
+    }
+
+    private func cost(_ input: Int, _ output: Int) -> Double {
+        Double(input) * inPer1M / 1_000_000 + Double(output) * outPer1M / 1_000_000
+    }
+
+    func admit() throws {
+        lock.lock(); defer { lock.unlock() }
+        // After a reply it could not price, the meter cannot keep the cap, so it sends nothing more.
+        guard !blind, cost(inputTokens, outputTokens) + Double(inFlight + 1) * dearest < cap else {
+            refused += 1
+            throw URLError(.cancelled)
+        }
+        inFlight += 1
+    }
+
+    func record(_ data: Data?, status: Int) {
+        let usage = data.flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }?["usage"] as? [String: Any]
+        lock.lock(); defer { lock.unlock() }
+        inFlight = max(0, inFlight - 1)
+        calls += 1
+        guard (200..<300).contains(status) else { rejected += 1; return }
+        if let p = usage?["prompt_tokens"] as? Int, let c = usage?["completion_tokens"] as? Int {
+            // A proxy may report thinking outside completion_tokens; total_tokens then says so.
+            let out = max(c, (usage?["total_tokens"] as? Int ?? 0) - p)
+            inputTokens += p; outputTokens += out
+            dearest = max(dearest, cost(p, out))
+        } else {
+            unmetered += 1
+            blind = true
+        }
+    }
+
+    var summary: String {
+        lock.lock(); defer { lock.unlock() }
+        return "calls=\(calls)\tunmetered=\(unmetered)\trejected=\(rejected)\trefused=\(refused)\tinput_tokens=\(inputTokens)"
+            + "\toutput_tokens=\(outputTokens)\tdearest_call_usd=\(String(format: "%.4f", dearest))"
+            + "\tspent_usd=\(String(format: "%.4f", cost(inputTokens, outputTokens)))\tcap_usd=\(cap)"
     }
 }
 

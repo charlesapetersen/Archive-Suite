@@ -737,3 +737,39 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-23 W40.i-sim-ui — raised.
+
+### S-041 · Process Files' cost estimate leaves out the dating and item-field calls
+
+- **Raised:** 2026-11-18 · W40.d1 · the $0 stand-in gateway run of the whole RG 165 box.
+- **Suspected behaviour:** a run on the gateway route makes three calls per document that the Cost Estimate box
+  does not count: the date route's two (`Tagging/DateRoute.swift`, "You are dating a document…" and "These are the
+  first pages of one archival document…") and the item fields' one (`Tagging/ItemFieldExtractor.swift`), which
+  sends images of up to ten of the document's pages. In the stand-in run they were 171 of 341 calls (113 OCR, 57
+  tagging, 57 of each of the three). `CostEstimator.estimate` (`Models/CostEstimator.swift`) has terms for OCR,
+  classification, tagging, collections and rotation only. Whether the dollar figure shown is low depends on the
+  real tokens: the same estimator prices a Gemini page at 40,000 image tokens, which may more than cover them.
+- **Where:** ledger `P-03`, `P-02`; the files above. Evidence of the call count:
+  [`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md) §"The $0 runs".
+- **Would confirm it:** W40.d1's paid run: its `spend.tsv` (metered from each reply's `usage`) above the
+  `estimate.txt` total for the same pages and settings.
+- **Would clear it:** the metered spend at or under the estimate, with the estimator's figures written down as
+  the reason (then the omission is a wording matter for the box, not a low figure).
+- **Status:** `open`
+- **History:**
+  - 2026-11-18 W40.d1 — raised.
+
+### S-042 · A failed tagging call leaves a document untagged, and the run still reports it tagged
+
+- **Raised:** 2026-11-18 · W40.d1 · the $0 stand-in cap test (the meter refused 17 calls once a $0.45 cap was spent).
+- **Suspected behaviour:** when a segment's tag-generation call fails, the document is written with no subject
+  tags and no date, its job stays `succeeded`, and the run's status line still counts it ("12 succeeded, 0 failed.
+  11 segments tagged."). In the cap test `00012 — RG 165.pdf` came out with no subject tags. The refusal there is a
+  thrown `URLError(.cancelled)` from the test meter, so a real provider error (a 5xx, a timeout, a bad reply) may
+  take another path; `scripts/test-processfiles-tagwarn.sh` covers a refused tag WRITE, not a failed tag CALL.
+- **Where:** ledger `P-33`, `P-26`; `OCR/OCRProcessor+Tagging.swift` `performTaggingPhase`.
+- **Would confirm it:** a stubbed tagging reply that errors (500, and a malformed body) on one segment of a small
+  run: the PDF untagged, the job `succeeded`, and nothing in the status line or the log naming the document.
+- **Would clear it:** the document is flagged in the file pane, the status line or the run log.
+- **Status:** `open`
+- **History:**
+  - 2026-11-18 W40.d1 — raised.

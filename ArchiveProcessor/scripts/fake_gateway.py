@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""W40.d1 — a stand-in OpenAI-compatible gateway, so the bulk OCR journey's gateway route can be proved for $0.
+
+Usage: fake_gateway.py <port> <log file> [completion_tokens] [key]
+
+Serves POST /v1/chat/completions on 127.0.0.1 only. An OCR request (the prompt's TRANSCRIBE task) gets a reply in
+the app's OCR format, its classification taken in turn from a fixed cycle (box, folder, then documents), so the
+split it produces means nothing; a tagging request gets the tag JSON. Every reply carries an OpenAI-shaped `usage`
+(1,000 prompt tokens, `completion_tokens` as given, default 500), which is what the driver's spend meter reads.
+A request without `Authorization: Bearer <key>` (default `stand-in-key`, the key file the journey's fake route
+hands over) gets a 401, so the run proves the key reached every call. Each request is one line in the log, with the
+start of its prompt. It runs in the VM guest, started by `ops/gui/vm-gui-runner.sh` when
+W40D1_FAKE_GATEWAY=1; it is never pointed at real material and sends nothing anywhere.
+"""
+import json
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+CYCLE = ['box_label', 'folder_label', 'document_start', 'document_continuation', 'document_start', 'document_start']
+lock = threading.Lock()
+count = {'ocr': 0, 'tags': 0, 'other': 0}
+
+
+def prompt_text(body):
+    out = []
+    for m in body.get('messages', []):
+        c = m.get('content')
+        if isinstance(c, str):
+            out.append(c)
+        elif isinstance(c, list):
+            out += [p.get('text', '') for p in c if isinstance(p, dict)]
+    return '\n'.join(out)
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if self.headers.get('Authorization') != f'Bearer {KEY}':
+            with open(LOG, 'a', encoding='utf-8') as f:
+                f.write(f'unauthorized\t{body.get("model")}\t0\t{self.headers.get("Authorization", "")[:12]!r}\n')
+            self.send_response(401)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+        text = prompt_text(body)
+        with lock:
+            if 'TRANSCRIBE' in text:
+                kind = 'ocr'
+                cls = CYCLE[count['ocr'] % len(CYCLE)]
+                reply = f'[{cls}]\n[rotate_0]\nW40.d1 stand-in transcription, page {count["ocr"] + 1}.'
+            elif 'subject_tags' in text:
+                kind = 'tags'
+                reply = json.dumps({'year': '1918', 'month': '3', 'day': '12', 'date_uncertain': False,
+                                    'subject_tags': ['War Department', 'Military Intelligence'],
+                                    'format': 'Letter'})
+            else:
+                kind = 'other'
+                reply = 'ok'
+            count[kind] += 1
+            with open(LOG, 'a', encoding='utf-8') as f:
+                head = ' '.join(text.split())[:90].replace('\t', ' ')
+                f.write(f'{kind}\t{body.get("model")}\t{count[kind]}\t{head}\n')
+        out = json.dumps({'id': 'fake', 'object': 'chat.completion', 'model': body.get('model'),
+                          'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': reply},
+                                       'finish_reason': 'stop'}],
+                          'usage': {'prompt_tokens': 1000, 'completion_tokens': COMPLETION,
+                                    'total_tokens': 1000 + COMPLETION}}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+
+if __name__ == '__main__':
+    port, LOG = int(sys.argv[1]), sys.argv[2]
+    COMPLETION = int(sys.argv[3]) if len(sys.argv) > 3 else 500
+    KEY = sys.argv[4] if len(sys.argv) > 4 else 'stand-in-key'
+    ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()
