@@ -197,6 +197,9 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let moneyHabit = SettingsKey(rawValue: "moneyHabit")
     static let monthCeilingUSD = SettingsKey(rawValue: "monthCeilingUSD")
     static let fineTuning = SettingsKey(rawValue: "fineTuning")
+    /// W46.training-optout-run: the keys and plans the user says do not train on their pages (`key:gemini`, a billed
+    /// project; `plan:claude`, its training setting off; `SettingsTraining.answerableWays`).
+    static let trainingOff = SettingsKey(rawValue: "trainingOff")
 
     // Any layer: the habits a collection may answer for itself, and the collection interview (§3.2).
     static let batchCeilingUSD = SettingsKey(rawValue: "batchCeilingUSD")
@@ -234,7 +237,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     }
 
     static let generalOnly: [SettingsKey] = [
-        .keys, .plans, .cluster, .gpusPerJob, .downloadsAllowed, .moneyHabit, .monthCeilingUSD, .fineTuning,
+        .keys, .plans, .cluster, .gpusPerJob, .downloadsAllowed, .moneyHabit, .monthCeilingUSD, .fineTuning, .trainingOff,
     ]
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
@@ -256,7 +259,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     var defaultValue: SettingsValue {
         let skipped = SettingsAnswers.skippedInterview
         switch self {
-        case .keys, .plans, .excludedModelFamilies, .languages, .scripts: return .strings([])
+        case .keys, .plans, .trainingOff, .excludedModelFamilies, .languages, .scripts: return .strings([])
         case .cluster: return .bool(false)
         case .gpusPerJob: return .int(1)
         case .downloadsAllowed: return .bool(true)
@@ -304,6 +307,7 @@ extension SettingsKey {
         case .moneyHabit: return "Spending"
         case .monthCeilingUSD: return "Most to spend in a month"
         case .fineTuning: return "Training a model on your corrections"
+        case .trainingOff: return "Keys and plans that do not train on your pages"
         case .batchCeilingUSD: return "Most to spend on a batch"
         case .hours: return "How long a batch may run"
         case .excludedModelFamilies: return "Models pages are never sent to"
@@ -384,6 +388,8 @@ extension SettingsKey {
                     let name = CollectionScript(rawValue: parts[0])?.label ?? parts[0]
                     return parts.count > 1 ? "\(name) \(parts[1])%" : name
                 }.joined(separator: ", ")
+            case .trainingOff:
+                return list.map { SettingsTraining.wayWords[$0] ?? $0 }.joined(separator: ", ")
             default:
                 return list.joined(separator: ", ")
             }
@@ -520,6 +526,7 @@ struct SettingsResolver: Sendable {
         r.gpusPerJob = max(1, resolve(.gpusPerJob).value.int ?? 1)
         r.downloadsAllowed = resolve(.downloadsAllowed).value.bool ?? true
         r.excludedModelFamilies = Set(resolve(.excludedModelFamilies).value.strings ?? [])
+        r.trainingOff = Set(resolve(.trainingOff).value.strings ?? [])
         return r
     }
 

@@ -345,7 +345,19 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     private unowned let session: CaptureSession
-    private var config: SessionProcessingConfig? { didSet { entitySettings = nil } }
+    private var config: SessionProcessingConfig? {
+        didSet {
+            entitySettings = nil
+            // W46.training-optout-run: the session's OpenRouter calls refuse an upstream that may train when its
+            // output folder's collection says its pages must not train.
+            let deny = config.map {
+                OpenRouterDataPolicy.deny(SettingsLayerStore.shared.snapshot(outputDirectory: $0.outputDirectory,
+                                                                             runID: UUID(), processing: [:]).values)
+            } ?? false
+            OpenRouterDataPolicy.set(deny, for: openRouterPolicyToken)
+        }
+    }
+    private let openRouterPolicyToken = "live-capture-" + UUID().uuidString
     /// W46.ent-feature-live — the layered settings the names policy reads (names ranked, "No names"), resolved for the
     /// session's output folder at its first finalize and kept for the session, as a Process Files run freezes them.
     /// Reset with the config and on Clear.

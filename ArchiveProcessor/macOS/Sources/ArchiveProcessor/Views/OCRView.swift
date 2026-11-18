@@ -28,6 +28,8 @@ struct OCRView: View {
     /// Which keys / `claude` the segmentation approaches can use; read on appear and on a key change, never
     /// while rendering.
     @State private var segmentationRoutes = SegmentationRoutes.none
+    /// W46.training-optout-run: what Start says before it runs a way the collection's "must not train" switch hides.
+    @State private var trainingWarning: String?
     @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.standard.rawValue
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .standard }
     @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
@@ -491,6 +493,7 @@ struct OCRView: View {
             ManualSegmentTagView(processor: processor)
         }
         .modifier(SegmentationStagePresentations(processor: processor))
+        .modifier(TrainingWarningPresentation(warning: $trainingWarning) { beginProcessing() })
         .modifier(InstitutionalComputeResumePresentation(processor: processor) { mixedPDF in
             if mixedPDF { resumePendingMixedPDF(readWithoutClusterText: true) }
             else { resumePendingRun(readWithoutClusterText: true) }
@@ -1476,7 +1479,39 @@ struct OCRView: View {
         }
     }
 
+    /// Start, unless the output collection says its pages must not train and this run would send them where they
+    /// may: then the warning asks first (W46.training-optout-run).
     private func startProcessing() {
+        guard outputDirectory != nil else { return }
+        if let warning = trainingRunWarning() {
+            trainingWarning = warning
+            return
+        }
+        beginProcessing()
+    }
+
+    /// The warning for this run, or nil: the output folder's collection, its project and the general layer, as the
+    /// run freezes them, and the reader and the segmenter as the run would send their pages.
+    private func trainingRunWarning() -> String? {
+        guard let outDir = outputDirectory else { return nil }
+        var doc: CollectionSettingsDocument?
+        if case .document(let d) = CollectionSettingsFile.read(in: outDir) { doc = d }
+        let resolver = SettingsLayerStore.shared.resolver(for: doc)
+        guard resolver.resolve(.noTraining).value.bool == true else { return nil }
+        var resources = SettingsResources(macMemoryGB: SettingsLayerStore.thisMacMemoryGB)
+        resources.trainingOff = Set(resolver.resolve(.trainingOff).value.strings ?? [])
+        var ways: [(SettingsTraining.RunWay, String)] = [
+            (SettingsTraining.readingWay(provider: effectiveProvider, modelID: effectiveModel.id,
+                                         gateway: currentGatewayConfig != nil, localAgent: currentLocalAgentConfig?.tool),
+             "reading and tagging the pages"),
+        ]
+        ways += SettingsTraining.segmentationWays(segmentationPlan, routes: segmentationRoutes,
+                                                  options: try? SegmentationOptions.loadBundled())
+            .map { ($0, "finding where documents begin") }
+        return SettingsTraining.runWarning(ways, resources: resources)
+    }
+
+    private func beginProcessing() {
         guard let outDir = outputDirectory else { return }
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let context = SegmentationContext(
@@ -1538,6 +1573,27 @@ struct OCRView: View {
                 localAgent: currentLocalAgentConfig
             )
         }
+    }
+}
+
+/// W46.training-optout-run: Start's question when the run would send a collection's pages where they may train a
+/// provider's models. Kept out of `OCRView.body` for the type-check reason below.
+private struct TrainingWarningPresentation: ViewModifier {
+    @Binding var warning: String?
+    let runAnyway: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert("These pages may train a provider's models",
+                   isPresented: Binding(get: { warning != nil }, set: { if !$0 { warning = nil } })) {
+                Button("Run anyway") {
+                    warning = nil
+                    runAnyway()
+                }
+                Button("Cancel", role: .cancel) { warning = nil }
+            } message: {
+                Text(warning ?? "")
+            }
     }
 }
 

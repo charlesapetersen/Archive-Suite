@@ -435,6 +435,7 @@ public enum CollectionSettingsVocabulary {
         "moneyHabit": "Spending",
         "monthCeilingUSD": "Most to spend in a month",
         "fineTuning": "Training a model on your corrections",
+        "trainingOff": "Keys and plans that do not train on your pages",
         "batchCeilingUSD": "Most to spend on a batch",
         "hours": "How long a batch may run",
         "excludedModelFamilies": "Models pages are never sent to",
@@ -457,8 +458,15 @@ public enum CollectionSettingsVocabulary {
     ]
 
     /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.
+    /// The ways a user says do not train on their pages (the Processor's `SettingsTraining.answerableWays`).
+    public static let trainingOffWords: [String: String] = [
+        "key:gemini": "the Gemini key (billed)", "key:mistral": "the Mistral key (paid or opted out)",
+        "plan:claude": "the Claude plan (training off)", "plan:chatgpt": "the ChatGPT plan (training off)",
+    ]
+
     public static let generalOnlyKeys: Set<String> = [
         "keys", "plans", "cluster", "gpusPerJob", "downloadsAllowed", "moneyHabit", "monthCeilingUSD", "fineTuning",
+        "trainingOff",
     ]
 
     static let overridePrefix = "override."
@@ -512,6 +520,8 @@ public enum CollectionSettingsVocabulary {
                     let name = scriptWords[parts[0]] ?? parts[0]
                     return parts.count > 1 ? "\(name) \(parts[1])%" : name
                 }.joined(separator: ", ")
+            case "trainingOff":
+                return list.map { trainingOffWords[$0] ?? $0 }.joined(separator: ", ")
             default:
                 return list.joined(separator: ", ")
             }

@@ -26,6 +26,10 @@ struct SegmentationRoutes: Equatable, Sendable {
     var memoryGB: Double = LocalModelRoute.thisMacMemoryGB
     /// The online approach the 2B on this Mac is checked against, or nil (`SegmentationApproach.storedLocalPartner`).
     var localPartner: SegmentationApproach?
+    /// W46.training-optout-run: the general layer's "pages must not train" switch and the keys and plans the user says
+    /// do not train (`SettingsResources.trainingOff`), which the default segmenter is picked under.
+    var noTraining = false
+    var trainingOff: Set<String> = []
 
     static let none = SegmentationRoutes()
 
@@ -59,8 +63,12 @@ struct SegmentationRoutes: Equatable, Sendable {
 
     /// `current()` for the views that show the chooser: once the keys are read, an unsaved approach is
     /// preselected from them (`SegmentationApproach.preselect`, W41.app-seg-default). Never from a view body.
+    @MainActor
     static func currentPreselecting(_ defaults: UserDefaults = .standard) -> SegmentationRoutes {
-        let routes = current(defaults)
+        var routes = current(defaults)
+        let general = SettingsLayerStore.shared.resolver(for: nil)
+        routes.noTraining = general.resolve(.noTraining).value.bool ?? false
+        routes.trainingOff = Set(general.resolve(.trainingOff).value.strings ?? [])
         SegmentationApproach.preselect(routes, defaults: defaults)
         return routes
     }

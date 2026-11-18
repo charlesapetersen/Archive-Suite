@@ -38,10 +38,11 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
     /// downloaded (the 2B on this Mac waits for the user's yes). Manual when nothing else can run. The Claude
     /// plan is not counted: an installed `claude` may not be signed in, which only the first call shows, and a
     /// saved choice is kept for good. A missing or unfit table falls back to W41.app-seg-default's rule, Gemini
-    /// 3.8 Flash whenever its key is set.
+    /// 3.8 Flash whenever its key is set, unless the general layer says pages must not train (a Gemini key may).
     static func preferredDefault(_ routes: SegmentationRoutes) -> SegmentationApproach {
         guard let table = SettingsRouteTable.bundled, table.problems().isEmpty else {
-            return routes.hasGeminiKey ? .gemini : defaultApproach
+            let geminiMayTrain = routes.noTraining && !routes.trainingOff.contains(SettingsTraining.keyWay("gemini"))
+            return routes.hasGeminiKey && !geminiMayTrain ? .gemini : defaultApproach
         }
         var resources = SettingsResources(macMemoryGB: routes.memoryGB)
         resources.downloadsAllowed = false
@@ -50,7 +51,9 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
             resources.keys.insert(key)
         }
         if routes.chatGPTByPlan { resources.plans.insert("chatgpt") }   // a signed-in account the app has seen
+        resources.trainingOff = routes.trainingOff
         var answers = SettingsAnswers()
+        answers.noTraining = routes.noTraining   // W46.training-optout-run: the general layer's switch
         answers.appRoutesOnly = true
         answers.stagesToSolve = ["segmentation"]
         let solution = SettingsSolver(table: table, pairs: nil, resources: resources, answers: answers).solve()

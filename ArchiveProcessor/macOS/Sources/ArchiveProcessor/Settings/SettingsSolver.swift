@@ -17,6 +17,9 @@ struct SettingsResources: Equatable, Sendable {
     /// Model families the user will not send pages to, matched against route ids (`gemini`): a key that reaches a
     /// family through a router (OpenRouter reaches Gemini) is then not a way to it.
     var excludedModelFamilies: Set<String> = []
+    /// W46.training-optout-run: the keys and plans the user says do not train (`key:gemini`, a billed project;
+    /// `plan:claude`, its training setting off), which `SettingsTraining.risk` then counts as safe.
+    var trainingOff: Set<String> = []
 
     /// The prototype's headroom for the rest of the Mac (`12-settings-design.md` §3.3).
     static let headroomGB = 5.0

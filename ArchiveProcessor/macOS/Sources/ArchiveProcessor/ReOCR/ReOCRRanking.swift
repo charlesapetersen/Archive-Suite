@@ -86,15 +86,17 @@ struct ReOCRRanking: Sendable {
     // MARK: Building
 
     /// The ranked readers for `pages` image pages of `kind`. `current` is the page's reader from its header
-    /// (display strings only: they mark a row, they never choose a route). `staysOnMac` is the batch's switch.
+    /// (display strings only: they mark a row, they never choose a route). `staysOnMac` and `noTraining` are the
+    /// collection's switches (W46.training-optout-run).
     static func rank(kind: OCRPageKind, pages: Int, table: SettingsRouteTable, pairs: OCRPairMatrix?,
-                     resources: SettingsResources, staysOnMac: Bool, readingFallback: Bool = true,
+                     resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false, readingFallback: Bool = true,
                      current: PDFReaderProvenance? = nil,
                      builtInModels: [LLMModel] = OCRCascade.candidates + LLMModel.appleVisionModels) -> ReOCRRanking {
         let metric = metric(for: kind, table: table, readingFallback: readingFallback, builtInModels: builtInModels)
         var answers = SettingsAnswers()
         answers.pages = max(1, pages)
         answers.staysOnMac = staysOnMac
+        answers.noTraining = noTraining
         answers.readingFallback = readingFallback
         let solver = SettingsSolver(table: table, pairs: pairs, resources: resources, answers: answers)
         let stage = table.stage("reading")

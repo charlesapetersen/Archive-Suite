@@ -707,7 +707,13 @@ class OCRProcessor: ObservableObject {
     var activeRunHistory: RunHistorySnapshot?
 
     /// The settings layers frozen at this run's start (W46.settings-layers), copied into its pending run or batch.
-    var activeResolvedSettings: ResolvedSettingsSnapshot?
+    var activeResolvedSettings: ResolvedSettingsSnapshot? {
+        // W46.training-optout-run: the run's OpenRouter calls refuse an upstream that may train when its collection
+        // says its pages must not train. Kept until the next run's settings replace it (only ever the stricter way).
+        didSet { OpenRouterDataPolicy.set(OpenRouterDataPolicy.deny(activeResolvedSettings?.values), for: openRouterPolicyToken) }
+    }
+    /// This processor's entry in `OpenRouterDataPolicy`.
+    nonisolated let openRouterPolicyToken = "process-files-" + UUID().uuidString
     /// This start's collection record, until the run is committed and it is written; nil once written or on a resume.
     var activeRunToRecord: PendingCollectionRecord?
 

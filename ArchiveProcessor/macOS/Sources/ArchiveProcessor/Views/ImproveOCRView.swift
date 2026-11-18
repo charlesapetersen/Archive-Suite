@@ -93,8 +93,12 @@ final class ImproveOCRController: ObservableObject {
         var resources = SettingsResources(macMemoryGB: Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824)
         resources.keys = Set(LLMProvider.allCases.filter { $0 != .appleVision && KeychainHelper.load(account: $0.rawValue) != nil }
             .map { $0.rawValue.lowercased() })
+        // W46.training-optout-run: the files' collections' switches, the stricter where the files' folders differ,
+        // and the keys and plans the user says do not train.
+        let switches = Self.collectionSwitches(for: files)
+        resources.trainingOff = Set(SettingsLayerStore.shared.resolver(for: nil).resolve(.trainingOff).value.strings ?? [])
         model = ReOCRDialogModel(files: files, selectedPairs: selectedPairs, table: table, pairs: OCRPairMatrix.bundled,
-                                 resources: resources, staysOnMac: false)
+                                 resources: resources, staysOnMac: switches.staysOnMac, noTraining: switches.noTraining)
         loadProblem = nil
         root = Self.findRoot(for: files)
         if root == nil { rootProblem = "these files are not inside one archive folder with a suite root marker" }
@@ -130,6 +134,34 @@ final class ImproveOCRController: ObservableObject {
     /// The archive root all `files` are inside: the nearest folder above the first with a root marker, the rule the
     /// Reader keys its flag records by (`SPEC/improve-ocr.md` §3). A marker that cannot be read stops the search
     /// (nil) rather than being looked past, as in the Reader.
+    /// "Stays on this Mac" and "must not train" for the files' collections: each file's folder, or the nearest folder
+    /// above it holding a collection's settings, resolved with its project and the general layer. Either is on when it
+    /// is on for any file's collection.
+    static func collectionSwitches(for files: [URL]) -> (staysOnMac: Bool, noTraining: Bool) {
+        var staysOnMac = false
+        var noTraining = false
+        var seen = Set<String>()
+        for url in files {
+            var dir = url.deletingLastPathComponent().standardizedFileURL
+            var doc: CollectionSettingsDocument?
+            while dir.pathComponents.count > 1 {
+                if case .document(let d) = CollectionSettingsFile.read(in: dir) { doc = d; break }
+                // The archive's root marker ends the search: a folder above it is not this archive's.
+                if (try? RootMarker.read(at: dir)) != nil { break }
+                dir = dir.deletingLastPathComponent()
+            }
+            guard seen.insert(dir.path).inserted else { continue }
+            let r = SettingsLayerStore.shared.resolver(for: doc)
+            // With no collection anywhere above, the general layer answers. "Stays on this Mac" counts only where a
+            // layer set it: its built-in value is the skipped interview's, which would hide every online reader from
+            // a user who never answered, where the dialog offered them before.
+            let stays = r.resolve(.staysOnMac)
+            staysOnMac = staysOnMac || (stays.layer != nil && stays.value.bool == true)
+            noTraining = noTraining || (r.resolve(.noTraining).value.bool ?? false)
+        }
+        return (staysOnMac, noTraining)
+    }
+
     static func findRoot(for files: [URL]) -> ReOCRJob.Root? {
         guard var dir = files.first?.deletingLastPathComponent().standardizedFileURL else { return nil }
         while dir.pathComponents.count > 1 {
@@ -191,6 +223,8 @@ final class ImproveOCRController: ObservableObject {
         }
         #endif
         let chooseReader = readerFor
+        // W46.training-optout-run: the job's OpenRouter calls refuse an upstream that may train.
+        OpenRouterDataPolicy.set(model.noTraining, for: openRouterPolicyToken)
         runTask = Task {
             let runs = await model.run(job: job, root: root, model: LLMModel.appleVisionModels[0], readerFor: chooseReader)
             for r in runs {
@@ -205,9 +239,11 @@ final class ImproveOCRController: ObservableObject {
             }
             running = false
             runTask = nil
+            OpenRouterDataPolicy.set(false, for: openRouterPolicyToken)
             revision += 1
         }
     }
+    private let openRouterPolicyToken = "improve-ocr-" + UUID().uuidString
 
     /// Stops a run when the dialog closes: no further page is read or paid for. A file already read stays "not
     /// decided" in the history, its original untouched.

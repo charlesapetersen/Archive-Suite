@@ -225,7 +225,35 @@ struct GeneralInterviewView: View {
                 Text("Yes, on a computing cluster").tag(FineTuningAnswer.cluster)
             }
             .help("Once you have corrected enough pages, a reader can be taught your material. It takes setup work, so most people answer No.")
+            trainingQuestions
         }
+    }
+
+    /// W46.training-optout-run: whether a key or plan found here trains on what it is sent. Asked only for the ways
+    /// whose terms depend on the account; a collection whose pages must not train hides the rest.
+    @ViewBuilder private var trainingQuestions: some View {
+        let found = Self.trainingWaysFound(inventory)
+        let shown = SettingsTraining.answerableWays.filter { found.contains($0.way) || answers.trainingOff.contains($0.way) }
+        if !shown.isEmpty {
+            ForEach(shown, id: \.way) { item in
+                Toggle(item.question, isOn: Binding(
+                    get: { answers.trainingOff.contains(item.way) },
+                    set: { on in
+                        if on { answers.trainingOff.insert(item.way) } else { answers.trainingOff.remove(item.way) }
+                        answers.touch(.trainingOff)
+                    }))
+            }
+            Text("A free Gemini or Mistral key, and a Claude or ChatGPT plan with its training setting on, may train the company's models on your pages. A collection that says its pages must not train uses these only when you say so here.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The answerable ways this Mac has: the keys found, the Claude tool, a ChatGPT sign-in.
+    static func trainingWaysFound(_ inventory: MacInventory) -> Set<String> {
+        var out = Set(inventory.keys.map(SettingsTraining.keyWay))
+        if inventory.claudePath != nil { out.insert(SettingsTraining.planWay("claude")) }
+        if inventory.chatGPTSignedIn { out.insert(SettingsTraining.planWay("chatgpt")) }
+        return out
     }
 
     private func dollars(_ label: String, _ value: Binding<Double>) -> some View {

@@ -338,10 +338,44 @@ extension OpenAICompatibleClient {
         }
     }
 
-    static func openRouterProviderField(_ route: OpenRouterRoute) -> [String: Any] {
-        ["order": [route.providerTag],
-         "allow_fallbacks": false,
-         "quantizations": [route.precision],
-         "max_price": ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]]
+    /// W46.training-optout-run: while a run whose collection says its pages must not train is going, every request
+    /// also carries `data_collection: "deny"`, so OpenRouter refuses an upstream that may keep or train on them; with
+    /// the provider pinned and fallbacks off, such a call fails instead of reading.
+    static func openRouterProviderField(_ route: OpenRouterRoute,
+                                        denyDataCollection: Bool = OpenRouterDataPolicy.denies) -> [String: Any] {
+        var field: [String: Any] = [
+            "order": [route.providerTag],
+            "allow_fallbacks": false,
+            "quantizations": [route.precision],
+            "max_price": ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]]
+        if denyDataCollection { field["data_collection"] = "deny" }
+        return field
+    }
+}
+
+/// W46.training-optout-run: which running jobs need OpenRouter to refuse upstreams that may train. Each job (a Process
+/// Files run, a Live Capture session, an Improve OCR job) holds its own entry under its own token, so one job ending
+/// never lifts another's. The clients are built deep in the pipeline, some on detached tasks, so the switch is read
+/// here when a request is made rather than passed down. A job that never clears its entry only keeps the stricter
+/// setting.
+enum OpenRouterDataPolicy {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var holders: Set<String> = []
+
+    /// Whether any running job's collection says its pages must not train.
+    static var denies: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return !holders.isEmpty
+    }
+
+    /// Set (or clear) `token`'s need.
+    static func set(_ deny: Bool, for token: String) {
+        lock.lock(); defer { lock.unlock() }
+        if deny { holders.insert(token) } else { holders.remove(token) }
+    }
+
+    /// The switch as a frozen settings snapshot holds it.
+    static func deny(_ values: [String: ResolvedSetting]?) -> Bool {
+        values?[SettingsKey.noTraining.rawValue]?.value.bool ?? false
     }
 }

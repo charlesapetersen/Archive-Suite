@@ -129,6 +129,9 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
     /// Whether the user set "pages may leave this Mac" themselves; until then choosing to spend money lets them leave.
     var staysOnMacChosen = false
     var preference: SettingsPreference = .bestMeasured
+    /// W46.training-optout-run: the keys and plans the user says do not train on their pages
+    /// (`SettingsTraining.answerableWays`); a collection whose pages must not train may then use them.
+    var trainingOff: Set<String> = []
     /// The starting point last pressed, and the answers it filled that the user has not changed since.
     var startingPoint: SettingsStartingPoint?
     var filled: Set<String> = []
@@ -148,6 +151,7 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
         staysOnMac = r.resolve(.staysOnMac).value.bool ?? staysOnMac
         if let e = layer.entry(.staysOnMac), case .follows = e.source {} else { staysOnMacChosen = layer.entry(.staysOnMac) != nil }
         preference = r.resolve(.preference).value.string.flatMap(SettingsPreference.init(rawValue:)) ?? preference
+        trainingOff = Set(r.resolve(.trainingOff).value.strings ?? [])
     }
 
     mutating func fill(_ point: SettingsStartingPoint) {
@@ -197,11 +201,14 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
         if staysOnMacChosen || filled.contains(SettingsKey.staysOnMac.rawValue) { put(.staysOnMac, .bool(staysOnMac)) }
         else { layer.set(.staysOnMac, .bool(staysOnMac), source: .follows(SettingsKey.moneyHabit.label, now)) }
         put(.preference, .string(preference.rawValue))
+        // Only the ways the interview asks about; an empty answer is not written, so the built-in "none" holds.
+        let off = trainingOff.filter { w in SettingsTraining.answerableWays.contains { $0.way == w } }.sorted()
+        if off.isEmpty { layer.reset(.trainingOff) } else { put(.trainingOff, .strings(off)) }
     }
 
     /// The general values this interview answers; a skip clears these and nothing else.
     static let keys: [SettingsKey] = [.cluster, .gpusPerJob, .moneyHabit, .batchCeilingUSD, .monthCeilingUSD, .hours,
-                                      .fineTuning, .downloadsAllowed, .staysOnMac, .preference]
+                                      .fineTuning, .downloadsAllowed, .staysOnMac, .preference, .trainingOff]
 
     /// What a skipped interview writes: only what was found on the Mac, so the sheet can list it. Every answer an
     /// earlier run gave is removed, so every other value is the built-in "Free, on this Mac" and nothing is spent

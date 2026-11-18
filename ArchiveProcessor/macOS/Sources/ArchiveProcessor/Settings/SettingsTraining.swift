@@ -130,16 +130,147 @@ enum SettingsTraining {
         for k in ways {
             let rec = k == "openrouter" ? openRouter(r, appRoute: appRoute)
                 : Self.keys[k] ?? Record(provider: k, terms: .unknown, summary: "no terms are on record for this key", source: "")
-            if rec.terms != .never { return rec }
+            if !safe(rec, way: keyWay(k), resources: resources) { return rec }
         }
         for p in planWays {
             let rec = Self.plans[p] ?? Record(provider: p, terms: .unknown, summary: "no terms are on record for this plan", source: "")
-            if rec.terms != .never { return rec }
+            if !safe(rec, way: planWay(p), resources: resources) { return rec }
         }
         return nil
+    }
+
+    // MARK: The user's own answer per key and plan (W46.training-optout-run)
+
+    /// The general interview's names for a way in, as `SettingsResources.trainingOff` holds them: `key:gemini`,
+    /// `plan:claude`. Prefixed, so a key and a plan never share a name.
+    static func keyWay(_ key: String) -> String { "key:" + key }
+    static func planWay(_ plan: String) -> String { "plan:" + plan }
+
+    /// A way's terms with the user's answer: a key the user says is billed, or a plan whose training setting the
+    /// user says is off, is safe. Only terms that depend on the account can be answered; a provider that may train
+    /// whatever the account (`.mayTrain`) or whose terms are unknown stays hidden.
+    static func safe(_ rec: Record, way: String, resources: SettingsResources) -> Bool {
+        switch rec.terms {
+        case .never: return true
+        case .unlessPaid, .unlessOptedOut: return resources.trainingOff.contains(way)
+        case .mayTrain, .unknown: return false
+        }
+    }
+
+    /// The ways the general interview asks about: the keys and plans whose terms depend on the account, with the
+    /// question in the interview's words.
+    static let answerableWays: [(way: String, question: String)] = [
+        (keyWay("gemini"), "My Gemini key is on a billed Google Cloud project"),
+        (keyWay("mistral"), "My Mistral key is on a paid plan, or its training setting is off"),
+        (planWay("claude"), "My Claude plan's “Help improve Claude” setting is off"),
+        (planWay("chatgpt"), "My ChatGPT plan's “Improve the model for everyone” setting is off"),
+    ]
+
+    /// The answers in the Settings window's words; ArchiveCore's `CollectionSettingsVocabulary.trainingOffWords` is
+    /// the same table, checked by the settings-layers test driver.
+    static let wayWords: [String: String] = [
+        "key:gemini": "the Gemini key (billed)", "key:mistral": "the Mistral key (paid or opted out)",
+        "plan:claude": "the Claude plan (training off)", "plan:chatgpt": "the ChatGPT plan (training off)",
+    ]
+
+    // MARK: The run (W46.training-optout-run)
+
+    /// One way a run sends pages off this Mac, in the solver's names.
+    enum RunWay: Equatable, Sendable {
+        case key(String)
+        case plan(String)
+        /// An OpenRouter model, by its id; its pinned upstream's terms hold.
+        case openRouter(modelID: String)
+        /// Nothing leaves the Mac, or it goes through a way whose terms rule training out (the gateway).
+        case safe
+    }
+
+    /// What Process Files says before it runs a way the switch hides, or nil when every way is safe. `ways` are the
+    /// run's readers and segmenter, each with what it does in the run ("reads the pages").
+    static func runWarning(_ ways: [(RunWay, String)], resources: SettingsResources) -> String? {
+        var lines: [String] = []
+        var seen = Set<String>()
+        for (way, role) in ways {
+            let rec: Record?
+            let wayName: String
+            switch way {
+            case .safe: continue
+            case .key(let k):
+                wayName = keyWay(k)
+                rec = keys[k] ?? Record(provider: k, terms: .unknown, summary: "no terms are on record for this key", source: "")
+            case .plan(let p):
+                wayName = planWay(p)
+                rec = plans[p] ?? Record(provider: p, terms: .unknown, summary: "no terms are on record for this plan", source: "")
+            case .openRouter(let id):
+                wayName = "openrouter:" + id
+                let pin = OpenRouterRoute.catalog.first { $0.model.id == id }
+                let upstream = pin.flatMap { $0.providerTag.split(separator: "/").first.map(String.init) }
+                let up = upstream.flatMap { upstreams[$0] }
+                // An upstream that trains is refused by OpenRouter under the switch (`data_collection: deny`), so the
+                // call fails instead of reading; say so before the run.
+                if let up, up.terms == .never { continue }
+                rec = up ?? unpinned
+            }
+            guard let rec, !safe(rec, way: wayName, resources: resources), seen.insert(wayName + role).inserted else { continue }
+            if case .openRouter = way {
+                lines.append("• \(role.prefix(1).uppercased() + role.dropFirst()) through \(rec.provider): \(rec.summary). "
+                             + "OpenRouter is told not to send these pages to a provider that may train, so those calls will fail.")
+            } else {
+                lines.append("• \(role.prefix(1).uppercased() + role.dropFirst()) with \(rec.provider): \(rec.summary).")
+            }
+        }
+        guard !lines.isEmpty else { return nil }
+        return "This collection's settings say its pages must not train a provider's models, but this run would send them where they may:\n\n"
+            + lines.joined(separator: "\n")
+            + "\n\nIf the key is billed or the plan's training setting is off, say so in Settings, under the general questions, and this warning stops."
     }
 
     /// The solver's blocker: one fixed prefix the sheet recognises, then the provider's own sentence.
     static let blockerPrefix = "may train on the pages: "
     static func blocker(_ rec: Record) -> String { blockerPrefix + rec.provider + " — " + rec.summary }
+}
+
+// MARK: - The ways a Process Files run sends pages (W46.training-optout-run)
+
+extension SettingsTraining {
+    /// The reader's way: the Local Agent's plan first, then the gateway, then the provider's own key, as the run
+    /// picks them (`OCRProcessor`'s client choice).
+    static func readingWay(provider: LLMProvider, modelID: String, gateway: Bool, localAgent: LocalAgentTool?) -> RunWay {
+        switch localAgent {
+        case .claude?: return .plan("claude")
+        case .codex?: return .plan("chatgpt")
+        case .gemini?: return .key("gemini")   // the Gemini CLI's free entitlement is Google's free tier
+        case nil: break
+        }
+        if gateway { return .safe }
+        switch provider {
+        case .appleVision: return .safe
+        case .openrouter: return .openRouter(modelID: modelID)
+        case .anthropic: return .key("anthropic")
+        case .openai: return .key("openai")
+        case .gemini: return .key("gemini")
+        case .mistral: return .key("mistral")
+        }
+    }
+
+    /// The window segmenter's ways: each voter of the approach (and the 2B's partner), by the way the run sends it.
+    static func segmentationWays(_ plan: SegmentationPlan, routes: SegmentationRoutes,
+                                 options: SegmentationOptions?) -> [RunWay] {
+        guard case .windows(let approach) = plan, let options else { return [] }
+        let spec: ApproachSpec?
+        if approach == .local, let partner = routes.localPartner {
+            spec = try? options.spec(for: approach, partner: partner)
+        } else {
+            spec = try? options.spec(for: approach)
+        }
+        return (spec?.voters ?? []).map { v in
+            switch v.provider {
+            case .local: return .safe
+            case .gemini: return .key("gemini")
+            case .anthropic: return routes.claudeByPlan ? .plan("claude") : .key("anthropic")
+            case .openai: return routes.chatGPTByPlan ? .plan("chatgpt") : .key("openai")
+            case .openrouter: return .openRouter(modelID: v.modelID)
+            }
+        }
+    }
 }

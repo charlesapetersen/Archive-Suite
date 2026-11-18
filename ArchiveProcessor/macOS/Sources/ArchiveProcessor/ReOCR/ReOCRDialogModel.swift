@@ -35,15 +35,18 @@ final class ReOCRDialogModel {
     let pairs: OCRPairMatrix?
     let resources: SettingsResources
     let staysOnMac: Bool
+    /// W46.training-optout-run: the files' collections say their pages must not train a provider's models.
+    let noTraining: Bool
 
     /// `selectedPairs` keeps, for a file the Reader named pairs for, only those pairs (0-based); a pair past the end of
     /// the file is ignored.
     init(files urls: [URL], selectedPairs: [URL: [Int]] = [:], table: SettingsRouteTable, pairs: OCRPairMatrix?,
-         resources: SettingsResources, staysOnMac: Bool) {
+         resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false) {
         self.table = table
         self.pairs = pairs
         self.resources = resources
         self.staysOnMac = staysOnMac
+        self.noTraining = noTraining
         for url in urls {
             let data = (try? Data(contentsOf: url)) ?? Data()
             let eligibility = ReOCRPairs.validate(data)
@@ -106,7 +109,7 @@ final class ReOCRDialogModel {
     private func ranking(for kind: OCRPageKind, pages count: Int) -> ReOCRRanking {
         let current = pages.first { $0.settledKind == kind }.flatMap { p in files.first { $0.id == p.fileID }?.currentReader }
         return ReOCRRanking.rank(kind: kind, pages: count, table: table, pairs: pairs, resources: resources,
-                                 staysOnMac: staysOnMac, current: current)
+                                 staysOnMac: staysOnMac, noTraining: noTraining, current: current)
     }
 
     // MARK: Choice and estimate
