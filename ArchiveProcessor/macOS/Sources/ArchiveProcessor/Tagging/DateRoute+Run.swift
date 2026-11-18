@@ -111,8 +111,15 @@ extension DateRoute {
     /// POST one user message to the gateway's chat completions at temperature 0, reasoning low; the first choice's
     /// text, nil on any failure or a non-200.
     private static func chat(content: Any, gateway: GatewayConfig) async -> String? {
+        await gatewayChat(content: content, gateway: gateway, model: gatewayModel, maxTokens: maxTokens,
+                          timeout: timeout)
+    }
+
+    /// The same request for another stage's measured call (W47.item-fields-build), with that stage's caps.
+    static func gatewayChat(content: Any, gateway: GatewayConfig, model: String, maxTokens: Int,
+                            timeout: TimeInterval) async -> String? {
         let body: [String: Any] = [
-            "model": gatewayModel, "temperature": 0, "max_tokens": maxTokens, "reasoning_effort": "low",
+            "model": model, "temperature": 0, "max_tokens": maxTokens, "reasoning_effort": "low",
             "messages": [["role": "user", "content": content]],
         ]
         guard let url = URL(string: "\(GatewayConfig.normalizedBaseURL(gateway.baseURL))/chat/completions"),

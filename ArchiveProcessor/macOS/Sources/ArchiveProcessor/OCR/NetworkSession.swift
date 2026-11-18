@@ -136,7 +136,7 @@ enum NetworkSession {
     /// OpenRouter request contract (`OpenRouterTestDriver.envKey`) and the W41 cascade contract
     /// (`OCRCascadeTestDriver.envKey`) and the W41 page-kind contract (`OCRPageKindTestDriver.envKey`) and the W41
     /// local-model contract (`LocalModelsTestDriver.envKey`), and the W46 entity feature
-    /// (`EntityFeatureTestDriver.envKey`).
+    /// (`EntityFeatureTestDriver.envKey`), and the W47 item fields (`ItemFieldsTestDriver.envKey`).
     nonisolated static func visionHybridTestTransportIsEnabled(flag: String?) -> Bool { flag == "1" }
 
     /// The stand-in transport for THIS process, or nil when the wire is what a request takes. Resolved in
@@ -173,6 +173,8 @@ enum NetworkSession {
                 flag: ProcessInfo.processInfo.environment[EntityFeatureTestDriver.envKey])
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[DateRouteTestDriver.envKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[ItemFieldsTestDriver.envKey])
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[PageReaderTestDriver.envKey]))
         else { return nil }

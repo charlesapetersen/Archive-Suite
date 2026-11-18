@@ -345,6 +345,8 @@ enum DateRouteTestDriver {
         var trace: [String] = []
         /// The image calls by the documents' page widths, and the model each call asked for.
         var images: [[Int]] = []
+        /// W47.item-fields-build's calls (answered "{}"), counted apart from the dating calls.
+        var itemFields = 0
         var models: Set<String> = []
         var taggingReply: [String: String] = [:]
         var traceReply: [String: String] = [:]
@@ -367,6 +369,11 @@ enum DateRouteTestDriver {
             let content: String = wire.lock.withLock {
                 if let model = body?["model"] as? String { wire.models.insert(model) }
                 if let parts = message?["content"] as? [[String: Any]] {
+                    // W47.item-fields-build's call sends the page images too; it is not the dating image pass.
+                    if (parts.last?["text"] as? String)?.hasPrefix("You are labelling catalogue fields") == true {
+                        wire.itemFields += 1
+                        return "{}"
+                    }
                     let widths = parts.compactMap { p -> Int? in
                         guard let u = (p["image_url"] as? [String: Any])?["url"] as? String,
                               let b64 = u.components(separatedBy: "base64,").last, let d = Data(base64Encoded: b64),
@@ -771,6 +778,14 @@ enum DateRouteTestDriver {
         check("6 Live D: the phone's 1933, no dating object", d.contains("1933") && !d.contains("1950")
               && dating("D") == nil && json(staged("D")?.jsonURL)["subjects"] != nil, "\(d)")
 
+        // W47.item-fields-build: the item-field call on Live documents too (the gateway is the measured route).
+        func fields(_ gid: String) -> [String: Any]? { json(staged(gid)?.jsonURL)["item_fields"] as? [String: Any] }
+        check("6 Live: an item-field call per document, its object in each sidecar",
+              wire.lock.withLock { wire.itemFields } == 4
+              && ["A", "B", "C", "D"].allSatisfy { fields($0)?["status"] as? String == "read" }
+              && fields("A")?["route"] as? String == "Gateway · " + ItemFieldExtractor.gatewayModel,
+              "\(wire.itemFields) \(String(describing: fields("A")))")
+
         // The staging manifest keeps the decision, so a relaunch's rotation review regenerates it without a call.
         let kept = s.liveProcessor._datingTestRetained("B")
         let reloaded = CaptureSession()
@@ -778,8 +793,9 @@ enum DateRouteTestDriver {
         check("6 Live: the staging manifest round-trips the decision", kept?.evidenceClass == .image
               && reloaded.liveProcessor._datingTestRetained("B") == kept
               && reloaded.liveProcessor._datingTestRetained("D") == nil)
-        let calls = wire.lock.withLock { wire.trace.count + wire.images.count }
+        let calls = wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields }
         let before = (dating("B") ?? [:]) as NSDictionary
+        let fieldsBefore = (fields("B") ?? [:]) as NSDictionary
         if let src = s.photos.first(where: { $0.groupId == "B" })?.url {
             s.liveProcessor.rotationReviewPages = [
                 LiveCaptureProcessor.RotationReviewPage(groupId: "B", pageIndex: 0, order: 2, sourceURL: src, rotationDegrees: 90)
@@ -789,7 +805,8 @@ enum DateRouteTestDriver {
             check("6 Live: the regenerated B keeps its dating object and header line, no second call",
                   done && ((dating("B") ?? [:]) as NSDictionary) == before
                   && evidence("B") == "image; page 1; dateline; \"March 30, 1961\""
-                  && wire.lock.withLock { wire.trace.count + wire.images.count } == calls,
+                  && wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields } == calls
+                  && !fieldsBefore.allKeys.isEmpty && ((fields("B") ?? [:]) as NSDictionary) == fieldsBefore,
                   "\(String(describing: dating("B")))")
         } else {
             check("6 Live: B's source page is on disk", false)

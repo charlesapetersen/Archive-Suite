@@ -1210,6 +1210,11 @@ final class LiveCaptureProcessor: ObservableObject {
         let dating = humanOnly ? nil
             : await liveDating(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
         dating?.apply(to: &tags)
+        // W47.item-fields-build — the item-field call, on the measured route only. Same B8 cover as above.
+        let itemFields = humanOnly ? nil
+            : await liveItemFields(group: group, segment: segment, results: results, tags: tags, mac: mac,
+                                   config: config)
+        guard clearGeneration == startedGeneration else { return }
         // Phone's in-the-room date wins (Mac override beats the phone value).
         if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
         if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
@@ -1261,7 +1266,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
                                    localAgentModelName: localAgentModelName, stagingDir: stagingDir, writeJSON: writeJSON,
-                                   jsonTags: jsonTags, entities: entities, dating: dating, texts: texts,
+                                   jsonTags: jsonTags, entities: entities, dating: dating, itemFields: itemFields,
+                                   texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1293,7 +1299,8 @@ final class LiveCaptureProcessor: ObservableObject {
             groupId: groupId, type: gType, order: gOrder,
             pages: pages, baseTags: baseTags, doMerge: doMerge, model: model, gatewayName: gatewayName,
             localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
-            writeJSON: writeJSON, jsonTags: jsonTags, entities: entities, dating: dating, texts: texts,
+            writeJSON: writeJSON, jsonTags: jsonTags, entities: entities, dating: dating, itemFields: itemFields,
+            texts: texts,
             boxLabelText: gType == .box ? texts.first : nil,
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
             exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1457,6 +1464,22 @@ final class LiveCaptureProcessor: ObservableObject {
                                    backend: backend, imageEveryDocument: imageEveryDocument)
     }
 
+    /// W47.item-fields-build — the item-field call for a document the tagging call read here (automatic mode, not
+    /// Mac-tagged, a reply that is not a failure), with sidecars on (its only output so far), on the measured route
+    /// only, as in Process Files: every page's text and image at its run rotation. nil = no `item_fields` object.
+    private func liveItemFields(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult],
+                                tags: GeneratedTags, mac: MacSegmentTags?,
+                                config: SessionProcessingConfig) async -> ItemFieldResult? {
+        guard group.type == .document, config.taggingMode == .automatic, (mac?.subjects ?? []).isEmpty,
+              !tags.ocrFailed, !segment.combinedText.isEmpty,
+              ItemFieldPolicy.skipReason(gateway: config.textGateway, localAgent: config.textLocalAgent,
+                                         sidecars: config.enableSegmentJSON) == nil,
+              let gateway = config.textGateway else { return nil }
+        let pages = zip(segment.pdfURLs, results).map { (url: $0, rotation: $1.rotationDegrees) }
+        return await ItemFieldExtractor.extract(ItemFieldExtractor.Input(texts: segment.texts, pages: Array(pages)),
+                                                gateway: gateway, route: "Gateway · " + ItemFieldExtractor.gatewayModel)
+    }
+
     // MARK: - Off-main file writing (nonisolated static; only touches the filesystem)
 
     private struct PageWork: Sendable, Codable {
@@ -1495,6 +1518,9 @@ final class LiveCaptureProcessor: ObservableObject {
         /// W46.date-route-other-paths — the dating route's decision, kept so a regenerated segment writes the same
         /// sidecar `dating` object and header line without a second call. nil when the route did not run.
         let dating: DateRoute.Decision?
+        /// W47.item-fields-build — the item fields written into the sidecar, kept so a regenerated sidecar carries
+        /// them without a second call. nil when the call did not run.
+        let itemFields: ItemFieldResult?
         let texts: [String]
         let boxLabelText: String?
         let outputImageFile: Bool
@@ -1514,7 +1540,7 @@ final class LiveCaptureProcessor: ObservableObject {
              pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
              localAgentDisplayName: String?, localAgentModelName: String?,
              writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil,
-             dating: DateRoute.Decision? = nil, texts: [String],
+             dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil, texts: [String],
              boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
@@ -1524,6 +1550,7 @@ final class LiveCaptureProcessor: ObservableObject {
             self.gatewayName = gatewayName
             self.localAgentDisplayName = localAgentDisplayName; self.localAgentModelName = localAgentModelName
             self.writeJSON = writeJSON; self.jsonTags = jsonTags; self.entities = entities; self.dating = dating
+            self.itemFields = itemFields
             self.texts = texts; self.boxLabelText = boxLabelText; self.outputImageFile = outputImageFile
             self.pdfImageMB = pdfImageMB; self.exportedImageMB = exportedImageMB; self.textColumns = textColumns
             self.taggingMode = taggingMode
@@ -1537,7 +1564,7 @@ final class LiveCaptureProcessor: ObservableObject {
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         localAgentDisplayName: String?, localAgentModelName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil,
-        dating: DateRoute.Decision? = nil, texts: [String],
+        dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil, texts: [String],
         boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
@@ -1625,7 +1652,8 @@ final class LiveCaptureProcessor: ObservableObject {
         if writeJSON, type == .document, let firstPDF = pdfURLs.first {
             let jurl = firstPDF.deletingPathExtension().appendingPathExtension("json")
             writeSegmentJSON(pageURLs: pages.map { $0.sourceURL }, texts: texts, tags: jsonTags,
-                             entities: entities?.sidecarObject, dating: dating?.sidecarObject(), to: jurl)
+                             entities: entities?.sidecarObject, dating: dating?.sidecarObject(),
+                             itemFields: itemFields?.sidecarObject, to: jurl)
             if fm.fileExists(atPath: jurl.path) { jsonURL = jurl }   // only record it if it actually wrote
         }
 
@@ -1724,9 +1752,10 @@ final class LiveCaptureProcessor: ObservableObject {
     /// is documents-only, so it passes no box/folder label format override.
     nonisolated private static func writeSegmentJSON(pageURLs: [URL], texts: [String], tags: GeneratedTags,
                                                      entities: [String: Any]? = nil, dating: [String: Any]? = nil,
-                                                     to jsonURL: URL) {
+                                                     itemFields: [String: Any]? = nil, to jsonURL: URL) {
         guard let data = SegmentJSONBuilder.buildData(fileURLs: pageURLs, texts: texts, tags: tags,
-                                                      entities: entities, dating: dating) else { return }
+                                                      entities: entities, dating: dating,
+                                                      itemFields: itemFields) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
 
@@ -2100,7 +2129,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                            localAgentDisplayName: seg.localAgentDisplayName,
                                            localAgentModelName: seg.localAgentModelName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
-                                           entities: seg.entities, dating: seg.dating,
+                                           entities: seg.entities, dating: seg.dating, itemFields: seg.itemFields,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,

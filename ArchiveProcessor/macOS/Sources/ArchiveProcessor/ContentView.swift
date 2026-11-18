@@ -104,6 +104,7 @@ struct ContentView: View {
             SettingsSheetTestDriver.runIfRequested()         // $0 W46 settings sheet: its words and its offscreen pages
             EntityFeatureTestDriver.runIfRequested()         // $0 W46 entity feature: prompt, evidence, policy, sidecar
             DateRouteTestDriver.runIfRequested()             // $0 W46 dating route: bench cases, decision, sidecar
+            ItemFieldsTestDriver.runIfRequested()            // $0 W47 item fields: parse, fill policy, sidecar
             ReOCRRankingTestDriver.runIfRequested()          // $0 W44 Improve OCR ranked readers, no wire
             ImproveOCRRequestStoreTestDriver.runIfRequested() // $0 W44 Improve OCR hand-off store, scratch only
             ReOCRPreservationCheckTestDriver.runIfRequested() // $0 W44 Improve OCR byte-preservation check, in memory

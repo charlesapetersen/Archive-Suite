@@ -1125,6 +1125,13 @@ extension OCRProcessor {
         let datingInputs: [DateRoute.Input?] = (0..<total).map {
             datingInput(for: $0, in: snapshot, jobBySource: jobBySource)
         }
+        // W47.item-fields-build: every page's text and image, for the item-field call where it runs on this backend.
+        let itemFieldGateway = ItemFieldPolicy.skipReason(gateway: gateway, localAgent: localAgent,
+                                                         sidecars: enableSegmentJSON) == nil ? gateway : nil
+        let itemFieldRoute = "Gateway · " + ItemFieldExtractor.gatewayModel
+        let itemFieldInputs: [ItemFieldExtractor.Input?] = (0..<total).map {
+            itemFieldGateway == nil ? nil : itemFieldInput(for: snapshot[$0], jobBySource: jobBySource)
+        }
 
         // Precompute neighbor context per segment on the main actor, so the concurrent tasks capture
         // only immutable, Sendable inputs.
@@ -1145,13 +1152,15 @@ extension OCRProcessor {
         // enclosure's write is deferred until the pool drains, then applied from `finalTagsBySeg`.
         var finalTagsBySeg: [Int: GeneratedTags] = [:]
         var deferredEnclosures: [(index: Int, raw: GeneratedTags, entities: EntityResult?,
-                                  dating: DateRoute.Decision?)] = []
+                                  dating: DateRoute.Decision?, fields: ItemFieldResult?)] = []
 
         // One segment: its tags, then its date (W46.date-route), then its names when the policy runs the feature on it
         // (the reply's `format` says whether it is correspondence). Mac-tagged segments skip every call.
-        let work: @Sendable (Int) async -> (Int, GeneratedTags, EntityResult?, DateRoute.Decision?) = { i in
+        // Then its item fields (W47.item-fields-build), on the measured route only.
+        let work: @Sendable (Int) async -> (Int, GeneratedTags, EntityResult?, DateRoute.Decision?,
+                                            ItemFieldResult?) = { i in
             if !macSubjectsBySeg[i].isEmpty {
-                return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil, nil)   // Mac-tagged → no LLM
+                return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil, nil, nil)   // Mac-tagged → no LLM
             }
             let tags = await generator.generateTags(
                 for: snapshot[i], nearbySegments: nearbyBySeg[i],
@@ -1162,39 +1171,44 @@ extension OCRProcessor {
             if let input = datingInputs[i], !tags.ocrFailed, !Task.isCancelled {
                 dating = await DateRoute.run(input, backend: datingBackend, imageEveryDocument: imageEveryDocument)
             }
+            var fields: ItemFieldResult? = nil
+            if let input = itemFieldInputs[i], let g = itemFieldGateway, !tags.ocrFailed, !Task.isCancelled {
+                fields = await ItemFieldExtractor.extract(input, gateway: g, route: itemFieldRoute)
+            }
             var inputs = entityBase[i]
             inputs.format = tags.format
             // The sidecar is the names' only output, so with sidecars off the call would be spent for nothing.
             guard enableSegmentJSON, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs) else {
-                return (i, tags, nil, dating)
+                return (i, tags, nil, dating, fields)
             }
             let names = await EntityExtractor.extract(text: snapshot[i].combinedText, decision: run,
                                                       provider: provider, model: model, apiKey: apiKey,
                                                       gatewayConfig: gateway)
-            return (i, tags, names, dating)
+            return (i, tags, names, dating, fields)
         }
 
         // Tag segments concurrently (bounded pool) instead of one-at-a-time. Each call is small,
         // text-only, and independent, so overlapping the network round-trips is a big speedup.
         // Tagging is a simple text→JSON task, so we skip thinking (`thinkingLevel: nil`).
         var completed = 0
-        await withTaskGroup(of: (Int, GeneratedTags, EntityResult?, DateRoute.Decision?).self) { group in
+        await withTaskGroup(of: (Int, GeneratedTags, EntityResult?, DateRoute.Decision?,
+                                 ItemFieldResult?).self) { group in
             var next = 0
             while next < maxConcurrent {
                 let i = next
                 group.addTask { await work(i) }
                 next += 1
             }
-            for await (i, rawTags, names, dating) in group {
+            for await (i, rawTags, names, dating, fields) in group {
                 if Task.isCancelled { break }
                 if Self.validCoverIndex(of: i, in: snapshot) != nil {
-                    deferredEnclosures.append((i, rawTags, names, dating))
+                    deferredEnclosures.append((i, rawTags, names, dating, fields))
                 } else {
                     finalTagsBySeg[i] = applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
                                                            enableSegmentJSON: enableSegmentJSON,
                                                            outputDirectory: outputDirectory,
                                                            runConfig: runConfig, entities: names,
-                                                           dating: dating,
+                                                           dating: dating, itemFields: fields,
                                                            taggingSenderWithheld: senderWithheld[i])
                 }
                 completed += 1
@@ -1209,7 +1223,7 @@ extension OCRProcessor {
         }
         // Same cancellation contract as the pool: a cancelled run writes nothing further.
         guard !Task.isCancelled else { return }
-        for (i, raw, names, dating) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
+        for (i, raw, names, dating, fields) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
             // A cover that was never applied (absent from `finalTagsBySeg`) yields NO sent-with date —
             // never a neighbour's.
             let cover = Self.validCoverIndex(of: i, in: snapshot).flatMap { finalTagsBySeg[$0] }
@@ -1217,7 +1231,7 @@ extension OCRProcessor {
                                                    enableSegmentJSON: enableSegmentJSON,
                                                    outputDirectory: outputDirectory,
                                                    runConfig: runConfig, coverTags: cover ?? GeneratedTags(),
-                                                   entities: names, dating: dating,
+                                                   entities: names, dating: dating, itemFields: fields,
                                                    taggingSenderWithheld: senderWithheld[i])
         }
     }
@@ -1234,6 +1248,15 @@ extension OCRProcessor {
             (url: url, rotation: jobBySource[url].flatMap { jobs[$0].result?.rotationDegrees } ?? 0)
         }
         return DateRoute.Input(text: DateRoute.ownText(seg), near: near, pages: Array(pages))
+    }
+    /// W47.item-fields-build — what the item-field call reads for one segment: every page's text and source image with
+    /// the run's rotation correction, or nil for a label or a document with no text (no call is made).
+    func itemFieldInput(for seg: DocumentSegment, jobBySource: [URL: Int]) -> ItemFieldExtractor.Input? {
+        guard !seg.isBox, !seg.isFolder, !seg.combinedText.isEmpty, !seg.pdfURLs.isEmpty else { return nil }
+        let pages = seg.pdfURLs.map { url in
+            (url: url, rotation: jobBySource[url].flatMap { jobs[$0].result?.rotationDegrees } ?? 0)
+        }
+        return ItemFieldExtractor.Input(texts: seg.texts, pages: pages)
     }
     /// W46.ent-feature — the names policy's inputs for one segment, before the tagging reply gives its `format`
     /// (`EntityRunPolicy.inputs`, which Live Capture reads too).
@@ -1261,7 +1284,7 @@ extension OCRProcessor {
                                     enableSegmentJSON: Bool, outputDirectory: URL,
                                     runConfig: SessionProcessingConfig?,
                                     coverTags: GeneratedTags? = nil, entities: EntityResult? = nil,
-                                    dating: DateRoute.Decision? = nil,
+                                    dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil,
                                     taggingSenderWithheld: Bool = false) -> GeneratedTags {
         guard i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
@@ -1306,7 +1329,7 @@ extension OCRProcessor {
                              tags: EntityRunPolicy.sidecarTags(tags, withholdingSender: taggingSenderWithheld),
                              outputDirectory: outputDirectory,
                              enclosureOf: enclosureOfName, entities: entities?.sidecarObject,
-                             dating: dating?.sidecarObject())
+                             dating: dating?.sidecarObject(), itemFields: itemFields?.sidecarObject)
         }
         return tags
     }
@@ -1455,7 +1478,7 @@ extension OCRProcessor {
     }
     private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL,
                                   enclosureOf: String? = nil, entities: [String: Any]? = nil,
-                                  dating: [String: Any]? = nil) {
+                                  dating: [String: Any]? = nil, itemFields: [String: Any]? = nil) {
         guard let firstFile = segment.pdfURLs.first else { return }
         // Write JSON next to the output PDF, using its base name so they match
         let jsonURL: URL
@@ -1472,7 +1495,7 @@ extension OCRProcessor {
         guard let data = SegmentJSONBuilder.buildData(fileURLs: segment.pdfURLs, texts: segment.texts,
                                                       tags: tags, formatOverride: formatOverride,
                                                       enclosureOf: enclosureOf, entities: entities,
-                                                      dating: dating) else { return }
+                                                      dating: dating, itemFields: itemFields) else { return }
         try? data.write(to: jsonURL, options: .atomic)
     }
     /// Merge multi-page document segments into single PDFs.

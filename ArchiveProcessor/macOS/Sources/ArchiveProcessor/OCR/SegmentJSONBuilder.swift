@@ -40,11 +40,16 @@ enum SegmentJSONBuilder {
     ///   - dating: W46.date-route — the dating route's `dating` object (`DateRoute.Decision.sidecarObject`): the
     ///     evidence class, the quote and its place, the interval where measured, second-role dates. `nil` → no key.
     ///
+    ///   - itemFields: W47.item-fields-build — the item-field call's `item_fields` object (`ItemFieldResult.sidecarObject`),
+    ///     when it ran on this document. When it read the document, it answers the publication and where the addressee
+    ///     is, so the tagging call's `publication_name` and `recipient_location` are left out: one answer per field.
+    ///     `nil` → no key, and the sidecar is byte-identical to the output before the feature.
+    ///
     /// The output is `[.prettyPrinted, .sortedKeys]` JSON, so it is byte-for-byte deterministic.
     static func buildData(fileURLs: [URL], texts: [String],
                           tags: GeneratedTags, formatOverride: String? = nil,
                           enclosureOf: String? = nil, entities: [String: Any]? = nil,
-                          dating: [String: Any]? = nil) -> Data? {
+                          dating: [String: Any]? = nil, itemFields: [String: Any]? = nil) -> Data? {
         // Body text with per-image markers (image marker always; text line only when non-empty).
         var bodyParts: [String] = []
         for (i, url) in fileURLs.enumerated() {
@@ -74,6 +79,13 @@ enum SegmentJSONBuilder {
             dict["author_name"] = nil
             dict["recipient_name"] = nil
             dict["author_location"] = nil
+        }
+        if let itemFields {
+            dict["item_fields"] = itemFields
+            if itemFields["status"] as? String == "read" {
+                dict["publication_name"] = nil
+                dict["recipient_location"] = nil
+            }
         }
         // Box/folder label override wins over tags.format (Process-Files path); nil-op for documents.
         if let f = formatOverride { dict["format"] = f }
