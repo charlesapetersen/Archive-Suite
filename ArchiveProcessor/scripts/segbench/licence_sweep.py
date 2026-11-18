@@ -332,6 +332,37 @@ def gutenocr_lines() -> int:
     return 0
 
 
+def gutenocr_check() -> int:
+    """W46.gutenocr-lines-ref: do GutenOCR's line boxes lie on kraken's lines? For each page with GutenOCR lines from
+    either runtime (place_hands.py detect gutenocr | gutenocr-mlx), the lowest line's bottom as a share of the page
+    height beside kraken blla's, and the share of GutenOCR lines whose vertical centre falls inside a blla line's
+    box that also overlaps it in x. Writes segbench-results/licence-sweep-gutenocr-check.json."""
+    import place_hands as PH
+    blla = PH.CACHE / "lines/blla"
+    out = {"item": "W46.gutenocr-lines-ref", "detector": f"{PH.GUTEN[0]}@{PH.GUTEN[1]}", "runtimes": {}}
+    for rt in ("gutenocr", "gutenocr-mlx"):
+        rows = []
+        for f in sorted((PH.CACHE / "lines" / rt).glob("*.json")):
+            g, k = json.loads(f.read_text()), json.loads((blla / f.name).read_text())
+            gb, kb = [ln["box"] for ln in g["lines"]], [ln["box"] for ln in k["lines"]]
+            if not gb or not kb:
+                rows.append({"page": f.stem, "lines": len(gb), "blla": len(kb)})
+                continue
+            on = sum(any(x[1] <= y + h / 2 <= x[1] + x[3] and min(x[0] + x[2], b[0] + b[2]) > max(x[0], b[0])
+                         for x in kb) for b in gb for y, h in [(b[1], b[3])])
+            rows.append({"page": f.stem, "lines": len(gb), "blla": len(kb),
+                         "bottom": round(max(b[1] + b[3] for b in gb), 3), "blla_bottom": round(max(b[1] + b[3] for b in kb), 3),
+                         "right": round(max(b[0] + b[2] for b in gb), 3), "blla_right": round(max(b[0] + b[2] for b in kb), 3),
+                         "on_blla_line": round(on / len(gb), 3), "tokens": g.get("tokens"), "seconds": g.get("seconds")})
+        if rows:
+            out["runtimes"][rt] = rows
+            print(rt)
+            for r in rows:
+                print("  " + "  ".join(f"{k}={v}" for k, v in r.items()))
+    (RES / "licence-sweep-gutenocr-check.json").write_text(json.dumps(out, indent=1) + "\n")
+    return 0
+
+
 def gutenocr_prep() -> int:
     """GutenOCR-3B for mlx-vlm (run from the lab venv): its two bf16 shards hold no lm_head while the config says
     untied; the repo's single-file copy carries one, range-read on 18 Nov and byte-identical to the shards'
@@ -364,7 +395,7 @@ def gutenocr_prep() -> int:
 
 
 if __name__ == "__main__":
-    cmds = {"gutenocr-prep": gutenocr_prep, "gutenocr-lines": gutenocr_lines, "signature": signature, "layoutreader": layoutreader, "hunyuan-prep": hunyuan_prep, "readers": readers, "bln600": bln600}
+    cmds = {"gutenocr-prep": gutenocr_prep, "gutenocr-lines": gutenocr_lines, "gutenocr-check": gutenocr_check, "signature": signature, "layoutreader": layoutreader, "hunyuan-prep": hunyuan_prep, "readers": readers, "bln600": bln600}
     if len(sys.argv) == 2 and sys.argv[1] in cmds:
         sys.exit(cmds[sys.argv[1]]())
     print(__doc__)

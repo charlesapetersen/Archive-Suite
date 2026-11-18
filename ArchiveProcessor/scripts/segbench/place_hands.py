@@ -49,7 +49,7 @@ word F1 (at centre, ranked; 0.5 and 0.7 beside), line-level alignment accuracy, 
 placed-hit on a PDF written with the hypothesis's words.
 
 Usage (system python3 unless noted; each detector runs itself under its own venv):
-  python3 place_hands.py detect blla|orli|surya|ppocrv6 [--pages p007,...]
+  python3 place_hands.py detect blla|orli|surya|ppocrv6|gutenocr|gutenocr-mlx [--pages p007,...]
   uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy python place_hands.py readings
   python3 place_hands.py align DET METHOD [READING ...]      # METHOD prop | flow | ctc-revcity | ctc-mccatmus
   python3 place_hands.py score                               # segbench-results/place-hands.json and .md
@@ -85,6 +85,7 @@ VENV = {
     'orli': CACHE / 'venv-orli/bin/python',
     'surya': CACHE / 'venv-surya/bin/python',
     'ctc': Path.home() / '.local/share/visionocr-ocrlab/venv-kraken/bin/python',
+    'gutenocr': CACHE.parent / 'torch-env/bin/python',  # torch-env.sh add qwen-vl-utils accelerate (transformers 5.22)
 }
 MODELS = {
     'orli': HTRMOPO / 'c690cc12-0cf5-59dd-af71-69cdef2392b2/orli_base.safetensors',
@@ -310,34 +311,103 @@ def guten_lines(raw: str):
     return [g for g in got if isinstance(g, dict) and isinstance(g.get('bbox'), list) and len(g['bbox']) == 4]
 
 
+def guten_pieces(got, sx, sy):
+    pieces = []
+    for g in got:
+        x1, y1, x2, y2 = (float(v) for v in g['bbox'])
+        if x2 > x1 and y2 > y1:
+            pieces.append(quad_line([(x1 * sx, y1 * sy), (x2 * sx, y1 * sy), (x2 * sx, y2 * sy), (x1 * sx, y2 * sy)]))
+    return pieces
+
+
+def guten_input(t):
+    """The page at GUTEN_SIDE on its longer side, each side a multiple of 28, so the processor keeps that size and
+    the boxes, in its pixels, scale straight back."""
+    from PIL import Image
+    im = Image.open(t['image']).convert('RGB')
+    W, H = im.size
+    s = GUTEN_SIDE / max(W, H)
+    w, h = max(28, round(W * s / 28) * 28), max(28, round(H * s / 28) * 28)
+    return im.resize((w, h), Image.LANCZOS), W, H
+
+
 def detect_gutenocr(todo):
+    """GutenOCR-3B on its card's runtime (W46.gutenocr-lines-ref): transformers' Qwen2_5_VLForConditionalGeneration
+    in bf16 on MPS, the card's qwen_vl_utils.process_vision_info and chat template (which injects the system prompt
+    that fixes integer-pixel boxes), greedy, asked for LINES. The shards hold no lm_head while the config says untied,
+    so the config is loaded tied (the single-file copy's lm_head is byte-identical to embed_tokens,
+    W46.licence-freed-sweep) and the tie is checked after loading. The input is guten_input's; the card feeds the
+    page as it is, but a full page (12.5 Mpx, about 16,000 visual tokens) does not fit beside the other sessions."""
+    import model_store
+    model_store.use()
+    import torch
+    from qwen_vl_utils import process_vision_info
+    from transformers import AutoConfig, AutoProcessor, Qwen2_5_VLForConditionalGeneration
+    path = model_store.snapshot(*GUTEN)
+    assert (path / 'model-00002-of-00002.safetensors').exists(), f'GutenOCR-3B\'s bf16 shards are not in {path}'
+    cfg = AutoConfig.from_pretrained(path)
+    cfg.tie_word_embeddings = True
+    if getattr(cfg, 'text_config', None) is not None:
+        cfg.text_config.tie_word_embeddings = True
+    dev = 'mps' if torch.backends.mps.is_available() else 'cpu'
+    model = Qwen2_5_VLForConditionalGeneration.from_pretrained(path, config=cfg, dtype=torch.bfloat16).to(dev).eval()
+    lm, emb = model.get_output_embeddings().weight, model.get_input_embeddings().weight
+    assert lm.data_ptr() == emb.data_ptr() or torch.equal(lm, emb), 'lm_head is not tied to embed_tokens'
+    proc = AutoProcessor.from_pretrained(path)
+    for t in todo:
+        out = CACHE / 'lines/gutenocr' / f'{key(t)}.json'
+        if out.exists():
+            continue
+        small, W, H = guten_input(t)
+        msgs = [{'role': 'user', 'content': [{'type': 'image', 'image': small}, {'type': 'text', 'text': GUTEN_PROMPT}]}]
+        text = proc.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+        images, videos = process_vision_info(msgs)
+        inputs = proc(text=[text], images=images, videos=videos, padding=True, return_tensors='pt').to(dev)
+        gh, gw = (int(v) * 14 for v in inputs['image_grid_thw'][0][1:])
+        assert (gw, gh) == small.size, f'the processor resized the page: {small.size} -> {(gw, gh)}'
+        t0 = time.time()
+        with torch.inference_mode():
+            ids = model.generate(**inputs, max_new_tokens=6144, do_sample=False)
+        sec = time.time() - t0
+        gen = ids[0][inputs['input_ids'].shape[1]:]
+        raw = proc.decode(gen, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        w, h = small.size
+        pieces = guten_pieces(guten_lines(raw), W / w, H / h)
+        save(CACHE / 'lines/gutenocr-raw' / f'{key(t)}.json', {'raw': raw, 'input': [w, h]})
+        peak = round(torch.mps.driver_allocated_memory() / 2**30, 2) if dev == 'mps' else None
+        save(out, normalise(join_rows(pieces), W, H, sec, device=f'transformers bf16 {dev}', pieces=len(pieces),
+                            input=[w, h], tokens=len(gen), mps_gb=peak))
+        print(f"{t['page']}: {len(pieces)} lines, {sec:.0f} s, {len(gen)} tokens", flush=True)
+        if dev == 'mps':
+            torch.mps.empty_cache()
+
+
+def detect_gutenocr_mlx(todo):
     """GutenOCR-3B (Qwen2.5-VL-3B fine-tuned for grounded OCR, 8-bit MLX, mlx-vlm in the lab venv) asked for LINES. The
-    page goes in at GUTEN_SIDE on its longer side, each side a multiple of 28, so the processor keeps that size and
-    the boxes, in its pixels, scale straight back. Each box is a line piece; pieces on one row are joined as for the
-    box detectors. The reply is kept beside the lines (raw text, private cache)."""
+    page goes in as guten_input makes it. Each box is a line piece; pieces on one row are joined as for the
+    box detectors. The reply is kept beside the lines (raw text, private cache). On this runtime the boxes came back
+    squeezed in height (W46.licence-freed-sweep), so detect_gutenocr runs the card's transformers code instead
+    (W46.gutenocr-lines-ref); this one is kept so the mlx result can be rerun."""
     import model_store
     model_store.use()
     import mlx.core as mx
     from mlx_vlm import load, stream_generate
     from mlx_vlm.prompt_utils import apply_chat_template
-    from PIL import Image
     path = GUTEN_MLX
     assert (path / 'config.json').exists(), f'run licence_sweep.py gutenocr-prep first: {path}'
     mx.set_cache_limit(256 * 2**20)
     model, proc = load(str(path))
     chat = apply_chat_template(proc, model.config, GUTEN_PROMPT, num_images=1)
-    tmp = CACHE / 'tmp-gutenocr'
+    tmp = CACHE / 'tmp-gutenocr-mlx'
     tmp.mkdir(parents=True, exist_ok=True)
     for t in todo:
-        out = CACHE / 'lines/gutenocr' / f'{key(t)}.json'
+        out = CACHE / 'lines/gutenocr-mlx' / f'{key(t)}.json'
         if out.exists():
             continue
-        im = Image.open(t['image']).convert('RGB')
-        W, H = im.size
-        s = GUTEN_SIDE / max(W, H)
-        w, h = max(28, round(W * s / 28) * 28), max(28, round(H * s / 28) * 28)
+        im, W, H = guten_input(t)
+        w, h = im.size
         small = tmp / f'{key(t)}.png'
-        im.resize((w, h), Image.LANCZOS).save(small)
+        im.save(small)
         t0 = time.time()
         text, last = [], None
         for r in stream_generate(model, proc, chat, image=[str(small)], max_tokens=6144, temperature=0.0):
@@ -346,21 +416,15 @@ def detect_gutenocr(todo):
         sec = time.time() - t0
         small.unlink()
         raw = ''.join(text)
-        got = guten_lines(raw)
-        sx, sy = W / w, H / h
-        pieces = []
-        for g in got:
-            x1, y1, x2, y2 = (float(v) for v in g['bbox'])
-            if x2 > x1 and y2 > y1:
-                pieces.append(quad_line([(x1 * sx, y1 * sy), (x2 * sx, y1 * sy), (x2 * sx, y2 * sy), (x1 * sx, y2 * sy)]))
-        save(CACHE / 'lines/gutenocr-raw' / f'{key(t)}.json', {'raw': raw, 'input': [w, h]})
+        pieces = guten_pieces(guten_lines(raw), W / w, H / h)
+        save(CACHE / 'lines/gutenocr-mlx-raw' / f'{key(t)}.json', {'raw': raw, 'input': [w, h]})
         save(out, normalise(join_rows(pieces), W, H, sec, device='mlx 8-bit', pieces=len(pieces), input=[w, h],
                             tokens=getattr(last, 'generation_tokens', 0), mlx_peak_gb=round(mx.get_peak_memory() / 2**30, 2)))
         print(f"{t['page']}: {len(pieces)} lines, {sec:.0f} s, {getattr(last, 'generation_tokens', 0)} tokens", flush=True)
 
 
 DETECTORS = {'blla': detect_blla, 'orli': detect_orli, 'surya': detect_surya, 'ppocrv6': detect_ppocrv6,
-             'gutenocr': detect_gutenocr}
+             'gutenocr': detect_gutenocr, 'gutenocr-mlx': detect_gutenocr_mlx}
 
 
 # ---------------------------------------------------------------- readings
