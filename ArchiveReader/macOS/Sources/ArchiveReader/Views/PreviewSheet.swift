@@ -7,6 +7,8 @@ import SwiftUI
 struct PreviewSheet: View {
     let selection: DocumentSelection
     @ObservedObject var nav: NavigationModel
+    /// Read so the copy buttons' tooltips name the right keys after Settings swaps them (W40.reader-copy-shortcut-swap).
+    @AppStorage(SettingsKey.copyCleanedOnCommandC) private var copyCleanedOnCommandC = false
     /// The PRESENTER's handle on this sheet's viewer model — set on appear, cleared on disappear.
     ///
     /// The sheet deliberately does not publish the model to the Document menu itself. A focused-SCENE

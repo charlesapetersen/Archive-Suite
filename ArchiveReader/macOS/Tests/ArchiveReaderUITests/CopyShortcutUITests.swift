@@ -12,10 +12,6 @@ import AppKit
 /// Each check seeds a sentinel first, so "nothing copied" is told apart from "copied the same text".
 final class CopyShortcutUITests: FixtureUITestCase {
 
-    private let sentinel = "W48-SENTINEL"
-    /// Text on the fixture's first document's OCR page (`scripts/make-gui-fixture.sh`).
-    private let pageText = "Reader synthetic fixture page"
-
     func testCopyShortcutInDocumentWindowRespectsSelectionAndFocusedField() throws {
         let before = fixtureSnapshot()
         waitForRows(minimum: 3, timeout: 10)
@@ -102,10 +98,60 @@ final class CopyShortcutUITests: FixtureUITestCase {
         XCTAssertEqual(fixtureSnapshot(), before, "copying must not change any archive file or tag")
     }
 
-    // MARK: helpers
+}
 
+/// W40.reader-copy-shortcut-swap — with Settings' switch on, ⌘C is the cleaned copy and ⇧⌘C the exact one.
+/// The fixture's one-line page reads the same either way, so which copy a pane makes is the unit bundle's
+/// `DocumentCopyTextPaneTests`; this checks the menu the owner sees and that the find field keeps its ⌘C.
+final class CopyShortcutSwapUITests: FixtureUITestCase {
+    override var extraLaunchArguments: [String] { ["-copyCleanedOnCommandC", "YES"] }
+
+    func testSwappedKeysInDocumentWindow() throws {
+        let before = fixtureSnapshot()
+        waitForRows(minimum: 3, timeout: 10)
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        settle(2)
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window opened")
+
+        let exact = menuItem("Edit", "Copy Exact Text")
+        XCTAssertTrue(exact.exists, "with the swap on, the exact copy is its own Edit item")
+        closeMenu()
+        XCTAssertFalse(menuItem("Edit", "Copy Cleaned for Prose").exists, "⌘C (Edit ▸ Copy) is the cleaned copy now")
+        closeMenu()
+
+        let doc = documentWindow()
+        doc.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.55)).click()
+        settle(0.5)
+        pressKey("a", modifiers: .command)
+        settle(0.5)
+        let cleaned = clipboard(after: { pressKey("c", modifiers: .command) })
+        XCTAssertTrue(cleaned.contains(pageText), "⌘C should copy the selection cleaned, got «\(cleaned)»")
+        let plain = clipboard(after: { pressKey("c", modifiers: [.command, .shift]) })
+        XCTAssertTrue(plain.contains(pageText), "⇧⌘C should copy the selection exactly, got «\(plain)»")
+
+        pressKey("f", modifiers: .command)
+        XCTAssertTrue(app.textFields["ar.doc.findField"].waitForExistence(timeout: 5))
+        settle(0.5)
+        app.typeText("Calif")
+        pressKey("a", modifiers: .command)
+        settle(0.3)
+        XCTAssertEqual(clipboard(after: { pressKey("c", modifiers: .command) }), "Calif",
+                       "the find field keeps its own ⌘C with the swap on")
+
+        pressKey("w", modifiers: .command)
+        settle(1)
+        XCTAssertEqual(fixtureSnapshot(), before, "copying must not change any archive file or tag")
+    }
+}
+
+private let sentinel = "W48-SENTINEL"
+/// Text on the fixture's first document's OCR page (`scripts/make-gui-fixture.sh`).
+private let pageText = "Reader synthetic fixture page"
+
+private extension FixtureUITestCase {
     /// Seed the sentinel, act, and return what the clipboard holds afterwards.
-    private func clipboard(after action: () -> Void) -> String {
+    func clipboard(after action: () -> Void) -> String {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(sentinel, forType: .string)
         action()
@@ -116,7 +162,7 @@ final class CopyShortcutUITests: FixtureUITestCase {
     /// Every archive file's modification date and Finder tags. Fresh URLs each call, so nothing is cached.
     /// The app's own content index (`content-index-*.sqlite3` and its WAL/SHM) is left out: the Reader
     /// writes it as it runs, copy or no copy (its `-shm` moved during the first VM run of this test).
-    private func fixtureSnapshot() -> [String: String] {
+    func fixtureSnapshot() -> [String: String] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .tagNamesKey, .isRegularFileKey]
         let root = URL(fileURLWithPath: Self.fixturePath)
         var out: [String: String] = [:]
@@ -130,19 +176,19 @@ final class CopyShortcutUITests: FixtureUITestCase {
         return out
     }
 
-    private func documentWindow() -> XCUIElement {
+    func documentWindow() -> XCUIElement {
         for i in 0..<app.windows.count where app.windows.element(boundBy: i).title != "Archive Reader" {
             return app.windows.element(boundBy: i)
         }
         return app.windows.firstMatch
     }
 
-    private func settle(_ seconds: TimeInterval) { RunLoop.current.run(until: Date().addingTimeInterval(seconds)) }
+    func settle(_ seconds: TimeInterval) { RunLoop.current.run(until: Date().addingTimeInterval(seconds)) }
 
-    private func closeMenu() { app.typeKey(.escape, modifierFlags: []); settle(0.3) }
+    func closeMenu() { app.typeKey(.escape, modifierFlags: []); settle(0.3) }
 
     /// Open a menu-bar menu and return one of its items (items join the tree only while the menu is open).
-    private func menuItem(_ menu: String, _ title: String) -> XCUIElement {
+    func menuItem(_ menu: String, _ title: String) -> XCUIElement {
         let bar = app.menuBars.element(boundBy: 0)
         let item = bar.menuBarItems[menu]
         XCTAssertTrue(item.waitForExistence(timeout: 5), "the \(menu) menu should exist")

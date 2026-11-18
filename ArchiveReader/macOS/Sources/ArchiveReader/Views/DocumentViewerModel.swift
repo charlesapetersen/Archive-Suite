@@ -192,7 +192,7 @@ final class DocumentViewerModel: ObservableObject {
         }
         // Edit ▸ Copy (⌘C) reaching any pane copies the viewer's selection (`ReaderPDFView.copy(_:)`,
         // `ExtractedTextView.copy(_:)`), and a selection the user makes in one pane clears the other's.
-        textController.copySelection = { [weak self] in self?.copyPlainSelection() }
+        textController.copySelection = { [weak self] in self?.copyForCommandC() }
         replacedObserver = NotificationCenter.default.publisher(for: .readerFileContentsReplaced)
             .sink { [weak self] note in
                 guard let paths = note.userInfo?[ReaderFileContentsReplaced.pathsKey] as? [String] else { return }
@@ -206,7 +206,7 @@ final class DocumentViewerModel: ObservableObject {
         let turnPage: (Bool) -> Void = { [weak self] next in if next { self?.next() } else { self?.previous() } }
         textController.turnPage = turnPage
         for controller in [leftController, rightController] {
-            controller.copySelection = { [weak self] in self?.copyPlainSelection() }
+            controller.copySelection = { [weak self] in self?.copyForCommandC() }
             controller.canCopySelection = { [weak self] in self?.hasTextSelection ?? false }
             let pane: Pane = controller === leftController ? .left : .right
             controller.userSelected = { [weak self] in self?.userSelected(in: pane) }
@@ -553,17 +553,26 @@ final class DocumentViewerModel: ObservableObject {
 
     // MARK: Copy — one live selection (W40.fix-reader-copy-text-pane)
 
-    /// Intelligent copy (prose-cleaned) from the pane that holds the selection — ⇧⌘C.
+    /// Intelligent copy (prose-cleaned) from the pane that holds the selection — ⇧⌘C, or ⌘C when swapped.
     func copySelection() { copyToPasteboard(cleanedCopyText(AppSettings.copyOptions)) }
 
     /// Plain/direct copy — the raw selected text, exactly as the pane reports it (no cleaning) — ⌘C, which
-    /// is Edit ▸ Copy reaching a pane's `copy:` (W48.reader-copy-shortcut).
+    /// is Edit ▸ Copy reaching a pane's `copy:` (W48.reader-copy-shortcut), or ⇧⌘C when Settings swaps them.
     func copyPlainSelection() { copyToPasteboard(plainCopyText) }
 
-    /// What ⌘C puts on the pasteboard (tests read it here rather than from the owner's clipboard).
+    /// Edit ▸ Copy (⌘C) reaching a pane: the exact copy, or the cleaned one when Settings swaps the two keys
+    /// (W40.reader-copy-shortcut-swap). A focused text field, the find bar's, answers ⌘C before any pane does.
+    func copyForCommandC() { copyToPasteboard(commandCCopyText) }
+
+    /// What ⌘C in a pane puts on the pasteboard.
+    var commandCCopyText: String? {
+        AppSettings.copyCleanedOnCommandC ? cleanedCopyText(AppSettings.copyOptions) : plainCopyText
+    }
+
+    /// What the exact copy puts on the pasteboard (tests read it here rather than from the owner's clipboard).
     var plainCopyText: String? { selectedText(plainSelection(in:)) }
 
-    /// What ⇧⌘C puts on the pasteboard.
+    /// What the cleaned copy puts on the pasteboard.
     func cleanedCopyText(_ opts: CopyTextOptions) -> String? {
         selectedText { pane in
             pane == .left ? leftController.cleanedSelection(opts)

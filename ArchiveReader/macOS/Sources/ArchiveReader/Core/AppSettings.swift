@@ -10,6 +10,7 @@ enum SettingsKey {
     static let copyDehyphenate = "copyDeHyphenate"
     static let copyLayoutParagraph = "copyParagraphFromLayout"
     static let copyTitleCase = "copyTitleCaseCapitals"
+    static let copyCleanedOnCommandC = "copyCleanedOnCommandC"   // W40.reader-copy-shortcut-swap
     static let viewerSplit = "viewerSplitFraction"
     static let readFilterDefault = "readFilterDefault"
     static let hiddenColumns = "ar.hiddenColumns"    // [String] — column IDs the user has hidden
@@ -40,6 +41,10 @@ enum AppSettings {
                         paragraphFromLayout: bool(SettingsKey.copyLayoutParagraph, true),
                         titleCaseCapitals: bool(SettingsKey.copyTitleCase, true))
     }
+
+    /// W40.reader-copy-shortcut-swap (owner, 2026-11-17): on, ⌘C in the page and text panes copies cleaned for
+    /// prose and ⇧⌘C copies the text exactly. Off (a fresh install) keeps ⌘C the exact copy.
+    static var copyCleanedOnCommandC: Bool { bool(SettingsKey.copyCleanedOnCommandC, false) }
 
     static var viewerSplitFraction: Double {
         let v = d.object(forKey: SettingsKey.viewerSplit) as? Double ?? 0.667

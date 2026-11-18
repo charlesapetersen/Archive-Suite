@@ -118,7 +118,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .showTagCloud: return "Show Tag Cloud"
         case .showInspector: return "Show Inspector"
         case .showJPEG: return "Show JPEG Image"
-        case .copyExact: return "Copy"
+        // With the keys swapped the exact copy is its own Edit item, beside the standard Copy that now cleans.
+        case .copyExact: return AppSettings.copyCleanedOnCommandC ? "Copy Exact Text" : "Copy"
         case .copyCleaned: return "Copy Cleaned for Prose"
         case .copyPageLink: return "Copy Archive Link to This Page"
         case .options: return "Settings…"
@@ -202,9 +203,10 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .showInspector: return CommandKey("i", [.command, .option])
         case .showJPEG: return CommandKey("j", [.command, .option])
         // ⌘C is the standard Edit ▸ Copy, which reaches the viewer through the responder chain (W48.reader-copy-shortcut).
-        case .copyExact: return CommandKey("c")
-        // Owner, 2026-11-08: ⇧⌘C cleans prose; Copy Link(s) takes ⌥⌘C.
-        case .copyCleaned: return CommandKey("c", [.command, .shift])
+        // Owner, 2026-11-08: ⇧⌘C cleans prose; Copy Link(s) takes ⌥⌘C. The Settings switch swaps the two
+        // (W40.reader-copy-shortcut-swap).
+        case .copyExact: return AppSettings.copyCleanedOnCommandC ? CommandKey("c", [.command, .shift]) : CommandKey("c")
+        case .copyCleaned: return AppSettings.copyCleanedOnCommandC ? CommandKey("c") : CommandKey("c", [.command, .shift])
         // ⌘L is Focus Tag Filter and ⇧⌘L Copy Archive Link(s), so the page link takes the remaining L.
         case .copyPageLink: return CommandKey("l", [.command, .option])
         case .options: return CommandKey(",")

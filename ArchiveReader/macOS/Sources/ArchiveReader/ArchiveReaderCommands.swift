@@ -28,6 +28,7 @@ struct ArchiveReaderCommands: Commands {
     let router: DeepLinkRouter
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
+    @AppStorage(SettingsKey.copyCleanedOnCommandC) private var copyCleanedOnCommandC = false
 
     private var noReadingPane: Bool { doc == nil || doc?.showingAllPages == true }
 
@@ -113,9 +114,14 @@ struct ArchiveReaderCommands: Commands {
         CommandGroup(after: .pasteboard) {
             Divider()
             // Owner, 2026-11-08: ⇧⌘C cleans prose; Selection ▸ Copy Link(s) takes ⌥⌘C so
-            // both commands keep distinct shortcuts while the preview sheet is open.
-            Button(ReaderCommand.copyCleaned.title) { doc?.copySelection() }
-                .keyboardShortcut(.copyCleaned).disabled(noReadingPane)
+            // both commands keep distinct shortcuts while the preview sheet is open. With Settings' swap on,
+            // ⌘C (Edit ▸ Copy, through the panes) cleans and this ⇧⌘C item is the exact copy
+            // (W40.reader-copy-shortcut-swap).
+            let shifted: ReaderCommand = copyCleanedOnCommandC ? .copyExact : .copyCleaned
+            Button(shifted.title) {
+                if copyCleanedOnCommandC { doc?.copyPlainSelection() } else { doc?.copySelection() }
+            }
+            .keyboardShortcut(shifted).disabled(noReadingPane)
             // ⌥⌘L: ⌘L is Focus Tag Filter and ⇧⌘L Copy Archive Link(s), which the preview sheet leaves enabled
             // beside this one, so the page link takes the remaining L.
             Button(ReaderCommand.copyPageLink.title) {

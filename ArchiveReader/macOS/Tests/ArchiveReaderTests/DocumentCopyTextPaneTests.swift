@@ -85,6 +85,32 @@ final class DocumentCopyTextPaneTests: XCTestCase {
                        "Copy Cleaned for Prose takes it, cleaned")
     }
 
+    /// W40.reader-copy-shortcut-swap: Settings' switch makes ⌘C in a pane the cleaned copy and ⇧⌘C the exact one.
+    func testTheSwapSettingMakesCommandCTheCleanedCopy() throws {
+        let key = SettingsKey.copyCleanedOnCommandC
+        let saved = UserDefaults.standard.object(forKey: key)
+        defer { if let saved { UserDefaults.standard.set(saved, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
+        let model = load([try scratchPDF(pages: ["Dear Riesman, the hyphen-\nated report follows."])])
+        let text = try textPane(model)
+        text.string = "the hyphen-\nated report"
+        select("hyphen-\nated", in: text)
+
+        UserDefaults.standard.removeObject(forKey: key)
+        XCTAssertEqual(model.commandCCopyText, "hyphen-\nated", "off (a fresh install): ⌘C copies exactly")
+        XCTAssertEqual(ReaderCommand.copyExact.key, CommandKey("c"))
+        XCTAssertEqual(ReaderCommand.copyCleaned.key, CommandKey("c", [.command, .shift]))
+        XCTAssertEqual(ReaderCommand.copyExact.title, "Copy")
+
+        UserDefaults.standard.set(true, forKey: key)
+        XCTAssertEqual(model.commandCCopyText, model.cleanedCopyText(AppSettings.copyOptions))
+        XCTAssertEqual(model.cleanedCopyText(CopyTextOptions()), "hyphenated", "precondition: cleaning changes it")
+        XCTAssertEqual(ReaderCommand.copyCleaned.key, CommandKey("c"), "on: ⌘C is the cleaned copy")
+        XCTAssertEqual(ReaderCommand.copyExact.key, CommandKey("c", [.command, .shift]), "and ⇧⌘C the exact one")
+        XCTAssertEqual(ReaderCommand.copyExact.title, "Copy Exact Text", "the Edit item ⇧⌘C sits on")
+        XCTAssertEqual(ReaderCommand.copyCleaned.help,
+                       "Copy the selected text cleaned for prose — joins lines, de-hyphenates (⌘C)")
+    }
+
     func testTheImagePanesSelectionStillCopies() throws {
         let model = load([try scratchPDF(pages: ["Dear Riesman, the report follows."])])
         let image = imagePane(model)

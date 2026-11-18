@@ -18,6 +18,8 @@ struct DocumentWindowView: View {
     private var imagePrefetcher: PreviewImagePrefetcher { model.imagePrefetcher }
 
     @AppStorage("ar.doc.infoWidth") private var infoWidth = 380.0
+    /// Read so the copy buttons' tooltips name the right keys after Settings swaps them (W40.reader-copy-shortcut-swap).
+    @AppStorage(SettingsKey.copyCleanedOnCommandC) private var copyCleanedOnCommandC = false
     @AppStorage("ar.doc.infoVisible") private var infoVisible = false
     @AppStorage("ar.doc.thumbnailsVisible") private var thumbnailsVisible = false
     @AppStorage("ar.doc.invertImages") private var invertImages = false

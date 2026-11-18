@@ -12,6 +12,7 @@ struct OptionsView: View {
     @AppStorage(SettingsKey.copyDehyphenate) private var copyDehyphenate: Bool = true
     @AppStorage(SettingsKey.copyLayoutParagraph) private var copyLayoutParagraph: Bool = true
     @AppStorage(SettingsKey.copyTitleCase) private var copyTitleCase: Bool = true
+    @AppStorage(SettingsKey.copyCleanedOnCommandC) private var copyCleanedOnCommandC: Bool = false
     @AppStorage(SettingsKey.viewerSplit) private var viewerSplit: Double = 0.667
     @AppStorage(SettingsKey.readFilterDefault) private var readFilterDefault: ReadFilter = .all
     @AppStorage("ar.listFontSize") private var listFontSize: Double = 13
@@ -37,6 +38,9 @@ struct OptionsView: View {
                 }
             }
             Section("Copying text") {
+                // W40.reader-copy-shortcut-swap: which copy ⌘C makes in the page and text panes.
+                Toggle("⌘C copies cleaned for prose, ⇧⌘C copies exactly", isOn: $copyCleanedOnCommandC)
+                    .accessibilityIdentifier("ar.options.copyCleanedOnCommandC")
                 Toggle("Collapse single line breaks into spaces", isOn: $copyCollapse)
                 Toggle("Blank line = paragraph break", isOn: $copyParagraph)
                 Toggle("Find paragraphs, lists and headings from the layout (indent, gap, marker, short line)",
