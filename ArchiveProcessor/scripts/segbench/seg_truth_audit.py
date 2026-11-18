@@ -189,6 +189,12 @@ def render_record(r) -> str:
         L[-1] += (f" **{f['differs']} of {f['ruled']} differ from the truth**. Weighted by N/n, the truth is wrong on "
                   f"an estimated **{100 * f['weighted_truth_error']:.1f}%** of the agreed pool (95% interval about "
                   f"{100 * lo:.1f}-{100 * hi:.1f}%, n {f['ruled']}).")
+        rc = f.get("recheck", [])
+        if rc:
+            same = sum(x["answer"] == x["earlier"] for x in rc)
+            L[-1] += (f" The {len(rc)} gaps he had answered continues where the old layout could have pushed a one-page "
+                      f"document that way were re-asked on the fixed layout (2026-11-18): {same} of {len(rc)} answered "
+                      f"as before ({', '.join(x['key'] for x in rc)}), so none changes.")
         L += ["", "| stratum | asked | differ |", "|---|---:|---:|"]
         for s, v in sorted(f["strata"].items()):
             L.append(f"| {s} | {v['asked']} | {v['differs']} |")
@@ -216,7 +222,9 @@ def render_record(r) -> str:
                " The interval is a normal one on the weighted rate, each stratum's variance from its Wilson interval, "
                "with a finite-pool correction. The sheet's answers on one-page documents proved unreliable (3 of 6 "
                "reversed); every other answer agrees with the truth, so the layout could not have made a false "
-               "difference among them, though an agreement it caused would not show." if f else
+               "difference among them" + (f", and the {len(f['recheck'])} continues it could have caused were "
+               "re-asked on the fixed layout and all stood." if f.get("recheck") else
+               ", though an agreement it caused would not show.") if f else
                f"{r['drawn']} answers against a pool of {r['pool']}: an error rate near zero will carry a wide interval "
                "(no error in 50 bounds the rate at about 6% with 95% confidence before weighting); report it with its n."),
         scope=(((("Only the asked gaps change. If the estimate holds, about "
@@ -461,6 +469,10 @@ LABEL = {"new": "New", "continue": "Cont"}
 # 138|139); he reversed all three, so nothing in the truth changes. A first apply wrote those three as Cont and was
 # undone by hand from truth-before-audit-fold/ (the folded copy kept as stanton-after-fold-reverted-20261118.csv).
 EXPECTED: dict[str, dict[int, str]] = {}
+# The owner's re-check (2026-11-18 10:03, recheck-20261118.html): the nine gaps answered continue whose earlier sheet
+# could have pushed a one-page document that way, re-asked on the fixed layout. A re-check answer replaces the earlier
+# one; apply refuses one that differs, since that would be a reversal for LATER, not a confirmation.
+RECHECK = OUT / "seg-truth-audit-recheck-answers.json"
 
 
 def flips(rows: list[dict]) -> dict[str, dict[int, str]]:
@@ -497,6 +509,11 @@ def cmd_apply(_a):
     want = flips(folded["rows"])
     if want != EXPECTED:
         raise SystemExit(f"the answers do not match the owner's file as checked: {want}")
+    re_ans = json.loads(RECHECK.read_text())
+    by_key = {r["key"]: r for r in folded["rows"]}
+    recheck = [{"key": k, "earlier": by_key[k]["answer"], "answer": re_ans.get(i)} for i, k in re_ans["_keys"].items()]
+    if any(x["answer"] != x["earlier"] for x in recheck):
+        raise SystemExit(f"a re-check answer differs from the folded one; add it to LATER first: {recheck}")
     before = {}
     for box in ("Stanton", "RG165"):
         folder = data.DATA_DIR / data.COLLECTIONS[box]
@@ -524,7 +541,7 @@ def cmd_apply(_a):
         "item": FOLD_TAG, "date": FOLD_DATE, "ruled": folded["ruled"], "differs": folded["differs"],
         "unsure": sum(v["unsure"] for v in folded["strata"].values()),
         "weighted_truth_error": round(folded["weighted_truth_error"], 4), "interval95": [round(lo, 4), round(hi, 4)],
-        "strata": folded["strata"],
+        "strata": folded["strata"], "recheck": recheck,
         "superseded": [{"key": r["key"], "sheet_answer": r["sheet_answer"], "answer": r["answer"]}
                        for r in folded["rows"] if r["key"] in folded.get("superseded", [])],
         "changed": [{"key": r["key"], "truth_before": before[r["key"].split()[0]][int(r["key"].split("|")[1])],

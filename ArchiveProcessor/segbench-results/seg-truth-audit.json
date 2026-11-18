@@ -141,6 +141,53 @@
     "blank": 0
    }
   },
+  "recheck": [
+   {
+    "key": "RG165 6|7",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "RG165 13|14",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 62|63",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 79|80",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 95|96",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 99|100",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 114|115",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 160|161",
+    "earlier": "continue",
+    "answer": "continue"
+   },
+   {
+    "key": "Stanton 230|231",
+    "earlier": "continue",
+    "answer": "continue"
+   }
+  ],
   "superseded": [
    {
     "key": "Stanton 80|81",
