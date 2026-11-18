@@ -16564,3 +16564,36 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   $0.048, the cancelled batch nothing billable). Bench cache: the three runs' output kept in
   `~/Library/Caches/ArchiveSuiteRehearsal/W40.d4/` (13 MB) as the evidence's artifacts.
   <!-- /W40.d4 -->
+
+- [x] **W42.c41-newspaper-scans — cut a Vision line where it crosses two layout regions, on whole-page newspaper scans [M · 1-2 sessions]** · §Vision OCR's engine — newspaper rows fused across columns, moved from Vision OCR (owner, 2026-10-16) · SHIPPED 2026-11-18 (checkpoints 1-2 plus this commit) (lane: processor) (uses: build)
+  `Recogniser.cutAtRegions` (packages/VisionOCRKit): on upright newspaper pages in the regions arrangement, a Vision
+  line no layout region holds that reaches a line height into two regions side by side is read again as its halves,
+  cut on blank paper between them (`blankGutter`; `readHalves`, factored out of `splitAtGutter` unchanged), before
+  `regionAligned` puts the regions' words on them. Kept whole: a row with ink across the gap, a cut whose halves lose
+  text (invariant 1), and one whose pieces on both sides read over 1.4 of the line height (a large headline across
+  touching regions); a piece over half of whose box a region-held line covers is that line read again and is
+  dropped. Turned pages are not cut (the upright reading keeps the line count); other kinds of page never are.
+  `visionocr-pdf` takes `VISIONOCR_PDF_NEWSPAPER=<reader>` to publish newspaper pages with the mode on. Section
+  "W42.c41-newspaper-scans" in visionocr-checks (11 checks; `swift test` 2163/2163); three
+  mutants (no cut, no headline guard, no repeat filter) each turn their checks red. Tried and dropped, measured: a gap
+  minimum of a third of the line's own height (Vision's fused boxes are two rows tall; Kalispell kept 16 fused rows
+  against 10) and paper twice the row's word spaces (refused 31 of 73 crossings).
+  Measured [page 1, published by `visionocr-pdf` from the source scans in Zotero storage, PaddleOCR-VL on
+  DocLayout-YOLO regions for newspaper pages, both builds made the same way; `Tools/count-fused-rows.swift`, web2
+  dictionary words through PDFKit]. Fused rows (oneRun), before -> after: Helena 1941 7 -> 4, Billings 1926 16 -> 13,
+  Kalispell 1939 17 -> 10, Comic 1950 5 -> 3, October 1960 1 -> 1; 46 -> 31. Mode-off floor 45 (runs of one build
+  differ by about 1 a page: Vision is not deterministic here). Dictionary words 82.11/81.93/78.62/85.97/86.13% ->
+  82.19/82.00/79.12/86.02/86.13%. Two-run rows 66 -> 78: a cut row's halves sit side by side and PDFKit groups them on one line (C39's drag
+  grouping, WONTFIX, not this item); repeated word
+  4-grams 44 -> 47. Helena 1941's Faculty Changes paragraph, selected by area: identical but one token, so C39's hand
+  count of its misreads stands (not recounted). Other newspaper scans: Helena 1931 8 -> 3 fused (dictionary 83.52 ->
+  84.00%), Helena 1928 6 -> 6 (84.52 -> 84.74%); WSJ 1969, Glazer 2003, Berendzen 1981 and Zipkin 2000 text
+  unchanged. Ordinary pages: 276 pages of seven documents identical but one character (`90"` -> `90`, Vision noise).
+  The 31 rows left [named from the diagnostic build's log, matched by place and text]: 24 never asked, as not
+  across two regions side by side (held by one region over both columns, the 10-14 a page layout-compare found, or
+  with no region on one side), all of Billings' 13 among them; 4 with no blank paper under the row (Kalispell's
+  narrow gutters); 2 refused by the guards; 1 cut that the counter still reads as one run. Holding a region over the
+  gutter is the layout model's and out of this cut's reach. Not run: `ux-regression.sh`'s `+accurate` rows, which
+  need Vision OCR's testdocs on the OneDrive backup (owner, 2026-11-13); the five scans and the samples above stand in.
+  Bench cache: the scratch in `~/Library/Caches/ArchiveSuiteRehearsal/W42.c41-newspaper-scans` moved to the Trash.
+  <!-- /W42.c41-newspaper-scans -->
