@@ -42,6 +42,9 @@ enum SettingsTraining {
         "openai": Record(provider: "OpenAI's API", terms: .never,
                          summary: "OpenAI does not train on API traffic by default; only an account that joins its data-sharing programme is trained on",
                          source: "https://help.openai.com/en/articles/5722486-how-your-data-is-used-to-improve-model-performance"),
+        "custom-gateway": Record(provider: "a gateway other than Stanford's", terms: .unknown,
+                                 summary: "the app has no terms on record for this gateway, so whether it trains is not known",
+                                 source: ""),
         "gemini": Record(provider: "a Gemini API key", terms: .unlessPaid,
                          summary: "Google trains on what a Gemini key's free tier is sent; a key on a billed project is not used for training",
                          source: "https://ai.google.dev/gemini-api/terms"),
@@ -50,8 +53,11 @@ enum SettingsTraining {
                           source: "https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training"),
     ]
 
-    /// The signed-in subscription plans, by the route table's plan name.
+    /// The signed-in subscription plans, by the route table's plan name (and the Gemini CLI, which the table lacks).
     static let plans: [String: Record] = [
+        "gemini-cli": Record(provider: "the Gemini CLI", terms: .mayTrain,
+                             summary: "the Gemini CLI signs in with a Google account, whose free use Google may train on",
+                             source: "https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals"),
         "claude": Record(provider: "a Claude plan", terms: .unlessOptedOut,
                          summary: "Anthropic trains on Free, Pro and Max sessions when the account's “Help improve Claude” setting is on",
                          source: "https://www.anthropic.com/news/updates-to-our-consumer-terms"),
@@ -235,14 +241,18 @@ enum SettingsTraining {
 extension SettingsTraining {
     /// The reader's way: the Local Agent's plan first, then the gateway, then the provider's own key, as the run
     /// picks them (`OCRProcessor`'s client choice).
-    static func readingWay(provider: LLMProvider, modelID: String, gateway: Bool, localAgent: LocalAgentTool?) -> RunWay {
+    /// `gatewayKnown`: the gateway is Stanford's (the record's) or a model on this Mac; another is a way with no terms.
+    static func readingWay(provider: LLMProvider, modelID: String, gateway: Bool, gatewayKnown: Bool = true,
+                           localAgent: LocalAgentTool?) -> RunWay {
         switch localAgent {
         case .claude?: return .plan("claude")
         case .codex?: return .plan("chatgpt")
-        case .gemini?: return .key("gemini")   // the Gemini CLI's free entitlement is Google's free tier
+        // The Gemini CLI signs in with a personal Google account, whose free entitlement Google may train on; the
+        // billed-key answer does not cover it, so it is a plan no answer lifts.
+        case .gemini?: return .plan("gemini-cli")
         case nil: break
         }
-        if gateway { return .safe }
+        if gateway { return gatewayKnown ? .safe : .key("custom-gateway") }
         switch provider {
         case .appleVision: return .safe
         case .openrouter: return .openRouter(modelID: modelID)
@@ -251,6 +261,16 @@ extension SettingsTraining {
         case .gemini: return .key("gemini")
         case .mistral: return .key("mistral")
         }
+    }
+
+    /// A refused page's second readers that may train (`OCRRefusalFallback.availableRoutes`, in its order): the
+    /// Claude plan, Qwen3.6 27B through OpenRouter, a Mistral key. The Anthropic and OpenAI keys never train.
+    static func refusalFallbackWays(claudeByPlan: Bool, openRouterKey: Bool, mistralKey: Bool) -> [RunWay] {
+        var out: [RunWay] = []
+        if claudeByPlan { out.append(.plan("claude")) }
+        if openRouterKey { out.append(.openRouter(modelID: OCRRefusalFallback.keyedModels[1].id)) }
+        if mistralKey { out.append(.key("mistral")) }
+        return out
     }
 
     /// The window segmenter's ways: each voter of the approach (and the 2B's partner), by the way the run sends it.

@@ -180,6 +180,24 @@ enum OpenRouterTestDriver {
         eq("6 window provider pinned", provider?["order"] as? [String], ["z-ai"])
         eq("6 window precision", provider?["quantizations"] as? [String], ["fp8"])
         check("6 window fallbacks off", raw.contains(#""allow_fallbacks":false"#))
+        check("6 window: no data_collection while no job holds the switch", provider?["data_collection"] == nil, raw)
+        // W46.training-optout-run: a job whose collection says its pages must not train adds deny to every request,
+        // a window's included, until that job's own entry is cleared; another job's clearing leaves it.
+        OpenRouterDataPolicy.set(true, for: "test-a")
+        OpenRouterDataPolicy.set(false, for: "test-b")
+        let denied = (try? APIWindowTransport.request(r, key: "test-key")).flatMap(\.httpBody)
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        eq("6 window under the switch: data_collection deny",
+           (denied?["provider"] as? [String: Any])?["data_collection"] as? String, "deny")
+        check("6 another job's clearing keeps the deny", OpenRouterDataPolicy.denies)
+        OpenRouterDataPolicy.set(false, for: "test-a")
+        check("6 the job's own clearing lifts it", !OpenRouterDataPolicy.denies)
+        let route0 = OpenRouterRoute.catalog[0]
+        eq("6 the provider field with deny", OpenAICompatibleClient.openRouterProviderField(route0, denyDataCollection: true)["data_collection"] as? String, "deny")
+        check("6 the provider field without", OpenAICompatibleClient.openRouterProviderField(route0, denyDataCollection: false)["data_collection"] == nil)
+        eq("6 the switch as a snapshot holds it",
+           [OpenRouterDataPolicy.deny([SettingsKey.noTraining.rawValue: ResolvedSetting(value: .bool(true), layer: .collection, source: nil, layerName: nil)]),
+            OpenRouterDataPolicy.deny([:]), OpenRouterDataPolicy.deny(nil)], [true, false, false])
         eq("6 window max_price", (provider?["max_price"] as? [String: Double])?["completion"], 0.50)
         eq("6 window temperature 0", (body["temperature"] as? NSNumber)?.doubleValue, 0)
         check("6 window reasoning minimal, excluded", (body["reasoning"] as? [String: Any])?["effort"] as? String == "minimal"

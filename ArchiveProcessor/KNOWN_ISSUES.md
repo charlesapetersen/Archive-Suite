@@ -281,17 +281,28 @@ Not fixed by also dropping the token of the file's current label: that would tak
 `Red` off a demoted "Red Scare" box page (`ProcessFilesTagWarningTestDriver` §8b), which is worse. A fix would
 record on the job the colour it was tagged with.
 
-## ⚠️ LIMITATION (W46.training-optout, 2026-11-17): what "My pages must not train a provider's models" does not yet do
+## ⚠️ LIMITATION (W46.training-optout, W46.training-optout-run, 2026-11-17): what "My pages must not train a provider's models" does not do
 
-- **It shapes the settings sheet's picks, not the run.** Like "Keep these pages on this Mac", the switch hides routes
-  in the solver and the sheet; Process Files still runs the app's processing settings (below), so a Gemini key or a
-  plan already chosen there keeps running until the user applies the sheet's pick. OpenRouter requests do not yet
-  carry `provider.data_collection: "deny"`, which would make OpenRouter refuse an upstream that trains
-  (`W46.training-optout-run`). The default segmenter (`SegmentationApproach.preferredDefault`) and Improve OCR's
-  ranking (`ReOCRRanking`) solve without it, so they may still offer a route the switch hides.
-- **It cannot tell a billed key or an opted-out plan.** A Gemini or Mistral key is hidden because their free tiers
-  train, and a Claude or ChatGPT plan because its training setting may be on; a user whose key is billed or whose
-  plan's setting is off loses those routes anyway (`W46.training-optout-run`).
+- **Start warns; it does not choose for you.** Process Files still runs the app's processing settings. When the output
+  collection has the switch on and the run would send pages to a Gemini or Mistral key or a personal plan the user
+  has not marked as not training, to the Gemini CLI, to a gateway other than Stanford's, or to an OpenRouter model
+  pinned to an upstream that may train, Start asks first ("Run anyway" / "Cancel"). It counts the reader (the Local
+  Agent's plan, else the gateway, else the key), Apple Vision's judgement pass, each kind's own reader, the cascade's
+  escalation, a refused page's second readers and the window segmenter's voters. Resuming an interrupted run does
+  not ask again; Live Capture does not ask at all. A collection settings file that cannot be read counts as the
+  switch off, as the run's own frozen settings do.
+- **OpenRouter is told to refuse, so a training upstream fails.** While a job works with the switch on (a Process
+  Files run, its tagging or retry; an open Live Capture session; an Improve OCR run), every OpenRouter request carries
+  `provider.data_collection: "deny"` (`OpenRouterDataPolicy`); with the provider pinned and no fallbacks, a
+  Chutes-pinned model's calls then fail instead of reading. The deny is process-wide, so another job working at the
+  same time is refused the same way; Live Capture holds it while its session's settings are loaded, not only while
+  it reads.
+- **The default segmenter reads the general layer only.** `SegmentationApproach.preferredDefault` is saved once for
+  the app, before any collection is known, so it takes the general layer's switch, not a collection's.
+- **The billed and opted-out answers are the user's word.** The general interview asks, for each key and plan found
+  whose terms depend on the account (a Gemini or Mistral key, a Claude or ChatGPT plan), whether it trains; the app
+  cannot check the answer. A provider that may train whatever the account (Chutes) or an unpinned OpenRouter row
+  stays hidden whatever the user answers.
 - **The terms are a reading of 2026-11-17.** They live in `SettingsTraining.swift` and
   `execution-plans/processing-review/13-stage-rules/15-training-terms.md`, with their sources; a provider that
   changes its terms needs both edited.

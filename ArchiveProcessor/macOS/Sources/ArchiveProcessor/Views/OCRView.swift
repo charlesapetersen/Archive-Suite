@@ -1500,11 +1500,45 @@ struct OCRView: View {
         guard resolver.resolve(.noTraining).value.bool == true else { return nil }
         var resources = SettingsResources(macMemoryGB: SettingsLayerStore.thisMacMemoryGB)
         resources.trainingOff = Set(resolver.resolve(.trainingOff).value.strings ?? [])
+        // Stanford's gateway and a model on this Mac are the gateway terms on record; another URL is not known.
+        let gatewayKnown = currentGatewayConfig.map { g in
+            g.isLocalModel || (URL(string: GatewayConfig.normalizedBaseURL(g.baseURL))?.host?.hasSuffix("stanford.edu") ?? false)
+        } ?? true
         var ways: [(SettingsTraining.RunWay, String)] = [
             (SettingsTraining.readingWay(provider: effectiveProvider, modelID: effectiveModel.id,
-                                         gateway: currentGatewayConfig != nil, localAgent: currentLocalAgentConfig?.tool),
+                                         gateway: currentGatewayConfig != nil, gatewayKnown: gatewayKnown,
+                                         localAgent: currentLocalAgentConfig?.tool),
              "reading and tagging the pages"),
         ]
+        // Apple Vision's judgement pass sends its text to the chosen provider on that provider's key.
+        if useAppleVision && visionUseLLMJudgment {
+            ways.append((SettingsTraining.readingWay(provider: selectedProvider, modelID: selectedModel.id, gateway: false,
+                                                     localAgent: nil), "judging and tagging Vision's text"))
+        }
+        // The direct-provider path's other readers (`OCRProcessor`: the gateway and the Local Agent are the user's
+        // single route): a kind's own reader, the cascade's escalation, and a refused page's second reader.
+        let gateway = currentGatewayConfig
+        let direct = currentLocalAgentConfig == nil && gateway == nil
+        if direct {
+            for choice in Set(pageReaderPlan.pages.values.map { "\($0.choice.provider.rawValue)|\($0.choice.modelID)" }).sorted() {
+                let parts = choice.split(separator: "|", maxSplits: 1).map(String.init)
+                guard let provider = LLMProvider(rawValue: parts[0]) else { continue }
+                ways.append((SettingsTraining.readingWay(provider: provider, modelID: parts.count > 1 ? parts[1] : "",
+                                                         gateway: false, localAgent: nil), "reading pages of one kind"))
+            }
+        }
+        if direct || (gateway?.isLocalModel == true && gateway?.localEscalates == true),
+           let escalation = OCRCascade.fromDefaults().escalationModel {
+            ways.append((SettingsTraining.readingWay(provider: escalation.provider, modelID: escalation.id, gateway: false,
+                                                     localAgent: nil), "reading the pages the first reader fails"))
+        }
+        if direct && !useAppleVision {
+            ways += SettingsTraining.refusalFallbackWays(
+                claudeByPlan: segmentationRoutes.claudeByPlan,
+                openRouterKey: KeychainHelper.exists(account: LLMProvider.openrouter.rawValue),
+                mistralKey: KeychainHelper.exists(account: LLMProvider.mistral.rawValue))
+                .map { ($0, "reading a page the first reader refuses") }
+        }
         ways += SettingsTraining.segmentationWays(segmentationPlan, routes: segmentationRoutes,
                                                   options: try? SegmentationOptions.loadBundled())
             .map { ($0, "finding where documents begin") }

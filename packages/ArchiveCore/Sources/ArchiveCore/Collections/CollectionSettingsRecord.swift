@@ -457,13 +457,13 @@ public enum CollectionSettingsVocabulary {
         "searchableFor": "Pages written as one searchable page, with no text page",
     ]
 
-    /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.
     /// The ways a user says do not train on their pages (the Processor's `SettingsTraining.answerableWays`).
     public static let trainingOffWords: [String: String] = [
         "key:gemini": "the Gemini key (billed)", "key:mistral": "the Mistral key (paid or opted out)",
         "plan:claude": "the Claude plan (training off)", "plan:chatgpt": "the ChatGPT plan (training off)",
     ]
 
+    /// The values only the general layer holds (`SettingsKey.generalOnly`); a collection's copy is ignored.
     public static let generalOnlyKeys: Set<String> = [
         "keys", "plans", "cluster", "gpusPerJob", "downloadsAllowed", "moneyHabit", "monthCeilingUSD", "fineTuning",
         "trainingOff",

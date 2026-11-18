@@ -61,7 +61,18 @@ https://openrouter.ai/docs/guides/privacy/provider-logging). The app pins each O
 
 OpenRouter also takes `provider.data_collection: "deny"` on a request, which routes only to providers that do not
 collect data; with a pinned provider and no fallbacks, a request to one that does would fail rather than go elsewhere.
-The app does not send it yet; see the item's follow-up in `SUITE_TODO.md`.
+Since W46.training-optout-run the app sends it on every OpenRouter request while a job whose collection has the switch
+on is working (`OpenRouterDataPolicy`), so a Chutes-pinned call fails instead of reading.
+
+## The user's answers and the run (W46.training-optout-run)
+
+The general interview asks, for each key and plan found whose terms depend on the account, whether it trains
+(`trainingOff`: `key:gemini` billed, `key:mistral` paid or opted out, `plan:claude` and `plan:chatgpt` with the
+training setting off); an answered way counts as never. "May train" and "unknown" cannot be answered away.
+Process Files' Start also counts two ways the solver's table lacks: the Gemini CLI (the Local Agent's third tool),
+which signs in with a personal Google account whose free use Google may train on
+(https://developers.google.com/gemini-code-assist/resources/privacy-notice-gemini-code-assist-individuals), so may
+train, unanswerable; and a gateway other than Stanford's, whose terms are unknown.
 
 ## Not in the app's routes
 

@@ -171,6 +171,23 @@ enum SettingsInterviewsTestDriver {
             SettingsKey.batchCeilingUSD.rawValue: SettingsEntry(value: .double(2), source: .setByUser(day))])
         eq("under no limit, a collection's own ceiling holds", SettingsResolver(general: layer, collection: coll).ceilingUSD(), 2)
 
+        // W46.training-optout-run: a key the user says is billed and a plan whose training setting is off.
+        var off = GeneralInterviewAnswers(from: layer)
+        off.trainingOff = [SettingsTraining.keyWay("gemini"), SettingsTraining.planWay("claude"), "key:made-up"]
+        var tl = layer
+        off.apply(to: &tl, inventory: fakeMac([]), now: day)
+        eq("the training answers are written, only the asked ways", tl.entry(.trainingOff)?.value,
+           .strings(["key:gemini", "plan:claude"]))
+        eq("…read back by the next run", GeneralInterviewAnswers(from: tl).trainingOff, ["key:gemini", "plan:claude"])
+        eq("…and given to the solver", SettingsResolver(general: tl).resources(macMemoryGB: 16).trainingOff,
+           ["key:gemini", "plan:claude"])
+        eq("…in words", SettingsKey.trainingOff.describe(.strings(["key:gemini", "plan:claude"])),
+           "the Gemini key (billed), the Claude plan (training off)")
+        var none = GeneralInterviewAnswers(from: tl)
+        none.trainingOff = []
+        none.apply(to: &tl, inventory: fakeMac([]), now: day)
+        check("no training answer writes none", tl.entry(.trainingOff) == nil)
+
         check("the general layer now holds answers", GeneralInterviewAnswers.hasAnswers(layer))
         layer.set(.excludedModelFamilies, .strings(["gemini"]), source: .setByUser(day))
         GeneralInterviewAnswers.skip(fakeMac(["Gemini"]), layer: &layer, now: day)

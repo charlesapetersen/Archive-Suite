@@ -429,6 +429,7 @@ enum SettingsLayersTestDriver {
         samples += MoneyHabit.allCases.map { (.moneyHabit, .string($0.rawValue)) }
         samples += SettingsPreference.allCases.map { (.preference, .string($0.rawValue)) }
         samples += FineTuningAnswer.allCases.map { (.fineTuning, .string($0.rawValue)) }
+        samples.append((.trainingOff, .strings(SettingsTraining.answerableWays.map(\.way))))
         let words = samples.allSatisfy { key, value in
             let core: CollectionSettingValue
             switch value {
@@ -442,6 +443,8 @@ enum SettingsLayersTestDriver {
             return CollectionSettingsVocabulary.describe(key.rawValue, core) == key.describe(value)
         }
         check("the Reader and Notes put every answer in the same words", words)
+        eq("the training answers' words are ArchiveCore's", SettingsTraining.wayWords, CollectionSettingsVocabulary.trainingOffWords)
+        check("every asked way has words", SettingsTraining.answerableWays.allSatisfy { SettingsTraining.wayWords[$0.way] != nil })
     }
 
     /// The snapshot rides in the pending run and batch, survives a write and a read, and changes neither fingerprint.

@@ -358,6 +358,8 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
     private let openRouterPolicyToken = "live-capture-" + UUID().uuidString
+    // A session's entry ends with its processor; while the processor lives, it lasts as long as its config.
+    deinit { OpenRouterDataPolicy.set(false, for: openRouterPolicyToken) }
     /// W46.ent-feature-live — the layered settings the names policy reads (names ranked, "No names"), resolved for the
     /// session's output folder at its first finalize and kept for the session, as a Process Files run freezes them.
     /// Reset with the config and on Clear.

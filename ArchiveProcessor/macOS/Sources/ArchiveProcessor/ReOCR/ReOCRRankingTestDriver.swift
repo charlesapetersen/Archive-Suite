@@ -155,6 +155,27 @@ enum ReOCRRankingTestDriver {
         check("3 a batch that stays on the Mac disables every hosted row",
               mac.rows.allSatisfy { $0.provider == .appleVision ? $0.readiness == .ready
                   : $0.readiness == .needsSetup("this batch stays on the Mac") })
+        // W46.training-optout-run: the files' collection says its pages must not train. A Gemini or Mistral key's row
+        // needs setup (their free tiers train); the paid APIs and Vision stay ready; a billed key is ready again.
+        let noTrain = ReOCRRanking.rank(kind: .typewritten, pages: 10, table: table, pairs: pairs, resources: keyed,
+                                        staysOnMac: false, noTraining: true)
+        func trainsRow(_ r: ReOCRRanking.Row) -> Bool {
+            if case .needsSetup(let why) = r.readiness { return why.hasPrefix(SettingsTraining.blockerPrefix) }
+            return false
+        }
+        let geminiRows = noTrain.rows.filter { $0.provider == .gemini }
+        check("3 must not train: every Gemini key row needs setup", !geminiRows.isEmpty && geminiRows.allSatisfy(trainsRow),
+              "\(noTrain.rows.map { "\($0.id) \($0.readiness)" })")
+        check("3 must not train: Vision and the OpenAI and Anthropic rows are not hidden for training",
+              noTrain.rows.filter { [.appleVision, .openai, .anthropic].contains($0.provider) }.allSatisfy { !trainsRow($0) })
+        check("3 must not train: no suggestion is a row hidden for training",
+              noTrain.suggestedID.map { id in noTrain.rows.first { $0.id == id }.map { !trainsRow($0) } ?? true } ?? true)
+        var billed = keyed
+        billed.trainingOff = [SettingsTraining.keyWay("gemini")]
+        let billedRank = ReOCRRanking.rank(kind: .typewritten, pages: 10, table: table, pairs: pairs, resources: billed,
+                                           staysOnMac: false, noTraining: true)
+        check("3 must not train, the Gemini key billed: its rows are ready",
+              billedRank.rows.filter { $0.provider == .gemini }.allSatisfy { !trainsRow($0) })
         check("3 keyed rows are ready", typed.rows.allSatisfy { $0.readiness == .ready },
               "\(typed.rows.filter { $0.readiness != .ready }.map { "\($0.id) \($0.readiness)" })")
 

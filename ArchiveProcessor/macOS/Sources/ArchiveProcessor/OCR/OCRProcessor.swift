@@ -6,7 +6,7 @@ import ArchiveCore
 @MainActor
 class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
-    @Published var isProcessing = false
+    @Published var isProcessing = false { didSet { updateOpenRouterPolicy() } }
     @Published private var displayedProgress: Double = 0
     /// A mixed Process Files run has two sequential routes. Each route continues reporting its own
     /// 0…1 progress; map that fraction into its share of the one run's progress bar.
@@ -707,13 +707,17 @@ class OCRProcessor: ObservableObject {
     var activeRunHistory: RunHistorySnapshot?
 
     /// The settings layers frozen at this run's start (W46.settings-layers), copied into its pending run or batch.
-    var activeResolvedSettings: ResolvedSettingsSnapshot? {
-        // W46.training-optout-run: the run's OpenRouter calls refuse an upstream that may train when its collection
-        // says its pages must not train. Kept until the next run's settings replace it (only ever the stricter way).
-        didSet { OpenRouterDataPolicy.set(OpenRouterDataPolicy.deny(activeResolvedSettings?.values), for: openRouterPolicyToken) }
-    }
+    var activeResolvedSettings: ResolvedSettingsSnapshot? { didSet { updateOpenRouterPolicy() } }
     /// This processor's entry in `OpenRouterDataPolicy`.
     nonisolated let openRouterPolicyToken = "process-files-" + UUID().uuidString
+
+    /// W46.training-optout-run: while this processor works (a run, its tagging, a retry), its OpenRouter calls refuse
+    /// an upstream that may train when the run's collection says its pages must not train. Idle, it holds nothing, so
+    /// another job's calls are not refused for this collection's sake.
+    func updateOpenRouterPolicy() {
+        OpenRouterDataPolicy.set(isProcessing && OpenRouterDataPolicy.deny(activeResolvedSettings?.values),
+                                 for: openRouterPolicyToken)
+    }
     /// This start's collection record, until the run is committed and it is written; nil once written or on a resume.
     var activeRunToRecord: PendingCollectionRecord?
 

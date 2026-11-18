@@ -33,6 +33,78 @@ enum SettingsSolverTestDriver {
         check(name, got == want, "got \(got) want \(want)")
     }
 
+    /// T3, T4. W46.training-optout-run: what Process Files' Start says, and the ways a run sends its pages.
+    private static func trainingRunChecks() {
+        // T3. The run's warning (Process Files' Start): one line per way the switch hides, none when all are safe.
+        let none = SettingsResources(macMemoryGB: 16)
+        let gem = SettingsTraining.runWarning([(.key("gemini"), "reading and tagging the pages")], resources: none)
+        check("T3 a Gemini key warns", gem?.contains("a Gemini API key") == true, gem ?? "nil")
+        var billed = none
+        billed.trainingOff = [SettingsTraining.keyWay("gemini")]
+        check("T3 a billed Gemini key does not warn",
+              SettingsTraining.runWarning([(.key("gemini"), "reading")], resources: billed) == nil)
+        check("T3 the gateway, an API key and this Mac do not warn",
+              SettingsTraining.runWarning([(.safe, "reading"), (.key("anthropic"), "segmenting"), (.key("openai"), "x")],
+                                          resources: none) == nil)
+        let plan = SettingsTraining.runWarning([(.plan("claude"), "finding where documents begin")], resources: none)
+        check("T3 a Claude plan warns", plan?.contains("a Claude plan") == true, plan ?? "nil")
+        let chutes = SettingsTraining.runWarning([(.openRouter(modelID: "qwen/qwen3.6-27b"), "reading")], resources: none)
+        check("T3 Chutes through OpenRouter warns that its calls will fail", chutes?.contains("will fail") == true, chutes ?? "nil")
+        check("T3 DeepInfra through OpenRouter does not warn",
+              SettingsTraining.runWarning([(.openRouter(modelID: "qwen/qwen3-vl-235b-a22b-instruct"), "reading")],
+                                          resources: none) == nil)
+        let two = SettingsTraining.runWarning([(.key("mistral"), "reading"), (.key("mistral"), "reading"),
+                                               (.plan("chatgpt"), "segmenting")], resources: none) ?? ""
+        check("T3 each way once", two.components(separatedBy: "• ").count == 3, two)
+
+        // T4. The run's ways, as the client choice makes them: the Local Agent first, then the gateway, then the key.
+        eq("T4 the Claude Local Agent is the Claude plan",
+           SettingsTraining.readingWay(provider: .gemini, modelID: "m", gateway: true, localAgent: .claude), .plan("claude"))
+        eq("T4 Codex is the ChatGPT plan",
+           SettingsTraining.readingWay(provider: .openai, modelID: "m", gateway: false, localAgent: .codex), .plan("chatgpt"))
+        eq("T4 the gateway is safe",
+           SettingsTraining.readingWay(provider: .gemini, modelID: "m", gateway: true, localAgent: nil), .safe)
+        eq("T4 a Gemini key", SettingsTraining.readingWay(provider: .gemini, modelID: "m", gateway: false, localAgent: nil),
+           .key("gemini"))
+        eq("T4 Apple Vision is safe",
+           SettingsTraining.readingWay(provider: .appleVision, modelID: "m", gateway: false, localAgent: nil), .safe)
+        eq("T4 OpenRouter names its model",
+           SettingsTraining.readingWay(provider: .openrouter, modelID: "qwen/qwen3.6-27b", gateway: false, localAgent: nil),
+           .openRouter(modelID: "qwen/qwen3.6-27b"))
+        let options = try? SegmentationOptions.loadBundled()
+        eq("T4 Gemini windows are the Gemini key",
+           SettingsTraining.segmentationWays(.windows(.gemini), routes: SegmentationRoutes(), options: options), [.key("gemini")])
+        eq("T4 Claude windows by plan are the Claude plan",
+           SettingsTraining.segmentationWays(.windows(.claude), routes: SegmentationRoutes(hasClaudeCLI: true), options: options),
+           [.plan("claude")])
+        eq("T4 Claude windows on a key are the Anthropic key",
+           SettingsTraining.segmentationWays(.windows(.claude), routes: SegmentationRoutes(hasAnthropicKey: true), options: options),
+           [.key("anthropic")])
+        eq("T4 the 2B alone sends nothing",
+           SettingsTraining.segmentationWays(.windows(.local), routes: SegmentationRoutes(), options: options), [.safe])
+        eq("T4 the 2B with its Gemini partner",
+           SettingsTraining.segmentationWays(.windows(.local), routes: SegmentationRoutes(localPartner: .gemini), options: options),
+           [.safe, .key("gemini")])
+        let geminiCLI = SettingsTraining.readingWay(provider: .gemini, modelID: "m", gateway: false, localAgent: .gemini)
+        var allAnswered = none
+        allAnswered.trainingOff = Set(SettingsTraining.answerableWays.map(\.way))
+        check("T4 the Gemini CLI warns whatever the answers",
+              SettingsTraining.runWarning([(geminiCLI, "reading")], resources: allAnswered) != nil)
+        let custom = SettingsTraining.readingWay(provider: .gemini, modelID: "m", gateway: true, gatewayKnown: false, localAgent: nil)
+        check("T4 a gateway other than Stanford's warns",
+              SettingsTraining.runWarning([(custom, "reading")], resources: allAnswered)?.contains("other than Stanford") == true)
+        eq("T4 a refused page's second readers that may train",
+           SettingsTraining.refusalFallbackWays(claudeByPlan: true, openRouterKey: true, mistralKey: true),
+           [.plan("claude"), .openRouter(modelID: OCRRefusalFallback.keyedModels[1].id), .key("mistral")])
+        eq("T4 none without a plan or those keys",
+           SettingsTraining.refusalFallbackWays(claudeByPlan: false, openRouterKey: false, mistralKey: false), [])
+        check("T4 the fallback's OpenRouter reader is pinned to Chutes, so it warns",
+              SettingsTraining.runWarning([(.openRouter(modelID: OCRRefusalFallback.keyedModels[1].id), "x")],
+                                          resources: allAnswered) != nil)
+        eq("T4 no segmenter without windows",
+           SettingsTraining.segmentationWays(.perPageReview, routes: SegmentationRoutes(), options: options), [])
+    }
+
     private static func skip(_ name: String, _ why: String) { lines.append("SKIP \(name): \(why)") }
 
     /// A part's route id, or its flag ("flag: needs a download or a key"); `none` for no names.
@@ -196,6 +268,25 @@ enum SettingsSolverTestDriver {
         var apiKey = mac(16)
         apiKey.keys = ["anthropic"]
         check("T Sonnet on an Anthropic API key stays", !trains(solve("T-anthropic", apiKey, noTrain), "segmentation", "claude-sonnet5.5"))
+
+        // T2. W46.training-optout-run: a key the user says is billed and a plan whose training setting is off are
+        // safe; a provider that may train whatever the account, and an unpinned row, stay hidden.
+        var answered = many
+        answered.trainingOff = [SettingsTraining.keyWay("gemini"), SettingsTraining.planWay("claude"),
+                                SettingsTraining.keyWay("openrouter"), "openrouter:qwen/qwen3.6-27b"]
+        let t2 = solve("T2", answered, noTrain)
+        check("T2 a billed Gemini key's route stays", !trains(t2, "reading", "gemini3.8-flash"),
+              t2.blockers("reading", "gemini3.8-flash").joined(separator: "; "))
+        check("T2 the Claude plan with training off stays", !trains(t2, "segmentation", "claude-sonnet5.5"),
+              t2.blockers("segmentation", "claude-sonnet5.5").joined(separator: "; "))
+        check("T2 Chutes stays hidden whatever the answers", trains(t2, "reading", "qwen3.6-27b"))
+        check("T2 an unpinned OpenRouter row stays hidden", trains(t2, "reading", "qwen3.5-397b"))
+        var otherPlan = many
+        otherPlan.trainingOff = [SettingsTraining.planWay("chatgpt")]
+        check("T2 another plan's answer does not lift the Claude plan",
+              trains(solve("T2-other", otherPlan, noTrain), "segmentation", "claude-sonnet5.5"))
+
+        trainingRunChecks()
 
         // C. An OpenRouter key, Gemini models not used.
         var orKey = mac(16)

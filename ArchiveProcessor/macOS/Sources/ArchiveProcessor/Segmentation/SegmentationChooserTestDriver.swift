@@ -349,6 +349,15 @@ enum SegmentationChooserTestDriver {
         check("6 Gemini key, nothing saved: saves", SegmentationApproach.preselect(gemOnly, defaults: d))
         eq("6 Gemini key, nothing saved: gemini-text", SegmentationApproach.stored(d), .geminiText)
         d.removeObject(forKey: key)
+        // W46.training-optout-run: under the general layer's "must not train", a Gemini key is not the default unless
+        // the user says it is billed.
+        var gemNoTrain = gemOnly
+        gemNoTrain.noTraining = true
+        let noTrainPick = SegmentationApproach.preferredDefault(gemNoTrain)
+        check("6 must not train: a Gemini key's approach is not the default",
+              noTrainPick != .gemini && noTrainPick != .geminiText, noTrainPick.rawValue)
+        gemNoTrain.trainingOff = [SettingsTraining.keyWay("gemini")]
+        eq("6 must not train, the key billed: gemini-text", SegmentationApproach.preferredDefault(gemNoTrain), .geminiText)
         var gemCLI = gemOnly
         gemCLI.hasClaudeCLI = true
         SegmentationApproach.preselect(gemCLI, defaults: d)
