@@ -1732,7 +1732,10 @@ extension OCRProcessor {
                                                     localAgentDisplayName: localAgentDisplayName,
                                                     localAgentModelName: localAgentModelName,
                                                     pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions,
-                                                    sourceFormat: OutputForm.format(ofExtension: sourceURL.pathExtension))
+                                                    sourceFormat: OutputForm.format(ofExtension: sourceURL.pathExtension),
+                                                    // W42.stroke-weight-processor — judged on the source:
+                                                    // `url` may be a converted copy without its camera tags.
+                                                    photographed: CompressedPage.isCameraPhoto(sourceURL))
                 var appliedTags: [String]? = nil
                 var tagWriteOK: Bool? = nil
                 if shouldPassTags {

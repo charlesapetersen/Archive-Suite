@@ -1836,6 +1836,10 @@ final class OCRModel: ObservableObject {
         /// Where a page's ink is, for the MRC layering, where `lines` are not on it (a host's
         /// unplaced layer); same convention. Nil, or no entry for a page: its layer's lines.
         inkBoxes: [Int: [SearchableWriter.BoundingBox]]? = nil,
+        /// W42.stroke-weight-processor (`CompressedPage`). The image is a camera's photo though
+        /// its file carries no camera tags (a host's own copy of it): it takes the camera route
+        /// `cameraExposed` gives a tagged one. False: the tags decide.
+        photographed: Bool = false,
         progress: @escaping (String, Double) -> Void,
         /// Called when recognition gave up on its helper process and did the
         /// document in-process instead (R40). Named for that one event rather
@@ -1919,9 +1923,9 @@ final class OCRModel: ObservableObject {
         // An image input's all-text pages keep their tone layers finer (`mrcLayers`).
         let fromImage = PDFDocument(url: file) == nil
         // page-kinds-three. A camera's tags make every page of the image a photograph.
-        let cameraExposed = fromImage && Flattener.cameraExposed(
+        let cameraExposed = fromImage && (photographed || Flattener.cameraExposed(
             CGImageSourceCreateWithURL(inputFile as CFURL, nil)
-                .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] })
+                .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }))
         if fromImage {
             let input = work.appendingPathComponent("input")
             guard (try? FileManager.default.createDirectory(

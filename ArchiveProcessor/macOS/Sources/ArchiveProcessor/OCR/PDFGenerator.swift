@@ -78,23 +78,28 @@ struct PDFGenerator {
                   localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                   pdfImageMB: Double = 0, textColumns: Int = 1,
                   sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
-                  textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil) throws -> ImagePageOutcome {
+                  textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil,
+                  photographed: Bool? = nil) throws -> ImagePageOutcome {
         try generateOutput(imageURL: imageURL, result: result, model: model, outputURL: outputURL,
                            originalFileName: originalFileName, gatewayDisplayName: gatewayDisplayName,
                            localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
                            pdfImageMB: pdfImageMB, textColumns: textColumns, sourceDates: sourceDates,
-                           pageKind: pageKind, textLayer: textLayer, sourceFormat: sourceFormat).imagePage
+                           pageKind: pageKind, textLayer: textLayer, sourceFormat: sourceFormat,
+                           photographed: photographed).imagePage
     }
 
     /// `generate`, saying also what the image page's searchable layer came to. `textLayer` nil writes no layer.
     /// `sourceFormat` is the input's own format (`OutputForm.format(ofExtension:)`; nil: `imageURL`'s), which with the
-    /// page's kind picks the form from `textLayer.searchableFor` (W42.int-s5-searchable).
+    /// page's kind picks the form from `textLayer.searchableFor` (W42.int-s5-searchable). `photographed`: whether the image
+    /// is a camera's photo, for the compressed page's stencil (`CompressedPage.write`, W42.stroke-weight-processor); nil
+    /// judges it from `imageURL`'s own tags. A caller whose `imageURL` is a copy that lost them says so itself.
     func generateOutput(imageURL: URL, result: OCRResult, model: LLMModel, outputURL: URL,
                         originalFileName: String? = nil, gatewayDisplayName: String? = nil,
                         localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                         pdfImageMB: Double = 0, textColumns: Int = 1,
                         sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
-                        textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil) throws -> Output {
+                        textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil,
+                        photographed: Bool? = nil) throws -> Output {
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
         var layer = TextLayerOutcome.textPage("no layer asked for")
@@ -160,7 +165,9 @@ struct PDFGenerator {
             if let searchable {
                 let written = writeCompressedSearchable(searchable.image, lines: searchable.lines,
                                                         unplaced: layer.route == .unplaced, reading: result.text ?? "",
-                                                        header: header.carried, to: outputURL)
+                                                        header: header.carried,
+                                                        photographed: photographed ?? CompressedPage.isCameraPhoto(imageURL),
+                                                        to: outputURL)
                 compression = written.why
                 if written.why == nil {
                     return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened, form: form,
@@ -181,9 +188,10 @@ struct PDFGenerator {
     /// without a redraw (`SearchableArchival`). The page is the image's own area of the pair's letter page. An
     /// `unplaced` layer's lines are not on the words, so the layering is told where they are by Vision's lines. `why`
     /// nil when written (with the engine's `note` on it, if any); otherwise why not, and nothing is written (the caller
-    /// writes the page uncompressed). Off the main thread.
+    /// writes the page uncompressed). A `photographed` page keeps the photo's stroke weight in its stencil, as the
+    /// engine's own camera route does. Off the main thread.
     private func writeCompressedSearchable(_ image: ImagePageData, lines: TextLayer.Lines?, unplaced: Bool,
-                                           reading: String, header: String?,
+                                           reading: String, header: String?, photographed: Bool,
                                            to url: URL) -> (why: String?, note: String?) {
         let missing = CompressedPage.missingTools
         guard missing.isEmpty else { return (missing.joined(separator: " and ") + " not found", nil) }
@@ -199,7 +207,7 @@ struct PDFGenerator {
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             note = try CompressedPage.write(image: cg, lines: lines, ink: unplaced ? TextLayer.visionLines(of: cg) : nil,
-                                            pageSize: size, to: page).first
+                                            pageSize: size, photographed: photographed, to: page).first
         } catch { return (error.localizedDescription, nil) }
         // The same test the uncompressed page passed: there is no text page, so the layer must lose nothing.
         guard let doc = PDFDocument(url: page), doc.pageCount == 1, let made = doc.page(at: 0),

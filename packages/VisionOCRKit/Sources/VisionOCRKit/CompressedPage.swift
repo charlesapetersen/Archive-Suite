@@ -41,6 +41,13 @@ public enum CompressedPage {
     /// The qpdf the compression uses, for a host that merges or finishes what it wrote without redrawing it.
     public static var qpdf: URL? { JBIG2.merger.map { URL(fileURLWithPath: $0) } }
 
+    /// Whether the image file at `url` is a camera's photo by its tags (a Make or Model and an exposure), as the engine
+    /// judges an image it is handed (`Flattener.cameraExposed`). False for a PDF, an unreadable file or a scan.
+    public static func isCameraPhoto(_ url: URL) -> Bool {
+        Flattener.cameraExposed(CGImageSourceCreateWithURL(url as CFURL, nil)
+            .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] })
+    }
+
     /// The engine's defaults in memory, shared with the page-kind reader; no saved preferences are read.
     static let settings: Prefs.Snapshot = {
         var s = EnginePageKind.settings
@@ -55,11 +62,14 @@ public enum CompressedPage {
     /// `ink`: where the words are, when `lines` are not on them (an unplaced layer), so the MRC layering keeps the
     /// text sharp where it really is; nil uses `lines`. Returns what the engine said of the page, to be logged: that ink
     /// outside the lines was stored at a lower resolution (C28), as Vision OCR's run report says it.
+    /// `photographed`: the image is a camera's photo (`isCameraPhoto`, or a host that knows it took it), which keeps
+    /// the photo's stroke weight in the layering as the engine does for a camera-tagged file
+    /// (W42.stroke-weight-photographed); the PNG handed to the engine carries no tags, so it must be told.
     /// Synchronous and seconds a page (jbig2 and qpdf run as children): call it off the main thread. Throws, and
     /// writes nothing, when the tools are missing, a line cannot be placed or the page did not come out compressed.
     @discardableResult
     public static func write(image: CGImage, lines: TextLayer.Lines, ink: TextLayer.Lines? = nil, pageSize: CGSize,
-                             to destination: URL) throws -> [String] {
+                             photographed: Bool = false, to destination: URL) throws -> [String] {
         assert(!Thread.isMainThread, "CompressedPage.write on the main thread")
         let missing = missingTools
         guard missing.isEmpty else { throw Failure.missingTools(missing) }
@@ -89,6 +99,7 @@ public enum CompressedPage {
         OCRModel.makeSearchablePDF(file: png, output: out, rebuild: true, rebuildMode: .auto, password: nil,
                                    settings: settings, control: RunControl(), lines: [1: lines.observations],
                                    inkBoxes: ink.flatMap { $0.isEmpty ? nil : [1: $0.observations.map(\.boundingBox)] },
+                                   photographed: photographed,
                                    progress: { _, _ in }, tookJBIG2Route: { compressed = true },
                                    shrunkTextPageNote: { notes.append($0) },
                                    report: { outcome = $0; message = $1 })

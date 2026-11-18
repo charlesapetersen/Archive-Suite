@@ -1613,7 +1613,9 @@ final class LiveCaptureProcessor: ObservableObject {
                                                  localAgentDisplayName: localAgentDisplayName,
                                                  localAgentModelName: localAgentModelName,
                                                  pdfImageMB: pdfImageMB, textColumns: textColumns,
-                                                 sourceDates: sourceDates, textLayer: textLayer)
+                                                 sourceDates: sourceDates, textLayer: textLayer,
+                                                 // W42.stroke-weight-processor: a live capture is the phone's photo.
+                                                 photographed: true)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as

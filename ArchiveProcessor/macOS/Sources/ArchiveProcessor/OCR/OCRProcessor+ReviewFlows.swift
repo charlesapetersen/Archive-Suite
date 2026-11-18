@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import os
+import VisionOCRKit
 
 extension OCRProcessor {
     /// W37.dual-date — the enclosure-proposal BASELINE for `files` (aligned with `jobs` by index): the
@@ -423,7 +424,8 @@ extension OCRProcessor {
                             pdfImageMB: pdfSettings.pdfImageMB,
                             textColumns: pdfSettings.textColumns,
                             textLayer: layerOptions,
-                            sourceFormat: OutputForm.format(ofExtension: source.pathExtension)
+                            sourceFormat: OutputForm.format(ofExtension: source.pathExtension),
+                            photographed: CompressedPage.isCameraPhoto(source)   // W42.stroke-weight-processor
                         )
                     }.value
                     recordImagePage(output.imagePage, forSource: source)

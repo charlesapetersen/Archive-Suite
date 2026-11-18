@@ -3,6 +3,7 @@ import ArchiveCore
 import UserNotifications
 import PDFKit
 import os
+import VisionOCRKit
 
 extension OCRProcessor {
     /// Resolve every output setting consumed after the main OCR pass. An explicit config wins, then the
@@ -860,7 +861,8 @@ extension OCRProcessor {
                                 pdfImageMB: imageMB,
                                 textColumns: columns,
                                 textLayer: layerOptions,
-                                sourceFormat: OutputForm.format(ofExtension: source.pathExtension)
+                                sourceFormat: OutputForm.format(ofExtension: source.pathExtension),
+                                photographed: CompressedPage.isCameraPhoto(source)   // W42.stroke-weight-processor
                             )
                         }.value
                         recordImagePage(output.imagePage, forSource: source)

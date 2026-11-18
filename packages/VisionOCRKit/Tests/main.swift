@@ -7021,6 +7021,148 @@ do {
 }
 }  // end of section
 
+// MARK: - W42.stroke-weight-processor: a host's camera page takes the engine's camera route
+
+section("a host's camera page is compressed as the engine compresses a camera's photo (W42.stroke-weight-processor)") {
+do {
+    // The photographed-type page above, as an image a host holds: Archive Processor hands
+    // `CompressedPage` a decoded image with no tags, so the camera has to be named.
+    guard CompressedPage.missingTools.isEmpty else {
+        check("W42.stroke-weight-processor: skipped, \(CompressedPage.missingTools.joined(separator: " and ")) not found",
+              true, "")
+        return
+    }
+    let w = 1224, h = 1584
+    let paperLevel = 158, inkLevel = 64
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                               bitsPerSample: 8, samplesPerPixel: 1, hasAlpha: false,
+                               isPlanar: false, colorSpaceName: .deviceWhite,
+                               bytesPerRow: w, bitsPerPixel: 8)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    NSColor(white: CGFloat(paperLevel) / 255, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: w, height: h).fill()
+    let attrs: [NSAttributedString.Key: Any] = [
+        .font: NSFont(name: "Times-Roman", size: 36) ?? NSFont.systemFont(ofSize: 36),
+        .foregroundColor: NSColor(white: CGFloat(inkLevel) / 255, alpha: 1)]
+    var lines: [PageLine] = []
+    for i in 0..<22 {
+        let text = "The quick brown fox jumps over the dog \(i)"
+        let baseline = 1440 - i * 62
+        (text as NSString).draw(at: NSPoint(x: 90, y: baseline), withAttributes: attrs)
+        // Normalised, top-left origin: the line's box from a little under its baseline.
+        lines.append(PageLine(text: text, box: CGRect(x: 80.0 / Double(w), y: Double(h - baseline - 44) / Double(h),
+                                                      width: 760.0 / Double(w), height: 52.0 / Double(h)),
+                              confidence: 1))
+    }
+    NSGraphicsContext.current?.flushGraphics()
+    NSGraphicsContext.restoreGraphicsState()
+    let clean = Array(UnsafeBufferPointer(start: rep.bitmapData!, count: w * h))
+    var photo = clean
+    for y in 1..<(h - 1) {
+        for x in 1..<(w - 1) {
+            var s = 0
+            for dy in -1...1 { for dx in -1...1 { s += Int(clean[(y + dy) * w + x + dx]) } }
+            photo[y * w + x] = UInt8(s / 9)
+        }
+    }
+    var seed: UInt64 = 0x5eed_c0de
+    for i in photo.indices {
+        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+        photo[i] = UInt8(clamping: Int(photo[i]) + Int((seed >> 33) % 25) - 12)
+    }
+    guard let provider = CGDataProvider(data: Data(photo) as CFData),
+          let cg = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w,
+                           space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                           provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent) else {
+        check("W42.stroke-weight-processor: the test image is made", false, "")
+        return
+    }
+    let dir = tmp.appendingPathComponent("camera-host")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    // The same pixels as a camera's file (a Make, a Model, an f-number: `cameraExposed`) and as an untagged one,
+    // both lossless at the page's 144 DPI.
+    func saved(_ name: String, camera: Bool) -> URL {
+        let url = dir.appendingPathComponent(name)
+        var props: [CFString: Any] = [kCGImagePropertyDPIWidth: 144.0, kCGImagePropertyDPIHeight: 144.0]
+        if camera {
+            props[kCGImagePropertyTIFFDictionary] = [kCGImagePropertyTIFFMake: "Google",
+                                                     kCGImagePropertyTIFFModel: "Pixel 6"]
+            props[kCGImagePropertyExifDictionary] = [kCGImagePropertyExifFNumber: 1.85]
+        }
+        if let sink = CGImageDestinationCreateWithURL(url as CFURL, "public.tiff" as CFString, 1, nil) {
+            CGImageDestinationAddImage(sink, cg, props as CFDictionary)
+            _ = CGImageDestinationFinalize(sink)
+        }
+        return url
+    }
+    let tagged = saved("camera.tiff", camera: true), untagged = saved("scan.tiff", camera: false)
+    check("W42.stroke-weight-processor: a camera's tagged file reads as a camera's photo, an untagged one does not",
+          CompressedPage.isCameraPhoto(tagged) && !CompressedPage.isCameraPhoto(untagged)
+            && !CompressedPage.isCameraPhoto(dir.appendingPathComponent("missing.jpg")), "")
+    let layer = TextLayer.lines(lines)
+    let size = CGSize(width: 612, height: 792)
+    func viaHost(_ name: String, photographed: Bool?) -> URL? {
+        let out = dir.appendingPathComponent(name)
+        var ok = false
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            if let photographed {
+                ok = (try? CompressedPage.write(image: cg, lines: layer, pageSize: size, photographed: photographed,
+                                                to: out)) != nil
+            } else {
+                ok = (try? CompressedPage.write(image: cg, lines: layer, pageSize: size, to: out)) != nil
+            }
+            done.signal()
+        }
+        done.wait()
+        return ok ? out : nil
+    }
+    let hostCamera = viaHost("host-camera.pdf", photographed: true)
+    let hostScan = viaHost("host-scan.pdf", photographed: false)
+    let hostDefault = viaHost("host-default.pdf", photographed: nil)
+    // The engine's own route for the camera's file, with the settings and lines `CompressedPage` gives it.
+    let engineCamera = dir.appendingPathComponent("engine-camera.pdf")
+    var outcome: Runner.Result.Outcome?
+    OCRModel.makeSearchablePDF(file: tagged, output: engineCamera, rebuild: true, rebuildMode: .auto, password: nil,
+                               settings: CompressedPage.settings, control: RunControl(),
+                               lines: [1: layer.observations], progress: { _, _ in },
+                               report: { o, _ in outcome = o })
+    // Each page as a reader draws it, grey, top-down, at the image's own pixels.
+    func drawn(_ url: URL?) -> [UInt8]? {
+        guard let url, let page = PDFDocument(url: url)?.page(at: 0)?.pageRef,
+              let g = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                                space: CGColorSpaceCreateDeviceGray(), bitmapInfo: 0) else { return nil }
+        g.setFillColor(gray: 1, alpha: 1)
+        g.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        g.scaleBy(x: CGFloat(w) / 612, y: CGFloat(h) / 792)
+        g.drawPDFPage(page)
+        return Array(UnsafeBufferPointer(start: g.data!.bindMemory(to: UInt8.self, capacity: w * h), count: w * h))
+    }
+    guard outcome == .succeeded, let camera = drawn(hostCamera), let scan = drawn(hostScan),
+          let byDefault = drawn(hostDefault), let engine = drawn(engineCamera) else {
+        check("W42.stroke-weight-processor: every page is written and drawn", false,
+              "engine \(String(describing: outcome)), host \(hostCamera != nil) \(hostScan != nil) \(hostDefault != nil)")
+        return
+    }
+    let differing = { (a: [UInt8], b: [UInt8]) in zip(a, b).filter { abs(Int($0) - Int($1)) > 2 }.count }
+    check("W42.stroke-weight-processor: a host's camera page draws as the engine's camera route draws the tagged file",
+          differing(camera, engine) * 1000 < w * h, "\(differing(camera, engine)) of \(w * h) pixels differ")
+    check("W42.stroke-weight-processor: …a host's page not named a camera is unchanged, the default",
+          byDefault == scan, "\(differing(byDefault, scan)) pixels differ")
+    // Inside the words, dark pixels over the type's as drawn before the blur, as in the section above.
+    let region = Flattener.textRegionMask([SearchableWriter.BoundingBox(x: 0.05, y: 0.05, width: 0.9, height: 0.9)],
+                                          width: w, height: h)
+    let middle = (inkLevel + paperLevel) / 2
+    func dark(_ px: [UInt8]) -> Int { (0..<(w * h)).filter { region[$0] && Int(px[$0]) < middle }.count }
+    let drawnDark = Double(max(dark(clean), 1))
+    let cameraDark = Double(dark(camera)) / drawnDark, scanDark = Double(dark(scan)) / drawnDark
+    check("W42.stroke-weight-processor: …the camera page keeps the photo's stroke weight, the scan's takes the re-cut",
+          cameraDark <= 1.05 && cameraDark >= 0.75 && scanDark > 1.30,
+          String(format: "%.3f of the drawn type's dark pixels as a camera's, %.3f as a scan's", cameraDark, scanDark))
+}
+}  // end of section
+
 // MARK: - C37: a scan that is already 1-bit JBIG2 keeps its own stream
 
 section("a 1-bit JBIG2 source page keeps its own stream (C37)") {
