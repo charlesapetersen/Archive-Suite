@@ -215,10 +215,11 @@ def summarise(rs, rulings):
         if t is not None:
             scored.append((r, src, t))
     month = tally((r["route"][1], t[1]) for r, _, t in scored)
-    day = tally((r["route"][2], t[2]) for r, _, t in scored)
-    full = sum(1 for r, _, t in scored if t[1] is not None and r["route"][1:] == t[1:])
-    with_month = sum(1 for _, _, t in scored if t[1] is not None)
-    with_day = sum(1 for _, _, t in scored if t[2] is not None)
+    sure_day = [(r, src, t) for r, src, t in scored if t[2] != "unsure"]     # a day the owner can't tell is not scored
+    day = tally((r["route"][2], t[2]) for r, _, t in sure_day)
+    full = sum(1 for r, _, t in sure_day if t[1] is not None and r["route"][1:] == t[1:])
+    with_month = sum(1 for _, _, t in sure_day if t[1] is not None)
+    with_day = sum(1 for _, _, t in sure_day if t[2] is not None)
     old = tally((r["old_month"], t[1]) for r, _, t in scored)
     # The month against the Finder tags alone (W46.date-month-score's question), independent of the page truth.
     tagged = [r for r in rs if r["cls"] in ("text", "image") and r["tag"][1] is not None and r["tag"][0] == r["route"][0]]
@@ -234,14 +235,24 @@ def summarise(rs, rulings):
             "by_truth_source": dict(collections.Counter(src for _, src, _ in scored)),
             "wrong": [{"id": r["id"], "route": r["route"], "truth": t, "source": src} for r, src, t in scored
                       if (r["route"][1] is not None and t[1] is not None and r["route"][1] != t[1])
-                      or (r["route"][2] is not None and t[2] is not None and r["route"][2] != t[2])]}
+                      or (r["route"][2] is not None and t[2] not in (None, "unsure") and r["route"][2] != t[2])],
+            "missing": [{"id": r["id"], "route": r["route"], "truth": t, "source": src, "cls": r["cls"],
+                         "date_from": r["date_from"]} for r, src, t in scored
+                        if (r["route"][1] is None and t[1] is not None)
+                        or (r["route"][2] is None and t[2] not in (None, "unsure"))],
+            "extra": [{"id": r["id"], "route": r["route"], "truth": t, "source": src} for r, src, t in scored
+                      if (r["route"][1] is not None and t[1] is None)
+                      or (r["route"][2] is not None and t[2] is None)]}
 
 
 def cmd_score(_a):
     rs = rows()
-    rulings = json.loads(RULINGS.read_text())["documents"] if RULINGS.exists() else {}
+    folded = json.loads(RULINGS.read_text()) if RULINGS.exists() else {}
+    rulings = folded.get("documents", {})
     S = summarise(rs, rulings)
-    S["sheet"] = {"documents": len(sheet_set(rs)), "folded": bool(rulings)}
+    key = json.loads(KEY.read_text())["documents"] if KEY.exists() else {}
+    S["sheet"] = {"documents": len(key) if rulings else len(sheet_set(rs)), "folded": bool(rulings),
+                  "controls": folded.get("controls")}
     RESULTS_JSON.write_text(json.dumps(S, indent=1) + "\n")
     RESULTS.write_text(report(S))
     print(json.dumps({k: S[k] for k in ("scored", "month", "day", "full_exact", "vs_tag", "by_source")}))
@@ -275,7 +286,16 @@ def report(S):
          f"- **Before and after on the page truth:** the old rule's month right on {frac(o.get('right', 0), mt)}; "
          f"{S['gained']} documents right only now, {S['lost']} only before. The old rule never wrote a day.",
          f"- **Where the month comes from** (explicit years): {', '.join(f'{k} {v}' for k, v in sorted(S['by_from'].items()))}.",
-         ("- **The owner's sheet is folded.**" if folded else
+         (f"- **The owner's sheet is folded** ({S['by_truth_source'].get('owner, this sheet', 0)} of its "
+          f"{S['sheet']['documents']} documents scored; W46.date-full-date-fold). Its controls: "
+          f"{S['sheet']['controls']['same']} of {S['sheet']['controls']['asked']} agreed documents as the owner reads "
+          "them (one on the month only: he reads the typed-over day as 27 or 29, the route wrote 29), so the agreed "
+          "truth stands. The month not written (13) is the error left: 5 are dates Vision garbled so the rule cannot "
+          "read them (a spaced day `APR 2 0 1977`, `DEC 2 1 1982`; `Aug• 4`; `NIRCH 13`; Cyrillic look-alikes "
+          "`ОстОВЕя 1, 1966`, and `1lth November` loses a day), 2 are image-pass years whose quote holds no dated form "
+          "while the reply's document month is right, and 6 are pages whose Vision text holds no dated form of the "
+          "date. The Gemini image pass had the owner's month on all 11 of these that were on this sheet "
+          "(W46.date-full-date-ocr-forms)." if folded else
           f"- **Not yet settled: {S['by_source'].get('disputed', 0)} disputed documents** (the route and the second "
           "reader differ, or the year came from the same image pass the second reader is) wait on the owner's blind "
           f"sheet ({S['sheet']['documents']} documents with {N_CONTROLS} controls); the figures above leave them out, so "
@@ -294,7 +314,11 @@ def report(S):
     L += ["", "## Measurement card", "",
           "- **Truth:** the page's own full date. Strongest is the owner's own reading of the page on his 2026-10-21 "
           f"date sheet ({S['by_truth_source'].get('owner, earlier sheet', 0)} scored documents)"
-          + (f" and this item's sheet ({S['by_truth_source'].get('owner, this sheet', 0)})" if folded else "")
+          + (f" and his blind sheet of 2026-11-18 ({S['by_truth_source'].get('owner, this sheet', 0)}; his two notes read "
+             "first: one day he can't tell, 27 or 29, is left out of the day score; one confirms the date at the foot "
+             "of the page over a December date on a document behind it). One sheet document is no longer scored: since "
+             "W46.date-stamp-fallback the route takes its year from a stamp, with no month or day by design, where he "
+             "reads 31 July 1975 on the page" if folded else "")
           + ". Next, the route and a second reader agreeing: the Gemini 3.7 Flash image pass on the first two pages "
           "(the same gateway model as the route's trace call, but reading the page image, where the route reads Apple "
           "Vision's text and takes its date by rule from a quote that must be in that text), and not against the owner's "
@@ -487,9 +511,18 @@ cnt();
 
 # --- fold ---------------------------------------------------------------------------------------------------------
 
+# The owner's notes, read before his answers (W46.date-full-date-fold, 2026-11-18). Each changes what an answer means:
+# {document id: (field overrides, the note's reason)}. A day "unsure" is left out of the day score, as a month "unsure"
+# leaves the document out.
+NOTE_RULINGS = {
+    "o:ec4e0e2e6b604c76": ({"day": "unsure"}, "D14: 'Day is typed over. Could be 27 or 29.' He gave 27; the day is not "
+                                              "scored, the month (June) is."),
+}
+
+
 def fold(answers: dict, key: dict) -> dict:
     """{documents: {document id: {month, day, note}}, controls: agreement on the controls, blank: ids not answered}.
-    A month is 1-12, None for "no month written", or "unsure"; a day only with a month."""
+    A month is 1-12, None for "no month written", or "unsure"; a day only with a month, or "unsure" from a note."""
     notes = answers.get("_notes") or {}
     docs, blank, controls = {}, [], {"asked": 0, "same": 0, "differs": []}
     for sid, k in key.items():
@@ -502,10 +535,23 @@ def fold(answers: dict, key: dict) -> dict:
         day = int(a["day"]) if isinstance(month, int) and str(a.get("day") or "").strip().isdigit() else None
         if day is not None and not 1 <= day <= 31:
             day = None
-        docs[k["id"]] = {"month": month, "day": day, "note": notes.get(sid, ""), "sheet_id": sid, "group": k["group"]}
+        given = day
+        over, why = NOTE_RULINGS.get(k["id"], ({}, ""))
+        if "month" in over:
+            month = over["month"]
+        if "day" in over:
+            day = over["day"]
+        docs[k["id"]] = {"month": month, "day": day, "note": notes.get(sid, ""), "sheet_id": sid, "group": k["group"],
+                         **({"answered_day": given, "note_ruling": why} if over else {})}
         if k["group"] == "control" and month != "unsure":
             controls["asked"] += 1
-            if [month, day] == k["route"][1:]:
+            if day == "unsure":
+                controls.setdefault("month_only", []).append(k["id"])
+                if month == k["route"][1]:
+                    controls["same"] += 1
+                else:
+                    controls["differs"].append(k["id"])
+            elif [month, day] == k["route"][1:]:
                 controls["same"] += 1
             else:
                 controls["differs"].append(k["id"])

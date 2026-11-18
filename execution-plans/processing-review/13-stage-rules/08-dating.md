@@ -60,7 +60,9 @@ it rests on. A guess with no evidence is never written."
    rule's dated form of that year; from the image, the quoted date the year rests on. A numeric date reads
    month-first when its first part can be a month; a day the month does not have is dropped. The tagging call's day
    stays only for the same year and month. Inherited and estimated years carry neither. Measured in
-   `date-full-date.md`.
+   `date-full-date.md`: with the owner's blind sheet folded (W46.date-full-date-fold), the month right on 90.2%
+   (119/132) and never wrong, the day 87.3% (96/110) with 2 wrong [M]. No ruling changed the rule (no day-first
+   numeric date among them); the months not written are mostly dates Vision garbles (W46.date-full-date-ocr-forms).
 5. *Not used.* Typeface or paper dating (DAT-4: 11 of 12 ranges contain the year at a median width of 50 years,
    `date-image-typeface.md`) and look-alike retrieval (27 exact of 122 against 52 for the nearest dated document
    before, `date-image.md`) are not steps.

@@ -1,58 +1,61 @@
 {
  "documents": 272,
- "explicit": 190,
+ "explicit": 189,
  "by_source": {
-  "disputed": 28,
+  "not explicit": 83,
   "owner, earlier sheet": 18,
-  "agreed": 94,
-  "not explicit": 82,
+  "agreed": 86,
+  "owner, this sheet": 35,
   "year not the owner's": 41,
   "no month found": 6,
   "agreed, no month": 3
  },
- "scored": 115,
- "with_month": 110,
- "with_day": 91,
+ "scored": 142,
+ "with_month": 131,
+ "with_day": 110,
  "month": {
-  "missing": 2,
-  "right": 108,
-  "none": 5
+  "missing": 13,
+  "right": 119,
+  "none": 9,
+  "extra": 1
  },
  "day": {
-  "missing": 2,
-  "right": 88,
-  "none": 24,
-  "wrong": 1
+  "missing": 12,
+  "right": 96,
+  "none": 31,
+  "wrong": 2
  },
- "full_exact": 106,
+ "full_exact": 115,
  "old_month": {
-  "missing": 2,
-  "right": 107,
+  "missing": 13,
+  "right": 118,
+  "none": 9,
   "wrong": 1,
-  "none": 5
+  "extra": 1
  },
  "gained": 1,
  "lost": 0,
  "vs_tag": {
-  "right": 87,
   "missing": 12,
+  "right": 86,
   "wrong": 1
  },
  "vs_tag_old": {
-  "right": 87,
   "missing": 12,
+  "right": 86,
   "wrong": 1
  },
- "tagged": 100,
+ "tagged": 99,
  "by_from": {
-  "image": 7,
   "none": 51,
   "quote": 124,
-  "rule": 8
+  "rule": 8,
+  "image": 6
  },
  "by_truth_source": {
   "owner, earlier sheet": 18,
-  "agreed": 94,
+  "agreed": 86,
+  "owner, this sheet": 35,
   "agreed, no month": 3
  },
  "wrong": [
@@ -69,10 +72,274 @@
     9
    ],
    "source": "owner, earlier sheet"
+  },
+  {
+   "id": "o:3420db3d37f3464f",
+   "route": [
+    1969,
+    1,
+    23
+   ],
+   "truth": [
+    1969,
+    1,
+    22
+   ],
+   "source": "owner, this sheet"
+  }
+ ],
+ "missing": [
+  {
+   "id": "o:492a5ec91467fe03",
+   "route": [
+    1987,
+    null,
+    null
+   ],
+   "truth": [
+    1987,
+    8,
+    3
+   ],
+   "source": "owner, earlier sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:8630fd8cb8b10b51",
+   "route": [
+    1956,
+    null,
+    null
+   ],
+   "truth": [
+    1956,
+    9,
+    4
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:5337068b4e6c5b05",
+   "route": [
+    1915,
+    11,
+    null
+   ],
+   "truth": [
+    1915,
+    11,
+    11
+   ],
+   "source": "owner, earlier sheet",
+   "cls": "text",
+   "date_from": "quote"
+  },
+  {
+   "id": "o:c575a9873a12960e",
+   "route": [
+    1977,
+    null,
+    null
+   ],
+   "truth": [
+    1977,
+    4,
+    20
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:db3da49a3817dd1e",
+   "route": [
+    1964,
+    null,
+    null
+   ],
+   "truth": [
+    1964,
+    1,
+    3
+   ],
+   "source": "owner, this sheet",
+   "cls": "image",
+   "date_from": null
+  },
+  {
+   "id": "o:f7d0a450d5b735bf",
+   "route": [
+    1982,
+    null,
+    null
+   ],
+   "truth": [
+    1982,
+    12,
+    21
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:7027e78edadc8045",
+   "route": [
+    1903,
+    null,
+    null
+   ],
+   "truth": [
+    1903,
+    8,
+    4
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:19b972ffddbaa48f",
+   "route": [
+    1970,
+    null,
+    null
+   ],
+   "truth": [
+    1970,
+    12,
+    null
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:59089c5953da87ed",
+   "route": [
+    1965,
+    null,
+    null
+   ],
+   "truth": [
+    1965,
+    3,
+    13
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:54d4ca78a2ac7f5f",
+   "route": [
+    1966,
+    null,
+    null
+   ],
+   "truth": [
+    1966,
+    10,
+    1
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:e78f16a562e85d6e",
+   "route": [
+    1969,
+    null,
+    null
+   ],
+   "truth": [
+    1969,
+    9,
+    null
+   ],
+   "source": "owner, earlier sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:6f2aa9f273ad44d2",
+   "route": [
+    1975,
+    null,
+    null
+   ],
+   "truth": [
+    1975,
+    10,
+    9
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:3a52ef94e328fbb3",
+   "route": [
+    1968,
+    null,
+    null
+   ],
+   "truth": [
+    1968,
+    7,
+    8
+   ],
+   "source": "owner, this sheet",
+   "cls": "text",
+   "date_from": null
+  },
+  {
+   "id": "o:edd1e829021aeff2",
+   "route": [
+    1968,
+    null,
+    null
+   ],
+   "truth": [
+    1968,
+    4,
+    15
+   ],
+   "source": "owner, this sheet",
+   "cls": "image",
+   "date_from": null
+  }
+ ],
+ "extra": [
+  {
+   "id": "o:28cf66082188ce71",
+   "route": [
+    1957,
+    7,
+    null
+   ],
+   "truth": [
+    1957,
+    null,
+    null
+   ],
+   "source": "owner, this sheet"
   }
  ],
  "sheet": {
   "documents": 36,
-  "folded": false
+  "folded": true,
+  "controls": {
+   "asked": 8,
+   "same": 8,
+   "differs": [],
+   "month_only": [
+    "o:ec4e0e2e6b604c76"
+   ]
+  }
  }
 }
