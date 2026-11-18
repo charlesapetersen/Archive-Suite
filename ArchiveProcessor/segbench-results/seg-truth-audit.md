@@ -15,22 +15,22 @@ Of the two boxes' 313 document gaps (both pages document pages, the two unknown 
 
 ## The owner's answers (W46.seg-truth-audit-fold, 2026-11-18)
 
-The owner answered all 50 gaps (0 can't tell, no notes or turns). **3 differ from the truth**, all in one stratum; the truth and all eleven routes called each a new document and the owner a continuation. Weighted by N/n, the truth is wrong on an estimated **9.2%** of the agreed pool (95% interval about 0.4-17.9%, n 50).
+The owner answered all 50 gaps (0 can't tell, no notes or turns). His sheet called 3 gaps continuations where the truth and all eleven routes call a new document (Stanton 80|81, Stanton 100|101, Stanton 138|139). Shown each gap alone with pages either side, he ruled all of them new documents (2026-11-18), so the later ruling stands and the sheet answers are superseded. All of them are one-page documents, where the sheet's layout put the next gap's '│ new' mark just right of the asked page; of his 15 Stanton-new answers, 3 of 6 one-page cases were answered continues against 0 of 9 others. The sheet now boxes the asked pair and names every other mark by its pair. **0 of 50 differ from the truth**. Weighted by N/n, the truth is wrong on an estimated **0.0%** of the agreed pool (95% interval about 0.0-5.5%, n 50).
 
 | stratum | asked | differ |
 |---|---:|---:|
 | RG165 continue | 10 | 0 |
 | RG165 new | 10 | 0 |
 | Stanton continue | 15 | 0 |
-| Stanton new | 15 | 3 |
+| Stanton new | 15 | 0 |
 
-Changed in the truth (`seg_truth_audit.py apply`, the CSVs copied first to the bench cache): Stanton 80|81 New -> Cont; Stanton 100|101 New -> Cont; Stanton 138|139 New -> Cont. Every test-box result is rescored from cached answers in the same item.
+Nothing in the truth changes, so no test-box result is rescored.
 
 ## Measurement card
 
-- **Truth.** The owner's untimed answers, three pages either side, are the truth for the asked gaps; they replace his capture labels where they differ.
+- **Truth.** The owner's untimed answers, three pages either side, are the truth for the asked gaps, with his later rulings where he reruled a gap shown alone; they replace his capture labels where they differ.
 - **Selection.** The population is chosen by route agreement (that is the audit's definition: agreed gaps were never re-judged); within it the draw is seeded and stratified by box and truth label, not by any route's confidence or answer. No ABBYY text.
-- **Comparison.** Every ranked route made the truth's call at each asked gap, so a changed gap counts against all of them at that gap: the routes' figures move together, though not by the same amount (a page counts exact only when its whole document is, so the other gaps of the document matter).
-- **Noise.** 3 of 50 answers differ, all in Stanton's new stratum (3 of 15, weight 6.533): the pool estimate rests on three gaps and its interval is wide. The interval is a normal one on the weighted rate, each stratum's variance from its Wilson interval, with a finite-pool correction.
-- **Scope.** Only the asked gaps change. If the estimate holds, about 17 more of the 164 unasked agreed gaps are wrong, most of them Stanton gaps called new; like these they would move every route alike. Does not re-rule the agreed gaps the owner already answered (56), the 43 gaps where the routes split (those the app's Gemini route did not flag were never asked), the unknown RG165 gaps, or any other box.
+- **Comparison.** Every ranked route made the truth's call at each asked gap, so a changed gap would count against all of them at that gap: the routes' figures would move together, though not by the same amount (a page counts exact only when its whole document is, so the other gaps of the document matter).
+- **Noise.** None of 50 answers differs: the estimate is zero and its upper bound is what the audit measures. The interval is a normal one on the weighted rate, each stratum's variance from its Wilson interval, with a finite-pool correction. The sheet's answers on one-page documents proved unreliable (3 of 6 reversed); every other answer agrees with the truth, so the layout could not have made a false difference among them, though an agreement it caused would not show.
+- **Scope.** Nothing changes. Does not re-rule the agreed gaps the owner already answered (56), the 43 gaps where the routes split (those the app's Gemini route did not flag were never asked), the unknown RG165 gaps, or any other box.
 

@@ -175,40 +175,54 @@ def render_record(r) -> str:
     f = r.get("fold")
     if f:
         lo, hi = f["interval95"]
+        sup = f.get("superseded", [])
         L += [f"## The owner's answers ({FOLD_TAG}, {f['date']})", "",
-              f"The owner answered all {f['ruled']} gaps ({f['unsure']} can't tell, no notes or turns). "
-              f"**{f['differs']} differ from the truth**, all in one stratum; the truth and all eleven routes called "
-              "each a new document and the owner a continuation. Weighted by N/n, the truth is wrong on an estimated "
-              f"**{100 * f['weighted_truth_error']:.1f}%** of the agreed pool (95% interval about "
-              f"{100 * lo:.1f}-{100 * hi:.1f}%, n {f['ruled']}).", "",
-              "| stratum | asked | differ |", "|---|---:|---:|"]
+              f"The owner answered all {f['ruled']} gaps ({f['unsure']} can't tell, no notes or turns). "]
+        if sup:
+            L[-1] += (f"His sheet called {len(sup)} gaps continuations where the truth and all eleven routes call a new "
+                      f"document ({', '.join(s['key'] for s in sup)}). Shown each gap alone with pages either side, "
+                      "he ruled all of them new documents (2026-11-18), so the later ruling stands and the sheet "
+                      "answers are superseded. All of them are one-page documents, where the sheet's layout put the "
+                      "next gap's '│ new' mark just right of the asked page; of his 15 Stanton-new answers, 3 of 6 "
+                      "one-page cases were answered continues against 0 of 9 others. The sheet now boxes the asked "
+                      "pair and names every other mark by its pair.")
+        L[-1] += (f" **{f['differs']} of {f['ruled']} differ from the truth**. Weighted by N/n, the truth is wrong on "
+                  f"an estimated **{100 * f['weighted_truth_error']:.1f}%** of the agreed pool (95% interval about "
+                  f"{100 * lo:.1f}-{100 * hi:.1f}%, n {f['ruled']}).")
+        L += ["", "| stratum | asked | differ |", "|---|---:|---:|"]
         for s, v in sorted(f["strata"].items()):
             L.append(f"| {s} | {v['asked']} | {v['differs']} |")
-        L += ["", "Changed in the truth (`seg_truth_audit.py apply`, the CSVs copied first to the bench cache): " +
-              "; ".join(f"{c['key']} {c['truth_before']} -> {c['truth_after']}" for c in f["changed"]) +
-              ". Every test-box result is rescored from cached answers in the same item.", ""]
+        L += ["", ("Changed in the truth (`seg_truth_audit.py apply`, the CSVs copied first to the bench cache): " +
+                   "; ".join(f"{c['key']} {c['truth_before']} -> {c['truth_after']}" for c in f["changed"]) +
+                   ". Every test-box result is rescored from cached answers in the same item.") if f["changed"] else
+              "Nothing in the truth changes, so no test-box result is rescored.", ""]
     L += seg_card.card(
-        truth=("The owner's untimed answers, three pages either side, are the truth for the asked gaps; they replace "
-               "his capture labels where they differ." if f else
+        truth=("The owner's untimed answers, three pages either side, are the truth for the asked gaps, with his "
+               "later rulings where he reruled a gap shown alone; they replace his capture labels where they differ."
+               if f else
                "None scored here. The sheet asks the owner about gaps whose truth came from his own capture labels and "
                "that no later check reached."),
         selection="The population is chosen by route agreement (that is the audit's definition: agreed gaps were never "
                   "re-judged); within it the draw is seeded and stratified by box and truth label, not by any route's "
                   "confidence or answer. No ABBYY text.",
-        comparison=("Every ranked route made the truth's call at each asked gap, so a changed gap counts against all "
-                    "of them at that gap: the routes' figures move together, though not by the same amount (a page counts "
-                    "exact only when its whole document is, so the other gaps of the document matter)." if f else
-                    "Not applicable until the answers are folded."),
-        noise=(f"{f['differs']} of {f['ruled']} answers differ, all in Stanton's new stratum (3 of 15, weight "
-               f"{next(s['weight'] for s in r['strata'] if s['stratum'] == 'Stanton new')}): the pool estimate rests on "
-               "three gaps and its interval is wide. The interval is a normal one on the weighted rate, each stratum's "
-               "variance from its Wilson interval, with a finite-pool correction." if f else
+        comparison=("Every ranked route made the truth's call at each asked gap, so a changed gap would count against "
+                    "all of them at that gap: the routes' figures would move together, though not by the same amount (a "
+                    "page counts exact only when its whole document is, so the other gaps of the document matter)."
+                    if f else "Not applicable until the answers are folded."),
+        noise=((f"{f['differs']} of {f['ruled']} answers differ: the pool estimate rests on "
+                f"{f['differs']} gap{'s' if f['differs'] != 1 else ''} and its interval is wide." if f["differs"] else
+                f"None of {f['ruled']} answers differs: the estimate is zero and its upper bound is what the audit "
+                "measures.") +
+               " The interval is a normal one on the weighted rate, each stratum's variance from its Wilson interval, "
+               "with a finite-pool correction. The sheet's answers on one-page documents proved unreliable (3 of 6 "
+               "reversed); every other answer agrees with the truth, so the layout could not have made a false "
+               "difference among them, though an agreement it caused would not show." if f else
                f"{r['drawn']} answers against a pool of {r['pool']}: an error rate near zero will carry a wide interval "
                "(no error in 50 bounds the rate at about 6% with 95% confidence before weighting); report it with its n."),
-        scope=(("Only the asked gaps change. If the estimate holds, about "
-                f"{round(f['weighted_truth_error'] * r['pool']) - f['differs']} more of the {r['pool'] - r['drawn']} "
-                "unasked agreed gaps are wrong, most of them Stanton gaps called new; like these they would move every "
-                "route alike. " if f else "") +
+        scope=(((("Only the asked gaps change. If the estimate holds, about "
+                 f"{round(f['weighted_truth_error'] * r['pool']) - f['differs']} more of the {r['pool'] - r['drawn']} "
+                 "unasked agreed gaps are wrong; like these they would move every route alike. ") if f["differs"] else
+                "Nothing changes. ") if f else "") +
                f"Does not re-rule the agreed gaps the owner already answered ({c['answered_before']}), the "
                f"{c['document_gaps'] - c['agreed']} gaps where the routes split (those the app's Gemini route did not "
                "flag were never asked), the unknown RG165 gaps, or any other box."))
@@ -385,16 +399,25 @@ cnt();
 
 # --- fold ---------------------------------------------------------------------------------------------------------
 
+# The owner's later rulings, which replace his sheet answers. 2026-11-18 ~09:35, interactive session: shown each of
+# the three gaps his sheet called continuations with pages either side (confirm-continuations.html in the bench
+# cache), he ruled all three new documents. All three are one-page documents, where the sheet's layout misled
+# (fixed in render_sheet the same day).
+LATER = {"Stanton 80|81": "new", "Stanton 100|101": "new", "Stanton 138|139": "new"}
+LATER_WHY = "owner, 2026-11-18 ~09:35: reruled shown the gap alone; the sheet answer is superseded"
+
 def fold(answers: dict, key: list[dict], ids: dict[str, str]) -> dict:
     """Each answer beside the truth, per-stratum agreement, and the pool's weighted truth-error estimate."""
     by_key = {g["key"]: g for g in key}
     rows, notes = [], answers.get("_notes") or {}
     for aid, k in ids.items():
         g = by_key[k]
-        ans = answers.get(aid)
+        ans = sheet = answers.get(aid)
+        ans = LATER.get(k, ans)
         rows.append({"id": aid, "key": k, "stratum": g["stratum"], "weight": g["weight"], "truth": g["truth"],
                      "consensus": g["consensus"], "answer": ans, "note": notes.get(aid, ""),
-                     "differs": ans in ("new", "continue") and ans != g["truth"]})
+                     "differs": ans in ("new", "continue") and ans != g["truth"],
+                     **({"sheet_answer": sheet, "later": LATER_WHY} if k in LATER else {})})
     ruled = [r for r in rows if r["answer"] in ("new", "continue")]
     strata = {}
     for r in rows:
@@ -407,7 +430,8 @@ def fold(answers: dict, key: list[dict], ids: dict[str, str]) -> dict:
     w_all = sum(r["weight"] for r in ruled)
     rate = sum(r["weight"] for r in ruled if r["differs"]) / w_all if w_all else None
     return {"rows": rows, "strata": strata, "ruled": len(ruled), "differs": sum(r["differs"] for r in ruled),
-            "weighted_truth_error": rate, "sheet_note": notes.get("_sheet", "")}
+            "weighted_truth_error": rate, "sheet_note": notes.get("_sheet", ""),
+            "superseded": sorted(r["key"] for r in rows if "later" in r and r["sheet_answer"] != r["answer"])}
 
 
 def cmd_fold(a):
@@ -432,10 +456,11 @@ FOLD_TAG = "W46.seg-truth-audit-fold"
 FOLD_DATE = "2026-11-18"
 BACKUP = OUT / "truth-before-audit-fold"
 LABEL = {"new": "New", "continue": "Cont"}
-# The owner's answers file (2026-11-18 08:40, 50 of 50, no notes or turns), checked so a misread file cannot fold
-# silently: three Stanton gaps the truth and all eleven routes called new continue. 100|101 is the gap before the
-# magazine cover; 101|102 keeps its New (W46.seg-truth-sheet, the article-within-issue rule).
-EXPECTED = {"Stanton": {81: "Cont", 101: "Cont", 139: "Cont"}}
+# The owner's answers file (2026-11-18 08:40, 50 of 50, no notes or turns) with his later rulings (LATER), checked
+# so a misread file cannot fold silently. His sheet called three Stanton gaps continuations (80|81, 100|101,
+# 138|139); he reversed all three, so nothing in the truth changes. A first apply wrote those three as Cont and was
+# undone by hand from truth-before-audit-fold/ (the folded copy kept as stanton-after-fold-reverted-20261118.csv).
+EXPECTED: dict[str, dict[int, str]] = {}
 
 
 def flips(rows: list[dict]) -> dict[str, dict[int, str]]:
@@ -500,6 +525,8 @@ def cmd_apply(_a):
         "unsure": sum(v["unsure"] for v in folded["strata"].values()),
         "weighted_truth_error": round(folded["weighted_truth_error"], 4), "interval95": [round(lo, 4), round(hi, 4)],
         "strata": folded["strata"],
+        "superseded": [{"key": r["key"], "sheet_answer": r["sheet_answer"], "answer": r["answer"]}
+                       for r in folded["rows"] if r["key"] in folded.get("superseded", [])],
         "changed": [{"key": r["key"], "truth_before": before[r["key"].split()[0]][int(r["key"].split("|")[1])],
                      "answer": r["answer"], "truth_after": LABEL[r["answer"]]} for r in folded["rows"] if r["differs"]]}
     RECORD.write_text(json.dumps(record, indent=1) + "\n")

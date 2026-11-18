@@ -104,12 +104,12 @@
   "item": "W46.seg-truth-audit-fold",
   "date": "2026-11-18",
   "ruled": 50,
-  "differs": 3,
+  "differs": 0,
   "unsure": 0,
-  "weighted_truth_error": 0.0916,
+  "weighted_truth_error": 0.0,
   "interval95": [
-   0.0043,
-   0.1789
+   0.0,
+   0.0548
   ],
   "strata": {
    "RG165 continue": {
@@ -136,30 +136,28 @@
    "Stanton new": {
     "asked": 15,
     "ruled": 15,
-    "differs": 3,
+    "differs": 0,
     "unsure": 0,
     "blank": 0
    }
   },
-  "changed": [
+  "superseded": [
    {
     "key": "Stanton 80|81",
-    "truth_before": "New",
-    "answer": "continue",
-    "truth_after": "Cont"
+    "sheet_answer": "continue",
+    "answer": "new"
    },
    {
     "key": "Stanton 100|101",
-    "truth_before": "New",
-    "answer": "continue",
-    "truth_after": "Cont"
+    "sheet_answer": "continue",
+    "answer": "new"
    },
    {
     "key": "Stanton 138|139",
-    "truth_before": "New",
-    "answer": "continue",
-    "truth_after": "Cont"
+    "sheet_answer": "continue",
+    "answer": "new"
    }
-  ]
+  ],
+  "changed": []
  }
 }
