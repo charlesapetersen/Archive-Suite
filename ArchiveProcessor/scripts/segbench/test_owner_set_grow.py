@@ -1,6 +1,7 @@
 """W46.owner-set-grow offline tests: the prompt and its parse, the selection of the base and top-up, the spans, the
 sheet's blind order and its key, and the fold. Synthetic data only; no corpus, no network. Run (from this
-directory): /usr/local/bin/python3 -m unittest test_owner_set_grow"""
+directory): uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy --with pillow \
+python -m unittest test_owner_set_grow"""
 import hashlib
 import random
 import unittest
@@ -51,6 +52,12 @@ class Spans(unittest.TestCase):
     def test_typography_is_not_a_dispute(self):
         sp = S.spans('it’s “here” – now', "it's \"here\" - now")
         self.assertTrue(all('agreed' in s for s in sp))
+
+    def test_a_decoding_loop_is_cut_at_its_second_pass(self):
+        run = 'one two three four five six seven eight'
+        self.assertEqual(S.trim_loop('head words ' + ' '.join([run] * 25)), 'head words ' + run)
+        self.assertIsNone(S.trim_loop('head words ' + ' '.join([run] * 3) + ' tail'))
+        self.assertIsNone(S.trim_loop('short'))
 
     def test_insertion_has_an_empty_side(self):
         sp = S.spans('a b c', 'a x b c')

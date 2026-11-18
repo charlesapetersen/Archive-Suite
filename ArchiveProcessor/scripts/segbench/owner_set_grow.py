@@ -72,7 +72,7 @@ ORIENT_BIN = REH / 'segbench/bin/segbench-ocr-orient'
 TOPUP = 30
 CONTROLS = 24
 SEED = 20261118
-CAP = 3.00                 # the item's gateway total across both drafters, under the $7 rule
+CAP = 6.50                 # the item's gateway total across pilots and both drafters, under the $7 rule
 DRAFT_SIDE = T.DRAFT_SIDE
 TURN_RATIO, TURN_MIN = 2.0, 20.0           # item_fields_retruth.display_turns: a clear win only
 SECONDS_PER_PAGE, SECONDS_PER_DISPUTE, SECONDS_PER_TYPED, TYPED_SHARE = 10, 6, 30, 0.15   # ocr_truth's, measured on
@@ -84,6 +84,11 @@ SECONDS_PER_CONTROL = 4                                                         
 DRAFTERS = {
     'gemini-3.7-flash': ('gemini3.7-flash-gw', 'gemini', 0.75, 3.75),
     'gpt-5.6-luna': ('gpt5.6-luna-gw', 'gpt', 0.20, 1.20),
+    # Not scored on the 96 (the reader-not-under-test rule); priced at their providers' list prices.
+    'gpt-5.4': ('gpt5.4-gw', 'gpt', 2.50, 15.00),
+    'claude-sonnet-5': ('claude-sonnet5-gw', 'claude', 3.00, 15.00),
+    'gemini-2.5-pro': ('gemini2.5-pro-gw', 'gemini', 1.25, 10.00),
+    'gemini-2.5-flash': ('gemini2.5-flash-gw', 'gemini', 0.30, 2.50),
 }
 LANG_LINE = 'LANGUAGE: <the main language of the page\'s text, in English: English, French, German, ...>'
 ANSWER_KEYS = {'1': 'no text', '2': 'a few words', '3': 'a page of text'}
@@ -394,16 +399,41 @@ def labels() -> tuple[str, str]:
     return d['a'], d['b']
 
 
+LOOP_N, LOOP_MIN = 8, 20
+
+
+def trim_loop(text: str) -> str | None:
+    """A draft that repeats one 8-word run 20 times or more; compare applies it only to a draft cut off at MAX_TOKENS,
+    the decoding loop (Gemini 2.5 Flash on s044, twice), since a form that really repeats is not cut off. Keeps the
+    text up to the run's second start, so the rest of the page is one dispute against the other reader, not
+    thousands of repeated words. None when there is no loop."""
+    w = text.split()
+    seen, count = {}, collections.Counter()
+    for i in range(len(w) - LOOP_N + 1):
+        g = tuple(w[i:i + LOOP_N])
+        count[g] += 1
+        seen.setdefault(g, []).append(i)
+    if not count:
+        return None
+    g, n = count.most_common(1)[0]
+    return ' '.join(w[:seen[g][1]]) if n >= LOOP_MIN else None
+
+
 def cmd_compare(_):
     la, lb = labels()
     rows = load_pages()
     rng = random.Random(SEED)
-    pages, missing = [], []
+    pages, missing, trimmed = [], [], []
     for r in rows:
         da, db = draft(la, r), draft(lb, r)
         if not (da and db):
             missing.append(r['id'])
             continue
+        for side, lab, d in (('a', la, da), ('b', lb, db)):
+            cut = json.loads(draft_path(lab, r).read_text())['meta'].get('finish') == 'length'
+            if cut and (t := trim_loop(d['text'])) is not None:
+                trimmed.append(f"{r['id']}:{side}")
+                d['text'] = t
         sp = spans(da['text'], db['text'])
         pages.append({'id': r['id'], 'spans': sp, 'controls': control_spans(sp, rng),
                       'kind': [da['kind'], db['kind']], 'table': [da['table'], db['table']],
@@ -414,10 +444,10 @@ def cmd_compare(_):
         chosen.add((pid, c['span'], c['t0']))
     for p in pages:
         p['controls'] = [c for c in p['controls'] if (p['id'], c['span'], c['t0']) in chosen]
-    (OUT / 'compare.json').write_text(json.dumps({'a': la, 'b': lb, 'missing': missing, 'pages': pages},
+    (OUT / 'compare.json').write_text(json.dumps({'a': la, 'b': lb, 'missing': missing, 'trimmed': trimmed, 'pages': pages},
                                                  ensure_ascii=False, indent=1))
     s = summary(rows, pages, missing)
-    print(json.dumps(s, indent=1))
+    print(json.dumps({**s, 'loops_trimmed': trimmed}, indent=1))
 
 
 def not_english(langs) -> bool:
@@ -722,6 +752,12 @@ def cmd_fold(a):
     print('Read every note before scoring: a note can correct a listed field or drop a page.')
 
 
+def spent_usd() -> float:
+    import gateway_gemini as G
+    G.CACHE = OUT / 'gateway'
+    return G.spent() if (G.CACHE / 'calls.jsonl').exists() else 0.0
+
+
 def cmd_report(_):
     """segbench-results/owner-set-grow.md from what the cache holds now: counts only (the repo is public)."""
     d = json.loads((OUT / 'draw.json').read_text())
@@ -760,7 +796,12 @@ def cmd_report(_):
               f"({s['missing']} missing). {s['words']:,} words; {s['disputes']:,} disputed spans covering "
               f"{s['disputed_words']:,} words; {s['pages_without_dispute']} pages with none; {s['controls']} agreed "
               f"controls. A drafter calls {s['not_english_by_a_drafter']} pages not English. Estimated owner time: "
-              f"about {s['owner_minutes']} minutes (ocr_truth's per-dispute rates, measured on the 96's sheet)."]
+              f"about {s['owner_minutes']} minutes (ocr_truth's per-page and per-dispute rates: an estimate, not a timing)."
+              + (f" A draft cut off in a decoding loop is kept to its first pass ({', '.join(cmp.get('trimmed', []))}), so "
+                 "the rest of that page is one dispute." if cmp.get('trimmed') else '')]
+        if spent_usd():
+            L += ['', f"Gateway spend for the item: ${spent_usd():.2f} (the larger of the gateway's figure and the "
+                  "list-price estimate, per call), pilots of four candidate drafters on 5 pages included."]
     if rul:
         tot = collections.Counter()
         for r in rul['pages'].values():
@@ -778,8 +819,9 @@ def cmd_report(_):
           'beside it, never pooled into the 96\'s figures.',
           '- **Noise:** with about 200 pages a typical pair resolves about 2 NES (n = (2.8 σd / Δ)², σd 9.7); pooled with '
           'the 96, about 1.6. Not yet 1 point.',
-          '- **Scope:** the owner\'s English collections only; what the scored drafters gain on agreed words is measured '
-          'by the controls, not removed.', '']
+          '- **Scope:** the owner\'s English collections only. Neither drafter is scored on the 96, but each has kin '
+          'that are (GPT-5.4 Mini and GPT-5.6 Luna; the Gemini 3.x routes), so a kin route may gain on agreed words; '
+          'the controls measure how often the owner overrules an agreed word, they do not remove the gain.', '']
     RESULTS.write_text('\n'.join(L))
     print(RESULTS)
 
