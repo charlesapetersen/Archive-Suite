@@ -187,6 +187,16 @@ def render(out) -> str:
     L += ["", f"{n_tie} of {len(out['pairs'])} pairs tie. The sign test would separate {split} of the tied pairs "
           "(p under 0.05): it counts documents, so a long document weighs no more than a one-page letter, while pages "
           "exact, the figure the settings show, weighs each document by its pages.", ""]
+    edge = [f"{p['a']} against {p['b']}" for p in out["pairs"] if p["tie"] and (p["lo"] == 0 or p["hi"] == 0)
+            and p["docs_only_a"] + p["docs_only_b"]]
+    if edge:
+        L += [f"On the boundary (an end of the interval exactly 0, counted as holding it): {'; '.join(edge)}. A one-document "
+              "change in either route or the truth can move such a pair either way.", ""]
+    same = [f"{p['a']} and {p['b']}" for p in out["pairs"] if p["docs_only_a"] == p["docs_only_b"] == 0]
+    if same:
+        L += [f"Identical page by page (no document right in one and not the other): {'; '.join(same)}; each pair is the "
+              "same model's answers at temperature 0 (the mix keeps ChatGPT's calls at its level; the 2B on the Mac and "
+              "its bf16 cluster run), built from separate cached sources.", ""]
     L += seg_card.card(
         truth="Owner-ruled Stanton and RG165 (truth photo labels), with W46.seg-truth-owner-fixes' eight corrections; "
               "the two unknown RG165 gaps leave 325 of 330 document pages. Truth has been re-judged only where models "

@@ -349,15 +349,13 @@ enum SettingsSolverTestDriver {
         check("D1 reading cites its pair", d1.pick("reading", "all")?.gap?.citation.contains("owner96/all/answered") == true)
         eq("D1 handwritten: Gemini 3.8 Flash", pick(d1, "reading", "handwritten"), "gemini3.8-flash")
         check("D1 no cascade beats Gemini 3.8 Flash", !pick(d1, "reading").hasPrefix("casc-"))
-        // Text alone and the 2B have no measured ranges: the 5.0-point floor cannot tie their 8.3-point gap.
-        eq("D1 segmentation: Gemini text beats the Mac 2B beyond their 5.0 floor", pick(d1, "segmentation"),
+        // Text alone is 8.3 points ahead of the 2B, +8.3 [+2.6, +15.0] paired (seg-pair-ties.md): no tie.
+        eq("D1 segmentation: Gemini text beats the Mac 2B on the paired comparison", pick(d1, "segmentation"),
            "gemini3.8-flash-text")
-        // W46.seg-common-support: on the 325 common pages text alone has 285 exact and GLM 269, 16 pages (4.9 points),
-        // twice g1's own 8-page offset spread; the rounded 2.5 makes a 5.0 floor, so they tie and GLM is cheaper.
-        // On 330 pages the same 16 pages read 4.85 against the old 4.8 floor: this pick moved with the denominator.
+        // Text alone 285 of 325 exact, GLM 269: +4.9 [-4.0, +14.4] paired, a tie, and GLM is cheaper.
         var gemOR = mac(16)
         gemOR.keys = ["gemini", "openrouter"]
-        eq("D1 Gemini and OpenRouter keys: GLM ties text alone inside the 5.0 floor and is cheaper",
+        eq("D1 Gemini and OpenRouter keys: GLM ties text alone on the paired comparison and is cheaper",
            pick(solve("D1-openrouter", gemOR), "segmentation"), "glm5.3-flash")
         var gem8 = mac(8)
         gem8.keys = ["gemini"]
@@ -419,8 +417,8 @@ enum SettingsSolverTestDriver {
         eq("D4 segmentation: ChatGPT", pick(d4, "segmentation"), "chatgpt-gpt6.1-sol")
         var both = mac(16)
         both.plans = ["claude", "chatgpt"]
-        // W46.seg-truth-owner-fixes: the mix's 90.2 is 1.2 points over Claude alone's 88.9, inside their 5.0 floor, so a
-        // tie and the one plan wins on cost.
+        // The mix's 90.2 is 1.2 points over Claude alone's 88.9, +1.2 [-4.2, +6.3] paired, so a tie and the one plan
+        // wins on cost.
         eq("D4 both plans: segmentation Claude alone ties the mix", pick(solve("D4-both", both), "segmentation"),
            "claude-sonnet5.5")
 
@@ -429,9 +427,9 @@ enum SettingsSolverTestDriver {
         d5r.keys = ["gemini"]
         var cheap = SettingsAnswers()
         cheap.preference = .cheapestWithinPoint
-        // Claude 88.9 versus text 87.7: still a tie under 5.0; the image g2 pair retains its own 10.4 floor.
+        // Claude 88.9 versus text 87.7: +1.2 [-4.8, +7.9] paired, a tie.
         let d5 = solve("D5", d5r, cheap)
-        eq("D5 segmentation: Claude ties Gemini text under 5.0 and costs no money", pick(d5, "segmentation"),
+        eq("D5 segmentation: Claude ties Gemini text and costs no money", pick(d5, "segmentation"),
            "claude-sonnet5.5")
         let seg = table.stage("segmentation")!
         let g2 = seg.route("gemini3.8-flash")!, g1 = seg.route("gemini3.7-flash-gateway")!
@@ -448,8 +446,9 @@ enum SettingsSolverTestDriver {
             check("segmentation pair: \(name) \(tie ? "ties" : "differs")", p?.tie == tie, p?.citation ?? "not measured")
             check("segmentation pair read either way: \(name)", p != nil && q != nil && p!.tie == q!.tie
                   && abs(p!.delta + q!.delta) < 1e-9 && abs(p!.lo + q!.hi) < 1e-9 && abs(p!.hi + q!.lo) < 1e-9)
+            // The flag is decided on the unrounded interval; an end stored as 0.00 may sit either side of 0.
             check("segmentation pair interval holds 0 exactly when it ties: \(name)",
-                  p.map { ($0.lo <= 0 && 0 <= $0.hi) == $0.tie } == true)
+                  p.map { abs($0.lo) < 0.01 || abs($0.hi) < 0.01 || ($0.lo <= 0 && 0 <= $0.hi) == $0.tie } == true)
             check("segmentation pair figures match the rows: \(name)", p.map {
                 abs($0.delta - (a.figure("test-boxes")! - b.figure("test-boxes")!)) < 0.06 } == true, p?.citation ?? "")
         }

@@ -80,6 +80,10 @@ The last two columns are for reference only: gap accuracy's paired form, McNemar
 
 39 of 55 pairs tie. The sign test would separate 0 of the tied pairs (p under 0.05): it counts documents, so a long document weighs no more than a one-page letter, while pages exact, the figure the settings show, weighs each document by its pages.
 
+On the boundary (an end of the interval exactly 0, counted as holding it): claude-sonnet5.5 against glm5.3-flash; gemini3.8-flash-text against qwen3.5-27b-teacher. A one-document change in either route or the truth can move such a pair either way.
+
+Identical page by page (no document right in one and not the other): chatgpt-gpt6.1-sol and mix-claude-chatgpt; seg-qwen3.5-2b-8bit and seg-qwen3.5-2b-bf16-cluster; each pair is the same model's answers at temperature 0 (the mix keeps ChatGPT's calls at its level; the 2B on the Mac and its bf16 cluster run), built from separate cached sources.
+
 ## Measurement card
 
 - **Truth.** Owner-ruled Stanton and RG165 (truth photo labels), with W46.seg-truth-owner-fixes' eight corrections; the two unknown RG165 gaps leave 325 of 330 document pages. Truth has been re-judged only where models disagreed; the agreed-gap audit (seg-truth-audit.md) asks the owner about agreed gaps.
