@@ -245,6 +245,52 @@ enum TextLayerTestDriver {
             archivalChecks("searchable output", typed)
         } else { check("7 print: written and read back", false) }
 
+        // W42.stroke-weight-processor: a camera's page is compressed as the engine compresses a camera's photo, which
+        // keeps the photo's stroke weight (no pale-ink re-cut). The same pale page as a phone's file, as an untagged
+        // file the caller names a camera (a live capture), and as an untagged one, a scan.
+        // A full page of type, as the engine's own check draws it (VisionOCRKit's suite, the same section).
+        let prose = (0..<20).map { "The quick brown fox jumps over the dog \($0)" }
+        if tools, let camera = drawPage(prose, to: dir.appendingPathComponent("camera.jpg"), type: "public.jpeg",
+                                        pale: true, camera: true),
+           let plain = drawPage(prose, to: dir.appendingPathComponent("plain.jpg"), type: "public.jpeg", pale: true) {
+            check("7 camera: a phone's tags read as a camera's photo, an untagged file's do not",
+                  CompressedPage.isCameraPhoto(camera) && !CompressedPage.isCameraPhoto(plain))
+            let result = OCRResult(text: prose.joined(separator: "\n"), classification: nil, rotationDegrees: 0,
+                                   errorMessage: nil, errorCode: nil)
+            func drawn(_ image: URL, photographed: Bool?, _ name: String) async -> [UInt8]? {
+                let out = dir.appendingPathComponent(name)
+                let o = await Task.detached {
+                    try? PDFGenerator().generateOutput(imageURL: image, result: result, model: model, outputURL: out,
+                                                       pageKind: .typewritten, textLayer: options,
+                                                       photographed: photographed)
+                }.value
+                if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                    try? FileManager.default.copyItem(at: out, to: URL(fileURLWithPath: keep).appendingPathComponent(name))
+                }
+                guard o?.form == .searchable, o?.compression == nil, let page = PDFDocument(url: out)?.page(at: 0)?.pageRef
+                else { return nil }
+                let box = page.getBoxRect(.mediaBox)
+                let w = Int(box.width * 2), h = Int(box.height * 2)
+                guard let g = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                                        space: CGColorSpaceCreateDeviceGray(), bitmapInfo: 0) else { return nil }
+                g.setFillColor(gray: 1, alpha: 1); g.fill(CGRect(x: 0, y: 0, width: w, height: h))
+                g.scaleBy(x: 2, y: 2); g.drawPDFPage(page)
+                return Array(UnsafeBufferPointer(start: g.data!.bindMemory(to: UInt8.self, capacity: w * h), count: w * h))
+            }
+            let tagged = await drawn(camera, photographed: nil, "camera.pdf")
+            let named = await drawn(plain, photographed: true, "named.pdf")
+            let scan = await drawn(plain, photographed: nil, "scan.pdf")
+            func differing(_ a: [UInt8]?, _ b: [UInt8]?) -> Int {
+                guard let a, let b, a.count == b.count else { return -1 }
+                return zip(a, b).filter { abs(Int($0) - Int($1)) > 2 }.count
+            }
+            let same = differing(tagged, named), apart = differing(tagged, scan), total = tagged?.count ?? 0
+            check("7 camera: a page named a camera draws as a camera-tagged file does",
+                  same >= 0 && same * 1000 < total, "\(same) of \(total) pixels differ")
+            check("7 camera: …and an untagged page takes the scan's stencil, not the camera's",
+                  apart * 100 > total / 10, "\(apart) of \(total) pixels differ")
+        }
+
         // Handwriting (owner, 2026-11-17): chosen for the searchable form, still a pair, since every handwritten page
         // keeps its text page; the placed layer only beside it, at the 0.9 gate.
         let hand = dir.appendingPathComponent("searchable-hand.pdf")
@@ -540,24 +586,59 @@ enum TextLayerTestDriver {
     static let pageW = 1200, pageH = 1550
     static func baselineY(_ i: Int) -> Int { pageH - 140 - i * 70 }
 
-    static func drawPage(_ text: [String], to url: URL, type: String, skew: Double = 0) -> URL? {
+    /// `pale`: dark grey type on grey paper, as a phone's photo of a page arrives; `camera`: a phone's tags on the file
+    /// (W42.stroke-weight-processor).
+    static func drawPage(_ text: [String], to url: URL, type: String, skew: Double = 0,
+                         pale: Bool = false, camera: Bool = false) -> URL? {
         guard let ctx = CGContext(data: nil, width: pageW, height: pageH, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
-        ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: pageW, height: pageH))
-        ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
-        let font = CTFontCreateWithName("Courier" as CFString, 34, nil)
+        let paper: CGFloat = pale ? 158 / 255 : 1, ink: CGFloat = pale ? 64 / 255 : 0
+        ctx.setFillColor(CGColor(red: paper, green: paper, blue: paper, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: pageW, height: pageH))
+        ctx.setFillColor(CGColor(red: ink, green: ink, blue: ink, alpha: 1))
+        let font = pale ? CTFontCreateWithName("Times-Roman" as CFString, 36, nil)
+                        : CTFontCreateWithName("Courier" as CFString, 34, nil)
         // A positive skew makes the lines fall to the right, as ReadingCopy measures it (y down): clockwise on paper.
         ctx.translateBy(x: CGFloat(pageW) / 2, y: CGFloat(pageH) / 2)
         ctx.rotate(by: CGFloat(-skew * .pi / 180))
         ctx.translateBy(x: -CGFloat(pageW) / 2, y: -CGFloat(pageH) / 2)
         for (i, line) in text.enumerated() {
-            let s = CFAttributedStringCreate(nil, line as CFString, [kCTFontAttributeName: font] as CFDictionary)!
+            // The context's fill colour, which CTLineDraw ignores without this (the type would be black).
+            let s = CFAttributedStringCreate(nil, line as CFString,
+                                             [kCTFontAttributeName: font, kCTForegroundColorFromContextAttributeName: true]
+                                                as CFDictionary)!
             ctx.textPosition = CGPoint(x: 90, y: CGFloat(baselineY(i))); CTLineDraw(CTLineCreateWithAttributedString(s), ctx)
+        }
+        // A pale page (Times 36, grey type on grey paper) is blurred (3x3) and noised (up to 12 either way, a fixed
+        // seed), as a camera's strokes are, and saved at the JPEG's full quality, which the page embeds as it is, so the
+        // noise survives: it then reads as pale ink (the engine's C54), as the owner's phone photos do.
+        if pale, let data = ctx.data {
+            let px = data.bindMemory(to: UInt8.self, capacity: ctx.bytesPerRow * pageH), row = ctx.bytesPerRow
+            let grey = (0..<(pageW * pageH)).map { px[($0 / pageW) * row + ($0 % pageW) * 4] }
+            var seed: UInt64 = 0x5eed_c0de
+            for y in 0..<pageH {
+                for x in 0..<pageW {
+                    var v = Int(grey[y * pageW + x])
+                    if x > 0, y > 0, x < pageW - 1, y < pageH - 1 {
+                        v = 0
+                        for dy in -1...1 { for dx in -1...1 { v += Int(grey[(y + dy) * pageW + x + dx]) } }
+                        v /= 9
+                    }
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    let out = UInt8(clamping: v + Int((seed >> 33) % 25) - 12)
+                    for c in 0..<3 { px[y * row + x * 4 + c] = out }
+                }
+            }
         }
         guard let image = ctx.makeImage(),
               let dest = CGImageDestinationCreateWithURL(url as CFURL, type as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary)
+        var props: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: pale ? 1.0 : 0.9]
+        if camera {
+            props[kCGImagePropertyTIFFDictionary] = [kCGImagePropertyTIFFMake: "Google", kCGImagePropertyTIFFModel: "Pixel 6"]
+            props[kCGImagePropertyExifDictionary] = [kCGImagePropertyExifFNumber: 1.85]
+        }
+        CGImageDestinationAddImage(dest, image, props as CFDictionary)
         return CGImageDestinationFinalize(dest) ? url : nil
     }
 
