@@ -16474,3 +16474,32 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   RotationUITests.testRotationIsOnUndoAndRedo (⌃⌘R, menu names it, ⌘Z upright by pixels, ⇧⌘Z turned again) and
   the existing rotation test pass; whole unit bundle green (919, DeepLinkTests skipped). No bench cache scratch.
   <!-- /W40.reader-rotate-undo -->
+- [x] **W46.date-month-score — score the new dating route's month [S]** · §Document processing review — W46 (owner, 2026-10-20) (lane: segbench) (uses: light) — Owner review of the pipeline doc, 2026-11-17: the route writes a month only from the dated line its year rests on; only the old tagging call was scored (75.0% of 120, date-tagging.md:47-55). Score the route's month on the same 120 owner documents from cached answers; day stays unscored (the owner tagged no days). (needs: owner) — HELD 2026-11-17: Owner, 2026-11-17 (review follow-up): superseded by W46.date-full-date; drop when that item completes.
+  DROPPED 2026-11-18, superseded by W46.date-full-date as the owner's 17 Nov note said. Its question is answered there
+  (date-full-date.md): on the 100 explicit years that are the owner's year and carry his month tag, the route's month is
+  his on 87.0% (87/100), another month on 1, none on 12, the same before and after W46.date-full-date's rule.
+  <!-- /W46.date-month-score -->
+- [x] **W46.date-full-date — write the month and day when the evidence carries them, and score them against the page, not only the Finder tags [M · Tier-2]** · §Document processing review — W46 (owner, 2026-10-20) (lane: processor,segbench) (uses: build,light) — Owner, 2026-11-17 (review follow-up): when the owner reviewed dating sheets most full dates were right, yet the route never writes a day and keeps a month only from the dated line its year rests on (DateRoute.swift:626-627, DateRoute+Run.swift:142-157). Write year, month and day whenever the quoted evidence or the model's confident reading gives them, still marked Date Uncertain where not explicit. Truth: the owner's Finder tags lack days, so build month and day truth from the page (the owner's earlier date sheets, plus a second reader's draft through the gateway, owner rules disputes). Supersedes W46.date-month-score.
+  SHIPPED 2026-11-18. The route (date_route_pipeline.route and its mirror DateRoute.decide) now writes the month and day
+  of the dated form an explicit year rests on: the trace reply's own quote when it cites "self", passes the check and
+  holds a dated form of that year, else the rule's dated form of the year; from the image pass, the quoted date the
+  year rests on unless the reply's document month names another. Candidates carry the day (full dates; numeric dates
+  month-first when the first part can be a month); a day the month does not have is dropped (no 30 February, 29
+  February only in a leap year). apply(to:): the route's month wins; the tagging call's day stays only for the same year
+  and month and only if the month has it; with no dated form, the tagging call's month and day stand for the same year as
+  before. Estimates and inherited years carry neither (inherit clears the day). No prompt changed, so the year
+  measurement of W46.date-route-pipeline stands; no migration (nothing to migrate). Measured on the pipeline's cached
+  Gemini 3.7 Flash replies, $0 (segbench-results/date-full-date.md, with its measurement card): on 115 owner documents
+  with a page truth (18 from his own readings on the 2026-10-21 date sheet, 94 where the route and the Gemini image
+  reading agree, 3 agreed without a month), month right 98.2% (108/110), wrong 0, missing 2; day right 96.7% (88/91),
+  wrong 1 (a 2/4/78 in Vision's text, 2/9/78 on the page), missing 2; 106 of 110 full dates exact. Against his Finder
+  month tags alone 87.0% (87/100). 28 disputed documents wait on a blind owner sheet (36 with 8 controls,
+  ~/Library/Caches/ArchiveSuiteRehearsal/date-full-date/sheet, proven headless by prove_date_full_date_sheet.py, 15
+  checks): W46.date-full-date-fold. Tier-2: one Opus adversarial review found no blocking defect; fixed from it a
+  tagging-call day the month lacks surviving, Python/Swift disagreement on non-ASCII digits (pyInt, a fixture case) and
+  inherit leaving the day. test-date-route.sh ALL PASS (260 checks, all 362 real pipeline documents in parity);
+  date_route_cases --check PASS; Processor Debug build clean. Known limit: day-first numeric dates with both parts
+  below 13 (British 5.1.73) read month-first. Bench cache: kept date-full-date/ (the owner's sheet and its key, needed
+  for the fold); swift-cases.json in date-route-pipeline/ regenerated in place (rebuildable). ArchiveOCRBench carries
+  no dating-route section (date-route-pipeline.md is not on it), so nothing there to update.
+  <!-- /W46.date-full-date -->

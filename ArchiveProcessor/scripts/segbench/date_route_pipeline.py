@@ -49,6 +49,7 @@ image pass (08-dating.md call 7.5), measured beside the two step-2 readers alrea
 from __future__ import annotations
 
 import argparse
+import calendar
 import collections
 import hashlib
 import json
@@ -712,12 +713,44 @@ def cmd_collect(a):
 
 # --- the route --------------------------------------------------------------------------------------------------
 
+def dated_in(quote, year):
+    """The first dated form (full, numeric or month-year) of `year` written in a quote, or None."""
+    return next((c for c in T.candidates(str(quote or ""), limit=len(str(quote or ""))) if c["year"] == year
+                 and c["kind"] != "year"), None)
+
+
+def month_day(c):
+    """(month, day) of a dated candidate: the day only when that month has it (no 30 February)."""
+    if c is None or c["kind"] == "year" or c["month"] is None:
+        return None, None
+    d = c.get("day")
+    if d is not None and not 1 <= d <= calendar.monthrange(c["year"], c["month"])[1]:
+        d = None
+    return c["month"], d
+
+
+def image_evidence(image_rec, year):
+    """(the quoted date the image pass's own year rests on, the reply's document month): the document date's quote
+    when it is among the written dates of that year, else the first written one (DateRoute.ImageReading.ownEvidence)."""
+    r = DI.read(image_rec)
+    mine = [x for x in r["dates"] if x["written"] and x["year"] == year]
+    ev = next((x for x in mine if x["quote"].strip() == r["doc_quote"].strip()), mine[0] if mine else None)
+    dd = (DI.reply(image_rec.get("text")) or {}).get("document_date")
+    mo = T._int(dd.get("month")) if isinstance(dd, dict) else None
+    return ev, mo if mo is not None and 1 <= mo <= 12 else None
+
+
 def route(doc, trace_raw, image_rec, self_only=False):
-    """The route's answer for one document: {year, du, cls, evidence, ...}. cls is the evidence class: "text"
-    (explicit from the own text), "image" (explicit from the page image), "estimate" (from a neighbour, checked,
+    """The route's answer for one document: {year, month, day, du, cls, evidence, ...}. cls is the evidence class:
+    "text" (explicit from the own text), "image" (explicit from the page image), "estimate" (from a neighbour, checked,
     Date Uncertain), or "none" (no year written). image_rec is None where the image pass was not sent. self_only: step 1
     also needs the reply to cite the document itself ("self"), as the trace prompt asks for a printed own date; by
-    default a year any own rule candidate carries is explicit whatever the reply cites (08-dating.md section 3, step 1)."""
+    default a year any own rule candidate carries is explicit whatever the reply cites (08-dating.md section 3, step 1).
+
+    W46.date-full-date: an explicit year also gets the month and day written in the date it rests on. From the text,
+    that is the reply's own quote when it cites "self" and passes the check and holds a dated form of the year, else the
+    rule's dated form of that year; from the image, the quoted date its year rests on, unless the reply's document
+    month names another month. An estimate or no year gets neither, as the document does not print its own date."""
     cands = T.candidates(doc["text"])
     own = {c["year"] for c in cands}
     tr = T.parse_trace(trace_raw)
@@ -725,20 +758,35 @@ def route(doc, trace_raw, image_rec, self_only=False):
         "none", "unparsed")
     cited = (tr["evidence"] or {}).get("neighbour", "self") if tr["evidence"] else None
     base = {"trace_y": tr["y"], "verdict": verdict, "reason": reason, "cited": cited, "lo": tr["lo"], "hi": tr["hi"],
-            "has_candidate": bool(cands), "image_sent": image_rec is not None, "model_du": tr["du"] if tr["parsed"] else None}
+            "has_candidate": bool(cands), "image_sent": image_rec is not None, "model_du": tr["du"] if tr["parsed"] else None,
+            "month": None, "day": None, "date_from": None}
     if tr["y"] is not None and (tr["y"] in own or verdict == "valid") and (cited == "self" or (
             not self_only and tr["y"] in own)):
-        return {**base, "year": tr["y"], "du": False, "cls": "text", "step": 1}
+        y = tr["y"]
+        c = dated_in((tr["evidence"] or {}).get("quote"), y) if cited == "self" and verdict == "valid" else None
+        frm = "quote" if c else "rule"
+        if c is None:
+            c = T.rule_pick([x for x in cands if x["year"] == y])[3]
+        m, d = month_day(c)
+        return {**base, "year": y, "du": False, "cls": "text", "step": 1, "month": m, "day": d,
+                "date_from": frm if m else None}
     if cands:
         if tr["y"] is not None and verdict == "valid":
             return {**base, "year": tr["y"], "du": True, "cls": "estimate", "step": 4}
         # an unparsed or unchecked reply: the rule stage's explicit year stands (08-dating.md, "Fallback")
-        y = T.rule_pick(cands)[0]
-        return {**base, "year": y, "du": y is None, "cls": "text" if y is not None else "none", "step": 1}
+        y, _, _, best = T.rule_pick(cands)
+        m, d = month_day(best)
+        return {**base, "year": y, "du": y is None, "cls": "text" if y is not None else "none", "step": 1,
+                "month": m, "day": d, "date_from": "rule" if m else None}
     if image_rec is not None:
         ok, own_y, _ = DU.own_date(image_rec)
         if own_y is not None:
-            return {**base, "year": own_y, "du": False, "cls": "image", "step": 2}
+            ev, doc_mo = image_evidence(image_rec, own_y)
+            m, d = month_day(dated_in(ev["quote"], own_y) if ev else None)
+            if m is not None and doc_mo is not None and doc_mo != m:
+                m = d = None
+            return {**base, "year": own_y, "du": False, "cls": "image", "step": 2, "month": m, "day": d,
+                    "date_from": "image" if m else None}
     if tr["y"] is not None and verdict == "valid":
         return {**base, "year": tr["y"], "du": True, "cls": "estimate", "step": 4}
     return {**base, "year": None, "du": True, "cls": "none", "step": None}

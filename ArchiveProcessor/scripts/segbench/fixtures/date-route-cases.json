@@ -30,14 +30,16 @@
      3,
      "full",
      2,
-     "March 3, 1947"
+     "March 3, 1947",
+     3
     ],
     [
      1946,
      null,
      "year",
      5,
-     "Thank you for your letter of 1946."
+     "Thank you for your letter of 1946.",
+     null
     ]
    ],
    "pick": [
@@ -59,6 +61,8 @@
    "image": null,
    "route": {
     "year": 1947,
+    "month": 3,
+    "day": 3,
     "cls": "text",
     "step": 1,
     "du": false
@@ -96,14 +100,16 @@
      3,
      "full",
      2,
-     "March 3, 1947"
+     "March 3, 1947",
+     3
     ],
     [
      1946,
      null,
      "year",
      5,
-     "Thank you for your letter of 1946."
+     "Thank you for your letter of 1946.",
+     null
     ]
    ],
    "pick": [
@@ -125,6 +131,8 @@
    "image": null,
    "route": {
     "year": 1946,
+    "month": null,
+    "day": null,
     "cls": "text",
     "step": 1,
     "du": true
@@ -162,14 +170,16 @@
      3,
      "full",
      2,
-     "March 3, 1947"
+     "March 3, 1947",
+     3
     ],
     [
      1946,
      null,
      "year",
      5,
-     "Thank you for your letter of 1946."
+     "Thank you for your letter of 1946.",
+     null
     ]
    ],
    "pick": [
@@ -191,6 +201,8 @@
    "image": null,
    "route": {
     "year": 1957,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -228,14 +240,16 @@
      3,
      "full",
      2,
-     "March 3, 1947"
+     "March 3, 1947",
+     3
     ],
     [
      1946,
      null,
      "year",
      5,
-     "Thank you for your letter of 1946."
+     "Thank you for your letter of 1946.",
+     null
     ]
    ],
    "pick": [
@@ -257,6 +271,8 @@
    "image": null,
    "route": {
     "year": 1947,
+    "month": 3,
+    "day": 3,
     "cls": "text",
     "step": 1,
     "du": true
@@ -294,14 +310,16 @@
      3,
      "full",
      2,
-     "March 3, 1947"
+     "March 3, 1947",
+     3
     ],
     [
      1946,
      null,
      "year",
      5,
-     "Thank you for your letter of 1946."
+     "Thank you for your letter of 1946.",
+     null
     ]
    ],
    "pick": [
@@ -323,6 +341,8 @@
    "image": null,
    "route": {
     "year": 1947,
+    "month": 3,
+    "day": 3,
     "cls": "text",
     "step": 1,
     "du": false
@@ -378,6 +398,8 @@
    },
    "route": {
     "year": 1961,
+    "month": 3,
+    "day": 30,
     "cls": "image",
     "step": 2,
     "du": false
@@ -433,6 +455,8 @@
    },
    "route": {
     "year": 1958,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -484,6 +508,8 @@
    "image": null,
    "route": {
     "year": 1958,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -535,6 +561,8 @@
    "image": null,
    "route": {
     "year": 1957,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -586,6 +614,8 @@
    "image": null,
    "route": {
     "year": null,
+    "month": null,
+    "day": null,
     "cls": "none",
     "step": null,
     "du": true
@@ -627,6 +657,8 @@
    "image": null,
    "route": {
     "year": 1961,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -678,6 +710,8 @@
    "image": null,
    "route": {
     "year": 1957,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -713,6 +747,8 @@
    "image": null,
    "route": {
     "year": null,
+    "month": null,
+    "day": null,
     "cls": "none",
     "step": null,
     "du": true
@@ -764,6 +800,8 @@
    "image": null,
    "route": {
     "year": null,
+    "month": null,
+    "day": null,
     "cls": "none",
     "step": null,
     "du": true
@@ -815,6 +853,8 @@
    "image": null,
    "route": {
     "year": 1957,
+    "month": null,
+    "day": null,
     "cls": "estimate",
     "step": 4,
     "du": true
@@ -836,42 +876,48 @@
      4,
      "numeric",
      1,
-     "4.5.62 and 13/1/1963"
+     "4.5.62 and 13/1/1963",
+     5
     ],
     [
      1963,
      1,
      "numeric",
      1,
-     "4.5.62 and 13/1/1963"
+     "4.5.62 and 13/1/1963",
+     13
     ],
     [
      1999,
      12,
      "numeric",
      2,
-     "31-12-99"
+     "31-12-99",
+     31
     ],
     [
      1970,
      null,
      "year",
      19,
-     "In 1970 and 1970 and 1971"
+     "In 1970 and 1970 and 1971",
+     null
     ],
     [
      1970,
      null,
      "year",
      19,
-     "In 1970 and 1970 and 1971"
+     "In 1970 and 1970 and 1971",
+     null
     ],
     [
      1971,
      null,
      "year",
      19,
-     "In 1970 and 1970 and 1971"
+     "In 1970 and 1970 and 1971",
+     null
     ]
    ],
    "pick": [
@@ -893,6 +939,8 @@
    "image": null,
    "route": {
     "year": 1962,
+    "month": 4,
+    "day": 5,
     "cls": "text",
     "step": 1,
     "du": false
@@ -914,21 +962,24 @@
      null,
      "year",
      20,
-     "the 1950 plan, 1950, and in May 1952"
+     "the 1950 plan, 1950, and in May 1952",
+     null
     ],
     [
      1950,
      null,
      "year",
      20,
-     "the 1950 plan, 1950, and in May 1952"
+     "the 1950 plan, 1950, and in May 1952",
+     null
     ],
     [
      1952,
      5,
      "month",
      20,
-     "the 1950 plan, 1950, and in May 1952"
+     "the 1950 plan, 1950, and in May 1952",
+     null
     ]
    ],
    "pick": [
@@ -950,6 +1001,8 @@
    "image": null,
    "route": {
     "year": 1950,
+    "month": null,
+    "day": null,
     "cls": "text",
     "step": 1,
     "du": false
@@ -971,14 +1024,16 @@
      10,
      "full",
      0,
-     "Signed the 3rd of October, 1938 at noon"
+     "Signed the 3rd of October, 1938 at noon",
+     3
     ],
     [
      1939,
      9,
      "full",
      1,
-     "and again Sept. 4th 1939"
+     "and again Sept. 4th 1939",
+     4
     ]
    ],
    "pick": [
@@ -1000,6 +1055,8 @@
    "image": null,
    "route": {
     "year": 1938,
+    "month": 10,
+    "day": 3,
     "cls": "text",
     "step": 1,
     "du": false
@@ -1021,14 +1078,16 @@
      12,
      "month",
      1,
-     "Dec. 1941"
+     "Dec. 1941",
+     null
     ],
     [
      1942,
      null,
      "year",
      2,
-     "page two 1942"
+     "page two 1942",
+     null
     ]
    ],
    "pick": [
@@ -1050,6 +1109,8 @@
    "image": null,
    "route": {
     "year": 1941,
+    "month": 12,
+    "day": null,
     "cls": "text",
     "step": 1,
     "du": false
@@ -1089,9 +1150,379 @@
    },
    "route": {
     "year": null,
+    "month": null,
+    "day": null,
     "cls": "none",
     "step": null,
     "du": true
+   }
+  }
+ },
+ {
+  "id": "full-date-quote-over-rule",
+  "input": {
+   "text": "Minutes\nMay 1947 meeting\nSigned July 9, 1947",
+   "near": [],
+   "trace_raw": "{\"year\": 1947, \"lo\": 1947, \"hi\": 1947, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"July 9, 1947\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1947,
+     5,
+     "month",
+     1,
+     "May 1947 meeting",
+     null
+    ],
+    [
+     1947,
+     7,
+     "full",
+     2,
+     "Signed July 9, 1947",
+     9
+    ]
+   ],
+   "pick": [
+    1947,
+    5
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMinutes\nMay 1947 meeting\nSigned July 9, 1947\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1947,
+    "lo": 1947,
+    "hi": 1947,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1947,
+    "month": 7,
+    "day": 9,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "full-date-quote-undated-rule",
+  "input": {
+   "text": "Minutes\nMay 1947 meeting\nheld in 1947",
+   "near": [],
+   "trace_raw": "{\"year\": 1947, \"lo\": 1947, \"hi\": 1947, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"held in 1947\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1947,
+     5,
+     "month",
+     1,
+     "May 1947 meeting",
+     null
+    ],
+    [
+     1947,
+     null,
+     "year",
+     2,
+     "held in 1947",
+     null
+    ]
+   ],
+   "pick": [
+    1947,
+    5
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMinutes\nMay 1947 meeting\nheld in 1947\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1947,
+    "lo": 1947,
+    "hi": 1947,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1947,
+    "month": 5,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "full-date-no-such-day",
+  "input": {
+   "text": "Memo\nFebruary 30, 1950\nfile",
+   "near": [],
+   "trace_raw": "{\"year\": 1950, \"lo\": 1950, \"hi\": 1950, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"February 30, 1950\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1950,
+     2,
+     "full",
+     1,
+     "February 30, 1950",
+     30
+    ]
+   ],
+   "pick": [
+    1950,
+    2
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMemo\nFebruary 30, 1950\nfile\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1950,
+    "lo": 1950,
+    "hi": 1950,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1950,
+    "month": 2,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "full-date-numeric-day-first",
+  "input": {
+   "text": "Memo\n25/12/1950\nfile",
+   "near": [],
+   "trace_raw": "{\"year\": 1950, \"lo\": 1950, \"hi\": 1950, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"25/12/1950\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1950,
+     12,
+     "numeric",
+     1,
+     "25/12/1950",
+     25
+    ]
+   ],
+   "pick": [
+    1950,
+    12
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMemo\n25/12/1950\nfile\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1950,
+    "lo": 1950,
+    "hi": 1950,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1950,
+    "month": 12,
+    "day": 25,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "full-date-unicode-digits",
+  "input": {
+   "text": "Memo\nMarch ٣, 1947 and ４ May 1948\nfile",
+   "near": [],
+   "trace_raw": "{\"year\": 1947, \"lo\": 1947, \"hi\": 1947, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"March \\u0663, 1947\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1947,
+     3,
+     "full",
+     1,
+     "March ٣, 1947 and ４ May 1948",
+     3
+    ],
+    [
+     1948,
+     5,
+     "full",
+     1,
+     "March ٣, 1947 and ４ May 1948",
+     4
+    ]
+   ],
+   "pick": [
+    1947,
+    3
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMemo\nMarch ٣, 1947 and ４ May 1948\nfile\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1947,
+    "lo": 1947,
+    "hi": 1947,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1947,
+    "month": 3,
+    "day": 3,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "full-date-image-day",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [
+    {
+     "label": "P1",
+     "dist": 1,
+     "text": "Office memo\n12/4/58\nPlease file."
+    },
+    {
+     "label": "P2",
+     "dist": 2,
+     "text": "A letter of\nJune 2, 1957\nregarding the {near} plan"
+    },
+    {
+     "label": "N1",
+     "dist": -1,
+     "text": "No date here at all."
+    }
+   ],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"Rec'd APR 4 1961\", \"page\": 1, \"where\": \"stamp\", \"kind\": \"stamped\", \"year\": 1961}], \"document_date\": {\"year\": 1961, \"month\": 4, \"quote\": \"Rec'd APR 4 1961\"}}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n[P2]\nA letter of\nJune 2, 1957\nregarding the {near} plan\n---\n[P1]\nOffice memo\n12/4/58\nPlease file.\n---\n[N1]\nNo date here at all.\n---\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n[P2] 1957 (\"June 2, 1957\")\n[P1] 1958 (\"12/4/58\")\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": 1961,
+    "stamps": 1
+   },
+   "route": {
+    "year": 1961,
+    "month": 4,
+    "day": 4,
+    "cls": "image",
+    "step": 2,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "full-date-image-month-disagrees",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [
+    {
+     "label": "P1",
+     "dist": 1,
+     "text": "Office memo\n12/4/58\nPlease file."
+    },
+    {
+     "label": "P2",
+     "dist": 2,
+     "text": "A letter of\nJune 2, 1957\nregarding the {near} plan"
+    },
+    {
+     "label": "N1",
+     "dist": -1,
+     "text": "No date here at all."
+    }
+   ],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"March 30, 1961\", \"page\": 1, \"where\": \"dateline\", \"kind\": \"typed\", \"year\": 1961}], \"document_date\": {\"year\": 1961, \"month\": 4, \"quote\": \"March 30, 1961\"}}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n[P2]\nA letter of\nJune 2, 1957\nregarding the {near} plan\n---\n[P1]\nOffice memo\n12/4/58\nPlease file.\n---\n[N1]\nNo date here at all.\n---\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n[P2] 1957 (\"June 2, 1957\")\n[P1] 1958 (\"12/4/58\")\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": 1961,
+    "stamps": 0
+   },
+   "route": {
+    "year": 1961,
+    "month": null,
+    "day": null,
+    "cls": "image",
+    "step": 2,
+    "du": false
    }
   }
  }

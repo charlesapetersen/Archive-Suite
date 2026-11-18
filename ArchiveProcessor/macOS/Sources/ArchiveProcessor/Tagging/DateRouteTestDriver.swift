@@ -95,9 +95,12 @@ enum DateRouteTestDriver {
             let traceRaw = input["trace_raw"] as? String, imageRaw = input["image_raw"] as? String
 
             let cands = DateRoute.candidates(text)
-            let got = cands.map { "\($0.year)|\($0.month.map(String.init) ?? "-")|\($0.kind)|\($0.lineNo)|\($0.line)" }
+            let got = cands.map {
+                "\($0.year)|\($0.month.map(String.init) ?? "-")|\($0.kind)|\($0.lineNo)|\($0.line)|\($0.day.map(String.init) ?? "-")"
+            }
             let wantC = (want["candidates"] as? [[Any]] ?? []).map { a in
-                "\(int(a[0]) ?? -1)|\(int(a[1]).map(String.init) ?? "-")|\(a[2])|\(int(a[3]) ?? -1)|\(a[4])"
+                "\(int(a[0]) ?? -1)|\(int(a[1]).map(String.init) ?? "-")|\(a[2])|\(int(a[3]) ?? -1)|\(a[4])|"
+                    + (a.count > 5 ? int(a[5]).map(String.init) ?? "-" : "?")
             }
             note("candidates", id, got == wantC, "got \(got.prefix(4)) want \(wantC.prefix(4))")
             let pick = DateRoute.rulePick(cands)
@@ -131,8 +134,9 @@ enum DateRouteTestDriver {
             let d = DateRoute.decide(text: text, near: near, traceRaw: traceRaw, image: sent, imageNote: "")
             let wr = want["route"] as? [String: Any] ?? [:]
             note("route", id, d.year == int(wr["year"]) && d.evidenceClass.rawValue == wr["cls"] as? String
-                 && d.step == int(wr["step"]) && d.dateUncertain == (wr["du"] as? Bool),
-                 "got \(d.year ?? -1) \(d.evidenceClass) \(d.step ?? -1) du \(d.dateUncertain) want \(wr)")
+                 && d.step == int(wr["step"]) && d.dateUncertain == (wr["du"] as? Bool)
+                 && d.month == int(wr["month"]) && d.day == int(wr["day"]),
+                 "got \(d.year ?? -1)-\(d.month ?? -1)-\(d.day ?? -1) \(d.evidenceClass) \(d.step ?? -1) du \(d.dateUncertain) want \(wr)")
         }
         if summarize {
             for part in ["candidates", "rule pick", "trace prompt byte for byte", "parsed reply", "evidence check",
@@ -156,8 +160,41 @@ enum DateRouteTestDriver {
               t.year == "1947" && t.month == "3 March" && t.day == "Day 3" && !t.dateUncertain)
         var t2 = GeneratedTags(year: "1950", month: "5 May", day: "Day 9")
         explicit.apply(to: &t2)
-        check("2 explicit text year: another year's month and day replaced by the dated form's month",
-              t2.year == "1947" && t2.month == "3 March" && t2.day == nil, "\(t2.allTags)")
+        check("2 explicit text year: another year's month and day replaced by the dated form's month and day",
+              t2.year == "1947" && t2.month == "3 March" && t2.day == "Day 3", "\(t2.allTags)")
+        // W46.date-full-date: the dated form's month wins over the tagging call's; its day is kept only for that month.
+        let monthYear = DateRoute.decide(text: "Washington\nMarch 1947\nDear Sir", near: near, traceRaw: #"{"year": 1947, "lo": 1947, "hi": 1947, "date_uncertain": false, "evidence": {"neighbour": "self", "quote": "March 1947"}}"#,
+                                         image: nil, imageNote: DateRoute.imageNotNeeded)
+        var t2a = GeneratedTags(year: "1947", month: "3 March", day: "Day 12")
+        monthYear.apply(to: &t2a)
+        var t2b = GeneratedTags(year: "1947", month: "4 April", day: "Day 12")
+        monthYear.apply(to: &t2b)
+        check("2 full date: a month-year form keeps the tagging call's day for the same month only",
+              monthYear.month == 3 && monthYear.day == nil && t2a.month == "3 March" && t2a.day == "Day 12"
+              && t2b.month == "3 March" && t2b.day == nil, "\(t2a.allTags) \(t2b.allTags)")
+        let febYear = DateRoute.decide(text: "Memo\nFebruary 1950\nfile", near: near, traceRaw: #"{"year": 1950, "lo": 1950, "hi": 1950, "date_uncertain": false, "evidence": {"neighbour": "self", "quote": "February 1950"}}"#,
+                                       image: nil, imageNote: DateRoute.imageNotNeeded)
+        var t2e = GeneratedTags(year: "1950", month: "2 February", day: "Day 30")
+        febYear.apply(to: &t2e)
+        check("2 full date: the tagging call's day is dropped when the month does not have it (30 February)",
+              t2e.month == "2 February" && t2e.day == nil, "\(t2e.allTags)")
+        let yearOnly = DateRoute.decide(text: "Report for 1947\nfigures", near: near, traceRaw: #"{"year": 1947, "lo": 1947, "hi": 1947, "date_uncertain": false, "evidence": {"neighbour": "self", "quote": "Report for 1947"}}"#,
+                                        image: nil, imageNote: DateRoute.imageNotNeeded)
+        var t2c = GeneratedTags(year: "1947", month: "6 June", day: "Day 2")
+        yearOnly.apply(to: &t2c)
+        var t2d = GeneratedTags(year: "1948", month: "6 June", day: "Day 2")
+        yearOnly.apply(to: &t2d)
+        check("2 full date: with no dated form, the tagging call's month and day only when it read the same year",
+              t2c.month == "6 June" && t2c.day == "Day 2" && t2d.year == "1947" && t2d.month == nil && t2d.day == nil,
+              "\(t2c.allTags) \(t2d.allTags)")
+        var leap = DateRoute.monthDay(DateRoute.datedIn("Feb. 29, 1948", year: 1948))
+        var noLeap = DateRoute.monthDay(DateRoute.datedIn("Feb. 29, 1949", year: 1949))
+        check("2 full date: a day the month has (29 February 1948, not 1949)",
+              leap.month == 2 && leap.day == 29 && noLeap.month == 2 && noLeap.day == nil)
+        leap = DateRoute.monthDay(DateRoute.datedIn("4/31/62", year: 1962))
+        noLeap = DateRoute.monthDay(DateRoute.datedIn("12/4/58", year: 1958))
+        check("2 full date: a numeric date is month-first (12/4/58 is 4 December), 31 April has no day",
+              leap.month == 4 && leap.day == nil && noLeap.month == 12 && noLeap.day == 4)
         let o = explicit.with(measured: true).sidecarObject()
         check("2 sidecar, explicit: class, step, the quote and its line", o["class"] as? String == "text"
               && o["step"] as? Int == 1 && o["quote"] as? String == "March 3, 1947" && o["line"] as? Int == 2
@@ -212,7 +249,8 @@ enum DateRouteTestDriver {
         let io = byImage.with(measured: true).sidecarObject()
         let roles = io["second_role_dates"] as? [[String: Any]] ?? []
         check("2 image: the document's own quoted date, its month, no flag; the stamp kept as a second-role date",
-              t6.year == "1961" && t6.month == "3 March" && !t6.dateUncertain && io["class"] as? String == "image"
+              t6.year == "1961" && t6.month == "3 March" && t6.day == "Day 30" && !t6.dateUncertain
+              && io["class"] as? String == "image"
               && io["quote"] as? String == "March 30, 1961" && io["where"] as? String == "dateline"
               && roles.count == 1 && roles[0]["quote"] as? String == "RECEIVED APR 4 1961" && roles[0]["role"] as? String == "stamp")
 
@@ -627,8 +665,8 @@ enum DateRouteTestDriver {
               wire.images.map { $0.first ?? 0 }.sorted() == [120, 130, 140, 150], "\(wire.images)")
         let cards = sheet.manualTagSegments
         if cards.count == 5 {
-            check("5 sheet A: its text year and its dated form's month, no day, no flag",
-                  cards[0].year == "1947" && cards[0].month == "3 March" && cards[0].day.isEmpty && !cards[0].dateUncertain,
+            check("5 sheet A: its text year and its dated form's month and day, no flag",
+                  cards[0].year == "1947" && cards[0].month == "3 March" && cards[0].day == "Day 3" && !cards[0].dateUncertain,
                   "\(cards[0].year) \(cards[0].month) \(cards[0].day)")
             check("5 sheet B: the page image's 1961, no flag", cards[2].year == "1961" && !cards[2].dateUncertain)
             check("5 sheet C: the neighbour's 1947, Date Uncertain, no month",

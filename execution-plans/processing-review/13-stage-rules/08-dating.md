@@ -48,6 +48,12 @@ it rests on. A guess with no evidence is never written."
    until item 8.3 fixes the checker's false refusals (owner call 9, 2026-11-06). On routes with no model for this step, propagation is the estimate: the year of the nearest earlier
    document printing one, at most three documents back (t=3), with that document as the evidence and `Date
    Uncertain`.
+   *Month and day* (W46.date-full-date, 2026-11-18): an explicit year (steps 1 and 2) also carries the month and day
+   of the dated form it rests on: the reply's own quote when it cites the document and passes the check, else the
+   rule's dated form of that year; from the image, the quoted date the year rests on. A numeric date reads
+   month-first when its first part can be a month; a day the month does not have is dropped. The tagging call's day
+   stays only for the same year and month. Inherited and estimated years carry neither. Measured in
+   `date-full-date.md`.
 5. *Not used.* Typeface or paper dating (DAT-4: 11 of 12 ranges contain the year at a median width of 50 years,
    `date-image-typeface.md`) and look-alike retrieval (27 exact of 122 against 52 for the nearest dated document
    before, `date-image.md`) are not steps.

@@ -1,0 +1,78 @@
+{
+ "documents": 272,
+ "explicit": 190,
+ "by_source": {
+  "disputed": 28,
+  "owner, earlier sheet": 18,
+  "agreed": 94,
+  "not explicit": 82,
+  "year not the owner's": 41,
+  "no month found": 6,
+  "agreed, no month": 3
+ },
+ "scored": 115,
+ "with_month": 110,
+ "with_day": 91,
+ "month": {
+  "missing": 2,
+  "right": 108,
+  "none": 5
+ },
+ "day": {
+  "missing": 2,
+  "right": 88,
+  "none": 24,
+  "wrong": 1
+ },
+ "full_exact": 106,
+ "old_month": {
+  "missing": 2,
+  "right": 107,
+  "wrong": 1,
+  "none": 5
+ },
+ "gained": 1,
+ "lost": 0,
+ "vs_tag": {
+  "right": 87,
+  "missing": 12,
+  "wrong": 1
+ },
+ "vs_tag_old": {
+  "right": 87,
+  "missing": 12,
+  "wrong": 1
+ },
+ "tagged": 100,
+ "by_from": {
+  "image": 7,
+  "none": 51,
+  "quote": 124,
+  "rule": 8
+ },
+ "by_truth_source": {
+  "owner, earlier sheet": 18,
+  "agreed": 94,
+  "agreed, no month": 3
+ },
+ "wrong": [
+  {
+   "id": "o:952140959eef6e8e",
+   "route": [
+    1978,
+    2,
+    4
+   ],
+   "truth": [
+    1978,
+    2,
+    9
+   ],
+   "source": "owner, earlier sheet"
+  }
+ ],
+ "sheet": {
+  "documents": 36,
+  "folded": false
+ }
+}

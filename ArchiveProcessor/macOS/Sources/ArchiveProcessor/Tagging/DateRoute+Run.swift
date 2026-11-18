@@ -146,8 +146,9 @@ extension DateRoute.Decision {
     /// estimates, a median width of 1 year (`segbench-results/date-route-pipeline.md`, "By evidence class").
     static let measuredCoverage = "held the owner's year on 86% (44/51) of this route's estimates (date-route-pipeline.md)"
 
-    /// The tags' date fields from the decision. The month is written only from the document itself: the tagging call's
-    /// month and day when it read the same year, else the month of the dated form the year rests on.
+    /// The tags' date fields from the decision. The month and day are written only for a year the document itself gives
+    /// (W46.date-full-date): those of the dated form the year rests on, the tagging call's day kept when it read the same
+    /// year and month; with no dated form, the tagging call's month and day when it read the same year.
     func apply(to tags: inout GeneratedTags) {
         let taggerYear = tags.year
         tags.dateUncertain = dateUncertain
@@ -158,9 +159,21 @@ extension DateRoute.Decision {
             return
         }
         tags.year = String(year)
-        if taggerYear == String(year), tags.month != nil { return }   // the tagging call's own month and day stand
-        tags.month = month.flatMap { GeneratedTags.monthTag($0) }
-        tags.day = nil
+        let sameYear = taggerYear == String(year)
+        guard let month, let tag = GeneratedTags.monthTag(month) else {
+            if !(sameYear && tags.month != nil) { tags.month = nil; tags.day = nil }   // the tagging call's own stand
+            return
+        }
+        // The tagging call's day for the same year and month, when that month has it (no 30 February).
+        var taggerDay: String? = nil
+        if sameYear, tags.month.flatMap({ GeneratedTags.monthNumber(from: $0) }) == month,
+           let n = tags.day.flatMap({ GeneratedTags.dayNumber(from: $0) }),
+           DateRoute.monthDay(DateRoute.Candidate(year: year, month: month, day: n, kind: "full", lineNo: 0, line: "",
+                                                  pos: 0)).day == n {
+            taggerDay = "Day \(n)"
+        }
+        tags.month = tag
+        tags.day = day.map { "Day \($0)" } ?? taggerDay
     }
 
     /// The date fields alone, for a manual card's auto-date (no tagging call's month and day to keep).
@@ -175,7 +188,7 @@ extension DateRoute.Decision {
     mutating func inherit(fromCover cover: GeneratedTags, coverFile: String?) {
         guard evidenceClass != .text, evidenceClass != .image,
               let y = cover.year.flatMap({ Int($0) }), DateRoute.yearRange.contains(y) else { return }
-        year = y; month = nil; dateUncertain = true; evidenceClass = .inherited; step = 3
+        year = y; month = nil; day = nil; dateUncertain = true; evidenceClass = .inherited; step = 3
         quote = nil; line = nil; page = nil; place = nil; sourceFile = coverFile
     }
 

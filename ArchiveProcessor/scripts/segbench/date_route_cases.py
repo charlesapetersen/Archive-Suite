@@ -55,14 +55,14 @@ def case(cid, text, near, trace_raw, image_raw):
             x["where"] == "stamp" or x["kind"] == "stamped"))}
     return {"id": cid,
             "input": {"text": text, "near": near, "trace_raw": trace_raw, "image_raw": image_raw},
-            "expect": {"candidates": [[c["year"], c["month"], c["kind"], c["line_no"], c["line"]] for c in cands],
+            "expect": {"candidates": [[c["year"], c["month"], c["kind"], c["line_no"], c["line"], c["day"]] for c in cands],
                        "pick": [y, m],
                        "prompt": T.trace_prompt(doc, "neigh"),
                        "trace": {"parsed": tr["parsed"], "year": tr["y"], "lo": tr["lo"], "hi": tr["hi"],
                                  "uncertain": tr["du"]},
                        "check": list(chk),
                        "image": img,
-                       "route": {"year": r["year"], "cls": r["cls"], "step": r["step"],
+                       "route": {"year": r["year"], "month": r["month"], "day": r["day"], "cls": r["cls"], "step": r["step"],
                                  "du": bool(r["du"] or (r["cls"] == "text" and r["model_du"] is True))}}}
 
 
@@ -124,6 +124,28 @@ def synthetic():
         case("day-of-month", "Signed the 3rd of October, 1938 at noon\nand again Sept. 4th 1939", [], None, None),
         case("crlf-and-feeds", "Line one\r\nDec. 1941\x0cpage two 1942 end", [], "", None),
         case("image-unparsable", MEMO, [], None, "no dates found"),
+        # W46.date-full-date: the month and day an explicit year rests on.
+        case("full-date-quote-over-rule", "Minutes\nMay 1947 meeting\nSigned July 9, 1947", [],
+             j(year=1947, lo=1947, hi=1947, date_uncertain=False, evidence={"neighbour": "self", "quote": "July 9, 1947"}),
+             None),
+        case("full-date-quote-undated-rule", "Minutes\nMay 1947 meeting\nheld in 1947", [],
+             j(year=1947, lo=1947, hi=1947, date_uncertain=False, evidence={"neighbour": "self", "quote": "held in 1947"}),
+             None),
+        case("full-date-no-such-day", "Memo\nFebruary 30, 1950\nfile", [],
+             j(year=1950, lo=1950, hi=1950, date_uncertain=False, evidence={"neighbour": "self", "quote": "February 30, 1950"}),
+             None),
+        case("full-date-numeric-day-first", "Memo\n25/12/1950\nfile", [],
+             j(year=1950, lo=1950, hi=1950, date_uncertain=False, evidence={"neighbour": "self", "quote": "25/12/1950"}),
+             None),
+        case("full-date-unicode-digits", "Memo\nMarch \u0663, 1947 and \uff14 May 1948\nfile", [],
+             j(year=1947, lo=1947, hi=1947, date_uncertain=False, evidence={"neighbour": "self", "quote": "March \u0663, 1947"}),
+             None),
+        case("full-date-image-day", MEMO, NEAR, None, j(dates=[{"quote": "Rec'd APR 4 1961", "page": 1, "where": "stamp",
+                                                                "kind": "stamped", "year": 1961}],
+                                                         document_date={"year": 1961, "month": 4, "quote": "Rec'd APR 4 1961"})),
+        case("full-date-image-month-disagrees", MEMO, NEAR, None, j(
+            dates=[{"quote": "March 30, 1961", "page": 1, "where": "dateline", "kind": "typed", "year": 1961}],
+            document_date={"year": 1961, "month": 4, "quote": "March 30, 1961"})),
     ]
 
 

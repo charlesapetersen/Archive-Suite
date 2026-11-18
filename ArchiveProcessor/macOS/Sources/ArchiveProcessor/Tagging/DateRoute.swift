@@ -94,6 +94,8 @@ enum DateRoute {
     struct Candidate: Equatable, Sendable {
         let year: Int
         let month: Int?
+        /// The day of a full or numeric date (W46.date-full-date); nil for a month-year or a bare year.
+        var day: Int? = nil
         let kind: String
         let lineNo: Int
         let line: String
@@ -120,8 +122,19 @@ enum DateRoute {
         return months.firstIndex { $0.hasPrefix(head) }.map { $0 + 1 }
     }
 
+    /// Python's `int()` on a regex group: any Unicode decimal digits (`\\d` matches them on both sides), else nil.
+    static func pyInt(_ s: String) -> Int? {
+        var n = 0
+        for c in s.unicodeScalars {
+            guard c.properties.numericType == .decimal, let v = c.properties.numericValue else { return nil }
+            n = n * 10 + Int(v)
+            if n > 1_000_000 { return nil }
+        }
+        return s.isEmpty ? nil : n
+    }
+
     /// Every date printed in the first `limit` characters, in text order. A two-digit numeric year is read as 19YY;
-    /// years outside 1800-2030 are dropped.
+    /// years outside 1800-2030 are dropped. A numeric date is month-first when its first part can be a month.
     static func candidates(_ text: String, limit: Int = textChars) -> [Candidate] {
         var out: [Candidate] = []
         for (n, line) in splitLines(scalarPrefix(text, limit)).enumerated() {
@@ -131,36 +144,37 @@ enum DateRoute {
                     let a0 = m.range.location, b0 = m.range.location + m.range.length
                     if taken.contains(where: { a0 < $0.1 && $0.0 < b0 }) { continue }
                     let g = (1..<m.numberOfRanges).map { group(m, $0, in: line) }
-                    var month: Int? = nil
+                    var month: Int? = nil, day: Int? = nil
                     let year: Int
                     switch kind {
                     case "full":
-                        let day: Int
-                        if let d = Int(g[0]) {
-                            guard let mo = monthOf(g[1]), let yy = Int(g[2]) else { continue }
-                            day = d; month = mo; year = yy
+                        let d: Int
+                        if let n = pyInt(g[0]) {
+                            guard let mo = monthOf(g[1]), let yy = pyInt(g[2]) else { continue }
+                            d = n; month = mo; year = yy
                         } else {
-                            guard let d = Int(g[1]), let yy = Int(g[2]) else { continue }
-                            month = monthOf(g[0]); day = d; year = yy
+                            guard let n = pyInt(g[1]), let yy = pyInt(g[2]) else { continue }
+                            month = monthOf(g[0]); d = n; year = yy
                         }
-                        if !(1...31).contains(day) { continue }
+                        if !(1...31).contains(d) { continue }
+                        day = d
                     case "numeric":
-                        guard let a = Int(g[0]), let b = Int(g[1]), let yv = Int(g[2]) else { continue }
+                        guard let a = pyInt(g[0]), let b = pyInt(g[1]), let yv = pyInt(g[2]) else { continue }
                         year = g[2].unicodeScalars.count == 4 ? yv : 1900 + yv
                         if !((1...12).contains(a) && (1...31).contains(b) || (1...12).contains(b) && (1...31).contains(a)) {
                             continue
                         }
-                        month = (1...12).contains(a) ? a : b
+                        (month, day) = (1...12).contains(a) ? (a, b) : (b, a)
                     case "month":
-                        guard let yy = Int(g[1]) else { continue }
+                        guard let yy = pyInt(g[1]) else { continue }
                         month = monthOf(g[0]); year = yy
                     default:
-                        guard let yy = Int(g[0]) else { continue }
+                        guard let yy = pyInt(g[0]) else { continue }
                         year = yy
                     }
                     if !yearRange.contains(year) { continue }
                     taken.append((a0, b0))
-                    out.append(Candidate(year: year, month: month, kind: kind, lineNo: n,
+                    out.append(Candidate(year: year, month: month, day: day, kind: kind, lineNo: n,
                                          line: scalarPrefix(strip(line), 200), pos: a0))
                 }
             }
@@ -188,6 +202,23 @@ enum DateRoute {
     static func pickMonth(_ c: Candidate?) -> Int? {
         guard let c, c.kind != "year" else { return nil }
         return c.month
+    }
+
+    /// `date_route_pipeline.dated_in`: the first dated form (full, numeric or month-year) of `year` written in a quote.
+    static func datedIn(_ quote: String?, year: Int) -> Candidate? {
+        guard let quote else { return nil }
+        return candidates(quote, limit: quote.unicodeScalars.count).first { $0.year == year && $0.kind != "year" }
+    }
+
+    /// `date_route_pipeline.month_day`: a dated form's month and day, the day only when that month has it.
+    static func monthDay(_ c: Candidate?) -> (month: Int?, day: Int?) {
+        guard let c, c.kind != "year", let m = c.month else { return (nil, nil) }
+        guard let d = c.day else { return (m, nil) }
+        var parts = DateComponents()
+        parts.year = c.year; parts.month = m
+        let cal = Calendar(identifier: .gregorian)
+        let days = cal.date(from: parts).flatMap { cal.range(of: .day, in: .month, for: $0) }?.count ?? 31
+        return (m, (1...days).contains(d) ? d : nil)
     }
 
     // MARK: The trace prompt ("neigh")
@@ -625,6 +656,8 @@ enum DateRoute {
     struct Decision: Equatable, Sendable, Codable {
         var year: Int?
         var month: Int?
+        /// W46.date-full-date: the day of the date an explicit year rests on, with its month.
+        var day: Int? = nil
         var dateUncertain: Bool
         var evidenceClass: EvidenceClass
         var step: Int?
@@ -664,13 +697,16 @@ enum DateRoute {
             d.year = y; d.dateUncertain = false; d.evidenceClass = .text; d.step = 1
             // The quoted string and its line: the reply's own quote when it cites the document, else the rule's.
             let pick = rulePick(cands.filter { $0.year == y })
+            var dated: Candidate? = nil
             if cited == "self", check.verdict == "valid", let q = tr.evidence?["quote"] {
                 d.quote = q
                 d.line = lineOf(q, in: selfText) ?? pick.map { $0.lineNo + 1 }
+                dated = datedIn(q, year: y)
             } else if let p = pick {
                 d.quote = p.line; d.line = p.lineNo + 1
             }
-            d.month = pickMonth(pick)
+            // W46.date-full-date: the month and day of the reply's own dated quote, else of the rule's dated form.
+            (d.month, d.day) = monthDay(dated ?? pick)
             // Owner, 2026-11-12 (a): the model's flag may add Date Uncertain to an explicit text year, never remove it.
             if tr.parsed, tr.uncertain { d.dateUncertain = true; d.modelFlagAdded = true }
         }
@@ -690,7 +726,7 @@ enum DateRoute {
             // An unparsed or unchecked reply: the rule stage's explicit year stands (08-dating.md, "Fallback").
             if let p = rulePick(cands) {
                 d.year = p.year; d.dateUncertain = false; d.evidenceClass = .text; d.step = 1
-                d.quote = p.line; d.line = p.lineNo + 1; d.month = pickMonth(p)
+                d.quote = p.line; d.line = p.lineNo + 1; (d.month, d.day) = monthDay(p)
                 if tr.parsed, tr.uncertain { d.dateUncertain = true; d.modelFlagAdded = true }
             }
             return d
@@ -699,7 +735,9 @@ enum DateRoute {
             d.year = y; d.dateUncertain = false; d.evidenceClass = .image; d.step = 2
             let ev = image.ownEvidence
             d.quote = ev?.quote; d.page = ev?.page; d.place = ev?.place
-            if let mo = image.docMonth, let q = ev?.quote, pickMonth(rulePick(candidates(q))) == mo { d.month = mo }
+            // The month and day of the quoted date the year rests on, unless the reply's document month names another.
+            let (m, day) = monthDay(datedIn(ev?.quote, year: y))
+            if let m, image.docMonth == nil || image.docMonth == m { d.month = m; d.day = day }
             return d
         }
         if let y = tr.year, check.verdict == "valid" { estimate(y) }

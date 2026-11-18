@@ -76,8 +76,10 @@ def _month_of(word):
 
 
 def candidates(text, limit=TEXT_CHARS):
-    """Every date printed in the first `limit` characters: [{year, month, kind, line_no, line}] in text order. A
-    two-digit numeric year is read as 19YY (the corpus is twentieth-century); years outside 1800-2030 are dropped."""
+    """Every date printed in the first `limit` characters: [{year, month, day, kind, line_no, line}] in text order. A
+    two-digit numeric year is read as 19YY (the corpus is twentieth-century); years outside 1800-2030 are dropped. A
+    numeric date's month is its first part when that can be a month (month-first, as American documents write it), its
+    day the other part (W46.date-full-date)."""
     out = []
     for n, line in enumerate(text[:limit].splitlines()):
         taken = []
@@ -86,7 +88,7 @@ def candidates(text, limit=TEXT_CHARS):
                 if any(m.start() < b and a < m.end() for a, b in taken):
                     continue
                 g = m.groups()
-                month = None
+                month = day = None
                 if kind == "full":
                     if g[0].isdigit():
                         day, month, year = int(g[0]), _month_of(g[1]), int(g[2])
@@ -99,7 +101,7 @@ def candidates(text, limit=TEXT_CHARS):
                     year = int(yy) if len(yy) == 4 else 1900 + int(yy)
                     if not (1 <= a <= 12 and 1 <= b <= 31 or 1 <= b <= 12 and 1 <= a <= 31):
                         continue
-                    month = a if 1 <= a <= 12 else b
+                    month, day = (a, b) if 1 <= a <= 12 else (b, a)
                 elif kind == "month":
                     month, year = _month_of(g[0]), int(g[1])
                 else:
@@ -107,7 +109,7 @@ def candidates(text, limit=TEXT_CHARS):
                 if not LO <= year <= HI:
                     continue
                 taken.append((m.start(), m.end()))
-                out.append({"year": year, "month": month, "kind": kind, "line_no": n, "line": line.strip()[:200],
+                out.append({"year": year, "month": month, "day": day, "kind": kind, "line_no": n, "line": line.strip()[:200],
                             "pos": m.start()})
     out.sort(key=lambda c: (c["line_no"], c["pos"]))
     return out
