@@ -104,12 +104,13 @@ struct VisionClient: Sendable {
                              errorCode: "vision_request_failed")
         }
 
-        let lines = (request.results ?? []).compactMap { observation -> String? in
+        let kept = (request.results ?? []).compactMap { observation -> (text: String, confidence: Float)? in
             guard let candidate = observation.topCandidates(1).first,
                   candidate.confidence >= settings.minimumConfidence else { return nil }
             let line = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            return line.isEmpty ? nil : line
+            return line.isEmpty ? nil : (line, candidate.confidence)
         }
+        let lines = kept.map(\.text)
         guard !lines.isEmpty else {
             return OCRResult(text: nil, classification: nil,
                              errorMessage: "Apple Vision found no text meeting the confidence threshold.",
@@ -117,8 +118,10 @@ struct VisionClient: Sendable {
         }
         // Vision has no document-classification channel. The normal call path concurrently derives any
         // selected local rotation correction and replaces this neutral orientation before output is written.
+        // W46.post-read-quality-flag: Vision's own confidence says whether this reading probably went wrong.
         return OCRResult(text: lines.joined(separator: "\n"), classification: nil,
-                         rotationDegrees: 0, errorMessage: nil, errorCode: nil)
+                         rotationDegrees: 0, errorMessage: nil, errorCode: nil,
+                         readPoorly: ReadQualityFlag.applies(to: settings) ? ReadQualityFlag.assess(kept) : nil)
     }
 
     /// The first image's EXIF/TIFF orientation, `.up` when it is absent or out of range.

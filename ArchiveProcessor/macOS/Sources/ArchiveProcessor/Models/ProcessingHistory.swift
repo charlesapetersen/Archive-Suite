@@ -42,6 +42,8 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     var kindRoutedPages: Int? = nil
     /// Pages the agreement rule left as they were, rotation unsure (W46.rotation-default). Optional, as above.
     var rotationUnsurePages: Int? = nil
+    /// Pages Apple Vision read with low confidence, so probably read poorly (W46.post-read-quality-flag). Optional, as above.
+    var readPoorlyPages: Int? = nil
     /// Pages that entered the newspaper layout stage, including its whole-page fallbacks.
     var newspaperPages: Int? = nil
     /// Image-reading requests made by those pages (regions, fills and fallbacks), across their recorded attempts.
@@ -200,7 +202,7 @@ struct RunHistorySnapshot {
     /// run's adds that model's page price less the run model's. `layouts` adds the newspaper requests beyond
     /// the one whole-page request already counted by the base or second-reader estimate.
     func makeRun(succeeded: Int, secondReaders: [SecondReader] = [], pageReaders: [PageReaderRecord] = [],
-                 rotationUnsure: Int = 0, layouts: [NewspaperLayoutRecord] = []) -> ProcessingRun {
+                 rotationUnsure: Int = 0, readPoorly: Int = 0, layouts: [NewspaperLayoutRecord] = []) -> ProcessingRun {
         let ok = max(0, min(succeeded, fileCount))
         let secondReaderCost = secondReaders.reduce(0) { $0 + ($1.estimatedCost ?? 0) }
         let routed = pageReaders.filter(\.isRouted)
@@ -223,6 +225,7 @@ struct RunHistorySnapshot {
             secondReaderPages: secondReaders.isEmpty ? nil : secondReaders.count,
             kindRoutedPages: routed.isEmpty ? nil : routed.count,
             rotationUnsurePages: rotationUnsure > 0 ? rotationUnsure : nil,
+            readPoorlyPages: readPoorly > 0 ? readPoorly : nil,
             newspaperPages: layouts.isEmpty ? nil : layouts.count,
             newspaperRequests: layouts.isEmpty ? nil : layouts.reduce(0) { $0 + $1.requests }
         )

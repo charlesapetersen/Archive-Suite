@@ -598,11 +598,17 @@ struct OCRResult: Codable {
     var rotationUnsure: Bool? = nil
     /// The fixed newspaper layout stage, including a visible whole-page fallback reason.
     var newspaperLayout: NewspaperLayoutRecord? = nil
+    /// W46.post-read-quality-flag — Apple Vision read this page with low confidence, so it probably read poorly
+    /// (`ReadQualityFlag`). Set only on Vision's own reading, and carried by the rebuilds that keep its text and feed
+    /// the run summary (not Live Capture's group rotation, the newspaper region join or re-OCR pairs, which show none).
+    /// `nil` = not flagged, or not read by Vision.
+    let readPoorly: ReadQualityFlag?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
          secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil, imported: ImportedReading? = nil,
-         readingCodes: [String]? = nil, newspaperLayout: NewspaperLayoutRecord? = nil) {
+         readingCodes: [String]? = nil, newspaperLayout: NewspaperLayoutRecord? = nil, readPoorly: ReadQualityFlag? = nil) {
+        self.readPoorly = text == nil ? nil : readPoorly
         self.readingCodes = readingCodes
         self.newspaperLayout = newspaperLayout
         self.secondReader = secondReader
@@ -639,7 +645,8 @@ struct OCRResult: Codable {
                   errorMessage: errorMessage, errorCode: errorCode,
                   enclosure: classification == self.classification ? enclosure : nil,
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
-                  secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes)
+                  secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes,
+                  readPoorly: readPoorly)
         copy.rotationUnsure = rotationUnsure
         copy.newspaperLayout = newspaperLayout
         return copy

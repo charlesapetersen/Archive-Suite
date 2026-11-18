@@ -231,7 +231,8 @@ struct OCRCascade: Codable, Equatable, Sendable {
                     NSLog("[OCR] \(imageURL.lastPathComponent): read by \(reader.summary)")
                     return OCRResult(text: read.text, classification: read.classification,
                                      rotationDegrees: read.rotationDegrees, errorMessage: nil, errorCode: nil,
-                                     enclosure: read.enclosure, secondReader: reader, newspaperLayout: NewspaperLayoutRecord.combining(read.newspaperLayout, after: incurredLayout))
+                                     enclosure: read.enclosure, secondReader: reader, newspaperLayout: NewspaperLayoutRecord.combining(read.newspaperLayout, after: incurredLayout),
+                                     readPoorly: read.readPoorly)
                 }
                 incurredLayout = NewspaperLayoutRecord.combining(read.newspaperLayout, after: incurredLayout)
                 why = "\(targetLabel): \(read.errorMessage ?? "no text")"

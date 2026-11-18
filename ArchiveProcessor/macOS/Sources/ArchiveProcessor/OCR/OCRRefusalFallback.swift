@@ -157,7 +157,8 @@ enum OCRRefusalFallback {
                 NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")
                 return OCRResult(text: result.text, classification: result.classification,
                                  rotationDegrees: result.rotationDegrees, errorMessage: nil, errorCode: nil,
-                                 enclosure: result.enclosure, secondReader: reader, newspaperLayout: NewspaperLayoutRecord.combining(result.newspaperLayout, after: incurredLayout))
+                                 enclosure: result.enclosure, secondReader: reader, newspaperLayout: NewspaperLayoutRecord.combining(result.newspaperLayout, after: incurredLayout),
+                                 readPoorly: result.readPoorly)
             }
             incurredLayout = NewspaperLayoutRecord.combining(result.newspaperLayout, after: incurredLayout)
             reasons.append("\(route.label): \(result.errorMessage ?? "no text")")

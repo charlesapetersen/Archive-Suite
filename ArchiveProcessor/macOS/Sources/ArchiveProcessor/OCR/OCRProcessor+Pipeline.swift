@@ -878,6 +878,7 @@ extension OCRProcessor {
             succeeded: succeeded, secondReaders: jobs.compactMap { $0.result?.secondReader },
             pageReaders: jobs.compactMap { $0.result?.pageReader },
             rotationUnsure: jobs.filter { $0.result?.rotationUnsure == true }.count,
+            readPoorly: readPoorlyNames.count,
             layouts: jobs.compactMap { $0.result?.newspaperLayout })
         ProcessingHistoryStore.shared.record(run)
         Self.recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: run.cost, files: run.fileCount, baseSources: nil)
@@ -945,6 +946,22 @@ extension OCRProcessor {
             + (secondRead == 0 ? "" : " \(secondRead) \(secondRead == 1 ? "page" : "pages") read by a second reader.")
             + (routed == 0 ? "" : " \(routed) \(routed == 1 ? "page" : "pages") read by the reader \(routed == 1 ? "its" : "their") kind chose.")
             + (unsure == 0 ? "" : " \(unsure) \(unsure == 1 ? "page" : "pages") left unturned, rotation unsure.")
+            + Self.readPoorlyClause(readPoorlyNames)
+    }
+
+    /// The files of this run's pages that probably read poorly (W46.post-read-quality-flag): Apple Vision's reading
+    /// with low confidence, on a page that succeeded.
+    var readPoorlyNames: [String] {
+        jobs.filter { $0.result?.readPoorly != nil && $0.result?.errorMessage == nil }.map(\.sourceURL.lastPathComponent)
+    }
+
+    /// The run summary's clause naming them: up to three files, then how many more.
+    static func readPoorlyClause(_ names: [String]) -> String {
+        guard !names.isEmpty else { return "" }
+        let shown = names.prefix(3).joined(separator: ", ")
+        let more = names.count > 3 ? " and \(names.count - 3) more" : ""
+        return " \(names.count) \(names.count == 1 ? "page" : "pages") may have read poorly (Apple Vision was unsure); "
+            + "check \(shown)\(more)."
     }
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
@@ -3580,7 +3597,8 @@ extension OCRProcessor {
                                errorMessage: result.errorMessage, errorCode: result.errorCode,
                                enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure),
                                secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
-                               readingCodes: result.readingCodes, newspaperLayout: result.newspaperLayout)
+                               readingCodes: result.readingCodes, newspaperLayout: result.newspaperLayout,
+                               readPoorly: result.readPoorly)
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,

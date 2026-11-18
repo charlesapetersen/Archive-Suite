@@ -513,7 +513,9 @@ extension OCRProcessor {
                     text: combinedText.isEmpty ? nil : combinedText,
                     classification: pageResults.first?.classification,
                     errorMessage: combinedText.isEmpty ? "No text returned by model." : nil,
-                    errorCode: nil
+                    errorCode: nil,
+                    // W46.post-read-quality-flag: the PDF read poorly if any of its pages did; the least sure page's.
+                    readPoorly: pageResults.compactMap(\.readPoorly).min { $0.visionConfidence < $1.visionConfidence }
                 )
                 jobs[index].classification = pageResults.first?.classification
                 jobs[index].status = .succeeded

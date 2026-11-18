@@ -53,6 +53,10 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   pre-OCRed input); header labels sanitised (separator, one line); estimates still count every page. Contract:
   `scripts/test-institutional-compute-import.sh`.
 - **Page-kind routing** is off by default. Contract: `scripts/test-ocr-page-kind.sh`.
+- **Read-poorly flag** (`OCR/ReadQualityFlag.swift`): Apple Vision's reading whose character-weighted line confidence
+  is under 0.9815 sets `OCRResult.readPoorly`; the run summary names the files and the history counts them. UI only,
+  never written to a file; only under the default Vision settings it was fitted with; the summary's rebuilds pass it on. The cut is fitted in
+  `segbench-results/post-read-flag.md`. Contract: `scripts/test-read-quality-flag.sh`.
 - **A model on this Mac** always sends the stand-in bearer `local`, never a saved key; escalating its failed pages
   is off by default (it may have been chosen to keep pages on the Mac). Its measured limits are required
   (W41.mac-local-measure: 4,096-token cap, streamed repetition check + one re-read with a repetition penalty, 600 s
