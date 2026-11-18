@@ -207,6 +207,56 @@ final class BackForwardTests: XCTestCase {
         XCTAssertEqual(model.currentPlace, .folder(nil), "the deleted smart folder is skipped")
     }
 
+    // MARK: Show in All Files (W40.reader-show-in-all-files)
+
+    func testShowInAllFilesFromASmartFolderSelectsTheRowAmongItsNeighboursAndBackReturns() throws {
+        let model = fixtureNavigationModel(pinnedTo: try makeRoot())
+        model.filter.read = .all
+        model.recompute()
+        XCTAssertFalse(model.canShowInAllFiles, "nothing selected")
+        model.selection = [model.displayed[0].id]
+        XCTAssertFalse(model.canShowInAllFiles, "All Files with no filter has nothing to lift")
+        var rule = SearchRule(field: .fileName)
+        rule.text = "memo"
+        let id = try XCTUnwrap(model.savedSearches.add(name: "Memos", search: AdvancedSearch(combine: .all, rules: [rule])))
+        model.applyScope(try XCTUnwrap(model.savedSearches.searches.first { $0.id == id }))
+        model.fullTextQuery = "scratch"
+        XCTAssertEqual(model.displayed.count, 2)
+        let memo = try XCTUnwrap(model.displayed.first { $0.name == "Jones memo.pdf" })
+        model.selection = [memo.id]
+        XCTAssertTrue(model.canShowInAllFiles)
+
+        model.showInAllFiles()
+        XCTAssertEqual(model.currentPlace, .folder(nil), "All Files")
+        XCTAssertEqual(model.fullTextQuery, "", "Find is lifted")
+        XCTAssertEqual(model.displayed.count, 3, "the neighbours are listed")
+        XCTAssertEqual(model.selection, [memo.id])
+        XCTAssertEqual(model.scrollTargetID, memo.id)
+        XCTAssertFalse(model.canShowInAllFiles)
+
+        model.goBack()
+        XCTAssertEqual(model.currentPlace, .smartFolder(id), "Back returns to the smart folder")
+        XCTAssertEqual(model.selection, [memo.id])
+    }
+
+    func testShowInAllFilesLiftsAFolderAndTheFilterBar() throws {
+        let model = fixtureNavigationModel(pinnedTo: try makeRoot())
+        model.filter.read = .all
+        model.recompute()
+        model.setFolderScope(folder(model, "Smith"))
+        model.filter.searchText = "letter"
+        model.recompute()
+        let letter = try XCTUnwrap(model.displayed.first)
+        XCTAssertEqual(model.displayed.count, 1)
+        model.selection = [letter.id]
+        XCTAssertTrue(model.canShowInAllFiles)
+
+        model.showInAllFiles()
+        XCTAssertNil(model.filter.pathPrefix)
+        XCTAssertEqual(model.displayed.count, 3)
+        XCTAssertEqual(model.selection, [letter.id])
+    }
+
     // MARK: Keys
 
     func testBackAndForwardTakeCommandBracketsAndTheUnreadCommandsMoveToOption() {

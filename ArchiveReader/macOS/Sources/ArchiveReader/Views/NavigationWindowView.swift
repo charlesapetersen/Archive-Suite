@@ -264,6 +264,10 @@ struct NavigationWindowView: View {
         let menu = NSMenu()
         menu.addItem(withTitle: "Open in Document View", action: #selector(ContextMenuActions.openInDocView), keyEquivalent: "")
         menu.addItem(withTitle: "Preview", action: #selector(ContextMenuActions.preview), keyEquivalent: "")
+        // W40.reader-show-in-all-files: only where something narrows the list.
+        if model.canShowInAllFiles {
+            menu.addItem(withTitle: "Show in All Files", action: #selector(ContextMenuActions.showInAllFiles), keyEquivalent: "")
+        }
         menu.addItem(withTitle: "Reveal in Finder", action: #selector(ContextMenuActions.revealInFinder), keyEquivalent: "")
         menu.addItem(withTitle: "Open in Default App", action: #selector(ContextMenuActions.openInDefaultApp), keyEquivalent: "")
         menu.addItem(withTitle: "Copy Link(s)", action: #selector(ContextMenuActions.copyLinks), keyEquivalent: "")
@@ -1011,6 +1015,7 @@ final class ContextMenuActions: NSObject {
     }
     @objc func openInDocView()    { openSelection() }
     @objc func preview()          { model.showingPreview = true }
+    @objc func showInAllFiles()   { model.showInAllFiles() }
     @objc func revealInFinder()   { model.revealInFinder() }
     @objc func openInDefaultApp() { model.openInDefaultApp() }
     @objc func copyLinks()        { model.copyLinks() }

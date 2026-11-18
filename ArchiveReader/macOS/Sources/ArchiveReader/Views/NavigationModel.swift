@@ -1914,6 +1914,34 @@ final class NavigationModel: ObservableObject {
         recomputeInBackground()
     }
 
+    /// Whether the list is narrowed by anything "Show in All Files" would lift: a folder, a smart folder or
+    /// search, the filter bar or Find.
+    var canShowInAllFiles: Bool {
+        guard !selection.isEmpty else { return false }
+        var neutral = LibraryFilter()
+        neutral.read = AppSettings.defaultReadFilter
+        return scope != nil || filter != neutral || !fullTextQuery.isEmpty || !filterSearchText.isEmpty
+    }
+
+    /// "Show in All Files" (W40.reader-show-in-all-files, owner 2026-11-17): the selected rows among their
+    /// neighbours. Lifts the scope, folder, filters and Find as a deep-link reveal does, then selects the same
+    /// rows and scrolls to the first. A read filter left by the default that would hide one of them is
+    /// lifted too, since a row not shown is not among its neighbours. A move for Back, which returns to the
+    /// search with its selection.
+    func showInAllFiles() {
+        let ids = selection
+        guard !ids.isEmpty else { return }
+        clearUserFilters(recompute: false)
+        setFolderScope(nil)
+        recompute()
+        if filter.read != .all, !ids.isSubset(of: Set(displayed.lazy.map(\.id))) {
+            filter.read = .all
+            recompute()
+        }
+        selection = ids.intersection(displayed.lazy.map(\.id))
+        if let first = displayed.first(where: { ids.contains($0.id) }) { requestScroll(to: first.id) }
+    }
+
     // MARK: Back and Forward (W40.reader-back-forward)
 
     /// What the navigation window shows, for Go ▸ Back and Forward: a folder (nil is All Files), a saved smart
