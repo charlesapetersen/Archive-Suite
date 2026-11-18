@@ -72,6 +72,8 @@ def parse_reading(text, year):
     c = P.dated_in(s, year)
     if c is None:      # a two-digit year after a month or an apostrophe: read it in full
         c = P.dated_in(re.sub(r"[’'‘](\d\d)\b", lambda m: str(year)[:2] + m.group(1), s), year)
+    if c is None:      # a day and a two-digit year joined by a hyphen ('Sept 10-26'), through the OCR forms
+        c = P.ocr_dated(re.sub(r"(?<=[A-Za-z.] )(\d{1,2})-(\d\d)\b", r"\1 '\2", s), year)
     return P.month_day(c)
 
 
@@ -133,11 +135,15 @@ def rows():
         doc = P.doc_of(d)
         sent = im if (im is not None and not T.candidates(doc["text"])) else None
         r = P.route(doc, traw, sent)
+        P.OCR_FORMS = False
+        rs = P.route(doc, traw, sent)      # the route before W46.date-full-date-ocr-forms, on the same replies
+        P.OCR_FORMS = True
         t = d.get("truth") or {}
         b = second_reader(P.load(P.image_dest(d)))
         o = owner.get(d["id"][2:])
         out.append({"id": d["id"], "kind": d.get("kind"), "cls": r["cls"], "date_from": r["date_from"],
                     "route": [r["year"], r["month"], r["day"]], "old_month": old_month(doc, traw, sent, r),
+                    "strict": [rs["month"], rs["day"]],
                     "tag": [t.get("year"), t.get("month"), t.get("du")],
                     "second": list(b[:3]), "second_quote": b[3],
                     "owner_read": list(o[:3]) if o else None, "owner_as_read": o[3] if o else None,
@@ -228,11 +234,14 @@ def summarise(rs, rulings):
     gained = sum(1 for r, _, t in scored if r["route"][1] == t[1] and t[1] is not None and r["old_month"] != t[1])
     lost = sum(1 for r, _, t in scored if r["old_month"] == t[1] and t[1] is not None and r["route"][1] != t[1])
     by_from = collections.Counter((r["date_from"] or "none") for r in rs if r["cls"] in ("text", "image"))
+    strict_m = tally((r["strict"][0], t[1]) for r, _, t in scored)
+    strict_d = tally((r["strict"][1], t[2]) for r, _, t in sure_day)
     return {"documents": len(rs), "explicit": sum(r["cls"] in ("text", "image") for r in rs),
             "by_source": dict(by_source), "scored": len(scored), "with_month": with_month, "with_day": with_day,
             "month": month, "day": day, "full_exact": full, "old_month": old, "gained": gained, "lost": lost,
             "vs_tag": vs_tag, "vs_tag_old": vs_tag_old, "tagged": len(tagged), "by_from": dict(by_from),
             "by_truth_source": dict(collections.Counter(src for _, src, _ in scored)),
+            "strict_month": strict_m, "strict_day": strict_d, "image_arm": image_arm(rs, scored),
             "wrong": [{"id": r["id"], "route": r["route"], "truth": t, "source": src} for r, src, t in scored
                       if (r["route"][1] is not None and t[1] is not None and r["route"][1] != t[1])
                       or (r["route"][2] is not None and t[2] not in (None, "unsure") and r["route"][2] != t[2])],
@@ -245,11 +254,57 @@ def summarise(rs, rulings):
                       or (r["route"][2] is not None and t[2] is None)]}
 
 
+def image_arm(rs, scored):
+    """What sending the image pass for a text year with no dated form would add (W46.date-full-date-ocr-forms), read
+    from the image replies already cached for every owner document: the reply's own month where its year is the route's
+    year, against the page truth and the Finder month tag; priced at the mean cost of the cached owner image calls."""
+    truth = {r["id"]: t for r, _, t in scored}
+    texty = [r for r in rs if r["cls"] == "text"]
+    bare = [r for r in texty if r["route"][1] is None]
+    got = [r for r in bare if r["second"][0] == r["route"][0] and r["second"][1] is not None]
+    on_truth = tally((r["second"][1] if r in got else None, truth[r["id"]][1]) for r in bare if r["id"] in truth)
+    on_tag = tally((r["second"][1] if r in got else None, r["tag"][1]) for r in bare
+                   if r["tag"][1] is not None and r["tag"][0] == r["route"][0])
+    costs = [json.loads(l).get("cost") for l in open(P.CACHED_OWNER_IMAGE_LEDGER)] if (
+        P.CACHED_OWNER_IMAGE_LEDGER.exists()) else []
+    costs = [c for c in costs if c]
+    mean = sum(costs) / len(costs) if costs else None
+    return {"text_years": len(texty), "no_month": len(bare), "image_month": len(got), "on_truth": on_truth,
+            "on_tag": on_tag, "calls_priced": len(costs), "mean_cost": round(mean, 5) if mean else None,
+            "per_1000_text_years": round(1000 * len(bare) / len(texty) * mean, 2) if mean and texty else None}
+
+
+def public_check():
+    """The OCR forms on the public set's dates (W41.date-model's Library of Congress items, its title's month the truth,
+    supplied dates left out): where the strict forms give the title's year no month, the month and day the route would
+    now write from the item's text; beside them, the strict forms' own month and day where they give one."""
+    try:
+        import public_dates as PD
+        import date_tagging as DTG
+        docs = [d for d in PD.load() if d["truth"]["month"] and not d["truth"]["supplied"]]
+    except (OSError, ImportError):
+        return None
+    ocr_m, ocr_d, st_m, st_d = collections.Counter(), collections.Counter(), collections.Counter(), collections.Counter()
+    for d in docs:
+        t, text = d["truth"], DTG.doc_text(d["prompt"])
+        c = T.rule_pick([x for x in T.candidates(text) if x["year"] == t["year"]])[3]
+        m, day, ocr = P.with_ocr_forms(c, [text], t["year"])
+        mc, dc = (ocr_m, ocr_d) if ocr else (st_m, st_d)
+        if m is None:
+            continue
+        mc["right" if m == t["month"] else "wrong"] += 1
+        if t["day"] and day is not None:
+            dc["right" if day == t["day"] else "wrong"] += 1
+    return {"documents": len(docs), "ocr_month": dict(ocr_m), "ocr_day": dict(ocr_d), "strict_month": dict(st_m),
+            "strict_day": dict(st_d)}
+
+
 def cmd_score(_a):
     rs = rows()
     folded = json.loads(RULINGS.read_text()) if RULINGS.exists() else {}
     rulings = folded.get("documents", {})
     S = summarise(rs, rulings)
+    S["public"] = public_check()
     key = json.loads(KEY.read_text())["documents"] if KEY.exists() else {}
     S["sheet"] = {"documents": len(key) if rulings else len(sheet_set(rs)), "folded": bool(rulings),
                   "controls": folded.get("controls")}
@@ -258,8 +313,49 @@ def cmd_score(_a):
     print(json.dumps({k: S[k] for k in ("scored", "month", "day", "full_exact", "vs_tag", "by_source")}))
 
 
+def ocr_findings(S):
+    """W46.date-full-date-ocr-forms' findings: the OCR forms, the image reply's document month, the public check and the
+    image pass for text years, priced."""
+    m, d, sm, sd, a, pub = S["month"], S["day"], S["strict_month"], S["strict_day"], S["image_arm"], S["public"]
+    mt = sum(m.get(k, 0) for k in ("right", "wrong", "missing"))
+    dtot = sum(d.get(k, 0) for k in ("right", "wrong", "missing"))
+    L = [f"- **The OCR forms (W46.date-full-date-ocr-forms) take the month from {frac(sm.get('right', 0), mt)} to "
+         f"{frac(m.get('right', 0), mt)} and the day from {frac(sd.get('right', 0), dtot)} to "
+         f"{frac(d.get('right', 0), dtot)}, with no new wrong month or day.** Where the strict forms give an explicit "
+         "year no month, the route now reads that year's dated forms as Vision damages them: a spaced day "
+         "(`APR 2 0 1977`, `DEC 2 1 1982`), a bullet for a full stop (`Aug• 4, 1903•`), a misread month within two "
+         "letters of one name in a full date with the four-digit year (`NIRCH 13, 1965`), Cyrillic look-alikes (`ОстОВЕя 1, 1966`), spaces in a numeric date "
+         "(`8 - 3-87`) and a two-digit year after a month word (`Dec. 70`, `Sept 69`, `9 Oct 75`, `Jan 3 64`); and an l "
+         "for a 1 gives `1lth November 1915` its day. An image year whose quote holds no dated form takes the reply's "
+         "document month. Four of the six documents filed as having no dated form had one with a two-digit year.",
+         f"- **Left without a month: {m.get('missing', 0)}**, both pages whose Vision text holds no dated form of the "
+         "date at all. A month written where the page has none: "
+         f"{m.get('extra', 0)}, the same document as before this item."]
+    if pub:
+        om, od, stm, std = pub["ocr_month"], pub["ocr_day"], pub["strict_month"], pub["strict_day"]
+        on, sn = om.get("right", 0) + om.get("wrong", 0), stm.get("right", 0) + stm.get("wrong", 0)
+        dn, sdn = od.get("right", 0) + od.get("wrong", 0), std.get("right", 0) + std.get("wrong", 0)
+        L.append(f"- **On the public set's dates** ({pub['documents']:,} Library of Congress items with a catalogue month): "
+                 f"where the strict forms give the title's year no month, the OCR forms write one on {on}, the title's "
+                 f"month on {frac(om.get('right', 0), on)}, its day on {frac(od.get('right', 0), dn)} of the days "
+                 f"written; the strict forms where they give one, {frac(stm.get('right', 0), sn)} and "
+                 f"{frac(std.get('right', 0), sdn)}. The misses on both are other dates in the text (a docket's "
+                 "received date, a date the letter mentions) and a day-first numeric date, not misreadings.")
+    if a["mean_cost"]:
+        ot = a["on_truth"]
+        L.append(f"- **The image pass for a text year with no dated form, not adopted:** {a['no_month']} of "
+                 f"{a['text_years']} text years still have no month; the image replies cached for every owner document "
+                 f"give the route's year a month on {a['image_month']}, right on {ot.get('right', 0)} on the page truth "
+                 f"and written where the owner reads none on {ot.get('extra', 0)}. Sending it costs one image call "
+                 f"(mean ${a['mean_cost']:.4f} over {a['calls_priced']} cached owner calls) on each such document, about "
+                 f"${a['per_1000_text_years']:.2f} per 1,000 text-year documents, for about 2 months in 133: the route "
+                 "keeps sending the image pass only where the text has no year.")
+    return "\n".join(L)
+
+
 def report(S):
     m, d, o, vt, vto = S["month"], S["day"], S["old_month"], S["vs_tag"], S["vs_tag_old"]
+    sm, sd = S["strict_month"], S["strict_day"]
     mt = sum(m.get(k, 0) for k in ("right", "wrong", "missing"))
     dtot = sum(d.get(k, 0) for k in ("right", "wrong", "missing"))
     tt = sum(vt.get(k, 0) for k in ("right", "wrong", "missing"))
@@ -290,16 +386,12 @@ def report(S):
           f"{S['sheet']['documents']} documents scored; W46.date-full-date-fold). Its controls: "
           f"{S['sheet']['controls']['same']} of {S['sheet']['controls']['asked']} agreed documents as the owner reads "
           "them (one on the month only: he reads the typed-over day as 27 or 29, the route wrote 29), so the agreed "
-          "truth stands. The month not written (13) is the error left: 5 are dates Vision garbled so the rule cannot "
-          "read them (a spaced day `APR 2 0 1977`, `DEC 2 1 1982`; `Aug• 4`; `NIRCH 13`; Cyrillic look-alikes "
-          "`ОстОВЕя 1, 1966`, and `1lth November` loses a day), 2 are image-pass years whose quote holds no dated form "
-          "while the reply's document month is right, and 6 are pages whose Vision text holds no dated form of the "
-          "date. The Gemini image pass had the owner's month on all 11 of these that were on this sheet "
-          "(W46.date-full-date-ocr-forms)." if folded else
+          "truth stands." if folded else
           f"- **Not yet settled: {S['by_source'].get('disputed', 0)} disputed documents** (the route and the second "
           "reader differ, or the year came from the same image pass the second reader is) wait on the owner's blind "
           f"sheet ({S['sheet']['documents']} documents with {N_CONTROLS} controls); the figures above leave them out, so "
           "they lean towards documents where two readings agree."), "",
+         ocr_findings(S), "",
          "## Truth by source", "",
          "| source | documents |", "|---|---|"]
     for k, v in sorted(S["by_source"].items(), key=lambda x: -x[1]):
@@ -307,8 +399,10 @@ def report(S):
     L += ["", "## Month and day on the page truth", "",
           "| | right | wrong | not written | written, none on the page |", "|---|---|---|---|---|",
           f"| month, this route | {m.get('right', 0)} | {m.get('wrong', 0)} | {m.get('missing', 0)} | {m.get('extra', 0)} |",
-          f"| month, before this item | {o.get('right', 0)} | {o.get('wrong', 0)} | {o.get('missing', 0)} | {o.get('extra', 0)} |",
+          f"| month, before the OCR forms | {sm.get('right', 0)} | {sm.get('wrong', 0)} | {sm.get('missing', 0)} | {sm.get('extra', 0)} |",
+          f"| month, before W46.date-full-date | {o.get('right', 0)} | {o.get('wrong', 0)} | {o.get('missing', 0)} | {o.get('extra', 0)} |",
           f"| day, this route | {d.get('right', 0)} | {d.get('wrong', 0)} | {d.get('missing', 0)} | {d.get('extra', 0)} |",
+          f"| day, before the OCR forms | {sd.get('right', 0)} | {sd.get('wrong', 0)} | {sd.get('missing', 0)} | {sd.get('extra', 0)} |",
           "", "Wrong months or days:", ""]
     L += [f"- `{w['id']}`: route {w['route']}, truth {w['truth']} ({w['source']})" for w in S["wrong"]] or ["- none"]
     L += ["", "## Measurement card", "",
@@ -333,8 +427,11 @@ def report(S):
           "seed 41), those with a confirmed JPEG original; scored where the route gives an explicit year equal to the "
           "owner's year. Not chosen by any route or by the ABBYY text.",
           "- **Comparison:** the same cached trace and image replies scored under the new rule and the rule before this "
-          "item; Vision text on the JPEG originals for both. The public set has no full-date truth, so only the owner's "
-          "documents are scored (no second OCR set).",
+          "item, and with the OCR forms switched off (`date_route_pipeline.OCR_FORMS`); Vision text on the JPEG "
+          "originals for all. The public set has no route replies, so the route itself is scored on the owner's "
+          "documents only; the OCR forms alone are checked on the public set's dates (its catalogue titles' month and "
+          "day against the item's transcribed text, so a title date that is not the text's first date counts against "
+          "both the strict and the OCR forms).",
           f"- **Noise:** n is small ({mt} months, {dtot} days); intervals are Wilson 95%. The rule is deterministic on "
           "cached replies, so there is no rerun noise in the rule itself; a fresh trace call could quote a different date.",
           "- **Scope:** not the tagging call's own month and day (the app keeps its day when it read the same year and "

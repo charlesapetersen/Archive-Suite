@@ -55,6 +55,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import statistics
 import subprocess
 import sys
@@ -729,6 +730,97 @@ def month_day(c):
     return c["month"], d
 
 
+# W46.date-full-date-ocr-forms: the dated forms of one known year as OCR damages them, read only where the strict forms
+# (date_traceable.candidates) give that year no month, or its dated form no day. They never choose a year.
+LOOK_ALIKE = str.maketrans({"А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H", "О": "O", "Р": "P", "С": "C",
+                            "Т": "T", "Х": "X", "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "т": "t", "у": "y", "х": "x",
+                            "я": "R", "Я": "R", "ı": "i", "İ": "I", "•": ".", "·": "."})
+DIGIT_ONE = re.compile(r"(?<=\d)[lI|](?=\d|st|nd|rd|th)")     # 1lth -> 11th
+OCR_FORMS = True     # off only to score the route as it was before W46.date-full-date-ocr-forms (date_full_date.py)
+
+
+def ocr_month(word, near=True):
+    """The month a word names: a month's full name, its first three letters or "sept"; else, with `near`, a full name of
+    five letters or more that it differs from in at most two letters at the same length (NIRCH), when exactly one does."""
+    w = word.lower()
+    for k, m in enumerate(T.MONTHS):
+        if w in (m, m[:3]) or w == "sept" and k == 8:
+            return k + 1
+    if not near:
+        return None
+    near = [k for k, m in enumerate(T.MONTHS) if len(m) >= 5 and len(m) == len(w)
+            and sum(a != b for a, b in zip(m, w)) <= 2]
+    return near[0] + 1 if len(near) == 1 else None
+
+
+def ocr_forms(year):
+    """(kind, pattern) of `year`'s dated forms as OCR writes them: a spaced day (APR 2 0 1977), spaces around a numeric
+    date's separators, the same both times (8 - 3-87, not pp. 3-11. 1977), a two-digit year after a month word (Dec. 70,
+    Sept '69, 9 Oct 75), a misread month."""
+    yy = f"{year % 100:02d}"
+    yr = rf"(?:,?\s*{year}|(?:,|\s)\s*[’']?{yy}|[’']{yy})"     # a two-digit year apart from the day: not November 1915
+    word = r"(?<![&/])(?<![&/] )([a-z]{3,9})\.?"     # not the second month of a span (Aug & Sep 61, Aug/Sept '41)
+    return (("full", re.compile(rf"\b{word}\s+([0-3] \d|\d{{1,2}})(?:st|nd|rd|th)?{yr}\b", re.I)),
+            ("full", re.compile(rf"\b(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?{word}{yr}\b", re.I)),
+            ("numeric", re.compile(rf"\b(\d{{1,2}})\s*([/.-])\s*(\d{{1,2}})\s*\2\s*(?:{year}|{yy})\b")),
+            ("month", re.compile(rf"\b{word}(?=,?\s){yr}\b", re.I)))
+
+
+def ocr_dated(text, year, limit=None):
+    """The first dated form of `year` in `text` (its first `limit` characters) as OCR damages it, after Cyrillic
+    look-alikes, bullets and an l for a 1 inside a number are put right: a candidate of kind "ocr", or None. Within a
+    line, a span one form claims is not read again by a later one, as in date_traceable.candidates."""
+    s = DIGIT_ONE.sub("1", str(text or "")[:limit].translate(LOOK_ALIKE))
+    for n, line in enumerate(s.splitlines()):
+        found, taken = [], []
+        for kind, rx in ocr_forms(year):
+            for m in rx.finditer(line):
+                if any(m.start() < b and a < m.end() for a, b in taken):
+                    continue
+                g = m.groups()
+                if kind == "full":     # a near month only with a day and the four-digit year (not Batch 15 for March '15)
+                    near = m.group(0).endswith(str(year))
+                    day, month = (g[0], ocr_month(g[1], near)) if g[0][0].isdigit() else (g[1], ocr_month(g[0], near))
+                    day = int(day.replace(" ", ""))
+                    if month is None or not 1 <= day <= 31:
+                        continue
+                elif kind == "numeric":
+                    a, b = int(g[0]), int(g[2])
+                    if not (1 <= a <= 12 and 1 <= b <= 31 or 1 <= b <= 12 and 1 <= a <= 31):
+                        continue
+                    month, day = (a, b) if 1 <= a <= 12 else (b, a)
+                else:
+                    month, day = ocr_month(g[0], near=False), None
+                    if month is None:
+                        continue
+                taken.append((m.start(), m.end()))
+                found.append({"year": year, "month": month, "day": day, "kind": "ocr", "line_no": n,
+                              "line": line.strip()[:200], "pos": m.start()})
+        if found:
+            return min(found, key=lambda c: c["pos"])
+    return None
+
+
+def with_ocr_forms(c, sources, year):
+    """(month, day, read through the OCR forms) of the dated candidate `c` an explicit year rests on: where `c` gives no
+    month, the first OCR-tolerant dated form of `year` in `sources`, in order; where it gives a month and no day, the
+    day of an OCR-tolerant form of the same month on `c`'s own line (1lth November 1915)."""
+    m, d = month_day(c)
+    if not OCR_FORMS:
+        return m, d, False
+    if m is None:
+        for s in sources:
+            m, d = month_day(ocr_dated(s, year, limit=T.TEXT_CHARS))
+            if m is not None:
+                return m, d, True
+        return None, None, False
+    if d is None:
+        od = month_day(ocr_dated(c["line"], year))
+        if od[0] == m and od[1] is not None:
+            return m, od[1], True
+    return m, d, False
+
+
 def image_evidence(image_rec, year):
     """(the quoted date the image pass's own year rests on, the reply's document month): the document date's quote
     when it is among the written dates of that year, else the first written one (DateRoute.ImageReading.ownEvidence)."""
@@ -764,6 +856,8 @@ def route(doc, trace_raw, image_rec, self_only=False):
     that is the reply's own quote when it cites "self" and passes the check and holds a dated form of the year, else the
     rule's dated form of that year; from the image, the quoted date its year rests on, unless the reply's document
     month names another month. An estimate or no year gets neither, as the document does not print its own date.
+    W46.date-full-date-ocr-forms: where those give no month (or a month and no day), the year's OCR-damaged dated forms
+    (with_ocr_forms: the quote, then the text); an image year whose quote has no dated form takes the document month.
 
     W46.date-stamp-fallback: a document whose text has no year and whose image pass finds no own date, but a stamped date
     (a received stamp, a postmark), takes that stamp's year with Date Uncertain, ahead of the neighbour estimate (owner,
@@ -783,21 +877,22 @@ def route(doc, trace_raw, image_rec, self_only=False):
     if tr["y"] is not None and (tr["y"] in own or verdict == "valid") and (cited == "self" or (
             not self_only and tr["y"] in own)):
         y = tr["y"]
-        c = dated_in((tr["evidence"] or {}).get("quote"), y) if cited == "self" and verdict == "valid" else None
+        quote = (tr["evidence"] or {}).get("quote") if cited == "self" and verdict == "valid" else None
+        c = dated_in(quote, y) if quote is not None else None
         frm = "quote" if c else "rule"
         if c is None:
             c = T.rule_pick([x for x in cands if x["year"] == y])[3]
-        m, d = month_day(c)
+        m, d, ocr = with_ocr_forms(c, ([quote] if quote is not None else []) + [doc["text"]], y)
         return {**base, "year": y, "du": False, "cls": "text", "step": 1, "month": m, "day": d,
-                "date_from": frm if m else None}
+                "date_from": ("ocr form" if ocr else frm) if m else None}
     if cands:
         if tr["y"] is not None and verdict == "valid":
             return {**base, "year": tr["y"], "du": True, "cls": "estimate", "step": 4}
         # an unparsed or unchecked reply: the rule stage's explicit year stands (08-dating.md, "Fallback")
         y, _, _, best = T.rule_pick(cands)
-        m, d = month_day(best)
+        m, d, ocr = with_ocr_forms(best, [doc["text"]], y)
         return {**base, "year": y, "du": y is None, "cls": "text" if y is not None else "none", "step": 1,
-                "month": m, "day": d, "date_from": "rule" if m else None}
+                "month": m, "day": d, "date_from": ("ocr form" if ocr else "rule") if m else None}
     if image_rec is not None:
         ok, own_y, _ = DU.own_date(image_rec)
         if own_y is not None:
@@ -805,11 +900,15 @@ def route(doc, trace_raw, image_rec, self_only=False):
             if ev is not None and is_stamp(ev):     # the page's own date is a stamp: the stamp step, Date Uncertain
                 return {**base, "year": own_y, "du": True, "cls": "stamp", "step": 2, "quote": ev["quote"],
                         "page": ev["page"], "where": ev["where"]}
-            m, d = month_day(dated_in(ev["quote"], own_y) if ev else None)
+            m, d, ocr = with_ocr_forms(dated_in(ev["quote"], own_y) if ev else None, [ev["quote"]] if ev else [], own_y)
+            frm = "image ocr form" if ocr else "image"
             if m is not None and doc_mo is not None and doc_mo != m:
                 m = d = None
+            elif OCR_FORMS and m is None and ev is not None and doc_mo is not None:
+                # W46.date-full-date-ocr-forms: the year is quoted with no dated form; the reply's document month stands
+                m, frm = doc_mo, "image month"
             return {**base, "year": own_y, "du": False, "cls": "image", "step": 2, "month": m, "day": d,
-                    "date_from": "image" if m else None}
+                    "date_from": frm if m else None}
         st = stamp_evidence(image_rec)
         if st is not None:
             return {**base, "year": st["year"], "du": True, "cls": "stamp", "step": 2, "quote": st["quote"],

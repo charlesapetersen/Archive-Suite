@@ -210,6 +210,112 @@ enum DateRoute {
         return candidates(quote, limit: quote.unicodeScalars.count).first { $0.year == year && $0.kind != "year" }
     }
 
+    // MARK: OCR-damaged dated forms (W46.date-full-date-ocr-forms; date_route_pipeline.ocr_dated, with_ocr_forms)
+
+    // The dated forms of one known year as OCR damages them, read only where the strict forms give that year no month,
+    // or its dated form no day. They never choose a year.
+    private static let lookAlike: [UInt32: Unicode.Scalar] = [
+        0x0410: "A", 0x0412: "B", 0x0415: "E", 0x041A: "K", 0x041C: "M", 0x041D: "H", 0x041E: "O", 0x0420: "P",
+        0x0421: "C", 0x0422: "T", 0x0425: "X", 0x0430: "a", 0x0435: "e", 0x043E: "o", 0x0440: "p", 0x0441: "c",
+        0x0442: "t", 0x0443: "y", 0x0445: "x", 0x044F: "R", 0x042F: "R", 0x0131: "i", 0x0130: "I", 0x2022: ".",
+        0x00B7: ".",
+    ]
+    /// 1lth -> 11th
+    private static let digitOne = rx(#"(?<=\d)[lI|](?=\d|st|nd|rd|th)"#)
+
+    /// `ocr_month`: a month's full name, its first three letters or "sept"; else, with `near`, a full name of five
+    /// letters or more that the word differs from in at most two letters at the same length (NIRCH), when exactly one does.
+    static func ocrMonth(_ word: String, near allowNear: Bool = true) -> Int? {
+        let w = word.lowercased()
+        for (k, m) in months.enumerated() where w == m || w == String(m.prefix(3)) || (w == "sept" && k == 8) {
+            return k + 1
+        }
+        guard allowNear else { return nil }
+        let ws = Array(w.unicodeScalars)
+        let near = months.indices.filter { k in
+            let ms = Array(months[k].unicodeScalars)
+            return ms.count >= 5 && ms.count == ws.count && zip(ms, ws).filter { $0 != $1 }.count <= 2
+        }
+        return near.count == 1 ? near[0] + 1 : nil
+    }
+
+    /// `ocr_forms`: a spaced day (APR 2 0 1977), spaces around a numeric date's separators, the same both times
+    /// (8 - 3-87, not pp. 3-11. 1977), a two-digit year after a month word (Dec. 70, Sept '69, 9 Oct 75), a misread
+    /// month; never the second month of a span (Aug & Sep 61).
+    private static func ocrForms(_ year: Int) -> [(String, NSRegularExpression)] {
+        let yy = String(format: "%02d", year % 100)
+        // A two-digit year stands apart from the day: not November 1915 read as November 19, '15.
+        let yr = #"(?:,?\s*"# + "\(year)" + #"|(?:,|\s)\s*[’']?"# + yy + #"|[’']"# + yy + ")"
+        let word = #"(?<![&/])(?<![&/] )([a-z]{3,9})\.?"#
+        return [
+            ("full", rx(#"\b"# + word + #"\s+([0-3] \d|\d{1,2})(?:st|nd|rd|th)?"# + yr + #"\b"#, true)),
+            ("full", rx(#"\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?"# + word + yr + #"\b"#, true)),
+            ("numeric", rx(#"\b(\d{1,2})\s*([/.-])\s*(\d{1,2})\s*\2\s*(?:"# + "\(year)|\(yy)" + #")\b"#)),
+            ("month", rx(#"\b"# + word + #"(?=,?\s)"# + yr + #"\b"#, true)),
+        ]
+    }
+
+    /// `ocr_dated`: the first dated form of `year` in `text` (its first `limit` characters) as OCR damages it, after
+    /// Cyrillic look-alikes, bullets and an l for a 1 inside a number are put right: a candidate of kind "ocr", or nil.
+    static func ocrDated(_ text: String, year: Int, limit: Int? = nil) -> Candidate? {
+        var v = String.UnicodeScalarView()
+        for c in (limit.map { scalarPrefix(text, $0) } ?? text).unicodeScalars { v.append(lookAlike[c.value] ?? c) }
+        let s = replace(digitOne, in: String(v), with: "1")
+        let forms = ocrForms(year)
+        for (n, line) in splitLines(s).enumerated() {
+            var found: [Candidate] = [], taken: [(Int, Int)] = []
+            for (k, (kind, r)) in forms.enumerated() {
+                for m in matches(r, line) {
+                    let a0 = m.range.location, b0 = m.range.location + m.range.length
+                    if taken.contains(where: { a0 < $0.1 && $0.0 < b0 }) { continue }
+                    let g = (1..<m.numberOfRanges).map { group(m, $0, in: line) }
+                    var month: Int?, day: Int?
+                    switch kind {
+                    case "full":
+                        // A near month only with a day and the four-digit year (not Batch 15 for March '15).
+                        let near = group(m, 0, in: line).hasSuffix("\(year)")
+                        let (dayText, word) = k == 0 ? (g[1], g[0]) : (g[0], g[1])
+                        guard let mo = ocrMonth(word, near: near), let dv = pyInt(dayText.replacingOccurrences(of: " ", with: "")),
+                              (1...31).contains(dv) else { continue }
+                        month = mo; day = dv
+                    case "numeric":
+                        guard let a = pyInt(g[0]), let b = pyInt(g[2]),
+                              (1...12).contains(a) && (1...31).contains(b) || (1...12).contains(b) && (1...31).contains(a)
+                        else { continue }
+                        (month, day) = (1...12).contains(a) ? (a, b) : (b, a)
+                    default:
+                        guard let mo = ocrMonth(g[0], near: false) else { continue }
+                        month = mo
+                    }
+                    taken.append((a0, b0))
+                    found.append(Candidate(year: year, month: month, day: day, kind: "ocr", lineNo: n,
+                                           line: scalarPrefix(strip(line), 200), pos: a0))
+                }
+            }
+            if let first = found.min(by: { $0.pos < $1.pos }) { return first }
+        }
+        return nil
+    }
+
+    /// `with_ocr_forms`: the month and day of the dated candidate an explicit year rests on; where it gives no month,
+    /// the first OCR-tolerant dated form of `year` in `sources`, in order; where it gives a month and no day, the day of
+    /// an OCR-tolerant form of the same month on its own line (1lth November 1915).
+    static func withOCRForms(_ c: Candidate?, sources: [String], year: Int) -> (month: Int?, day: Int?) {
+        let (m, d) = monthDay(c)
+        guard let m else {
+            for s in sources {
+                let o = monthDay(ocrDated(s, year: year, limit: textChars))
+                if o.month != nil { return o }
+            }
+            return (nil, nil)
+        }
+        if d == nil, let c {
+            let o = monthDay(ocrDated(c.line, year: year))
+            if o.month == m, let od = o.day { return (m, od) }
+        }
+        return (m, d)
+    }
+
     /// `date_route_pipeline.month_day`: a dated form's month and day, the day only when that month has it.
     static func monthDay(_ c: Candidate?) -> (month: Int?, day: Int?) {
         guard let c, c.kind != "year", let m = c.month else { return (nil, nil) }
@@ -712,15 +818,18 @@ enum DateRoute {
             // The quoted string and its line: the reply's own quote when it cites the document, else the rule's.
             let pick = rulePick(cands.filter { $0.year == y })
             var dated: Candidate? = nil
+            var sources = [text]
             if cited == "self", check.verdict == "valid", let q = tr.evidence?["quote"] {
                 d.quote = q
                 d.line = lineOf(q, in: selfText) ?? pick.map { $0.lineNo + 1 }
                 dated = datedIn(q, year: y)
+                sources.insert(q, at: 0)
             } else if let p = pick {
                 d.quote = p.line; d.line = p.lineNo + 1
             }
-            // W46.date-full-date: the month and day of the reply's own dated quote, else of the rule's dated form.
-            (d.month, d.day) = monthDay(dated ?? pick)
+            // W46.date-full-date: the month and day of the reply's own dated quote, else of the rule's dated form;
+            // W46.date-full-date-ocr-forms: else of an OCR-damaged form of the year, in the quote, then the text.
+            (d.month, d.day) = withOCRForms(dated ?? pick, sources: sources, year: y)
             // Owner, 2026-11-12 (a): the model's flag may add Date Uncertain to an explicit text year, never remove it.
             if tr.parsed, tr.uncertain { d.dateUncertain = true; d.modelFlagAdded = true }
         }
@@ -740,7 +849,8 @@ enum DateRoute {
             // An unparsed or unchecked reply: the rule stage's explicit year stands (08-dating.md, "Fallback").
             if let p = rulePick(cands) {
                 d.year = p.year; d.dateUncertain = false; d.evidenceClass = .text; d.step = 1
-                d.quote = p.line; d.line = p.lineNo + 1; (d.month, d.day) = monthDay(p)
+                d.quote = p.line; d.line = p.lineNo + 1
+                (d.month, d.day) = withOCRForms(p, sources: [text], year: p.year)
                 if tr.parsed, tr.uncertain { d.dateUncertain = true; d.modelFlagAdded = true }
             }
             return d
@@ -755,8 +865,14 @@ enum DateRoute {
             }
             d.year = y; d.dateUncertain = false; d.evidenceClass = .image; d.step = 2
             // The month and day of the quoted date the year rests on, unless the reply's document month names another.
-            let (m, day) = monthDay(datedIn(ev?.quote, year: y))
-            if let m, image.docMonth == nil || image.docMonth == m { d.month = m; d.day = day }
+            // W46.date-full-date-ocr-forms: an OCR-damaged form in the quote counts too, and a quote of the year with no
+            // dated form takes the reply's document month.
+            let (m, day) = withOCRForms(datedIn(ev?.quote, year: y), sources: ev.map { [$0.quote] } ?? [], year: y)
+            if let m, image.docMonth == nil || image.docMonth == m {
+                d.month = m; d.day = day
+            } else if m == nil, ev != nil, let dm = image.docMonth {
+                d.month = dm
+            }
             return d
         }
         // W46.date-stamp-fallback: no own date on the page either, but a stamp or postmark: its year, Date Uncertain,

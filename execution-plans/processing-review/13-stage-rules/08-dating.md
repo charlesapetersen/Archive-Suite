@@ -59,10 +59,17 @@ it rests on. A guess with no evidence is never written."
    of the dated form it rests on: the reply's own quote when it cites the document and passes the check, else the
    rule's dated form of that year; from the image, the quoted date the year rests on. A numeric date reads
    month-first when its first part can be a month; a day the month does not have is dropped. The tagging call's day
-   stays only for the same year and month. Inherited and estimated years carry neither. Measured in
-   `date-full-date.md`: with the owner's blind sheet folded (W46.date-full-date-fold), the month right on 90.2%
-   (119/132) and never wrong, the day 87.3% (96/110) with 2 wrong [M]. No ruling changed the rule (no day-first
-   numeric date among them); the months not written are mostly dates Vision garbles (W46.date-full-date-ocr-forms).
+   stays only for the same year and month. Inherited and estimated years carry neither. Where the strict forms give
+   the explicit year no month, or its dated form no day, the route reads that year's dated forms as Vision damages
+   them (W46.date-full-date-ocr-forms): a spaced day, a bullet for a full stop, Cyrillic look-alikes, a misread month
+   within two letters of exactly one full name in a full date, spaces in a numeric date, a two-digit year after a month word, an l
+   for a 1 in a day; they never choose the year. An image year whose quote holds no dated form takes the reply's
+   document month. Measured in `date-full-date.md` with the owner's blind sheet folded (W46.date-full-date-fold): the
+   month right on 98.5% (131/133) and never wrong, the day 94.6% (105/111) with 2 wrong [M] (before the OCR forms
+   89.5% and 86.5%); on the public set's dates the OCR forms write the catalogue month on 99.0% (568/574), the strict
+   forms 97.6%. No ruling changed the rule (no day-first numeric date among them). The image pass is not sent for a
+   text year with no dated form: from the cached replies it would add about 2 months in 133, at about $0.51 per
+   1,000 text-year documents.
 5. *Not used.* Typeface or paper dating (DAT-4: 11 of 12 ranges contain the year at a median width of 50 years,
    `date-image-typeface.md`) and look-alike retrieval (27 exact of 122 against 52 for the nearest dated document
    before, `date-image.md`) are not steps.

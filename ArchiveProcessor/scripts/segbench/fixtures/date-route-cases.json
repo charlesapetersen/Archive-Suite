@@ -1527,6 +1527,1190 @@
   }
  },
  {
+  "id": "ocr-form-spaced-day",
+  "input": {
+   "text": "Office of the Dean\nAPR 2 0 1977\nfile copy 1977",
+   "near": [],
+   "trace_raw": "{\"year\": 1977, \"lo\": 1977, \"hi\": 1977, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"APR 2 0 1977\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1977,
+     null,
+     "year",
+     1,
+     "APR 2 0 1977",
+     null
+    ],
+    [
+     1977,
+     null,
+     "year",
+     2,
+     "file copy 1977",
+     null
+    ]
+   ],
+   "pick": [
+    1977,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nAPR 2 0 1977\nfile copy 1977\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1977,
+    "lo": 1977,
+    "hi": 1977,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1977,
+    "month": 4,
+    "day": 20,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-spaced-day-2",
+  "input": {
+   "text": "Office of the Dean\nDEC 2 1 1982\nfile copy 1982",
+   "near": [],
+   "trace_raw": "{\"year\": 1982, \"lo\": 1982, \"hi\": 1982, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"DEC 2 1 1982\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1982,
+     null,
+     "year",
+     1,
+     "DEC 2 1 1982",
+     null
+    ],
+    [
+     1982,
+     null,
+     "year",
+     2,
+     "file copy 1982",
+     null
+    ]
+   ],
+   "pick": [
+    1982,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nDEC 2 1 1982\nfile copy 1982\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1982,
+    "lo": 1982,
+    "hi": 1982,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1982,
+    "month": 12,
+    "day": 21,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-bullet",
+  "input": {
+   "text": "Office of the Dean\nAug• 4, 1903•\nfile copy 1903",
+   "near": [],
+   "trace_raw": "{\"year\": 1903, \"lo\": 1903, \"hi\": 1903, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Aug\\u2022 4, 1903\\u2022\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1903,
+     null,
+     "year",
+     1,
+     "Aug• 4, 1903•",
+     null
+    ],
+    [
+     1903,
+     null,
+     "year",
+     2,
+     "file copy 1903",
+     null
+    ]
+   ],
+   "pick": [
+    1903,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nAug• 4, 1903•\nfile copy 1903\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1903,
+    "lo": 1903,
+    "hi": 1903,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1903,
+    "month": 8,
+    "day": 4,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-misread-month",
+  "input": {
+   "text": "Office of the Dean\nSATURDAY, NIRCH 13, 1965\nfile copy 1965",
+   "near": [],
+   "trace_raw": "{\"year\": 1965, \"lo\": 1965, \"hi\": 1965, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"SATURDAY, NIRCH 13, 1965\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1965,
+     null,
+     "year",
+     1,
+     "SATURDAY, NIRCH 13, 1965",
+     null
+    ],
+    [
+     1965,
+     null,
+     "year",
+     2,
+     "file copy 1965",
+     null
+    ]
+   ],
+   "pick": [
+    1965,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nSATURDAY, NIRCH 13, 1965\nfile copy 1965\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1965,
+    "lo": 1965,
+    "hi": 1965,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1965,
+    "month": 3,
+    "day": 13,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-cyrillic",
+  "input": {
+   "text": "Office of the Dean\nОстОВЕя 1, 1966\nfile copy 1966",
+   "near": [],
+   "trace_raw": "{\"year\": 1966, \"lo\": 1966, \"hi\": 1966, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"\\u041e\\u0441\\u0442\\u041e\\u0412\\u0415\\u044f 1, 1966\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1966,
+     null,
+     "year",
+     1,
+     "ОстОВЕя 1, 1966",
+     null
+    ],
+    [
+     1966,
+     null,
+     "year",
+     2,
+     "file copy 1966",
+     null
+    ]
+   ],
+   "pick": [
+    1966,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nОстОВЕя 1, 1966\nfile copy 1966\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1966,
+    "lo": 1966,
+    "hi": 1966,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1966,
+    "month": 10,
+    "day": 1,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-l-for-1",
+  "input": {
+   "text": "Office of the Dean\nAt Sea, 1lth November 1915\nfile copy 1915",
+   "near": [],
+   "trace_raw": "{\"year\": 1915, \"lo\": 1915, \"hi\": 1915, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"At Sea, 1lth November 1915\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1915,
+     11,
+     "month",
+     1,
+     "At Sea, 1lth November 1915",
+     null
+    ],
+    [
+     1915,
+     null,
+     "year",
+     2,
+     "file copy 1915",
+     null
+    ]
+   ],
+   "pick": [
+    1915,
+    11
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nAt Sea, 1lth November 1915\nfile copy 1915\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1915,
+    "lo": 1915,
+    "hi": 1915,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1915,
+    "month": 11,
+    "day": 11,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-numeric-spaced",
+  "input": {
+   "text": "Office of the Dean\n8 - 3-87\nfile copy 1987",
+   "near": [],
+   "trace_raw": "{\"year\": 1987, \"lo\": 1987, \"hi\": 1987, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"8 - 3-87\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1987,
+     null,
+     "year",
+     2,
+     "file copy 1987",
+     null
+    ]
+   ],
+   "pick": [
+    1987,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\n8 - 3-87\nfile copy 1987\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1987,
+    "lo": 1987,
+    "hi": 1987,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year (two digits)"
+   ],
+   "image": null,
+   "route": {
+    "year": 1987,
+    "month": 8,
+    "day": 3,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-two-digit-month",
+  "input": {
+   "text": "Office of the Dean\nDec. 70\nfile copy 1970",
+   "near": [],
+   "trace_raw": "{\"year\": 1970, \"lo\": 1970, \"hi\": 1970, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Dec. 70\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1970,
+     null,
+     "year",
+     2,
+     "file copy 1970",
+     null
+    ]
+   ],
+   "pick": [
+    1970,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nDec. 70\nfile copy 1970\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1970,
+    "lo": 1970,
+    "hi": 1970,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year (two digits)"
+   ],
+   "image": null,
+   "route": {
+    "year": 1970,
+    "month": 12,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-two-digit-apostrophe",
+  "input": {
+   "text": "Office of the Dean\nSept '69\nfile copy 1969",
+   "near": [],
+   "trace_raw": "{\"year\": 1969, \"lo\": 1969, \"hi\": 1969, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Sept '69\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1969,
+     null,
+     "year",
+     2,
+     "file copy 1969",
+     null
+    ]
+   ],
+   "pick": [
+    1969,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nSept '69\nfile copy 1969\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1969,
+    "lo": 1969,
+    "hi": 1969,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year (two digits)"
+   ],
+   "image": null,
+   "route": {
+    "year": 1969,
+    "month": 9,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-two-digit-day-first",
+  "input": {
+   "text": "Office of the Dean\n9 Oct 75\nfile copy 1975",
+   "near": [],
+   "trace_raw": "{\"year\": 1975, \"lo\": 1975, \"hi\": 1975, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"9 Oct 75\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1975,
+     null,
+     "year",
+     2,
+     "file copy 1975",
+     null
+    ]
+   ],
+   "pick": [
+    1975,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\n9 Oct 75\nfile copy 1975\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1975,
+    "lo": 1975,
+    "hi": 1975,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year (two digits)"
+   ],
+   "image": null,
+   "route": {
+    "year": 1975,
+    "month": 10,
+    "day": 9,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-two-digit-day",
+  "input": {
+   "text": "Office of the Dean\nJan 3 64\nfile copy 1964",
+   "near": [],
+   "trace_raw": "{\"year\": 1964, \"lo\": 1964, \"hi\": 1964, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Jan 3 64\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1964,
+     null,
+     "year",
+     2,
+     "file copy 1964",
+     null
+    ]
+   ],
+   "pick": [
+    1964,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nJan 3 64\nfile copy 1964\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1964,
+    "lo": 1964,
+    "hi": 1964,
+    "uncertain": false
+   },
+   "check": [
+    "unsupported",
+    "quote does not carry the year given"
+   ],
+   "image": null,
+   "route": {
+    "year": 1964,
+    "month": 1,
+    "day": 3,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-not-glued",
+  "input": {
+   "text": "Office of the Dean\nNovember 1915 report\nfile copy 1915",
+   "near": [],
+   "trace_raw": "{\"year\": 1915, \"lo\": 1915, \"hi\": 1915, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"November 1915 report\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1915,
+     11,
+     "month",
+     1,
+     "November 1915 report",
+     null
+    ],
+    [
+     1915,
+     null,
+     "year",
+     2,
+     "file copy 1915",
+     null
+    ]
+   ],
+   "pick": [
+    1915,
+    11
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nNovember 1915 report\nfile copy 1915\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1915,
+    "lo": 1915,
+    "hi": 1915,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1915,
+    "month": 11,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-month-span",
+  "input": {
+   "text": "Office of the Dean\nAug & Sep 61 accounts\nfile copy 1961",
+   "near": [],
+   "trace_raw": "{\"year\": 1961, \"lo\": 1961, \"hi\": 1961, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Aug & Sep 61 accounts\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1961,
+     null,
+     "year",
+     2,
+     "file copy 1961",
+     null
+    ]
+   ],
+   "pick": [
+    1961,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nAug & Sep 61 accounts\nfile copy 1961\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1961,
+    "lo": 1961,
+    "hi": 1961,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year (two digits)"
+   ],
+   "image": null,
+   "route": {
+    "year": 1961,
+    "month": null,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-not-a-month",
+  "input": {
+   "text": "Office of the Dean\nTotal 70 votes\nfile copy 1970",
+   "near": [],
+   "trace_raw": "{\"year\": 1970, \"lo\": 1970, \"hi\": 1970, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Total 70 votes\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1970,
+     null,
+     "year",
+     2,
+     "file copy 1970",
+     null
+    ]
+   ],
+   "pick": [
+    1970,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nTotal 70 votes\nfile copy 1970\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1970,
+    "lo": 1970,
+    "hi": 1970,
+    "uncertain": false
+   },
+   "check": [
+    "unsupported",
+    "quote does not carry the year given"
+   ],
+   "image": null,
+   "route": {
+    "year": 1970,
+    "month": null,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-near-month-limit",
+  "input": {
+   "text": "Office of the Dean\nRemember 4, 1966\nfile copy 1966",
+   "near": [],
+   "trace_raw": "{\"year\": 1966, \"lo\": 1966, \"hi\": 1966, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Remember 4, 1966\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1966,
+     null,
+     "year",
+     1,
+     "Remember 4, 1966",
+     null
+    ],
+    [
+     1966,
+     null,
+     "year",
+     2,
+     "file copy 1966",
+     null
+    ]
+   ],
+   "pick": [
+    1966,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nRemember 4, 1966\nfile copy 1966\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1966,
+    "lo": 1966,
+    "hi": 1966,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1966,
+    "month": 12,
+    "day": 4,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-page-range",
+  "input": {
+   "text": "Office of the Dean\nSmith, Annals 4, pp. 3-11. 1977.\nfile copy 1977",
+   "near": [],
+   "trace_raw": "{\"year\": 1977, \"lo\": 1977, \"hi\": 1977, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Smith, Annals 4, pp. 3-11. 1977.\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1977,
+     null,
+     "year",
+     1,
+     "Smith, Annals 4, pp. 3-11. 1977.",
+     null
+    ],
+    [
+     1977,
+     null,
+     "year",
+     2,
+     "file copy 1977",
+     null
+    ]
+   ],
+   "pick": [
+    1977,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nSmith, Annals 4, pp. 3-11. 1977.\nfile copy 1977\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1977,
+    "lo": 1977,
+    "hi": 1977,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1977,
+    "month": null,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-near-word-no-day",
+  "input": {
+   "text": "Office of the Dean\nI remember 1977 well\nfile copy 1977",
+   "near": [],
+   "trace_raw": "{\"year\": 1977, \"lo\": 1977, \"hi\": 1977, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"I remember 1977 well\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1977,
+     null,
+     "year",
+     1,
+     "I remember 1977 well",
+     null
+    ],
+    [
+     1977,
+     null,
+     "year",
+     2,
+     "file copy 1977",
+     null
+    ]
+   ],
+   "pick": [
+    1977,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nI remember 1977 well\nfile copy 1977\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1977,
+    "lo": 1977,
+    "hi": 1977,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1977,
+    "month": null,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-near-word-two-digit",
+  "input": {
+   "text": "Office of the Dean\nBatch 15 of the 1915 order\nfile copy 1915",
+   "near": [],
+   "trace_raw": "{\"year\": 1915, \"lo\": 1915, \"hi\": 1915, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Batch 15 of the 1915 order\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1915,
+     null,
+     "year",
+     1,
+     "Batch 15 of the 1915 order",
+     null
+    ],
+    [
+     1915,
+     null,
+     "year",
+     2,
+     "file copy 1915",
+     null
+    ]
+   ],
+   "pick": [
+    1915,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nBatch 15 of the 1915 order\nfile copy 1915\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1915,
+    "lo": 1915,
+    "hi": 1915,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1915,
+    "month": null,
+    "day": null,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-dotless-i",
+  "input": {
+   "text": "Office of the Dean\nAprıl 3 77\nfile copy 1977",
+   "near": [],
+   "trace_raw": "{\"year\": 1977, \"lo\": 1977, \"hi\": 1977, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"Apr\\u0131l 3 77\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1977,
+     null,
+     "year",
+     2,
+     "file copy 1977",
+     null
+    ]
+   ],
+   "pick": [
+    1977,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice of the Dean\nAprıl 3 77\nfile copy 1977\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1977,
+    "lo": 1977,
+    "hi": 1977,
+    "uncertain": false
+   },
+   "check": [
+    "unsupported",
+    "quote does not carry the year given"
+   ],
+   "image": null,
+   "route": {
+    "year": 1977,
+    "month": 4,
+    "day": 3,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-in-text-not-quote",
+  "input": {
+   "text": "Office\nheld in 1965\nPALO ALTO TIMES, NIRCH 13, 1965",
+   "near": [],
+   "trace_raw": "{\"year\": 1965, \"lo\": 1965, \"hi\": 1965, \"date_uncertain\": false, \"evidence\": {\"neighbour\": \"self\", \"quote\": \"held in 1965\"}}",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1965,
+     null,
+     "year",
+     1,
+     "held in 1965",
+     null
+    ],
+    [
+     1965,
+     null,
+     "year",
+     2,
+     "PALO ALTO TIMES, NIRCH 13, 1965",
+     null
+    ]
+   ],
+   "pick": [
+    1965,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice\nheld in 1965\nPALO ALTO TIMES, NIRCH 13, 1965\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": true,
+    "year": 1965,
+    "lo": 1965,
+    "hi": 1965,
+    "uncertain": false
+   },
+   "check": [
+    "valid",
+    "quote found in the cited document and carries the year"
+   ],
+   "image": null,
+   "route": {
+    "year": 1965,
+    "month": 3,
+    "day": 13,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-rule-fallback",
+  "input": {
+   "text": "Office\nheld in 1965\nNIRCH 13, 1965",
+   "near": [],
+   "trace_raw": "not json",
+   "image_raw": null
+  },
+  "expect": {
+   "candidates": [
+    [
+     1965,
+     null,
+     "year",
+     1,
+     "held in 1965",
+     null
+    ],
+    [
+     1965,
+     null,
+     "year",
+     2,
+     "NIRCH 13, 1965",
+     null
+    ]
+   ],
+   "pick": [
+    1965,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nOffice\nheld in 1965\nNIRCH 13, 1965\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": null,
+   "route": {
+    "year": 1965,
+    "month": 3,
+    "day": 13,
+    "cls": "text",
+    "step": 1,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-image-quote",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [
+    {
+     "label": "P1",
+     "dist": 1,
+     "text": "Office memo\n12/4/58\nPlease file."
+    },
+    {
+     "label": "P2",
+     "dist": 2,
+     "text": "A letter of\nJune 2, 1957\nregarding the {near} plan"
+    },
+    {
+     "label": "N1",
+     "dist": -1,
+     "text": "No date here at all."
+    }
+   ],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"Jan 3 64\", \"page\": 1, \"where\": \"dateline\", \"kind\": \"typed\", \"year\": 1964}], \"document_date\": {\"year\": 1964, \"month\": 1, \"quote\": \"Jan 3 64\"}}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n[P2]\nA letter of\nJune 2, 1957\nregarding the {near} plan\n---\n[P1]\nOffice memo\n12/4/58\nPlease file.\n---\n[N1]\nNo date here at all.\n---\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n[P2] 1957 (\"June 2, 1957\")\n[P1] 1958 (\"12/4/58\")\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": 1964,
+    "stamps": 0
+   },
+   "route": {
+    "year": 1964,
+    "month": 1,
+    "day": 3,
+    "cls": "image",
+    "step": 2,
+    "du": false
+   }
+  }
+ },
+ {
+  "id": "ocr-form-image-document-month",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [
+    {
+     "label": "P1",
+     "dist": 1,
+     "text": "Office memo\n12/4/58\nPlease file."
+    },
+    {
+     "label": "P2",
+     "dist": 2,
+     "text": "A letter of\nJune 2, 1957\nregarding the {near} plan"
+    },
+    {
+     "label": "N1",
+     "dist": -1,
+     "text": "No date here at all."
+    }
+   ],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"1968\", \"page\": 1, \"where\": \"dateline\", \"kind\": \"typed\", \"year\": 1968}], \"document_date\": {\"year\": 1968, \"month\": 4, \"quote\": \"1968\"}}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n[P2]\nA letter of\nJune 2, 1957\nregarding the {near} plan\n---\n[P1]\nOffice memo\n12/4/58\nPlease file.\n---\n[N1]\nNo date here at all.\n---\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n[P2] 1957 (\"June 2, 1957\")\n[P1] 1958 (\"12/4/58\")\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": 1968,
+    "stamps": 0
+   },
+   "route": {
+    "year": 1968,
+    "month": 4,
+    "day": null,
+    "cls": "image",
+    "step": 2,
+    "du": false
+   }
+  }
+ },
+ {
   "id": "stamp-over-estimate",
   "input": {
    "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",

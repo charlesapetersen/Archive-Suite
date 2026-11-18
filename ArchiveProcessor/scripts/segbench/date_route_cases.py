@@ -146,6 +146,31 @@ def synthetic():
         case("full-date-image-month-disagrees", MEMO, NEAR, None, j(
             dates=[{"quote": "March 30, 1961", "page": 1, "where": "dateline", "kind": "typed", "year": 1961}],
             document_date={"year": 1961, "month": 4, "quote": "March 30, 1961"})),
+        # W46.date-full-date-ocr-forms: the year's dated forms as Vision damages them, where the strict forms read none.
+        *[case("ocr-form-" + cid, "Office of the Dean\n" + line + "\nfile copy " + str(y), [],
+               j(year=y, lo=y, hi=y, date_uncertain=False, evidence={"neighbour": "self", "quote": line}), None)
+          for cid, line, y in (("spaced-day", "APR 2 0 1977", 1977), ("spaced-day-2", "DEC 2 1 1982", 1982),
+                               ("bullet", "Aug• 4, 1903•", 1903), ("misread-month", "SATURDAY, NIRCH 13, 1965", 1965),
+                               ("cyrillic", "ОстОВЕя 1, 1966", 1966),
+                               ("l-for-1", "At Sea, 1lth November 1915", 1915), ("numeric-spaced", "8 - 3-87", 1987),
+                               ("two-digit-month", "Dec. 70", 1970), ("two-digit-apostrophe", "Sept '69", 1969),
+                               ("two-digit-day-first", "9 Oct 75", 1975), ("two-digit-day", "Jan 3 64", 1964),
+                               ("not-glued", "November 1915 report", 1915), ("month-span", "Aug & Sep 61 accounts", 1961),
+                               ("not-a-month", "Total 70 votes", 1970), ("near-month-limit", "Remember 4, 1966", 1966),
+                               ("page-range", "Smith, Annals 4, pp. 3-11. 1977.", 1977),
+                               ("near-word-no-day", "I remember 1977 well", 1977),
+                               ("near-word-two-digit", "Batch 15 of the 1915 order", 1915),
+                               ("dotless-i", "Apr\u0131l 3 77", 1977))],
+        case("ocr-form-in-text-not-quote", "Office\nheld in 1965\nPALO ALTO TIMES, NIRCH 13, 1965", [],
+             j(year=1965, lo=1965, hi=1965, date_uncertain=False, evidence={"neighbour": "self", "quote": "held in 1965"}),
+             None),
+        case("ocr-form-rule-fallback", "Office\nheld in 1965\nNIRCH 13, 1965", [], "not json", None),
+        case("ocr-form-image-quote", MEMO, NEAR, None, j(dates=[{"quote": "Jan 3 64", "page": 1, "where": "dateline",
+                                                                 "kind": "typed", "year": 1964}],
+                                                          document_date={"year": 1964, "month": 1, "quote": "Jan 3 64"})),
+        case("ocr-form-image-document-month", MEMO, NEAR, None, j(
+            dates=[{"quote": "1968", "page": 1, "where": "dateline", "kind": "typed", "year": 1968}],
+            document_date={"year": 1968, "month": 4, "quote": "1968"})),
         # W46.date-stamp-fallback: no own date on the page, a stamped one: its year, Date Uncertain, before the estimate.
         case("stamp-over-estimate", MEMO, NEAR,
              j(year=1958, lo=1957, hi=1959, date_uncertain=True, evidence={"neighbour": "P1", "quote": "12/4/58"}),
