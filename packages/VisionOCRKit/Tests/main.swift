@@ -76,6 +76,12 @@ if CommandLine.arguments.count == 5, CommandLine.arguments[1] == "--probe-deep-o
     let queue = OperationQueue()
     queue.maxConcurrentOperationCount = 1
     queue.addOperation {
+        // Both walks: PDFKit's rebuild, which runs without qpdf (its file is
+        // thrown away: macOS 27.2's PDFKit writes no outline), then the default.
+        _ = SearchableWriter.copyOutline(
+            from: src, of: composed,
+            to: out.deletingLastPathComponent().appendingPathComponent("pdfkit-walk.pdf"),
+            using: nil)
         _ = SearchableWriter.copyOutline(from: src, of: composed, to: out)
     }
     queue.waitUntilAllOperationsAreFinished()
@@ -615,6 +621,112 @@ func mrcStencilSharpness(in dir: URL, using jb: String) -> Double {
     var dark = 0
     for i in 0..<(n * n) where px[i] < 96 { dark += 1 }
     return Double(dark) / Double(n * n)
+}
+
+/// An outline entry for a fixture: a title, the page and point it goes to (none for an
+/// entry that points nowhere), and its children.
+struct FixtureOutline {
+    var title: String
+    var page: Int? = nil
+    var point: CGPoint = .zero
+    var children: [FixtureOutline] = []
+}
+
+/// Puts `items` on the PDF at `url` as its outline, in place, through qpdf's JSON update.
+///
+/// Not PDFKit: on macOS 27.2 `PDFDocument.write(to:)` serialises an outline it read from
+/// the file but drops one assigned to `outlineRoot`, and still returns true — every
+/// outline fixture built that way reached the pipeline without one (W42.kit-outline-
+/// fixtures). Not the kit's `JBIG2.setOutline` either, which is one of the writers these
+/// fixtures test. Returns false when qpdf is missing or the update failed.
+@discardableResult
+func authorOutline(_ items: [FixtureOutline], into url: URL) -> Bool {
+    guard let qpdf = JBIG2.merger, !items.isEmpty else { return false }
+    func run(_ arguments: [String]) -> Data? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: qpdf)
+        process.arguments = arguments
+        let out = Pipe()
+        process.standardOutput = out
+        process.standardError = FileHandle.nullDevice
+        guard (try? process.run()) != nil else { return nil }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return process.terminationStatus == 0 || process.terminationStatus == 3 ? data : nil
+    }
+    guard let data = run([url.path, "--json=2", "--json-stream-data=none",
+                          "--json-key=pages", "--json-key=qpdf"]),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let pages = (json["pages"] as? [[String: Any]])?.compactMap({ $0["object"] as? String }),
+          let described = json["qpdf"] as? [Any], described.count == 2,
+          let header = described[0] as? [String: Any],
+          let objects = described[1] as? [String: Any],
+          let rootRef = ((objects["trailer"] as? [String: Any])?["value"]
+                            as? [String: Any])?["/Root"] as? String,
+          var catalog = (objects["obj:\(rootRef)"] as? [String: Any])?["value"] as? [String: Any]
+    else { return false }
+
+    func ref(_ n: Int) -> String { "\(n) 0 R" }
+    // UTF-16BE with its byte-order mark for anything outside ASCII, so the bytes are exact.
+    func text(_ s: String) -> String {
+        guard !s.allSatisfy(\.isASCII) else { return "u:" + s }
+        return "b:feff" + s.utf16.map { String(format: "%04x", $0) }.joined()
+    }
+    var next = objects.keys.reduce(header["maxobjectid"] as? Int ?? 0) { highest, key in
+        guard key.hasPrefix("obj:") else { return highest }
+        return max(highest, key.dropFirst(4).split(separator: " ").first.flatMap { Int($0) } ?? 0)
+    } + 1
+    var patch: [String: Any] = [:]
+    /// Writes one level and everything below it; the first and last entry and the count
+    /// of all of them.
+    func level(_ entries: [FixtureOutline], parent: Int) -> (first: Int, last: Int, count: Int) {
+        let numbers = entries.indices.map { next + $0 }
+        next += entries.count
+        var total = entries.count
+        for (i, entry) in entries.enumerated() {
+            var value: [String: Any] = ["/Title": text(entry.title), "/Parent": ref(parent)]
+            if i > 0 { value["/Prev"] = ref(numbers[i - 1]) }
+            if i + 1 < numbers.count { value["/Next"] = ref(numbers[i + 1]) }
+            if let page = entry.page, page < pages.count {
+                value["/Dest"] = [pages[page], "/XYZ", Double(entry.point.x),
+                                  Double(entry.point.y), NSNull()]
+            }
+            if !entry.children.isEmpty {
+                let kids = level(entry.children, parent: numbers[i])
+                value["/First"] = ref(kids.first)
+                value["/Last"] = ref(kids.last)
+                value["/Count"] = kids.count
+                total += kids.count
+            }
+            patch["obj:\(ref(numbers[i]))"] = ["value": value]
+        }
+        return (numbers[0], numbers[numbers.count - 1], total)
+    }
+    let root = next
+    next += 1
+    let top = level(items, parent: root)
+    patch["obj:\(ref(root))"] = ["value": ["/Type": "/Outlines", "/First": ref(top.first),
+                                           "/Last": ref(top.last), "/Count": top.count]]
+    catalog["/Outlines"] = ref(root)
+    patch["obj:\(rootRef)"] = ["value": catalog]
+
+    let patchURL = url.deletingLastPathComponent()
+        .appendingPathComponent("outline-\(UUID().uuidString).json")
+    let written = url.deletingLastPathComponent()
+        .appendingPathComponent("outlined-\(UUID().uuidString).pdf")
+    defer {
+        try? FileManager.default.removeItem(at: patchURL)
+        try? FileManager.default.removeItem(at: written)
+    }
+    let document: [String: Any] = ["qpdf": [
+        ["jsonversion": 2, "pdfversion": header["pdfversion"] ?? "1.4"], patch]]
+    guard let body = try? JSONSerialization.data(withJSONObject: document),
+          (try? body.write(to: patchURL)) != nil,
+          run([url.path, "--update-from-json=\(patchURL.path)", written.path]) != nil,
+          (try? FileManager.default.removeItem(at: url)) != nil,
+          (try? FileManager.default.moveItem(at: written, to: url)) != nil
+    else { return false }
+    return true
 }
 
 /// A scanned page of ordinary black text on paper of a given colour.
@@ -9661,20 +9773,12 @@ do {
     let src = dir.appendingPathComponent("book.pdf")
     makeScannedPDF(at: src, lines: ["CHAPTER ONE OPENING", "the body text of it"])
     // Give it a two-level outline, as a repository would.
-    guard let doc = PDFDocument(url: src), let page0 = doc.page(at: 0) else {
+    guard authorOutline([FixtureOutline(
+        title: "Chapter One", page: 0, point: CGPoint(x: 0, y: 700),
+        children: [FixtureOutline(title: "Section 1.1", page: 0, point: CGPoint(x: 0, y: 500))])],
+        into: src) else {
         check("built the outline fixture", false); exit(1)
     }
-    let root = PDFOutline()
-    let chapter = PDFOutline()
-    chapter.label = "Chapter One"
-    chapter.destination = PDFDestination(page: page0, at: CGPoint(x: 0, y: 700))
-    let section = PDFOutline()
-    section.label = "Section 1.1"
-    section.destination = PDFDestination(page: page0, at: CGPoint(x: 0, y: 500))
-    chapter.insertChild(section, at: 0)
-    root.insertChild(chapter, at: 0)
-    doc.outlineRoot = root
-    doc.write(to: src)
     check("the fixture really has an outline",
           PDFDocument(url: src)?.outlineRoot?.numberOfChildren == 1)
 
@@ -9716,6 +9820,17 @@ do {
     } else {
         check("…and its runs still have real geometry", false, "run not locatable")
     }
+
+    // Without qpdf the copy is a PDFKit write, and on macOS 27.2 that returns true
+    // with no outline in the file. Whatever PDFKit does, a true must mean the
+    // outline is there, and a false must leave nothing behind to publish.
+    let pdfkitOut = dir.appendingPathComponent("book.pdfkit.pdf")
+    let pdfkitCopied = SearchableWriter.copyOutline(from: src, of: out, to: pdfkitOut, using: nil)
+    let pdfkitOutline = PDFDocument(url: pdfkitOut)?.outlineRoot?.numberOfChildren ?? 0
+    check("without qpdf, a copied outline is really in the file, and a failed one leaves no file",
+          pdfkitCopied ? pdfkitOutline == 1
+                       : !FileManager.default.fileExists(atPath: pdfkitOut.path),
+          "copied=\(pdfkitCopied) outline=\(pdfkitOutline)")
 
     // The JBIG2 route gets the outline a different way: written into the
     // catalogue of the PDF `JBIG2.assemble` hand-writes, which `qpdf --overlay`
@@ -13466,12 +13581,9 @@ do {
     }
     if let doc = PDFDocument(url: source), let third = doc.page(at: 2) {
         third.rotation = 90
-        let root = PDFOutline(), entry = PDFOutline()
-        entry.label = "The turned page"
-        entry.destination = PDFDestination(page: third, at: CGPoint(x: 0, y: 500))
-        root.insertChild(entry, at: 0)
-        doc.outlineRoot = root
         doc.write(to: source)
+        authorOutline([FixtureOutline(title: "The turned page", page: 2,
+                                      point: CGPoint(x: 0, y: 500))], into: source)
     }
     // Longer than the tallest page PDF allows.
     let long = (1...4000).map { "word\($0) of a long letter," }.joined(separator: " ")
@@ -17388,19 +17500,14 @@ do {
     try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let src = dir.appendingPathComponent("deep.pdf")
     makeScannedPDF(at: src, lines: ["DEEP OUTLINE"])
-    if let doc = PDFDocument(url: src), let p0 = doc.page(at: 0) {
+    do {
         // 4,000 levels: past the limit, and past what a 512 KB stack survives.
-        let root = PDFOutline()
-        var node = root
-        for i in 0..<4_000 {
-            let child = PDFOutline()
-            child.label = "level \(i)"
-            child.destination = PDFDestination(page: p0, at: CGPoint(x: 0, y: 100))
-            node.insertChild(child, at: 0)
-            node = child
+        var chain = FixtureOutline(title: "level 3999", page: 0, point: CGPoint(x: 0, y: 100))
+        for i in stride(from: 3_998, through: 0, by: -1) {
+            chain = FixtureOutline(title: "level \(i)", page: 0, point: CGPoint(x: 0, y: 100),
+                                   children: [chain])
         }
-        doc.outlineRoot = root
-        doc.write(to: src)
+        authorOutline([chain], into: src)
     }
     // The point is that this returns at all.
     let items = SearchableWriter.readOutline(from: src)
@@ -17452,6 +17559,10 @@ do {
     // one started counting at the root's children and the other at the root.
     // Both were bounded, which is why nothing noticed — the property that was
     // missing is that they **agree**, and that is what R23 was about.
+    //
+    // With qpdf installed, `copyOutline` writes `readOutline`'s tree, so this now
+    // measures the qpdf route. The PDFKit rebuild's depth is only proven not to
+    // crash (the probe): on macOS 27.2 its output is discarded, PDFKit writing no outline.
     //
     // Held document, not a chained optional: a `PDFOutline` does not own its
     // document, and reading a tree off a temporary reads back as an empty root.
@@ -20780,23 +20891,18 @@ do {
             // hold and what a hand-written JSON patch could get wrong.
             let outlinedSrc = e2eDir.appendingPathComponent("outlined.pdf")
             var outlinedBuilt = false
-            if let source = PDFDocument(url: mixedSrc), source.pageCount == 3 {
-                let root = PDFOutline()
-                func entry(_ title: String, _ page: Int?) -> PDFOutline {
-                    let item = PDFOutline()
-                    item.label = title
-                    if let page, let p = source.page(at: page) {
-                        item.destination = PDFDestination(page: p, at: CGPoint(x: 0, y: 700))
-                    }
-                    return item
+            if let source = PDFDocument(url: mixedSrc), source.pageCount == 3,
+               (try? FileManager.default.copyItem(at: mixedSrc, to: outlinedSrc)) != nil {
+                func entry(_ title: String, _ page: Int?,
+                           _ children: [FixtureOutline] = []) -> FixtureOutline {
+                    FixtureOutline(title: title, page: page, point: CGPoint(x: 0, y: 700),
+                                   children: children)
                 }
-                let contents = entry("Contents", nil)
-                contents.insertChild(entry("Cover", 0), at: 0)
-                contents.insertChild(entry("Scans \u{2014} \u{00E9}t\u{00E9}", 2), at: 1)
-                root.insertChild(contents, at: 0)
-                root.insertChild(entry("Last page", 2), at: 1)
-                source.outlineRoot = root
-                outlinedBuilt = source.write(to: outlinedSrc)
+                outlinedBuilt = authorOutline(
+                    [entry("Contents", nil, [entry("Cover", 0),
+                                             entry("Scans \u{2014} \u{00E9}t\u{00E9}", 2)]),
+                     entry("Last page", 2)],
+                    into: outlinedSrc)
             }
             func outlineShape(_ url: URL) -> [String] {
                 func walk(_ items: [SearchableWriter.OutlineItem]) -> [String] {

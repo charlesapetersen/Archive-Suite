@@ -667,11 +667,19 @@ public enum SearchableWriter {
     /// surface — links, highlights, form fields, each with its own coordinate
     /// space to remap — and nothing downstream depends on them.
     ///
-    /// CoreGraphics cannot write an outline at all, so this is a PDFKit pass over
-    /// the finished file, which re-serialises it. That is the risk: the invisible
-    /// text layer is the most delicate thing in this codebase. It is guarded by
-    /// "the outline survives and the text layer is unharmed", which re-measures
-    /// extraction and run geometry after the rewrite.
+    /// With qpdf, the outline goes on through `JBIG2.setOutline`, as on the JBIG2
+    /// route: a JSON update that leaves every page's objects as they were and
+    /// verifies its own read-back. That is also the only way that works on macOS
+    /// 27.2: PDFKit there serialises an outline it read from the file but drops
+    /// one assigned to `outlineRoot`, so its `write(to:)` returned true and
+    /// published a re-serialised file with no outline (W42.kit-outline-fixtures).
+    ///
+    /// Without qpdf it is a PDFKit pass over the finished file, which re-serialises
+    /// it. That is the risk: the invisible text layer is the most delicate thing in
+    /// this codebase. It is guarded by "the outline survives and the text layer is
+    /// unharmed", which re-measures extraction and run geometry after the rewrite,
+    /// and the result is read back, so a PDFKit that drops the outline costs a
+    /// rewrite and nothing else.
     ///
     /// Writes to `out` rather than in place, so a failed rewrite can never damage
     /// the composed file — the caller falls back to publishing that instead.
@@ -679,10 +687,28 @@ public enum SearchableWriter {
     /// outline must never cost the user their OCR.
     @discardableResult
     static func copyOutline(from source: URL, of composed: URL, to out: URL,
-                            password: String? = nil) -> Bool {
+                            password: String? = nil,
+                            using qpdf: String? = JBIG2.merger,
+                            register: (Process) -> Void = { _ in }) -> Bool {
         guard let src = Flattener.open(source, password: password),
               let root = src.outlineRoot, root.numberOfChildren > 0,
               let dst = PDFDocument(url: composed), dst.pageCount > 0 else { return false }
+
+        if let qpdf {
+            // `readOutline` is this function's mirror: the same bounds, the same
+            // keep rule and the same move into the republished page's space.
+            let items = readOutline(from: source, password: password)
+            guard !items.isEmpty else { return false }
+            do {
+                try? FileManager.default.removeItem(at: out)
+                try FileManager.default.copyItem(at: composed, to: out)
+                try JBIG2.setOutline(items, in: out, using: qpdf, register: register)
+                return true
+            } catch {
+                try? FileManager.default.removeItem(at: out)
+                return false
+            }
+        }
 
         // The same two bounds `readOutline` has, for the same reason and with the
         // same numbers (R23). This is the Flate route's mirror of that function
@@ -758,7 +784,13 @@ public enum SearchableWriter {
         }
         guard kept > 0 else { return false }
         dst.outlineRoot = newRoot
-        return dst.write(to: out)
+        // Read back: a true from `write` does not mean the outline was written.
+        guard dst.write(to: out),
+              PDFDocument(url: out)?.outlineRoot?.numberOfChildren == kept else {
+            try? FileManager.default.removeItem(at: out)
+            return false
+        }
+        return true
     }
 
     /// Page numbers the recogniser never reported at all.

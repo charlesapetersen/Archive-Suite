@@ -90,8 +90,12 @@ written where the `searchableFor` setting names the input's format and the page'
 
 ## Verification baseline (2026-11-14)
 
-The compression functional checks pass. VisionOCRKit now passes 2134/2148: only the 14 accepted outline-fixture
-failures from W42.int-s1 remain. **W42.kit-preferences-isolation fixed the preferences boundary and nested light-tier
+The compression functional checks pass. VisionOCRKit passes **2154/2154** (2026-11-17,
+**W42.kit-outline-fixtures**): the 14 outline failures were macOS 27.2's PDFKit, whose `write(to:)` drops an
+outline assigned to `outlineRoot` and still returns true. The fixtures now author outlines through qpdf, and the
+Flate route's `copyOutline`, which had the same defect in production, writes through `JBIG2.setOutline` when qpdf is
+installed. Without qpdf, a Flate-route copy on macOS 27.2 has no outline, and its result note says so.
+**W42.kit-preferences-isolation fixed the preferences boundary and nested light-tier
 failures**: default-only engine/compression/timing snapshots use typed values without opening a defaults store or
 registering preferences; the original guard is intact. Focused 13/13 and light 627/627 pass; evidence:
 `verification/evidence/processor/W42.kit-preferences-isolation.md`. The initial compression run was 2126/2142.

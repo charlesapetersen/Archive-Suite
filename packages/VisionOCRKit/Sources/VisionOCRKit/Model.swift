@@ -2969,31 +2969,37 @@ final class OCRModel: ObservableObject {
                 return
             }
             // Carry the source's outline across, if it has one. CoreGraphics
-            // cannot write an outline, so this is a PDFKit rewrite — done into a
-            // separate file and verified before use, because that rewrite
-            // re-serialises the invisible text layer. Anything unexpected and we
-            // publish the composed file untouched: an outline is worth having,
-            // never worth risking the OCR for.
+            // cannot write an outline, so this is a qpdf JSON update (a PDFKit
+            // rewrite without qpdf) — done into a separate file and verified
+            // before use. Anything unexpected and we publish the composed file
+            // untouched, and say so, as the JBIG2 route does: an outline is worth
+            // having, never worth risking the OCR for.
             //
             // Only for the Flate route — the JBIG2 route already wrote the
-            // outline into the assembled catalogue above, and running PDFKit over
-            // it here would undo the compression that route exists for.
+            // outline into the assembled catalogue above, and the fallback's PDFKit
+            // pass over it here would undo the compression that route exists for.
             let outlined = work.appendingPathComponent("outlined.pdf")
             var finished = staged
             // The pages the published file has: the source's, and any text pages (hw-qwen).
             var published = expected
-            if !usedJBIG2, !outline.isEmpty,
-               SearchableWriter.copyOutline(from: inputFile, of: staged, to: outlined,
-                                            password: password),
-               PDFPageCount(outlined) == expected {
-                finished = outlined
+            if !usedJBIG2, !outline.isEmpty {
+                let copied = control.adopting { register in
+                    SearchableWriter.copyOutline(from: inputFile, of: staged, to: outlined,
+                                                 password: password, register: register)
+                }
+                if copied, PDFPageCount(outlined) == expected {
+                    finished = outlined
+                } else {
+                    outlineNote = "the original's outline could not be carried "
+                        + "across, so this copy has none"
+                }
             }
 
             // Carry the reader's own marks across, last, onto whichever file is about
             // to be published.
             //
-            // **Last, and not earlier**, for two reasons. The outline rewrite above is
-            // a PDFKit re-serialisation, and running it *after* the transplant would
+            // **Last, and not earlier**, for two reasons. The outline rewrite above is,
+            // without qpdf, a PDFKit re-serialisation, and running it *after* the transplant would
             // re-encode every appearance stream the transplant just carried — the same
             // 4.08x inflation that ruled PDFKit out as the mechanism. And a transplant
             // is only worth doing onto a file that has already passed every other gate.
@@ -3090,7 +3096,8 @@ final class OCRModel: ObservableObject {
             // Last thing before the user's disk is touched.
             //
             // The gate above is several seconds earlier on a long document: `copyOutline`
-            // is a full PDFKit re-serialisation at about 13 ms a page, and the annotation
+            // is a qpdf rewrite (without qpdf, a full PDFKit re-serialisation at about
+            // 13 ms a page), and the annotation
             // transplant adds three qpdf passes. Measured, a cancel landing in that window
             // published the file and reported **succeeded** — so "failure is reported,
             // never published" and "three gates, then publish" were both false. This does
