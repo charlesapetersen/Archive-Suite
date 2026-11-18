@@ -225,9 +225,11 @@ explain; the Processor's W40 visual review (e12) covers the screen.
 ### Stage 7 — retire Vision OCR's app
 
 Vision OCR's last release (owner-only, as its releases are) shows its users a notice that the app continues as
-Archive Processor, with a link; its updater then stops offering versions. Vision OCR's settings that have an
-equivalent are read on first launch of Archive Processor (presets, the memory limit, downloaded models, which stay
-where they are).
+Archive Processor, with a link; its updater then stops offering versions. Nothing is imported or reused: Archive
+Processor treats every user as a new user, Vision OCR's included (owner, 2026-11-17), so it reads none of Vision OCR's
+settings, presets, memory limit or downloaded models. The owner split the stage the same day: Archive Suite's part
+(this plan) is done, and Vision OCR's own notice, updater shutdown and final release are `W42.int-s7-standalone`,
+after Archive Processor is complete and released. No engine session writes the vision-ocr repository.
 
 ### Stage 8 — verify
 
