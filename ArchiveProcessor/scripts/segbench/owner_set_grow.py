@@ -264,8 +264,25 @@ def page_turns() -> dict[str, dict]:
 
 # ---------------------------------------------------------------- the gateway
 
+def key_ready(G):
+    """Read the gateway key into gateway_gemini's memory with a 20 s bound (hand_icl_gateway's rule): a locked login
+    Keychain waits for a password nobody is there to type, so it stops here, before any request."""
+    import subprocess
+    if G._key is None:
+        try:
+            r = subprocess.run(['/usr/bin/security', 'find-generic-password', '-s', 'com.archiveprocessor.app',
+                                '-a', 'Gateway', '-w'], capture_output=True, text=True, timeout=20)
+        except subprocess.TimeoutExpired:
+            raise SystemExit('the login Keychain did not answer in 20 s (locked?); nothing was sent') from None
+        if r.returncode or not r.stdout.strip():
+            raise SystemExit('no gateway key in the Keychain (com.archiveprocessor.app / Gateway); nothing was sent')
+        G._key = r.stdout.strip()
+    return G
+
+
 def gateway(model: str):
     import gateway_gemini as G
+    key_ready(G)
     if model not in DRAFTERS:
         raise SystemExit(f'{model} has no price in DRAFTERS; add it (list price, labelled an estimate) first')
     G.CACHE, G.CAP, G.MODEL = OUT / 'gateway', CAP, model
@@ -275,6 +292,7 @@ def gateway(model: str):
 
 def cmd_models(_):
     import gateway_gemini as G
+    key_ready(G)
     r = G.request('/models', timeout=60)
     r.raise_for_status()
     ids = sorted(m['id'] for m in r.json().get('data', []))
@@ -292,10 +310,18 @@ def draft_path(label, r) -> Path:
     return OUT / 'drafts' / label / f"{r['id']}.json"
 
 
+_TURNS = None
+
+
 def draft_image_bytes(r) -> bytes:
+    """The page upright (the sheet's turn: clear wins and the eye check), at DRAFT_SIDE; the boxes come from the stored
+    image's Vision words, matched by text, so the drafts' turn does not move them."""
     from PIL import Image
+    global _TURNS
+    if _TURNS is None:
+        _TURNS = page_turns()
     with Image.open(image(r)) as im:
-        im = im.convert('RGB')
+        im = im.convert('RGB').rotate(-_TURNS.get(r['key'], {}).get('turn', 0), expand=True)
         im.thumbnail((DRAFT_SIDE, DRAFT_SIDE), Image.LANCZOS)
         b = io.BytesIO()
         im.save(b, 'JPEG', quality=90)
@@ -435,6 +461,16 @@ def both(vals) -> str:
     return v[0] if v[0] == v[1] else f'{" / ".join(sorted(set(v)))} (the readers differ)'
 
 
+def context_tokens(sp: list[dict], n: int) -> list[str]:
+    """A's tokens as the sheet may show them around a place: agreed words as they are, a disputed word as '…', so
+    the context never shows one reader's side of a neighbouring dispute."""
+    out = ['…'] * n
+    for s in sp:
+        if 'agreed' in s:
+            out[s['t0']:s['t1']] = s['agreed'].split()
+    return out
+
+
 def build(cmp: dict, rows: list[dict], turns: dict, vision: dict) -> tuple[list, dict]:
     """(the sheet's items, the private key). Each place is a dispute (both readings, seeded order) or a control
     (the agreed reading); the box comes from A's token positions through Vision's words, so it says where to look,
@@ -446,6 +482,7 @@ def build(cmp: dict, rows: list[dict], turns: dict, vision: dict) -> tuple[list,
         r = by_id[p['id']]
         rng = random.Random(f"{SEED}:{p['id']}")
         raw_a = p['a_text'].split()
+        shown = context_tokens(p['spans'], len(raw_a))
         vw = vision.get(r['key'])
         n_a = max(1, len(raw_a))
         places, kp = [], {}
@@ -461,16 +498,14 @@ def build(cmp: dict, rows: list[dict], turns: dict, vision: dict) -> tuple[list,
             rng.shuffle(opts)
             bx, at = box(s['t0'], s['t1'])
             pid = f'd{i}'
-            ctx_l = ' '.join(raw_a[max(0, s['t0'] - 6):s['t0']])
-            ctx_r = ' '.join(raw_a[s['t1']:s['t1'] + 6]) if s['t1'] > s['t0'] else ' '.join(raw_a[s['t0']:s['t0'] + 6])
             places.append({'id': pid, 'kind': 'dispute', 'texts': [o[1] for o in opts], 'box': bx, 'at': at,
-                           'left': ctx_l, 'right': ctx_r})
+                           'left': ' '.join(shown[max(0, s['t0'] - 6):s['t0']]), 'right': ' '.join(shown[s['t1']:s['t1'] + 6])})
             kp[pid] = {'span': i, 'options': [o[0] for o in opts]}
         for c in p['controls']:
             bx, at = box(c['t0'], c['t1'])
             pid = f"c{c['span']}_{c['w0']}"
             places.append({'id': pid, 'kind': 'control', 'texts': [c['text']], 'box': bx, 'at': at,
-                           'left': ' '.join(raw_a[max(0, c['t0'] - 6):c['t0']]), 'right': ' '.join(raw_a[c['t1']:c['t1'] + 6])})
+                           'left': ' '.join(shown[max(0, c['t0'] - 6):c['t0']]), 'right': ' '.join(shown[c['t1']:c['t1'] + 6])})
             kp[pid] = {'span': c['span'], 'w0': c['w0'], 'w1': c['w1'], 'control': True}
         places.sort(key=lambda x: (int(re.match(r'[dc](\d+)', x['id']).group(1)), x['id']))
         tn = turns.get(r['key'], {'turn': 0, 'close': None, 'how': 'not checked'})
@@ -687,6 +722,68 @@ def cmd_fold(a):
     print('Read every note before scoring: a note can correct a listed field or drop a page.')
 
 
+def cmd_report(_):
+    """segbench-results/owner-set-grow.md from what the cache holds now: counts only (the repo is public)."""
+    d = json.loads((OUT / 'draw.json').read_text())
+    rows = load_pages()
+    cmp = json.loads((OUT / 'compare.json').read_text()) if (OUT / 'compare.json').exists() else None
+    rul = json.loads((OUT / 'rulings.json').read_text()) if (OUT / 'rulings.json').exists() else None
+    turns = page_turns() if (OUT / 'orient.json').exists() else {}
+    src = collections.Counter(r['source'] for r in rows)
+    L = ['# W46.owner-set-grow: S1, about 200 more random owner pages beside the 96', '',
+         'Owner review of the pipeline doc, 2026-11-17: the 96 resolve about 3 NES on a typical pair of routes, and 730-2,303 '
+         'pages are needed for 1 point (`execution-plans/benchmark-corpus/00-plan.md` §4). S1 adds about 200 pages; the 96 '
+         '(S0) stay frozen. Built by `scripts/segbench/owner_set_grow.py`; images, drafts and the sheet stay in the bench '
+         'cache, since the pages are the owner\'s.', '', '## The draw', '',
+         f"- Base: W46.ocr-vision-unfiltered's {d['unfiltered_drawn']} hashed-draw pages (one page per document, uniform "
+         f"over the {d['pool_docs']:,} documents of the 96's pool that hold none of the 96's pages), of which the owner "
+         f"answered \"a page of text\" for {d['base_kept']} on 11 Nov ({d['base_answers'].get('2', 0)} \"a few words\", "
+         f"{d['base_answers'].get('1', 0)} \"no text\").",
+         f"- Top-up: the next {d['topup']} documents of the same hashed order (the rebuilt order holds the first draw's "
+         f"{d['unfiltered_drawn']} as its first {d['last_base_position'] + 1}); {len(d['failed'])} document passed over "
+         'as unreadable from disk. The owner answers the has-text question for these on the sheet.',
+         f"- {len(rows)} pages in all. Images: " + ', '.join(f'{n} {k}' for k, n in src.most_common()) + '.']
+    if turns:
+        sc = json.loads((OUT / 'orient.json').read_text())['scores']
+        doubt = sum(1 for k, v in sc.items() if max(range(4), key=lambda i: v[i]) and not clear_turn(v)[0])
+        L.append(f"- Upright: {sum(1 for t in turns.values() if t['turn'])} pages turned for the sheet. ocr_orient.swift's "
+                 f"scores gave {sum(1 for v in sc.values() if clear_turn(v)[0])} clear wins and {doubt} pages where "
+                 f"another turn scored highest without one. All {doubt + sum(1 for v in sc.values() if clear_turn(v)[0])} were "
+                 f"judged by eye on four-turn thumbnails, {sum(1 for t in turns.values() if t['how'] == 'eye')} recorded in "
+                 "orient-eye.tsv (two clear wins were wrong: upright handwriting that Vision "
+                 "read better upside down). Up and upside down score alike on most pages, so the rest stay as stored, "
+                 "and the sheet has a turn button.")
+    if cmp:
+        s = summary(rows, cmp['pages'], cmp['missing'])
+        L += ['', '## The drafts and the sheet', '',
+              f"Drafters, blind: {cmp['a']} and {cmp['b']}, through the gateway. {s['pages']} pages drafted by both "
+              f"({s['missing']} missing). {s['words']:,} words; {s['disputes']:,} disputed spans covering "
+              f"{s['disputed_words']:,} words; {s['pages_without_dispute']} pages with none; {s['controls']} agreed "
+              f"controls. A drafter calls {s['not_english_by_a_drafter']} pages not English. Estimated owner time: "
+              f"about {s['owner_minutes']} minutes (ocr_truth's per-dispute rates, measured on the 96's sheet)."]
+    if rul:
+        tot = collections.Counter()
+        for r in rul['pages'].values():
+            tot.update(r['counts'])
+        kept = [r for r in rul['pages'].values() if r['status'] == 'settled' and not r['drop']]
+        L += ['', '## The owner\'s rulings', '', f"{len(kept)} pages settled and kept; dropped: " +
+              (', '.join(f'{n} {k}' for k, n in collections.Counter(r['drop'] for r in rul['pages'].values() if r['drop']).items()) or 'none')
+              + '. ' + ', '.join(f'{k} {n}' for k, n in sorted(tot.items())) + '.']
+    L += ['', '## Measurement card', '',
+          '- **Truth:** ' + ('two gateway drafters blind, every disputed span and the controls ruled by the owner on a '
+                              'blind sheet with boxes.' if rul else 'not made yet: the drafts and the owner\'s sheet are pending.'),
+          '- **Selection:** a hashed draw, one page per document, uniform over documents; the text filter is the owner\'s '
+          'own answer, not a route\'s reading; English by the drafters\' language line, the owner able to overrule.',
+          '- **Comparison:** S1 is scored with the same scorer and settings as the 96 (`ocr_panel_score`), and reported '
+          'beside it, never pooled into the 96\'s figures.',
+          '- **Noise:** with about 200 pages a typical pair resolves about 2 NES (n = (2.8 σd / Δ)², σd 9.7); pooled with '
+          'the 96, about 1.6. Not yet 1 point.',
+          '- **Scope:** the owner\'s English collections only; what the scored drafters gain on agreed words is measured '
+          'by the controls, not removed.', '']
+    RESULTS.write_text('\n'.join(L))
+    print(RESULTS)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -699,6 +796,7 @@ def main():
     d.add_argument('--concurrency', type=int, default=4)
     d.set_defaults(fn=cmd_draft)
     sub.add_parser('compare').set_defaults(fn=cmd_compare)
+    sub.add_parser('report').set_defaults(fn=cmd_report)
     sub.add_parser('sheet').set_defaults(fn=cmd_sheet)
     f = sub.add_parser('fold')
     f.add_argument('answers')

@@ -93,6 +93,12 @@ class Sheet(unittest.TestCase):
         self.assertIn(('has text', 'a page of text (your answer of 11 Nov)'), it['fields'])
         self.assertEqual(it['places'][0]['at'], round(100 * 2 / 15))   # no Vision words: how far through the text
 
+    def test_context_never_shows_a_side_of_a_dispute(self):
+        items, key = S.build(self.cmp, self.rows, {}, {})
+        for x in items[0]['places']:
+            self.assertNotIn('Smith', x['left'] + x['right'])
+            self.assertNotIn('Smyth', x['left'] + x['right'])
+
     def test_fold_picks_types_and_controls(self):
         items, key = S.build(self.cmp, self.rows, {}, {})
         places = key['pages']['s001']['places']
