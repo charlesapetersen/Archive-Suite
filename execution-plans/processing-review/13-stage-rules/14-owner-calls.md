@@ -70,6 +70,11 @@ calls are section 1.
     (`00-plan.md`). Model families: versions within one family (e.g. Gemini 3.7 and 3.8 Flash) count as one unless a
     pick depends on the difference; no further same-family comparisons are filed.
 
+13. **Withholding for a quality floor (2026-11-18).** No feature, field or route is withheld, dropped or left unoffered
+    because a measurement falls short of a fill rule, threshold or baseline without the owner's confirmation; the session
+    asks with the figures and what the user would lose. Authority: the repo `CLAUDE.md`, "Withholding a feature for a
+    quality floor". The withholdings already made are reviewed in `W47.withheld-review`.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.

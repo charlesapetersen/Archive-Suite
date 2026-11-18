@@ -189,6 +189,12 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
 - ⛔ **But $7 is the ceiling without asking (owner, 2026-10-11; raised from $3 on 2026-10-28)** of real money for one piece of
   work (an item across all its sessions). Subscription usage is not money. Over $7, an unattended session asks in the
   Daemon Report and moves on. Authority: `~/Claude/CLAUDE.md`, "Spending money".
+- ⛔ **Withholding a feature for a quality floor is the owner's call (owner, 2026-11-18).** When a measured result falls
+  short of a fill rule, threshold or baseline and the work would withhold, hide, drop or leave unoffered a feature, field or
+  route for that reason, the session records the result and asks in the Daemon Report (needs you) with the figures and
+  what the user would lose; it does not finalize the withholding. Until the owner answers, the feature stays as it was
+  before the item. This covers a feature already shipped that a new figure would take away. Withholdings decided before
+  this rule are listed for his review by `W47.withheld-review`. Record: `13-stage-rules/14-owner-calls.md` call 13.
 - ✅ **The W46 processing review's paid arms are released (owner, 2026-10-21).** The paid-benchmarking hold below
   no longer covers the review's items (`execution-plans/processing-review/10-gap-audit.md` §5). Route order: the **Stanford AI API
   gateway** first (`https://aiapi-prod.stanford.edu/v1`, the Processor's gateway key in Keychain, account `Gateway`),
