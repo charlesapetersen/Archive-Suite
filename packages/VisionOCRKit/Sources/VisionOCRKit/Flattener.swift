@@ -4852,7 +4852,7 @@ enum Flattener {
     /// is no core (96 on `0011 — Scott`, paper 172, a midpoint over all but 66 of 344,269
     /// pixels). Filled with the core's colour, the type inside the words carried
     /// 1.06-1.26x the photo's ink and 1.11-1.38x its dark pixels; Sauvola's first cut and
-    /// the lift alone carry 0.96-1.12x its ink and 0.76-1.06x its dark pixels, the faint
+    /// the lift alone carry 0.97-1.13x its ink and 0.76-1.06x its dark pixels, the faint
     /// pink carbons the fewest: their strokes are filled darker than the photo's average,
     /// so they carry its ink in fewer pixels, and side by side they read as the photo.
     /// Rejected, keeping the re-cut and cutting it at a midpoint from the strokes' core to

@@ -6993,7 +6993,7 @@ do {
     // strokes, filled from their darkest quarter (`foregroundHoles`), carry their ink in
     // fewer pixels than they cover, and the background keeps their blurred edges, so the
     // dark pixels come out under the drawn type's and the ink over it, by about a fifth
-    // each (the owner's pink carbons 0.76-0.80 and 0.96-1.02). Lighter than 0.75 would be
+    // each (the owner's pink carbons 0.76-0.80 and 0.97-1.02). Lighter than 0.75 would be
     // strokes lost.
     check("W42.stroke-weight-photographed: a camera's photo publishes no more dark pixels than the "
             + "drawn type and C56's 5%, not thickened by the pale-ink re-cut",
