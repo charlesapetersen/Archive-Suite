@@ -35,9 +35,11 @@ calls are section 1.
 7. **The training kit's scope in this release (notes 12 calls 7.1 and 7.4, 07 call 1).** The cluster kit ships: the
    student from the user's tags, and the continuation once 200 corrected gaps of one material exist ("adaptation after
    about 200 corrections, flagging kept on", labelled measured on one material), every model past the gate; the Mac step
-   (W46.kit-mac-build) before it ships. No Mac segmentation LoRA (not measured to fit). The handwriting fine-tune also
-   ships: a line-correction screen is built in this release, and kraken PP-OCRv6 is offered from 80 corrected lines with
-   160 as the target, on the handwritten kind.
+   (W46.kit-mac-build) before it ships. No Mac segmentation LoRA (not measured to fit). Amended by the owner,
+   2026-11-17 (review of the pipeline doc): the handwriting fine-tune does not ship. No line-correction screen and no
+   kraken PP-OCRv6 fine-tune per hand; `W46.kit-hands` is dropped. The cluster segmentation kit and the continuation
+   still ship. (Was, 2026-11-06: the fine-tune ships, offered from 80 corrected lines with 160 as the target, on the
+   handwritten kind, with a line-correction screen built in this release.)
 8. **The Gemini 3.8 Flash offsets on the personal key, about $2.60 (note 07 call 4; pass 7).** Declined. No personal-key
    spend; Gemini 3.8 Flash stays the app's segmentation default, and its card shows Gemini 3.7's measured range labelled
    as 3.7's, with the single 3.8 run shown as a single run. The Sasha lead over the 2B stands on the 3.7 card only.
@@ -59,6 +61,14 @@ calls are section 1.
     only when the collection interview ranks them, since the feature became its own call ($2.37 per 1,000
     correspondence documents) and nothing reads unshown names; and where the feature does not run on Apple Vision
     text, the sidecar leaves out the tagging call's sender as well.
+
+12. **The owner's calls of 2026-11-17 (review of the pipeline doc).** Call 7 amended above (no handwriting fine-tune).
+    Handwriting placement: every handwritten page gets a separate text page, and the placed layer stays on the image
+    only where alignment confidence is 0.9 or more (note 05; built in W46.place-hands-textpage, 663cee4b). Licences: no
+    model is excluded on its licence alone; AGPL, GPL and non-commercial models may be offered as separate optional
+    downloads with their licence shown, nothing GPL or AGPL linked or bundled into the app, the app's own code MIT
+    (`00-plan.md`). Model families: versions within one family (e.g. Gemini 3.7 and 3.8 Flash) count as one unless a
+    pick depends on the difference; no further same-family comparisons are filed.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
@@ -104,7 +114,7 @@ Each is a table default or a filed item, reversible without app work; the figure
   typed pages, not measured on mixed pages", Mac time "figure pending" until timed like for like (P11-4), off by default
   (call 3 above); the mix shown with its sample size and the classifier's error (137 of 141; 723 of 895) and pages under
   the 0.8 floor shown as unsure; kinds the classifier does not measure (clippings, newspapers, registers, mixed) asked in
-  the interview labelled "not measured"; ATRIUM's licence conflict noted, moot while the shipped classifier is kept.
+  the interview labelled "not measured"; ATRIUM's licence conflict noted, moot while the shipped classifier is kept (and since 2026-11-17 no conflict: a CC BY-NC model may be an optional download with its licence shown, `00-plan.md`).
 - **Capture (note 11 calls 1-3):** static guidance only until a sharpness cut is validated on real captures (the
   in-sample cuts false-alarm on 17-34% of good pages); flash off, raw original kept, no on-phone processing; the Android
   and iOS quality settings wait on a device read; 2,048 px at JPEG 0.85 stands as measured (`enh-dewarp.md` §"The app's encoding": Vision +0.5, Qwen3.6-27B -0.3, LightOnOCR -0.4,

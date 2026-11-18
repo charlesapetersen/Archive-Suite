@@ -20,6 +20,11 @@ fourth (the Mac segmentation LoRA) is a row marked not offered, so the sheet can
 
 ## 3. The rule for the settings layer
 
+**Amended by the owner, 2026-11-17 (14-owner-calls.md call 7): the handwriting fine-tune does not ship.** The
+`kit-hands-ppocrv6-ft` row below, the "with a coding agent" mapping to it, call 7.4 and `W46.kit-hands-check` are
+history; until the app's row is removed (W46.kit-hands-retire) the sheet must not offer it. The cluster rows stand.
+The sheet text loses "or on this Mac (one handwriting hand)".
+
 Text the sheet shows: "Training adapts a model to your material. It is optional, runs on a cluster (segmentation) or
 on this Mac (one handwriting hand), and a trained model is used only after it passes a check on pages it never saw."
 
@@ -264,7 +269,8 @@ measured to fit at 18 GB and is unmeasured at 32 GB (`kit-mac-lora.md`, P9-12); 
 (`STATE.md`; profiles are farmshare and example-university) [M]. The handwriting fine-tune needs a line-correction screen
 the Processor lacks (H §6.3). Recommendation was (b). Decided (owner, 14-owner-calls.md call 7): (a), the cluster kit
 with the continuation, W46.kit-mac-build before it ships, no Mac segmentation LoRA, and the handwriting fine-tune with a
-line-correction screen built in this release.
+line-correction screen built in this release. Amended 2026-11-17 (call 7): no handwriting fine-tune; the cluster kit
+with the continuation stands.
 
 **7.2 The gate rule.** The proposed rule (low end of the paired held-out interval above -3 points against the shipped
 model, every expected gap counted). Open parts: (i) the measure: gap accuracy needs about 147 (4B against 2B) or 267
@@ -306,7 +312,7 @@ a 160 target; offer from 160; do not offer in this release. Note the base recogn
 hand pages (71.6 against 89.9), so the route matters only where kraken is what the user runs. Recommendation: offer from
 80 with 160 as the target, on the handwritten kind, only after a line-correction screen exists; else not this release.
 Decided (owner, 14-owner-calls.md call 7): offered from 80 corrected lines, target 160, on the handwritten kind; the
-line-correction screen is built in this release.
+line-correction screen is built in this release. Withdrawn 2026-11-17 (call 7 amended): the fine-tune does not ship.
 
 **7.5 The adaptation-after-200-corrections rule's plug-in point (kit's part only; the rule is note 07's).** The kit's
 part: the continuation is a cluster job the kit runs when the review records hold at least 200 corrected gaps of one
@@ -335,7 +341,7 @@ section 2): confirmed as read.
   scorer for the gate (H open question 7).
 - **W46.kit-licence-statement** [S], no blocker (call 7.3 decided): README section and a manifest `licence` field shown
   by the range view; the wording the owner's at ship time.
-- **W46.kit-hands-check** [M], no blocker (14-owner-calls.md call 7): a per-hand held-out acceptance check and a
+- ~~**W46.kit-hands-check**~~ dropped 2026-11-17 (call 7 amended; filed as `W46.kit-hands`, removed). Was: [M], no blocker (14-owner-calls.md call 7): a per-hand held-out acceptance check and a
   manifest for the handwriting fine-tune (none exists [I]); and the line-correction screen it needs, built in this
   release, filed with stage 04's queue.
 - **W46.kit-corrections-store** [S], with note 07: corrected gaps and lines kept in the review records (call 7.5

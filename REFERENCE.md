@@ -44,9 +44,9 @@ depends on the apps' current settings, structure or outputs.
   owner's: up to its $50 a month may go to the review, but none is spent for its own sake. Personal keys only for what
   the gateway cannot serve (Azure, Textract, Document AI checks; one Gemini 3.7-against-3.8 Flash check on the 96).
   The $7-per-item rule still applies to each item, except W46.seg-window-modality's full 551-page sweep, approved at
-  about $8 list / $4 batch. Newer gateway models need the owner to request access; on 2026-10-21 the key had only
-  older ones (Gemini 2.0 Flash/2.5 Pro, Claude 4.5 Sonnet/Opus 4.6, GPT-5/5.2), not Gemini 3.7 Flash, Claude 5
-  Sonnet, GPT 5.6 Luna or GLM 5.3 Flash.
+  about $8 list / $4 batch. Newer gateway models need the owner to request access. On 2026-10-21 the key had only
+  older ones; from 2026-10-22 the gateway served 32 models, Gemini 3.7 Flash, gpt-5.6-luna and claude-sonnet-5
+  among them (`W46.gateway-models-ok`). List its current models before planning an arm.
 - ✅ **Benchmark uploads are authorized (owner, 2026-10-25).** The owner approved sending the frozen 96 owner
   benchmark pages and 12 public pages, including their region and tile crops, to
   `https://aiapi-prod.stanford.edu/v1/chat/completions` using the Processor Gateway key and Gemini 3.7 Flash,

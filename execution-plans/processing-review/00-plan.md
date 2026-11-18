@@ -77,10 +77,16 @@ Each recommendation is given per profile and per document kind (typed, printed, 
 newspapers, non-Latin scripts, early modern hands).
 
 Running on a Mac is an attribute of the laptop profile, never a filter on candidates. A method that needs GPUs
-(diffusion restorers, large readers, training) is a candidate for the cluster profile on Sherlock. Licences are
-judged by route: a model the app bundles or downloads for any user needs a licence that allows that; a model a user
-runs on their own cluster through our kit may carry a research or non-commercial licence, stated plainly in the
-kit (owner, 2026-10-20).
+(diffusion restorers, large readers, training) is a candidate for the cluster profile on Sherlock. Licences
+(owner, 2026-11-17, replacing the 2026-10-20 route rule): no model is excluded on its licence alone. AGPL, GPL and
+non-commercial models may be offered as separate optional downloads, each with its licence shown before the user
+takes it; nothing GPL or AGPL is linked or bundled into the app's binary, and the app's own code stays MIT. A model
+whose licence restricts where it may be used (e.g. HunyuanOCR-1.5, not for EU, UK or Korea users) is measured and
+offered with the restriction shown.
+
+Model families (owner, 2026-11-17): versions within one family (e.g. Gemini 3.7 and 3.8 Flash) count as one model
+unless a pick depends on the difference. Do not file further same-family comparisons; measure readers from
+families not yet measured instead (W46.ocr-family-coverage).
 
 ## Every stage against every compute route
 

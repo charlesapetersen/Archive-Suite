@@ -58,7 +58,8 @@ The owner's Gemini report is assessed in `screens/gemini-report-2026-10-20.md` (
 - [x] Owner's decisions on section 6 (2026-10-21):
   1. Paid arms released, Stanford AI API gateway first (about $32 there, about $2 personal); up to the gateway's
      $50 a month, not spent for its own sake. Owner to request Gemini 3.7 Flash, Claude 5 Sonnet, GPT 5.6 Luna and
-     GLM 5.3 Flash on the gateway; until then gateway arms wait.
+     GLM 5.3 Flash on the gateway; until then gateway arms wait. (Done: from 2026-10-22 the gateway served 32
+     models, gpt-5.6-luna and claude-sonnet-5 among them; the 21 Oct key list is history.)
   2. Labelling: the owner takes the judgement sets (short passes about 3.5 h, the two new boxes about 2 h, about 40
      marks pages about 6-7 h); placement boxes, capture tags and the rest are drafted by models and audited.
   3. Request Reading the Archive's gated gold: yes (owner's request via the Zenodo record).

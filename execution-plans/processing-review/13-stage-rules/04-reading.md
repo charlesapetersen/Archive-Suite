@@ -426,7 +426,8 @@ dropped (`ocr-panel-cloud.md`); GPT-5.6 Luna was read through OpenRouter instead
     2026-11-11: five rows (the four and `churro-3b-farmshare`), the strata check under "Not in the table", the
     rerun deferred as paid (`paid-runs-deferred.md`).
 11. **Gaps already known, not refiled:** Gemini 3.8 Flash and the other hosted rows on the 455 (W43.sweep, held);
-    Infinity-Parser2-Pro's licence and kit status (C-ocr §8).
+    Infinity-Parser2-Pro's licence and kit status (C-ocr §8). Since 2026-11-17 a licence alone excludes nothing: a
+    research or non-commercial model may be an optional download with its licence shown (`00-plan.md`).
 
 ## 9. Profile test expectations
 
@@ -506,7 +507,8 @@ routes has the floor 0.00, so any paired gap separates two of them; on the 895 a
 - Early modern hands and non-Latin strata of the 440 (L5-L8, N1, N3, N4): `churro-3b-farmshare` (L6 69.45, N3 84.70),
   the leader on each of the seven strata; its smallest leads are L8 +2.95 [−0.03, +4.94] over Infinity and N4 +12.07
   [−0.55, +24.12] over `qwen3.6-27b-farmshare` (n 80, 40, public895/<stratum>/strict). Labelled with OCR-15 (trained on
-  CHURRO-DS) and its research-only licence.
+  CHURRO-DS) and its research-only licence; since 2026-11-17 a research licence no longer excludes a model, which is offered
+  with the licence shown (`00-plan.md`; CHURRO's remaining strata in W46.ocr-family-coverage).
 
 **5. Any of these plus a coding agent.** The kit's same-hand kraken PP-OCRv6 fine-tune is an after-training row (note
 12): +2.6 (+1.7 to +3.4) at 160 lines on MPS on one public hand, worse on 3 of 4 owner Shils pages; corrected lines in the

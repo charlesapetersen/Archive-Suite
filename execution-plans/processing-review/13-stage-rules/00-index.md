@@ -122,7 +122,7 @@ The queue Phase 4 filed from these notes, with `ops/autonomous/plan-edit.sh` and
 §"The settings layer"), the integration stages (`W42.int-s1`, `-s2`, `-s3`, `-s5`, `-s7`; stages 4 and 6 replaced by the
 settings build), the app changes (`W46.tagging-prompt-revert`, `W46.ent-feature`, `W46.date-route`, `W46.seg-review-rule`,
 `W46.layout-newspapers`, `W46.capture-companions`, `W46.kit-gate-rule`, `W46.kit-sherlock-profile`,
-`W46.kit-licence-statement`, `W46.kit-corrections-store`, `W46.kit-continuation`, `W46.kit-hands`; the existing
+`W46.kit-licence-statement`, `W46.kit-corrections-store`, `W46.kit-continuation`, `W46.kit-hands` (dropped 2026-11-17, call 7 amended); the existing
 `W46.rotation-default`, `W46.mixed-route-setting` and `W46.kit-mac-build` carry their decisions), the useful-now
 measurements (`W46.ocr-time-like-for-like`, `W46.ocr-pair-matrix`, `W46.ocr-vision-unfiltered`, `W46.seg-text-tier-test`,
 `W46.seg-check-time`, `W46.date-route-pipeline`, `W46.date-evidence-check`, `W46.ent-local-shipped-prompt`,

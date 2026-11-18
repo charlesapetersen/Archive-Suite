@@ -176,7 +176,7 @@ From `14-owner-calls.md`; section 3 is amended where a call changes it.
 - **Section 2's kinds picks (calls 1, 3-5; owner may veto).** One mixed switch on every typed or printed page, its
   wording and "figure pending" time as in section 3, off by default; the mix shown with sample size, the classifier's
   error (137 of 141; 723 of 895) and pages under 0.8 as unsure; unmeasured kinds asked, labelled "not measured";
-  ATRIUM's licence noted, moot while ours is kept (section 8).
+  ATRIUM's licence noted, moot while ours is kept (section 8); CC BY-NC no longer excludes it, an optional download with its licence shown (owner, 2026-11-17).
 
 Files read: execution-plans/processing-review/00-plan.md (1-105), 13-stage-rules/00-index.md (worktree), K-kinds.md
 §5, 6, 8, 9, 11-measurement-audit.md (FLD-2, KND-1 to 3), 12-settings-design.md (§3.2, 3.4, 3.9 lines), measure-reviews
