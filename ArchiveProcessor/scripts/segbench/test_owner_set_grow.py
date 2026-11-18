@@ -164,6 +164,69 @@ class Sheet(unittest.TestCase):
             S.fold(self.cmp, key, {'_build': key['build']})
 
 
+class TieBreak(unittest.TestCase):
+    A = 'Dear Mr Smith thank you for the letter of May 4 one two three four'
+    B = 'Dear Mr Smyth thank you for the letter of May 9 one two three four'
+
+    def disputes(self, c_text):
+        sp = S.spans(self.A, self.B)
+        S.tie_breaks(self.A, c_text, sp)
+        return [s for s in sp if 'agreed' not in s]
+
+    def test_c_matching_one_side_settles_it(self):
+        d = self.disputes('Dear Mr Smyth thank you for the letter of May 4 one two three four')
+        self.assertEqual([(s['c'], s['major']) for s in d], [('Smyth', 'b'), ('4', 'a')])
+
+    def test_a_third_reading_settles_nothing(self):
+        d = self.disputes('Dear Mr Smitt thank you for the letter of May 4th one two three four')
+        self.assertEqual([(s['c'], s['major']) for s in d], [('Smitt', None), ('4th', None)])
+
+    def test_c_must_agree_on_the_words_beside_the_place(self):
+        # C misses "Mr", the word before the first place, and "one", the word after the second: neither is read
+        d = self.disputes('Dear Smith thank you for the letter of May 4 two three four')
+        self.assertEqual([(s['c'], s['major']) for s in d], [(None, None), (None, None)])
+
+    def test_an_insertion_settles_by_the_empty_side(self):
+        sp = S.spans('a b c d', 'a b x c d')
+        S.tie_breaks('a b c d', 'a b c d', sp)
+        d = [s for s in sp if 'agreed' not in s][0]
+        self.assertEqual((d['c'], d['major']), ('', 'a'))
+
+    def test_extra_words_in_c_at_a_place_settle_nothing(self):
+        sp = S.spans('a b c d', 'a b x c d')
+        S.tie_breaks('a b c d', 'a b x y c d', sp)
+        d = [s for s in sp if 'agreed' not in s][0]
+        self.assertEqual((d['c'], d['major']), ('x y', None))
+
+    def test_typography_counts_as_a_match(self):
+        sp = S.spans('it is “here” now', 'it is there now')
+        S.tie_breaks('it is “here” now', 'it is "here" now', sp)
+        self.assertEqual([s['major'] for s in sp if 'agreed' not in s], ['a'])
+
+    def test_listed_on_the_sheet_and_folded_by_the_majority(self):
+        cmp = compare_fixture()
+        S.tie_breaks(cmp['pages'][0]['a_text'], 'Dear Mr Smyth thank you for the letter of May 7 one two three four',
+                     cmp['pages'][0]['spans'])
+        rows = [{'id': 's001', 'key': 'k1', 'set': 'base', 'tags': [], 'source': 'original'}]
+        items, key = S.build(cmp, rows, {}, {})
+        kinds = [x['kind'] for x in items[0]['places']]
+        self.assertEqual(kinds[-1], 'listed')                    # listed after the places he is asked
+        listed = items[0]['places'][-1]
+        self.assertEqual(listed['texts'], ['Smyth'])
+        places = key['pages']['s001']['places']
+        self.assertEqual(places[listed['id']], {'span': 1, 'majority': 'b'})
+        ans = {'_build': key['build'], 's001': {p: ('y' if v.get('control') else '=6') for p, v in places.items()
+                                                if 'majority' not in v}}
+        got = S.fold(cmp, key, ans)['s001']
+        self.assertEqual(got['status'], 'settled')
+        self.assertIn('Mr Smyth thank', got['text'])
+        self.assertEqual(got['counts']['dispute 2 to 1 b'], 1)
+        w0, w1 = got['two_to_one_words'][0]
+        self.assertEqual(got['text'].split()[w0:w1], ['Smyth'])
+        s = S.summary(rows, cmp['pages'], [])
+        self.assertEqual((s['disputes'], s['disputes_asked'], s['settled_2_to_1']), (2, 1, {'b': 1}))
+
+
 class Turns(unittest.TestCase):
     def test_clear_wins_only(self):
         self.assertEqual(S.clear_turn([10, 200, 5, 3]), (90, False))

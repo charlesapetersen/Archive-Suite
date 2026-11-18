@@ -72,11 +72,12 @@ ORIENT_BIN = REH / 'segbench/bin/segbench-ocr-orient'
 TOPUP = 30
 CONTROLS = 24
 SEED = 20261118
-CAP = 6.50                 # the item's gateway total across pilots and both drafters, under the $7 rule
+CAP = 13.00                # the item's gateway total; the owner approved $13 for a third reader (2026-11-18 gate)
 DRAFT_SIDE = T.DRAFT_SIDE
 TURN_RATIO, TURN_MIN = 2.0, 20.0           # item_fields_retruth.display_turns: a clear win only
 SECONDS_PER_PAGE, SECONDS_PER_DISPUTE, SECONDS_PER_TYPED, TYPED_SHARE = 10, 6, 30, 0.15   # ocr_truth's, measured on
 SECONDS_PER_CONTROL = 4                                                                    # the 96's sheet
+SECONDS_PER_LISTED = 1     # a place settled 2 to 1 is listed, not asked: a glance (an estimate, not measured)
 
 # Drafter candidates through the gateway: id -> (label, family, $ per million input, output tokens, ceilings).
 # A price is a labelled estimate from the provider's list price; the gateway's own figure is kept beside it and the
@@ -386,17 +387,49 @@ def control_spans(sp: list[dict], rng: random.Random, n_words=6) -> list[dict]:
     return out
 
 
-def owner_minutes(n_pages: int, n_disputes: int, n_controls: int, n_topup: int) -> float:
+def owner_minutes(n_pages: int, n_disputes: int, n_controls: int, n_topup: int, n_listed: int = 0) -> float:
     return (n_pages * SECONDS_PER_PAGE + n_disputes * (SECONDS_PER_DISPUTE + TYPED_SHARE * SECONDS_PER_TYPED)
-            + n_controls * SECONDS_PER_CONTROL + n_topup * 3) / 60
+            + n_controls * SECONDS_PER_CONTROL + n_topup * 3 + n_listed * SECONDS_PER_LISTED) / 60
 
 
-def labels() -> tuple[str, str]:
+def labels() -> tuple[str, str, str | None]:
+    """(A, B, the tie-breaking third reader or None): drafters.json's "a", "b" and optional "c"."""
     f = OUT / 'drafters.json'
     if not f.exists():
         raise SystemExit(f'{f} is missing: write {{"a": "<label>", "b": "<label>"}} naming the two drafters')
     d = json.loads(f.read_text())
-    return d['a'], d['b']
+    return d['a'], d['b'], d.get('c')
+
+
+def a_to_c(ops, i: int, start: bool, n_a: int, n_c: int) -> int | None:
+    """Where A's token boundary i falls in C's tokens, or None unless the word beside it agrees: a span's start needs
+    A's word before it matched in C, its end the word after it (the text's own ends count as matched)."""
+    if start and i == 0:
+        return 0
+    if not start and i == n_a:
+        return n_c
+    for op, i1, i2, j1, _ in ops:
+        if op == 'equal' and (i1 < i <= i2 if start else i1 <= i < i2):
+            return j1 + (i - i1)
+    return None
+
+
+def tie_breaks(a_text: str, c_text: str, sp: list[dict]) -> None:
+    """Adds to each disputed span C's reading of it ('c', None when C's words around it do not line up with A's) and
+    'major': the side C matches exactly by the comparison keys, so the place settles 2 to 1 (owner, 2026-11-18)."""
+    _, ka = norm_tokens(a_text)
+    rc, kc = norm_tokens(c_text)
+    ops = difflib.SequenceMatcher(None, ka, kc, autojunk=False).get_opcodes()
+    for s in sp:
+        if 'agreed' in s:
+            continue
+        j0 = a_to_c(ops, s['t0'], True, len(ka), len(kc))
+        j1 = a_to_c(ops, s['t1'], False, len(ka), len(kc))
+        s['c'] = ' '.join(rc[j0:j1]) if j0 is not None and j1 is not None and j0 <= j1 else None
+        s['major'] = None
+        if s['c'] is not None:
+            got = kc[j0:j1]
+            s['major'] = 'a' if got == norm_tokens(s['a'])[1] else 'b' if got == norm_tokens(s['b'])[1] else None
 
 
 LOOP_N, LOOP_MIN = 8, 20
@@ -420,34 +453,42 @@ def trim_loop(text: str) -> str | None:
 
 
 def cmd_compare(_):
-    la, lb = labels()
+    la, lb, lc = labels()
     rows = load_pages()
     rng = random.Random(SEED)
-    pages, missing, trimmed = [], [], []
+    pages, missing, trimmed, no_c = [], [], [], []
     for r in rows:
         da, db = draft(la, r), draft(lb, r)
+        dc = draft(lc, r) if lc else None
         if not (da and db):
             missing.append(r['id'])
             continue
-        for side, lab, d in (('a', la, da), ('b', lb, db)):
+        for side, lab, d in (('a', la, da), ('b', lb, db), ('c', lc, dc)):
+            if not d:
+                continue
             cut = json.loads(draft_path(lab, r).read_text())['meta'].get('finish') == 'length'
             if cut and (t := trim_loop(d['text'])) is not None:
                 trimmed.append(f"{r['id']}:{side}")
                 d['text'] = t
         sp = spans(da['text'], db['text'])
+        if dc:
+            tie_breaks(da['text'], dc['text'], sp)
+        elif lc:
+            no_c.append(r['id'])                 # every dispute on the page goes to the owner
         pages.append({'id': r['id'], 'spans': sp, 'controls': control_spans(sp, rng),
                       'kind': [da['kind'], db['kind']], 'table': [da['table'], db['table']],
-                      'language': [da['language'], db['language']], 'a_text': da['text'], 'b_text': db['text']})
+                      'language': [da['language'], db['language']], 'a_text': da['text'], 'b_text': db['text'],
+                      'c_text': dc['text'] if dc else None})
     pool = [(p['id'], c) for p in pages for c in p['controls']]
     chosen = set()
     for pid, c in rng.sample(pool, min(CONTROLS, len(pool))):
         chosen.add((pid, c['span'], c['t0']))
     for p in pages:
         p['controls'] = [c for c in p['controls'] if (p['id'], c['span'], c['t0']) in chosen]
-    (OUT / 'compare.json').write_text(json.dumps({'a': la, 'b': lb, 'missing': missing, 'trimmed': trimmed, 'pages': pages},
-                                                 ensure_ascii=False, indent=1))
+    (OUT / 'compare.json').write_text(json.dumps({'a': la, 'b': lb, 'c': lc, 'missing': missing, 'no_c': no_c,
+                                                  'trimmed': trimmed, 'pages': pages}, ensure_ascii=False, indent=1))
     s = summary(rows, pages, missing)
-    print(json.dumps({**s, 'loops_trimmed': trimmed}, indent=1))
+    print(json.dumps({**s, 'loops_trimmed': trimmed, 'pages_without_c': no_c}, indent=1))
 
 
 def not_english(langs) -> bool:
@@ -455,18 +496,22 @@ def not_english(langs) -> bool:
 
 
 def summary(rows, pages, missing) -> dict:
-    n_disp = sum(1 for p in pages for s in p['spans'] if 'agreed' not in s)
+    disp = [s for p in pages for s in p['spans'] if 'agreed' not in s]
+    major = collections.Counter(s['major'] for s in disp if s.get('major'))
     n_ctrl = sum(len(p['controls']) for p in pages)
     by_id = {r['id']: r for r in rows}
     n_top = sum(1 for p in pages if by_id[p['id']]['set'] == 'topup')
     words = sum(len(p['a_text'].split()) for p in pages)
-    disp_words = sum(max(len(s['a'].split()), len(s['b'].split())) for p in pages for s in p['spans'] if 'agreed' not in s)
-    return {'pages': len(pages), 'missing': len(missing), 'topup': n_top, 'disputes': n_disp, 'controls': n_ctrl,
-            'words': words, 'disputed_words': disp_words,
+    disp_words = sum(max(len(s['a'].split()), len(s['b'].split())) for s in disp)
+    n_asked = len(disp) - sum(major.values())
+    return {'pages': len(pages), 'missing': len(missing), 'topup': n_top, 'disputes': len(disp),
+            'settled_2_to_1': dict(major), 'c_unaligned': sum(1 for s in disp if 'c' in s and s['c'] is None),
+            'disputes_asked': n_asked, 'controls': n_ctrl, 'words': words, 'disputed_words': disp_words,
             'pages_without_dispute': sum(1 for p in pages if all('agreed' in s for s in p['spans'])),
+            'pages_without_question': sum(1 for p in pages if all('agreed' in s or s.get('major') for s in p['spans'])),
             'not_english_by_a_drafter': sum(1 for p in pages if not_english(p['language'])),
             'kinds': collections.Counter(p['kind'][0] if p['kind'][0] == p['kind'][1] else 'readers differ' for p in pages),
-            'owner_minutes': round(owner_minutes(len(pages), n_disp, n_ctrl, n_top))}
+            'owner_minutes': round(owner_minutes(len(pages), n_asked, n_ctrl, n_top, sum(major.values())))}
 
 
 # ---------------------------------------------------------------- the sheet
@@ -507,7 +552,7 @@ def build(cmp: dict, rows: list[dict], turns: dict, vision: dict) -> tuple[list,
     never which reading is which."""
     import ocr_truth_bias as B
     by_id = {r['id']: r for r in rows}
-    items, key = [], {'build': None, 'a': cmp['a'], 'b': cmp['b'], 'pages': {}}
+    items, key = [], {'build': None, 'a': cmp['a'], 'b': cmp['b'], 'c': cmp.get('c'), 'pages': {}}
     for p in cmp['pages']:
         r = by_id[p['id']]
         rng = random.Random(f"{SEED}:{p['id']}")
@@ -528,6 +573,12 @@ def build(cmp: dict, rows: list[dict], turns: dict, vision: dict) -> tuple[list,
             rng.shuffle(opts)
             bx, at = box(s['t0'], s['t1'])
             pid = f'd{i}'
+            if s.get('major'):                   # settled 2 to 1: listed with the reading it takes, not asked
+                places.append({'id': pid, 'kind': 'listed', 'texts': [s[s['major']]], 'box': bx, 'at': at,
+                               'left': ' '.join(shown[max(0, s['t0'] - 6):s['t0']]),
+                               'right': ' '.join(shown[s['t1']:s['t1'] + 6])})
+                kp[pid] = {'span': i, 'majority': s['major']}
+                continue
             places.append({'id': pid, 'kind': 'dispute', 'texts': [o[1] for o in opts], 'box': bx, 'at': at,
                            'left': ' '.join(shown[max(0, s['t0'] - 6):s['t0']]), 'right': ' '.join(shown[s['t1']:s['t1'] + 6])})
             kp[pid] = {'span': i, 'options': [o[0] for o in opts]}
@@ -538,6 +589,7 @@ def build(cmp: dict, rows: list[dict], turns: dict, vision: dict) -> tuple[list,
                            'left': ' '.join(shown[max(0, c['t0'] - 6):c['t0']]), 'right': ' '.join(shown[c['t1']:c['t1'] + 6])})
             kp[pid] = {'span': c['span'], 'w0': c['w0'], 'w1': c['w1'], 'control': True}
         places.sort(key=lambda x: (int(re.match(r'[dc](\d+)', x['id']).group(1)), x['id']))
+        places = [x for x in places if x['kind'] != 'listed'] + [x for x in places if x['kind'] == 'listed']
         tn = turns.get(r['key'], {'turn': 0, 'close': None, 'how': 'not checked'})
         fields = [('folder tags', listed_tags(r['tags'])), ('kind of writing', both(p['kind'])),
                   ('mostly a table or form', both(p['table'])), ('language', both(p['language'])),
@@ -585,6 +637,7 @@ SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W46 owner set: disp
 #main{flex:1;position:relative;overflow:auto;background:#333;display:flex;align-items:center;justify-content:center}
 #wrap{position:relative;transition:transform .1s}#wrap img{display:block;max-height:92vh;max-width:none;background:#fff}
 .bx{position:absolute;border:3px solid #f0a;background:rgba(255,0,170,.08)}.bx.cur{border-color:#0af}
+.bx.ls{border:2px dashed #999;background:none}.bx.ls.cur{border-color:#0af}.pl.ls{border-style:dashed;color:#444}
 .k{display:inline-block;border:1px solid #888;border-radius:4px;padding:1px 6px;margin:2px;cursor:pointer}
 .k.on{background:#2a6;color:#fff;border-color:#2a6}textarea,input[type=text]{width:100%;box-sizing:border-box}
 .pl{border:1px solid #ddd;border-radius:5px;padding:6px;margin:6px 0}.pl.cur{border-color:#0af;background:#f4fbff}
@@ -594,7 +647,9 @@ SHEET_HTML = r"""<!doctype html><meta charset="utf-8"><title>W46 owner set: disp
 <p><small>About __MIN__ minutes in all; answers save in this browser as you go, so it can be done in several sittings.
 Each page lists the places where the two readers differ (pick the reading that matches the page, or type it) and a
 few places where they agree (say whether the words match the page). The readings are in no particular order and
-nothing says which reader gave which. The box on the image marks roughly where each place is; with no box, the
+nothing says which reader gave which. Below them, grey and dashed, are places where a third reader matched one
+of the two exactly: those are settled 2 to 1 and only listed, with the reading they take; nothing to do unless one
+is wrong, and then a note on it says so. The box on the image marks roughly where each place is; with no box, the
 place says how far through the page's text it falls. Keys: <b>1</b>/<b>2</b> pick, <b>t</b> type, <b>e</b> can't tell,
 <b>y</b>/<b>n</b> on an agreed place, <b>↓</b>/<b>↑</b> next/previous place, <b>←</b>/<b>→</b> page, <b>r</b> turn the page.
 Keys do nothing while you type in a box. __TURNED__ pages were turned upright before the sheet was built (a clear
@@ -616,7 +671,7 @@ let pi=0,cur=0;const $=id=>document.getElementById(id);
 const esc=s=>(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ans(p,id){return (A[p]||{})[id]}
 function setAns(p,id,v){A[p]=A[p]||{};A[p][id]=v;save();}
-function done(it){return (!it.ask_text||ans(it.page,'_text'))&&it.places.every(x=>ans(it.page,x.id)!=null)}
+function done(it){return (!it.ask_text||ans(it.page,'_text'))&&it.places.every(x=>x.kind=='listed'||ans(it.page,x.id)!=null)}
 function turn(it){return ((it.turn||0)+(A._turns[it.page]||0))%360}
 function show(){const it=items[pi];$('im').src=it.img;$('wrap').style.transform='rotate('+turn(it)+'deg)';
  $('pos').textContent='page '+(pi+1)+' of '+items.length+' ('+it.page+')'+(done(it)?' ✓':'');
@@ -626,11 +681,12 @@ function show(){const it=items[pi];$('im').src=it.img;$('wrap').style.transform=
  $('fields').innerHTML='<p><small>Listed, not asked: '+it.fields.map(f=>'<b>'+esc(f[0])+'</b>: '+esc(f[1])).join(' · ')+'</small></p>'
   +(it.flag_language?'<p class="warn">A reader thinks this page is not in English: say so in the note if it should be dropped.</p>':'');
  $('places').innerHTML=it.places.length?'':'<p><small>The readers agree on every word of this page.</small></p>';
- it.places.forEach((x,i)=>{const a=ans(it.page,x.id);const d=document.createElement('div');d.className='pl'+(i==cur?' cur':'');
-  let h='<small>'+(x.kind=='dispute'?'The readers differ':'The readers agree')+(x.box?'':' · no box: about '+x.at+'% through the text')+'</small><br>'
+ it.places.forEach((x,i)=>{const a=ans(it.page,x.id);const d=document.createElement('div');d.className='pl'+(x.kind=='listed'?' ls':'')+(i==cur?' cur':'');
+  let h='<small>'+(x.kind=='dispute'?'The readers differ':x.kind=='listed'?'Settled 2 to 1, listed, not asked':'The readers agree')+(x.box?'':' · no box: about '+x.at+'% through the text')+'</small><br>'
    +'<span class="ctx">…'+esc(x.left)+'</span> <b>[ ]</b> <span class="ctx">'+esc(x.right)+'…</span><br>';
   if(x.kind=='dispute'){x.texts.forEach((t,j)=>{h+='<span class="k opt'+(a==String(j+1)?' on':'')+'" data-p="'+i+'" data-v="'+(j+1)+'">'+(j+1)+' '+(esc(t)||'<i>(nothing here)</i>')+'</span><br>'});
    h+='<span class="k'+(a=='either'?' on':'')+'" data-p="'+i+'" data-v="either">e can\'t tell</span>';}
+  else if(x.kind=='listed')h+='<span class="opt">'+(esc(x.texts[0])||'<i>(nothing here)</i>')+'</span>';
   else{h+='<span class="opt">'+esc(x.texts[0])+'</span><br><span class="k'+(a=='y'?' on':'')+'" data-p="'+i+'" data-v="y">y matches the page</span>'
    +'<span class="k'+(a&&a.startsWith('=')?' on':'')+'" data-p="'+i+'" data-v="t">n wrong: type it</span>';}
   if(x.kind=='dispute')h+='<span class="k'+(a&&a.startsWith('=')?' on':'')+'" data-p="'+i+'" data-v="t">t type it</span>';
@@ -639,7 +695,7 @@ function show(){const it=items[pi];$('im').src=it.img;$('wrap').style.transform=
   d.innerHTML=h;$('places').appendChild(d);});
  $('note').value=A._notes[it.page]||'';$('snote').value=A._notes._sheet||'';drawBoxes();}
 function drawBoxes(){const it=items[pi];document.querySelectorAll('.bx').forEach(b=>b.remove());
- it.places.forEach((x,i)=>{if(!x.box)return;const b=document.createElement('div');b.className='bx'+(i==cur?' cur':'');
+ it.places.forEach((x,i)=>{if(!x.box)return;const b=document.createElement('div');b.className='bx'+(x.kind=='listed'?' ls':'')+(i==cur?' cur':'');
   b.style.left=(100*x.box[0])+'%';b.style.top=(100*x.box[1])+'%';b.style.width=(100*x.box[2])+'%';b.style.height=(100*x.box[3])+'%';
   $('wrap').appendChild(b);});}
 function pick(i,v){const it=items[pi],x=it.places[i];if(v=='t'){const t=prompt('Type the words as they are on the page (leave empty for "no words here"):',
@@ -659,7 +715,7 @@ $('exp').onclick=()=>{const b=new Blob([JSON.stringify(A,null,1)],{type:'applica
 document.addEventListener('keydown',e=>{if(['TEXTAREA','INPUT'].includes(e.target.tagName))return;const it=items[pi];
  const x=it.places[cur];if(e.key=='ArrowRight')go(1);else if(e.key=='ArrowLeft')go(-1);
  else if(e.key=='ArrowDown'){cur=Math.min(cur+1,it.places.length-1);show();}else if(e.key=='ArrowUp'){cur=Math.max(cur-1,0);show();}
- else if(e.key=='r')$('rot').click();else if(!x)return;
+ else if(e.key=='r')$('rot').click();else if(!x||x.kind=='listed')return;
  else if(x.kind=='dispute'&&['1','2'].includes(e.key))pick(cur,e.key);else if(x.kind=='dispute'&&e.key=='e')pick(cur,'either');
  else if(e.key=='t'||(x.kind=='control'&&e.key=='n'))pick(cur,'t');else if(x.kind=='control'&&e.key=='y')pick(cur,'y');
  else return;e.preventDefault();});
@@ -670,8 +726,9 @@ show();
 # ---------------------------------------------------------------- fold
 
 def fold(cmp: dict, key: dict, answers: dict) -> dict:
-    """{page id: {'text', 'status', 'counts', 'note', 'drop'}}: the truth from the spans and the owner's rulings.
-    A dispute takes his pick or his typed text; 'can't tell' takes neither reader's words as settled: the page is
+    """{page id: {'text', 'status', 'counts', 'note', 'drop', 'two_to_one_words'}}: the truth from the spans and the
+    owner's rulings. A place settled 2 to 1 takes the majority's reading; its [first, past-last) word positions in the
+    text are kept, so a route can be scored with and without those places (owner, 2026-11-18). A dispute takes his pick or his typed text; 'can't tell' takes neither reader's words as settled: the page is
     kept with the place as [illegible] and counted. A control he marks wrong replaces those agreed words. A top-up
     page he does not call a page of text is dropped, and so is a page both drafters call non-English."""
     if answers.get('_build') != key['build']:
@@ -694,7 +751,7 @@ def fold(cmp: dict, key: dict, answers: dict) -> dict:
         for pl, v in kp['places'].items():
             if v.get('control'):
                 ctrl.setdefault(v['span'], []).append((pl, v))
-        parts, open_ = [], False
+        parts, open_, maj = [], False, []
         for i, s in enumerate(p['spans']):
             if 'agreed' in s:
                 toks = s['agreed'].split()
@@ -710,6 +767,12 @@ def fold(cmp: dict, key: dict, answers: dict) -> dict:
                 parts.append(' '.join(toks))
                 continue
             pl = f'd{i}'
+            if side := kp['places'][pl].get('majority'):
+                c[f'dispute 2 to 1 {side}'] += 1        # listed, not asked; a place note is read before scoring
+                w0 = sum(len(x.split()) for x in parts)
+                maj.append([w0, w0 + len(s[side].split())])
+                parts.append(s[side])
+                continue
             a = got.get(pl)
             opts = kp['places'][pl]['options']
             if a is None:
@@ -726,7 +789,7 @@ def fold(cmp: dict, key: dict, answers: dict) -> dict:
                 c[f'dispute picked {side}'] += 1
                 parts.append(s[side])
         out[pid] = {'text': None if open_ else ' '.join(x for x in parts if x), 'status': 'open' if open_ else 'settled',
-                    'counts': dict(c), 'note': notes.get(pid), 'drop': drop,
+                    'counts': dict(c), 'note': notes.get(pid), 'drop': drop, 'two_to_one_words': maj,
                     'place_notes': {k.split('/', 1)[1]: v for k, v in notes.items() if k.startswith(pid + '/') and v}}
     return out
 
@@ -799,6 +862,14 @@ def cmd_report(_):
               f"about {s['owner_minutes']} minutes (ocr_truth's per-page and per-dispute rates: an estimate, not a timing)."
               + (f" A draft cut off in a decoding loop is kept to its first pass ({', '.join(cmp.get('trimmed', []))}), so "
                  "the rest of that page is one dispute." if cmp.get('trimmed') else '')]
+        if cmp.get('c'):
+            m = s['settled_2_to_1']
+            L += ['', f"Third reader, blind, to break ties (owner, 2026-11-18): {cmp['c']}, through the gateway, on "
+                  f"{s['pages'] - len(cmp.get('no_c', []))} of the {s['pages']} pages. Where its words at a disputed place "
+                  f"match one draft exactly, the place settles 2 to 1 and is listed on the sheet, not asked: "
+                  f"{m.get('a', 0) + m.get('b', 0):,} of the {s['disputes']:,} ({m.get('a', 0):,} for {cmp['a']}, "
+                  f"{m.get('b', 0):,} for {cmp['b']}); at {s['c_unaligned']:,} more its neighbouring words do not line "
+                  f"up with A's, so it is not read there. {s['disputes_asked']:,} places are asked."]
         if spent_usd():
             L += ['', f"Gateway spend for the item: ${spent_usd():.2f} (the larger of the gateway's figure and the "
                   "list-price estimate, per call), pilots of four candidate drafters on 5 pages included."]
@@ -819,9 +890,11 @@ def cmd_report(_):
           'beside it, never pooled into the 96\'s figures.',
           '- **Noise:** with about 200 pages a typical pair resolves about 2 NES (n = (2.8 σd / Δ)², σd 9.7); pooled with '
           'the 96, about 1.6. Not yet 1 point.',
-          '- **Scope:** the owner\'s English collections only. Neither drafter is scored on the 96, but each has kin '
-          'that are (GPT-5.4 Mini and GPT-5.6 Luna; the Gemini 3.x routes), so a kin route may gain on agreed words; '
-          'the controls measure how often the owner overrules an agreed word, they do not remove the gain.', '']
+          '- **Scope:** the owner\'s English collections only. No drafter is scored on the 96, but each has kin '
+          'that are (GPT-5.4 Mini and GPT-5.6 Luna; the Gemini 3.x routes; Claude Sonnet 5.5 for the tie-breaker, '
+          'Sonnet 5), so a kin route may gain on agreed words and on places settled 2 to 1; the controls measure how '
+          'often the owner overrules an agreed word, they do not remove the gain. Sonnet 5.5\'s S1 score is to be '
+          'reported with and without the 2-to-1 places (owner, 2026-11-18; the fold keeps their word positions).', '']
     RESULTS.write_text('\n'.join(L))
     print(RESULTS)
 
