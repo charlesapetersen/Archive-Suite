@@ -475,6 +475,36 @@ class Holds(Fixture):
         self.assertEqual([d for d in items if d["source"] == "Daemon Report"], [])
         self.assertEqual([d["key"] for d in items if not d["permanent"]], ["H.ok"])
 
+    def test_a_standing_gate_is_never_a_question(self):
+        # Owner, 2026-11-18: the menu bar shows only what he must decide; W46.nice-to-have is kept closed on purpose.
+        plan = PLAN.replace("- [ ] **A.four", "- [ ] **A.nice — later** (blocked-on: W46.nice-to-have)\n- [ ] **A.four")
+        plan = plan.replace("- [ ] **H.ok — owner says yes**",
+                            "- [ ] **H.ok — owner says yes**\n- [ ] **W46.nice-to-have — OWNER GATE: nice-to-have**")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertTrue(by["W46.nice-to-have"]["permanent"])
+        self.assertFalse(by["H.ok"]["permanent"])
+
+    def test_a_report_entry_finds_its_owner_ok_gate_past_a_leading_date(self):
+        # 2026-11-18: "W46.owner-set-grow — …" asked the question its gate W46.owner-set-grow-owner-ok asks, and
+        # "2026-11-18 — W46.ocr-cells-l4-more — needs you" stayed a decision after its gate was ticked.
+        plan = PLAN.replace("- [ ] **A.four", "- [ ] **A.grow — grow** (blocked-on: A.grow-owner-ok)\n"
+                            "- [ ] **A.cells — cells**\n- [ ] **A.four")
+        plan = plan.replace("- [x] **H.done — answered**", "- [x] **H.done — answered**\n"
+                            "- [ ] **A.grow-owner-ok — OWNER GATE for A.grow: which size?**\n"
+                            "- [x] **A.cells-owner-ok — OWNER GATE for A.cells** — OWNER ANSWERED 2026-11-18: no")
+        plan = plan.replace("follow-ups\n\n", "follow-ups\n\nA.grow \u2014 the sheet is big: which way?\n\n"
+                            "2026-11-18 ~09:35 \u2014 A.cells \u2014 needs you: a sheet\n\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        items = self.jsonl(self.hook("holds").stdout)
+        by = {d["key"]: d for d in items}
+        self.assertFalse(by["A.grow-owner-ok"]["permanent"])
+        self.assertTrue(by["A.grow-owner-ok"]["detail"].startswith("A.grow \u2014 the sheet is big"))
+        report = [d for d in items if d["source"] == "Daemon Report"]
+        self.assertEqual(len(report), 1)
+        self.assertTrue(report[0]["text"].startswith("Daemon Report: 3 decisions"), report[0]["text"])  # the fixture's own
+        self.assertNotIn("A.cells", report[0]["text"] + report[0]["detail"])
+
     def test_a_walked_report_has_no_item(self):
         plan = PLAN.replace("## Daemon Report \u2014 owner decisions / follow-ups\n\n",
                             "## Daemon Report \u2014 owner decisions / follow-ups\n\n"

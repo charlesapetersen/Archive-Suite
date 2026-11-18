@@ -244,6 +244,19 @@ def half_recorded(gate, rows):
     return out
 
 
+# Standing gates (owner, 2026-11-18: "let's not show things in the menubar that I don't actually need to make
+# decisions about"). A gate the owner keeps closed on purpose is not a question: it is listed as a permanent hold,
+# never notified, and the walkthrough does not ask it. Opening it is his to raise. W46.nice-to-have: the end-of-project
+# gate (owner, 2026-10-22), kept closed at every walkthrough since.
+STANDING_GATES = {"W46.nice-to-have"}
+LEAD_DATE = re.compile(r"^\d{4}-\d\d-\d\d(?:\s+[~\d:]+)?\s*[\u2014-]+\s*")
+
+
+def entry_tag(entry):
+    """The tag a Daemon Report entry is about: its first token, after a leading date and dash if it has one."""
+    return tag_of(LEAD_DATE.sub("", clean(entry, DETAIL_MAX)))
+
+
 def short_hash(s):
     return hashlib.sha1(s.strip().encode("utf-8")).hexdigest()[:8]
 
@@ -303,7 +316,8 @@ def holds():
         if not tag or tag in seen:
             continue
         seen.add(tag)
-        ready = tag in pending and own_prerequisites_met(line, states) and not cluster_submitted(tag, line)
+        ready = (tag in pending and own_prerequisites_met(line, states) and not cluster_submitted(tag, line)
+                 and tag not in STANDING_GATES)
         text = clean(line[m.end():])
         half = half_recorded(tag, rows)
         if half:
@@ -323,17 +337,24 @@ def holds():
     # An entry its writer labels "no decision" is a mention: it never makes the item or changes its key, so a report
     # of mentions only emails nobody (owner, 2026-10-11: "only receive an email when something actually needs me").
     # An entry that opens with the tag of a pending hold is that hold's question: it becomes the hold's detail (the
-    # email's full text) and is not counted again, so one question is one item (owner, 2026-10-11).
+    # email's full text) and is not counted again, so one question is one item (owner, 2026-10-11). The entry
+    # usually names the item and its gate is the item's tag plus -owner-ok, so either matches; a leading date is
+    # skipped. An entry whose item or gate is already ticked has been answered and is not counted (owner,
+    # 2026-11-18: the menu bar listed three decisions where one was his).
     entries = report_entries(plan)
     holds_by_tag = {d["key"]: d for d in out if not d["permanent"]}
+    done = states[0]
     asks = []
     for e in entries:
         if NO_DECISION.search(e):
             continue
-        h = holds_by_tag.get(tag_of(clean(e, DETAIL_MAX)) or "")
+        t = entry_tag(e) or ""
+        h = holds_by_tag.get(t) or holds_by_tag.get(t + "-owner-ok")
         if h is not None:
             if not h.get("asked"):
                 h["detail"], h["asked"] = clean(e, DETAIL_MAX), True
+            continue
+        if t and (t in done or t + "-owner-ok" in done):
             continue
         asks.append(e)
     for d in out:
