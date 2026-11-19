@@ -214,6 +214,8 @@ final class NavigationModel: ObservableObject {
     @Published var containerEditSaving = false
     /// W40.reader-item-field-edit: why the last item-field edit was refused, for the Inspector's Checks.
     @Published var itemFieldEditError: String?
+    /// W47.ct-folder-date-reader: the offer to date a folder run's undated documents by its confirmed date.
+    @Published var folderDatingOffer: FolderDatingOffer?
     /// The file the last item-field edit was for; its error is shown only with that file (nil: with any).
     var itemFieldEditPath: String?
     /// Bumped after each `.archivesuite` edit, undo or redo, so the Checks section reads the user's values again.

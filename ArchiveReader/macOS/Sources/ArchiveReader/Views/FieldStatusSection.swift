@@ -38,6 +38,9 @@ struct FieldStatusSection: View {
         var dateEvidence: String?
         /// The user's values (`UserItemFields`); "" is "none".
         var user: [CheckableField: String] = [:]
+        /// W47.ct-folder-date-reader: the folder date the Reader gave the file, with its evidence; it stands for
+        /// page 2's evidence while the file still carries that date.
+        var dateRecord: FolderDateRecord?
         /// Why the folder's item-field file cannot be read or written, when it cannot; editing is then off.
         var userProblem: String?
 
@@ -61,6 +64,7 @@ struct FieldStatusSection: View {
             case .missing: break
             case let .loaded(doc, stamp):
                 fields.user = doc.values(for: url.lastPathComponent)
+                fields.dateRecord = doc.dateRecord(for: url.lastPathComponent)
                 if stamp.droppedOnReading { fields.userProblem = problem }
             case .newer, .unreadable: fields.userProblem = problem
             }
@@ -168,7 +172,9 @@ struct FieldStatusList: View {
         if let date = tags.displayDate {
             rows.append(Row(field: .date, value: date + (tags.dateUncertain ? " (uncertain)" : ""),
                             status: FieldStatusPolicy.date(checked: tags.checkedFields.contains(.date),
-                                                           evidence: header?.dateEvidence)))
+                                                           evidence: FolderDateRecord.evidence(
+                                                               header?.dateRecord, page: header?.dateEvidence,
+                                                               tags: tags))))
         }
         if let sent = tags.displaySentWith {
             rows.append(Row(field: .sentWith, value: sent + (tags.sentWithUncertain ? " (uncertain)" : ""),

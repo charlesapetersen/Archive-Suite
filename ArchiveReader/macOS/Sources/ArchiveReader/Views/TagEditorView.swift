@@ -107,6 +107,7 @@ struct TagEditorView: View {
                 commitDateFields()
             }
         }
+        .modifier(FolderDatingAlert(model: model, window: undoManager.map(ObjectIdentifier.init)))
     }
 
     /// The file whose collection record the inspector shows (W46.settings-reader-notes): the selection's when every
@@ -449,6 +450,30 @@ struct TagEditorView: View {
         } else {
             Button(label, action: action)
                 .buttonStyle(.bordered)
+        }
+    }
+}
+
+/// W47.ct-folder-date-reader: the offer to date a folder run's undated documents, asked in the window whose Inspector
+/// the folder date was saved from.
+private struct FolderDatingAlert: ViewModifier {
+    let model: NavigationModel
+    let window: ObjectIdentifier?
+
+    private var offer: FolderDatingOffer? {
+        guard let offer = model.folderDatingOffer, offer.window == nil || offer.window == window else { return nil }
+        return offer
+    }
+
+    func body(content: Content) -> some View {
+        content.alert(offer?.title ?? "", isPresented: Binding(
+            get: { offer != nil },
+            set: { if !$0, offer != nil { model.folderDatingOffer = nil } }), presenting: offer) { offer in
+            Button(offer.confirmTitle) { model.applyFolderDating(offer) }
+                .accessibilityIdentifier("ar.folderDating.confirm")
+            Button("Not Now", role: .cancel) { model.folderDatingOffer = nil }
+        } message: { offer in
+            Text(offer.message)
         }
     }
 }

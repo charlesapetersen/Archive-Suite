@@ -43,8 +43,9 @@ paths also contain **non-breaking spaces** U+00A0).
 - **Day:** `Day N` (unpadded), e.g. `Day 25`, `Day 1`. Often absent.
 - **Decade:** `NNNNs`, e.g. `1970s` (3–4 digit run ending in `0`, then lowercase `s`; medieval `970s`).
   An approximate date; **mutually exclusive with Year** (Year supersedes). Sorts at decade start
-  (`1970s` → `19_700_000`, same as year-only `1970`), displays `"1970s"` italic (speculative). Reader
-  never authors a decade — Processor-only (manual Year field). A year edit supersedes a decade
+  (`1970s` → `19_700_000`, same as year-only `1970`), displays `"1970s"` italic (speculative). The
+  Reader's date editor never authors a decade (the Processor's manual Year field does); the Reader's folder-date
+  offer writes one for an 8-to-19-year folder (W47.ct-folder-date-reader). A year edit supersedes a decade
   (TagEditing removes both `yearToken` + `decadeToken`). Parser: `DocumentTags.parseDecade`.
 - **Date Uncertain:** flags that the date is **speculative** — the file *usually still has a Year
   tag*. So these files sort by their (speculative) year like any dated file; the nav window renders

@@ -61,7 +61,7 @@ extension NavigationModel {
         default: throw ContainerWriteError.refusedExisting(UserItemFields.fileName)
         }
         var edited = change(fields)
-        guard edited.files != fields.files else { return nil }
+        guard edited.files != fields.files || edited.dates != fields.dates else { return nil }
         edited.updatedAt = Date()
         let wrote = try ContainerFileStore.writeItemFields(edited, directory: directory, expecting: stamp)
         return ContainerDocumentRestore(folder: directory, restore: .itemFields(fields), expecting: wrote,

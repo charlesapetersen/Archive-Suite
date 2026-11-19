@@ -58,7 +58,8 @@ sort key) are in REFERENCE.md under this heading. The rules they carry:
 - **Tags are read from the Finder-tag xattr** (`ArchiveCore.TagReading`); never treat a search index as tag truth.
 - Keeping the color-name token (`Red`/`Purple`) in the tag array preserves `labelNumber` without writing it —
   **still verify-after-write**.
-- Years are **3–4 digits** — don't assume exactly 4. **Reader never authors a decade** (Processor-only); a year
+- Years are **3–4 digits** — don't assume exactly 4. **The Reader's date editor never authors a decade**; the one
+  Reader writer of one is the folder-date offer (W47.ct-folder-date-reader, the owner's 8-to-19-year rule). A year
   edit supersedes a decade (removes both tokens). Date Uncertain files sort by their speculative year, in italics.
 - **Never lose any facet token.** Subjects can collide with other facets (a subject literally `1984`, `Q1`,
   `Read`): facet classification is display-only and **must never drive a destructive write**. Literal

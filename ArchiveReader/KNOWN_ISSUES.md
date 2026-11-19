@@ -2,6 +2,26 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Dating a folder's documents from its confirmed date — the limits (W47.ct-folder-date-reader, 2026-11-19)
+
+Shipped: setting or confirming a folder run's date in the Container section offers to date the run's documents that
+have no date of their own, by the owner's folder-date rule (`SPEC/containers.md` §The folder-date rule). The tags go
+through `TagWriter` in one undo group (Tags ▸ Undo Tag Change); the `Date evidence:` value is kept in the folder's
+`.archivesuite/item-fields.json` and the Checks name the folder for those dates.
+- **Clearing or widening the folder's date un-dates nothing**, and choosing Not Now does not ask again until the
+  date is edited again (accepted: the offer only adds dates; Undo, or the Inspector's date editor, takes them back).
+- **The offer is made only from the Container section.** A folder date written into the container file elsewhere
+  (Live Capture's Finish, another app) dates nothing already written until it is set or confirmed here (accepted: the
+  offer answers the user's own edit; Live Capture dates its own session's documents, W47.ct-folder-date-live).
+- **A placeholder PDF (not on disk) is never opened**, so a date it carries is treated as its own text's and stands;
+  one with no date is dated (accepted: the Core Directive forbids materialising a placeholder).
+- **Page 2's evidence is not tied to the tags.** A year retyped in Finder (which adds no check) on a document whose
+  page 2 says the year was a stamp's or the estimate's is still treated as that, and the folder's date replaces it
+  (accepted: a date edited in the Inspector is checked, and a checked date always stands; Finder edits are outside
+  the suite).
+- **The evidence record is keyed by file name**: a renamed file loses it and its Checks fall back to page 2's evidence
+  (accepted: as the item-field values and container runs are keyed).
+
 ## Editing containers — the limits (W47.ct-reader-edit, 2026-11-19)
 
 Shipped: the Inspector's **Container** section edits. Each value has an **Edit** menu (Change…, Confirm, None Here,

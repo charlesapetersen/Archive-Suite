@@ -30,13 +30,20 @@ extension NavigationModel {
     func editContainerField(_ field: ContainerField, _ edit: ContainerFieldEdit, forPath path: String,
                             undo: UndoManager? = nil) {
         guard let (tree, dir, name) = containerEditLocation(path) else { return }
+        folderDatingOffer = nil   // W47.ct-folder-date-reader: an offer made before this edit no longer stands
         let now = Date()
         let action = switch edit {
         case .set: "Container Change"
         case .noneHere: "None Here"
         case .remove: "Remove Your Value"
         }
-        runContainerEdit(done: "Container saved.", action: action, undo: undo) {
+        // W47.ct-folder-date-reader: a folder date typed or confirmed may date the run's undated documents.
+        var onSaved: (@MainActor () -> Void)?
+        if field == .date, case .set = edit {
+            let window = undo.map { ObjectIdentifier($0) }
+            onSaved = { [weak self] in self?.offerFolderDating(at: path, window: window) }
+        }
+        runContainerEdit(done: "Container saved.", action: action, undo: undo, {
             let directory = try Self.containerDirectoryURL(tree, dir)
             return try Self.editContainerFile(at: directory) { file in
                 let target = ContainerEdits.target(for: field, at: name, in: file)
@@ -61,7 +68,7 @@ extension NavigationModel {
                 }
                 return ContainerEdits.set(field, to: value, at: target, in: file)
             }.map { ContainerUndoStep(restores: [$0]) }
-        }
+        }, onSaved: onSaved)
     }
 
     /// "Set for selection": `field` is `text` for the selected files and no other, each folder's neighbours a run of
@@ -200,6 +207,7 @@ extension NavigationModel {
             return
         }
         let redoing = undo.isRedoing
+        if document == .containers { folderDatingOffer = nil }   // the folder date it offered may be the one undone
         if document == .itemFields { itemFieldEditPath = nil }   // an undo's error is shown whatever is selected
         let result = step.apply()
         registerContainerUndo(result.inverse, action: action, on: undo)
@@ -272,9 +280,10 @@ extension NavigationModel {
     }
 
     /// Runs one edit off the main thread, one at a time, then reads the container files again.
-    /// What it wrote is registered with `undo` as `action`.
+    /// What it wrote is registered with `undo` as `action`; `onSaved` runs on the main thread after a save that worked.
     func runContainerEdit(done: String, action: String, undo: UndoManager?, document: EditedDocument = .containers,
-                          _ work: @escaping @Sendable () throws -> ContainerUndoStep?) {
+                          _ work: @escaping @Sendable () throws -> ContainerUndoStep?,
+                          onSaved: (@MainActor () -> Void)? = nil) {
         guard !containerEditSaving else {
             setEditError("The last change is still being saved. Try again in a moment.", document)
             return
@@ -300,9 +309,11 @@ extension NavigationModel {
                 self.statusMessage = done
                 self.announce(done)
             }
+            let saved = failure == nil
             // The editor stays disabled until the catalog read after this edit is published, so a menu still
             // offering the old value cannot write it back over the one just saved (`refreshContainers` clears it).
             self.finishEdit(document)
+            if saved { onSaved?() }
         }
     }
 
