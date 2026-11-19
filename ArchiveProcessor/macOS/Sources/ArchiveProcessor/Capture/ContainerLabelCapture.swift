@@ -36,10 +36,13 @@ enum ContainerLabelCapture {
     /// the larger of the token estimate and the gateway's own figure).
     static let gatewayDollarsPerLabel = 0.00084
 
-    /// `read`, with the Vision text it parsed (for recognising a "No Folder" sheet) and whether a gateway call was made
-    /// (real money). `useModel` false reads with Vision + parser alone: no gateway call and no local model.
+    /// `read`, with the Vision text it parsed (for recognising a "No Folder" sheet), whether Vision answered at all (an
+    /// error is not an empty label), whether a gateway call was made (real money) and whether a model's reading that
+    /// parsed went into the fields. `useModel` false reads with Vision + parser
+    /// alone: no gateway call and no local model.
     static func readLabel(type: ItemType, text: String, photo: URL, rotation: Int, gateway: GatewayConfig?,
-                          useModel: Bool = true) async -> (fields: ContainerFieldSet, visionText: String, gatewayCalled: Bool) {
+                          useModel: Bool = true)
+        async -> (fields: ContainerFieldSet, visionText: String, visionAnswered: Bool, gatewayCalled: Bool, modelAnswered: Bool) {
         let vision = try? await VisionClient(settings: .default).ocr(imageURL: photo)
         let visionText = vision?.text ?? ""
         let lines = (visionText.isEmpty ? text : visionText).components(separatedBy: .newlines)
@@ -66,7 +69,7 @@ enum ContainerLabelCapture {
         let fields = ContainerLabelReader.proposals(lines: lines, type: type, model: model,
                                                     modelReader: model == nil ? nil : modelReader,
                                                     parserReader: parserReader, at: Date())
-        return (fields, visionText, gatewayCalled)
+        return (fields, visionText, vision != nil, gatewayCalled, !(model ?? [:]).isEmpty)
     }
 
     /// One filed marker, for the finalize write.

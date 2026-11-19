@@ -121,7 +121,7 @@ struct ToolsView: View {
         .onChange(of: selectedProvider) { _, _ in reloadKey() }
         .onChange(of: useGateway) { _, _ in reloadKey() }
         .sheet(isPresented: $showContainerBackfill) {
-            ContainerBackfillSheet(model: Self.backfillModel()) { showContainerBackfill = false }
+            ContainerBackfillSheet(makeModel: Self.backfillModel) { showContainerBackfill = false }
         }
         .sheet(isPresented: $showHistory) {
             ProcessingHistoryView(onDismiss: { showHistory = false })
@@ -203,7 +203,7 @@ struct ToolsView: View {
     }
 
     /// A new window's model; under a UI test, on the test's scratch folder with canned reads.
-    private static func backfillModel() -> ContainerBackfillModel {
+    @MainActor private static func backfillModel() -> ContainerBackfillModel {
         let model = ContainerBackfillModel()
 #if DEBUG
         if ProcessorUITestConfiguration.backfillFakeReads {

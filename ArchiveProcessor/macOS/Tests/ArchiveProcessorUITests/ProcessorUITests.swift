@@ -650,6 +650,62 @@ final class ProcessorUITests: XCTestCase {
                       "the caption must name the run's provider: \(caption)")
     }
 
+    /// W47.ct-backfill: Tools ▸ Read Box and Folder Labels on a scratch tree with canned reads. The folders are proposed
+    /// and nothing is written until one is accepted; then only that folder's `.archivesuite/containers.json`, with the
+    /// photos' bytes unchanged. A skipped folder gets nothing.
+    func testBackfillWritesOnlyTheAcceptedFolder() throws {
+        let root = scratchRoot.appendingPathComponent("Backfill", isDirectory: true)
+        let files: [(String, String?)] = [("Glotzer/0001.pdf", "Box"), ("Glotzer/0002.pdf", nil), ("Glotzer/0003.pdf", "Folder"),
+                                          ("Glotzer/0004.pdf", nil), ("Glotzer/Box 2/0001.pdf", "Box"),
+                                          ("Glotzer/Box 2/0002.pdf", nil)]
+        var bytes: [String: Data] = [:]
+        for (path, tag) in files {
+            let url = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let data = Data("scratch photo \(path)".utf8)
+            try data.write(to: url)
+            if let tag { try (url as NSURL).setResourceValue([tag], forKey: .tagNamesKey) }
+            bytes[path] = data
+        }
+        relaunch(extra: ["-APUITestBackfillFolder", root.path, "-APUITestBackfillFakeReads"])
+        let window = app.windows.firstMatch
+        let tools = [window.radioButtons["Tools"], window.buttons["Tools"]].first { $0.exists }
+        guard let tools else { return XCTFail("the main window must offer the Tools mode") }
+        tools.click()
+        let showSheet = window.buttons["Read Labels in a Folder…"]
+        XCTAssertTrue(showSheet.waitForExistence(timeout: 5), "Tools must offer Read Box and Folder Labels")
+        showSheet.click()
+
+        let summary = element("ap.backfill.summary")
+        XCTAssertTrue(summary.waitForExistence(timeout: 10), "the scan must report what it found")
+        XCTAssertTrue(renderedText(of: summary).contains("3 box and folder photos"), renderedText(of: summary))
+        XCTAssertTrue(element("ap.backfill.levels").exists, "the folder has no level map, so it is offered")
+        let read = element("ap.backfill.read")
+        XCTAssertTrue(read.waitForExistence(timeout: 5))
+        read.click()
+        let accept = element("ap.backfill.accept.Glotzer")
+        XCTAssertTrue(accept.waitForExistence(timeout: 15), "the folder's runs must be proposed")
+        let containerFile = root.appendingPathComponent("Glotzer/.archivesuite/containers.json")
+        let innerFile = root.appendingPathComponent("Glotzer/Box 2/.archivesuite/containers.json")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: containerFile.path), "nothing is written before Accept")
+        attachScreenshot("processor-backfill-proposed")
+
+        accept.click()
+        XCTAssertTrue(element("ap.backfill.written.Glotzer").waitForExistence(timeout: 10), "Accept must write the folder")
+        let skip = element("ap.backfill.skip.Glotzer/Box 2")
+        XCTAssertTrue(skip.exists, "the other folder is still waiting for its own answer")
+        skip.click()
+        attachScreenshot("processor-backfill-accepted")
+        let written = try String(contentsOf: containerFile, encoding: .utf8)
+        XCTAssertTrue(written.contains("Box 1") && written.contains("\"3\""), written)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: innerFile.path), "a skipped folder gets nothing")
+        for (path, data) in bytes {
+            XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(path)), data, "\(path) must be untouched")
+        }
+        let added = try FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("Glotzer/.archivesuite").path)
+        XCTAssertEqual(added, ["containers.json"])
+    }
+
     /// W40.fix-processor-compare-count: the Compare Models footer counts every ticked model, and says how many
     /// can run. Headless, no provider has a key, so a ticked model is selected but cannot run.
     func testCompareModelsCountsTickedModelsWithoutKeys() throws {

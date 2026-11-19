@@ -20,6 +20,7 @@ final class ContainerBackfillModel: ObservableObject {
     enum RowStatus: Equatable {
         case waiting
         case proposed
+        case accepting
         case written
         case skipped
         case unchanged
@@ -35,7 +36,8 @@ final class ContainerBackfillModel: ObservableObject {
         var note: String?
     }
 
-    /// Above this the read asks again before it starts (the suite's $7 line for one piece of work).
+    /// Above this the read asks again before it starts (the suite's $7 line for one piece of work), counting what this
+    /// window has already spent.
     static let confirmAboveDollars = 7.0
     /// Reads in flight at once: the gateway took four at once in `ct-read.md`.
     static let concurrentReads = 4
@@ -53,9 +55,14 @@ final class ContainerBackfillModel: ObservableObject {
     @Published private(set) var gatewayCalls = 0
 
     private var task: Task<Void, Never>?
-    /// Whether the last read pass used a model: its proposals are made from that pass's reads.
-    private var readWithModel = false
+    private var scanFlag: CancelFlag?
+    /// Bumped by every choose, rescan and stop: a task's results land only while it is still the current one.
+    private var generation = 0
+    /// Whether the last read pass used a model, and which: its proposals are made from that pass's reads.
+    private var readRoute: ContainerBackfillCache.Route = .vision
     private var reads: [String: ContainerBackfillCache.Entry] = [:]
+    /// Each marker's size and modification time, taken once at the scan (`ContainerBackfillCache.stamp`).
+    private var stamps: [URL: String] = [:]
     private let cache: ContainerBackfillCache
     /// A test seam: the read for one marker in place of Vision and the models (UI tests in the VM).
     var readOverride: (@Sendable (ContainerBackfill.Marker) async -> ContainerBackfillCache.Entry)?
@@ -67,25 +74,35 @@ final class ContainerBackfillModel: ObservableObject {
     var gateway: GatewayConfig? { GatewayConfig.fromDefaults() }
 
     /// What "use a model" would read with: the gateway's Luna (money), else Gemma on this Mac when a server lists it.
-    enum ModelRoute: Equatable { case gateway, localModel }
-    var modelRoute: ModelRoute {
-        if let g = gateway, !g.isLocalModel { return .gateway }
-        return .localModel
+    var modelRoute: ContainerBackfillCache.Route {
+        if let g = gateway, !g.isLocalModel { return .luna }
+        return .gemma
     }
+
+    private var requestedRoute: ContainerBackfillCache.Route { useModel ? modelRoute : .vision }
 
     var markers: [ContainerBackfill.Marker] { scan?.directories.flatMap(\.markers) ?? [] }
 
+    private func key(_ marker: ContainerBackfill.Marker, _ route: ContainerBackfillCache.Route) -> String {
+        cache.key(path: marker.url.path, stamp: stamps[marker.url] ?? "?", route: route)
+    }
+
     /// The markers a read would still have to read (the rest are in the read cache from an earlier pass).
     var markersToRead: Int {
-        markers.filter { reads[cache.key(for: $0.url, withModel: useModel)] == nil }.count
+        let route = requestedRoute
+        return markers.filter { reads[key($0, route)] == nil }.count
     }
 
     /// The up-front estimate in dollars: only a gateway read costs money.
     var estimatedDollars: Double {
-        useModel && modelRoute == .gateway ? Double(markersToRead) * ContainerLabelCapture.gatewayDollarsPerLabel : 0
+        requestedRoute == .luna ? Double(markersToRead) * ContainerLabelCapture.gatewayDollarsPerLabel : 0
     }
 
-    var needsCostConfirmation: Bool { estimatedDollars > Self.confirmAboveDollars }
+    var spentDollars: Double { Double(gatewayCalls) * ContainerLabelCapture.gatewayDollarsPerLabel }
+
+    var needsCostConfirmation: Bool {
+        estimatedDollars > 0 && spentDollars + estimatedDollars > Self.confirmAboveDollars
+    }
 
     var isBusy: Bool {
         switch phase {
@@ -97,27 +114,43 @@ final class ContainerBackfillModel: ObservableObject {
     // MARK: Scan
 
     func choose(_ folder: URL) {
-        cancel()
         root = folder.standardizedFileURL
         rescan()
     }
 
     func rescan() {
         guard let root else { return }
-        cancel()
+        stopTask()
+        generation += 1
+        let gen = generation
         phase = .scanning
         message = nil
         rows = []
         scan = nil
+        stamps = [:]
+        levelsDraft = nil
+        levelsError = nil
         let colours = self.colours
+        let flag = CancelFlag()
+        scanFlag = flag
+        let cache = self.cache
         task = Task { [weak self] in
-            let found = await Task.detached { ContainerBackfill.scan(root: root, colours: colours) }.value
-            guard let self, !Task.isCancelled, let found else { return }
-            self.reads = await Task.detached { [cache] in cache.load() }.value
+            let result = await Task.detached { () -> (ContainerBackfill.Scan, [URL: String], [String: ContainerBackfillCache.Entry], Bool)? in
+                guard let found = ContainerBackfill.scan(root: root, colours: colours, isCancelled: { flag.isSet })
+                else { return nil }
+                var stamps: [URL: String] = [:]
+                for d in found.directories { for m in d.markers { stamps[m.url] = ContainerBackfillCache.stamp(of: m.url) } }
+                let offerLevels = !ContainerBackfillModel.hasLevelMap(atOrAbove: root)
+                    && found.fileDirectories.contains { !$0.isEmpty }
+                return (found, stamps, cache.load(), offerLevels)
+            }.value
+            guard let self, gen == self.generation, let (found, stamps, loaded, offerLevels) = result else { return }
+            self.reads.merge(loaded) { current, _ in current }
+            self.stamps = stamps
             self.scan = found
             self.rows = found.directories.filter { !$0.markers.isEmpty }.map { Row(directory: $0) }
             self.phase = .scanned
-            if ContainerFileStore.loadLevelMap(root: root) == .missing, found.fileDirectories.contains(where: { !$0.isEmpty }) {
+            if offerLevels {
                 self.levelsDraft = ContainerLevelsDraft.make(directories: found.fileDirectories, tree: root,
                                                              treePath: root.path)
             }
@@ -128,58 +161,101 @@ final class ContainerBackfillModel: ObservableObject {
         }
     }
 
+    /// Whether the chosen folder or a folder above it holds a level map: the nearest one wins (SPEC §The level map),
+    /// so a new one here would shadow it, and one there, readable or not, is the user's.
+    nonisolated static func hasLevelMap(atOrAbove folder: URL) -> Bool {
+        var dir = folder.standardizedFileURL
+        while true {
+            if FileManager.default.fileExists(atPath: ContainerFileStore.levelMapURL(in: dir).path) { return true }
+            let up = dir.deletingLastPathComponent()
+            if up.path == dir.path { return false }
+            dir = up
+        }
+    }
+
     // MARK: Read
 
     func startReading() {
         guard root != nil, phase == .scanned || phase == .reviewing else { return }
-        let toRead = rows.map(\.directory)
-        let withModel = useModel
-        readWithModel = withModel
-        let gateway = withModel ? self.gateway : nil
-        let total = toRead.reduce(0) { $0 + $1.markers.count }
+        generation += 1
+        let gen = generation
+        let toRead = rows.filter { $0.status != .written }.map(\.directory)
+        let route = requestedRoute
+        readRoute = route
+        let gateway = route == .vision ? nil : self.gateway
+        // Cache hits are resolved here, on the main actor, so the reads in flight touch nothing of this model. A
+        // model's read also stands for a Vision one; a Vision read kept after a model failed to answer does not stand
+        // for a model's, so that photo is tried again.
+        let work = toRead.flatMap { d in
+            d.markers.map { m in
+                let keys = (vision: key(m, .vision), model: key(m, route))
+                return (d.relativePath, m, keys, reads[keys.model])
+            }
+        }
+        let cache = self.cache
+        let total = work.count
+        var left: [String: Int] = [:]
+        for d in toRead { left[d.relativePath] = d.markers.count }
+        let override = readOverride
         phase = .reading(done: 0, total: total)
         message = nil
         task = Task { [weak self] in
-            guard let self else { return }
             var done = 0
-            var left: [String: Int] = [:]
-            for d in toRead { left[d.relativePath] = d.markers.count }
-            // Cache hits are resolved here, on the main actor, so the reads in flight touch nothing of this model.
-            let work = toRead.flatMap { d in
-                d.markers.map { m in (d.relativePath, m, self.reads[self.cache.key(for: m.url, withModel: withModel)]) }
-            }
-            let override = self.readOverride
             var next = 0
-            await withTaskGroup(of: (String, ContainerBackfill.Marker, ContainerBackfillCache.Entry, Bool)?.self) { group in
+            var finished: [String] = []
+            // Reads that land after the window closed, saved straight into the cache below: they were paid for.
+            var orphans: [String: ContainerBackfillCache.Entry] = [:]
+            typealias Keys = (vision: String, model: String)
+            typealias Result = (dir: String, keys: Keys, entry: ContainerBackfillCache.Entry?, visionAnswered: Bool,
+                                called: Bool, modelAnswered: Bool)
+            await withTaskGroup(of: Result.self) { group in
                 func add() {
                     guard next < work.count else { return }
-                    let (dir, marker, hit) = work[next]
+                    let (dir, marker, keys, hit) = work[next]
                     next += 1
                     group.addTask {
-                        if let hit { return (dir, marker, hit, false) }
-                        guard !Task.isCancelled else { return nil }
-                        if let override { return (dir, marker, await override(marker), false) }
-                        return await Self.read(marker, gateway: gateway, withModel: withModel)
-                            .map { (dir, marker, $0.entry, $0.gatewayCalled) }
+                        if let hit { return (dir, keys, hit, false, false, false) }
+                        if Task.isCancelled { return (dir, keys, nil, false, false, false) }
+                        if let override { return (dir, keys, await override(marker), true, false, route != .vision) }
+                        let r = await Self.read(marker, gateway: gateway, route: route)
+                        return (dir, keys, r?.entry, r?.visionAnswered ?? false, r?.gatewayCalled ?? false,
+                                r?.modelAnswered ?? false)
                     }
                 }
                 for _ in 0..<Self.concurrentReads { add() }
-                while let result = await group.next() {
-                    if Task.isCancelled { group.cancelAll(); continue }
-                    if let (dir, marker, entry, called) = result {
-                        self.reads[self.cache.key(for: marker.url, withModel: withModel)] = entry
-                        if called { self.gatewayCalls += 1 }
-                        left[dir, default: 1] -= 1
-                        if left[dir] == 0 { await self.propose(dir) }
+                while let r = await group.next() {
+                    // A read that arrives after Stop is still kept and counted: it was paid for. A read is kept under
+                    // a route's key only when that route answered, so a failed one is tried again next time.
+                    var keep: [String: ContainerBackfillCache.Entry] = [:]
+                    if let entry = r.entry {
+                        if r.visionAnswered || r.modelAnswered { keep[r.keys.vision] = entry }
+                        if route != .vision, r.modelAnswered { keep[r.keys.model] = entry }
                     }
+                    guard let self else {
+                        orphans.merge(keep) { _, new in new }
+                        group.cancelAll(); continue
+                    }
+                    if r.called { self.gatewayCalls += 1 }
+                    for (k, entry) in keep where k == r.keys.model || self.reads[k] == nil { self.reads[k] = entry }
+                    let dir = r.dir
+                    guard gen == self.generation, !Task.isCancelled else { group.cancelAll(); continue }
                     done += 1
+                    left[dir, default: 1] -= 1
+                    if left[dir] == 0 { finished.append(dir) }
                     self.phase = .reading(done: done, total: total)
                     if done % 25 == 0 { self.saveCache() }
                     add()
+                    // Proposals are made between reads, never while a result is half recorded.
+                    for d in finished { await self.propose(d, generation: gen) }
+                    finished = []
                 }
             }
+            guard let self else {
+                if !orphans.isEmpty { cache.merge(orphans) }
+                return
+            }
             self.saveCache()
-            guard !Task.isCancelled else { return }
+            guard gen == self.generation, !Task.isCancelled else { return }
             self.phase = .reviewing
         }
     }
@@ -187,29 +263,31 @@ final class ContainerBackfillModel: ObservableObject {
     /// One marker's read off the main thread: a PDF's first page rendered to a temporary JPEG (deleted after), never
     /// its text layer.
     nonisolated private static func read(_ marker: ContainerBackfill.Marker, gateway: GatewayConfig?,
-                                         withModel: Bool) async -> (entry: ContainerBackfillCache.Entry, gatewayCalled: Bool)? {
+                                         route: ContainerBackfillCache.Route)
+        async -> (entry: ContainerBackfillCache.Entry, visionAnswered: Bool, gatewayCalled: Bool, modelAnswered: Bool)? {
         let photo = await Task.detached { PDFToImageConverter.imageURL(for: marker.url) }.value
         defer { if photo != marker.url { try? FileManager.default.removeItem(at: photo) } }
-        guard !Task.isCancelled else { return nil }
         let r = await ContainerLabelCapture.readLabel(type: marker.type, text: "", photo: photo, rotation: 0,
-                                                      gateway: gateway, useModel: withModel)
-        return (ContainerBackfillCache.Entry(fields: r.fields, text: r.visionText), r.gatewayCalled)
+                                                      gateway: gateway, useModel: route != .vision)
+        return (ContainerBackfillCache.Entry(fields: r.fields, text: r.visionText), r.visionAnswered, r.gatewayCalled,
+                r.modelAnswered)
     }
 
-    private func containerMarkers(_ d: ContainerBackfill.Directory, withModel: Bool) -> [ContainerMarker] {
+    private func containerMarkers(_ d: ContainerBackfill.Directory, route: ContainerBackfillCache.Route) -> [ContainerMarker] {
         d.markers.map { m in
-            let entry = reads[cache.key(for: m.url, withModel: withModel)]
+            let entry = reads[key(m, route)] ?? reads[key(m, .vision)]
             return ContainerMarker(fileName: m.fileName, type: m.type, read: entry?.fields ?? ContainerFieldSet(),
                                    text: entry?.text)
         }
     }
 
-    private func propose(_ relativePath: String) async {
+    private func propose(_ relativePath: String, generation gen: Int) async {
         guard let i = rows.firstIndex(where: { $0.id == relativePath }) else { return }
         let d = rows[i].directory
-        let markers = containerMarkers(d, withModel: readWithModel)
+        let markers = containerMarkers(d, route: readRoute)
         let proposal = await Task.detached { ContainerBackfill.propose(markers, in: d.url) }.value
-        guard let j = rows.firstIndex(where: { $0.id == relativePath }) else { return }
+        guard gen == generation, let j = rows.firstIndex(where: { $0.id == relativePath }),
+              rows[j].status != .written, rows[j].status != .accepting else { return }
         rows[j].proposal = proposal
         switch proposal.state {
         case .ready: rows[j].status = .proposed
@@ -218,22 +296,31 @@ final class ContainerBackfillModel: ObservableObject {
         }
     }
 
+    /// Stop: what is read so far is kept, and its folders already proposed stay proposed.
     func cancel() {
-        task?.cancel()
-        task = nil
-        if case .reading = phase {
+        let wasReading: Bool
+        if case .reading = phase { wasReading = true } else { wasReading = false }
+        let wasScanning = phase == .scanning
+        stopTask()
+        generation += 1
+        if wasReading {
             phase = rows.contains { $0.proposal != nil } ? .reviewing : .scanned
             message = "Stopped. The labels read so far are kept, so reading again starts where this stopped."
-        } else if phase == .scanning {
+        } else if wasScanning {
             phase = .idle
         }
         saveCache()
     }
 
+    private func stopTask() {
+        task?.cancel()
+        task = nil
+        scanFlag?.set()
+        scanFlag = nil
+    }
+
     private func saveCache() {
-        let snapshot = reads
-        let cache = self.cache
-        Task.detached { cache.save(snapshot) }
+        cache.save(reads)
     }
 
     // MARK: Accept
@@ -241,29 +328,38 @@ final class ContainerBackfillModel: ObservableObject {
     func accept(_ id: Row.ID) {
         guard let root, let i = rows.firstIndex(where: { $0.id == id }), let proposal = rows[i].proposal,
               rows[i].status == .proposed else { return }
+        rows[i].status = .accepting
+        rows[i].note = nil
+        let gen = generation
         Task { [weak self] in
             let outcome: ContainerBackfill.AcceptOutcome
             do {
                 outcome = try await Task.detached { try ContainerBackfill.accept(proposal, root: root) }.value
             } catch {
-                self?.setStatus(id, .failed("not written: \(error.localizedDescription)"))
+                guard let self, gen == self.generation else { return }
+                self.setStatus(id, .failed("not written: \(error.localizedDescription)"))
                 return
             }
-            guard let self else { return }
+            // A new scan or a Stop meanwhile: these rows are not the ones accepted (the write itself stands).
+            guard let self, gen == self.generation else { return }
             switch outcome {
             case .wrote: self.setStatus(id, .written)
             case .unchanged: self.setStatus(id, .unchanged)
             case .refused(let why): self.setStatus(id, .failed(why))
             case .changedSinceRead:
-                await self.propose(id)
-                if let j = self.rows.firstIndex(where: { $0.id == id }) {
+                self.setStatus(id, .waiting)
+                await self.propose(id, generation: self.generation)
+                if let j = self.rows.firstIndex(where: { $0.id == id }), self.rows[j].status == .proposed {
                     self.rows[j].note = "The folder's container file changed after this was proposed; this is the new proposal."
                 }
             }
         }
     }
 
-    func skip(_ id: Row.ID) { setStatus(id, .skipped) }
+    func skip(_ id: Row.ID) {
+        guard let i = rows.firstIndex(where: { $0.id == id }), rows[i].status == .proposed else { return }
+        setStatus(id, .skipped)
+    }
 
     private func setStatus(_ id: Row.ID, _ status: RowStatus) {
         guard let i = rows.firstIndex(where: { $0.id == id }) else { return }
@@ -272,21 +368,34 @@ final class ContainerBackfillModel: ObservableObject {
     }
 
     func saveLevels(_ draft: ContainerLevelsDraft) {
+        guard let root, draft.tree == root else { levelsDraft = nil; return }
         levelsError = ProcessFilesTree.saveLevels(draft)
         if levelsError == nil { levelsDraft = nil }
     }
 }
 
+/// A flag a scan off the main thread polls, set by Stop or a new scan.
+final class CancelFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
+    func set() { lock.lock(); value = true; lock.unlock() }
+}
+
 /// The labels read by earlier passes, so reading a folder again, or after a Stop, reads only what is new and pays for
 /// no read twice. Kept app-side (Application Support), never in the corpus. Keyed by the file's path, size and
-/// modification time, and by whether a model read it.
+/// modification time, and by the route that read it: a model's key holds only a read the model answered.
 struct ContainerBackfillCache: Sendable {
+    enum Route: String, Sendable { case vision, luna, gemma }
+
     struct Entry: Codable, Equatable, Sendable {
         var fields: ContainerFieldSet
         var text: String
     }
 
     let url: URL
+    /// Saves run one after another in the order they were asked for, so an older snapshot never lands last.
+    private static let queue = DispatchQueue(label: "ArchiveProcessor.containerBackfillCache")
 
     static var standard: ContainerBackfillCache {
 #if DEBUG
@@ -299,21 +408,40 @@ struct ContainerBackfillCache: Sendable {
         return ContainerBackfillCache(url: base.appendingPathComponent("ArchiveProcessor/container-label-reads.json"))
     }
 
-    func key(for file: URL, withModel: Bool) -> String {
+    /// A file's size and modification time, or "?" when it cannot be read.
+    static func stamp(of file: URL) -> String {
         var st = stat()
-        let path = file.standardizedFileURL.path
-        let stamp = stat(path, &st) == 0 ? "\(st.st_size)|\(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)" : "?"
-        return "\(withModel ? "model" : "vision")|\(stamp)|\(path)"
+        guard stat(file.path, &st) == 0 else { return "?" }
+        return "\(st.st_size)|\(st.st_mtimespec.tv_sec).\(st.st_mtimespec.tv_nsec)"
+    }
+
+    func key(path: String, stamp: String, route: Route) -> String { "\(route.rawValue)|\(stamp)|\(path)" }
+
+    /// Adds `entries` to what is on disk (theirs win), for reads that land after the window closed.
+    func merge(_ entries: [String: Entry]) {
+        let url = self.url
+        Self.queue.async {
+            var all = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode([String: Entry].self, from: $0) } ?? [:]
+            all.merge(entries) { _, new in new }
+            guard let data = try? JSONEncoder().encode(all) else { return }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
     }
 
     func load() -> [String: Entry] {
-        guard let data = try? Data(contentsOf: url) else { return [:] }
-        return (try? JSONDecoder().decode([String: Entry].self, from: data)) ?? [:]
+        Self.queue.sync {
+            guard let data = try? Data(contentsOf: url) else { return [:] }
+            return (try? JSONDecoder().decode([String: Entry].self, from: data)) ?? [:]
+        }
     }
 
     func save(_ entries: [String: Entry]) {
-        guard let data = try? JSONEncoder().encode(entries) else { return }
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+        let url = self.url
+        Self.queue.async {
+            guard let data = try? JSONEncoder().encode(entries) else { return }
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: url, options: .atomic)
+        }
     }
 }

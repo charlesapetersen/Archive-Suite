@@ -260,6 +260,24 @@ until the user confirms it. In Live Capture the marker's card shows them (throug
 and Save confirms them; at Finish each filed marker's run starts at its own PDF in the collection folder. Process
 Files writes them as proposals, for the Reader.
 
+**Backfill** (`ContainerBackfill`, W47.ct-backfill). Route A for material photographed before the apps: the Processor's
+Tools ▸ Read Box and Folder Labels takes a folder the user chooses and walks it as §Route B in Process Files reads a
+tree (hidden folders, packages, links to folders and depths past 12 not entered; photos and PDFs only). A file is a
+marker when its `Box` / `Folder` tag, or its Finder colour under the colours the user gives for older material (Red
+a box and Purple a folder unless changed), names a type; nothing else is read from it but its tags. Each marker is
+read as at capture (§Reading a label): Apple Vision on the photo, or on a PDF's first page rendered to a temporary
+image, never the PDF's text layer; with the user's say-so, GPT 5.6 Luna on the gateway (real money: the estimate,
+about $0.00084 a photo from `ct-read.md`, is shown first, and a read above $7 asks again) or Gemma 3 12B on this Mac.
+Reads are kept app-side (Application Support), keyed by the file's path, size and modification time and by whether a
+model read it, so reading again pays for nothing already read. Each directory's reads become a proposal
+(`propose`: `applyMarkers` on its container file as it is, nothing written), shown as the runs it adds or changes with
+its warnings. A directory is written only when the user accepts it (`accept`): only its
+`.archivesuite/containers.json`, only if that file is still the one the proposal read (else the proposal is made
+again and shown), never one that is newer, unreadable or holds values this build drops, and never through a link or
+outside the chosen folder. The folder names are Route B: when neither the chosen folder nor a folder above it holds
+a level map, the map pre-filled from its tree is offered and written there only on Save. Running it on a real corpus
+is the user's own act from the app.
+
 ## Warnings
 
 `ContainerInference.applyMarkers` and `.warnings` give the warnings; they are shown, never acted on.

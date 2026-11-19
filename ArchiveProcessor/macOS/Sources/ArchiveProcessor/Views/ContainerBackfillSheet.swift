@@ -10,8 +10,10 @@ struct ContainerBackfillSheet: View {
     @State private var showingLevels = false
     let onDone: () -> Void
 
-    init(model: ContainerBackfillModel = ContainerBackfillModel(), onDone: @escaping () -> Void) {
-        _model = StateObject(wrappedValue: model)
+    /// `makeModel` runs once, when the sheet first appears (`StateObject`), not on every render of the view above.
+    init(makeModel: @escaping @MainActor () -> ContainerBackfillModel = { ContainerBackfillModel() },
+         onDone: @escaping () -> Void) {
+        _model = StateObject(wrappedValue: makeModel())
         self.onDone = onDone
     }
 
@@ -42,12 +44,13 @@ struct ContainerBackfillSheet: View {
         }
         .padding(20)
         .frame(width: 780, height: 640)
-        .alert("Read with GPT 5.6 Luna for about \(dollars(model.estimatedDollars))?", isPresented: $confirmingCost) {
+        .alert("Read with GPT 5.6 Luna for about \(dollars(model.estimatedDollars)) more?", isPresented: $confirmingCost) {
             Button("Read") { model.startReading() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("\(model.markersToRead) label photos at about \(dollars(ContainerLabelCapture.gatewayDollarsPerLabel)) each "
-                 + "through the gateway: real money, above \(dollars(ContainerBackfillModel.confirmAboveDollars)). "
+                 + "through the gateway: real money. With the \(dollars(model.spentDollars)) this window has spent, that is "
+                 + "above \(dollars(ContainerBackfillModel.confirmAboveDollars)). "
                  + "Reading with Vision alone is free.")
         }
         .sheet(isPresented: $showingLevels) {
@@ -137,15 +140,16 @@ struct ContainerBackfillSheet: View {
     private var costLine: String {
         let n = model.markersToRead
         let visionMinutes = max(1, Int((Double(n) * 0.17 / 60).rounded(.up)))
+        if n == 0 { return "Every photo has been read this way already: reading again costs nothing and proposes the folders again." }
         guard model.useModel else {
             return "Box and folder numbers with Apple Vision on this Mac: free, about \(visionMinutes) min for \(n) photos "
                 + "not read yet. Titles, collection numbers and accessions are left for you, or read them with a model."
         }
         switch model.modelRoute {
-        case .gateway:
+        case .luna:
             return "GPT 5.6 Luna on the gateway for titles, collection numbers and accessions: real money, about "
                 + "\(dollars(model.estimatedDollars)) for \(n) photos not read yet (\(dollars(ContainerLabelCapture.gatewayDollarsPerLabel)) each)."
-        case .localModel:
+        case .gemma, .vision:
             let minutes = Int((Double(n) * ContainerLabelGemma.secondsPerLabel / 60).rounded(.up))
             return "Gemma 3 12B on this Mac, when a local model server lists it: free, about \(minutes) min for \(n) photos. "
                 + "With no server, Vision's reading alone is proposed."
@@ -192,6 +196,7 @@ struct ContainerBackfillSheet: View {
     private func statusView(_ row: ContainerBackfillModel.Row) -> some View {
         switch row.status {
         case .waiting: Text("not read").font(.caption).foregroundStyle(.secondary)
+        case .accepting: ProgressView().controlSize(.small)
         case .proposed:
             Button("Skip") { model.skip(row.id) }.controlSize(.small)
                 .accessibilityIdentifier("ap.backfill.skip.\(row.id)")
@@ -234,7 +239,7 @@ struct ContainerBackfillSheet: View {
                 Button("Stop") { model.cancel() }.accessibilityIdentifier("ap.backfill.stop")
             } else if model.phase == .scanned || model.phase == .reviewing {
                 Button(model.phase == .reviewing ? "Read Again" : "Read Labels") {
-                    if model.useModel && model.needsCostConfirmation { confirmingCost = true } else { model.startReading() }
+                    if model.needsCostConfirmation { confirmingCost = true } else { model.startReading() }
                 }
                 .disabled(model.rows.isEmpty)
                 .accessibilityIdentifier("ap.backfill.read")

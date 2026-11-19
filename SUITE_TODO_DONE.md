@@ -16969,3 +16969,37 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Found on the VM: an edit's async save registers outside any event, where the action name was lost, so it opens its own undo group; even so SwiftUI's Edit menu reads a bare "Undo"/"Redo" (KNOWN_ISSUES, accepted: the status line says what was undone). Tier-2 review (Opus): no path overwrites another writer's change; its stamp-after-rename and rollback-message findings fixed, main-thread restore and the empty names file recorded as accepted in KNOWN_ISSUES.
   Tests: ContainerEditTests (undo/redo round trip, a changed file left alone, an empty file for none, the names file, all-or-nothing refusal, one step across folders, rollback after a failed write), ContainerFileStoreTests (the returned stamp); ContainerUITests in the VM: Edit ▸ Undo and Redo take a change back and forward. Notes and Processor built against the core change. No bench cache used.
   <!-- /W47.ct-reader-edit-undo -->
+- [x] **W47.ct-backfill — read an existing corpus's markers and propose runs for review [M]** · §Archival containers — W47 (owner, 2026-10-21) (lane: processor) (uses: build,paid) (blocked-on: W47.ct-processor-capture, W47.ct-reader-edit) — A command over a chosen folder that reads its marker photos and folder names and proposes runs, accepted directory by directory before any container file is written. Built and tested on scratch copies; running it on the owner's real corpus is the owner's own action from the app. A paid read over $3 asks first. detail: execution-plans/containers/00-plan.md **Measurement audit (2026-10-30, `execution-plans/processing-review/11-measurement-audit.md`):** FLD-10: the spending line is $7 (owner, 2026-10-28), not $3.
+  SHIPPED 2026-11-19. Tools ▸ Read Box and Folder Labels (Processor). ArchiveCore `Containers/ContainerBackfill.swift`:
+  `scan` walks a chosen folder as `ContainerTree` does and finds each directory's markers by `Box`/`Folder` tag or by
+  the colours the user gives for older material (Red box, Purple folder by default), reading tags only; `propose` runs
+  `applyMarkers` on the directory's container file as it is and writes nothing; `accept` writes only that directory's
+  `.archivesuite/containers.json`, only if the file is still the one the proposal read (else `.changedSinceRead`, and the
+  window proposes again), never a newer, unreadable or value-dropping one, never through a link or outside the chosen
+  folder. Processor: `Capture/ContainerBackfillModel.swift` reads each marker with `ContainerLabelCapture.readLabel`
+  (Vision + parser free; optional Luna on the gateway, estimated at $0.00084 a photo from ct-read.md and confirmed above
+  $7 counting what the window spent, or Gemma on this Mac), four at once; a PDF marker's first page is rendered to a
+  temporary JPEG, deleted after, and its text layer is never read (owner, 2026-10-30, no ABBYY text). Reads are cached
+  in Application Support keyed by path, size, mtime and route, a route's key holding only a read that route answered, so
+  a rerun or a Stop pays nothing twice and a failed read is retried; reads landing after Stop or after the window closed
+  are kept and counted. `Views/ContainerBackfillSheet.swift`: per folder the runs it adds or changes and its warnings,
+  Accept or Skip; the level map is offered for the chosen folder when none is there or above (`ContainerLevelsSheet`,
+  its texts now parameters). SPEC/containers.md §Route A "Backfill"; limits ArchiveProcessor/KNOWN_ISSUES.md
+  §W47.ct-backfill (markers by tag or colour only; no turn tried; calls counted in the window only, added to
+  W47.ct-label-cost; proposals last as long as the window; no Accept All; the read cache is not pruned).
+  Tier-2: an Opus adversarial review found no HIGH, 4 MED (a failed model read cached as a model read; paid reads after
+  Stop dropped; Stop during a proposal left the phase stuck and a stale proposal could land in a new scan's row; the
+  cache replaced on rescan with unordered saves) and 5 LOW (main-thread stat per render; key taken after the read; a
+  stale level-map draft after choosing another folder; double Accept; scan not cancellable, the $7 check ignoring
+  spend, the sheet's model re-made per render); all fixed. An Opus re-check confirmed them and found five more (a failed
+  Vision read cached; an unparsed model reply counted as an answer; keys still taken after the read; an Accept landing
+  on a newer scan's row; reads lost when the window closed mid-read); fixed. Checks: ContainerBackfillTests (5, scratch
+  trees: a scan and a proposal write nothing, accept adds only the container file with the photos' bytes and tags
+  untouched, a file the Reader changed after the proposal is not overwritten, newer and unreadable files blocked, a
+  folder swapped for a link refused); ArchiveCore Container tests 82 green; test-collection-organize ALL PASS (the
+  Process Files label path shares `readLabel`); ProcessorUITests.testBackfillWritesOnlyTheAcceptedFolder passed in the
+  Tart VM three times (canned reads; nothing written before Accept, only the accepted folder written, a skipped one
+  gets nothing, bytes unchanged), screenshots read. Running it on the owner's real corpus is the owner's own action
+  from the app. $0 spent (no gateway call in any test). No migration: nothing to migrate (owner, 2026-08-01). No bench
+  cache used.
+  <!-- /W47.ct-backfill -->
