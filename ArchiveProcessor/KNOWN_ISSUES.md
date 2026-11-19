@@ -15,11 +15,35 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
   Gemini 3.8 Flash and none for the others, as the direct routes' estimates do.
 - **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac.
-- **The app's Claude models and the unmeasured Gemini and GPT built-ins come through OpenRouter only as unmeasured
-  listing models** (W41.app-openrouter-unmeasured): by the listing's ids, unpinned, without their makers' handling
-  (Gemini's refusals and second reader, image-token counts) and not as a route-table row's OpenRouter route. Claude Sonnet 5.5's measured rows
-  become pinned maker routes in `W41.app-openrouter-claude`, which takes them out of the unmeasured list (it skips every
-  catalog id).
+- **The unmeasured Claude models (Sonnet 4.6, Opus 4.6, Opus 5.5, Haiku 4.5) and the unmeasured Gemini and GPT
+  built-ins come through OpenRouter only as unmeasured listing models** (W41.app-openrouter-unmeasured): by the listing's
+  ids, unpinned, without their makers' handling (Gemini's refusals and second reader, image-token counts) and not as a
+  route-table row's OpenRouter route. Claude Sonnet 5.5 is not among them: the bench measured it (through the owner's
+  Claude plan, for reading and for the windows), so it is a pinned maker route on Anthropic's endpoint
+  (W41.app-openrouter-claude), and the listing skips its id. Opus 5.5 and Haiku 4.5 have narrow measurements that do
+  not make routes (`LLMModel.anthropicModels` says which).
+
+## ⚠️ LIMITATION (W41.app-openrouter-claude, 2026-11-18): Claude Sonnet 5.5's routes carry its plan route's figures
+- **Its figures were measured through `claude -p`**, the owner's plan (reading: 96.48 NES on the 96, a relative of the
+  truth's drafter Claude Opus 5.5; windows: 88.9% on the test boxes). The Anthropic key and OpenRouter routes carry them
+  with no parity check (owner, 2026-11-18). They send the app's own OCR prompt, which carries the page-kind tags the
+  pipeline needs, not the panel's prompt; and reasoning low through OpenRouter (the endpoint refuses it off), adaptive
+  thinking at the user's level by key, where `claude -p` set none.
+- **Its by-key reading price is the cloud pilot's** ($19.56 per 1,000 pages, three pages through OpenRouter's Anthropic
+  endpoint), at Anthropic's list price ($2/$10, checked 2026-11-18). The route table gives no batch figure: OpenRouter
+  has none, so an Anthropic key's overnight batch is priced at the standard rate there.
+- **Not the mix.** "Claude and ChatGPT together" stays on the keys and plans: its ChatGPT half (GPT-6.1 Sol through
+  Codex) is not a measured OpenRouter route. Claude as the Mac 2B's partner does go through OpenRouter.
+- **The plan alone does not reach its reading row.** The route table's reading row is read by key only (an Anthropic
+  or OpenRouter key, always money); the app's Local Agent reader is not the route the bench measured, so the settings
+  sheet never prices Claude's reading as free. Its windows still go by the plan where `claude` is there.
+- **Thinking at High is not capped by a budget.** Claude 4.7 and later think adaptively (a `budget_tokens` is a 400),
+  so High is `effort: high` inside the same `max_tokens` (8,192 plus 8,000 for a page). A page that thinks past that
+  fails as cut off rather than returning short text, and the estimate counts no Anthropic thinking tokens.
+- **Its OpenRouter windows have not been sent live.** The request is the Anthropic key's (no thinking field), pinned to
+  Anthropic's endpoint with `require_parameters`; the bench's pilot found that endpoint refuses reasoning *off*
+  (`enabled: false`), which this request does not send. No live call was made (no money for this item); the first real
+  run is the check, and a refusal fails every window loudly (a 400 is fatal).
 
 ## ⚠️ LIMITATION (W41.app-openrouter-unmeasured, 2026-11-18): what an unmeasured OpenRouter model does not do
 

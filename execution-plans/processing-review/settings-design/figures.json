@@ -1154,14 +1154,15 @@
   },
   {
    "id": "claude-sonnet5.5",
-   "name": "Claude Sonnet 5.5 (your Claude plan)",
-   "family": "plan",
+   "name": "Claude Sonnet 5.5 (measured on the Claude plan; an Anthropic or OpenRouter key)",
+   "family": "cloud",
    "needs": {
-    "plan": [
-     "claude"
+    "key": [
+     "anthropic",
+     "openrouter"
     ]
    },
-   "usd_1000": 0.0,
+   "usd_1000": 19.56,
    "usd_1000_batch": null,
    "s_page": 10.0,
    "s_est": false,
@@ -1686,7 +1687,8 @@
    "family": "plan",
    "needs": {
     "key": [
-     "anthropic"
+     "anthropic",
+     "openrouter"
     ],
     "plan": [
      "claude"

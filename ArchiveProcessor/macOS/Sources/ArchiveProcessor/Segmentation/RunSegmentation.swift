@@ -241,9 +241,16 @@ enum WindowStageTransport {
                     "ChatGPT is set to go by your ChatGPT plan, but ChatGPT is not signed in. Sign in with ChatGPT, or choose By API key."))
             } else if !noKey {
                 routes[p] = api
+            } else if p == .anthropic, !spec.voters.contains(where: { $0.provider == .openai }),
+                      !(keys[.openrouter] ?? "").isEmpty {
+                // W41.app-openrouter-claude: no Anthropic key and no `claude`, but an OpenRouter key: Claude's windows on
+                // Anthropic's own endpoint. Not the mix's (`SegmentationRoutes.claudeThroughOpenRouter`).
+                routes[p] = OpenRouterClaudeWindowTransport(api: api)
             } else {
                 return .failure(Missing(description: p == .anthropic
-                    ? "Claude needs an Anthropic API key or a signed-in claude."
+                    ? (spec.voters.contains { $0.provider == .openai }
+                        ? "Claude needs an Anthropic API key or a signed-in claude."
+                        : "Claude needs an Anthropic API key, an OpenRouter API key or a signed-in claude.")
                     : p == .gemini ? "Gemini needs an API key."
                     : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."
                     : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
@@ -264,6 +271,10 @@ enum WindowStageTransport {
         for p in Set(spec.voters.map(\.provider)) {
             guard let account = p.keychainAccount else { continue }
             keys[p] = KeychainHelper.load(account: account.rawValue) ?? ""
+        }
+        // Claude's windows with no Anthropic key may go through OpenRouter (W41.app-openrouter-claude): read its key.
+        if keys[.anthropic]?.isEmpty == true, keys[.openrouter] == nil {
+            keys[.openrouter] = KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? ""
         }
         let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
         let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""

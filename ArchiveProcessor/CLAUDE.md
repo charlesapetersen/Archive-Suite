@@ -32,9 +32,11 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 
 - **Built-in models** are the REFERENCE.md §LLM Provider & Model Selection lists (`Models/ProviderModels.swift`);
   don't silently add others to them. OpenRouter's are `OpenRouterRoute.catalog`, each pinned as benched (`provider.order`,
-  `allow_fallbacks: false`, `max_price`): the open models at their `quantizations`, temp 0; and the measured Gemini and GPT
-  models on their makers' own endpoints (`makerRoutes`, W41.app-openrouter-any), so one OpenRouter key reaches the
-  recommended route. Such a model stands for its maker's (`LLMModel.measuredModel`: figures, tokens, Gemini's refusals
+  `allow_fallbacks: false`, `max_price`): the open models at their `quantizations`, temp 0; and the measured Gemini, GPT
+  and Claude Sonnet 5.5 models on their makers' own endpoints (`makerRoutes`, W41.app-openrouter-any and
+  -claude; Claude's windows too, not the mix's), so one OpenRouter key reaches the recommended route. Claude 4.7+
+  refuse a `budget_tokens` (`ThinkingLevel.anthropicThinkingFields`).
+  Such a model stands for its maker's (`LLMModel.measuredModel`: figures, tokens, Gemini's refusals
   and their second reader), and a route-table row runs through it when the user has only an OpenRouter key
   (`Route.appRoute(keys:)`). Any other model (W41.app-openrouter-unmeasured): every image-reading model in OpenRouter's
   listing (`OCR/OpenRouterListing.swift`, `GET /models`, read with the prices) and any id typed in Manage custom

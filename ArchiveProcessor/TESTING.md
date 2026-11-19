@@ -357,7 +357,10 @@ existing scratch, key-free, no-network execution remains unchanged.
   paid, the GLM segmentation approach (options.json figures, the window request, its error mapping), and (section 9,
   W41.app-openrouter-unmeasured) the listing's image filter and prices, the unpinned request (`data_collection` deny,
   `max_price` at the estimate's price, the user's reasoning level), a typed id priced or unpriced, and pricing fixed
-  when offered. No key,
+  when offered, and (section 10, W41.app-openrouter-claude) Claude Sonnet 5.5: the Anthropic list and its price, the
+  maker route's body and pin, its Settings note, listed once ahead of the listing's Claude models, the solver and Re-OCR
+  with only an OpenRouter key reaching both Claude rows, its windows' request through OpenRouter (not the mix's), and
+  the Anthropic key's adaptive thinking. No key,
   network, corpus, or spend; not in the health gate.
 - **`live-openrouter.sh`** — PAID (about $0.03): each catalog model reads two synthetic pages through the real
   Process Files pipeline (`ProcessFilesTestDriver`, `PROCESSFILES_PROVIDER=OpenRouter`); asserts success, the PDF

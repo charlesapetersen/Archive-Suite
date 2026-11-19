@@ -84,6 +84,7 @@ enum SettingsTraining {
         // W41.app-openrouter-any: a maker's own endpoint (`OpenRouterRoute.makerRoutes`) holds the maker's API terms.
         "google-ai-studio": makersThroughOpenRouter["gemini"]!,
         "openai": makersThroughOpenRouter["openai"]!,
+        "anthropic": makersThroughOpenRouter["anthropic"]!,   // W41.app-openrouter-claude
     ]
 
     /// A closed model reached through OpenRouter runs on its maker's paid API, so the maker's API terms hold.
@@ -94,6 +95,9 @@ enum SettingsTraining {
         "openai": Record(provider: "OpenAI, through OpenRouter", terms: .never,
                          summary: "OpenRouter reaches OpenAI's API, which does not train on API traffic",
                          source: "https://help.openai.com/en/articles/5722486-how-your-data-is-used-to-improve-model-performance"),
+        "anthropic": Record(provider: "Anthropic, through OpenRouter", terms: .never,
+                            summary: "OpenRouter reaches Anthropic's API, which does not train on API traffic (its commercial terms)",
+                            source: "https://www.anthropic.com/news/updates-to-our-consumer-terms"),
     ]
     // Not Mistral: its models are open-weight, so OpenRouter may serve them from third parties; an unpinned Mistral
     // row through OpenRouter is `unpinned`.
@@ -290,7 +294,12 @@ extension SettingsTraining {
             switch v.provider {
             case .local: return .safe
             case .gemini: return .key("gemini")
-            case .anthropic: return routes.claudeByPlan ? .plan("claude") : .key("anthropic")
+            case .anthropic:
+                // W41.app-openrouter-claude: Claude outside the mix may go through OpenRouter (`WindowStageTransport.make`).
+                if routes.claudeByPlan { return .plan("claude") }
+                if approach != .mix, routes.claudeThroughOpenRouter, let id = OpenRouterRoute.through(
+                    provider: .anthropic, modelID: v.modelID)?.model.id { return .openRouter(modelID: id) }
+                return .key("anthropic")
             case .openai: return routes.chatGPTByPlan ? .plan("chatgpt") : .key("openai")
             case .openrouter: return .openRouter(modelID: v.modelID)
             }

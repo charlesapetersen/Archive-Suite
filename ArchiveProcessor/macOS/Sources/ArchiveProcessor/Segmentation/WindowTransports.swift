@@ -100,13 +100,21 @@ struct APIWindowTransport: WindowTransport {
             }
             url = URL(string: "\(OpenAICompatibleClient.openRouterBaseURL)/chat/completions")!
             headers["Authorization"] = "Bearer \(key)"
-            var content: [[String: Any]] = r.images.map {
-                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\($0.base64EncodedString())"]]
+            func image(_ d: Data) -> [String: Any] {
+                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(d.base64EncodedString())"]]
             }
+            // Claude through OpenRouter (W41.app-openrouter-claude) sends its Anthropic request: each image after its
+            // "Page n:" line, no temperature (the endpoint lists none), at the listing's price once read.
+            let claude = route.maker?.provider == .anthropic
+            var content: [[String: Any]] = claude
+                ? zip(r.pageNumbers, r.images).flatMap { [["type": "text", "text": "Page \($0):"], image($1)] }
+                : r.images.map(image)
             content.append(["type": "text", "text": r.prompt])
-            var o: [String: Any] = ["model": route.model.id, "max_tokens": maxOutputTokens, "temperature": 0,
+            let priced = claude ? route.ceiling(OpenRouterPrices.priced(route)) : route
+            var o: [String: Any] = ["model": route.model.id, "max_tokens": maxOutputTokens,
                                     "messages": [["role": "user", "content": content]],
-                                    "provider": OpenAICompatibleClient.openRouterProviderField(route)]
+                                    "provider": OpenAICompatibleClient.openRouterProviderField(priced)]
+            if !claude { o["temperature"] = 0 }
             if let t = r.voter.thinkingLevel { o["reasoning"] = ["effort": t, "exclude": true] }
             body = o
         case .local:
@@ -305,6 +313,25 @@ struct LocalAgentWindowTransport: WindowTransport {
 
 /// Routes each window to the transport for its voter's provider: the mix sends Claude windows one way and
 /// Gemini windows another.
+/// W41.app-openrouter-claude — Claude Sonnet 5.5's windows through OpenRouter, pinned to Anthropic's own endpoint with
+/// fallbacks off (`OpenRouterRoute.makerRoutes`), on the user's OpenRouter key. The request is the Anthropic one the
+/// cost figure was counted on (`options.py` `tokens_claude`): "Page n:" before each image, the prompt last, no
+/// temperature and no thinking, 4,096 tokens (`APIWindowTransport.request`). The shipped figures are the plan route's,
+/// carried with no parity check (owner, 2026-11-18).
+struct OpenRouterClaudeWindowTransport: WindowTransport {
+    var api: APIWindowTransport
+
+    func send(_ r: WindowRequest) async throws -> String {
+        guard let route = OpenRouterRoute.through(provider: .anthropic, modelID: r.voter.modelID) else {
+            throw WindowTransportError.fatal("\(r.voter.modelID) has no route through OpenRouter")
+        }
+        let voter = WindowVoter(name: r.voter.name, provider: .openrouter, modelID: route.model.id,
+                                thinkingLevel: r.voter.thinkingLevel, prompt: r.voter.prompt,
+                                thumbnailLongEdgePx: r.voter.thumbnailLongEdgePx, sendsImages: r.voter.sendsImages)
+        return try await api.send(WindowRequest(voter: voter, prompt: r.prompt, images: r.images, pageNumbers: r.pageNumbers))
+    }
+}
+
 struct RoutingWindowTransport: WindowTransport {
     let routes: [WindowProvider: any WindowTransport]
 

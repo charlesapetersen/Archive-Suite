@@ -215,7 +215,30 @@ struct LLMModel: Identifiable, Hashable, Codable {
         )
     ]
 
+    // W41.app-openrouter-claude: Claude Sonnet 5.5 is the one Claude model the bench read the owner's 96 with (the
+    // route table's reading row `claude-sonnet5.5`: 96.48 NES, every page answered, handwriting 92.5; through
+    // `claude -p` on the owner's plan, so its figure is that route's, carried here with no parity check, owner
+    // 2026-11-18). Claude Opus 5.5 drafted part of that truth, so Sonnet 5.5 is a relative of a drafter: say so
+    // wherever the figure is shown. It is first, so the Anthropic key's default is the measured model. Anthropic's list
+    // price, checked 2026-11-18 (platform.claude.com/docs/en/about-claude/pricing): $2 in, $10 out, half in a batch.
+    // The 4.6 entries were never measured; they stay under their ids (persisted selections).
+    // Not here, and not routes: Opus 5.5 split one development box (Deaver) at 97.9% with the cues prompt, tied with
+    // Sonnet 5.5, Gemini 3.8 Flash and Codex (`cues-models-Deaver.md`), and it drafted the 96's truth, so it cannot be
+    // scored on them; Haiku 4.5 read NewsBench's 15 newspaper pages in the Vision OCR lab's table, 0.894 with PaddleX
+    // layout and 0.232 whole page, below the other layout models (`farmshare/news/newsbench-score.txt`). TABME's 0.782
+    // in `seg_tabme.py` is the paper's figure, not ours. Both reach the app only unmeasured, through OpenRouter's
+    // listing (`OpenRouterListing`).
     static let anthropicModels: [LLMModel] = [
+        LLMModel(
+            id: "claude-sonnet-5-5",
+            displayName: "Claude Sonnet 5.5",
+            provider: .anthropic,
+            supportsThinking: true,
+            returnsMd: false,
+            inputCostPer1M: 2.0,
+            outputCostPer1M: 10.0,
+            batchDiscount: 0.5
+        ),
         LLMModel(
             id: "claude-sonnet-4-6",
             displayName: "Claude Sonnet 4.6",
@@ -432,7 +455,7 @@ struct LLMModel: Identifiable, Hashable, Codable {
     // Until W41.app-openrouter-any the first open route (the rule table's pick for an OpenRouter key with no fallback
     // for a failed page) was the provider's default; now the makers' routes lead, so it is Gemini 3.8 Flash's.
     /// At OpenRouter's listed price for each pinned upstream once read (W42.int-s2, `OpenRouterPrices`), else the bench's.
-    /// W41.app-openrouter-any: the measured Gemini and GPT models come first, in their own providers' order, so the
+    /// W41.app-openrouter-any: the measured Gemini, GPT and (W41.app-openrouter-claude) Claude models come first, in their own providers' order, so the
     /// provider's default is the app's (Gemini 3.8 Flash) and one OpenRouter key reaches the recommended route.
     static var openrouterModels: [LLMModel] {
         (OpenRouterRoute.makerRoutes + OpenRouterRoute.openRoutes).map { OpenRouterPrices.priced($0) }
@@ -536,10 +559,17 @@ struct OpenRouterRoute: Sendable, Equatable {
     /// W41.app-openrouter-any — the measured models of another provider, through OpenRouter on their maker's own
     /// endpoint (`allow_fallbacks: false`), with the reasoning setting the bench sent (`ocr_cloud.py`,
     /// `method_openrouter.py`); the bench read every one of them this way, so its figures are these routes' own
-    /// (owner, 2026-11-18: no parity check). The Claude entries are not here: the bench never read them, and an
-    /// unmeasured model is not given a measured route. The models' prices before OpenRouter's listing is read are
+    /// (owner, 2026-11-18: no parity check). The models' prices before OpenRouter's listing is read are
     /// the maker's plus a tenth, as OpenRouter listed Gemini 3.8 Flash on 2026-11-18 ($0.825/$4.125 against Google's
     /// $0.75/$3.75), so the ceiling is not under a listed price that was never read.
+    ///
+    /// W41.app-openrouter-claude: Claude Sonnet 5.5 too. 40d3ddee left Claude out as never read by the bench, which was
+    /// wrong: the bench read the 96 with it through `claude -p` (the route table's reading row) and split the test boxes
+    /// with it (the segmentation row `window-claude`), and both rows' figures are carried by this route (no parity
+    /// check). The id is OpenRouter's listing's (`ocr_cloud.py`, and its frozen catalog `ocr-panel-cloud-prices.json`,
+    /// 2026-10-14); the reasoning is what the bench sent on this endpoint, low, since it refuses reasoning off (the
+    /// cloud pilot, `ocr-panel-cloud-pilot.md`). Its windows go through `OpenRouterClaudeWindowTransport`. Opus 5.5 and
+    /// Haiku 4.5 are not here (`LLMModel.anthropicModels` says what they were measured on).
     static let makerRoutes: [OpenRouterRoute] = [
         maker("gemini-3.8-flash", as: "google/gemini-3.8-flash", on: "google-ai-studio", reasoning: .effort("low")),
         maker("gemini-3.5-flash-lite", as: "google/gemini-3.5-flash-lite", on: "google-ai-studio",
@@ -549,11 +579,21 @@ struct OpenRouterRoute: Sendable, Equatable {
         maker("gemini-3.5-flash", as: "google/gemini-3.5-flash", on: "google-ai-studio", reasoning: .effort("minimal")),
         maker("gemini-3.1-pro", as: "google/gemini-3.1-pro-preview", on: "google-ai-studio", reasoning: .effort("low")),
         maker("gpt-5.4-mini", as: "openai/gpt-5.4-mini", on: "openai", reasoning: .effort("minimal")),
+        maker("claude-sonnet-5-5", as: "anthropic/claude-sonnet-5.5", on: "anthropic", reasoning: .effort("low")),
     ]
 
+    /// A maker's endpoint tag in the user's words.
+    static func upstreamName(_ tag: String) -> String {
+        switch tag {
+        case "openai": return "OpenAI"
+        case "anthropic": return "Anthropic"
+        default: return "Google AI Studio"
+        }
+    }
+
     private static func maker(_ id: String, as openRouterID: String, on tag: String, reasoning: Reasoning) -> OpenRouterRoute {
-        let m = (LLMModel.geminiModels + LLMModel.openaiModels).first { $0.id == id }!
-        let upstream = tag == "openai" ? "OpenAI" : "Google AI Studio"
+        let m = (LLMModel.geminiModels + LLMModel.openaiModels + LLMModel.anthropicModels).first { $0.id == id }!
+        let upstream = upstreamName(tag)
         return OpenRouterRoute(
             model: LLMModel(id: openRouterID, displayName: "\(m.displayName) (\(upstream))", provider: .openrouter,
                             supportsThinking: m.supportsThinking, returnsMd: m.returnsMd,
@@ -564,10 +604,15 @@ struct OpenRouterRoute: Sendable, Equatable {
     }
 
     /// The route that reaches `model` through OpenRouter: itself for an OpenRouter model, the maker's route for a
-    /// measured Gemini or GPT model, else nil.
+    /// measured Gemini, GPT or Claude model, else nil.
     static func through(_ model: LLMModel) -> OpenRouterRoute? {
         model.provider == .openrouter ? forModel(model.id)
             : makerRoutes.first { $0.maker?.id == model.id && $0.maker?.provider == model.provider }
+    }
+
+    /// The maker's route for a built-in model named by provider and id (a window voter's model), or nil.
+    static func through(provider: LLMProvider, modelID: String) -> OpenRouterRoute? {
+        makerRoutes.first { $0.maker?.provider == provider && $0.maker?.id == modelID }
     }
 
     /// The maker's route for a route-table `app_route` (`gemini|gemini-3.8-flash` → `openrouter|google/gemini-3.8-flash`).
@@ -650,12 +695,18 @@ struct OpenRouterRoute: Sendable, Equatable {
     var settingsNote: String {
         if let maker {
             let priced = OpenRouterPrices.priced(self)
-            let upstream = providerTag == "openai" ? "OpenAI" : "Google AI Studio"
+            let upstream = Self.upstreamName(providerTag)
             let row = SettingsRouteTable.bundled?.stage("reading")?.routes.first { $0.appRoute == makerAppRoute }
-            let figure = row?.figure("overall").map {
-                "Measured on the owner's 96 test pages, read this way: \(String(format: "%.2f", $0)) NES on the pages it answered"
-                    // The geminiModels comment: it drafted part of the truth, so say so wherever its figure shows.
-                    + (maker.id == "gemini-3.8-flash" ? ", though it drafted part of their truth, so its lead may be partly flattery. " : ". ")
+            let figure = row?.figure("overall").map { value -> String in
+                // Claude Sonnet 5.5's figure is its plan route's, read through `claude -p` (W41.app-openrouter-claude).
+                let how = maker.provider == .anthropic ? "read through the Claude plan" : "read this way"
+                // The geminiModels and anthropicModels comments: a drafter or its relative, so say so wherever it shows.
+                let caveat = maker.id == "gemini-3.8-flash"
+                    ? ", though it drafted part of their truth, so its lead may be partly flattery. "
+                    : maker.provider == .anthropic
+                        ? ", though Claude Opus 5.5, of the same family, drafted part of their truth, so its lead may be partly flattery. "
+                        : ". "
+                return "Measured on the owner's 96 test pages, \(how): \(String(format: "%.2f", value)) NES on the pages it answered" + caveat
             } ?? ""
             return "\(maker.displayName) through OpenRouter. " + figure
                 + "Runs on \(upstream) only, with OpenRouter's fallbacks off, at $\(Self.price(priced.inputCostPer1M)) in, "

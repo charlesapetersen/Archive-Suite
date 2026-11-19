@@ -395,9 +395,11 @@ extension OpenAICompatibleClient {
     func applyOpenRouterRoute(_ body: inout [String: Any]) {
         guard let route = openRouterRoute else { return }
         body["provider"] = Self.openRouterProviderField(route)
-        // OpenAI's endpoint takes no temperature (`ocr_cloud.py` drops it there); nor, unpinned, an OpenAI model's.
-        let openAI = route.maker?.provider == .openai || (!route.pinned && route.model.id.hasPrefix("openai/"))
-        if !openAI { body["temperature"] = 0 }
+        // OpenAI's and Anthropic's endpoints take no temperature (`ocr_cloud.py` drops it there: their listing does not
+        // advertise it, and `require_parameters` would refuse the endpoint); nor, unpinned, an OpenAI model's.
+        let noTemperature = [LLMProvider.openai, .anthropic].contains(route.maker?.provider)
+            || (!route.pinned && route.model.id.hasPrefix("openai/"))
+        if !noTemperature { body["temperature"] = 0 }
         if let reasoning = route.reasoning.body { body["reasoning"] = reasoning }
         // Excluded reasoning still counts against max_tokens: give a reasoning model room above the answer's
         // budget, or a short call (classification asks for 64) can come back empty. A maker's page read keeps the

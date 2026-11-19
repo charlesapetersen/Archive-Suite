@@ -130,8 +130,7 @@ struct AnthropicBatchClient: Sendable {
             ]
 
             if let thinking = thinkingLevel {
-                let budget = thinking.budgetTokens(for: .documentOCR)
-                params["thinking"] = ["type": "enabled", "budget_tokens": budget]
+                params.merge(thinking.anthropicThinkingFields(modelID: model.id, purpose: .documentOCR)) { $1 }
                 // Anthropic counts thinking tokens against max_tokens; raise the ceiling by the
                 // budget so the transcription isn't silently truncated to the remainder.
                 params["max_tokens"] = thinking.anthropicOCRMaxTokens(baseOutputTokens: 8192)
@@ -161,7 +160,8 @@ struct AnthropicBatchClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        if thinkingLevel != nil {
+        // Adaptive thinking (Claude 4.7 and later) needs no beta header (W41.app-openrouter-claude).
+        if thinkingLevel != nil, !ThinkingLevel.anthropicThinksAdaptively(model.id) {
             request.setValue("interleaved-thinking-2025-05-14", forHTTPHeaderField: "anthropic-beta")
         }
         request.httpBody = bodyData

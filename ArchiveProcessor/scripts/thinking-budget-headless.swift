@@ -36,6 +36,21 @@ enum ThinkingLevel { case low, high }
             }
         }
         precondition(shapes == 6)
-        print("THINKING BUDGET PASS: 6 purpose/level values, 2 Anthropic OCR ceilings, 6 Anthropic text request shapes")
+        // W41.app-openrouter-claude: Claude 4.7 and later reject budget_tokens; they think adaptively at the level's
+        // effort, with the same max_tokens room. Older ids keep the budget.
+        for (id, adaptive) in [("claude-sonnet-5-5", true), ("claude-opus-4-7", true), ("claude-sonnet-5", true),
+                               ("claude-sonnet-4-6", false), ("claude-opus-4-6", false), ("claude-haiku-4-5-20251001", false),
+                               ("claude-3-5-sonnet-20241022", false), ("claude-3-7-sonnet-20250219", false), ("m", false)] {
+            precondition(ThinkingLevel.anthropicThinksAdaptively(id) == adaptive, id)
+        }
+        for (level, effort) in [(ThinkingLevel.low, "low"), (.high, "high")] {
+            let body = AnthropicTextRequest.body(prompt: "p", modelID: "claude-sonnet-5-5", thinkingLevel: level, maxTokens: 256)
+            precondition((body["thinking"] as? [String: Any])?["type"] as? String == "adaptive")
+            precondition((body["thinking"] as? [String: Any])?["budget_tokens"] == nil)
+            precondition((body["output_config"] as? [String: Any])?["effort"] as? String == effort)
+            precondition(body["max_tokens"] as? Int == 256 + level.budgetTokens(for: .textCompletion))
+        }
+        print("THINKING BUDGET PASS: 6 purpose/level values, 2 Anthropic OCR ceilings, 6 Anthropic text request shapes, "
+              + "9 adaptive-model ids, 2 adaptive request shapes")
     }
 }

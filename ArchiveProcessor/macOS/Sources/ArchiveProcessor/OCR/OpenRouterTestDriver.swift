@@ -148,6 +148,136 @@ enum OpenRouterTestDriver {
         segmentationChecks()
         wire.reply = #"{"choices":[{"message":{"content":"[document_start]\nHello archive"}}]}"#
         await unmeasuredChecks(wire: wire, image: image)
+        wire.reply = #"{"choices":[{"message":{"content":"[document_start]\nHello archive"}}]}"#
+        await claudeChecks(wire: wire, image: image)
+    }
+
+    /// 10. W41.app-openrouter-claude — Claude Sonnet 5.5, the Claude model the bench measured, through OpenRouter on
+    /// Anthropic's own endpoint, and on the Anthropic key's list.
+    private static func claudeChecks(wire: Wire, image: URL) async {
+        guard let sonnet = LLMModel.anthropicModels.first, let route = OpenRouterRoute.through(sonnet) else {
+            check("10 Claude Sonnet 5.5 has a maker's route", false); return
+        }
+        // The Anthropic key's list: Sonnet 5.5 first, at Anthropic's list price; the 4.6 entries stay under their ids.
+        eq("10 the Anthropic list", LLMModel.anthropicModels.map(\.id), ["claude-sonnet-5-5", "claude-sonnet-4-6", "claude-opus-4-6"])
+        eq("10 Sonnet 5.5 at $2/$10, half in a batch", [sonnet.inputCostPer1M, sonnet.outputCostPer1M, sonnet.batchDiscount], [2, 10, 0.5])
+        let reading = SettingsRouteTable.bundled?.stage("reading")?.route("claude-sonnet5.5")
+        eq("10 the reading row is the Anthropic entry's", reading?.appRoute, "anthropic|claude-sonnet-5-5")
+        eq("10 its figure is the plan route's", reading?.figure("overall"), 96.48)
+        check("10 Opus and Haiku are not routes", LLMModel.anthropicModels.dropFirst().allSatisfy { OpenRouterRoute.through($0) == nil }
+              && !OpenRouterRoute.catalog.contains { $0.model.id.contains("opus") || $0.model.id.contains("haiku") })
+        // The maker's route: Anthropic's endpoint, fallbacks off, the bench's low effort, no temperature, no batch.
+        eq("10 the route", [route.model.id, route.providerTag], ["anthropic/claude-sonnet-5.5", "anthropic"])
+        check("10 it stands for Sonnet 5.5", route.model.measuredModel == sonnet && route.model.batchDiscount == 1)
+        wire.requests = []
+        _ = try? await OpenAICompatibleClient.openRouter(model: route.model, apiKey: "k", thinkingLevel: .low)?.ocr(imageURL: image)
+        let body = wire.requests.first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let provider = body?["provider"] as? [String: Any]
+        eq("10 pinned to Anthropic", provider?["order"] as? [String], ["anthropic"])
+        eq("10 fallbacks off, parameters required", [provider?["allow_fallbacks"] as? Bool, provider?["require_parameters"] as? Bool],
+           [false, true])
+        check("10 no temperature, no quantizations", body?["temperature"] == nil && provider?["quantizations"] == nil)
+        eq("10 low reasoning at Low", (body?["reasoning"] as? [String: Any])?["effort"] as? String, "low")
+        let note = route.settingsNote
+        check("10 the note: the plan's figure, the drafter's relative, Anthropic only",
+              note.contains("96.48") && note.contains("Claude plan") && note.contains("Opus 5.5") && note.contains("Runs on Anthropic only"), note)
+        // Listed ahead of, and not again as, its unmeasured listing entry; Opus 5.5 stays an unmeasured entry.
+        func row(_ id: String) -> String {
+            #"{"id":"\#(id)","name":"N","architecture":{"input_modalities":["text","image"],"output_modalities":["text"]},"pricing":{"prompt":"0.000002","completion":"0.00001"},"supported_parameters":["reasoning"]}"#
+        }
+        if let entries = OpenRouterListing.parse(Data((#"{"data":["# + [row("anthropic/claude-sonnet-5.5"), row("anthropic/claude-opus-5.5")]
+            .joined(separator: ",") + "]}").utf8)) {
+            OpenRouterListing.testListing = OpenRouterListing.Stored(entries: entries, fetched: Date())
+            let ids = LLMProvider.openrouter.models.map(\.id)
+            OpenRouterListing.testListing = nil
+            eq("10 Sonnet 5.5 listed once, among the makers' routes", ids.filter { $0 == route.model.id }.count, 1)
+            check("10 ahead of the unmeasured entries", (ids.firstIndex(of: route.model.id) ?? 99) < (ids.firstIndex(of: "anthropic/claude-opus-5.5") ?? -1),
+                  ids.joined(separator: ", "))
+        } else { check("10 the listing parses", false) }
+
+        // The settings solver with only an OpenRouter key reaches both Claude rows, on the OpenRouter route.
+        guard let table = SettingsRouteTable.bundled, let seg = table.stage("segmentation")?.route("claude-sonnet5.5"),
+              let reading else { check("10 the Claude rows load", false); return }
+        var res = SettingsResources(macMemoryGB: 16)
+        res.keys = ["openrouter"]
+        let solver = SettingsSolver(table: table, pairs: OCRPairMatrix.bundled, resources: res, answers: SettingsAnswers())
+        check("10 only an OpenRouter key: the reading row is usable", solver.blockers(reading, stage: "reading").isEmpty,
+              solver.blockers(reading, stage: "reading").joined(separator: "; "))
+        check("10 only an OpenRouter key: the windows row is usable", solver.blockers(seg, stage: "segmentation").isEmpty,
+              solver.blockers(seg, stage: "segmentation").joined(separator: "; "))
+        eq("10 the reading row runs through OpenRouter", reading.appRoute(keys: ["openrouter"]), "openrouter|anthropic/claude-sonnet-5.5")
+        eq("10 by the Anthropic key with it", reading.appRoute(keys: ["anthropic", "openrouter"]), "anthropic|claude-sonnet-5-5")
+        // The app reads it only by key, so the Claude plan alone does not reach it, nor makes it free.
+        var planAndKey = res
+        planAndKey.plans = ["claude"]
+        check("10 by key it is money, even with the Claude plan", solver.usdPer1000(reading, stage: "reading") > 19
+              && SettingsSolver(table: table, pairs: nil, resources: planAndKey, answers: SettingsAnswers())
+                .usdPer1000(reading, stage: "reading") > 19)
+        var planOnly = SettingsResources(macMemoryGB: 16)
+        planOnly.plans = ["claude"]
+        check("10 the plan alone does not reach the reading row", !SettingsSolver(table: table, pairs: nil, resources: planOnly,
+              answers: SettingsAnswers()).blockers(reading, stage: "reading").isEmpty)
+        let solved = SettingsSolver(table: table, pairs: OCRPairMatrix.bundled, resources: res, answers: SettingsAnswers()).solve()
+        lines.append("INFO 10 picks with only an OpenRouter key: "
+                     + solved.picks.filter { ["reading", "segmentation"].contains($0.stage) }
+                        .map { "\($0.stage)/\($0.part) → \($0.route?.id ?? "-")" }.joined(separator: ", "))
+        let run = ReOCRRanking.executable(reading, builtInModels: OCRCascade.candidates, keys: ["openrouter"])
+        check("10 Re-OCR runs it through OpenRouter", run?.0 == .openrouter && run?.1.id == route.model.id)
+        // Anthropic's terms hold through OpenRouter: no training warning.
+        eq("10 no training warning", SettingsTraining.runWarning([(.openRouter(modelID: route.model.id), "reads the pages")],
+                                                                 resources: res), nil)
+
+        // Its windows: the Anthropic request, through OpenRouter on Anthropic's endpoint, for Claude alone.
+        guard let options = try? SegmentationOptions.loadBundled(), let spec = try? options.spec(for: .claude),
+              let mix = try? options.spec(for: .mix), let voter = spec.voters.first else {
+            check("10 the claude approach resolves", false); return
+        }
+        let routes = SegmentationRoutes(hasOpenRouterKey: true)
+        check("10 the chooser: Claude runs on an OpenRouter key, the mix does not",
+              routes.canRun(.anthropic, approach: .claude) && !routes.canRun(.anthropic, approach: .mix) && !routes.canRun(.anthropic))
+        let row = SegmentationRow.make(.claude, options: options, pageCount: 100, routes: routes)
+        check("10 the claude row can run and is priced", row.canRun && (row.apiDollars ?? 0) > 0, row.unavailableReason ?? "")
+        check("10 the mix row still needs its plans or keys", !SegmentationRow.make(.mix, options: options, pageCount: 100, routes: routes).canRun)
+        eq("10 the run's way for Claude's windows", SettingsTraining.segmentationWays(.windows(.claude), routes: routes, options: options),
+           [.openRouter(modelID: route.model.id)])
+        let captured = Wire()
+        let http: APIWindowTransport.HTTP = { request in
+            captured.requests.append(request)
+            return (Data(#"{"choices":[{"message":{"content":"{\"pages\":[]}"}}]}"#.utf8),
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        guard case .success(let t) = WindowStageTransport.make(spec, keys: [.openrouter: "or-key"], claudeBinary: nil, http: http) else {
+            check("10 the claude windows get a transport on an OpenRouter key", false); return
+        }
+        var missing = ""
+        if case .failure(let m) = WindowStageTransport.make(mix, keys: [.openrouter: "or-key", .openai: "oa"], claudeBinary: nil, http: http) {
+            missing = m.description
+        }
+        eq("10 the mix does not go through OpenRouter", missing, "Claude needs an Anthropic API key or a signed-in claude.")
+        let answer = try? await t.send(WindowRequest(voter: voter, prompt: "PROMPT", images: [Data([1]), Data([2])], pageNumbers: [3, 4]))
+        eq("10 a window answer", answer, #"{"pages":[]}"#)
+        guard let w = captured.requests.first, let wb = w.httpBody.flatMap({ try? JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+        else { check("10 a window request was sent", false); return }
+        eq("10 window: OpenRouter, the OpenRouter key", [w.url?.absoluteString, w.value(forHTTPHeaderField: "Authorization")],
+           ["https://openrouter.ai/api/v1/chat/completions", "Bearer or-key"])
+        eq("10 window model", wb["model"] as? String, "anthropic/claude-sonnet-5.5")
+        let content = ((wb["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
+        eq("10 window: Page n before each image, the prompt last", content.map { ($0["type"] as? String ?? "") + ($0["text"] as? String ?? "") },
+           ["textPage 3:", "image_url", "textPage 4:", "image_url", "textPROMPT"])
+        let wp = wb["provider"] as? [String: Any]
+        eq("10 window pinned to Anthropic, fallbacks off", [wp?["order"] as? [String] == ["anthropic"], wp?["allow_fallbacks"] as? Bool == false,
+                                                           wp?["require_parameters"] as? Bool == true], [true, true, true])
+        check("10 window: no temperature, no reasoning, 4,096 tokens", wb["temperature"] == nil && wb["reasoning"] == nil
+              && wb["max_tokens"] as? Int == APIWindowTransport.maxOutputTokens)
+
+        // The Anthropic key's own request for Sonnet 5.5: adaptive thinking, since 4.7 and later refuse a budget.
+        wire.requests = []
+        wire.reply = #"{"content":[{"type":"text","text":"[document_start]\nHello archive"}],"stop_reason":"end_turn"}"#
+        _ = try? await AnthropicClient(apiKey: "k", model: sonnet, thinkingLevel: .low).ocr(imageURL: image)
+        let ab = wire.requests.first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        eq("10 the Anthropic key: adaptive thinking at low effort, no budget",
+           [(ab?["thinking"] as? [String: Any])?["type"] as? String, (ab?["output_config"] as? [String: Any])?["effort"] as? String,
+            (ab?["thinking"] as? [String: Any])?["budget_tokens"].map { "\($0)" }], ["adaptive", "low", nil])
     }
 
     /// 9. W41.app-openrouter-unmeasured — every other image model OpenRouter lists, and a typed id.
@@ -376,11 +506,16 @@ enum OpenRouterTestDriver {
         eq("8 the id mapping", Dictionary(uniqueKeysWithValues: makers.map { ($0.maker?.id ?? "", $0.model.id) }),
            ["gemini-3.8-flash": "google/gemini-3.8-flash", "gemini-3.5-flash-lite": "google/gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite", "gemini-3.5-flash": "google/gemini-3.5-flash",
-            "gemini-3.1-pro": "google/gemini-3.1-pro-preview", "gpt-5.4-mini": "openai/gpt-5.4-mini"])
+            "gemini-3.1-pro": "google/gemini-3.1-pro-preview", "gpt-5.4-mini": "openai/gpt-5.4-mini",
+            // W41.app-openrouter-claude: OpenRouter's listing's id (`ocr_cloud.py`, `ocr-panel-cloud-prices.json`).
+            "claude-sonnet-5-5": "anthropic/claude-sonnet-5.5"])
         eq("8 each pinned to its maker's own endpoint", makers.map(\.providerTag),
-           ["google-ai-studio", "google-ai-studio", "google-ai-studio", "google-ai-studio", "google-ai-studio", "openai"])
+           ["google-ai-studio", "google-ai-studio", "google-ai-studio", "google-ai-studio", "google-ai-studio", "openai",
+            "anthropic"])
+        // Claude's endpoint refuses reasoning off, so the bench sent low (`ocr-panel-cloud-pilot.md`).
         eq("8 the reasoning the bench sent", makers.map(\.reasoning),
-           [.effort("low"), .effort("minimal"), .effort("minimal"), .effort("minimal"), .effort("low"), .effort("minimal")])
+           [.effort("low"), .effort("minimal"), .effort("minimal"), .effort("minimal"), .effort("low"), .effort("minimal"),
+            .effort("low")])
         for r in makers {
             guard let m = r.maker else { check("8 \(r.model.id) names its maker", false); continue }
             check("8 \(r.model.id) is an OpenRouter model with no batch", r.model.provider == .openrouter && r.model.batchDiscount == 1)
@@ -403,8 +538,6 @@ enum OpenRouterTestDriver {
               && !OCRCascade(routeID: OCRCascade.routeID(for: makers[0].model)).applies(to: .gemini, model: LLMModel.geminiModels[0])
               && OCRCascade(routeID: OCRCascade.routeID(for: LLMModel.geminiModels[4])).applies(to: .openrouter, model: makers[0].model))
         eq("8 the OpenRouter default is the app's default", LLMProvider.openrouter.models.first?.id, "google/gemini-3.8-flash")
-        check("8 Claude is not mapped: the bench never read the app's Claude models",
-              LLMModel.anthropicModels.allSatisfy { OpenRouterRoute.through($0) == nil })
         check("8 an open model stands for itself", OpenRouterRoute.catalog[0].model.measuredModel == OpenRouterRoute.catalog[0].model)
 
         // Every reading row the bench measured through OpenRouter on a maker's model has its route.
@@ -412,7 +545,7 @@ enum OpenRouterTestDriver {
             check("8 the route table loads", false); return
         }
         let makerRows = reading.filter { r in
-            r.needs.key.contains("openrouter") && (r.appRoute?.hasPrefix("gemini|") == true || r.appRoute?.hasPrefix("openai|") == true)
+            r.needs.key.contains("openrouter") && ["gemini|", "openai|", "anthropic|"].contains { r.appRoute?.hasPrefix($0) == true }
         }
         check("8 the table has the makers' rows", makerRows.count == makers.count, makerRows.map(\.id).joined(separator: ", "))
         for r in makerRows {
@@ -604,8 +737,8 @@ enum OpenRouterTestDriver {
         let price = provider?["max_price"] as? [String: Double]
         eq("2 \(tag) max_price prompt", price?["prompt"], route.model.inputCostPer1M)
         eq("2 \(tag) max_price completion", price?["completion"], route.model.outputCostPer1M)
-        if route.maker?.provider == .openai {
-            check("2 \(tag) no temperature on OpenAI's endpoint", body["temperature"] == nil)
+        if [LLMProvider.openai, .anthropic].contains(route.maker?.provider) {
+            check("2 \(tag) no temperature on OpenAI's or Anthropic's endpoint", body["temperature"] == nil)
         } else {
             eq("2 \(tag) temperature 0", (body["temperature"] as? NSNumber)?.doubleValue, 0)
         }

@@ -297,10 +297,21 @@ def reading_rows():
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, "mistral-ocr" if rid == "mistral-ocr-4-1" else rid), cost(rid),
             cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None}, cav)
 
-    # ---- plans (R5)
-    add("claude-sonnet5.5", "Claude Sonnet 5.5 (your Claude plan)", "plan", None, "measured", {"plan": ["claude"]},
+    # ---- plans (R5), read by key
+    # W41.app-openrouter-claude: measured through `claude -p` on the owner's plan, but the app reads it only by an
+    # Anthropic key, or an OpenRouter key on Anthropic's own endpoint (`OpenRouterRoute.makerRoutes`), carrying the plan
+    # route's figures (owner, 2026-11-18: no parity check). So its access is the two keys, not the plan (the app has no
+    # reading by plan this row measures), and it is money: the cloud pilot's cost through that endpoint (three pages,
+    # extrapolated to 99), at Anthropic's list price ($2/$10, checked 2026-11-18); no batch figure, since OpenRouter has
+    # none.
+    add("claude-sonnet5.5", "Claude Sonnet 5.5 (measured on the Claude plan; an Anthropic or OpenRouter key)", "cloud",
+        "anthropic|claude-sonnet-5-5", "measured", {"key": ["anthropic", "openrouter"]},
         figs("claude-sonnet5.5", "claude-sonnet5.5", "claude-sonnet5.5"),
-        {"usd_1000_list": 0.0, "api_equivalent_usd_1000": routes["claude-sonnet5.5"]["std"], "plan_share": "five-hour and weekly windows; measured on the user's account (usage.md)", "source": src(PD, "claude-sonnet5.5", "routes.std (estimated API price, data/inputs.json)", routes["claude-sonnet5.5"]["std"])},
+        {"usd_1000_list": 19.56, "price_read": "2026-10-15 (cloud pilot)",
+         "derived": "the pilot's three pages extrapolated to 99, $1.936, per 1,000 pages",
+         "source": src("ArchiveProcessor/segbench-results/ocr-panel-cloud-pilot.md", "claude-sonnet5.5", "99 pages, mean cost", "$1.936"),
+         "api_equivalent_usd_1000": routes["claude-sonnet5.5"]["std"],
+         "api_equivalent_source": src(PD, "claude-sonnet5.5", "routes.std (estimated API price, data/inputs.json)", routes["claude-sonnet5.5"]["std"])},
         {"per_unit_s": 10.0, "measured": True, "measured_on": "mean, three at once through claude -p", "source": src("ArchiveProcessor/segbench-results/ocr-panel-cloud.md", "claude-sonnet5.5", "mean s a page", 10)},
         {"peak_gb": 0, "source": None},
         ["Claude Opus 5.5 drafted the truth: same family (OCR-1)", "read through claude -p, whose harness may resize the image (ocr-panel-cloud.md)", "96 only"])
@@ -542,6 +553,13 @@ def build(built):
         head.setdefault("fallback", None)
         order = ["id", "name", "note", "unit", "choice", "metric", "kinds", "kind_strata", "rules", "fallback", "routes_role", "routes", "pairs"]
         stages.append({k: head[k] for k in order if k in head} | {k: v for k, v in head.items() if k not in order})
+    # W41.app-openrouter-claude: Claude Sonnet 5.5's windows also go through OpenRouter on Anthropic's own endpoint
+    # (`OpenRouterClaudeWindowTransport`), at Anthropic's price. Claude alone: the mix's ChatGPT half is not a measured
+    # OpenRouter route, so the mix keeps its plans.
+    for st in stages:
+        for r in st["routes"]:
+            if st["id"] == "segmentation" and r["app_route"] == "anthropic|claude-sonnet-5-5" and "openrouter" not in r["needs"]["key"]:
+                r["needs"]["key"] = sorted(r["needs"]["key"] + ["openrouter"])
     ids = [r["id"] for s in stages for r in s["routes"]]
     return {"version": 1, "built": built, "item": ITEM, "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
             "schema": f"{NOTES}/00-index.md §The table schema", "noise": NOISE, "stages": stages}

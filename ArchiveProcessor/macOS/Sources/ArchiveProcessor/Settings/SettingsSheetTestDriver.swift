@@ -162,7 +162,9 @@ enum SettingsSheetTestDriver {
                            collection: layer(.collection, [(.noTraining, .bool(true)),
                                                            (SettingsSheetModel.overrideKey("reading"), .string("apple-vision"))]))
         check("T a Custom reading card still names what the switch hides",
-              card(trCustom, "reading")?.trainingCost.map { $0.contains("costs this step") && $0.contains("Gemini") } == true,
+              // W41.app-openrouter-claude: the pick may be Claude through OpenRouter, which ties the route the switch hides.
+              card(trCustom, "reading")?.trainingCost.map {
+                  ($0.contains("costs this step") || $0.contains("costs no accuracy here")) && $0.contains("Gemini") } == true,
               card(trCustom, "reading")?.trainingCost ?? "nil")
         let gemRunning = SettingsSheetModel.Running(readingRouteID: "gemini3.8-flash", readingName: "Gemini 3.8 Flash",
                                                     segmentation: .manual)

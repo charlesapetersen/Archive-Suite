@@ -4755,15 +4755,16 @@
     },
     {
      "id": "claude-sonnet5.5",
-     "name": "Claude Sonnet 5.5 (your Claude plan)",
-     "family": "plan",
-     "app_route": null,
-     "status": "measured",
+     "name": "Claude Sonnet 5.5 (measured on the Claude plan; an Anthropic or OpenRouter key)",
+     "family": "cloud",
+     "app_route": "anthropic|claude-sonnet-5-5",
+     "status": "shipped",
      "needs": {
-      "key": [],
-      "plan": [
-       "claude"
+      "key": [
+       "anthropic",
+       "openrouter"
       ],
+      "plan": [],
       "cluster": false,
       "gpus": null,
       "mac": false,
@@ -4852,10 +4853,17 @@
       }
      },
      "cost": {
-      "usd_1000_list": 0.0,
-      "api_equivalent_usd_1000": 11.5,
-      "plan_share": "five-hour and weekly windows; measured on the user's account (usage.md)",
+      "usd_1000_list": 19.56,
+      "price_read": "2026-10-15 (cloud pilot)",
+      "derived": "the pilot's three pages extrapolated to 99, $1.936, per 1,000 pages",
       "source": {
+       "file": "ArchiveProcessor/segbench-results/ocr-panel-cloud-pilot.md",
+       "route": "claude-sonnet5.5",
+       "attribute": "99 pages, mean cost",
+       "value": "$1.936"
+      },
+      "api_equivalent_usd_1000": 11.5,
+      "api_equivalent_source": {
        "file": "ArchiveOCRBench/data/panel-data.json",
        "route": "claude-sonnet5.5",
        "attribute": "routes.std (estimated API price, data/inputs.json)",
@@ -8612,7 +8620,8 @@
      "status": "shipped",
      "needs": {
       "key": [
-       "anthropic"
+       "anthropic",
+       "openrouter"
       ],
       "plan": [
        "claude"

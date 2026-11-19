@@ -42,8 +42,7 @@ struct AnthropicClient: Sendable {
         ]
 
         if let thinking = thinkingLevel {
-            let budget = thinking.budgetTokens(for: .documentOCR)
-            body["thinking"] = ["type": "enabled", "budget_tokens": budget]
+            body.merge(thinking.anthropicThinkingFields(modelID: model.id, purpose: .documentOCR)) { $1 }
             // Anthropic counts thinking tokens against max_tokens, so the ceiling must exceed
             // the budget or the visible transcription is silently truncated to the remainder.
             // Raise it by the budget to preserve the full output allowance.
@@ -55,7 +54,8 @@ struct AnthropicClient: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        if thinkingLevel != nil {
+        // Adaptive thinking (Claude 4.7 and later) interleaves on its own and needs no beta header.
+        if thinkingLevel != nil, !ThinkingLevel.anthropicThinksAdaptively(model.id) {
             request.setValue("interleaved-thinking-2025-05-14", forHTTPHeaderField: "anthropic-beta")
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

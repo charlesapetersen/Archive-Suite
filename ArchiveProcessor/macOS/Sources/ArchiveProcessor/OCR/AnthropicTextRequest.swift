@@ -12,7 +12,7 @@ enum AnthropicTextRequest {
             "messages": [["role": "user", "content": prompt]]
         ]
         if let thinking = thinkingLevel {
-            body["thinking"] = ["type": "enabled", "budget_tokens": thinking.budgetTokens(for: .textCompletion)]
+            body.merge(thinking.anthropicThinkingFields(modelID: modelID, purpose: .textCompletion)) { $1 }
         }
         return body
     }

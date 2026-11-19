@@ -35,6 +35,11 @@ struct SegmentationRoutes: Equatable, Sendable {
 
     /// Claude's windows go by the user's own plan: `claude` is there, and either no key or the user chose the plan.
     var claudeByPlan: Bool { hasClaudeCLI && (!hasAnthropicKey || claudeRoute == .plan) }
+    /// W41.app-openrouter-claude: Claude's windows go through OpenRouter, on Anthropic's own endpoint: no Anthropic key
+    /// and no `claude`, but an OpenRouter key. Not in the mix (`canRun(_:approach:)`): its ChatGPT half is GPT-6.1 Sol
+    /// through Codex, not a measured OpenRouter route, so the mix stays on the keys and plans. Claude as the 2B's
+    /// partner is Claude alone, so it may.
+    var claudeThroughOpenRouter: Bool { !hasAnthropicKey && !hasClaudeCLI && hasOpenRouterKey }
     /// The route is the user's to choose only when both exist.
     var offersClaudeRouteChoice: Bool { hasClaudeCLI && hasAnthropicKey }
     var hasChatGPTPlan: Bool { chatGPTAccount != nil }
@@ -87,6 +92,12 @@ struct SegmentationRoutes: Equatable, Sendable {
     /// and the model on this Mac always (whether its server answers is asked when the run starts).
     func canRun(_ p: WindowProvider) -> Bool {
         p == .local || hasKey(p) || (p == .anthropic && hasClaudeCLI) || (p == .openai && hasChatGPTPlan)
+    }
+
+    /// `canRun(_:)` for one approach's voter: Claude outside the mix also runs on an OpenRouter key
+    /// (`claudeThroughOpenRouter`).
+    func canRun(_ p: WindowProvider, approach: SegmentationApproach) -> Bool {
+        canRun(p) || (p == .anthropic && approach != .mix && claudeThroughOpenRouter)
     }
 }
 
@@ -164,12 +175,12 @@ struct SegmentationRow: Equatable, Sendable {
 
         // Which providers this approach needs, and which of them the user can reach.
         let providers = providerOrder(entry)
-        let missing = providers.filter { !routes.canRun($0) }
+        let missing = providers.filter { !routes.canRun($0, approach: approach) }
         let missingKeys = missing.filter { !routes.hasKey($0) }
-        let reason: String? = missing.isEmpty ? nil : "Needs " + missing.map(needPhrase).joined(separator: " and ") + "."
+        let reason: String? = missing.isEmpty ? nil : "Needs " + missing.map { needPhrase($0, approach: approach) }.joined(separator: " and ") + "."
 
         let (lines, notes, dollars) = approach.proposesBoundaries
-            ? costLines(entry, pageCount: n, routes: routes, today: today)
+            ? costLines(entry, pageCount: n, routes: routes, today: today, approach: approach)
             : (["No cost"], [], 0)
 
         // The 2B checked against an online model (W46.seg-review-rule): the 2B's boundaries, the partner's cost, and
@@ -208,7 +219,8 @@ struct SegmentationRow: Equatable, Sendable {
             notes: (entry.figuresNote.map { [$0] } ?? [])
                 + (providers.contains(.local) ? LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac,
                                                                      onlineReachable: SegmentationOptions.partnerApproaches.contains {
-                                                                         SegmentationRow.providers($0, options: options).allSatisfy(routes.canRun)
+                                                                         let a = $0
+                                                                         return SegmentationRow.providers(a, options: options).allSatisfy { routes.canRun($0, approach: a) }
                                                                      }) : []))
     }
 
@@ -259,7 +271,8 @@ struct SegmentationRow: Equatable, Sendable {
     /// ChatGPT by its plan has no meter an app can read (usage.md), so its line is the token figure and the notional
     /// API price of the same calls, labelled approximate, with "Using ChatGPT plan".
     private static func costLines(_ entry: SegmentationOptions.Approach, pageCount n: Int,
-                                  routes: SegmentationRoutes, today: Date) -> ([String], [String], Double?) {
+                                  routes: SegmentationRoutes, today: Date,
+                                  approach: SegmentationApproach) -> ([String], [String], Double?) {
         let models = (entry.cost?.perModel ?? [:]).sorted { $0.key < $1.key }
         let day = dayString(today)
         var apiList = 0.0, anyAPI = false
@@ -290,6 +303,10 @@ struct SegmentationRow: Equatable, Sendable {
                 continue
             }
             anyAPI = true
+            if provider == .anthropic, approach != .mix, routes.claudeThroughOpenRouter {
+                notes.append("Claude: through your OpenRouter key on Anthropic's endpoint, at OpenRouter's listed price "
+                             + "(until it is read, up to a tenth above Anthropic's, which this figure uses)")
+            }
             var list = cost.listUSDPer1000Pages
             if let change = cost.priceChange {
                 // `after_2026_12_31`: the old price holds through that day, the new one from the next.
@@ -388,9 +405,12 @@ struct SegmentationRow: Equatable, Sendable {
         }
     }
 
-    private static func needPhrase(_ p: WindowProvider) -> String {
+    private static func needPhrase(_ p: WindowProvider, approach: SegmentationApproach) -> String {
         switch p {
-        case .anthropic: return "an Anthropic API key, or the claude tool installed and signed in"
+        case .anthropic:
+            // Claude outside the mix also runs on an OpenRouter key (W41.app-openrouter-claude).
+            return approach == .mix ? "an Anthropic API key, or the claude tool installed and signed in"
+                : "an Anthropic or OpenRouter API key, or the claude tool installed and signed in"
         case .gemini: return "a Gemini API key"
         case .openai: return "an OpenAI API key, or Sign in with ChatGPT"
         case .openrouter: return "an OpenRouter API key"

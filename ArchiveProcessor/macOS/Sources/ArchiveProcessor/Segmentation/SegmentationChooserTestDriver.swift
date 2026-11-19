@@ -198,7 +198,11 @@ enum SegmentationChooserTestDriver {
         } else { check("4 an unmeasured row shows the file's reason and no figures", false, "could not rebuild the file") }
         let noClaude = row(.claude, 1000, .none)
         eq("4 claude without key or claude",
-           noClaude.unavailableReason, "Needs an Anthropic API key, or the claude tool installed and signed in.")
+           noClaude.unavailableReason, "Needs an Anthropic or OpenRouter API key, or the claude tool installed and signed in.")
+        // W41.app-openrouter-claude: an OpenRouter key runs Claude's windows; the mix still needs its own.
+        check("4 claude runs on an OpenRouter key", row(.claude, 1000, SegmentationRoutes(hasOpenRouterKey: true)).canRun)
+        eq("4 the mix does not", row(.mix, 1000, SegmentationRoutes(hasOpenRouterKey: true)).unavailableReason?
+            .hasPrefix("Needs an Anthropic API key, or the claude tool"), true)
         eq("4 claude offers the Anthropic key", noClaude.missingKeys, [.anthropic])
         check("4 unavailable row still shows its figures", noClaude.toCheck == claude.toCheck)
         eq("4 unavailable row still shows what the key would cost", noClaude.costLines, claude.costLines)

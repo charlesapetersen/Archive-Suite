@@ -288,10 +288,17 @@ enum SettingsSolverTestDriver {
 
         trainingRunChecks()
 
-        // C. An OpenRouter key, Gemini models not used.
-        var orKey = mac(16)
-        orKey.keys = ["openrouter"]
-        orKey.excludedModelFamilies = ["gemini"]
+        // C. An OpenRouter key, Gemini models not used. W41.app-openrouter-claude: Claude Sonnet 5.5 is reached through
+        // OpenRouter now, and leads reading (96.48); left out below too, so C stays the open models' profile.
+        var orClaude = mac(16)
+        orClaude.keys = ["openrouter"]
+        orClaude.excludedModelFamilies = ["gemini"]
+        let cc = solve("C-claude", orClaude)
+        eq("C with Claude: reading is Claude Sonnet 5.5 through OpenRouter", pick(cc, "reading"), "claude-sonnet5.5")
+        eq("C with Claude: and runs on the OpenRouter key", cc.pick("reading", "all")?.route?.appRoute(keys: orClaude.keys),
+           "openrouter|anthropic/claude-sonnet-5.5")
+        var orKey = orClaude
+        orKey.excludedModelFamilies = ["gemini", "claude"]
         let c = solve("C", orKey)
         eq("C reading: Qwen3.8 Flash ties Qwen3.6 27B and is cheaper", pick(c, "reading"), "qwen3.8-flash")
         check("C reading cites its pair", c.pick("reading", "all")?.gap?.citation == "−0.08 [−1.62, +1.64], n 91, owner96/all/answered",
@@ -403,7 +410,11 @@ enum SettingsSolverTestDriver {
         var claude = mac(16)
         claude.plans = ["claude"]
         let d3 = solve("D3", claude)
-        eq("D3 reading: Claude Sonnet 5.5 on the plan", pick(d3, "reading"), "claude-sonnet5.5")
+        // W41.app-openrouter-claude: Claude Sonnet 5.5's reading row is read by key only (the app has no reading by the
+        // plan that row measures), so the plan alone reads with what runs on this Mac.
+        eq("D3 reading: the plan alone reaches no Claude reading, Vision", pick(d3, "reading"), "apple-vision")
+        check("D3 the Claude reading row needs a key", d3.blockers("reading", "claude-sonnet5.5").contains { $0.contains("key") },
+              d3.blockers("reading", "claude-sonnet5.5").joined(separator: "; "))
         eq("D3 segmentation: Claude Sonnet 5.5", pick(d3, "segmentation"), "claude-sonnet5.5")
         eq("D3 dating: no plan row, the Mac route", pick(d3, "dating", "step 1"), "vision-2b-chooser-t3")
         eq("D3 names: no plan row, the Mac route", pick(d3, "entities", "correspondence-typed"), "qwen3-vl-8b-mac")
