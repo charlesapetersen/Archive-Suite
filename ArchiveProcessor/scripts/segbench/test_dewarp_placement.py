@@ -73,6 +73,8 @@ class Variants(unittest.TestCase):
         self.assertEqual((D.base('dvd.r2'), D.uses_quad('dvd.r2')), ('dvd', True))
         self.assertEqual((D.base('dvd.noquad'), D.uses_quad('dvd.noquad')), ('dvd', False))
         self.assertTrue(D.uses_quad('uvdoc'))
+        arms = ['route', 'dvd-copy', 'dvd.r2-copy', 'dvd.noquad-copy', 'dvd.r3-guarded', 'uvdoc-copy']
+        self.assertEqual(D.runs_of(arms, 'dvd'), ['dvd', 'dvd.r2', 'dvd.r3'])
 
     def test_no_quad_passes_the_whole_image(self):
         img = np.zeros((4, 6, 3), np.uint8)

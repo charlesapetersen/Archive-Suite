@@ -137,11 +137,35 @@ def cmd_prep(a):
             np.savez(g, grid=grid, out_w=out.shape[1], out_h=out.shape[0], src_w=img.shape[1], src_h=img.shape[0],
                      found=found)
             print(f'{d} {n}/{len(rs)} {k} quad found {found}', flush=True)
-        jobs = CACHE / f'{d}-lines-jobs.tsv'
-        jobs.write_text(''.join(f"{ddir(d, 'out') / (r['key'] + '.jpg')}\t{ddir(d, 'lines') / (r['key'] + '.json')}\n"
-                                for r, _, _ in rs if not (ddir(d, 'lines') / (r['key'] + '.json')).exists()))
-        if jobs.read_text():
+        read_lines(d, [r['key'] for r, _, _ in rs if not (ddir(d, 'lines') / (r['key'] + '.json')).exists()])
+
+
+def read_lines(d, keys, rounds=3):
+    """Vision's lines on d's flattened images, each read twice and kept only when the two reads agree.
+    W46.p16-dewarp-floor: during one prep batch on 18-19 Nov Vision returned about 15% fewer lines on most flattened
+    images than a lone read of the same JPEG, a strict subset, on every dewarper; later reads agreed with each other.
+    So a page is read again until two reads in a row match, and prep stops if one never does."""
+    todo = list(keys)
+    for _ in range(rounds + 1):
+        if not todo:
+            return
+        for sub in ('lines-a', 'lines-b'):
+            for k in todo:
+                (ddir(d, sub) / f'{k}.json').unlink(missing_ok=True)
+            jobs = CACHE / f'{d}-{sub}-jobs.tsv'
+            jobs.write_text(''.join(f"{ddir(d, 'out') / (k + '.jpg')}\t{ddir(d, sub) / (k + '.json')}\n" for k in todo))
             subprocess.run([str(DCS.DEWARP_BIN), 'lines', str(jobs)], check=True)
+        left = []
+        for k in todo:
+            a, b = ddir(d, 'lines-a') / f'{k}.json', ddir(d, 'lines-b') / f'{k}.json'
+            if a.read_bytes() == b.read_bytes():
+                a.replace(ddir(d, 'lines') / f'{k}.json')
+            else:
+                left.append(k)
+        if left:
+            print(f'{d}: {len(left)} pages read differently twice, reading again', flush=True)
+        todo = left
+    raise SystemExit(f'{d}: Vision never read {todo} the same way twice')
 
 
 # ---------------------------------------------------------------- the placement-only layer
@@ -357,6 +381,12 @@ def summary(xs, arms):
     return s
 
 
+def runs_of(arms, d):
+    """The runs of dewarper d's quad setup among the arms, first run first: ['dvd', 'dvd.r2', 'dvd.r3']."""
+    runs = {arm.split('-')[0] for arm in arms if arm != 'route'}
+    return sorted(r for r in runs if base(r) == d and uses_quad(r))
+
+
 def floor(xs, runs):
     """The rerun floor: for each pair of runs of one setup (`d`, `d.r2`, …) and each of its arms, the second run
     against the first on the lines both score, and how many of those lines changed outcome."""
@@ -394,9 +424,7 @@ def cmd_report(a):
            'sets': {'curved bound or curled': summary(curved, arms), 'their flat pairs': summary(flat, arms),
                     'curved, classed flat': summary([x for x in curved_all if x not in curved], arms),
                     'all 64': summary(xs, arms)},
-           'floor': {name: {d: floor(sel, sorted({arm.split('-')[0] for arm in arms if base(arm) == d
-                                                  and uses_quad(arm.split('-')[0]) and arm != 'route'}))
-                            for d in ('uvdoc', 'dvd')}
+           'floor': {name: {d: floor(sel, runs_of(arms, d)) for d in ('uvdoc', 'dvd', 'docscanner', 'docgeonet')}
                      for name, sel in (('curved bound or curled', curved), ('their flat pairs', flat))},
            'owner_pages': {x['key']: {arm: f"{v['pass']}/{v['n']}" for arm, v in x['arms'].items()}
                            | {'guard': x['guard']} for x in xs if x['key'] in PC.OWNER_PAGES},
