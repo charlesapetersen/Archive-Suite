@@ -26,35 +26,35 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   main window opens with an OpenRouter key (as well as when the Settings note shows), so before “Read with this”,
   Re-OCR's ranking or page-kind routing can pick one; the read is asynchronous, so an estimate made in the first
   seconds after launch, or while OpenRouter is unreachable, still uses the guess. That price is also the request's
-  `max_price`: if OpenRouter lists one higher, its pages fail (nothing is charged) until a read succeeds.
+  `max_price`: if OpenRouter lists one higher, its pages fail (nothing is charged) until a read succeeds. (accepted: the listing is read asynchronously; the guess is also `max_price`, so a wrong one fails safe, with no charge).
 - **The estimate counts the maker's thinking tokens at Low only.** At High, a maker's thinking model gets the direct
   clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
-  Gemini 3.8 Flash and none for the others, as the direct routes' estimates do.
-- **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac.
+  Gemini 3.8 Flash and none for the others, as the direct routes' estimates do. (accepted: no High thinking figure is measured; the estimate follows the direct routes').
+- **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac. (accepted: OpenRouter has no batch interface).
 - **The unmeasured Claude models (Sonnet 4.6, Opus 4.6, Opus 5.5, Haiku 4.5) and the unmeasured Gemini and GPT
   built-ins come through OpenRouter only as unmeasured listing models** (W41.app-openrouter-unmeasured): by the listing's
   ids, unpinned, without their makers' handling (Gemini's refusals and second reader, image-token counts) and not as a
   route-table row's OpenRouter route. Claude Sonnet 5.5 is not among them: the bench measured it (through the owner's
   Claude plan, for reading and for the windows), so it is a pinned maker route on Anthropic's endpoint
   (W41.app-openrouter-claude), and the listing skips its id. Opus 5.5 and Haiku 4.5 have narrow measurements that do
-  not make routes (`LLMModel.anthropicModels` says which).
+  not make routes (`LLMModel.anthropicModels` says which). (accepted: only a measured model becomes a pinned route; the rest are offered as listing models by design).
 
 ## ⚠️ LIMITATION (W47.ct-processor-intake, 2026-11-19): what reading a folder tree in Process Files does not do
 - **The level map is offered once per output folder.** A map already there (an earlier run's, or one the Reader saved),
   readable or not, is used as it stands, even when the new tree is deeper or named differently; edit it in Archive
   Reader (File ▸ Container Levels… on that archive). A map above the output folder is not looked for: with the output
   inside a Reader archive, Save writes a map for the output folder's subtree, and Start Without Saving leaves the
-  outer map reading the new folders from its own root.
+  outer map reading the new folders from its own root. (accepted: the map is the archive's record and is edited in the Reader, not overwritten by a run).
 - **Documents are found across the whole run.** Segmentation and tagging see the run's pages in order and may treat
   pages from two folders as one document; merging splits it at the folder change, but the pieces keep the tags the
-  whole document was given.
+  whole document was given. (queued: W49.proc-tree-folder-docs).
 - **Depth.** Folders more than 12 below the given folder are not read, and nothing says so. A given folder whose own
-  name starts with "." is read but filed flat.
+  name starts with "." is read but filed flat. (queued: W49.proc-tree-depth-say).
 - **Collection organisation is skipped for a tree's outputs**, by design: the tree says where they go. Its status line
-  still counts every collection the run found.
+  still counts every collection the run found. (accepted: by design, the tree says where outputs go).
 - **The Files tab's sheet and question were not run in the VM**: the logic behind them is in the driver
   (`test-collection-organize.sh`) and a real Apple Vision run on a scratch tree (`PROCESSFILES_TREE=1`); the two SwiftUI
-  views follow the Reader's levels sheet, which the VM checked (W47.ct-reader-view).
+  views follow the Reader's levels sheet, which the VM checked (W47.ct-reader-view). (queued: W49.proc-tree-sheet-vm).
 
 ## ⚠️ LIMITATION (W47.ct-processor-capture, 2026-11-19): what reading box and folder labels does not do
 - **Gemma needs a server already running on this Mac** (W47.ct-capture-gemma). With the gateway off or a local model on
@@ -65,32 +65,32 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   the window. With mlx-vlm, start it with the model (`mlx_vlm.server --model mlx-community/gemma-3-12b-it-4bit`): its
   0.7.4 cache listing skips that build, whose index names five shards where the repo has two, so a server that has
   not loaded it does not list it. Settings has no switch for it apart from the label-reading toggle. The reader is recorded as
-  `gemma-3-12b` whichever build the server lists.
+  `gemma-3-12b` whichever build the server lists. (accepted: by design the app starts no server and downloads no model; the Vision + parser route is the fallback).
 - **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma (about 8 GB) is asked on
   that same server first; LM Studio and Ollama may unload the OCR model to load it, and load it again for the next
   page, tens of seconds each way on an 18 GB Mac, inside Live Capture's segment work (Finish waits). Not measured
-  interleaved; `segbench-results/ct-gemma-route.md` times labels alone.
+  interleaved; `segbench-results/ct-gemma-route.md` times labels alone. (queued: W49.proc-gemma-swap-time).
 - **A local address is trusted.** Only a loopback address is asked, but a proxy there that forwards to a cloud model,
-  or redirects, cannot be told apart from a local server; Ollama's `-cloud` tags are refused by name.
+  or redirects, cannot be told apart from a local server; Ollama's `-cloud` tags are refused by name. (accepted: a loopback server is the user's own; a forwarding proxy there is their choice).
 - **Process Files has no card.** Its labels are written as proposals (source `label`), to confirm in the Reader's
   editor (the Inspector's Container section, W47.ct-reader-edit). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
   folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
-  collection organisation stopped partway (its moves are not reported then).
+  collection organisation stopped partway (its moves are not reported then). (accepted: by design labels are proposals confirmed in the Reader, and a pre-OCRed run's outputs are its inputs).
 - **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
   call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
-  nothing written.
+  nothing written. (accepted: labels are known only after organisation; the read is shown and Stop ends it cleanly).
 - **The up-front estimate gives the label read's price a photo, not a total** (W47.ct-label-cost). Each Luna call is
   counted in the run's cost, summary, history and month's ledger (the gateway's own figure, else its tokens, else
   $0.00084), but which photos are labels is known only once the run has read them (accepted: no classification
   before the run). After a relaunch, a Live Capture marker filed later is counted at the $0.00084 estimate when its
   fields carry Luna's reading, since the measured charge is kept in memory (accepted: within a cent of the figure).
 - **Vision reads the photo as stored**, turned by its EXIF orientation only, not by the run's rotation correction; a
-  label shot sideways may read nothing there, and the run's OCR text stands in (`ocr-text+parser`).
+  label shot sideways may read nothing there, and the run's OCR text stands in (`ocr-text+parser`). (queued: W49.proc-label-read-turned).
 - **A marker whose card is still up when the collection sheet is confirmed** is filed with its read's proposals; its
-  card goes with it. Skip leaves proposals too; both are confirmed later in the Reader.
+  card goes with it. Skip leaves proposals too; both are confirmed later in the Reader. (accepted: proposals are confirmed in the Reader either way).
 - **A marker whose own PDF failed to move** and is filed by a later Finish gets the next number after the documents
-  already filed, so its run starts after them (the numbering, not the label read).
+  already filed, so its run starts after them (the numbering, not the label read). (accepted: a failure path only; the numbers stay unique).
 
 ## ⚠️ LIMITATION (W47.ct-backfill, 2026-11-19): Tools ▸ Read Box and Folder Labels
 - **Markers are found by tag or colour only.** The label classifier is not run over existing material, so a box or
@@ -113,52 +113,52 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   (`LocalAgentClient.pacingReset`), until the plan answers or the user presses Stop. It never goes to a key. The
   message forms read are Claude Code's ("resets 3pm", "resets in 2h", "resets Nov 24, 9am", "usage limit reached|epoch");
   a new wording the CLI adopts is matched as a limit only if it says "usage limit", "hit your limit", "limit reached",
-  "session limit", "rate limit" or 429 (`LocalAgentWindowTransport.isUsageLimit`), else the page fails as before.
+  "session limit", "rate limit" or 429 (`LocalAgentWindowTransport.isUsageLimit`), else the page fails as before. (accepted: the plan route is free by design and never falls back to a key; Stop ends the wait).
 - **Reading does not stop at 90% of the five-hour window.** The segmentation windows read the account's meter
   (`stream-json`, `PlanRunGate`) and pause before the window runs out; the page reader uses `--output-format json`,
-  which prints no meter, so a batch reads until the limit itself and then waits.
+  which prints no meter, so a batch reads until the limit itself and then waits. (queued: W49.proc-plan-read-meter).
 - **Live Capture waits too.** A captured page at the limit waits inside its OCR task; the capture window shows the
-  pause (`PlanPauseCaption`), and the segment is filed when its pages are read.
+  pause (`PlanPauseCaption`), and the segment is filed when its pages are read. (accepted: by design, as for any plan read at the limit).
 - **Throughput is from three synthetic pages** (`scripts/e2e-fixtures`, 2026-11-19): 5.7–8.5 s a page one at a time,
   11.6 s for the three two at once; not a benchmark figure, so not in ArchiveOCRBench. `scripts/test-localagent.sh
-  --live` repeats it on the plan.
+  --live` repeats it on the plan. (accepted: a smoke figure, not a benchmark; the bench's reading figure stands for the route).
 
 ## ⚠️ LIMITATION (W41.app-openrouter-claude, 2026-11-18): Claude Sonnet 5.5's routes carry its plan route's figures
 - **Its figures were measured through `claude -p`**, the owner's plan (reading: 96.48 NES on the 96, a relative of the
   truth's drafter Claude Opus 5.5; windows: 88.9% on the test boxes). The Anthropic key and OpenRouter routes carry them
   with no parity check (owner, 2026-11-18). They send the app's own OCR prompt, which carries the page-kind tags the
   pipeline needs, not the panel's prompt; and reasoning low through OpenRouter (the endpoint refuses it off), adaptive
-  thinking at the user's level by key, where `claude -p` set none.
+  thinking at the user's level by key, where `claude -p` set none. (accepted: owner, 2026-11-18, no parity check).
 - **Its by-key reading price is the cloud pilot's** ($19.56 per 1,000 pages, three pages through OpenRouter's Anthropic
   endpoint), at Anthropic's list price ($2/$10, checked 2026-11-18). The route table gives no batch figure: OpenRouter
-  has none, so an Anthropic key's overnight batch is priced at the standard rate there.
+  has none, so an Anthropic key's overnight batch is priced at the standard rate there. (accepted: the measured record; OpenRouter has no batch).
 - **Not the mix.** "Claude and ChatGPT together" stays on the keys and plans: its ChatGPT half (GPT-6.1 Sol through
-  Codex) is not a measured OpenRouter route. Claude as the Mac 2B's partner does go through OpenRouter.
+  Codex) is not a measured OpenRouter route. Claude as the Mac 2B's partner does go through OpenRouter. (accepted: the ChatGPT half is not a measured OpenRouter route).
 - **The plan reaches its reading row (W41.app-claude-plan-reading, 2026-11-19).** A Claude plan reads with it at no
   money, through the Local Agent backend (`claude -p` at `claude-sonnet-5-5`, the way the bench read the 96, so the
   figure is this route's own; owner, 2026-11-19). The app sends its own OCR prompt with the page as a file the CLI's Read
   tool opens, where the panel sent its own prompt; no parity check. Where the plan reaches the row the sheet's "Read
   with this" switches on the plan, even when an Anthropic key is there too, because the row is then priced at nothing.
-  By key it stays money. Its windows go by the plan where `claude` is there, as before.
+  By key it stays money. Its windows go by the plan where `claude` is there, as before. (accepted: owner, 2026-11-19, the plan route's own figure, no parity check).
 - **Thinking at High is not capped by a budget.** Claude 4.7 and later think adaptively (a `budget_tokens` is a 400),
   so High is `effort: high` inside the same `max_tokens` (8,192 plus 8,000 for a page). A page that thinks past that
-  fails as cut off rather than returning short text, and the estimate counts no Anthropic thinking tokens.
+  fails as cut off rather than returning short text, and the estimate counts no Anthropic thinking tokens. (accepted: Anthropic's adaptive thinking takes no budget; a cut-off page fails loudly).
 - **Its OpenRouter windows have not been sent live.** The request is the Anthropic key's (no thinking field), pinned to
   Anthropic's endpoint with `require_parameters`; the bench's pilot found that endpoint refuses reasoning *off*
   (`enabled: false`), which this request does not send. No live call was made (no money for this item); the first real
-  run is the check, and a refusal fails every window loudly (a 400 is fatal).
+  run is the check, and a refusal fails every window loudly (a 400 is fatal). (accepted: no money for this item; the first real run is the check and a refusal fails loudly).
 
 ## ⚠️ LIMITATION (W41.app-openrouter-unmeasured, 2026-11-18): what an unmeasured OpenRouter model does not do
 
 - **Its estimate is OpenRouter's generic one.** Image tokens are counted as for any OpenRouter model, reasoning as
   1,024 tokens a page whatever the level (High may spend up to its 8,000-token budget more), and `max_price` caps
   the price per token, not the number of tokens. A model the listing gives a per-image or per-request charge is not
-  listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge.
+  listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge. (accepted: an unmeasured model has only OpenRouter's listing to go on).
 - **A listed model that leaves the listing leaves the picker.** A selection that no longer resolves falls back to
   the provider's first model (Gemini 3.8 Flash through OpenRouter), as a deleted custom model's does; the picker
-  and the estimate show the change, nothing warns. A run already going has no client for it, so its pages fail.
+  and the estimate show the change, nothing warns. A run already going has no client for it, so its pages fail. (queued: W49.proc-openrouter-gone-warn).
 - **No provider is pinned, so the precision and the upstream's terms are unknown**; `data_collection: "deny"` is
-  sent on every request, so an upstream that may keep or train on pages is refused.
+  sent on every request, so an upstream that may keep or train on pages is refused. (accepted: unmeasured models are unpinned by design; `data_collection: "deny"` guards the pages).
 
 ## FIXED (W46.layout-partition-fix, 2026-11-17): the newspaper fill read like a whole page
 
@@ -234,27 +234,27 @@ written where the `searchableFor` setting names the input's format and the page'
   app still runs on Intel, but arm64-only bundled tools are ignored there: install native `jbig2enc` and `qpdf` for
   compression. Debug also uses installed tools. Lookup is Resources, then /opt/homebrew/bin, /usr/local/bin,
   /opt/local/bin, then the login shell's PATH. Without runnable tools the embedded JPEG remains (about 2 MB a
-  photographed page), and the run log says "written uncompressed: jbig2 and qpdf not found".
+  photographed page), and the run log says "written uncompressed: jbig2 and qpdf not found" (accepted: shipped, W42.int-s5-compress-ship; the bundled tools are arm64, so an Intel Mac uses installed ones).
 - **Compressing costs time**: 3 s the drawn memo, 10 s UIUC 00233, about 67 s each UIUC 00149 and 00156 (the engine's
   rebuild and MRC layering, every page in the app's process; measured 2026-11-14, Debug build). An unplaced page also
-  runs Vision once more, to tell the layering where the words are.
+  runs Vision once more, to tell the layering where the words are (accepted: the measured cost of compressing).
 - **The compressed page is the engine's rebuild of the reading copy**, not the camera original: lossy MRC/JPEG
   layers at the engine's defaults (`Prefs.register`: balanced photo detail), so fine tone and colour in stamps and
-  photographs are softer than in the pair's JPEG.
+  photographs are softer than in the pair's JPEG (accepted: lossy MRC layers are what compression is; the pair keeps the JPEG).
 - **The settings sheet chooses by kind only** (the rules tab, placement: "Every page" and one switch a kind, for any
-  input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such.
+  input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such (accepted: the sheet's design; a format-specific entry stays a settings-file choice).
 - **Merges and date rewrites preserve compression where qpdf succeeds.** If qpdf is unavailable or refuses the
   file, they fall back to the Quartz PDF/A writer, which can expand compressed images. A merge logs that fallback;
-  a date rewrite does not. Compression children also have no per-page timeout or connection to run cancellation.
+  a date rewrite does not. Compression children also have no per-page timeout or connection to run cancellation (queued: W49.proc-child-cancel).
 - **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
   (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
-  image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages.
-- **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead.
+  image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages (accepted: the reading has no word positions to place by; the run log names the pages).
+- **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead (accepted: by design, a searchable file has no text page to replace).
 - **A file edited elsewhere can lose its headers.** A list whose count is not the page count is ignored (the file was
-  edited, so which entry is which page is unknown), and the file is then read as pairs.
+  edited, so which entry is which page is unknown), and the file is then read as pairs (accepted: the safe fallback for a file whose page order is unknown).
 - **Live Capture and the multi-page PDF path drop the run-log notes** (unplaced pages, pages written as pairs instead),
-  as they drop the layer outcome.
-- **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing).
+  as they drop the layer outcome (queued: W49.proc-runlog-all-paths).
+- **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing) (accepted: a moment on first showing).
 
 ## Verification baseline (2026-11-14)
 
@@ -303,25 +303,25 @@ layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
 - **The download is not published yet.** The app pins `hands.tgz` (286,946,670 B, sha256 `f835149b…`) at the
   `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the handwriting
   placer" fails until the owner uploads the archive kept in the autonomous state's `model-files/hands-build/`
-  (`W42.int-s5-hands-publish`). Until then every hand page gets the text page, as before, and says why.
+  (`W42.int-s5-hands-publish`). Until then every hand page gets the text page, as before, and says why (queued: W42.int-s5-hands-publish).
 - **Time and memory:** 13.6-31.8 s a page in the app, median 18.2 (blla on the CPU about 6-9 s, imports and model loads
   3-5 s, every page in a fresh process; the first page of a launch 64 s, torch imported cold), physical footprint 4.6-6.8 GB a page; the placer's cap is 10 GB (`HandPlacer.memoryGB`) and
   it holds every model-reader slot, so hand pages run one at a time and never beside a model reader. A 16 GB Mac, not
-  an 8 GB one (`place-hands-cost.md`).
+  an 8 GB one (`place-hands-cost.md`) (accepted: the measured cost; hand pages run one at a time by design).
 - **The gate reads the reading copy, not the camera original.** The placer runs on the image page as written (the 2 MB
   JPEG copy, straightened when it slopes), where the bench measured the originals: on 5 of 21 owner pages the
   confidence rose (p031 0.70 to 0.89, p096 0.57 to 0.72), and p096 is placed where the bench gated it (20 of 21 on the
   same side). The 0.9 gate was read off the originals' line-pass table; its refit waits on more hand truth
-  (`05-placement.md` §6).
+  (`05-placement.md` §6) (accepted: the 0.9 gate is the owner's call of 2026-11-17, W46.place-hands-textpage; its refit waits on more hand truth).
 - **A handwritten page of no known kind can still go without a text page**: under "Every page" (`*/*`) of the
   searchable form, a page no classifier called and no tag named is not known to be handwritten, so it is written as
   one searchable page with its reading unplaced (W46.place-hands-textpage keeps the text page on every page whose
-  kind, or whose reading's hand, is handwritten, mixed or registers).
-- **Cancelling a run does not stop a page's placer**: it finishes its page (up to 600 s) or its wait for a slot.
+  kind, or whose reading's hand, is handwritten, mixed or registers) (accepted: a page no classifier or tag names is not known to be handwritten).
+- **Cancelling a run does not stop a page's placer**: it finishes its page (up to 600 s) or its wait for a slot (queued: W49.proc-child-cancel).
 - **The reflow rule is by name**: a reader whose model name holds Infinity-Parser, LightOnOCR, PaddleOCR-VL or
-  Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught.
+  Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught (accepted: reflowing is a property of those model families, which only the name identifies).
 - **Accented readings align worse**: McCATMuS is an NFD model and the reading is not normalised to NFD (as on the
-  bench), so a precomposed accent scores 0 and lowers the page's confidence.
+  bench), so a precomposed accent scores 0 and lowers the page's confidence (queued: W49.proc-hand-nfd).
 
 ## ⚠️ LIMITATION (W42.int-s5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
 
@@ -336,24 +336,24 @@ limits in their own section). Open:
   Elsewhere the layer follows the new reading (`SPEC/improve-ocr.md` §5). A page kept this way is not named in the
   review, and the review shows only the text diff: it does not say the image page's invisible layer changes too.
   The remade page carries no `/Rotate` of its own (Quartz writes none), so under a page tree that passes a turn down
-  its revision is refused by the preservation check and the old layer stays.
+  its revision is refused by the preservation check and the old layer stays (queued: W49.proc-reocr-layer-review).
 - **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
   about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
-  media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither.
+  media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither (queued: W49.proc-pdfa-memory).
 - **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
-  Live Capture and the multi-page PDF path drop the outcome.
+  Live Capture and the multi-page PDF path drop the outcome (queued: W49.proc-runlog-all-paths).
 - **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
   the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses
-  (W42.int-s5-compress); the pair is not.
+  (W42.int-s5-compress); the pair is not (accepted: the measured record; the pair's image page is the reading copy by design, and the searchable form is the compressed one).
 - **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
   "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
   the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the
-  switch once a session (`liveSettings`), so a change mid-session waits for the next.
+  switch once a session (`liveSettings`), so a change mid-session waits for the next (queued: W49.proc-straighten-record).
 - **The Reader indexes the text twice** (the layer and the text page, `ExtractedContent.fullBody`); on a page where the
-  reading did not align, the layer is Vision's own words, so Vision's misreads are searchable there.
+  reading did not align, the layer is Vision's own words, so Vision's misreads are searchable there (accepted: both are the file's text, and the text page carries the reading).
 - **Time:** at output the engine's Vision pass runs once more per print page (seconds a page), and straightening reads
-  the line angle with one more Vision pass at 1,600 px on every page, Live Capture included.
+  the line angle with one more Vision pass at 1,600 px on every page, Live Capture included (accepted: the measured cost of the layer and of straightening).
 
 ## ⚠️ LIMITATION (W46.seg-text-tier-default, 2026-11-13): the default Gemini segmenter reads no picture, so a page with no OCR text gives it nothing
 
@@ -378,14 +378,14 @@ What remains: a box with many such pages has more gaps to check than the figures
   phone (or Mac card) gives a month but no year keeps that month over the route's, while the evidence quotes the page's
   own date. A rotation-review regeneration in Live Capture reuses the first decision, with no second call, so a page
   first read sideways keeps an image pass that found nothing. The sidecar's `dating` object and the header line are
-  written on a manual card only while it still holds the date the route filled; a date the user typed carries none.
+  written on a manual card only while it still holds the date the route filled; a date the user typed carries none (queued: W49.proc-date-paths-rest).
 - **The image pass runs only through a remote gateway** (Gemini 3.7 Flash, the measured route). On a direct key,
   OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
   estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`.
   **Settled by W46.date-route-image-routes (2026-11-15):** the Mac 8B was measured in a7068d5f
   (`segbench-results/date-route-pipeline.md`, W46.date-route-pipeline-8b) and gained no correct year over no image
   pass on either trace, so it is not added (08-dating.md call 7.5). The direct-key Gemini 3.8 route was dropped by
-  the owner on 2026-11-13 (737b5bb9). This remains the supported scope, with no route pending under that item.
+  the owner on 2026-11-13 (737b5bb9). This remains the supported scope, with no route pending under that item (accepted: settled by W46.date-route-image-routes; no other backend has a measured image route).
 - **The PDF header's `Date evidence:` line (W46.date-route-header) is written on one-pair outputs only.** A Re-OCR
   multi-page output (several pairs in one file) and any output whose text page does not read back cleanly (a wrapped
   filename PDFKit splits differently, a page whose text is not the run's) are left as they are, logged, with the
@@ -393,16 +393,16 @@ What remains: a box with many such pages has more gaps to check than the figures
   setting changed between the OCR and a resumed tagging pass changes the page's columns (the check ignores layout).
   It runs on the main actor, one text page per document with a non-explicit year. A later manual year edit in review
   leaves the line as it was (an output-time snapshot, like the source-date lines; the tags are authoritative), and a
-  rotation or retry that regenerates a page drops it until the run is tagged again.
+  rotation or retry that regenerates a page drops it until the run is tagged again (accepted: the sidecar holds the evidence; the header line is an output-time snapshot and the tags are authoritative).
 - **A reclassification after tagging** refreshes `Sent With` (W37) but not an enclosure's inherited own year: an
   enclosure that stops being one keeps its cover's year, still marked `Date Uncertain`, and a page newly marked an
-  enclosure does not inherit, until the run is tagged again.
+  enclosure does not inherit, until the run is tagged again (queued: W49.proc-date-paths-rest).
 - **A year the reply quotes from the document itself counts as explicit** even when no rule candidate carries it (a
   two-digit `'47`, an OCR-damaged `196L`), as the measured bench route does (`date_route_pipeline.route`); 08-dating.md
-  §3 words step 1 by the rule candidate alone. The model's own flag can still add `Date Uncertain` there.
+  §3 words step 1 by the rule candidate alone. The model's own flag can still add `Date Uncertain` there (accepted: as the measured bench route does).
 - **No propagation fallback.** 08-dating.md §3 step 4 names propagation (the nearest earlier dated document, t=3) for a
   route with no model for the step; the app has no such route yet (every tagging run has a text model), so a failed
-  dating call writes no year, the rule's explicit year standing where there is one (the stage's Fallback rule).
+  dating call writes no year, the rule's explicit year standing where there is one (the stage's Fallback rule) (accepted: every tagging run has a text model, so no route needs it yet).
 - **The folder's date (step 3b, W47.ct-folder-date) dates only files tagged in place.** Process Files and the manual
   tagging modes take a folder run's confirmed date only for the pre-OCRed route (output = source), whose names the
   runs were set on; a new output would sort into another batch's run, and collection organisation renames and moves
@@ -421,23 +421,22 @@ What remains: a box with many such pages has more gaps to check than the figures
 
 - **Refused for in-place improvement:** encrypted or signed files, files ending in a cross-reference stream (the
   pinned PDFium 8046d writes a revision Quartz cannot open after one; the Processor's own output uses tables), raw
-  one-page originals and any file not in suite image/text pairs, and a text page whose original filename PDFKit reads
-  back as three or more lines (Core's header parser then misses the reader line: `W44.reocr-header-longname`).
+  one-page originals and any file not in suite image/text pairs (accepted: refused to keep in-place improvement safe).
 - **Apple Vision fails inside the macOS 27.2 VM guest** ("Foundation._GenericObjCError 0") while it reads the same
-  page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision.
+  page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision (accepted: a VM guest platform limit; the host self-test uses the real Vision).
 - **The dialog offers Run once per opening:** after Run its file list is stale (an accepted file has a new reader);
-  reopening reads the files again.
+  reopening reads the files again (queued: W49.proc-reocr-dialog).
 - **Opening the dialog on many files is slow:** it reads and validates every file, and asks the classifier about
-  header-less pages, on the main thread (500 flagged files at most from the finder); load in the background later.
+  header-less pages, on the main thread (500 flagged files at most from the finder); load in the background later (queued: W49.proc-reocr-dialog).
 - **The Kind picker is per file:** it shows the first page's Kind and sets every page of the file, so a mixed-Kind
-  file's header Kinds are overwritten by a choice there; per-page pickers are open.
+  file's header Kinds are overwritten by a choice there; per-page pickers are open (queued: W49.proc-reocr-dialog).
 - **Opening the dialog reads the Keychain** for each provider (to know which readers are ready), which can bring back
-  a Keychain prompt on an unseeded Mac.
+  a Keychain prompt on an unseeded Mac (accepted: a one-time Keychain seed, kept by the stable signing certificate).
 - **Release notices:** the static PDFium also carries its bundled third-party code (FreeType, libjpeg-turbo,
   OpenJPEG, lcms2, zlib, abseil and others); their notices and the verbatim Apache-2.0 text must join
-  `ThirdParty/PDFium-LICENSE.txt` before a DMG ships.
+  `ThirdParty/PDFium-LICENSE.txt` before a DMG ships (queued: W49.proc-pdfium-notices).
 - **Not re-flagged:** a restore whose publication launch recovery had to finish, and an acceptance whose clear
-  finished through its own reconciled retry, leave the flag off (the safe side).
+  finished through its own reconciled retry, leave the flag off (the safe side) (accepted: off is the safe side).
 
 ## ⚠️ LIMITATION (W40.suite-item-types, 2026-11-11): a box/folder colour changed in Settings mid-batch can leave the old colour word behind
 
@@ -459,40 +458,36 @@ record on the job the colour it was tagged with.
   Agent's plan, else the gateway, else the key), Apple Vision's judgement pass, each kind's own reader, the cascade's
   escalation, a refused page's second readers and the window segmenter's voters. Resuming an interrupted run does
   not ask again; Live Capture does not ask at all. A collection settings file that cannot be read counts as the
-  switch off, as the run's own frozen settings do.
+  switch off, as the run's own frozen settings do. (queued: W49.proc-training-warn-capture)
 - **OpenRouter is told to refuse, so a training upstream fails.** While a job works with the switch on (a Process
   Files run, its tagging or retry; an open Live Capture session; an Improve OCR run), every OpenRouter request carries
   `provider.data_collection: "deny"` (`OpenRouterDataPolicy`); with the provider pinned and no fallbacks, a
   Chutes-pinned model's calls then fail instead of reading. The deny is process-wide, so another job working at the
   same time is refused the same way; Live Capture holds it while its session's settings are loaded, not only while
-  it reads.
+  it reads. (accepted: deliberately conservative; while any job with the switch on works, a concurrent job is refused rather than sent to a training upstream)
 - **The default segmenter reads the general layer only.** `SegmentationApproach.preferredDefault` is saved once for
-  the app, before any collection is known, so it takes the general layer's switch, not a collection's.
+  the app, before any collection is known, so it takes the general layer's switch, not a collection's. (accepted: the default is saved for the whole app before any collection is known)
 - **The billed and opted-out answers are the user's word.** The general interview asks, for each key and plan found
   whose terms depend on the account (a Gemini or Mistral key, a Claude or ChatGPT plan), whether it trains; the app
   cannot check the answer. A provider that may train whatever the account (Chutes) or an unpinned OpenRouter row
-  stays hidden whatever the user answers.
+  stays hidden whatever the user answers. (accepted: the app cannot check an account's terms; routes that may train whatever the account stay hidden)
 - **The terms are a reading of 2026-11-17.** They live in `SettingsTraining.swift` and
   `execution-plans/processing-review/13-stage-rules/15-training-terms.md`, with their sources; a provider that
-  changes its terms needs both edited.
+  changes its terms needs both edited. (accepted: the terms are a dated reading with sources, re-read when a provider changes them)
 
 ## ⚠️ LIMITATION (W46.settings-layers, 2026-11-11): what the settings layers do not yet cover
 
-- **The interviews fill the layers; nothing shows the picks yet.** The general and collection interviews
-  (`W46.settings-interviews`, 2026-11-11) write their answers, and the settings sheet (`W46.settings-sheet`) is what
-  will show every value with its source and the solver's pick per stage. Until then Settings' "This collection"
-  section lists only the values a collection holds.
 - **The interviews' known gaps (W46.settings-interviews).** The kind sample reads photographs only (JPEG, PNG,
   HEIC, TIFF), not PDF pages, and needs macOS 26 for the classifier. A Claude plan counts only after "Check the
   sign-in" passes (one short message on the plan). The period, language and script rules that pick a public test set
   are the bench's strata read by the period's middle year; they are a reading, not a measurement. The money habit
-  "No limit" can be chosen only in the general settings.
+  "No limit" can be chosen only in the general settings. (accepted: design limits of the interviews: a photo-only kind sample, the classifier's macOS 26 floor, a plan counted once it answers, the strata read as a rule, and "No limit" a general-layer choice)
 - **The run still reads the app's processing settings, not the solver's picks.** The frozen record carries both: the
   resolved layers and the `UserDefaults` processing settings the run actually used. Running a batch from the
-  solver's picks is the sheet's job.
+  solver's picks is the sheet's job. (accepted: the run reads the processing settings by design; the settings sheet's apply button carries a pick into them, W46.settings-sheet)
 - **A Live Capture session's layers resolve at Finalize.** The session cannot know its collection folders before
   then, so each folder's record uses that folder's layers as they are at Finalize. The processing settings are the
-  ones the session took when it started.
+  ones the session took when it started. (accepted: a session cannot know its collection folders before Finalize)
 - **The month's ledger is an estimate, and a few runs are priced roughly (W46.settings-ledger, W46.settings-ledger-more,
   2026-11-12).** Each line is the list-price estimate the processing history uses, not a billed figure, dated when the
   run was last counted. A run that ends early (Stop, a stop before segmentation, a mixed run whose image half failed
@@ -503,12 +498,12 @@ record on the job the colour it was tagged with.
   may bill requests it finished first. Live Capture counts the pages it files, at Finalize, without their second
   readers; pages read and then discarded are not counted. A run quit or crashed mid-way counts nothing unless it
   is resumed. A headless test launch keeps the app's own ledger in memory and never writes its lines. The limit itself shapes only the settings sheet's choices:
-  Process Files does not yet stop a batch at it (it runs the app's processing settings, above).
+  Process Files does not yet stop a batch at it (it runs the app's processing settings, above). (queued: W49.proc-ledger-limit-stop)
 - **The guarded writer checks, then writes.** A local process that swaps `.archivesuite` for a link between the
   check and the write could redirect one write (`SPEC/collection-settings.md`). Accepted: it needs a hostile local
-  process.
+  process. (accepted: needs a hostile local process)
 - **The named processing profiles are gone, with no migration.** Nothing real was saved with them (owner,
-  2026-08-01).
+  2026-08-01). (accepted: no migration because nothing real was saved with them, owner 2026-08-01)
 
 ## Human Poor OCR flag and new-output headers (W44.reocr-spec, 2026-11-07)
 
@@ -616,10 +611,10 @@ fails such a page for Retry when none of those readings was a verdict (`LiveCapt
 `Recitation`) or a cut-off first reading still files image-only. Anthropic's low-credit reply (a 400
 `invalid_request_error`) is now recorded as a 402. Two edges remain:
 - A page AI Studio refuses with a bare 500 on every try, for a user with no second reader set up, now holds its
-  document back until a second reader is added (the failure message says how); before, it filed image-only.
+  document back until a second reader is added (the failure message says how); before, it filed image-only. (accepted: fixed, W40.fix-processor-failed-ocr-wrapped; a never-read page waits for a second reader rather than filing image-only, by design)
 - Bare HTTP statuses from OpenAI, Mistral and OpenRouter (a 400, a 413) count as request failures, while
   Anthropic's `invalid_request_error` and `request_too_large` count as verdicts, so the same faulty request is
-  failed on one route and filed image-only on another.
+  failed on one route and filed image-only on another. (queued: W49.proc-request-failure-codes)
 
 ## FIXED (W40.fix-processor-after-finish-not-processed, 2026-11-01): a document ended after a full Finish, in the same run, staged with no output
 
@@ -837,28 +832,28 @@ the estimate and its time does not).
 `InstitutionalComputeImport` takes a cluster bulk run's text for the pages whose image bytes it read. What it does not do:
 - **The estimates count every page.** The cost and time lines do not know which pages will match until each is
   hashed during the run, so they overstate a run with cluster text (a matched page costs one short text-only
-  classification call).
+  classification call). (accepted: which pages match is known only once each is hashed during the run)
 - **Rotation is 0** on an imported page: asking the run's provider would be a paid call per page, and the cluster read
-  the file as stored. A sideways scan stays sideways in the PDF.
+  the file as stored. A sideways scan stays sideways in the PDF. (accepted: a rotation check would be a paid call per page)
 - **Imported text follows the bench panel's prompt**, not the Processor's: the custom OCR prompt and the
-  previous-page context do not apply to imported pages (the classification call does get the custom prompt).
+  previous-page context do not apply to imported pages (the classification call does get the custom prompt). (accepted: the cluster read every page with the bench panel's prompt)
 - **Only image inputs match.** A PDF input's pages are drawn to temporary JPEGs whose bytes the cluster never saw.
-  Paid batches, the gateway, the Local Agent and Apple Vision runs ignore the import.
+  Paid batches, the gateway, the Local Agent and Apple Vision runs ignore the import. (accepted: a PDF's pages are drawn during the run, so the cluster never saw their bytes; the other routes do not read pages through the import)
 - **A resumed run reloads the folder on the main actor** (every `_meta` file); a very large run may pause the resume
   for some seconds. A folder moved, deleted or emptied since gives no import, so resume first asks whether to read
   the remaining pages with the run's model or stop and put the folder back (W40.fix-processor-instcompute-resume-silent).
   An interrupted mixed PDF run asks the same, counting its image pages as "up to": which of them are still unread
   is not known until the resume runs. It asks only when the folder gives no page at all: a folder swapped for another
-  bulk run's still loads, so pages it does not match are read by the run's model without a question.
+  bulk run's still loads, so pages it does not match are read by the run's model without a question. (queued: W49.proc-instcompute-resume-load)
 - **Every imported page gets a classification call**, even when tagging, merging and segmentation are off:
-  `performOCRCall` cannot see the run's tagging mode. One short text call a page, inside the estimate.
+  `performOCRCall` cannot see the run's tagging mode. One short text call a page, inside the estimate. (queued: W49.proc-instcompute-classify)
 - **Every page is hashed** once more than it is read (one extra read of each input), the price of matching by
-  content rather than by name.
+  content rather than by name. (accepted: the price of matching by content rather than by name)
 - **Older bulk output without `_meta.cluster` does not import.** No institution is guessed. Use a new output folder
-  with the neutral kit; no migration is provided because there is no kept app output.
+  with the neutral kit; no migration is provided because there is no kept app output. (accepted: no kept app output, so no migration)
 - **The kit supports Slurm/NVIDIA only.** Profiles describe local policy and memory; offline dry-runs do not
   prove CUDA/model compatibility or throughput. The example university is fictional. Run the frozen truth
-  check on a new cluster before bulk processing; ask its research computing office for allocation/runtime settings.
+  check on a new cluster before bulk processing; ask its research computing office for allocation/runtime settings. (accepted: the kit's scope is Slurm with NVIDIA GPUs; other clusters need their own truth check)
 
 ## ⚠️ LIMITATION (W41.app-ocr-cascade, 2026-10-16): what the cheap-first cascade does not yet cover
 
@@ -937,13 +932,13 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
   plan request takes inline `input_image` parts (if not, it fails with `subscription_sharing_unsupported_capability`,
   which stops the run, and the window would have to be sent another way); whether it takes `reasoning.effort`; and
   how the issued client id behaves when a different account signs in after a sign-out (the app starts a new
-  registration then, which OpenAI's docs allow).
+  registration then, which OpenAI's docs allow). (asked: W49.proc-chatgpt-real-signin-owner-ok)
 - **No meter, so no share.** OpenAI gives an app no usage figure, so the ChatGPT line is the bench's token figure
   and its API list price, labelled approximate, never a share of the plan. A usage limit stops the run resumably
-  with the Manage usage link; there is no 90% pause as Claude's plan route has.
+  with the Manage usage link; there is no 90% pause as Claude's plan route has. (accepted: OpenAI gives an app no usage figure, so the approximate token and list-price line is the most the route can show)
 - **The token figure is the bench's**, measured through Codex with its harness subtracted
   (`input_excluding_harness_per_1000_pages`); the app's own requests have no harness, so it should be close, but it
-  was not measured on this route.
+  was not measured on this route. (accepted: the app's requests carry no harness, so the figure is a close bound and is labelled approximate)
 
 ## ⚠️ LIMITATION (W36.seg-opt-subscription, 2026-10-11): the Claude plan route, as built
 
@@ -951,11 +946,11 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
   completion, the probe and the segmentation windows) has `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` removed
   (`LocalAgentClient.claudeAPICredentialVariables`; W40.fix-processor-localagent-api-key, 2026-11-01), so a key
   exported by the shell that launched the app is never used. A key the CLI stored at its own login is outside the
-  environment and the app cannot see it: the cost pane's "the plan covers it" is then wrong.
+  environment and the app cannot see it: the cost pane's "the plan covers it" is then wrong. (queued: W49.proc-claude-stored-key-cost)
 - **The meter is account-wide and whole-percent.** Other use of the account during a run inflates the measured
-  share; rule 7 discards a run only when a step jumps by more than the calls explain, or when a window resets.
+  share; rule 7 discards a run only when a step jumps by more than the calls explain, or when a window resets. (accepted: the meter is the account's whole-percent figure; rule 7 discards the runs it cannot explain)
 - **The ratio is stored unkeyed.** A change of plan shows as a ratio that moves; the median of the last five runs
-  follows it after about three runs.
+  follows it after about three runs. (accepted: a plan change shows as a moving ratio and the median of the last five runs follows it in about three runs)
 
 ## ⚠️ LIMITATION (W36.seg-opt-review, 2026-10-11): where the window segmenter's run state is and is not kept
 
@@ -963,25 +958,25 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
   than run the window segmenter on whatever Settings holds now, the resume pins `manual`. Its journal is also
   retired before segmentation, so a batch run that hits a usage limit offers only "check the rest myself", not
   Stop. A non-batch run keeps its approach and its answers (`PendingRunRuntimeConfig.segmentationApproach`,
-  `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume.
+  `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume. (accepted: pinning manual is the safe choice over running the window segmenter on whatever Settings holds now)
 - **A window approach sends page images to its model even in an Apple Vision run** that has a judgment LLM. The
-  approach is an explicit opt-in with its cost shown, so this is by design, but it is not text-only.
+  approach is an explicit opt-in with its cost shown, so this is by design, but it is not text-only. (accepted: the window approach is an explicit opt-in with its cost shown, by design)
 - **Every page's window image is held in memory for the run** (about 1,600 px JPEGs, so roughly 150 MB for 500
-  pages), as the engine takes the whole page list at once.
+  pages), as the engine takes the whole page list at once. (accepted: the engine takes the whole page list at once; about 150 MB for 500 pages)
 - **A box or folder photo the OCR model missed** is added in the skim, after the windows ran, so the gaps on
-  either side of it keep the windows' decision rather than becoming a boundary by construction.
+  either side of it keep the windows' decision rather than becoming a boundary by construction. (accepted: the skim adds it after the windows ran so the windows' decisions on either side stand, by construction)
 
 ## ⚠️ LIMITATION (W37.dual-date, 2026-10-06): where enclosure dates are and are not produced
 
 - **Process Files PDFs carry no `Document date:` / `Sent with:` header lines.** Those PDFs are rendered at
   OCR time, before tagging, and finished PDFs are not rewritten to add them (rewriting risks tags and bytes).
   Live Capture renders after tagging and writes the `Document date:` line. The Finder tags are the live
-  value either way; the header is only a snapshot.
+  value either way; the header is only a snapshot. (accepted: finished PDFs are not rewritten, which risks tags and bytes; the Finder tags are the live value)
 - **Enclosure proposals come only from the OCR prompt's `[enclosure]` marker**, so Mistral, Apple Vision and
   pre-OCRed classification-only runs propose none; the owner can still type a sent-with date in the manual
-  tag sheet. Nothing checks that the covering unit is actually a letter.
-- **The manual sheet can clear a proposed relation or type a date, but cannot re-point it** at another letter.
-- The OCR prompt gained one optional instruction (the marker), so it is in every paid OCR call.
+  tag sheet. Nothing checks that the covering unit is actually a letter. (queued: W49.proc-enclosure-other-routes)
+- **The manual sheet can clear a proposed relation or type a date, but cannot re-point it** at another letter. (queued: W49.proc-manual-repoint-relation)
+- The OCR prompt gained one optional instruction (the marker), so it is in every paid OCR call. (accepted: one optional instruction in the OCR prompt is the price of the marker)
 
 ## ✅ FIXED (W34.recov-flake): recovery Test 25 could clear a different session's staging folder
 
@@ -1211,18 +1206,18 @@ affected files. Deliberately W3.cap-r1's mechanism, not a second warning channel
 Four decisions worth keeping:
 
 - **The file still counts as processed** — the owner's 2026-07-18 decision, unchanged. Tags are
-  re-derivable; withholding "done" over metadata would help nobody. Only the silence was the bug.
+  re-derivable; withholding "done" over metadata would help nobody. Only the silence was the bug. (accepted: fixed, W23.m5; why the tag-failure record is built this way)
 - **The record is keyed by the INPUT file, not the output.** `CollectionSegmenter.organizeOutput` MOVES
   *and RENUMBERS* every output (`00003 Box 12.pdf`) as the last step of a run, so an output name or URL
   recorded during tagging names a file that no longer exists by the time the summary is written. The
-  input name never changes and is what the operator recognizes.
+  input name never changes and is what the operator recognizes. (accepted: fixed, W23.m5; why the tag-failure record is built this way)
 - **Self-healing, but only on a real attempt.** A later successful re-write (rotation regen, review
   retry) CLEARS the entry. A step that attempts no write does not: a post-run `retryOne` regenerates the
   PDF and — outside copy-source — does not re-tag it, so treating "no attempt" as success would have
-  silently cleared a warning about a file that is still untagged.
+  silently cleared a warning about a file that is still untagged. (accepted: fixed, W23.m5; why the tag-failure record is built this way)
 - **Merge keeps it honest.** One merged PDF now covers every page, so its successful tag write resolves
   each page's earlier failure; the placeholder warning stays against the photo whose page is still a
-  placeholder inside the merged PDF — the page an operator would actually re-shoot.
+  placeholder inside the merged PDF — the page an operator would actually re-shoot. (accepted: fixed, W23.m5; why the tag-failure record is built this way)
 
 **Guard:** `scripts/test-processfiles-tagwarn.sh` (`ProcessFilesTagWarningTestDriver`,
 `PROCESSFILES_TAGWARN_TEST=1`) — 79 $0 checks, no OCR/network/GUI, synthetic files in a temp dir.
@@ -1312,15 +1307,15 @@ recorded 640/647/673 had drifted with W16.cfg\*).
 
 - The app assigns exactly one colour (Red = box, Purple = folder, none = document), so `jsonTags.colorTag`
   is passed explicitly and `colorIsAuthoritative` is **fixed `true`** in the helper rather than left to the
-  caller — this seam no longer has a code path that can guess.
+  caller — this seam no longer has a code path that can guess. (accepted: fixed, W3.cap-r1; why the tag-write record is built this way)
 - The helper returns whether the write landed; a refusal is recorded on the new
   `StagedSegment.untaggedOutputs` and `finalize` warns, naming how many filed files carry no tags and what
-  to do. Optional field ⇒ a legacy staging manifest decodes and behaves exactly as before.
+  to do. Optional field ⇒ a legacy staging manifest decodes and behaves exactly as before. (accepted: fixed, W3.cap-r1; why the tag-write record is built this way)
 - **The file still counts as filed** — the owner's 2026-07-18 decision. Bytes are safe and retagging is
   possible, so withholding "filed" would strand the source photo over recoverable metadata. Only the silence
-  was a bug. (Contrast W23.h5, where the *image* is missing and the photo genuinely must be kept.)
+  was a bug. (Contrast W23.h5, where the *image* is missing and the photo genuinely must be kept.) (accepted: fixed, W3.cap-r1; why the tag-write record is built this way)
 - Merge removes its about-to-be-deleted constituent PDFs from the record before tagging the merged output,
-  so the warning never counts an artifact that no longer exists.
+  so the warning never counts an artifact that no longer exists. (accepted: fixed, W3.cap-r1; why the tag-write record is built this way)
 
 **Both had to ship together** (and did): (1) changes *which* overload is called and (2) changes *whether the
 result is discarded*, on the same three lines — landing them apart would have silently reverted half of the
@@ -1478,17 +1473,17 @@ on. If that ever needs closing it is a separate item, not a re-open of this one.
 - `PairingGeneration` — a monotonic token rotated by every pair **and** unpair (`retirePreviousPairing()`,
   called from `disconnect()`, `connect()`'s success branch and `connectCloud()`), which also cancels every
   outstanding upload/segment job. Cancelling is best-effort by nature (a blocking POST already on the wire
-  runs to completion), which is exactly why the *generation check*, not the cancel, is what makes this safe.
+  runs to completion), which is exactly why the *generation check*, not the cancel, is what makes this safe. (accepted: fixed, W23.m1; the ownership design the fix is built on)
 - `OutstandingSends<K>` — the in-flight guard, now generation-stamped. `claim` still refuses a second send
   for a key **even across a re-pair**, preserving W23.h4's invariant that only one coroutine ever holds a
   photo file (the delete path's cancel-and-join depends on it). `release` frees only the caller's own claim,
-  so a retired send unwinding can never free the live endpoint's guard.
+  so a retired send unwinding can never free the live endpoint's guard. (accepted: fixed, W23.m1; the ownership design the fix is built on)
 - `sendAck(ok, tokenIsCurrent)` — the ownership rule in ONE place, shared by both kinds of send so they
   cannot drift. Staleness deliberately outranks success: an `ok` from a Mac we are no longer paired with is
   `REQUEUE_STALE`, never `CONFIRM` — because `CONFIRM` is what marks a page uploaded and therefore
   deletable. The upload handler bails out before `setState(UPLOADED)` (so a crash in that window can't
   persist a false confirmation either), and its `finally` returns the page to the queue via
-  `markSendableAgain` (`PENDING`, resend marker cleared, heartbeat re-counted) for the endpoint paired now.
+  `markSendableAgain` (`PENDING`, resend marker cleared, heartbeat re-counted) for the endpoint paired now. (accepted: fixed, W23.m1; the ownership design the fix is built on)
 
 **No behaviour change when nothing re-pairs:** with the generation constant, `claim`/`release` are exactly
 the old `add`/`remove` and `sendAck` always yields the old CONFIRM/RETRY decision.
@@ -1533,23 +1528,23 @@ validity was never established anywhere in the chain.
 **The fix** (per the owner's constraint: keep the placeholder, still count the file as filed, never retire
 the source — the same "warn, don't withhold-filing" shape as W3.cap-r1's `tagsApplied`):
 - `PDFGenerator.generate` now returns `ImagePageOutcome` (`.embedded` / `.placeholder`), `@discardableResult`
-  so the five Process Files call sites are untouched (their `try?` swallowing is the separate item W23.m5).
+  so the five Process Files call sites are untouched (their `try?` swallowing is the separate item W23.m5). (accepted: fixed, W23.h5; how the placeholder guard is built)
 - `writeSegmentFiles` records the affected **source URLs** on the new `StagedSegment.placeholderSources`.
   A `nil` outcome — `generate` threw yet still left a file on disk — is treated as placeholder: unknown
-  resolves toward keeping the photo.
+  resolves toward keeping the photo. (accepted: fixed, W23.h5; how the placeholder guard is built)
 - `finalize` runs its deletion set through the new pure `LiveCaptureProcessor.sourcesSafeToRetire(...)`,
   which AND-s the existing filed gate with the new one. Withholding is **per page**: a sibling page that
-  embedded fine is still retired, so one unreadable page doesn't strand a whole session's photos.
+  embedded fine is still retired, so one unreadable page doesn't strand a whole session's photos. (accepted: fixed, W23.h5; how the placeholder guard is built)
 - Operator surface (it was silent before): new `SegmentStatus.Phase.succeededPlaceholderImage`
   ("Filed (scan MISSING)") → new amber `ItemState.succeededPlaceholderImage` with a row explanation and
-  retry/rotate actions, plus a finalize-summary warning naming how many photos were kept and why.
+  retry/rotate actions, plus a finalize-summary warning naming how many photos were kept and why. (accepted: fixed, W23.h5; how the placeholder guard is built)
 - Backward compatible: `placeholderSources` is optional, so a legacy staging manifest behaves exactly as
   before. The rotation-review regeneration path replaces the whole `StagedSegment`, so the flag self-heals
   when a retry succeeds and re-arms if it fails. ⚠️ The *record* always self-healed there; the **row
   describing it did not** until `W3.cap-r3-fu6` (`61fc680`, 2026-08-04) sent both writers through one
   `labelStagedRecord`. Before that, a regeneration could leave a `.failed` label on a record that now files
   (the sheet then warning about it, inviting a retry that re-buys the OCR) or a success label on one that
-  now holds nothing.
+  now holds nothing. (accepted: fixed, W23.h5; how the placeholder guard is built)
 
 **Regression:** `LiveCaptureRecoveryTestDriver` Tests 9–11 via `scripts/test-recovery.sh` ($0, no OCR,
 no network, no GUI, synthetic temp files) — detection, the pure retirement gate, and the wiring between
@@ -1579,15 +1574,15 @@ JVM with no device:
 - **Confirm.** `requiresDeleteConfirmation(item)` — true unless the Mac has confirmed the bytes AND no
   metadata resend is outstanding. Deliberately the SAME predicate `pendingReportCount` uses (it now
   delegates to it), so "the Mac still needs this" and "losing this loses it forever" cannot drift apart.
-  An already-uploaded page still deletes on the third tap; anything else opens an `AlertDialog`.
+  An already-uploaded page still deletes on the third tap; anything else opens an `AlertDialog`. (accepted: fixed, W23.h4; how the delete guard is built)
 - **Cancel-and-join.** `retireCapture(uploadJob, file, retire)` `cancelAndJoin`s the item's upload BEFORE
   the bytes go away, so the upload either completed or unwound while the file was still readable. The
   `uploadJobs[id]` read and the `cancel()` happen in one main-thread turn (`viewModelScope` is
-  `Main.immediate`), so nothing can enqueue a replacement job into the gap.
+  `Main.immediate`), so nothing can enqueue a replacement job into the gap. (accepted: fixed, W23.h4; how the delete guard is built)
 - **Recoverable retire.** The dialog's primary action is "Save to gallery & delete": the photo is copied to
   Pictures/Archive Capture via the existing `PhoneBackup`, and the local file is removed ONLY once that copy
   is confirmed written. A failed copy returns `KEPT_RETIRE_FAILED`, **keeps the photo**, and re-queues it
-  (its upload had been cancelled). "Delete permanently" remains available for a genuinely bad shot.
+  (its upload had been cancelled). "Delete permanently" remains available for a genuinely bad shot. (accepted: fixed, W23.h4; how the delete guard is built)
 
 Regression coverage: `CaptureDeletePolicyTest` (8 JVM cases, scratch temp files only). The cancel-and-join
 case is proven non-vacuous — swapping `cancelAndJoin()` for a bare `cancel()` turns it RED. Full Android
@@ -1712,13 +1707,13 @@ and writes receipts. It does not. The paragraph is retained below only as the hi
   (`LiveCaptureProcessor.swift:709-719`) is the only one of the three durable-state records that is unversioned
   and unverified, and `loadStagingManifest` (:190-242) **fails silent-open**: both decodes fail, `restored` stays
   empty, and the operator sees an empty Processing pane while `_processed/` holds orphaned output. Corrupt
-  manifests get renamed + bannered, never auto-deleted.
-- **`W17.det1`** — stranded-session **detection logic only**, no UI.
+  manifests get renamed + bannered, never auto-deleted. (accepted: closed by owner decision 2026-07-18; the record of what was promoted instead, shipped in Wave 17)
+- **`W17.det1`** — stranded-session **detection logic only**, no UI. (accepted: closed by owner decision 2026-07-18; the record of what was promoted instead, shipped in Wave 17)
 - **Tag-write failures folded into `W3.cap-r1`** — ✅ **SHIPPED 2026-07-31** (see the FIXED entry at the top of this
   file). A real finding this entry did NOT contain: all three live-path tag writes were
   `_ = try? MacOSTagger.applyTags(...)`, so a file could be trashed-at-source while its output carried **no tags at
   all** and was invisible to Reader triage. Fixed as specified — record the failure, warn in the finalize summary,
-  still counts as filed — in the same commit as r1's colour-overload fix, as required.
+  still counts as filed — in the same commit as r1's colour-overload fix, as required. (accepted: closed by owner decision 2026-07-18; the record of what was promoted instead, shipped in Wave 17)
 
 **Original proposal (historical — see the fiction warning above):**
 
@@ -1978,10 +1973,10 @@ gaps. Only cfg6 remains: remove the now-production-unused fallback statics and c
 - *"`MacOSTagger` retains a global fallback for older call sites"* — **there is no global.** It stopped being
   `nonisolated(unsafe)` at `5b58da8` (`OSAllocatedUnfairLock`-backed), stopped being *read* at W16.cfg4 (which
   made `stampUnread:` a required parameter at all 13 sites, so no site takes an implicit default), and was
-  deleted outright by **W16.cfg6-fu** on 2026-08-01. `MacOSTagger` now holds no state.
+  deleted outright by **W16.cfg6-fu** on 2026-08-01. `MacOSTagger` now holds no state. (accepted: a corrected stale claim, kept as the record of what is already shipped)
 - *"let persisted recovery records own a versioned copy"* — **already shipped.** `PendingRunRuntimeConfig`
   (`OCRProcessor.swift:403`) is schema-versioned, manifest-attached, structurally validated independent of the
-  fingerprint (`+Pipeline.swift:204-233`), and round-trip tested (`BatchResumeTestDriver.swift:304-426`).
+  fingerprint (`+Pipeline.swift:204-233`), and round-trip tested (`BatchResumeTestDriver.swift:304-426`). (accepted: a corrected stale claim, kept as the record of what is already shipped)
 
 **Why it is not HIGH:** the headline scenario — a Process Files run mutating an in-flight Live Capture's
 settings — is **already impossible**; Live Capture is fully injected and reads/writes zero globals. The count of
@@ -2051,14 +2046,14 @@ size and tag policies win. (2026-07-17)
 **This entry was substantially STALE — three of its four headline risks are already closed AND regression-tested:**
 - *"forget a persistence transition"* → `persistPendingBatchMutation` mutates a copy, writes atomically, and
   publishes in memory **only** if the disk write succeeded; on failure it halts the run rather than running ahead
-  of its journal (`+Pipeline.swift:593-613`, transitions at :616/:626/:633).
+  of its journal (`+Pipeline.swift:593-613`, transitions at :616/:626/:633). (accepted: fixed, W16.bat1/W16.bat2 era; the record of why this risk was already closed)
 - *"mishandle partial submission"* → partial submission is a **first-class journaled state**
   (`submissionComplete`, `OCRProcessor.swift:298`; guard `+Pipeline.swift:408`), regression-tested at
-  `BatchResumeTestDriver.swift:476-486`.
+  `BatchResumeTestDriver.swift:476-486`. (accepted: fixed, W16.bat1/W16.bat2 era; the record of why this risk was already closed)
 - *"delete recovery state before cancellation is confirmed"* → `cancel()` deletes the journal **only** when every
   server cancellation is confirmed — and since W16.bat2 that rule lives in one testable seam,
-  `performServerBatchCancellation` (`+Pipeline.swift:1565`), regression-tested by `BatchCancelContract`.
-- *"keep a migration decoder for existing `pending_batch.json`"* → **already shipped** (`OCRProcessor.swift:344-372`).
+  `performServerBatchCancellation` (`+Pipeline.swift:1565`), regression-tested by `BatchCancelContract`. (accepted: fixed, W16.bat2; the rule now lives in one tested seam)
+- *"keep a migration decoder for existing `pending_batch.json`"* → **already shipped** (`OCRProcessor.swift:344-372`). (accepted: fixed, shipped in OCRProcessor.swift; the record that the decoder exists)
 
 *"Gemini returns multiple job IDs as a comma-separated string"* is **half stale**: the joined string survives as a
 **derived compatibility mirror**, but the authoritative representation is the ordered `submittedChunkIds` array
@@ -2614,14 +2609,14 @@ was classified `.absent` — *not* counted. Two facts combined into total loss:
 **Fix (this commit):**
 - `executePlans` now reports `filedGroupIds` (segments whose **every PDF landed at the destination**, verified
   on disk) + `movedFiles` + `allFiled`. `finalize` deletes a source **only** for a segment in `filedGroupIds`;
-  a missing/failed output keeps its source + staged output in the backup folder for retry/recovery.
+  a missing/failed output keeps its source + staged output in the backup folder for retry/recovery. (accepted: fixed, 2026-07-07; why the fix is built this way)
 - `writeSegmentFiles` records a PDF/JSON URL **only if the file exists on disk** (no phantoms). A segment that
-  produced no PDF is marked `.failed` (retryable), never silently "staged".
-- All post-processing deletions of capture data go to the **Trash** (`CaptureSession.trashOrRemove`), not `rm`.
+  produced no PDF is marked `.failed` (retryable), never silently "staged". (accepted: fixed, 2026-07-07; why the fix is built this way)
+- All post-processing deletions of capture data go to the **Trash** (`CaptureSession.trashOrRemove`), not `rm`. (accepted: fixed, 2026-07-07; why the fix is built this way)
 - Staging moved **into the visible backup folder** (`<session>/_processed/`) so processed PDFs (with tags) are
-  recoverable next to the raw sources if the app fails before finalize.
+  recoverable next to the raw sources if the app fails before finalize. (accepted: fixed, 2026-07-07; why the fix is built this way)
 - Regression: `LiveCaptureRecoveryTestDriver` ($0, no OCR, `LIVECAPTURE_RECOVERYTEST=1`) asserts a missing
-  output is never reported filed, and that `trashOrRemove` trashes rather than hard-deletes.
+  output is never reported filed, and that `trashOrRemove` trashes rather than hard-deletes. (accepted: fixed, 2026-07-07; the regression that guards it)
 
 **Later (W3.cap-r6, 2026-08-02) — the same straggler, one step downstream.** The guard above keeps a
 straggler's *source photo*; it did not keep a straggler's *processed output*. `finalize` reclaimed the whole
@@ -2713,15 +2708,15 @@ end-of-session rotation review showed only 2 of 6 pages — yet **all 6 files we
 **Root cause (confirmed in code):**
 - `LiveCaptureProcessor.finishSession()` (in `Capture/LiveCaptureProcessor.swift`) builds `rotationReviewPages`
   by iterating `retained.values`. `retained` holds the per-segment inputs needed to
-  regenerate a segment (source URLs, `OCRResult` incl. `rotationDegrees`, tags, model, …).
+  regenerate a segment (source URLs, `OCRResult` incl. `rotationDegrees`, tags, model, …). (accepted: fixed, W14.5 and moot since W40.b5; the original analysis kept as history)
 - `retained[groupId]` is written **atomically with every `staged.append(...)`** in `finalizeSegment`,
-  so for any segment the current build finalizes, `staged` and `retained` stay in sync.
+  so for any segment the current build finalizes, `staged` and `retained` stay in sync. (accepted: fixed, W14.5 and moot since W40.b5; the original analysis kept as history)
 - The **only** way `staged` can contain a segment with no `retained` entry is `loadStagingManifest()`
   restoring a **legacy-format** staging manifest — a bare `[StagedSegment]` array written
   before retained-persistence (commit `c0312f4`). The new format is `StagingManifest { staged, retained }`;
-  the legacy branch restores `staged` + `finalizedGroups` but leaves `retained` empty for those segments.
+  the legacy branch restores `staged` + `finalizedGroups` but leaves `retained` empty for those segments. (accepted: fixed, W14.5 and moot since W40.b5; the original analysis kept as history)
 - Result on recovery of such a session: legacy segments are re-staged/output (they're in `staged`) but
-  **excluded from the rotation review** (not in `retained`), while freshly-processed segments appear.
+  **excluded from the rotation review** (not in `retained`), while freshly-processed segments appear. (accepted: fixed, W14.5 and moot since W40.b5; the original analysis kept as history)
 
 **Impact:** minor. Output is correct — legacy segments keep the rotation that was baked when they were
 first staged (auto-detected). The user just can't *manually re-review* those pages' orientation.
