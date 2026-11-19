@@ -9,23 +9,38 @@ optional downloads.
 
 Script: `scripts/segbench/dewarp_placement.py` (tests: `test_dewarp_placement.py`; the DvD and DocTr++ wrappers:
 `dewarp_extra_arms.py`). Figures: `dewarp-placement.json`. No model was called through any API and nothing was spent.
+W46.p16-dewarp-floor (2026-11-19) added DvD's rerun floor, three more DvD runs, and DvD, DocScanner-L and DocGeoNet
+without Apple's quad (the last two sections); its arms are in the same JSON, named `dvd.r2` to `dvd.r4` and
+`<d>.noquad`, with the floor under `floor`.
 
 ## Verdict
 
-- **Placing the layer through a dewarp, on the image the user keeps, selects worse than the route.** On the 24 bound
-  or curled pages, on the blla lines both score: UVDoc −8.9 (−17.6 to −1.8) with one level run a line and −7.6
-  (−16.7 to 0.0) with the line split into runs that follow the bend; DvD −8.9 (−13.8 to −4.6) and −7.2 (−13.0 to
-  −1.0). Their flat pairs lose too (−2.2 to −3.2). Nothing here argues for revisiting the 2026-11-06 call (no
-  dewarped copy) in favour of placement through a dewarp.
+- **Placing the layer through a dewarp, on the image the user keeps, does not select better than the route, and
+  with one level run a line it selects worse.** On the 24 bound or curled pages, on the blla lines both score: UVDoc
+  −8.9 (−17.6 to −1.8) with one level run a line, and −7.6 (−16.7 to 0.0) with the line split into runs that follow
+  the bend, which is a tie, since its interval reaches zero; DvD −8.9 (−13.8 to −4.6) and −7.2 (−13.0 to −1.0). DvD's
+  one-run-a-line arm loses on all four runs (−8.8 to −9.0); its chunked arm loses on three and ties on the fourth,
+  −5.5 (−12.7 to +0.2). Their flat pairs lose too (−2.2 to −3.2). Nothing here argues for revisiting the 2026-11-06
+  call (no dewarped copy) in favour of placement through a dewarp.
 - **Why: the bend is still on the page the layer sits on.** Vision reads the flattened image in slightly longer lines
   (6.6 words a line against 6.2 raw, page medians on the 24), and those lines, carried back, span 1.55 word heights on
   the bent photograph against 1.40 for raw Vision's own lines. A level run over that box, or a stack of level runs,
   gives PDFKit more line breaks: 195 to 272 broken lines against the route's 117. A placement-only gain would need a
   writer that lays text along a curve (a run per word, or a rotated run per segment); no writer we have does.
-- **DvD is worse than UVDoc as a reading copy.** It crops the page on nearly every photograph (the own-sheet guard
-  passes it on 1 of the 24 curved pages and 3 of the flat pairs, UVDoc on 12 and 10): unguarded −11.9 (−25.4 to
-  0.0) curved and −11.3 (−17.1 to −4.9) on the flat pairs; guarded −0.1, since it is nearly always held back. UVDoc
-  stays the only dewarper with a guarded gain (+3.2, +0.4 to +7.7, as in dewarp-curved-select).
+- **DvD is worse than UVDoc as a reading copy, after the quad.** It crops the page on nearly every photograph (the
+  own-sheet guard passes it on 1 of the 24 curved pages and 3 of the flat pairs, UVDoc on 12 and 10): unguarded
+  −11.9 (−25.4 to 0.0) curved, a tie with the route by its interval, and −11.3 (−17.1 to −4.9) on the flat pairs, a
+  loss; guarded −0.1, since it is nearly always held back. UVDoc stays the only dewarper with a guarded gain (+3.2,
+  +0.4 to +7.7, as in dewarp-curved-select).
+- **DvD's rerun floor is small next to these gaps.** DvD samples from unseeded noise, so it gives a different lattice
+  each run. Over four runs its copy arm moves by at most 0.1 points on the 24 curved pages, and its placement arms by
+  up to 0.8 (one run a line) and 3.4 (chunked). Every DvD verdict above holds on every run except the chunked one
+  noted. UVDoc, DocScanner-L and DocGeoNet reproduce their first run exactly on every arm.
+- **Much of the cropping is the setup, not the model** (a pilot, no pick changes). Run on the whole photograph
+  instead of after Apple's quad, DvD, DocScanner-L and DocGeoNet cut 95 to 101 curved-page lines instead of 255 to
+  296, the guard passes them on 6 to 8 of the 24 instead of 0 or 1, and their copies tie the route: DvD +2.7 (−4.2
+  to +9.9), DocScanner-L +0.1 (−5.4 to +6.3), DocGeoNet −6.4 (−13.9 to +0.8). None beats UVDoc's guarded +3.2, and
+  all three still lose as copies on the flat pairs.
 - **DocTr++ could not be measured.** Its authors publish no weights (DocTr-Plus 2b12e48: the README says to put
   `DocTrP.pth` in `model_pretrained/`, with no link in any commit, release or mirror; the DocTr Drive folder holds
   only DocTr's own). The wrapper is written and untested; running it needs the weights from the authors.
@@ -126,8 +141,18 @@ arm's image does not show; a "broken" selection holds a line break.
 - **Comparison.** Every arm has the same photograph, blla lines, writer and PDFKit drag tool. The placement arms
   differ from the route in two things at once, by design: the words (Vision on the flattened image) and their
   geometry (carried back through the lattice). The paired figure is on the blla lines both score.
-- **Noise.** Vision, the dewarpers on CPU, the writer and PDFKit are deterministic on an image, so the rerun floor
-  is 0. The sets are 24 pages each, and the intervals say so.
+- **Noise.** UVDoc, DocScanner-L and DocGeoNet on CPU, the writer and PDFKit are deterministic on an image: rerun
+  from scratch on 19 Nov, they reproduce the first run on every arm and every line. DvD is not: it samples by DDIM
+  from unseeded `th.randn`, and the first report's "rows reproduce" was a replay of cached grids (P16-6). Its floor,
+  measured over four runs, is in "DvD's rerun floor" below: at most 0.1 points on the copy arms and up to 3.4 on the
+  chunked placement arm. Vision is not fully deterministic either: two complete reads of one handwritten flattened
+  image (s00573, DocScanner-L) gave different words on the same 21 lines. And during one prep batch on 18-19 Nov it
+  returned about 15% fewer lines on 37 to 45 of the 64 flattened images per dewarper, a strict subset of a lone read
+  of the same JPEG; the cause was not found (not the torch parent process, tested). That batch was discarded:
+  `prep` now reads each flattened image twice and keeps a read only when the two agree, and the route's cached raw
+  reads equal a fresh read on all 64. The first run's placement arms equal the clean rerun's for the three
+  deterministic dewarpers, so the first run's reads were complete. The sets are 24 pages each, and the intervals say
+  so.
 - **Dewarpers.** UVDoc 4c9b82b5 (`best_model.pkl`), CPU, torch-env, as in dewarp-curved-select. DvD db87dd2f
   (`model1852000.pt` sha256 0d7d50da058…, `line_model2.pth` 3890f1758e0b…, `seg.pth` cb79fdec55a5…, `seg_model.pth`
   b1716f4dec7f…), 3 sampling steps on CPU, about 3 s a page and 5 GB, through its own sampling loop with three local
@@ -136,7 +161,82 @@ arm's image does not show; a "broken" selection holds a line break.
   block 11 has trained adaLN weights), `mpi4py` stubbed and mmcv's ConvModule replaced by conv → BN → ReLU (mmcv has
   no Mac wheel; the checkpoint loads with no missing or unexpected keys). Its map is scaled by its code's 0.987. The patches are
   `scripts/segbench/dewarp_dvd_local.patch`. Both
-  run after Apple's quad.
-- **Scope.** Selection on Vision's own layer, not OCR accuracy of the flattened reading. The 64 pages are photographs
+  run after Apple's quad, except the `.noquad` arms. DocScanner-L (54f6063) and DocGeoNet (ead1d37) as in
+  licence-freed-sweep, with the authors' Drive weights.
+- **Scope.** Selection on Vision's own layer, not OCR accuracy of the flattened reading. The no-quad runs are a
+  pilot, one run each (DvD's one run sits inside the floor measured with the quad); UVDoc without the quad was not
+  run. The 64 pages are photographs
   from the Reader sample and two UIUC originals; the dewarpers ran after Apple's quad, as UVDoc did in
   dewarp-curved-select.
+
+## DvD's rerun floor (W46.p16-dewarp-floor)
+
+DvD ran four times from scratch on all 64 photographs, after Apple's quad, with the same code and weights: the first
+report's run (`dvd`) and three on 19 Nov (`dvd.r2` to `dvd.r4`). Each run is scored against the route as above, and
+each pair of runs against each other on the blla lines both score, with the same page bootstrap.
+
+**Each run against the route, curved bound or curled** (24 pages)
+
+| arm | run 1 | run 2 | run 3 | run 4 |
+|---|---|---|---|---|
+| copy | −11.9 (−25.4 to 0.0) | −11.9 (−25.3 to −0.1) | −11.8 (−25.3 to +0.1) | −11.9 (−25.5 to +0.1) |
+| guarded | −0.1 | −0.1 | −0.1 | −0.1 |
+| place-line | −8.9 (−13.8 to −4.6) | −9.0 (−14.4 to −4.5) | −8.9 (−14.5 to −4.3) | −8.8 (−14.8 to −3.9) |
+| place-chunk | −7.2 (−13.0 to −1.0) | −7.5 (−13.4 to −1.4) | −8.6 (−14.9 to −2.2) | −5.5 (−12.7 to +0.2) |
+
+The guard passes DvD on 1 of the 24 in every run, and on 3 of the flat pairs. On the flat pairs every run's copy
+loses (−11.3 to −11.4) and its placement arms lose or tie (−2.4 to −3.3).
+
+**Run against run, the six pairs** (the range of the pooled difference, and the most lines that changed outcome)
+
+| arm | curved: difference | curved: lines changed | flat pairs: difference | flat pairs: lines changed |
+|---|---|---|---|---|
+| copy | −0.1 to +0.1 | 4 of 1,095 | −0.1 to +0.1 | 4 of 851 |
+| guarded | 0.0 | 0 | 0.0 to +0.1 | 1 |
+| place-line | −0.1 to +0.8 | 47 of about 1,060 | −0.5 to +0.4 | 20 of about 820 |
+| place-chunk | −1.1 to +3.4 | 74 of about 1,060 | −0.7 to +0.4 | 22 of about 820 |
+
+Only two of the 48 comparisons (six pairs, four arms, two sets) separate: chunked, run 4 against run 3, +3.4 (+0.3 to +8.1) curved, and run 4 against
+run 2, −0.7 (−1.5 to −0.1) on the flat pairs. So a DvD placement gap under about 3.5 points is inside its floor; the
+copy and guarded gaps above are far outside theirs. UVDoc, DocScanner-L and DocGeoNet, rerun the same way once each,
+gave 0.0 on every arm and changed no line.
+
+## Without the quad: DvD, DocScanner-L and DocGeoNet on the whole photograph (pilot)
+
+The three dewarpers that crop all ran after Apple's quad, which has already cut the photograph down to the page, and
+each then masks the page again itself (DvD's segmentation net; DocScanner-L's and DocGeoNet's U2NETP). UVDoc has no
+mask step. Here each ran once on the whole upright photograph instead, its lattice used directly; the guard still
+judges the cut against Apple's quad corners. One run each, so DvD's floor above applies to its rows.
+
+**curved bound or curled** (24 pages)
+
+| arm | lines cut, quad → no quad | guard passes, quad → no quad | copy vs route, no quad | guarded, no quad | place-line, no quad | place-chunk, no quad |
+|---|---|---|---|---|---|---|
+| DvD | 255 → 95 | 1 → 8 | +2.7 (−4.2 to +9.9) | +1.0 (−1.8 to +5.3) | −2.7 (−5.4 to +0.1) | −0.3 (−5.0 to +4.3) |
+| DocScanner-L | 279 → 101 | 0 → 8 | +0.1 (−5.4 to +6.3) | +2.7 (−0.3 to +7.4) | −0.5 (−3.1 to +2.1) | −1.1 (−5.0 to +2.3) |
+| DocGeoNet | 296 → 100 | 1 → 6 | −6.4 (−13.9 to +0.8) | +0.3 (−3.3 to +4.3) | −2.7 (−5.5 to −0.4) | −1.4 (−5.7 to +1.9) |
+| UVDoc, with the quad (reference) | 199 | 12 | −5.0 (−16.9 to +8.0) | +3.2 (+0.4 to +7.7) | −8.9 (−17.6 to −1.8) | −7.6 (−16.7 to 0.0) |
+
+**their flat pairs** (24 pages)
+
+| arm | lines cut, quad → no quad | guard passes, quad → no quad | copy vs route, no quad | guarded, no quad | place-line, no quad |
+|---|---|---|---|---|---|
+| DvD | 62 → 28 | 3 → 10 | −6.8 (−9.8 to −3.2) | −0.5 (−1.2 to 0.0) | −1.7 (−4.4 to +0.6) |
+| DocScanner-L | 76 → 34 | 5 → 7 | −10.0 (−14.0 to −5.7) | −0.9 (−2.1 to −0.1) | −2.9 (−6.1 to −0.6) |
+| DocGeoNet | 97 → 47 | 1 → 6 | −24.1 (−31.1 to −16.8) | −0.6 (−1.5 to 0.0) | −3.1 (−6.5 to −0.7) |
+
+- **The quad is most of the cropping.** Without it, each cuts about a third as many lines, and their curved-page
+  copies go from losses of 12 to 23 points to ties with the route. What is left still cuts more than the route, and
+  on the flat pairs all three still lose as copies.
+- **No dewarper improves on guarded UVDoc.** The nearest, DocScanner-L guarded without the quad, +2.7 (−0.3 to
+  +7.4), is a tie on the curved pages and loses on the flat pairs (−0.9, −2.1 to −0.1). So no pick changes, and
+  none would without a full paired run.
+- **Placement without the quad is much closer to the route** (−0.3 to −2.7, ties but for DocGeoNet's one-run-a-line
+  −2.7, −5.5 to −0.4), against −7.2 to −10.6 after the quad. The verdict's reason, that the carried-back lines still
+  bend on the kept photograph, is a reasoned account and this does not test it; but it shows the quad's crop
+  accounts for much of the placement loss for these three. The flattened reading still does not select better than
+  the route.
+- **The owner's two pages.** UIUC 00233 (bound, route 21 of 27): DvD without the quad 25 as a copy, 27 chunked;
+  DocScanner-L 24, DocGeoNet 26; every guard still holds the copy back. UIUC 00149 (curled, route 33 of 33): the
+  copies read 13 to 26, and the guards hold all three back.
+

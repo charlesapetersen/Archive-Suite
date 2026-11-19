@@ -16697,3 +16697,28 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Tier-2 review (Opus): one HIGH fixed (the reading row priced free on the plan while "Read with this" billed a key: now key-only), MEDs fixed (3.x ids parsed as 4.7+; the chooser now says how Claude through OpenRouter is billed) or recorded in KNOWN_ISSUES (High thinking uncapped by a budget; the OpenRouter window body not sent live), LOWs fixed (batch beta header, the pilot source's label, an extra Keychain read).
   Tests: test-openrouter.sh section 10 (the Anthropic list and price, the route's body and pin, the note, listed once ahead of the listing, solver and Re-OCR on an OpenRouter key alone, the window request and the mix refused, the Anthropic key's adaptive thinking); test-thinking-budgets.sh (9 ids, adaptive shapes); solver C/D3, sheet T, chooser 4 updated. Also green: settings-routes, -sheet, -interviews, -layers, segmentation-engine, -chatgpt, reocr-ranking, provider-errors, ocr-cascade, ocr-refusal, page-reader, localagent, ocr-page-kind. No money spent; no live call (`live-openrouter.sh` is the keyed check of the id). No bench cache scratch.
   <!-- /W41.app-openrouter-claude -->
+- [x] **W46.p16-dewarp-floor — DvD's rerun floor measured, and the cropping dewarpers tried without the quad [S]** · §Document processing review — W46 (owner, 2026-10-20) — Measurement review 2026-11-18 pass 16, P16-6. SHIPPED 2026-11-19.
+  DvD (unseeded DDIM) ran three more times from scratch on all 64 place-curved-owner photographs after Apple's quad;
+  with the first report's run that is four runs, six pairs. Floor on the 24 curved pages: copy at most 0.1 points
+  (4 of 1,095 lines change), place-line up to 0.8, place-chunk up to 3.4 (only 2 of 48 run-pair comparisons
+  separate). Every DvD verdict holds on every run except chunked placement, which ties on run 4, −5.5 (−12.7 to
+  +0.2). UVDoc, DocScanner-L and DocGeoNet rerun from scratch reproduce run 1 on every arm and line. Card corrected
+  (DvD is not deterministic; the first "rows reproduce" was a grid replay), and "selects worse" reworded: UVDoc
+  chunked −7.6 (−16.7 to 0.0) and DvD's curved copy −11.9 (−25.4 to 0.0) are ties by their intervals.
+  No-quad pilot (one run each): DvD, DocScanner-L and DocGeoNet cut 95-101 curved lines instead of 255-296, the guard
+  passes them on 6-8 of 24 instead of 0-1, and their curved copies tie the route (+2.7, +0.1, −6.4); flat pairs still
+  lose as copies; none beats guarded UVDoc's +3.2 (nearest DocScanner-L guarded +2.7, −0.3 to +7.4, which loses on the
+  flat pairs). Placement without the quad ties the route (−0.3 to −2.7). No pick changes.
+  Found on the way: one prep batch's Vision reads of the flattened images were short (about 15% fewer lines on
+  37-45 of 64 pages per dewarper, a strict subset of a lone read); discarded, `prep` now reads twice and keeps only
+  agreeing reads, filed as W46.vision-short-reads. Vision also gave different words on one handwritten page across
+  two complete reads.
+  Code: `dewarp_placement.py` variants `d.rN` / `d.noquad`, `runs_of` + `floor` report section, `read_lines`
+  (tests: test_dewarp_placement, 9 pass). Results: `dewarp-placement.md` (two new sections) and `.json`;
+  pointers in `licence-freed-sweep.md` and `13-stage-rules/01-reading-copy.md`. The bench page does not chart this
+  result (it never did), so ArchiveOCRBench is unchanged. CPU, $0.
+  Bench cache: kept `dewarp-placement/src` (DvD's code and weights, there before this item) and the small `rows-*.json`
+  (the report rebuilds from them); moved to the Trash the item's variant grids and images, Vision check reads, page
+  PDFs, upright copies, quads, HEIC conversions and the re-fetched `licence-freed-sweep/src` (DocScanner 54f6063,
+  DocGeoNet ead1d37 and their Drive weights, re-fetchable with gdown).
+  <!-- /W46.p16-dewarp-floor -->

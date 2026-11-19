@@ -163,7 +163,8 @@ line pass against the shipped placer.
 
 Both ran as `dewarp_placement.py` arms on the 64 place-curved-owner pages, after Apple's quad, on CPU. Each runs its
 repository's own network (a U2NETP page mask, then the rectifier) at its own input size (288 and 256 px). The weights
-are the authors' Google Drive releases. UVDoc's and DvD's rows were rerun beside them and reproduce unchanged.
+are the authors' Google Drive releases. UVDoc's and DvD's rows were rerun beside them and reproduce unchanged (a replay of their cached grids; DvD is not
+deterministic, and its rerun floor is in dewarp-placement.md).
 
 | 24 bound or curled pages, line pass vs the route | DocScanner-L | DocGeoNet | UVDoc (for reference) |
 |---|---|---|---|
@@ -173,7 +174,9 @@ are the authors' Google Drive releases. UVDoc's and DvD's rows were rerun beside
 | Placement only, one run a line | −9.1 (−14.6 to −5.3) | −10.6 (−16.2 to −6.0) | −8.9 |
 | Their flat pairs, guarded | +0.5 (−1.1 to +2.8) | 0.0 | +1.1 |
 
-Like DvD, both crop into the page, which is why the guard holds them back. Placement through either loses for the
+Like DvD, both crop into the page, which is why the guard holds them back. Run on the whole photograph instead of
+after the quad (W46.p16-dewarp-floor, a pilot), they cut about a third as many lines and their curved copies tie the
+route; the flat pairs still lose and no pick changes (dewarp-placement.md, "Without the quad"). Placement through either loses for the
 reason dewarp-placement found: the carried-back lines still bend on the kept photograph. UVDoc stays the only
 dewarper with a guarded gain.
 

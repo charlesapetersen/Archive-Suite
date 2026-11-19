@@ -374,7 +374,7 @@ def summary(xs, arms):
                   'cut': sum(x['arms'][arm]['cut'] for x in xs), 'broken': sum(x['arms'][arm]['broken'] for x in xs)}
         if arm != 'route':
             s[arm]['vs_route'] = paired(xs, arm)
-    for d in {a.split('-')[0] for a in arms if a != 'route'}:
+    for d in sorted({a.split('-')[0] for a in arms if a != 'route'}):
         if all(d in x['guard'] for x in xs):
             s[f'{d}-guard_pass'] = sum(x['guard'][d]['pass'] for x in xs)
             s[f'{d}-filled_words'] = sum(x['filled'][d] for x in xs)
