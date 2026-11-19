@@ -115,6 +115,18 @@ Truth was re-judged only where models disagreed with it: the 92 gaps the app's G
 
 Neutralised, 7 of the 16 pairs would tie under the interval alone: gemini3.7-flash-gateway over qwen3.5-27b-teacher; gemini3.7-flash-gateway over seg-qwen3.5-2b-8bit; gemini3.7-flash-gateway over seg-qwen3.5-2b-bf16-cluster; gemini3.8-flash-text over seg-qwen3.5-2b-8bit; gemini3.8-flash-text over seg-qwen3.5-2b-bf16-cluster; gemini3.8-flash over seg-qwen3.5-2b-8bit; gemini3.8-flash over seg-qwen3.5-2b-bf16-cluster. These are the verdicts an owner look at those gaps could move; no truth is changed here.
 
+## The picks the floor would move (not changed; the owner decides)
+
+The settings solver's profile tests run on a scratch table that reads the floor column. Profiles that keep their pick: D3 (the Claude plan only: Claude), D4, D5 (a Claude plan and a Gemini key: Claude), B1-B4, C (the 2B already), and any profile with an OpenAI key, where ChatGPT or the mix still differs from the 2B.
+
+| profile | pick now | with the floor |
+|---|---|---|
+| D1, a Gemini key on a 16 GB Mac | gemini3.8-flash-text (87.7%, $1.68) | seg-qwen3.5-2b-8bit (79.4%, $0) |
+| D1, Gemini and OpenRouter keys | glm5.3-flash (82.8%, $1.16) | seg-qwen3.5-2b-8bit |
+| D1, only g2 and the 2B usable | gemini3.8-flash (87.4%, $3.61) | seg-qwen3.5-2b-8bit |
+| E, a cluster with a Gemini key | seg-qwen3.5-4b-cluster (82.8%) | seg-qwen3.5-2b-bf16-cluster (79.4%) |
+| an Anthropic key only on a Mac (no test case; by the rule) | claude-sonnet5.5 (88.9%) | seg-qwen3.5-2b-8bit |
+
 ## Measurement card
 
 - **Truth.** Owner-ruled Stanton and RG165 (truth photo labels), with W46.seg-truth-owner-fixes' eight corrections; the two unknown RG165 gaps leave 325 of 330 document pages. Truth has been re-judged only where models disagreed; the agreed-gap audit (seg-truth-audit.md) asks the owner about agreed gaps.

@@ -37,11 +37,22 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   table carries every pair of the 11 ranked rows (`pairs` in the stage, `SettingsSolver.segmentationPair`); a pair not
   measured ties only within the user's point. On two boxes the intervals are wide: 39 of 55 pairs tie, among them
   ChatGPT against GLM-5.3 Flash (+7.4 [−1.0, +16.9]); the 2B on the Mac differs from every cloud route but GLM, and
-  the teacher from ChatGPT, the mix, Claude and Gemini 3.7 on the gateway. Gap accuracy's own paired form, McNemar's
-  exact sign test on the documents only one route has right, separates none of the 39 (reference column in
-  seg-pair-ties.md). This replaced twice the larger window-offset range, a route with none borrowing g1's 2.5 points
-  (5.0 or, with g2, 10.4 points; W46.seg-tie-borrowed-range): pairing on fixed windows takes window placement out of
-  the comparison instead of adding it to a floor. The offset ranges stay on the cards (Gemini 3.7 on g2 84.6-89.8%,
+  the teacher from ChatGPT, the mix, Claude and Gemini 3.7 on the gateway. The Mac 2B row's test-box figure is the
+  FarmShare bf16 run (`method_openrouter.py` `LOCAL_SEG_KEY`), the same answers as the cluster 2B row, not a second
+  run. Gap accuracy's own paired form, McNemar's exact sign test on the documents only one route has right,
+  separates none of the 39 and leaves 8 of the 16 differing pairs unseparated (reference column in
+  seg-pair-ties.md), so the two agree on the ties only. This replaced twice the larger window-offset range, a route
+  with none borrowing g1's 2.5 points (5.0 or, with g2, 10.4 points; W46.seg-tie-borrowed-range): pairing on fixed
+  windows takes window placement out of the comparison instead of adding it to a floor. It does not take out a rerun:
+  a fixed window does not give a fixed answer. Byte-identical vLLM reruns of the students moved a box 1.4-3.2 points
+  (SEG-10), and every differing pair has the 2B or the teacher on a side. W46.p16-seg-tie-floor (P16-1) gives each
+  pair a `tie_floor` beside the rule in force: a tie unless the interval clears 0 and its near end clears the larger
+  recorded floor of its routes (3.2 for a student; none recorded for a cloud route, counted 0). With it 51 of 55 tie
+  and only ChatGPT and the mix still differ from the 2B (+10.8 [+3.9, +18.4]); four profile picks would move to the 2B
+  (D1 with a Gemini key on 16 GB, D1 with Gemini and OpenRouter keys, D1 with only g2 and the 2B, E with a Gemini
+  key from the 4B), and an Anthropic-key-only Mac from Claude, by the rule. **Not in force:** the table still reads
+  `tie` until the owner answers (`W46.p16-seg-floor-apply`, Daemon Report 2026-11-18). Six Stanton gaps no one
+  re-judged decide discordant documents in the 16 pairs (SEG-11; seg-pair-ties.md). The offset ranges stay on the cards (Gemini 3.7 on g2 84.6-89.8%,
   seg-g2-offsets.md; on g1 86.8-89.2%, seg-boxes-score.md). In gap accuracy the paired sign test decides as before
   (seg-boxes-score.md Noise). Error counts differ by one or two within noise (options.md Reading).
   The rule applies to the text-only window too (owner, 2026-11-13, W46.seg-text-tier-default): with a Gemini key,
