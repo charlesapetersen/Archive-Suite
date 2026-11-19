@@ -132,6 +132,10 @@ calls are section 1.
     - **Routing by kind under the classifier's 0.8 floor (W47.wh-kinds-floor).** Keep the floor as it is: no routing
       of unsure pages by their top class, and no document prior (`segbench-results/kind-floor.md`: a tie for every
       run model, the gain resting on two pages).
+17. **The read-poorly flag for Claude Sonnet 5.5 and Mistral OCR (2026-11-19, walkthrough of 12:20;
+    W47.wh-read-flag-cm-owner-ok).** Leave both unflagged. Their cuts hold the 5% false-alarm ceiling on the 96 but
+    caught none of their poor readings (0 of 2, 0 of 7), so a flag would only be false alarms on about 4% of good
+    pages (`ArchiveProcessor/segbench-results/post-read-flag.md`). W47.wh-read-flag-cm is declined and not built.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

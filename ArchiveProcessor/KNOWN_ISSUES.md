@@ -9,7 +9,8 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   reads worse, so the same cut may flag more good pages (Gemini's plain-photo cut flagged 21% of its good damaged
   readings); the run summary says what each check was measured on (queued: W46.post-read-flag-readers).
 - Claude Sonnet 5.5 and Mistral OCR pages are never flagged: their cuts hold the 5% ceiling but caught none of their
-  poor readings on the 96 (0 of 2, 0 of 7) (asked: W47.wh-read-flag-cm-owner-ok).
+  poor readings on the 96 (0 of 2, 0 of 7) (accepted: owner, 2026-11-19 walkthrough, call 17: a flag would only be
+  false alarms; W47.wh-read-flag-cm declined).
 - A route the bench has not read (a typed gateway or OpenRouter model, Claude on the plan, the Local Agent, the older
   Gemini, GPT and Claude models) is not flagged, nor is a page another route read in its place, an imported page, a
   newspaper page read in regions, a page the app turned, a page Vision failed on, or a batch run's pages (accepted: a cut is only as good as the readings it was fitted on; the refit on real
