@@ -502,8 +502,9 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               folders that test one (W47.ct-reader-facet-rules).
   ContainerEdits.swift        W47.ct-reader-edit: the editor's edits worked out purely on a container file: where an
                               edit goes (target), set, set for selection (splits runs), standard names.
-  ContainerLevelsDraft.swift  The level map as the sheet edits it: pre-filled (ContainerLevelMap.prefilled), examples
+  (ContainerLevelsDraft)      The level map as the sheet edits it: pre-filled (ContainerLevelMap.prefilled), examples
                               per level, workflow folders and what their contents are, a preview; tied to its tree.
+                              In ArchiveCore's Containers/ since W47.ct-processor-intake, shared with Process Files.
   CollationRanks.swift        localizedStandardCompare ranks cached across sorts, + UTF8Key (byte-
                               keyed hashing; String normalizes non-ASCII on every hash).
   ReaderStages.swift          os_signpost intervals (`com.archivereader.app`/`Stages`) around the stages one

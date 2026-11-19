@@ -1,38 +1,38 @@
 import Foundation
-import ArchiveCore
 
-// MARK: - The level map, offered when a root is first added (W47.ct-reader-view; `SPEC/containers.md` §The level map)
+// MARK: - The level map, offered for confirmation (W47.ct-reader-view; `SPEC/containers.md` §The level map)
 //
-// Route B: what each depth of folders below the archive's main folder names ("level 1 = Repository, level 2 =
-// Collection, level 3 = Box"), pre-filled from the folder names (`ContainerLevelMap.prefilled`) and confirmed or
-// edited once per root. Nothing is written until the user saves it; saving writes only
+// Route B: what each depth of folders below a root names ("level 1 = Repository, level 2 = Collection, level 3 =
+// Box"), pre-filled from the folder names (`ContainerLevelMap.prefilled`) and confirmed or edited once per root: the
+// Reader's archive folder when a root is first added, the Processor's output folder when Process Files is given a
+// tree (W47.ct-processor-intake). Nothing is written until the user saves it; saving writes only
 // `<root>/.archivesuite/container-levels.json`, through ArchiveCore's audited writer.
 
-struct ContainerLevelsDraft: Equatable, Sendable, Identifiable {
+public struct ContainerLevelsDraft: Equatable, Sendable, Identifiable {
     /// A new draft is a new sheet, so a sheet never keeps editing a draft the model has replaced.
-    let id = UUID()
+    public let id = UUID()
     /// The tree the draft was made for (the archive's main folder) and its path as the library spells paths; the
     /// map is saved only into this tree, and only while it is still the one open.
-    let tree: URL
-    let treePath: String
+    public let tree: URL
+    public let treePath: String
     /// The map as the user is editing it.
-    var map: ContainerLevelMap
+    public var map: ContainerLevelMap
     /// A few folder names at each depth of `map.levels`, the most common first, workflow folders left out.
-    let examples: [[String]]
+    public let examples: [[String]]
     /// How many folders each depth holds, workflow folders left out.
-    let folderCounts: [Int]
+    public let folderCounts: [Int]
     /// The workflow folders the map skipped when the draft was made ("05 Final Tagging"), by their path below the
     /// root; the user may stop skipping one (`setSkipped`).
-    let workflowFolders: [String]
+    public let workflowFolders: [String]
     /// The folder holding the most files, for the sheet's example of what a file there would show.
-    let sampleDirectory: [String]?
+    public let sampleDirectory: [String]?
     /// The stamp of the map this draft was made from, nil when there was none; the write refuses a map changed since.
-    let expecting: ContainerFileStamp?
+    public let expecting: ContainerFileStamp?
 
     /// The roles a depth may take, in the order the menu lists them.
-    static let roles: [ContainerLevelRole] = [.repository, .collection, .accession, .series, .box, .folder, .ignore]
+    public static let roles: [ContainerLevelRole] = [.repository, .collection, .accession, .series, .box, .folder, .ignore]
 
-    static func roleName(_ role: ContainerLevelRole) -> String {
+    public static func roleName(_ role: ContainerLevelRole) -> String {
         switch role {
         case .repository: return "Repository"
         case .collection: return "Collection"
@@ -46,7 +46,7 @@ struct ContainerLevelsDraft: Equatable, Sendable, Identifiable {
 
     /// A draft from `directories` (each listed file's directory below the root, top first, once per file): the
     /// stored map when there is one (`existing`), else the pre-filled one.
-    static func make(directories: [[String]], existing: ContainerLevelMap? = nil,
+    public static func make(directories: [[String]], existing: ContainerLevelMap? = nil,
                      expecting: ContainerFileStamp? = nil, tree: URL, treePath: String) -> ContainerLevelsDraft {
         var map = existing ?? ContainerLevelMap.prefilled(directories: directories)
         // Per depth, each folder (by its path) with the files under it. Depth as the map counts it: a skipped
@@ -90,25 +90,25 @@ struct ContainerLevelsDraft: Equatable, Sendable, Identifiable {
     }
 
     /// Stop skipping a workflow folder, or skip it again.
-    mutating func setSkipped(_ path: String, _ skipped: Bool) {
+    public mutating func setSkipped(_ path: String, _ skipped: Bool) {
         if skipped { map.overrides[path] = .init(role: .ignore) } else { map.overrides[path] = nil }
     }
 
     /// What the folders inside a skipped workflow folder are: by default the level the workflow folder stands at;
     /// `role` names another ("05 Final Tagging/5 Priority 5" holding collections, SPEC §The level map, `children`).
-    mutating func setChildren(_ path: String, _ role: ContainerLevelRole?) {
+    public mutating func setChildren(_ path: String, _ role: ContainerLevelRole?) {
         guard map.overrides[path]?.role == .ignore else { return }
         map.overrides[path] = .init(role: .ignore, children: role)
     }
 
     /// The roles `setChildren` may name: those `map.levels` holds (a `children` role must be one of them).
-    var childRoles: [ContainerLevelRole] {
+    public var childRoles: [ContainerLevelRole] {
         Self.roles.filter { $0 != .ignore && map.levels.contains($0) }
     }
 
     /// What one folder path below the root would give, with the draft as it stands: "Repository: Hoover · Box: Box
     /// 17". For the sheet's example line.
-    func preview(_ components: [String]) -> String {
+    public func preview(_ components: [String]) -> String {
         let fields = map.pathFields(for: components).reduce(into: [ContainerField: ContainerValue]()) { all, set in
             for (field, value) in set.values { all[field] = value }
         }
