@@ -22,7 +22,7 @@ Spotlight query (Wave 26). `CorpusWalker` skips hidden folders, so neither is ev
 ## The fields
 
 Every field is optional; most collections have only some. A value is the text as written on the label or in the
-folder name (display in title case and the user's standard names are `W47.ct-normalise`'s, not stored here). The
+folder name; how it is shown (title case, the user's standard names) is §Showing a value. The
 key is the JSON name; the segbench name is `ct_truth.py` `FIELDS_REV`.
 
 | key | segbench | example | home level | CSL |
@@ -173,6 +173,38 @@ Role to field: `repository` → `repository`; `collection` → `collectionTitle`
 `container`; `folder` → `folder`, the rest of the name `folderTitle`. Splitting names, the patterns that pre-fill the
 map (`Box 17`, `B17F8`, `Carton 9`, `f. 5`, `Series II`, `Accession 91006`, `RG 165`) and box or folder numbers in file
 names are `W47.ct-infer`'s.
+
+## Showing a value (`W47.ct-normalise`)
+
+Values stay as written; only what is shown changes (`ContainerDisplay`, `Containers/ContainerNames.swift`). The
+comparisons in `ct_read.py` fold case, so they are untouched.
+
+- **Title case.** A value written wholly in capitals is shown in title case by the suite's one rule
+  (`Text/TitleCase.swift`, shared with the Reader's Copy Cleaned for Prose): "BOX 12" and "JANE DOE PAPERS" show as
+  "Box 12" and "Jane Doe Papers"; acronyms, initials, Roman numerals and words with no vowel ("UCLA", "MSS", "II")
+  stay. Mixed case is the writer's and is left.
+- **Standard names.** The user may give one standard name to the wordings of a repository, a collection or any other
+  field: "Special Collections, Example Library, Example University" and "Example University Library Special
+  Collections" both show as "Example University, Example Library". Wordings match with case, accents, width and
+  punctuation folded and `&` read as "and" (`ContainerNames.key`). A standard name is per field and shown as the
+  user wrote it. An entry may also say which parts of a label go into which field: it gives text for other fields,
+  which fill a field only where the record has no value of its own (a user's "none here" counts as one; the newest
+  entry fills first), or it gives
+  no text for its own field, which then shows nothing.
+- A wording belongs to one entry per field; setting a new entry takes its wordings from older ones and comes first,
+  so it wins.
+- Two candidates under one standard name, or differing only in case, punctuation or spacing, are not a disagreement
+  (`ContainerDisplay.disagreements`).
+
+The names live in `<root>/.archivesuite/container-names.json`, beside the level map, for the tree under that root; the
+nearest file above a directory wins. Same writing rules as the container file. Reading is strict, as the level map's:
+a field or key this build does not know makes the document unreadable, so it is left alone.
+
+| key | meaning |
+|---|---|
+| `schemaVersion` | `1`. |
+| `names` | Newest first, each `{ "field": F, "variants": [wording, …], "fields": { F2: text, … } }`; the first that matches wins. |
+| `updatedAt` | When the names were last changed. |
 
 ## Zotero (CSL-JSON)
 

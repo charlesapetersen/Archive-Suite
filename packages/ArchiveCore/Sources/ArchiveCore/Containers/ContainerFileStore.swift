@@ -4,7 +4,7 @@ import Darwin
 // MARK: - Reading and writing the container file and the level map (W47.ct-spec, Tier-2)
 //
 // A new write class in the corpus (`SPEC/containers.md` §File safety): only `<directory>/.archivesuite/containers.json`
-// and `<root>/.archivesuite/container-levels.json` are ever written, through a temporary file in `.archivesuite`
+// and `<root>/.archivesuite/container-levels.json` and `container-names.json` are ever written, through a temporary file in `.archivesuite`
 // renamed over the old one. Every step after opening `.archivesuite` goes through its file descriptor (`openat`,
 // `renameatx_np`, `unlinkat`), so a link swapped in for it or for the document cannot send a write elsewhere. Writers
 // hold `flock` on that descriptor from the check to the rename, so two apps never overwrite each other unnoticed.
@@ -96,15 +96,38 @@ public enum ContainerFileStore {
                   expecting: expecting)
     }
 
+    public static func namesURL(in root: URL) -> URL {
+        root.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+            .appendingPathComponent(ContainerNames.fileName)
+    }
+
+    public static func loadNames(root: URL) -> ContainerLoad<ContainerNames> {
+        load(root, ContainerNames.fileName, version: ContainerNames.schemaVersion)
+    }
+
+    public static func writeNames(_ names: ContainerNames, root: URL, expecting: ContainerFileStamp?) throws {
+        try write(names, in: root, name: ContainerNames.fileName, version: ContainerNames.schemaVersion,
+                  expecting: expecting)
+    }
+
     /// The nearest folder at or above `directory` holding a level map, stopping at `root` (inclusive); nil outside it.
     public static func locateLevelMap(from directory: URL, within root: URL) -> URL? {
+        locate(ContainerLevelMap.fileName, from: directory, within: root)
+    }
+
+    /// The nearest folder at or above `directory` holding the user's standard names, as `locateLevelMap`.
+    public static func locateNames(from directory: URL, within root: URL) -> URL? {
+        locate(ContainerNames.fileName, from: directory, within: root)
+    }
+
+    private static func locate(_ name: String, from directory: URL, within root: URL) -> URL? {
         var folder = directory.resolvingSymlinksInPath().standardizedFileURL
         let rootParts = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
         for _ in 0..<64 {
             let parts = folder.pathComponents
             guard parts.count >= rootParts.count, Array(parts.prefix(rootParts.count)) == rootParts else { return nil }
             let suite = folder.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
-            if fileType(suite) == S_IFDIR, fileType(levelMapURL(in: folder)) == S_IFREG { return folder }
+            if fileType(suite) == S_IFDIR, fileType(suite.appendingPathComponent(name)) == S_IFREG { return folder }
             if parts.count == rootParts.count { return nil }
             folder = folder.deletingLastPathComponent()
         }

@@ -18,7 +18,7 @@ that an older build leaves a newer document alone. It is not there to carry a mi
 Capture files each collection into its own subfolder, so each of those is a collection and gets its own record. The
 `.archivesuite` folder is hidden and holds only the Suite's own files about the collection. Its `corrections` folder
 holds the review records for the training kit (§"The review records"). The W47 container file, `containers.json`, and a
-tree's level map, `container-levels.json`, live in the same hidden folder (`SPEC/containers.md`).
+tree's level map, `container-levels.json`, and its standard names, `container-names.json`, live in the same hidden folder (`SPEC/containers.md`).
 
 ## What it holds
 

@@ -40,6 +40,15 @@ public struct ContainerLevelMap: Equatable, Sendable {
             self.role = role
             self.children = children
         }
+
+        private enum CodingKeys: String, CodingKey { case role, children }
+
+        public init(from decoder: Decoder) throws {
+            try decoder.refuseUnknownKeys(["role", "children"])
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(role: try c.decode(ContainerLevelRole.self, forKey: .role),
+                      children: try c.decodeIfPresent(ContainerLevelRole.self, forKey: .children))
+        }
     }
 
     /// The role of each depth below the root, the first for its direct subfolders.
@@ -87,9 +96,10 @@ public struct ContainerLevelMap: Equatable, Sendable {
 extension ContainerLevelMap: Codable {
     private enum CodingKeys: String, CodingKey { case schemaVersion, levels, overrides, updatedAt }
 
-    // Strict: a role this build does not know makes the whole map unreadable, so it is left alone rather than
+    // Strict: a role or key this build does not know makes the whole map unreadable, so it is left alone rather than
     // read wrongly or overwritten.
     public init(from decoder: Decoder) throws {
+        try decoder.refuseUnknownKeys(["schemaVersion", "levels", "overrides", "updatedAt"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.levels = try c.decode([ContainerLevelRole].self, forKey: .levels)
         self.overrides = try c.decodeIfPresent([String: Override].self, forKey: .overrides) ?? [:]

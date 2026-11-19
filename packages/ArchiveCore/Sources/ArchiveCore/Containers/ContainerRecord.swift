@@ -305,6 +305,15 @@ extension Decoder {
         }
     }
 
+    /// For a strict document (the level map, the standard names): a key outside `known` that holds anything but
+    /// null makes it unreadable, so a writer leaves it alone rather than erase what a newer build put there.
+    func refuseUnknownKeys(_ known: Set<String>) throws {
+        let c = try container(keyedBy: ContainerJSONKey.self)
+        for key in c.allKeys where !known.contains(key.stringValue) && !((try? c.decodeNil(forKey: key)) ?? false) {
+            throw DecodingError.dataCorruptedError(forKey: key, in: c, debugDescription: "unknown key \(key.stringValue)")
+        }
+    }
+
     /// An optional value: absent or null is nil; present but unreadable is nil and noted as a drop.
     func optional<T: Decodable, K: CodingKey>(_ type: T.Type, _ c: KeyedDecodingContainer<K>, _ key: K) -> T? {
         guard c.contains(key), !((try? c.decodeNil(forKey: key)) ?? true) else { return nil }
