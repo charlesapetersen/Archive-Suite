@@ -15,6 +15,11 @@ struct ContainerLevelsDraft: Equatable, Sendable {
     let examples: [[String]]
     /// How many folders each depth holds, workflow folders left out.
     let folderCounts: [Int]
+    /// The workflow folders the map skipped when the draft was made ("05 Final Tagging"), by their path below the
+    /// root; the user may stop skipping one (`setSkipped`).
+    let workflowFolders: [String]
+    /// The folder holding the most files, for the sheet's example of what a file there would show.
+    let sampleDirectory: [String]?
     /// The stamp of the map this draft was made from, nil when there was none; the write refuses a map changed since.
     let expecting: ContainerFileStamp?
 
@@ -31,12 +36,6 @@ struct ContainerLevelsDraft: Equatable, Sendable {
         case .folder: return "Folder"
         case .ignore: return "Ignore this level"
         }
-    }
-
-    /// The workflow folders the map skips ("05 Final Tagging"), by their path below the root.
-    var skippedFolders: [String] {
-        map.overrides.filter { $0.value.role == .ignore && $0.value.children == nil }.keys
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     /// A draft from `directories` (each listed file's directory below the root, top first, once per file): the
@@ -70,8 +69,16 @@ struct ContainerLevelsDraft: Equatable, Sendable {
             for f in ordered where !names.contains(f.name) && names.count < 3 { names.append(f.name) }
             return names
         }
+        let workflow = map.overrides.filter { $0.value.role == .ignore && $0.value.children == nil }.keys
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        var perDirectory: [[String]: Int] = [:]
+        for dir in directories where !dir.isEmpty { perDirectory[dir, default: 0] += 1 }
+        let sample = perDirectory.max {
+            $0.value != $1.value ? $0.value < $1.value
+                                 : $0.key.joined(separator: "/").localizedStandardCompare($1.key.joined(separator: "/")) == .orderedDescending
+        }?.key
         return ContainerLevelsDraft(map: map, examples: examples, folderCounts: folders.map(\.count),
-                                    expecting: expecting)
+                                    workflowFolders: workflow, sampleDirectory: sample, expecting: expecting)
     }
 
     /// Stop skipping a workflow folder, or skip it again.

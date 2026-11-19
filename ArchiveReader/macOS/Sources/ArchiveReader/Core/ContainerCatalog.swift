@@ -129,6 +129,9 @@ struct ContainerCatalog: Sendable {
     /// Each listed file's directory below the root (top first), once per file under it: what
     /// `ContainerLevelMap.prefilled` weighs.
     let fileDirectories: [[String]]
+    /// Each facet's values across the listed files, with how many files carry each, most first
+    /// (`facetValues(_:)`), worked out once here rather than on every redraw of the filter bar.
+    let facetLists: [ContainerFacet: [FacetValue]]
     private let contexts: [String: DirectoryContext]
 
     struct DirectoryContext: Sendable {
@@ -136,23 +139,40 @@ struct ContainerCatalog: Sendable {
         let names: ContainerNames?
     }
 
+    struct FacetValue: Equatable, Sendable {
+        let value: String
+        let count: Int
+    }
+
     static let empty = ContainerCatalog(rootPath: "", rows: [:], rootLevelMap: .missing, fileDirectories: [],
-                                        contexts: [:])
+                                        facetLists: [:], contexts: [:])
 
     var isEmpty: Bool { rows.isEmpty }
 
-    /// The shown values of `facet` across the listed files, with how many files carry each, most first. Values
-    /// differing only in case or punctuation are one, shown as the first spelling met.
-    func facetValues(_ facet: ContainerFacet, among paths: [String]? = nil) -> [(value: String, count: Int)] {
-        var counts: [String: (value: String, count: Int)] = [:]
-        func add(_ row: ContainerRow) {
-            guard let v = row.facets[facet] else { return }
-            counts[ContainerFacet.key(v), default: (v, 0)].count += 1
+    /// The shown values of `facet` across the listed files, with how many files carry each, most first.
+    func facetValues(_ facet: ContainerFacet) -> [FacetValue] { facetLists[facet] ?? [] }
+
+    /// Values differing only in case or punctuation are one, shown in the spelling most files carry.
+    static func facetLists(_ rows: [String: ContainerRow]) -> [ContainerFacet: [FacetValue]] {
+        var lists: [ContainerFacet: [FacetValue]] = [:]
+        for facet in ContainerFacet.allCases {
+            var spellings: [String: [String: Int]] = [:]
+            for row in rows.values {
+                guard let v = row.facets[facet] else { continue }
+                spellings[ContainerFacet.key(v), default: [:]][v, default: 0] += 1
+            }
+            let values = spellings.values.map { counts -> FacetValue in
+                let best = counts.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }!
+                return FacetValue(value: best.key, count: counts.values.reduce(0, +))
+            }
+            if !values.isEmpty {
+                lists[facet] = values.sorted {
+                    $0.count != $1.count ? $0.count > $1.count
+                                         : $0.value.localizedStandardCompare($1.value) == .orderedAscending
+                }
+            }
         }
-        if let paths { for p in paths { if let r = rows[p] { add(r) } } } else { rows.values.forEach(add) }
-        return counts.values.sorted {
-            $0.count != $1.count ? $0.count > $1.count : $0.value.localizedStandardCompare($1.value) == .orderedAscending
-        }
+        return lists
     }
 
     /// The file's container in full, each value with its state (`FieldStatusPolicy.container`), and every
@@ -270,7 +290,7 @@ struct ContainerCatalog: Sendable {
             }
         }
         return ContainerCatalog(rootPath: rootPath, rows: rows, rootLevelMap: rootMap,
-                                fileDirectories: fileDirectories, contexts: contexts)
+                                fileDirectories: fileDirectories, facetLists: facetLists(rows), contexts: contexts)
     }
 
     /// `path`'s directory below `rootPath` (top first) and its name; nil when it is not under the root. Byte-exact,

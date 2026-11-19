@@ -57,7 +57,7 @@ struct AppKitTableView: NSViewRepresentable {
                   + "a file in the library has one. It names the kind of capture, not the box or folder a file is in."),
         .init(id: containerColumnID, title: "Container", width: 170, minWidth: 100, maxWidth: 360, sortField: .container,
               toolTip: "The box and folder a file is in, or its collection when no box is known: from the folder "
-                  + "names, as the folder levels read them (Library ▸ Container Levels…), and from the container "
+                  + "names, as the folder levels read them (File ▸ Container Levels…), and from the container "
                   + "records the apps keep beside the files. ⚠︎ marks sources that disagree. Offered once a file "
                   + "in the library has one. Click to sort."),
         .init(id: "tags", title: "File tags", width: 300, minWidth: 100, maxWidth: 600, sortField: .subjects, flexible: true,

@@ -102,6 +102,14 @@ struct NavigationWindowView: View {
             SimilarTagsSheet(model: model, size: SheetSizing.fitted(SimilarTagsSheet.preferredSize, in: contentSize))
         }
         .sheet(isPresented: $model.showingSaveDialog) { SaveSearchSheet(model: model) }
+        .sheet(isPresented: Binding(get: { model.containerLevelsDraft != nil },
+                                    set: { if !$0, model.containerLevelsDraft != nil { model.dismissContainerLevels() } })) {
+            if let draft = model.containerLevelsDraft {
+                ContainerLevelsSheet(draft: draft, error: model.containerLevelsError,
+                                     onSave: { model.saveContainerLevels($0) },
+                                     onCancel: { model.dismissContainerLevels() })
+            }
+        }
         .sheet(item: $model.advancedSearchRequest) { request in AdvancedSearchSheet(model: model, request: request) }
         .alert("Rename Smart Folder", isPresented: Binding(
             get: { model.renamingSearch != nil },
@@ -588,6 +596,46 @@ struct NavigationWindowView: View {
         .help("Filter by year: matches a document's own date or the date of the letter it was sent with")
         .accessibilityIdentifier("ar.filter.dates")
         .popover(isPresented: $showingDateFilter) { dateFilterPopover }
+
+        if !model.containerCatalog.isEmpty { containerFacetMenu }
+    }
+
+    /// The most values a container facet's menu lists; the rest are reached by narrowing with another facet first.
+    static let containerFacetMenuLimit = 200
+
+    /// W47.ct-reader-view: the container facets, one submenu each, every value with how many files carry it. A
+    /// chosen value shows as a chip under the bar.
+    private var containerFacetMenu: some View {
+        let active = model.filter.activeContainerFacets
+        return Menu {
+            ForEach(ContainerFacet.allCases, id: \.self) { facet in
+                let values = model.containerCatalog.facetValues(facet)
+                if !values.isEmpty {
+                    let chosen = model.filter.containerFacet(facet).map(ContainerFacet.key)
+                    Menu(facet.label) {
+                        Button("Any \(facet.label.lowercased())") { model.filter.setContainerFacet(facet, nil) }
+                            .disabled(chosen == nil)
+                        Divider()
+                        ForEach(values.prefix(Self.containerFacetMenuLimit), id: \.value) { v in
+                            Toggle("\(v.value) (\(v.count))", isOn: Binding(
+                                get: { chosen == ContainerFacet.key(v.value) },
+                                set: { model.filter.setContainerFacet(facet, $0 ? v.value : nil) }))
+                        }
+                        if values.count > Self.containerFacetMenuLimit {
+                            Text("\(values.count - Self.containerFacetMenuLimit) more, the least common").disabled(true)
+                        }
+                    }
+                    .accessibilityIdentifier("ar.filter.containers.\(facet.rawValue)")
+                }
+            }
+        } label: {
+            Label(active.isEmpty ? "Containers" : "Containers (\(active.count))", systemImage: "archivebox")
+        }
+        .controlSize(.small)
+        .fixedSize()
+        .help("Filter by repository, collection, accession, series or container: from the folder levels "
+              + "(File ▸ Container Levels…) and the container records the apps keep beside the files")
+        .accessibilityIdentifier("ar.filter.containers")
     }
 
     /// File name and OCR text: finding documents by what they contain, on their own row (W40.fix-reader-filter-bar).

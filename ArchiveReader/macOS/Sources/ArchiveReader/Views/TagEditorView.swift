@@ -47,6 +47,11 @@ struct TagEditorView: View {
                     Divider()
                     FieldStatusSection(files: files, apply: apply)
                     Divider()
+                    // W47.ct-reader-view: shown for one file, once any file in the library has a container value.
+                    if files.count == 1, let file = files.first, !model.containerCatalog.isEmpty {
+                        ContainerSection(detail: model.containerCatalog.detail(forPath: file.path))
+                        Divider()
+                    }
                     qualitySection(s)
                     Divider()
                     itemTypeSection(s, files)

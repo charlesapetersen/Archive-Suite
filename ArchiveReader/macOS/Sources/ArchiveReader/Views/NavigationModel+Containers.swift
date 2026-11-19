@@ -84,7 +84,7 @@ extension NavigationModel {
         defaults.set(asked, forKey: Self.containerLevelsAskedKey)
     }
 
-    /// Library ▸ Container Levels…: the stored map to edit, or a pre-filled one. A map this build cannot read is
+    /// File ▸ Container Levels…: the stored map to edit, or a pre-filled one. A map this build cannot read is
     /// left alone, and the sheet says so instead of offering to replace it.
     func openContainerLevels() {
         guard let tree = containerTree else { return }
@@ -130,7 +130,7 @@ extension NavigationModel {
         }
     }
 
-    /// Not Now: nothing is written, and the sheet is not offered again for this root (Library ▸ Container Levels…
+    /// Not Now: nothing is written, and the sheet is not offered again for this root (File ▸ Container Levels…
     /// opens it).
     func dismissContainerLevels() {
         markContainerLevelsAsked()

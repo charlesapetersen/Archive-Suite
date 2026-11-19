@@ -67,7 +67,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     // Edit
     case copyExact, copyCleaned, copyPageLink, options
     // File
-    case chooseFolder, rescan, saveSearch, connectImproveOCR
+    case chooseFolder, rescan, saveSearch, connectImproveOCR, containerLevels
     // Selection
     case open, preview, revealInFinder, copyLinks, copyArchiveLinks, selectRun, nextUnread, previousUnread
     // Tags
@@ -127,6 +127,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .rescan: return "Rescan Archive Folder"
         case .saveSearch: return "Save Current Search…"
         case .connectImproveOCR: return "Connect Improve OCR Folder…"
+        case .containerLevels: return "Container Levels…"
         case .open: return "Open in Document Window"
         case .preview: return "Preview"
         case .revealInFinder: return "Reveal in Finder"
@@ -213,7 +214,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .chooseFolder: return CommandKey("o", [.command, .shift])
         // ⌘R is Mark Read.
         case .rescan: return CommandKey("r", [.command, .option])
-        case .saveSearch, .connectImproveOCR, .improveOCR, .showPoorOCROnly: return nil
+        case .saveSearch, .connectImproveOCR, .containerLevels, .improveOCR, .showPoorOCROnly: return nil
         case .open: return CommandKey("o")
         case .preview: return CommandKey("y")
         case .revealInFinder: return CommandKey("r", [.command, .shift])
@@ -289,6 +290,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .togglePoorOCR: return "Mark the selection's OCR as not good enough (the OCR Poor tag), or remove the mark"
         case .improveOCR: return "Open Archive Processor's Improve OCR dialog on the selection, to read it again with a better reader"
         case .connectImproveOCR: return "Choose the folder the Reader and Archive Processor share for Improve OCR"
+        case .containerLevels: return "Say what each level of folders in the archive names: repository, collection, box or folder"
         case .undoTagChange: return "Undo the last tag change"
         case .advancedSearch: return "Advanced Search: combine rules on text, tags, dates, folders and more"
         case .previousPage: return "Previous page in this segment"
