@@ -17,7 +17,10 @@ Yes. The shipped cloud call reaches sender 0.73, recipient 0.82 and place 0.72 (
 text before) [M]. Inside the API family the shipped tagging call and the
 dedicated prompt at the same length tie on every field once both carry the place rule [M, `ent-place-rule.md`]; the
 8,000-character dedicated prompt was not paired with the shipped call (0.76 against 0.73 on the sender, unpaired), so
-the real choice is family, not prompt [I].
+the real choice is family, not prompt [I]. W47.wh-ent-8k-paired (2026-11-19) has since paired it with the shipped entity
+call, fresh, run twice, on Gemini 3.8 Flash: sender +0.107 (+0.038 to +0.189) and +0.108 on the replicate against a rerun
+drift of about -0.01, all on the 48 documents past 3,000 characters; recipient and place tie (`ent-8k-paired.md`) [M].
+The window stays at 3,000 until the owner answers (W47.wh-ent-8k-apply).
 
 ## 3. The rule for the settings layer
 

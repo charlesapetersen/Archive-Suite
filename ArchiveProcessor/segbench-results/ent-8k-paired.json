@@ -1,0 +1,734 @@
+{
+ "docs": 138,
+ "long_docs": 48,
+ "answered": {
+  "shipped": 138,
+  "shipped-b": 138,
+  "8k": 138,
+  "8k-b": 138
+ },
+ "unparsed": {
+  "shipped": 0,
+  "shipped-b": 0,
+  "8k": 0,
+  "8k-b": 0
+ },
+ "scores": {
+  "shipped": {
+   "sender": {
+    "precision": 0.7652173913043478,
+    "recall": 0.6518518518518519,
+    "f1": 0.7040000000000001,
+    "tp": 88,
+    "fp": 27,
+    "fn": 47,
+    "wrong_when_filled_docs": 27,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.9119496855345912,
+    "recall": 0.847953216374269,
+    "f1": 0.8787878787878787,
+    "tp": 145,
+    "fp": 14,
+    "fn": 26,
+    "wrong_when_filled_docs": 13,
+    "filled_when_empty": 0,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.859375,
+    "recall": 0.7638888888888888,
+    "f1": 0.8088235294117647,
+    "tp": 55,
+    "fp": 9,
+    "fn": 17,
+    "wrong_when_filled_docs": 9,
+    "filled_when_empty": 1,
+    "truth_nonempty": 72,
+    "docs": 138
+   },
+   "city": {
+    "tp": 60,
+    "fp": 4,
+    "fn": 12,
+    "f1": 0.8823529411764706,
+    "precision": 0.9375
+   },
+   "n": 138
+  },
+  "shipped-b": {
+   "sender": {
+    "precision": 0.7543859649122807,
+    "recall": 0.6370370370370371,
+    "f1": 0.6907630522088354,
+    "tp": 86,
+    "fp": 28,
+    "fn": 49,
+    "wrong_when_filled_docs": 28,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.9125,
+    "recall": 0.8538011695906432,
+    "f1": 0.8821752265861027,
+    "tp": 146,
+    "fp": 14,
+    "fn": 25,
+    "wrong_when_filled_docs": 13,
+    "filled_when_empty": 0,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.8769230769230769,
+    "recall": 0.7916666666666666,
+    "f1": 0.832116788321168,
+    "tp": 57,
+    "fp": 8,
+    "fn": 15,
+    "wrong_when_filled_docs": 8,
+    "filled_when_empty": 1,
+    "truth_nonempty": 72,
+    "docs": 138
+   },
+   "city": {
+    "tp": 61,
+    "fp": 4,
+    "fn": 11,
+    "f1": 0.8905109489051095,
+    "precision": 0.9384615384615385
+   },
+   "n": 138
+  },
+  "8k": {
+   "sender": {
+    "precision": 0.8294573643410853,
+    "recall": 0.7925925925925926,
+    "f1": 0.8106060606060607,
+    "tp": 107,
+    "fp": 22,
+    "fn": 28,
+    "wrong_when_filled_docs": 22,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.9192546583850931,
+    "recall": 0.8654970760233918,
+    "f1": 0.891566265060241,
+    "tp": 148,
+    "fp": 13,
+    "fn": 23,
+    "wrong_when_filled_docs": 12,
+    "filled_when_empty": 1,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.8615384615384616,
+    "recall": 0.7777777777777778,
+    "f1": 0.8175182481751826,
+    "tp": 56,
+    "fp": 9,
+    "fn": 16,
+    "wrong_when_filled_docs": 9,
+    "filled_when_empty": 1,
+    "truth_nonempty": 72,
+    "docs": 138
+   },
+   "city": {
+    "tp": 61,
+    "fp": 4,
+    "fn": 11,
+    "f1": 0.8905109489051095,
+    "precision": 0.9384615384615385
+   },
+   "n": 138
+  },
+  "8k-b": {
+   "sender": {
+    "precision": 0.8203125,
+    "recall": 0.7777777777777778,
+    "f1": 0.7984790874524715,
+    "tp": 105,
+    "fp": 23,
+    "fn": 30,
+    "wrong_when_filled_docs": 23,
+    "filled_when_empty": 1,
+    "truth_nonempty": 127,
+    "docs": 136
+   },
+   "recipient": {
+    "precision": 0.9130434782608695,
+    "recall": 0.8596491228070176,
+    "f1": 0.8855421686746987,
+    "tp": 147,
+    "fp": 14,
+    "fn": 24,
+    "wrong_when_filled_docs": 13,
+    "filled_when_empty": 1,
+    "truth_nonempty": 130,
+    "docs": 137
+   },
+   "sending_place": {
+    "precision": 0.8636363636363636,
+    "recall": 0.7916666666666666,
+    "f1": 0.8260869565217391,
+    "tp": 57,
+    "fp": 9,
+    "fn": 15,
+    "wrong_when_filled_docs": 9,
+    "filled_when_empty": 1,
+    "truth_nonempty": 72,
+    "docs": 138
+   },
+   "city": {
+    "tp": 62,
+    "fp": 4,
+    "fn": 10,
+    "f1": 0.8985507246376812,
+    "precision": 0.9393939393939394
+   },
+   "n": 138
+  }
+ },
+ "paired": {
+  "8k against shipped (first runs)": {
+   "a": "shipped",
+   "b": "8k",
+   "sender": {
+    "n": 138,
+    "diff": 0.1066060606060606,
+    "lo": 0.038394240863870444,
+    "hi": 0.18908796436886333
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.012778386272362163,
+    "lo": -0.009743653804429986,
+    "hi": 0.04029075804776738
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": 0.008694718763417764,
+    "lo": -0.037735849056603876,
+    "hi": 0.05459171871385615
+   },
+   "city": {
+    "n": 138,
+    "diff": 0.00815800772863895,
+    "lo": 0.0,
+    "hi": 0.02738336713995937
+   }
+  },
+  "8k against shipped (second runs)": {
+   "a": "shipped-b",
+   "b": "8k-b",
+   "sender": {
+    "n": 138,
+    "diff": 0.10771603524363615,
+    "lo": 0.03404958677685943,
+    "hi": 0.19409635884684506
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.0033669420885961143,
+    "lo": -0.021013885006057276,
+    "hi": 0.029055220017256245
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": -0.006029831799428731,
+    "lo": -0.07902253252935576,
+    "hi": 0.06491376873056265
+   },
+   "city": {
+    "n": 138,
+    "diff": 0.008039775732571641,
+    "lo": -0.017579197949093572,
+    "hi": 0.03702479338842979
+   }
+  },
+  "rerun drift: shipped again": {
+   "a": "shipped",
+   "b": "shipped-b",
+   "sender": {
+    "n": 138,
+    "diff": -0.013236947791164577,
+    "lo": -0.047250316055625796,
+    "hi": 0.017796277863240118
+   },
+   "recipient": {
+    "n": 138,
+    "diff": 0.0033873477982239164,
+    "lo": -0.016154970760233867,
+    "hi": 0.02579234972677591
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": 0.023293258909403147,
+    "lo": -0.027210884353741527,
+    "hi": 0.07906591891146464
+   },
+   "city": {
+    "n": 138,
+    "diff": 0.00815800772863895,
+    "lo": 0.0,
+    "hi": 0.029036004645760727
+   }
+  },
+  "rerun drift: 8k again": {
+   "a": "8k",
+   "b": "8k-b",
+   "sender": {
+    "n": 138,
+    "diff": -0.012126973153589016,
+    "lo": -0.03542587680518716,
+    "hi": 0.0062375562145831065
+   },
+   "recipient": {
+    "n": 138,
+    "diff": -0.0060240963855421326,
+    "lo": -0.02557437531443907,
+    "hi": 0.008863247552142184
+   },
+   "sending_place": {
+    "n": 138,
+    "diff": 0.008568708346556653,
+    "lo": -0.06201550387596899,
+    "hi": 0.08267973856209154
+   },
+   "city": {
+    "n": 138,
+    "diff": 0.008039775732571641,
+    "lo": 0.0,
+    "hi": 0.02762573013482239
+   }
+  }
+ },
+ "paired_long": {
+  "8k against shipped (first runs)": {
+   "a": "shipped",
+   "b": "8k",
+   "sender": {
+    "n": 48,
+    "diff": 0.342809364548495,
+    "lo": 0.1643835616438356,
+    "hi": 0.5156418554476807
+   },
+   "recipient": {
+    "n": 48,
+    "diff": 0.03883495145631066,
+    "lo": 0.0,
+    "hi": 0.1030927835051546
+   },
+   "sending_place": {
+    "n": 48,
+    "diff": 0.033333333333333326,
+    "lo": -0.13793103448275856,
+    "hi": 0.20888055034396502
+   },
+   "city": {
+    "n": 48,
+    "diff": 0.030158730158730163,
+    "lo": 0.0,
+    "hi": 0.10766045548654246
+   }
+  },
+  "8k against shipped (second runs)": {
+   "a": "shipped-b",
+   "b": "8k-b",
+   "sender": {
+    "n": 48,
+    "diff": 0.36845039018952064,
+    "lo": 0.18478873239436622,
+    "hi": 0.5350539291217258
+   },
+   "recipient": {
+    "n": 48,
+    "diff": 0.01941747572815533,
+    "lo": -0.035028723553313657,
+    "hi": 0.08925994640280355
+   },
+   "sending_place": {
+    "n": 48,
+    "diff": 0.007722007722007818,
+    "lo": -0.20598006644518263,
+    "hi": 0.21904761904761905
+   },
+   "city": {
+    "n": 48,
+    "diff": 0.05868725868725877,
+    "lo": 0.0,
+    "hi": 0.16047297297297303
+   }
+  },
+  "rerun drift: shipped again": {
+   "a": "shipped",
+   "b": "shipped-b",
+   "sender": {
+    "n": 48,
+    "diff": -0.02564102564102566,
+    "lo": -0.12345679012345678,
+    "hi": 0.05882352941176472
+   },
+   "recipient": {
+    "n": 48,
+    "diff": 0.0,
+    "lo": -0.03921568627450989,
+    "hi": 0.04183355585224746
+   },
+   "sending_place": {
+    "n": 48,
+    "diff": 0.05714285714285705,
+    "lo": 0.0,
+    "hi": 0.19354838709677424
+   },
+   "city": {
+    "n": 48,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   }
+  },
+  "rerun drift: 8k again": {
+   "a": "8k",
+   "b": "8k-b",
+   "sender": {
+    "n": 48,
+    "diff": 0.0,
+    "lo": 0.0,
+    "hi": 0.0
+   },
+   "recipient": {
+    "n": 48,
+    "diff": -0.01941747572815533,
+    "lo": -0.05252525252525253,
+    "hi": 0.0
+   },
+   "sending_place": {
+    "n": 48,
+    "diff": 0.03153153153153154,
+    "lo": -0.19512195121951226,
+    "hi": 0.26578947368421046
+   },
+   "city": {
+    "n": 48,
+    "diff": 0.028528528528528607,
+    "lo": 0.0,
+    "hi": 0.09999999999999998
+   }
+  }
+ },
+ "scores_long": {
+  "shipped": {
+   "sender": {
+    "precision": 0.6,
+    "recall": 0.375,
+    "f1": 0.4615384615384615,
+    "tp": 18,
+    "fp": 12,
+    "fn": 30,
+    "wrong_when_filled_docs": 12,
+    "filled_when_empty": 0,
+    "truth_nonempty": 40,
+    "docs": 46
+   },
+   "recipient": {
+    "precision": 0.8235294117647058,
+    "recall": 0.8076923076923077,
+    "f1": 0.8155339805825242,
+    "tp": 42,
+    "fp": 9,
+    "fn": 10,
+    "wrong_when_filled_docs": 8,
+    "filled_when_empty": 0,
+    "truth_nonempty": 45,
+    "docs": 48
+   },
+   "sending_place": {
+    "precision": 0.875,
+    "recall": 0.7368421052631579,
+    "f1": 0.7999999999999999,
+    "tp": 14,
+    "fp": 2,
+    "fn": 5,
+    "wrong_when_filled_docs": 2,
+    "filled_when_empty": 0,
+    "truth_nonempty": 19,
+    "docs": 48
+   },
+   "city": {
+    "tp": 16,
+    "fp": 0,
+    "fn": 3,
+    "f1": 0.9142857142857143,
+    "precision": 1.0
+   },
+   "n": 48
+  },
+  "shipped-b": {
+   "sender": {
+    "precision": 0.5666666666666667,
+    "recall": 0.3541666666666667,
+    "f1": 0.4358974358974359,
+    "tp": 17,
+    "fp": 13,
+    "fn": 31,
+    "wrong_when_filled_docs": 13,
+    "filled_when_empty": 0,
+    "truth_nonempty": 40,
+    "docs": 46
+   },
+   "recipient": {
+    "precision": 0.8235294117647058,
+    "recall": 0.8076923076923077,
+    "f1": 0.8155339805825242,
+    "tp": 42,
+    "fp": 9,
+    "fn": 10,
+    "wrong_when_filled_docs": 8,
+    "filled_when_empty": 0,
+    "truth_nonempty": 45,
+    "docs": 48
+   },
+   "sending_place": {
+    "precision": 0.9375,
+    "recall": 0.7894736842105263,
+    "f1": 0.8571428571428572,
+    "tp": 15,
+    "fp": 1,
+    "fn": 4,
+    "wrong_when_filled_docs": 1,
+    "filled_when_empty": 0,
+    "truth_nonempty": 19,
+    "docs": 48
+   },
+   "city": {
+    "tp": 16,
+    "fp": 0,
+    "fn": 3,
+    "f1": 0.9142857142857143,
+    "precision": 1.0
+   },
+   "n": 48
+  },
+  "8k": {
+   "sender": {
+    "precision": 0.8409090909090909,
+    "recall": 0.7708333333333334,
+    "f1": 0.8043478260869567,
+    "tp": 37,
+    "fp": 7,
+    "fn": 11,
+    "wrong_when_filled_docs": 7,
+    "filled_when_empty": 0,
+    "truth_nonempty": 40,
+    "docs": 46
+   },
+   "recipient": {
+    "precision": 0.8627450980392157,
+    "recall": 0.8461538461538461,
+    "f1": 0.854368932038835,
+    "tp": 44,
+    "fp": 7,
+    "fn": 8,
+    "wrong_when_filled_docs": 6,
+    "filled_when_empty": 0,
+    "truth_nonempty": 45,
+    "docs": 48
+   },
+   "sending_place": {
+    "precision": 0.8823529411764706,
+    "recall": 0.7894736842105263,
+    "f1": 0.8333333333333333,
+    "tp": 15,
+    "fp": 2,
+    "fn": 4,
+    "wrong_when_filled_docs": 2,
+    "filled_when_empty": 0,
+    "truth_nonempty": 19,
+    "docs": 48
+   },
+   "city": {
+    "tp": 17,
+    "fp": 0,
+    "fn": 2,
+    "f1": 0.9444444444444444,
+    "precision": 1.0
+   },
+   "n": 48
+  },
+  "8k-b": {
+   "sender": {
+    "precision": 0.8409090909090909,
+    "recall": 0.7708333333333334,
+    "f1": 0.8043478260869567,
+    "tp": 37,
+    "fp": 7,
+    "fn": 11,
+    "wrong_when_filled_docs": 7,
+    "filled_when_empty": 0,
+    "truth_nonempty": 40,
+    "docs": 46
+   },
+   "recipient": {
+    "precision": 0.8431372549019608,
+    "recall": 0.8269230769230769,
+    "f1": 0.8349514563106797,
+    "tp": 43,
+    "fp": 8,
+    "fn": 9,
+    "wrong_when_filled_docs": 7,
+    "filled_when_empty": 0,
+    "truth_nonempty": 45,
+    "docs": 48
+   },
+   "sending_place": {
+    "precision": 0.8888888888888888,
+    "recall": 0.8421052631578947,
+    "f1": 0.8648648648648649,
+    "tp": 16,
+    "fp": 2,
+    "fn": 3,
+    "wrong_when_filled_docs": 2,
+    "filled_when_empty": 0,
+    "truth_nonempty": 19,
+    "docs": 48
+   },
+   "city": {
+    "tp": 18,
+    "fp": 0,
+    "fn": 1,
+    "f1": 0.972972972972973,
+    "precision": 1.0
+   },
+   "n": 48
+  }
+ },
+ "evidence": {
+  "shipped": {
+   "sender": {
+    "quote in text": [
+     88,
+     27
+    ],
+    "no quote": [
+     1,
+     0
+    ]
+   },
+   "recipient": {
+    "quote in text": [
+     146,
+     14
+    ]
+   },
+   "sending_place": {
+    "quote in text": [
+     55,
+     9
+    ]
+   }
+  },
+  "shipped-b": {
+   "sender": {
+    "quote in text": [
+     87,
+     28
+    ]
+   },
+   "recipient": {
+    "quote in text": [
+     147,
+     14
+    ]
+   },
+   "sending_place": {
+    "quote in text": [
+     57,
+     8
+    ]
+   }
+  },
+  "8k": {
+   "sender": {
+    "quote in text": [
+     107,
+     23
+    ],
+    "no quote": [
+     1,
+     0
+    ]
+   },
+   "recipient": {
+    "quote in text": [
+     149,
+     13
+    ]
+   },
+   "sending_place": {
+    "quote in text": [
+     56,
+     9
+    ]
+   }
+  },
+  "8k-b": {
+   "sender": {
+    "quote in text": [
+     105,
+     24
+    ],
+    "no quote": [
+     1,
+     0
+    ]
+   },
+   "recipient": {
+    "quote in text": [
+     148,
+     14
+    ]
+   },
+   "sending_place": {
+    "quote in text": [
+     57,
+     9
+    ]
+   }
+  }
+ },
+ "calls": {
+  "n": 552,
+  "ok": 552,
+  "spent": 2.3004,
+  "other_model_calls": 8,
+  "key_spent": 3.429,
+  "models": {
+   "gemini-3.8-flash": 552
+  },
+  "thoughts_mean": 820,
+  "prompt_mean": {
+   "shipped": 924,
+   "shipped-b": 924,
+   "8k": 1134,
+   "8k-b": 1134
+  },
+  "finish": {
+   "STOP": 552
+  }
+ },
+ "price": [
+  0.75,
+  3.75
+ ]
+}
