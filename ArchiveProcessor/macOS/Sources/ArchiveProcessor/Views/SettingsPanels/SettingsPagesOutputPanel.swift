@@ -209,13 +209,13 @@ struct SettingsPagesOutputPanel: View {
                 usesGateway: useGateway && GatewayConfig.fromDefaults() != nil, usesLocalAgent: useLocalAgent,
                 gatewayIsLocal: gatewayLocalModel) {
                 Text("This OCR backend has no LLM rotation check, so pages are checked with Local Vision instead.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                     .accessibilityIdentifier("ap.settings.rotationFallback")
             }
             if rotationMode == .agreement, !preOCRedInput, !gatewayRotation {
                 // W46.rotation-default: the agreement rule asks a model only through the gateway (the one measured).
                 Text("With no remote API gateway, a page the two local checks disagree on is left as it is and counted in the run’s summary.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                     .accessibilityIdentifier("ap.settings.rotationUnsure")
             }
             Toggle(isOn: $reviewRotation) {

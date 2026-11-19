@@ -92,7 +92,7 @@ struct SettingsSheetView: View {
                 Text("Settings for \(outputFolder?.lastPathComponent ?? "new collections")").font(.title3.weight(.semibold))
                 Text("The app's choices for your answers and your Mac, \(pagesCaption). Every figure was measured on test "
                      + "pages and says how many.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -319,16 +319,16 @@ struct SheetLimitsAndTotals: View {
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 4) {
                     ForEach(m.limits) { l in
                         GridRow {
-                            Text(l.label).foregroundStyle(.secondary)
+                            Text(l.label).foregroundStyle(.primary)
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(l.value).fixedSize(horizontal: false, vertical: true)
-                                Text(l.source).font(.caption2).foregroundStyle(.secondary)
+                                Text(l.source).font(.caption2).foregroundStyle(.primary)
                             }
                         }
                     }
                 }
                 Text("Change these with “Questions about this material” in Settings.")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(.primary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -337,11 +337,11 @@ struct SheetLimitsAndTotals: View {
         HStack(alignment: .top, spacing: 8) {
             ForEach(m.totals) { t in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(t.label).font(.caption).foregroundStyle(.secondary)
+                    Text(t.label).font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(t.value).font(.title3.weight(.semibold))
                     if let d = t.detail {
-                        Text(d).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        Text(d).font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(8)
@@ -375,9 +375,9 @@ struct SheetSwitchRow: View {
         Toggle(isOn: Binding(get: { sw.isOn }, set: { setSwitch(sw.key, $0) })) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(sw.label)
-                Text(sw.source).font(.caption2).foregroundStyle(.secondary)
+                Text(sw.source).font(.caption2).foregroundStyle(.primary)
                 if let note = sw.note {
-                    Text(note).font(.caption2).italic().foregroundStyle(.secondary)
+                    Text(note).font(.caption2).italic().foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -402,20 +402,20 @@ struct RuleStageBox: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(stage.text).fixedSize(horizontal: false, vertical: true)
                 if let homeNote {
-                    Text(homeNote).font(.caption2).foregroundStyle(.secondary)
+                    Text(homeNote).font(.caption2).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.sheet.home.\(stage.id)")
                 }
                 ForEach(stage.switches) { sw in SheetSwitchRow(row: sw, setSwitch: setSwitch) }
                 if stage.id == "layout" { NewspaperLayoutDownloadRow() }
                 if let forms = stage.forms { formsRow(forms) }
-                DisclosureGroup("The rules in detail") {
+                SheetDisclosure("The rules in detail") {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(stage.rules) { r in
                             Text("• \(r.text)" + (r.source.map { " (\($0))" } ?? ""))
                                 .font(.caption).fixedSize(horizontal: false, vertical: true)
                         }
                         if let s = stage.source {
-                            Text("Source: \(s)").font(.caption2).foregroundStyle(.secondary)
+                            Text("Source: \(s)").font(.caption2).foregroundStyle(.primary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -435,8 +435,8 @@ struct RuleStageBox: View {
                  + "but selections may not line up. Unchecked kinds keep a separate page of text after each image, "
                  + "and so do handwritten, mixed and register pages, always. "
                  + "Searchable images use less space when the compression tools are available.")
-                .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Text(forms.source).font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
+            Text(forms.source).font(.caption2).foregroundStyle(.primary)
             Toggle("Every page, pages of no known kind too", isOn: Binding(get: { forms.all },
                                                set: { setStrings(.searchableFor, forms.settingAll($0)) }))
                 .accessibilityIdentifier("ap.sheet.forms.all")
@@ -448,11 +448,35 @@ struct RuleStageBox: View {
             }
             if !forms.others.isEmpty {
                 Text("Also set in the settings file: " + forms.others.joined(separator: ", "))
-                    .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ap.sheet.forms")
+    }
+}
+
+/// A disclosure drawn as a button (W47.settings-panels): SwiftUI's `DisclosureGroup` triangle carries no accessibility
+/// action, which the audit fails now that the sheet's boxes sit in Settings.
+struct SheetDisclosure<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+    @State private var expanded = false
+
+    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+        self.title = title
+        self.content = content
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button { expanded.toggle() } label: {
+                Label(title, systemImage: expanded ? "chevron.down" : "chevron.right")
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(expanded ? "expanded" : "collapsed")
+            if expanded { content().padding(.leading, 18) }
+        }
     }
 }
 
@@ -490,13 +514,13 @@ struct StageCardView: View {
             HStack {
                 Text(card.title).font(.headline)
                 Spacer()
-                Text(card.weight).font(.caption).foregroundStyle(.secondary)
+                Text(card.weight).font(.caption).foregroundStyle(.primary)
             }
         } content: {
             VStack(alignment: .leading, spacing: 8) {
-                Text(card.about).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(card.about).font(.caption).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
                 if let homeNote {
-                    Text(homeNote).font(.caption2).foregroundStyle(.secondary)
+                    Text(homeNote).font(.caption2).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.sheet.home.\(card.id)")
                 }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -508,23 +532,30 @@ struct StageCardView: View {
                 Text(card.why).fixedSize(horizontal: false, vertical: true)
                     .help(card.evidence)
                 if let t = card.trainingCost {
-                    Label(t, systemImage: "lock.shield").foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Label { Text(t).fixedSize(horizontal: false, vertical: true) } icon: {
+                        Image(systemName: "lock.shield").foregroundStyle(.orange)
+                    }
                 }
 
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
                     ForEach(card.parts) { p in
                         GridRow {
-                            Text(p.label).foregroundStyle(.secondary)
+                            Text(p.label).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: 250, alignment: .leading)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(p.figure + (p.routeName.map { $0 != card.routeName ? " — \($0)" : "" } ?? ""))
-                                    .foregroundStyle(p.warning ? Color.orange : Color.primary)
+                                let figure = Text(p.figure + (p.routeName.map { $0 != card.routeName ? " — \($0)" : "" } ?? ""))
                                     .fixedSize(horizontal: false, vertical: true)
-                                if let s = p.sample { Text(s).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                                if p.warning {
+                                    Label { figure } icon: {
+                                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                                    }
+                                } else {
+                                    figure
+                                }
+                                if let s = p.sample { Text(s).font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true) }
                                 if let l = p.label2 {
-                                    Text(l).font(.caption2).italic().foregroundStyle(.secondary)
+                                    Text(l).font(.caption2).italic().foregroundStyle(.primary)
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
                             }
@@ -533,9 +564,9 @@ struct StageCardView: View {
                 }
 
                 Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 2) {
-                    GridRow { Text("Cost").foregroundStyle(.secondary); Text(card.cost) }
-                    GridRow { Text("Time").foregroundStyle(.secondary); Text(card.time) }
-                    GridRow { Text("Memory").foregroundStyle(.secondary); Text(card.memory) }
+                    GridRow { Text("Cost").foregroundStyle(.primary); Text(card.cost) }
+                    GridRow { Text("Time").foregroundStyle(.primary); Text(card.time) }
+                    GridRow { Text("Memory").foregroundStyle(.primary); Text(card.memory) }
                 }
                 .font(.callout)
 
@@ -602,7 +633,7 @@ struct StageCardView: View {
                     }
                 }
 
-                DisclosureGroup("Notes from the measurements") {
+                SheetDisclosure("Notes from the measurements") {
                     VStack(alignment: .leading, spacing: 3) {
                         if !card.evidence.isEmpty {
                             Text(card.evidence).font(.caption2).fixedSize(horizontal: false, vertical: true)
@@ -611,7 +642,7 @@ struct StageCardView: View {
                             Text("• \($0)").font(.caption2).fixedSize(horizontal: false, vertical: true)
                         }
                         Text("Figures from: " + card.sources.joined(separator: ", "))
-                            .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                            .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
