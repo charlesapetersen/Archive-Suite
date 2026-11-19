@@ -400,11 +400,12 @@ counts pooled (so its intervals are narrower than the sample warrants; read them
 FINDINGS = """
 ## Findings (2026-11-18)
 
-- **Apple Vision's own confidence is the one flag that holds a 5% false-alarm ceiling on plain and damaged photographs
+- **Apple Vision's own confidence is the one flag near a 5% false-alarm rate on plain and damaged photographs
   alike.** Fitted on the 96 (flag under 0.9815), it catches 10 of Vision's 21 poor readings with 3 false alarms in 75
-  (cross-validated 46% at 6%), and applied once to the ladder's defect images it catches 179 of 231 with 7 false alarms
-  in 249 (3%). The cut fitted on the ladder lands within 0.006 of it. Its misses on the 96 are confident failures
-  (several poor pages at confidence 1.0, mostly printed pages Vision misreads), so it says "check this" on about half
+  in-sample (4%, the fit itself); cross-validated, the honest estimate for new pages (repeated 5-fold, pooled over the
+  repeats), it catches 193 of 420 (46%) with 87 false alarms in 1,500 (5.8%, 4.7-7.1), a little over the ceiling it
+  was fitted to. Applied once to the ladder's defect images it catches 179 of 231 with 7 false alarms in 249 (3%).
+  The cut fitted on the ladder lands within 0.006 of it. Its misses on the 96 are confident failures (several poor pages at confidence 1.0, mostly printed pages Vision misreads), so it says "check this" on about half
   of Vision's poor plain-photo readings and on most damaged ones. This is the rule the app ships, for pages Vision
   reads (the no-key route).
 - **Two-reader disagreement with Apple Vision ranks a reader's errors well on plain photographs** (AUC 0.89-0.98), and

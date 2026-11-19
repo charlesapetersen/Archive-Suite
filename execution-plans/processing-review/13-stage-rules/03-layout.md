@@ -169,7 +169,10 @@ that the fill reads like a whole page for any reader is from the geometry [I].
 **The fixed partition (W46.layout-partition-fix, 2026-11-17).** Each Vision line is now read once, whole, by the
 region holding most of its pixels (930 of 9,635 lines cross a region edge); lines touching no region (244) are read
 as 80 small crops of their own lines; 17 of 980 regions masked blank are not read; the whole-page fill stays only
-for a page with no Vision line. Same reader and settings: 78.7 strict NES, a tie with raw regions (−5.9 [−15.8,
-+1.6]; order-free 91.2 against 91.5; added words 22.7 against 17.7, a tie), +58.5 over the shipped partition, 791 s
-of reading [M, layout-partition-fix.md]. The remaining strict gap is one page's reader repetition loop. The
-coverage floor above no longer triggers anything; it is recorded only.
+for a page with no Vision line. Same reader and settings: 78.7 strict NES, not shown behind raw regions by the
+predeclared rule (−5.9 [−15.8, +1.6]; order-free 91.2 against 91.5; added words 22.7 against 17.7), +58.5 over the
+shipped partition, 791 s of reading [M, layout-partition-fix.md]. It is not a page-by-page tie: the partition trails
+raw regions on 11 of 15 pages, −64.2 on one page's repetition loop (mss3413201819-6, which the kind gate reads whole,
+so the app never sends it the partition), −17.2 and −13.4 on two more (one spread over many region reads plus the
+outside crops, the other one region's capped loop), a mean of −1.7 over the other 14. As the app routes it: 78.6,
+−6.0 [−16.1, +1.6] (W46.p16-score-hygiene). The coverage floor above no longer triggers anything; it is recorded only.

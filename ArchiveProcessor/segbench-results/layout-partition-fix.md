@@ -9,9 +9,11 @@ $0.
 ## What this says
 
 - **The fix restores the region gain.** The fixed partition scores 78.7 strict NES against 20.2 for the shipped
-  one, +58.5 [+49.4, +66.1], ahead on all 15 pages, and ties the raw regions it was built to match: strict -5.9
-  [-15.8, +1.6], order-free 91.2 against 91.5, -0.3 [-9.2, +7.5], missed words 5.7 against 5.8 per 100, added
-  22.7 against 17.7, +5.0 [-21.2, +37.0]. The predeclared pass is met on all three.
+  one, +58.5 [+49.4, +66.1], ahead on all 15 pages. Against the raw regions it was built to match, the predeclared
+  pass is met on all three measures (no interval excludes 0): strict -5.9 [-15.8, +1.6], order-free 91.2 against
+  91.5, -0.3 [-9.2, +7.5], missed words 5.7 against 5.8 per 100, added 22.7 against 17.7, +5.0 [-21.2, +37.0].
+  That is not a tie page by page: on strict NES the partition is behind on 11 of the 15 (below). As the app routes
+  it (the kind gate reads one page whole) it scores 78.6, -6.0 [-16.1, +1.6] against the raw regions.
 - **Why it works.** 930 of 9,635 Vision lines (10%) cross a region edge; each is now read whole by the region
   holding most of it instead of moving, with its neighbours, into a whole-page fill (8,037 lines before). Only
   244 lines touch no region; they are read as 80 small crops carrying 2.3% of the words. 17 of 980 regions were
@@ -19,12 +21,24 @@ $0.
 - **The outside crops find words and cost a little order.** Without them the partition misses 7.0 words per 100
   against 5.7 with them (-1.3 [-2.0, -0.7]), but strict NES is 1.4 points higher (80.1): text read after every
   region is out of place. Order-free they tie. Kept, since a missed word is lost while a misplaced one is not.
-- **The strict gap that remains is one page.** On mss3413201819-6 the partition scores 26.8 against 91.0 for the
-  raw regions: one wide region crop (1,665 x 255 px) and one small outside
-  crop sent the reader into a repetition loop to its 4,096-token cap, adding 188 words per 100. Raw regions have
-  such pages too (two pages capped; 111 and 126 added words per 100 on its two worst). The bench loop has no repetition guard for
-  any arm; the app's Mac route stops a repeating stream and re-reads once with a repetition penalty, which this
-  bench does not exercise. On the other 14 pages the partition is within a few points of the raw regions.
+- **The strict gap is one large loss, two clear ones and a small spread.** Per page against the raw regions:
+  -64.2 on mss3413201819-6, -17.2 on mss3413201309-4, -13.4 on mss3413201323-27, +21.7 on mss3413201283-24
+  (where the raw regions loop instead), and over the other 14 pages a mean of -1.7, behind on 11 of 15 in all.
+  On mss3413201819-6 one wide region crop (1,665 x 255 px) and one small outside crop sent the reader into a
+  repetition loop to its 4,096-token cap, adding 188 words per 100. That page is the one the app's kind gate
+  reads whole, so the app never sends it this partition; its whole-page read loops too (25.5, capped), so the
+  app-routed row is no better there. The bench loop has no repetition guard for any arm (the app's Mac route
+  stops a repeating stream and re-reads once with a repetition penalty), so these figures do not show what that
+  guard would recover.
+- **Where the two other losing pages lose** (W46.p16-score-hygiene, from per-region scores: each partition
+  region read swapped for its best-matching raw region read, page NES rescored; the texts were not read). On
+  mss3413201309-4 (67.7 against 85.0) no region is at fault: 26 of 67 region reads differ from the raw crop's
+  (similarity under 0.8; reasoned: edge lines now sit in other regions), no single swap gains more than 1.8 points,
+  and swapping all of them gains 11.1; the 5 outside crops, read after every region, cost the rest (5.9 points
+  when dropped). On mss3413201323-27 (63.9 against 77.3) one region is at fault: region 47 (1,528 x 1,368 px) ran
+  to its 4,096-token cap, 796 words against 248 in the raw read (a repetition loop's pattern), and swapping it alone gains
+  7.6 points, all regions 9.6; the 20 outside crops cost 2.0 more. Neither page loses to a fill. The swaps are
+  scored by `layout_partition_fix_regions.py`.
 - **The owner's choices stand.** The detector, its native order, pictures kept and regions for every reader are
   unchanged; only what each crop holds changed.
 
@@ -44,6 +58,7 @@ Predeclared pass: **met** (strict not behind the raw regions beyond the interval
 | raw regions (measured baseline) | 84.6 | 91.5 | 5.8 | 17.7 | 969 | 2 | 0 | 650 |
 | fixed partition | 78.7 | 91.2 | 5.7 | 22.7 | 1,043 | 3 | 0 | 791 |
 | fixed partition without its outside crops | 80.1 | 90.8 | 7.0 | 21.0 | 963 | 3 | 0 | 753 |
+| as the app routes it (fixed partition, or whole where the kind gate says so) | 78.6 | 88.4 | 10.9 | 25.6 | 971 | 3 | 0 | 739 |
 | shipped partition (W46.layout-partition-score) | 20.2 | 19.5 | 68.6 | 222.5 | 995 | 15 | 0 | 1,643 |
 
 The no-outside row is the partition's own requests less its outside crops, not a route the app
@@ -64,6 +79,7 @@ is a tie. For missed and added words lower is better, so the verdict names the a
 | partition − shipped | 78.7 | 20.2 | +58.5 [+49.4, +66.1] | 0.000 | 15 / 0 | partition |
 | partition-nooutside − raw | 80.1 | 84.6 | -4.5 [-14.0, +2.8] | 0.435 | 5 / 10 | tie |
 | partition − partition-nooutside | 78.7 | 80.1 | -1.4 [-2.3, -0.7] | 0.000 | 0 / 14 | partition-nooutside |
+| app − raw | 78.6 | 84.6 | -6.0 [-16.1, +1.6] | 0.230 | 4 / 11 | tie |
 
 ### order-free bag-of-words F1
 
@@ -74,6 +90,7 @@ is a tie. For missed and added words lower is better, so the verdict names the a
 | partition − shipped | 91.2 | 19.5 | +71.7 [+63.3, +79.0] | 0.000 | 15 / 0 | partition |
 | partition-nooutside − raw | 90.8 | 91.5 | -0.7 [-9.2, +6.9] | 0.777 | 8 / 7 | tie |
 | partition − partition-nooutside | 91.2 | 90.8 | +0.4 [-0.2, +1.0] | 0.195 | 13 / 1 | tie |
+| app − raw | 88.4 | 91.5 | -3.1 [-17.6, +7.5] | 0.986 | 11 / 4 | tie |
 
 ### missed words per 100 truth words
 
@@ -84,6 +101,7 @@ is a tie. For missed and added words lower is better, so the verdict names the a
 | partition − shipped | 5.7 | 68.6 | -62.9 [-72.3, -51.7] | 0.000 | 15 / 0 | partition |
 | partition-nooutside − raw | 7.0 | 5.8 | +1.1 [+0.0, +2.3] | 0.080 | 4 / 11 | raw |
 | partition − partition-nooutside | 5.7 | 7.0 | -1.3 [-2.0, -0.7] | 0.000 | 14 / 0 | partition |
+| app − raw | 10.9 | 5.8 | +5.1 [-1.5, +16.9] | 0.815 | 9 / 6 | tie |
 
 ### added words per 100 truth words
 
@@ -94,6 +112,7 @@ is a tie. For missed and added words lower is better, so the verdict names the a
 | partition − shipped | 22.7 | 222.5 | -199.8 [-247.9, -155.1] | 0.000 | 15 / 0 | partition |
 | partition-nooutside − raw | 21.0 | 17.7 | +3.3 [-21.4, +32.3] | 0.798 | 9 / 6 | tie |
 | partition − partition-nooutside | 22.7 | 21.0 | +1.7 [+0.1, +4.8] | 0.000 | 0 / 12 | partition-nooutside |
+| app − raw | 25.6 | 17.7 | +7.9 [-21.2, +45.9] | 0.771 | 9 / 6 | tie |
 
 ## Measurement card
 

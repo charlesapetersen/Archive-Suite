@@ -8,8 +8,12 @@ Same reader, settings, pages and scoring as layout_partition_score.py, whose fun
 are W46.layout-partition-score's saved reads, the partition arm is the fixed plan (layout_partition_plans.sh, then
 layout_partition_read.py --arms partition). The partition is also scored without its outside crops (descriptive).
 The shipped partition's per-page scores come from the committed layout-partition-score-pages.csv, for the
-before/after pair. Saved readings only: no model, network or money. Writes score-only files:
+before/after pair, and so does the kind gate's routing for the "as the app routes it" arm (the pages that item's
+app arm read whole). Saved readings only: no model, network or money. Writes score-only files:
 segbench-results/layout-partition-fix.{md,json} and -pages.csv.
+
+--saved rescores after the item's plan images went to the Trash: the reads are taken from the bench cache in index
+order, and the plan's counts from the committed -pages.csv and .json (W46.p16-score-hygiene).
 
 Predeclared pass (SUITE_TODO W46.layout-partition-fix): the fixed partition does not trail the raw regions beyond
 the interval on strict NES or order-free F1 (the interval's upper end is not below 0), and adds no more words than
@@ -17,6 +21,7 @@ they do beyond the interval (the added-words interval's lower end is not above 0
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import statistics as st
@@ -27,31 +32,56 @@ import layout_partition_score as P
 L, S, R, D = P.L, P.S, P.R, P.D
 RES = P.RES
 OUT = RES / 'layout-partition-fix'
-ARMS = ('whole', 'raw', 'partition', 'partition-nooutside', 'shipped')
+ARMS = ('whole', 'raw', 'partition', 'partition-nooutside', 'app', 'shipped')
 NAMES = {'whole': 'whole page', 'raw': 'raw regions (measured baseline)', 'partition': 'fixed partition',
          'partition-nooutside': 'fixed partition without its outside crops',
+         'app': 'as the app routes it (fixed partition, or whole where the kind gate says so)',
          'shipped': 'shipped partition (W46.layout-partition-score)'}
 PAIRS = [('partition', 'raw'), ('partition', 'whole'), ('partition', 'shipped'), ('partition-nooutside', 'raw'),
-         ('partition', 'partition-nooutside')]
+         ('partition', 'partition-nooutside'), ('app', 'raw')]
 
 
 def outside(rec: dict) -> bool:
     return rec['source'].startswith('outside')
 
 
-def rows() -> list[dict]:
+def saved_pages() -> list:
+    with (RES / 'layout-partition-fix-pages.csv').open() as f:
+        part = {r['page']: r for r in csv.DictReader(f) if r['arm'] == 'partition'}
+    out = []
+    for line in (L.WORK / 'pages.tsv').read_text().splitlines():
+        if line.strip():
+            pid, path = line.split('\t')
+            c = part[pid]
+            out.append((pid, Path(path), {'plan_regions': int(c['regions']), 'prepare_seconds': 0.0,
+                                          **{k: int(c[k]) for k in ('region_images', 'fill_lines', 'split_lines',
+                                                                     'vision_lines')}}))
+    return out
+
+
+def saved_records(arm: str, pid: str, original, plan) -> list[dict]:
+    recs = [json.loads(f.read_text()) for f in sorted((L.WORK / 'reads' / arm / pid).glob('*.json'))]
+    assert [r['index'] for r in recs] == list(range(len(recs))), (arm, pid)
+    return recs
+
+
+def rows(saved: bool = False) -> list[dict]:
     R.MANIFEST = D.MANIFEST
     truth = {R.job_id(r): r for r in R.frozen()}
     with (RES / 'layout-partition-score-pages.csv').open() as f:
-        shipped = {r['page']: r for r in csv.DictReader(f) if r['arm'] == 'partition'}
+        old = list(csv.DictReader(f))
+    shipped = {r['page']: r for r in old if r['arm'] == 'partition'}
+    routed = {r['page']: r['requests'] != '1' for r in old if r['arm'] == 'app'}
+    records = saved_records if saved else P.records
     out = []
-    for pid, original, plan in L.pages():
+    for pid, original, plan in (saved_pages() if saved else L.pages()):
         ref = Path(truth[pid]['truth']).read_text()
-        got = {arm: P.records(arm, pid, original, plan) for arm in ('whole', 'raw', 'partition')}
+        got = {arm: records(arm, pid, original, plan) for arm in ('whole', 'raw', 'partition')}
         got['partition-nooutside'] = [r for r in got['partition'] if not outside(r)]
+        got['app'] = got['partition'] if routed[pid] else got['whole']
         for arm, recs in got.items():
             errors = sum(1 for r in recs if r['error'])
-            planned = arm.startswith('partition')
+            planned = arm.startswith('partition') or (arm == 'app' and routed[pid])
             used = recs + got['whole'] if planned and errors else recs
             text = P.stitch(got['whole']) if planned and errors else P.stitch(recs)
             row = {'arm': arm, 'page': pid, 'requests': len(used), 'errors': errors,
@@ -75,7 +105,10 @@ def rows() -> list[dict]:
 
 
 def main() -> None:
-    rr = rows()
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--saved', action='store_true', help='rescore from the reads and committed counts alone')
+    saved = ap.parse_args().saved
+    rr = rows(saved)
     comps = {m: {f'{a} − {b}': P.pair(rr, a, b, m, hi) for a, b in PAIRS} for m, _, hi in P.MEASURES}
     arms = {}
     for arm in ARMS:
@@ -95,6 +128,8 @@ def main() -> None:
             'split_lines': sum(r['split_lines'] for r in part),
             'outside_word_share': sum(r['outside_words'] for r in part) / max(1, sum(r['words_read'] for r in part)),
             'prepare_seconds': sum(r['prepare_seconds'] for r in part)}
+    if saved:
+        plan['prepare_seconds'] = json.loads(OUT.with_suffix('.json').read_text())['plan']['prepare_seconds']
     s, o, a = comps['nes']['partition − raw'], comps['bowf1']['partition − raw'], comps['added']['partition − raw']
     verdict = {'strict_not_behind': s['hi'] >= 0 or abs(s['delta']) < 100 * P.FLOOR,
                'orderfree_not_behind': o['hi'] >= 0 or abs(o['delta']) < 100 * P.FLOOR,
@@ -163,9 +198,11 @@ def render(plan: dict, arms: dict, comps: dict, verdict: dict) -> str:
 FINDINGS = [
     '## What this says', '',
     '- **The fix restores the region gain.** The fixed partition scores 78.7 strict NES against 20.2 for the shipped',
-    '  one, +58.5 [+49.4, +66.1], ahead on all 15 pages, and ties the raw regions it was built to match: strict -5.9',
-    '  [-15.8, +1.6], order-free 91.2 against 91.5, -0.3 [-9.2, +7.5], missed words 5.7 against 5.8 per 100, added',
-    '  22.7 against 17.7, +5.0 [-21.2, +37.0]. The predeclared pass is met on all three.',
+    '  one, +58.5 [+49.4, +66.1], ahead on all 15 pages. Against the raw regions it was built to match, the predeclared',
+    '  pass is met on all three measures (no interval excludes 0): strict -5.9 [-15.8, +1.6], order-free 91.2 against',
+    '  91.5, -0.3 [-9.2, +7.5], missed words 5.7 against 5.8 per 100, added 22.7 against 17.7, +5.0 [-21.2, +37.0].',
+    '  That is not a tie page by page: on strict NES the partition is behind on 11 of the 15 (below). As the app routes',
+    '  it (the kind gate reads one page whole) it scores 78.6, -6.0 [-16.1, +1.6] against the raw regions.',
     '- **Why it works.** 930 of 9,635 Vision lines (10%) cross a region edge; each is now read whole by the region',
     '  holding most of it instead of moving, with its neighbours, into a whole-page fill (8,037 lines before). Only',
     '  244 lines touch no region; they are read as 80 small crops carrying 2.3% of the words. 17 of 980 regions were',
@@ -173,12 +210,24 @@ FINDINGS = [
     '- **The outside crops find words and cost a little order.** Without them the partition misses 7.0 words per 100',
     '  against 5.7 with them (-1.3 [-2.0, -0.7]), but strict NES is 1.4 points higher (80.1): text read after every',
     '  region is out of place. Order-free they tie. Kept, since a missed word is lost while a misplaced one is not.',
-    '- **The strict gap that remains is one page.** On mss3413201819-6 the partition scores 26.8 against 91.0 for the',
-    '  raw regions: one wide region crop (1,665 x 255 px) and one small outside',
-    '  crop sent the reader into a repetition loop to its 4,096-token cap, adding 188 words per 100. Raw regions have',
-    '  such pages too (two pages capped; 111 and 126 added words per 100 on its two worst). The bench loop has no repetition guard for',
-    '  any arm; the app\'s Mac route stops a repeating stream and re-reads once with a repetition penalty, which this',
-    '  bench does not exercise. On the other 14 pages the partition is within a few points of the raw regions.',
+    '- **The strict gap is one large loss, two clear ones and a small spread.** Per page against the raw regions:',
+    '  -64.2 on mss3413201819-6, -17.2 on mss3413201309-4, -13.4 on mss3413201323-27, +21.7 on mss3413201283-24',
+    '  (where the raw regions loop instead), and over the other 14 pages a mean of -1.7, behind on 11 of 15 in all.',
+    '  On mss3413201819-6 one wide region crop (1,665 x 255 px) and one small outside crop sent the reader into a',
+    '  repetition loop to its 4,096-token cap, adding 188 words per 100. That page is the one the app\'s kind gate',
+    '  reads whole, so the app never sends it this partition; its whole-page read loops too (25.5, capped), so the',
+    '  app-routed row is no better there. The bench loop has no repetition guard for any arm (the app\'s Mac route',
+    '  stops a repeating stream and re-reads once with a repetition penalty), so these figures do not show what that',
+    '  guard would recover.',
+    '- **Where the two other losing pages lose** (W46.p16-score-hygiene, from per-region scores: each partition',
+    '  region read swapped for its best-matching raw region read, page NES rescored; the texts were not read). On',
+    '  mss3413201309-4 (67.7 against 85.0) no region is at fault: 26 of 67 region reads differ from the raw crop\'s',
+    '  (similarity under 0.8; reasoned: edge lines now sit in other regions), no single swap gains more than 1.8 points,',
+    '  and swapping all of them gains 11.1; the 5 outside crops, read after every region, cost the rest (5.9 points',
+    '  when dropped). On mss3413201323-27 (63.9 against 77.3) one region is at fault: region 47 (1,528 x 1,368 px) ran',
+    '  to its 4,096-token cap, 796 words against 248 in the raw read (a repetition loop\'s pattern), and swapping it alone gains',
+    '  7.6 points, all regions 9.6; the 20 outside crops cost 2.0 more. Neither page loses to a fill. The swaps are',
+    '  scored by `layout_partition_fix_regions.py`.',
     '- **The owner\'s choices stand.** The detector, its native order, pictures kept and regions for every reader are',
     '  unchanged; only what each crop holds changed.',
 ]

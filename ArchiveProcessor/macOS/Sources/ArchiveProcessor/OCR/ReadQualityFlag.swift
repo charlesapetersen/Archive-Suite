@@ -2,9 +2,10 @@ import Foundation
 
 /// W46.post-read-quality-flag — "this page probably read poorly", said after processing, for a page Apple Vision read.
 /// The signal is Vision's own confidence: the mean of its line confidences, each line weighted by its characters. The
-/// cut was fitted on the owner's 96 for at most 5% false alarms among readings at 70 NES or above, and held that ceiling
-/// on the capture ladder's damaged photographs too (`ArchiveProcessor/segbench-results/post-read-flag.md`: 10 of 21
-/// poor readings caught with 3 false alarms in 75 on the 96; 179 of 231 with 7 in 249 on the defect images). No other
+/// cut was fitted on the owner's 96 for at most 5% false alarms among readings at 70 NES or above
+/// (`ArchiveProcessor/segbench-results/post-read-flag.md`: in-sample 10 of 21 poor readings caught with 3 false alarms in
+/// 75; cross-validated, the estimate for new pages, 46% caught at 5.8% false alarms, 87 in 1,500 pooled over repeats;
+/// on the capture ladder's damaged photographs 179 of 231 with 7 in 249). No other
 /// reader is flagged: disagreement with Vision did not hold the ceiling on damaged photographs, and no route returns
 /// token probabilities. UI only (the run summary and the history); nothing is written to a file.
 struct ReadQualityFlag: Codable, Equatable, Sendable {
