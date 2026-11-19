@@ -137,9 +137,19 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
 - **Where.** Process Files' automatic dating route, for a file tagged where it already is (the pre-OCRed route,
   output = source), from its folder's container file, read and never written. A new output is not dated by it: its
   name was never in the runs, it would sort into another batch's run, and collection organisation renames and moves
-  it. Its `Date evidence:` line is `folder; from <the run's first file>; "<the date>"` (`SPEC/tag-format.md`). A date
-  confirmed after the run dates nothing already written (`W47.ct-folder-date-reader`); Live Capture and the manual
-  tagging modes do not take it yet (`W47.ct-folder-date-live`).
+  it. Its `Date evidence:` line is `folder; from <the run's first file>; "<the date>"` (`SPEC/tag-format.md`). The
+  manual tagging modes' auto-date (the tagging sheet and the manual segment card) take it the same way, on the same
+  files, into the date they fill; the sheet puts no cover's year into a card's own date (its Sent With carries it),
+  so there an enclosure takes the folder's. A date confirmed after the run dates nothing already written
+  (`W47.ct-folder-date-reader`).
+- **Live Capture** (`W47.ct-folder-date-live`). A document's run is the session's own: it is in the folder run of the
+  last box or folder marker captured before it, where that marker is a folder whose card the user saved with a date
+  (Save makes every value `user`); a box ends it. Documents are tagged as they stage, before any file name exists, so
+  the session's markers, not a container file, decide it: a run already in the collection folder chosen at Finish
+  dates none of the session's documents. A card saved after a document was tagged re-dates it at Finish (no call),
+  where its staged output is regenerated, reviewed or not; a re-date never takes a folder date away (a marker filed
+  by an earlier Finish, or its photo deleted, does not end the run). The evidence line names the folder (`folder; from the
+  folder; "<the date>"`), as the folder photo's filed name is not known until Finish. The phone's date wins.
 
 ## The container file
 

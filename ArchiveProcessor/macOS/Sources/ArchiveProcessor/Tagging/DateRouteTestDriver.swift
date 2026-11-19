@@ -837,6 +837,62 @@ enum DateRouteTestDriver {
               && card.manualSegDraftTags.standingDating?.evidenceClass == DateRoute.EvidenceClass.none)
         card.manualSegDraftTags.year = "1950"
         check("5 card: a typed date carries none of the route's evidence", card.manualSegDraftTags.standingDating == nil)
+
+        // W47.ct-folder-date-live: the sheet and the card on files tagged in place, in the folder runs of part 3.
+        wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
+        let (ms, _, _) = processor(gateway: gw, out: "sheetfolder")
+        let msDir = tmp.appendingPathComponent("sheetfolder", isDirectory: true)
+        let msPDFs = markers.map { msDir.appendingPathComponent("\($0).pdf") }
+        ms.jobs = ms.jobs.enumerated().map { i, job in
+            var inPlace = OCRJob(sourceURL: msPDFs[i])
+            inPlace.result = job.result
+            inPlace.classification = job.classification
+            return inPlace
+        }
+        ms.outputURLMap = Dictionary(uniqueKeysWithValues: msPDFs.map { ($0, $0) })
+        ms.rebuildSegments(files: msPDFs)
+        let (msContainer, msBefore) = withFolderRuns(msDir)
+        let msRun = Task {
+            await ms.performManualTaggingPhase(mode: .autoDate, provider: .gemini, model: route.model,
+                                               thinkingLevel: nil, apiKey: "", outputDirectory: msDir,
+                                               enableSegmentJSON: true)
+        }
+        var msFilled = false
+        for _ in 0..<400 {
+            if ms.awaitingManualTagging, ms.manualTagSegments.count == 5,
+               ms.manualTagSegments.allSatisfy({ !$0.dateLoading }) { msFilled = true; break }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+        let msCards = ms.manualTagSegments
+        if msFilled, msCards.count == 5 {
+            check("5 sheet, in place: B and C, undated of their own, take the confirmed folder's 1966 with Date Uncertain",
+                  msCards[2].year == "1966" && msCards[2].dateUncertain && msCards[3].year == "1966"
+                  && msCards[3].dateUncertain && msCards[3].standingDating?.evidenceClass == .folder,
+                  "\(msCards.map(\.year))")
+            check("5 sheet, in place: A's text year stands; E and D, in the run whose date nobody confirmed, take none",
+                  msCards[0].year == "1947" && msCards[1].year.isEmpty && msCards[4].year.isEmpty, "\(msCards.map(\.year))")
+        } else {
+            check("5 sheet, in place: five cards dated", false, "\(msFilled) \(msCards.count)")
+        }
+        ms.finishManualTagging()
+        await msRun.value
+        let msC = applied(ms, msPDFs[3])
+        check("5 sheet, in place: C written as 1966 with Date Uncertain", msC.contains("1966") && msC.contains("Date Uncertain")
+              && ((try? MacOSTagger.readTags(from: msPDFs[3])) ?? []).contains("1966"), "\(msC)")
+        ms.manualSegAutoDate = true
+        ms.manualSegModel = route.model
+        ms.manualSegProvider = .gemini
+        ms.manualSegApiKey = ""
+        ms.manualSegImages = msPDFs.enumerated().map {
+            ManualSegImage(fileIndex: $0, url: $1, rotationDegrees: 0, kind: .document)
+        }
+        ms.manualSegDraftTags = SegmentTagData()
+        await ms.fetchManualSegDate(forIndices: [3])
+        check("5 card, in place: C takes the confirmed folder's 1966 with Date Uncertain",
+              ms.manualSegDraftTags.year == "1966" && ms.manualSegDraftTags.dateUncertain
+              && ms.manualSegDraftTags.standingDating?.evidenceClass == .folder, "\(ms.manualSegDraftTags.year)")
+        check("5 in place: the container file is read, never written",
+              msBefore != nil && (try? Data(contentsOf: msContainer)) == msBefore)
     }
 
     // MARK: 6. Live Capture
@@ -971,6 +1027,75 @@ enum DateRouteTestDriver {
         } else {
             check("6 Live: B's source page is on disk", false)
         }
+
+        // W47.ct-folder-date-live: a folder whose card is saved before its documents · G, undated of its own · H, its
+        // date in the text · a second folder whose card is saved only after K, undated, was tagged · a box (its card
+        // dated by the user too) and L, undated, after it. Through the real ingest, the marker card's Save and Finish.
+        let staging2 = tmp.appendingPathComponent("APStaging-folder", isDirectory: true)
+        try? fm.createDirectory(at: staging2, withIntermediateDirectories: true)
+        let f = CaptureSession()
+        f._recoveryTestBeginLive(config: cfg, stagingDir: staging2)
+        f.liveProcessor._entityTestSetSettings([:])
+        func fStaged(_ gid: String) -> LiveCaptureProcessor.StagedSegment? { f.liveProcessor.staged.first { $0.groupId == gid } }
+        func fTags(_ gid: String) -> [String] { fStaged(gid)?.pdfURLs.first.flatMap { try? MacOSTagger.readTags(from: $0) } ?? [] }
+        func fDating(_ gid: String) -> [String: Any]? { json(fStaged(gid)?.jsonURL)["dating"] as? [String: Any] }
+        func fEvidence(_ gid: String) -> String? {
+            guard let pdf = fStaged(gid)?.pdfURLs.first, let doc = PDFDocument(url: pdf), let page = doc.page(at: 1) else { return nil }
+            return PDFHeaderParser.parse(page).header?.dateEvidence
+        }
+        var seq = 0
+        func capture(_ gid: String, _ type: CaptureGroupType, _ text: String) async -> Bool {
+            seq += 1
+            let page = tmp.appendingPathComponent("folder-\(gid).jpg")
+            writeJPEG(page, width: 300 + seq)
+            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: text, classification: nil, errorMessage: nil,
+                                                                  errorCode: nil)
+            _ = f.ingest(jpeg: (try? Data(contentsOf: page)) ?? Data(), groupId: gid, seq: seq, type: type,
+                         quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+            if type == .document { f.liveProcessor.segmentResolved(groupId: gid) }
+            let done = await settle { fStaged(gid) != nil }
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+            return done
+        }
+        func save(_ gid: String, _ date: String) -> Bool {
+            f.applyContainerFields(groupId: gid, fields: ContainerFieldSet([.date: ContainerValue(date, source: .user)]))
+        }
+        var captured = await capture("F1", .folder, "FOLDER 3")
+        captured = save("F1", "1965-1967") && captured
+        for (gid, type, text) in [("G", CaptureGroupType.document, "DOCC Note to the files"),
+                                  ("H", .document, "DOCA Washington\nMarch 3, 1947\nDear Mr. Hale:"),
+                                  ("F2", .folder, "FOLDER 4"), ("K", .document, "DOCC Note to the files"),
+                                  ("X", .box, "BOX 7"), ("L", .document, "DOCC Note to the files")] {
+            captured = await capture(gid, type, text) && captured
+        }
+        check("6 Live folder: every marker and document stages", captured, "\(f.liveProcessor.staged.map(\.groupId))")
+        let g = fTags("G")
+        check("6 Live folder G: an undated document after a saved folder card takes its mid-point 1966, Date Uncertain",
+              g.contains("1966") && g.contains("Date Uncertain") && fDating("G")?["class"] as? String == "folder"
+              && fDating("G")?["folder_date"] as? String == "1965-1967"
+              && fEvidence("G") == "folder; from the folder; \"1965-1967\"", "\(g) \(String(describing: fEvidence("G")))")
+        let h = fTags("H")
+        check("6 Live folder H: its own text year wins", h.contains("1947") && !h.contains("1966")
+              && !h.contains("Date Uncertain"), "\(h)")
+        check("6 Live folder K: tagged before its folder's card was saved, no folder date yet",
+              !fTags("K").contains("1970") && fDating("K")?["class"] as? String == "none", "\(fTags("K"))")
+        let finishCalls = wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields + wire.tagging }
+        let saved = save("F2", "Feb. 1970") && save("X", "1980")
+        f.liveProcessor.finishSession()
+        if f.liveProcessor.showRotationReview { f.liveProcessor.applyRotationReviewAndFinalize() }
+        let finished = await settle { !f.liveProcessor.isFinalizing && fTags("K").contains("1970") }
+        let k = fTags("K")
+        check("6 Live folder K: Finish re-dates it from the card saved later: 1970, its month, no Date Uncertain",
+              saved && finished && k.contains("1970") && k.contains("2 February") && !k.contains("Date Uncertain")
+              && fDating("K")?["class"] as? String == "folder" && fEvidence("K") == "folder; from the folder; \"Feb. 1970\""
+              && f.liveProcessor._datingTestRetained("K")?.evidenceClass == .folder, "\(k)")
+        let l = fTags("L")
+        check("6 Live folder L: after a box, no folder date, and a box's date dates nothing",
+              !l.contains("1970") && !l.contains("1980") && l.contains("Date Uncertain")
+              && fDating("L")?["class"] as? String == "none", "\(l)")
+        check("6 Live folder: G and H unchanged at Finish, and Finish made no call",
+              fTags("G") == g && fTags("H") == h
+              && wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields + wire.tagging } == finishCalls)
     }
 }
 #endif

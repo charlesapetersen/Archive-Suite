@@ -671,6 +671,9 @@ extension OCRProcessor {
         // (its own text, the neighbouring documents, its first page images); nil for a document with no text.
         let jobBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
         var work: [(idx: Int, input: DateRoute.Input?)] = []
+        // W47.ct-folder-date-live: each dated card's folder run's confirmed date, step 3b, as Process Files takes it.
+        var runsByFolder: [URL: [ContainerRun]] = [:]
+        var folderDates: [Int: ContainerFolderDate] = [:]
         for idx in manualTagSegments.indices {
             let segIndex = manualTagSegments[idx].segmentIndex
             guard segIndex < segments.count else { continue }
@@ -678,7 +681,9 @@ extension OCRProcessor {
                 manualTagSegments[idx].dateLoading = false
                 continue
             }
-            work.append((idx, datingInput(for: segIndex, in: segments, jobBySource: jobBySource)))
+            let input = datingInput(for: segIndex, in: segments, jobBySource: jobBySource)
+            if input != nil { folderDates[idx] = confirmedFolderDate(for: segments[segIndex], runsByFolder: &runsByFolder) }
+            work.append((idx, input))
         }
         guard !work.isEmpty else { return }
         let backend = DateRoute.Backend(provider: provider, model: model, apiKey: apiKey, gateway: currentGateway,
@@ -708,7 +713,8 @@ extension OCRProcessor {
                     // been typed there — never a month or day beside a year the user typed meanwhile.
                     if manualTagSegments[idx].dateComponents == TypedDateTags.Components(),
                        !manualTagSegments[idx].dateTextUnreadable {
-                        if let decision {
+                        if var decision {
+                            if let folder = folderDates[idx] { decision.inherit(fromFolder: folder) }
                             manualTagSegments[idx].setDate(fromRoute: decision)
                         } else {
                             manualTagSegments[idx].dateUncertain = true
@@ -1082,6 +1088,11 @@ extension OCRProcessor {
                                 pages: Array(pages.prefix(DateRoute.imagePages))),
                 backend: backend, imageEveryDocument: imageEveryDocument)
             manualSegDateFetching = false
+            // W47.ct-folder-date-live: then the folder run's confirmed date, step 3b, as Process Files takes it.
+            var runsByFolder: [URL: [ContainerRun]] = [:]
+            if let folder = confirmedFolderDate(for: segment, runsByFolder: &runsByFolder) {
+                decision?.inherit(fromFolder: folder)
+            }
         }
 
         guard !Task.isCancelled else { return }
@@ -1094,6 +1105,20 @@ extension OCRProcessor {
         } else {
             manualSegDraftTags.dateUncertain = true
         }
+    }
+    /// W47.ct-folder-date: the confirmed date of the folder run `segment` falls in, from the container file of its folder
+    /// (`ContainerFolderDate.confirmed`; each folder's file read once through `runsByFolder`, never written). Only for a
+    /// file tagged where it already is (the pre-OCRed route, output = source), whose name the runs were set on: a new
+    /// output written into a folder with runs would sort into another batch's run, and collection organisation renames
+    /// and moves it. Process Files and both manual tagging modes (W47.ct-folder-date-live) take it the same way.
+    func confirmedFolderDate(for segment: DocumentSegment,
+                             runsByFolder: inout [URL: [ContainerRun]]) -> ContainerFolderDate? {
+        guard let first = segment.pdfURLs.first, let output = outputURLMap[first],
+              output.standardizedFileURL == first.standardizedFileURL else { return nil }
+        let folder = output.deletingLastPathComponent().standardizedFileURL
+        let runs = runsByFolder[folder] ?? ContainerFileStore.load(directory: folder).document?.runs ?? []
+        runsByFolder[folder] = runs
+        return ContainerFolderDate.confirmed(at: output.lastPathComponent, in: runs)
     }
     func performTaggingPhase(
         provider: LLMProvider,
@@ -1130,19 +1155,10 @@ extension OCRProcessor {
         let datingInputs: [DateRoute.Input?] = (0..<total).map {
             datingInput(for: $0, in: snapshot, jobBySource: jobBySource)
         }
-        // W47.ct-folder-date: the confirmed date of the folder run each dated segment falls in, from the container file
-        // of its folder (`ContainerFolderDate.confirmed`; each folder's file read once). Only for a file tagged where it
-        // already is (the pre-OCRed route, output = source), whose name the runs were set on: a new output written into
-        // a folder with runs would sort into another batch's run, and collection organisation renames and moves it.
+        // W47.ct-folder-date: the confirmed date of the folder run each dated segment falls in.
         var runsByFolder: [URL: [ContainerRun]] = [:]
-        var folderDates: [ContainerFolderDate?] = Array(repeating: nil, count: total)
-        for i in 0..<total where datingInputs[i] != nil {
-            guard let first = snapshot[i].pdfURLs.first, let output = outputURLMap[first],
-                  output.standardizedFileURL == first.standardizedFileURL else { continue }
-            let folder = output.deletingLastPathComponent().standardizedFileURL
-            let runs = runsByFolder[folder] ?? ContainerFileStore.load(directory: folder).document?.runs ?? []
-            runsByFolder[folder] = runs
-            folderDates[i] = ContainerFolderDate.confirmed(at: output.lastPathComponent, in: runs)
+        let folderDates: [ContainerFolderDate?] = (0..<total).map { i in
+            datingInputs[i] == nil ? nil : confirmedFolderDate(for: snapshot[i], runsByFolder: &runsByFolder)
         }
         // W47.item-fields-build: every page's text and image, for the item-field call where it runs on this backend.
         let itemFieldGateway = ItemFieldPolicy.skipReason(gateway: gateway, localAgent: localAgent,

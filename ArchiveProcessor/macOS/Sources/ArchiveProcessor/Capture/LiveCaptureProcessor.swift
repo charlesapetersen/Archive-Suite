@@ -1231,22 +1231,19 @@ final class LiveCaptureProcessor: ObservableObject {
         guard clearGeneration == startedGeneration else { return }
         // W46.date-route-other-paths — the dating route replaces the tagging call's date, as in Process Files, on a
         // document the tagging call dated here and whose phone (or Mac card) gives no year. Same B8 cover as above.
-        let dating = humanOnly ? nil
+        let routeDating = humanOnly ? nil
             : await liveDating(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
-        dating?.apply(to: &tags)
         // W47.item-fields-build — the item-field call, on the measured route only. Same B8 cover as above.
         let itemFields = humanOnly ? nil
             : await liveItemFields(group: group, segment: segment, results: results, tags: tags, mac: mac,
                                    config: config)
         guard clearGeneration == startedGeneration else { return }
-        // Phone's in-the-room date wins (Mac override beats the phone value).
-        if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
-        if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m) {
-            tags.month = mt
-        }
-        // A saved Mac tag card is the operator's explicit Quality decision, including 0/unrated.
-        // The phone's Q input is only the default when the card was skipped.
-        if let mac { tags.quality = mac.quality }
+        // W47.ct-folder-date-live — then, after the last call, the confirmed date of the folder run it is in (step 3b).
+        // A card saved later re-dates it at Finish (`redateFromFolders`), from the tags kept here before any dating.
+        var folderDated = routeDating
+        if let folder = liveFolderDate(for: groupId) { folderDated?.inherit(fromFolder: folder) }
+        let dating = folderDated, preDatingTags = tags
+        tags = Self.datedTags(preDatingTags, dating: dating, mac: mac, group: group)
         let untaggedContainer = humanOnly && group.type != .document
 
         // Snapshot Sendable per-page work for the off-main file writes.
@@ -1329,7 +1326,8 @@ final class LiveCaptureProcessor: ObservableObject {
             outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
             exportedImageMB: exportedImageMB, textColumns: textColumns,
             taggingMode: taggingMode,
-            stampUnread: stampUnread, textLayer: textLayer)
+            stampUnread: stampUnread, textLayer: textLayer,
+            routeDating: routeDating, preDatingTags: routeDating == nil ? nil : preDatingTags)
         persistManifest()
         if let containerRead { session.setContainerRead(groupId: groupId, read: containerRead) }
         for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
@@ -1489,6 +1487,61 @@ final class LiveCaptureProcessor: ObservableObject {
                                    backend: backend, imageEveryDocument: imageEveryDocument)
     }
 
+    /// W47.ct-folder-date-live — the confirmed date of the folder run a Live document is in, by the rule Process Files
+    /// follows (`ContainerFolderDate.confirmed`, `SPEC/containers.md` §The folder-date rule): the session's last box or
+    /// folder marker before the document in capture order, where it is a folder whose card the user saved with a date
+    /// (source `user`). A box ends the folder run (§Runs), so a box, or no marker, dates nothing. At Finish the run
+    /// starts at the folder photo's filed PDF, a name not known while the session runs, so the evidence names the folder.
+    private func liveFolderDate(for groupId: String) -> ContainerFolderDate? {
+        guard let doc = session.groups.first(where: { $0.id == groupId }), doc.type == .document,
+              let marker = session.groups.filter({ $0.type != .document && $0.order < doc.order })
+                .max(by: { $0.order < $1.order }),
+              marker.type == .folder, let fields = session.containerFields[marker.id] else { return nil }
+        return ContainerFolderDate.confirmed(at: "", in: [ContainerRun(start: "", level: .folder, fields: fields)])
+    }
+
+    /// A document's tags with its date: the dating decision over the tags before any dating, then the phone's
+    /// in-the-room date (a Mac card's beats the phone's), which wins over all; a decade takes no month
+    /// (`SPEC/tag-format.md`). A saved Mac tag card is the operator's explicit Quality decision, including 0/unrated;
+    /// the phone's Q input is only the default when the card was skipped. One function, so staging and Finish's
+    /// re-date (`redateFromFolders`) cannot come apart.
+    private static func datedTags(_ preDating: GeneratedTags, dating: DateRoute.Decision?, mac: MacSegmentTags?,
+                                  group: CaptureGroup) -> GeneratedTags {
+        var tags = preDating
+        dating?.apply(to: &tags)
+        if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
+        if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m), tags.year?.hasSuffix("s") != true {
+            tags.month = mt
+        }
+        if let mac { tags.quality = mac.quality }
+        return tags
+    }
+
+    /// W47.ct-folder-date-live — at Finish, every staged document whose folder date has changed since it was tagged (a
+    /// folder card saved after it) takes the decision it would take now, with its tags and sidecar tags, and is added
+    /// to `changed` for regeneration. Only a document the route dated (`routeDating`), whose source photos are still on
+    /// disk (as the rotation review's regeneration requires), and whose group is still in the session. No call is made.
+    private func redateFromFolders(into changed: inout Set<String>) {
+        let fm = FileManager.default
+        for gid in Array(retained.keys) {
+            guard var seg = retained[gid], let routeDating = seg.routeDating, let preDating = seg.preDatingTags,
+                  let group = session.groups.first(where: { $0.id == gid }) else { continue }
+            var want = routeDating
+            if let folder = liveFolderDate(for: gid) { want.inherit(fromFolder: folder) }
+            // Never take a folder date away: a marker filed by an earlier Finish, or its photo deleted, leaves the
+            // session's groups but not the run (SPEC §Runs: removing the label photo does not move the run).
+            guard want != seg.dating, want.evidenceClass == .folder || seg.dating?.evidenceClass != .folder,
+                  seg.pages.allSatisfy({ fm.fileExists(atPath: $0.sourceURL.path) }) else { continue }
+            let tags = Self.datedTags(preDating, dating: want, mac: session.macTags[gid], group: group)
+            seg.dating = want
+            seg.baseTags = tags.allTags
+            seg.jsonTags.year = tags.year; seg.jsonTags.month = tags.month; seg.jsonTags.day = tags.day
+            seg.jsonTags.dateUncertain = tags.dateUncertain
+            retained[gid] = seg
+            changed.insert(gid)
+        }
+    }
+
     /// W47.item-fields-build — the item-field call for a document the tagging call read here (automatic mode, not
     /// Mac-tagged, a reply that is not a failure), with sidecars on (its only output so far), on the measured route
     /// only, as in Process Files: every page's text and image at its run rotation. nil = no `item_fields` object.
@@ -1529,20 +1582,20 @@ final class LiveCaptureProcessor: ObservableObject {
         let type: CaptureGroupType
         let order: Int
         var pages: [PageWork]        // var: page rotation is updated before regeneration
-        let baseTags: [String]
+        var baseTags: [String]       // var: a folder's date re-dates a document at Finish (W47.ct-folder-date-live)
         let doMerge: Bool
         let model: LLMModel
         let gatewayName: String?
         let localAgentDisplayName: String?
         let localAgentModelName: String?
         let writeJSON: Bool
-        let jsonTags: GeneratedTags
+        var jsonTags: GeneratedTags
         /// W46.ent-feature-live — the names written into the sidecar, kept so a regenerated sidecar carries them
         /// without a second call. nil when the feature did not run (and in a manifest written before it).
         let entities: EntityResult?
         /// W46.date-route-other-paths — the dating route's decision, kept so a regenerated segment writes the same
         /// sidecar `dating` object and header line without a second call. nil when the route did not run.
-        let dating: DateRoute.Decision?
+        var dating: DateRoute.Decision?
         /// W47.item-fields-build — the item fields written into the sidecar, kept so a regenerated sidecar carries
         /// them without a second call. nil when the call did not run.
         let itemFields: ItemFieldResult?
@@ -1559,6 +1612,11 @@ final class LiveCaptureProcessor: ObservableObject {
         /// W42.int-s5 — the image page's switches (straighten, hand placement) as they were at staging, so a rotation
         /// regeneration writes the same kind of page. nil in a manifest written before them: the built-in defaults.
         let textLayer: PDFGenerator.TextLayerOptions?
+        /// W47.ct-folder-date-live — the route's own decision, before any folder date, and the tags before any dating
+        /// (the tagging call's), so Finish can re-date the document from a folder card saved after it was tagged
+        /// (`redateFromFolders`). nil where the route did not run, and in a manifest written before them.
+        var routeDating: DateRoute.Decision?
+        var preDatingTags: GeneratedTags?
 
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, order: Int,
@@ -1569,7 +1627,8 @@ final class LiveCaptureProcessor: ObservableObject {
              boxLabelText: String?,
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
-             stampUnread: Bool, textLayer: PDFGenerator.TextLayerOptions? = nil) {
+             stampUnread: Bool, textLayer: PDFGenerator.TextLayerOptions? = nil,
+             routeDating: DateRoute.Decision? = nil, preDatingTags: GeneratedTags? = nil) {
             self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName
@@ -1581,6 +1640,7 @@ final class LiveCaptureProcessor: ObservableObject {
             self.taggingMode = taggingMode
             self.stampUnread = stampUnread
             self.textLayer = textLayer
+            self.routeDating = routeDating; self.preDatingTags = preDatingTags
         }
     }
 
@@ -2081,7 +2141,8 @@ final class LiveCaptureProcessor: ObservableObject {
     func finishSession() {
         guard !stagingManifestBlocked, !staged.isEmpty else { return }
         let wantReview = UserDefaults.standard.bool(forKey: DefaultsKeys.reviewRotation)
-        guard wantReview else { beginFinalize(); return }
+        // W47.ct-folder-date-live: with no review, still through the regeneration pass, for a folder's re-date.
+        guard wantReview else { applyRotationReviewAndFinalize(); return }
         var pages: [RotationReviewPage] = []
         for seg in retained.values {
             for (i, p) in seg.pages.enumerated() {
@@ -2091,7 +2152,7 @@ final class LiveCaptureProcessor: ObservableObject {
             }
         }
         pages.sort { ($0.order, $0.pageIndex) < ($1.order, $1.pageIndex) }
-        guard !pages.isEmpty else { beginFinalize(); return }
+        guard !pages.isEmpty else { applyRotationReviewAndFinalize(); return }
         rotationReviewPages = pages
         showRotationReview = true
     }
@@ -2103,7 +2164,8 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// Apply the reviewed rotations: regenerate each changed segment's staged PDF/JPG, then proceed
-    /// to collection naming. Unchanged pages are left untouched.
+    /// to collection naming. Unchanged pages are left untouched. W47.ct-folder-date-live: every Finish passes here,
+    /// reviewed or not, so a document whose folder card was saved after it was tagged is re-dated and regenerated too.
     func applyRotationReviewAndFinalize() {
         guard !stagingManifestBlocked else { return }
         showRotationReview = false
@@ -2126,6 +2188,7 @@ final class LiveCaptureProcessor: ObservableObject {
             changedGroups.insert(page.groupId)
         }
         rotationReviewPages = []
+        if stagingDir != nil { redateFromFolders(into: &changedGroups) }   // recorded only where it is also written
         // Only regenerate segments whose source photos ALL still exist on disk. Regenerating from a
         // missing source (e.g. the operator hit "Clear" before Finish, deleting the originals) would
         // overwrite good staged output with an image-less/broken file — so keep the existing output.
