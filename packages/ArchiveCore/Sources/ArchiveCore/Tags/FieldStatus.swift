@@ -83,6 +83,13 @@ public enum FieldStatusPolicy {
                            measured: "Not measured as an item field.")
     }
 
+    /// A page-2 item field whose value the user set in the Reader (`UserItemFields`): checked, as a container value
+    /// the user set is. `pageValue` is what page 2 reads, nil when it has none.
+    public static func userItemField(pageValue: String?) -> FieldStatus {
+        let source = pageValue.map { "Set by the user; page 2 reads “\($0)”" } ?? "Set by the user; page 2 has none"
+        return FieldStatus(level: .checked, source: source, measured: "")
+    }
+
     /// The item's own date, from its tags. `evidence` is the page-2 `Date evidence:` line, which the Processor's
     /// dating route writes for a year not explicit in the document's text; with none, the date is explicit in the
     /// text or its source was not recorded (a hand-set tag writes no line). No class of the route clears the rule

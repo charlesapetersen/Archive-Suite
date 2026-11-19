@@ -16,6 +16,9 @@ public struct ZoteroSource: Equatable, Sendable {
     /// The page-2 header's item fields; the sidecar's fill what the header lacks.
     public var itemFields = PDFItemFields()
     public var sidecar: ZoteroSidecar?
+    /// The user's own item-field values (`UserItemFields`, W40.reader-item-field-edit): each replaces the header's and
+    /// the sidecar's; "" says the document has none.
+    public var userItemFields: [CheckableField: String] = [:]
     /// The container as the apps show it (`ContainerDisplay.values`).
     public var container: [ContainerField: String] = [:]
     /// A link back to the document (Notes' `archivereader://` source link), sent as `URL`.
@@ -38,6 +41,9 @@ public struct ZoteroSource: Equatable, Sendable {
         source.tags = TagReading.readTags(pdf)
         source.itemFields = headerItemFields(pdf: pdf)
         source.sidecar = ZoteroSidecar.read(pdf: pdf)
+        let folder = pdf.deletingLastPathComponent().resolvingSymlinksInPath()
+        source.userItemFields = ContainerFileStore.loadItemFields(directory: folder).document?
+            .values(for: pdf.lastPathComponent) ?? [:]
         if let lookup { source.container = lookup.shown(for: pdf).mapValues(\.text) }
         return source
     }
@@ -98,9 +104,9 @@ public enum ZoteroExport {
     }
 
     /// The item-field kinds (SPEC tag-format §Item fields).
-    static let kinds: Set<String> = ["letter", "memo", "telegram", "newspaper article", "magazine article",
-                                     "journal article", "newsletter", "clipping", "report", "speech", "press release",
-                                     "photograph", "other"]
+    public static let kinds: Set<String> = ["letter", "memo", "telegram", "newspaper article", "magazine article",
+                                            "journal article", "newsletter", "clipping", "report", "speech",
+                                            "press release", "photograph", "other"]
 
     /// Workflow tags that are not subjects of the document.
     static let notSubjects: Set<String> = [DocumentTags.poorOCRTag.lowercased(), "ocr failed"]
@@ -108,9 +114,11 @@ public enum ZoteroExport {
     /// The CSL-JSON item for `source`. `id` is the file name, unique within one export (`export` numbers repeats).
     public static func item(_ source: ZoteroSource, id: String? = nil) -> [String: Any] {
         let side = source.sidecar ?? ZoteroSidecar()
-        let fields = merged(source.itemFields, side.itemFields)
-        // The tagging call's format stands in for a kind only where it names one exactly.
-        let kind = fields.documentKind ?? side.format.map { $0.lowercased() }.flatMap { kinds.contains($0) ? $0 : nil }
+        let fields = UserItemFields.applied(source.userItemFields, to: merged(source.itemFields, side.itemFields))
+        // The tagging call's format stands in for a kind only where it names one exactly, and not where the user said
+        // the document has none.
+        let formatKind = source.userItemFields[.documentKind] != nil ? nil : side.format
+        let kind = fields.documentKind ?? formatKind.map { $0.lowercased() }.flatMap { kinds.contains($0) ? $0 : nil }
         let map = typeMap(kind: kind, format: side.format)
         var item: [String: Any] = ["id": id ?? source.fileName, "type": map.csl]
         var extra: [String] = []

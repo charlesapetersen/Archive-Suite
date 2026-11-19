@@ -4,7 +4,8 @@ import Darwin
 // MARK: - Reading and writing the container file and the level map (W47.ct-spec, Tier-2)
 //
 // A new write class in the corpus (`SPEC/containers.md` §File safety): only `<directory>/.archivesuite/containers.json`
-// and `<root>/.archivesuite/container-levels.json` and `container-names.json` are ever written, through a temporary file in `.archivesuite`
+// and `item-fields.json` (the user's item-field values, `UserItemFields`) and `<root>/.archivesuite/container-levels.json`
+// and `container-names.json` are ever written, through a temporary file in `.archivesuite`
 // renamed over the old one. Every step after opening `.archivesuite` goes through its file descriptor (`openat`,
 // `renameatx_np`, `unlinkat`), so a link swapped in for it or for the document cannot send a write elsewhere. Writers
 // hold `flock` on that descriptor from the check to the rename, so two apps never overwrite each other unnoticed.
@@ -147,7 +148,7 @@ public enum ContainerFileStore {
     private enum SuiteFolderError: Error { case missing, notOrdinary(String), io(String, Int32) }
 
     /// Reads one document. A linked or misshapen directory or `.archivesuite` reads as unreadable, not as missing.
-    private static func load<D: Codable & Equatable & Sendable>(_ directory: URL, _ name: String,
+    static func load<D: Codable & Equatable & Sendable>(_ directory: URL, _ name: String,
                                                                version: Int) -> ContainerLoad<D> {
         switch openSuiteFolder(directory, create: false) {
         case .success(let sfd):
