@@ -258,11 +258,11 @@ enum DateRouteTestDriver {
         let stampOnly = DateRoute.readImage(#"{"dates": [{"quote": "RECEIVED MAY 2 1960", "page": 1, "where": "stamp", "kind": "stamped", "year": 1960, "month": 5}], "document_date": null}"#)
         let byStamp = DateRoute.decide(text: memo, near: near, traceRaw: #"{"year": 1957, "lo": 1956, "hi": 1958, "date_uncertain": true, "evidence": {"neighbour": "P1", "quote": "June 2, 1957"}}"#,
                                        image: stampOnly, imageNote: DateRoute.imageSent)
-        var t7 = GeneratedTags(year: "1960", month: "5 May", day: "Day 2")
+        var t7 = GeneratedTags(year: "1958", month: "1 January", day: "Day 9")
         byStamp.apply(to: &t7)
         let so = byStamp.with(measured: true).sidecarObject()
-        check("2 stamp: the stamp's year over the estimate, Date Uncertain, no month or day; its quote in the sidecar and header",
-              t7.year == "1960" && t7.dateUncertain && t7.month == nil && t7.day == nil && byStamp.evidenceClass == .stamp
+        check("2 stamp: the stamp's year over the estimate, Date Uncertain, its month and day; its quote in the sidecar and header",
+              t7.year == "1960" && t7.dateUncertain && t7.month == "5 May" && t7.day == "Day 2" && byStamp.evidenceClass == .stamp
               && so["class"] as? String == "stamp" && so["quote"] as? String == "RECEIVED MAY 2 1960"
               && so["where"] as? String == "stamp" && so["page"] as? Int == 1 && so["interval_90"] == nil
               && byStamp.with(measured: true).headerEvidence == "stamp; page 1; stamp; \"RECEIVED MAY 2 1960\"",

@@ -2759,8 +2759,8 @@
    },
    "route": {
     "year": 1960,
-    "month": null,
-    "day": null,
+    "month": 5,
+    "day": 2,
     "cls": "stamp",
     "step": 2,
     "du": true
@@ -2857,8 +2857,163 @@
    },
    "route": {
     "year": 1961,
+    "month": 4,
+    "day": 4,
+    "cls": "stamp",
+    "step": 2,
+    "du": true
+   }
+  }
+ },
+ {
+  "id": "stamp-own-date-month-disagrees",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [
+    {
+     "label": "P1",
+     "dist": 1,
+     "text": "Office memo\n12/4/58\nPlease file."
+    },
+    {
+     "label": "P2",
+     "dist": 2,
+     "text": "A letter of\nJune 2, 1957\nregarding the {near} plan"
+    },
+    {
+     "label": "N1",
+     "dist": -1,
+     "text": "No date here at all."
+    }
+   ],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"RECEIVED MAR 30 1961\", \"page\": 1, \"where\": \"stamp\", \"kind\": \"stamped\", \"year\": 1961}], \"document_date\": {\"year\": 1961, \"month\": 4, \"quote\": \"RECEIVED MAR 30 1961\"}}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n[P2]\nA letter of\nJune 2, 1957\nregarding the {near} plan\n---\n[P1]\nOffice memo\n12/4/58\nPlease file.\n---\n[N1]\nNo date here at all.\n---\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n[P2] 1957 (\"June 2, 1957\")\n[P1] 1958 (\"12/4/58\")\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": 1961,
+    "stamps": 1
+   },
+   "route": {
+    "year": 1961,
     "month": null,
     "day": null,
+    "cls": "stamp",
+    "step": 2,
+    "du": true
+   }
+  }
+ },
+ {
+  "id": "stamp-own-date-document-month",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [
+    {
+     "label": "P1",
+     "dist": 1,
+     "text": "Office memo\n12/4/58\nPlease file."
+    },
+    {
+     "label": "P2",
+     "dist": 2,
+     "text": "A letter of\nJune 2, 1957\nregarding the {near} plan"
+    },
+    {
+     "label": "N1",
+     "dist": -1,
+     "text": "No date here at all."
+    }
+   ],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"Rec'd 1968\", \"page\": 1, \"where\": \"stamp\", \"kind\": \"stamped\", \"year\": 1968}], \"document_date\": {\"year\": 1968, \"month\": 4, \"quote\": \"Rec'd 1968\"}}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n[P2]\nA letter of\nJune 2, 1957\nregarding the {near} plan\n---\n[P1]\nOffice memo\n12/4/58\nPlease file.\n---\n[N1]\nNo date here at all.\n---\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n[P2] 1957 (\"June 2, 1957\")\n[P1] 1958 (\"12/4/58\")\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": 1968,
+    "stamps": 1
+   },
+   "route": {
+    "year": 1968,
+    "month": 4,
+    "day": null,
+    "cls": "stamp",
+    "step": 2,
+    "du": true
+   }
+  }
+ },
+ {
+  "id": "stamp-only-one-full-date",
+  "input": {
+   "text": "MEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.",
+   "near": [],
+   "trace_raw": null,
+   "image_raw": "{\"dates\": [{\"quote\": \"POSTMARKED JUN 12 1959\", \"page\": 1, \"where\": \"stamp\", \"kind\": \"stamped\", \"year\": 1959}, {\"quote\": \"the 1955 budget\", \"page\": 1, \"where\": \"body\", \"kind\": \"typed\", \"year\": 1955}], \"document_date\": null}"
+  },
+  "expect": {
+   "candidates": [],
+   "pick": [
+    null,
+    null
+   ],
+   "prompt": "You are dating a document from a historical archive for a scholar who will check your evidence.\n\nThe document's OCR text (id \"self\"):\n---\nMEMORANDUM\nTo: Files\nRe: the budget\n\nThe committee met and agreed on the figures given above.\n---\n\nNearby documents from the same folder, in folder order (P1 is just before this document, N1 just after), each headed by its id:\n(none)\n\n\nDates a rule found printed in the nearby documents (id, year, the line):\n(none found)\n\nGive the year this document was written.\n- If the document prints its own date, use that year and quote the date from \"self\".\n- Otherwise estimate it from the nearby documents: quote the nearby text that carries the year and give that document's id.\n- Give an interval lo to hi that you are 90% sure contains the year (lo = hi when the document prints its date).\n- date_uncertain is true when this document does not print its own year.\n- A quote must be copied exactly from the document you cite and must contain the year. If nothing supports any year, give \"year\": null.\n\nRespond with ONLY a JSON object, for example:\n{\"year\": 1947, \"lo\": 1946, \"hi\": 1948, \"date_uncertain\": true, \"evidence\": {\"neighbour\": \"P1\", \"quote\": \"March 3, 1947\"}}",
+   "trace": {
+    "parsed": false,
+    "year": null,
+    "lo": null,
+    "hi": null,
+    "uncertain": true
+   },
+   "check": [
+    "none",
+    "unparsed"
+   ],
+   "image": {
+    "ok": true,
+    "own": null,
+    "stamps": 1
+   },
+   "route": {
+    "year": 1959,
+    "month": 6,
+    "day": 12,
     "cls": "stamp",
     "step": 2,
     "du": true

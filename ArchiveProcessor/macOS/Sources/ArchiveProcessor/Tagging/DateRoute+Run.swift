@@ -148,10 +148,18 @@ extension DateRoute.Decision {
 
     /// The tags' date fields from the decision. The month and day are written only for a year the document itself gives
     /// (W46.date-full-date): those of the dated form the year rests on, the tagging call's day kept when it read the same
-    /// year and month; with no dated form, the tagging call's month and day when it read the same year.
+    /// year and month; with no dated form, the tagging call's month and day when it read the same year. A stamp's year
+    /// (W46.p16-stamp-own-date, owner 2026-11-18) takes the month and day it is quoted with, and nothing from the
+    /// tagging call.
     func apply(to tags: inout GeneratedTags) {
         let taggerYear = tags.year
         tags.dateUncertain = dateUncertain
+        if let year, evidenceClass == .stamp {
+            tags.year = String(year)
+            tags.month = month.flatMap { GeneratedTags.monthTag($0) }
+            tags.day = tags.month == nil ? nil : day.map { "Day \($0)" }
+            return
+        }
         guard let year, evidenceClass == .text || evidenceClass == .image else {
             tags.year = year.map(String.init)
             tags.month = nil

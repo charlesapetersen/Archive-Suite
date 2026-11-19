@@ -12,11 +12,27 @@
     "id": "o:fb0e9fdd858b7428",
     "set": "owner",
     "truth_y": 1975,
-    "year": 1975,
-    "without_stamp": 1975,
+    "now": {
+     "year": 1975,
+     "month": 7,
+     "day": 31,
+     "du": true,
+     "cls": "stamp"
+    },
+    "before": {
+     "year": 1975,
+     "month": 7,
+     "day": 31,
+     "du": false,
+     "cls": "image"
+    },
     "stamp_quote": "THU JUL 31 1975"
    }
   ],
+  "fired_by_path": {
+   "own date a stamp": 1,
+   "no own date": 0
+  },
   "owner_stamp": {
    "exact": {
     "k": 25,
@@ -83,6 +99,10 @@
    "undated": 0
   },
   "fired": [],
+  "fired_by_path": {
+   "own date a stamp": 0,
+   "no own date": 0
+  },
   "owner_stamp": {
    "exact": {
     "k": 19,

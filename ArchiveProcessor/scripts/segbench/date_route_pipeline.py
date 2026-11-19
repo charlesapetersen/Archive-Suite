@@ -737,6 +737,7 @@ LOOK_ALIKE = str.maketrans({"А": "A", "В": "B", "Е": "E", "К": "K", "М": "M
                             "я": "R", "Я": "R", "ı": "i", "İ": "I", "•": ".", "·": "."})
 DIGIT_ONE = re.compile(r"(?<=\d)[lI|](?=\d|st|nd|rd|th)")     # 1lth -> 11th
 OCR_FORMS = True     # off only to score the route as it was before W46.date-full-date-ocr-forms (date_full_date.py)
+STAMP_STEP = True    # off only to score the route as it was before W46.date-stamp-fallback (date_stamp_fallback.py)
 
 
 def ocr_month(word, near=True):
@@ -863,8 +864,11 @@ def route(doc, trace_raw, image_rec, self_only=False):
     (a received stamp, a postmark), takes that stamp's year with Date Uncertain, ahead of the neighbour estimate (owner,
     2026-11-17: a stamp is better than no date; date-stamp-fallback.md). So does a document whose image pass names a
     stamped date as its own: the stamp dates the stamping, so it is class "stamp" with Date Uncertain, not "image".
-    No month or day: the stamp dates the stamping, not the writing. A covering document's year still wins in the app
-    (step 3a, inherit(fromCover:)), as no step here measures it."""
+    A covering document's year still wins in the app (step 3a, inherit(fromCover:)), as no step here measures it.
+    W46.p16-stamp-own-date (owner, 2026-11-18: a stamp that is the page's only date keeps its month and day, with Date
+    Uncertain set): the stamp's month and day are written as an image date's are, the flag saying the date is the
+    stamping's; on the no-own-date path only where that stamp is the only stamped date the image pass quotes, as the
+    earliest of several is not the page's only date."""
     cands = T.candidates(doc["text"])
     own = {c["year"] for c in cands}
     tr = T.parse_trace(trace_raw)
@@ -897,9 +901,6 @@ def route(doc, trace_raw, image_rec, self_only=False):
         ok, own_y, _ = DU.own_date(image_rec)
         if own_y is not None:
             ev, doc_mo = image_evidence(image_rec, own_y)
-            if ev is not None and is_stamp(ev):     # the page's own date is a stamp: the stamp step, Date Uncertain
-                return {**base, "year": own_y, "du": True, "cls": "stamp", "step": 2, "quote": ev["quote"],
-                        "page": ev["page"], "where": ev["where"]}
             m, d, ocr = with_ocr_forms(dated_in(ev["quote"], own_y) if ev else None, [ev["quote"]] if ev else [], own_y)
             frm = "image ocr form" if ocr else "image"
             if m is not None and doc_mo is not None and doc_mo != m:
@@ -907,11 +908,20 @@ def route(doc, trace_raw, image_rec, self_only=False):
             elif OCR_FORMS and m is None and ev is not None and doc_mo is not None:
                 # W46.date-full-date-ocr-forms: the year is quoted with no dated form; the reply's document month stands
                 m, frm = doc_mo, "image month"
+            if STAMP_STEP and ev is not None and is_stamp(ev):   # the page's own date is a stamp: Date Uncertain
+                return {**base, "year": own_y, "du": True, "cls": "stamp", "step": 2, "month": m, "day": d,
+                        "date_from": ("stamp" + frm[5:]) if m else None, "quote": ev["quote"], "page": ev["page"],
+                        "where": ev["where"]}
             return {**base, "year": own_y, "du": False, "cls": "image", "step": 2, "month": m, "day": d,
                     "date_from": frm if m else None}
-        st = stamp_evidence(image_rec)
+        st = stamp_evidence(image_rec) if STAMP_STEP else None
         if st is not None:
-            return {**base, "year": st["year"], "du": True, "cls": "stamp", "step": 2, "quote": st["quote"],
+            # the month and day only where this stamp is the page's only stamped date (owner: "the page's only date")
+            only = sum(1 for x in DI.read(image_rec)["dates"] if x["written"] and is_stamp(x)) == 1
+            m, d, ocr = with_ocr_forms(dated_in(st["quote"], st["year"]), [st["quote"]], st["year"]) if only else (
+                None, None, False)
+            return {**base, "year": st["year"], "du": True, "cls": "stamp", "step": 2, "month": m, "day": d,
+                    "date_from": ("stamp ocr form" if ocr else "stamp") if m else None, "quote": st["quote"],
                     "page": st["page"], "where": st["where"]}
     if tr["y"] is not None and verdict == "valid":
         return {**base, "year": tr["y"], "du": True, "cls": "estimate", "step": 4}

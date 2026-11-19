@@ -859,11 +859,9 @@ enum DateRoute {
             let ev = image.ownEvidence
             d.quote = ev?.quote; d.page = ev?.page; d.place = ev?.place
             // W46.date-stamp-fallback: a stamped own date dates the stamping, so it is the stamp step, Date Uncertain.
-            if let ev, ev.isStamp {
-                d.year = y; d.dateUncertain = true; d.evidenceClass = .stamp; d.step = 2
-                return d
-            }
-            d.year = y; d.dateUncertain = false; d.evidenceClass = .image; d.step = 2
+            // W46.p16-stamp-own-date (owner, 2026-11-18): it keeps its month and day, read as an image date's are.
+            let stamped = ev?.isStamp == true
+            d.year = y; d.dateUncertain = stamped; d.evidenceClass = stamped ? .stamp : .image; d.step = 2
             // The month and day of the quoted date the year rests on, unless the reply's document month names another.
             // W46.date-full-date-ocr-forms: an OCR-damaged form in the quote counts too, and a quote of the year with no
             // dated form takes the reply's document month.
@@ -876,11 +874,16 @@ enum DateRoute {
             return d
         }
         // W46.date-stamp-fallback: no own date on the page either, but a stamp or postmark: its year, Date Uncertain,
-        // ahead of the neighbour estimate (owner, 2026-11-17; date-stamp-fallback.md). No month or day: the stamp dates
-        // the stamping. A covering document's year still wins (step 3a, `inherit(fromCover:)`).
+        // ahead of the neighbour estimate (owner, 2026-11-17; date-stamp-fallback.md), with the month and day it is
+        // quoted with when it is the only stamp (W46.p16-stamp-own-date, owner 2026-11-18). A covering document's year still wins (step 3a,
+        // `inherit(fromCover:)`).
         if let image, let st = image.stampEvidence, let y = st.year {
             d.year = y; d.dateUncertain = true; d.evidenceClass = .stamp; d.step = 2
             d.quote = st.quote; d.page = st.page; d.place = st.place
+            // Only where it is the page's only stamped date: the earliest of several is not the page's only date.
+            if image.secondRole.count == 1 {
+                (d.month, d.day) = withOCRForms(datedIn(st.quote, year: y), sources: [st.quote], year: y)
+            }
             return d
         }
         if let y = tr.year, check.verdict == "valid" { estimate(y) }

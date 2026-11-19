@@ -185,6 +185,17 @@ def synthetic():
         case("stamp-as-own-date", MEMO, NEAR, None, j(dates=[{"quote": "Rec'd APR 4 1961", "page": 1, "where": "other",
                                                               "kind": "stamped", "year": 1961}],
                                                        document_date={"year": 1961, "month": 4, "quote": "Rec'd APR 4 1961"})),
+        # W46.p16-stamp-own-date: a stamped own date keeps its month and day, read as an image date's are.
+        case("stamp-own-date-month-disagrees", MEMO, NEAR, None, j(
+            dates=[{"quote": "RECEIVED MAR 30 1961", "page": 1, "where": "stamp", "kind": "stamped", "year": 1961}],
+            document_date={"year": 1961, "month": 4, "quote": "RECEIVED MAR 30 1961"})),
+        case("stamp-own-date-document-month", MEMO, NEAR, None, j(
+            dates=[{"quote": "Rec'd 1968", "page": 1, "where": "stamp", "kind": "stamped", "year": 1968}],
+            document_date={"year": 1968, "month": 4, "quote": "Rec'd 1968"})),
+        case("stamp-only-one-full-date", MEMO, [], None, j(
+            dates=[{"quote": "POSTMARKED JUN 12 1959", "page": 1, "where": "stamp", "kind": "stamped", "year": 1959},
+                   {"quote": "the 1955 budget", "page": 1, "where": "body", "kind": "typed", "year": 1955}],
+            document_date=None)),
         case("stamp-year-unwritten-estimate", MEMO, NEAR,
              j(year=1958, lo=1957, hi=1959, date_uncertain=True, evidence={"neighbour": "P1", "quote": "12/4/58"}),
              j(dates=[{"quote": "RECEIVED MAY 2", "page": 1, "where": "stamp", "kind": "stamped", "year": 1960}],

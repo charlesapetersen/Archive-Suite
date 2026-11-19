@@ -1,35 +1,35 @@
 {
  "documents": 272,
- "explicit": 189,
+ "explicit": 190,
  "by_source": {
-  "not explicit": 83,
+  "owner, this sheet": 36,
   "owner, earlier sheet": 18,
   "agreed": 86,
-  "owner, this sheet": 35,
+  "not explicit": 82,
   "year not the owner's": 21,
   "no month found": 6,
   "agreed, no month": 3,
   "no owner year tag": 20
  },
- "scored": 142,
- "with_month": 132,
- "with_day": 111,
+ "scored": 143,
+ "with_month": 133,
+ "with_day": 112,
  "month": {
-  "right": 131,
+  "right": 132,
   "missing": 2,
   "none": 8,
   "extra": 1
  },
  "day": {
-  "right": 105,
+  "right": 106,
   "none": 30,
   "missing": 4,
   "wrong": 2
  },
- "full_exact": 126,
+ "full_exact": 127,
  "old_month": {
+  "right": 119,
   "missing": 14,
-  "right": 118,
   "none": 8,
   "wrong": 1,
   "extra": 1
@@ -37,17 +37,18 @@
  "gained": 13,
  "lost": 0,
  "vs_tag": {
-  "right": 94,
+  "right": 95,
   "missing": 4,
   "wrong": 1
  },
  "vs_tag_old": {
+  "right": 87,
   "missing": 12,
-  "right": 86,
   "wrong": 1
  },
- "tagged": 99,
+ "tagged": 100,
  "by_from": {
+  "stamp": 1,
   "ocr form": 11,
   "quote": 123,
   "none": 36,
@@ -57,20 +58,20 @@
   "image month": 4
  },
  "by_truth_source": {
+  "owner, this sheet": 36,
   "owner, earlier sheet": 18,
   "agreed": 86,
-  "owner, this sheet": 35,
   "agreed, no month": 3
  },
  "strict_month": {
+  "right": 120,
   "missing": 14,
-  "right": 119,
   "none": 8,
   "extra": 1
  },
  "strict_day": {
+  "right": 97,
   "missing": 13,
-  "right": 96,
   "none": 30,
   "wrong": 2
  },
@@ -93,28 +94,28 @@
  },
  "strata": {
   "owner": {
-   "documents": 53,
+   "documents": 54,
    "month": {
-    "right": 45,
+    "right": 46,
     "missing": 2,
     "none": 5,
     "extra": 1
    },
    "strict_month": {
+    "right": 34,
     "missing": 14,
-    "right": 33,
     "none": 5,
     "extra": 1
    },
    "day": {
-    "right": 36,
+    "right": 37,
     "missing": 4,
     "none": 10,
     "wrong": 2
    },
    "strict_day": {
+    "right": 28,
     "missing": 13,
-    "right": 27,
     "none": 10,
     "wrong": 2
    }

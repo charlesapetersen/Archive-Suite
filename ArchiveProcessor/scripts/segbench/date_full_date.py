@@ -70,6 +70,11 @@ MONTHS = ("January", "February", "March", "April", "May", "June", "July", "Augus
 
 # --- readings -----------------------------------------------------------------------------------------------------
 
+# The classes whose month and day the route writes from the page: an explicit text or image year, and a stamp's year
+# (W46.p16-stamp-own-date, owner 2026-11-18: a stamp keeps its month and day, with Date Uncertain). "explicit" below
+# counts these three.
+DATED = ("text", "image", "stamp")
+
 def parse_reading(text, year):
     """(month, day) of a date as someone wrote it down ('8-3-87', "Sept '69", 'June 7, 1955'), for `year`."""
     s = str(text or "")
@@ -119,7 +124,9 @@ def old_month(doc, traw, sent, r):
         own_branch = ty is not None and (ty in own or r["verdict"] == "valid") and (r["cited"] == "self" or ty in own)
         pick = T.rule_pick([c for c in cands if c["year"] == r["year"]] if own_branch else cands)
         return pick[1]
-    if r["cls"] == "image":
+    if r["cls"] == "stamp" and DU.own_date(sent)[1] is None:
+        return None    # the no-own-date stamp step: before W46.date-stamp-fallback no stamp wrote a year at all
+    if r["cls"] in ("image", "stamp"):     # an own date read from a stamp was an image year before that item
         ev, mo = P.image_evidence(sent, r["year"])
         if mo is not None and ev and T.rule_pick(T.candidates(ev["quote"]))[1] == mo:
             return mo
@@ -162,7 +169,7 @@ def truth_of(r, rulings, agreed=None):
     explicit year is the owner's year are scored: a wrong year makes its month and day moot. `agreed` is the frozen
     agreed truth ({document id: [year, month, day]}); None before the freeze, when agreement is read off this run's
     route, which makes the agreed stratum the route's own answer."""
-    if r["cls"] not in ("text", "image"):
+    if r["cls"] not in DATED:
         return "not explicit", None
     y = r["route"][0]
     if r["tag"][0] is None:
@@ -264,15 +271,15 @@ def summarise(rs, rulings, agreed=None):
     with_day = sum(1 for _, _, t in sure_day if t[2] is not None)
     old = tally((r["old_month"], t[1]) for r, _, t in scored)
     # The month against the Finder tags alone (W46.date-month-score's question), independent of the page truth.
-    tagged = [r for r in rs if r["cls"] in ("text", "image") and r["tag"][1] is not None and r["tag"][0] == r["route"][0]]
+    tagged = [r for r in rs if r["cls"] in DATED and r["tag"][1] is not None and r["tag"][0] == r["route"][0]]
     vs_tag = tally((r["route"][1], r["tag"][1]) for r in tagged)
     vs_tag_old = tally((r["old_month"], r["tag"][1]) for r in tagged)
     gained = sum(1 for r, _, t in scored if r["route"][1] == t[1] and t[1] is not None and r["old_month"] != t[1])
     lost = sum(1 for r, _, t in scored if r["old_month"] == t[1] and t[1] is not None and r["route"][1] != t[1])
-    by_from = collections.Counter((r["date_from"] or "none") for r in rs if r["cls"] in ("text", "image"))
+    by_from = collections.Counter((r["date_from"] or "none") for r in rs if r["cls"] in DATED)
     strict_m = tally((r["strict"][0], t[1]) for r, _, t in scored)
     strict_d = tally((r["strict"][1], t[2]) for r, _, t in sure_day)
-    return {"documents": len(rs), "explicit": sum(r["cls"] in ("text", "image") for r in rs),
+    return {"documents": len(rs), "explicit": sum(r["cls"] in DATED for r in rs),
             "by_source": dict(by_source), "scored": len(scored), "with_month": with_month, "with_day": with_day,
             "month": month, "day": day, "full_exact": full, "old_month": old, "gained": gained, "lost": lost,
             "vs_tag": vs_tag, "vs_tag_old": vs_tag_old, "tagged": len(tagged), "by_from": dict(by_from),
@@ -489,9 +496,9 @@ def report(S):
           f"date sheet ({S['by_truth_source'].get('owner, earlier sheet', 0)} scored documents)"
           + (f" and his blind sheet of 2026-11-18 ({S['by_truth_source'].get('owner, this sheet', 0)}; his two notes read "
              "first: one day he can't tell, 27 or 29, is left out of the day score; one confirms the date at the foot "
-             "of the page over a December date on a document behind it). One sheet document is no longer scored: since "
-             "W46.date-stamp-fallback the route takes its year from a stamp, with no month or day by design, where he "
-             "reads 31 July 1975 on the page" if folded else "")
+             "of the page over a December date on a document behind it). One sheet document's year now comes from a stamp "
+             "(W46.date-stamp-fallback), with Date Uncertain; it keeps the stamp's month and day (W46.p16-stamp-own-date, "
+             "owner 2026-11-18) and is scored as before, where he reads 31 July 1975 on the page" if folded else "")
           + ". Next, the route and a second reader agreeing: the Gemini 3.7 Flash image pass on the first two pages "
           "(the same gateway model as the route's trace call, but reading the page image, where the route reads Apple "
           "Vision's text and takes its date by rule from a quote that must be in that text), and not against the owner's "

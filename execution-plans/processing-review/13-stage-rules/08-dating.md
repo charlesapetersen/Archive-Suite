@@ -42,11 +42,16 @@ it rests on. A guess with no evidence is never written."
    owner at `W47.ct-design-ok`. A document's own date always wins over either inheritance.
    3c. *A stamp* (`W46.date-stamp-fallback`, owner 2026-11-17: a stamp is better than no date). Where the image pass
    finds no own date but a written stamped date (a received stamp, a postmark), and no cover gives a year, the
-   earliest such year is the document's, with `Date Uncertain`, evidence class `stamp` and its quote and place; no
-   month or day. An own date the image pass quotes from a stamp takes the same class (the stamp dates the stamping).
+   earliest such year is the document's, with `Date Uncertain`, evidence class `stamp` and its quote and place. An own
+   date the image pass quotes from a stamp takes the same class (the stamp dates the stamping). The stamp keeps the
+   month and day it is quoted with, read as an image date's are (`W46.p16-stamp-own-date`, owner 2026-11-18: a stamp
+   that is the page's only date keeps its month and day, with `Date Uncertain` set); on the no-own-date path only
+   where it is the one stamped date quoted, since the earliest of several is not the page's only date.
    It comes before step 4, a judgement that the document's own page beats a neighbour's: a stamp's year was the
    owner's on 25 of 25 owner documents carrying one, most of them also dated in their text, against 35 of 51 for the
-   estimate on other documents; it fired on 1 of the 362 dating documents, right (`date-stamp-fallback.md`) [M].
+   estimate on other documents. It fired on 1 of the 362 dating documents, and through the own-date path, not the
+   no-own-date one: an image date before the item (31 July 1975, as the owner reads it), the same date now with
+   `Date Uncertain` added (`date-stamp-fallback.md`, before and after) [M].
 4. *Estimated from neighbours, on what is left.* The trace prompt with neighbour dates (`trace-neigh`): the reply names
    the year, the cited neighbouring document and a quote from it, and a 90% interval. It is written only when the
    evidence check passes (`date_scorers.evidence_check`: the cited neighbour is in the context, the quote is a
