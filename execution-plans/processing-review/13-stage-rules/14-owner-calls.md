@@ -121,6 +121,17 @@ calls are section 1.
       of 122 against 52; enclosure 0 of 3; entity links 2 of 54).
     - **His general note, "Look into it"**, answers the sheet's closing point: call 9 hides an estimate that fails the
       evidence check until item 8.3 fixes the checker, and 8.3 shipped on 11 November (W47.wh-date-evidence-shown).
+16. **The settings design, failed date estimates and the kind floor (2026-11-19, walkthrough of 10:39).**
+    - **Settings (W47.settings-levels-owner-ok).** The design in `../settings-design/levels.md` is approved as
+      written: eight panels and three levels (Basic, Standard, Advanced); all twelve control groups listed there move
+      to Advanced; trained segmentation models under the kit minimums and the post-correction stage both sit at
+      Advanced; a new user starts at Basic.
+    - **Date estimates that fail the evidence check (W47.wh-date-suggest-owner-ok).** Keep them hidden: call 9
+      stands now that its condition is met, and W47.wh-date-suggest is declined and not built
+      (`ArchiveProcessor/segbench-results/date-failed-estimates.md`).
+    - **Routing by kind under the classifier's 0.8 floor (W47.wh-kinds-floor).** Keep the floor as it is: no routing
+      of unsure pages by their top class, and no document prior (`segbench-results/kind-floor.md`: a tie for every
+      run model, the gain resting on two pages).
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
