@@ -36,10 +36,14 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   models on their makers' own endpoints (`makerRoutes`, W41.app-openrouter-any), so one OpenRouter key reaches the
   recommended route. Such a model stands for its maker's (`LLMModel.measuredModel`: figures, tokens, Gemini's refusals
   and their second reader), and a route-table row runs through it when the user has only an OpenRouter key
-  (`Route.appRoute(keys:)`). No custom models yet (unmeasured ones: `W41.app-openrouter-unmeasured`); a model outside the
-  catalog gets no client, so no call goes unpinned.
+  (`Route.appRoute(keys:)`). Any other model (W41.app-openrouter-unmeasured): every image-reading model in OpenRouter's
+  listing (`OCR/OpenRouterListing.swift`, `GET /models`, read with the prices) and any id typed in Manage custom
+  models, after the pinned ones, marked not measured. These are unpinned (`OpenRouterRoute.unpinned`): no provider
+  order, OpenRouter's fallbacks on, always `data_collection: "deny"`, `max_price` at the listing's price the estimate
+  showed; a typed id the listing does not price is `LLMModel.unpriced` (no estimate, no ceiling, the note says so).
+  The benched routes stay pinned exactly as before. An id neither listed nor typed gets no client.
   Their prices are OpenRouter's listing for the pinned upstream only (`OCR/OpenRouterPrices.swift`, read when the
-  Settings note for an OpenRouter model shows, at most daily), else the bench's (a maker's: its own price plus a tenth);
+  Settings note for an OpenRouter model shows or the main window opens with an OpenRouter key, at most daily), else the bench's (a maker's: its own price plus a tenth);
   `max_price` is the run's model's price, the one its estimate showed (`OpenRouterRoute.ceiling`). Segmentation's
   OpenRouter voter keeps the bench's.
 - **One way to read a page** (W42.int-s2): every client is a VisionOCRKit `PageReader`, and `PageReaders.reader`

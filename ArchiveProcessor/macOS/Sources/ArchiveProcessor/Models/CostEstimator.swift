@@ -56,7 +56,10 @@ struct CostEstimator {
         switch model.measuredModel.id {
         case "gemini-3.8-flash": return 117
         case "z-ai/glm-5.3-flash": return 153
-        default: return 0
+        // W41.app-openrouter-unmeasured: an unmeasured OpenRouter model that reasons, at the room its request is given.
+        default:
+            return model.provider == .openrouter && model.supportsThinking && OpenRouterRoute.forModel(model.id) == nil
+                ? Double(OpenAICompatibleClient.openRouterReasoningAllowance) : 0
         }
     }
 

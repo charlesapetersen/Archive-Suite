@@ -16,7 +16,7 @@ struct ManageModelsView: View {
                 VStack(spacing: 8) {
                     Text("No custom models added.")
                         .foregroundStyle(.primary)
-                    Text("Add models here when new Anthropic or Gemini models are released, without waiting for an app update.")
+                    Text("Add models here when new Anthropic or Gemini models are released, without waiting for an app update, or any OpenRouter model by its id.")
                         .font(.caption)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.center)
@@ -36,8 +36,12 @@ struct ManageModelsView: View {
                                             .font(.caption)
                                             .foregroundStyle(.primary)
                                         HStack(spacing: 12) {
-                                            Text("In: $\(model.inputCostPer1M, specifier: "%.2f")/1M")
-                                            Text("Out: $\(model.outputCostPer1M, specifier: "%.2f")/1M")
+                                            if model.provider == .openrouter {
+                                                Text("Priced from OpenRouter's listing")
+                                            } else {
+                                                Text("In: $\(model.inputCostPer1M, specifier: "%.2f")/1M")
+                                                Text("Out: $\(model.outputCostPer1M, specifier: "%.2f")/1M")
+                                            }
                                             if model.supportsThinking {
                                                 Text("Thinking")
                                                     .padding(.horizontal, 4)
@@ -87,7 +91,7 @@ struct ManageModelsView: View {
 
     private var groupedByProvider: [(LLMProvider, [LLMModel])] {
         let grouped = Dictionary(grouping: store.allCustomModels, by: \.provider)
-        return [LLMProvider.anthropic, .gemini]
+        return [LLMProvider.anthropic, .gemini, .openrouter]
             .filter { grouped[$0] != nil }
             .map { ($0, grouped[$0]!) }
     }
@@ -105,7 +109,8 @@ struct AddModelView: View {
     @State private var outputCost: String = ""
     @State private var errorMessage: String?
 
-    private var availableProviders: [LLMProvider] { [.anthropic, .gemini] }
+    /// OpenRouter (W41.app-openrouter-unmeasured): any model id, priced from OpenRouter's listing, not measured.
+    private var availableProviders: [LLMProvider] { [.anthropic, .gemini, .openrouter] }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -121,13 +126,21 @@ struct AddModelView: View {
                     }
                 }
 
-                TextField("Model ID", text: $modelId, prompt: Text("e.g. claude-sonnet-4-20260618"))
+                TextField("Model ID", text: $modelId,
+                          prompt: Text(provider == .openrouter ? "e.g. mistralai/pixtral-large-2411" : "e.g. claude-sonnet-4-20260618"))
                 TextField("Display Name", text: $displayName, prompt: Text("e.g. Claude Sonnet 4"))
 
                 Toggle("Supports Thinking", isOn: $supportsThinking)
 
-                TextField("Input cost ($/1M tokens)", text: $inputCost, prompt: Text("e.g. 3.00"))
-                TextField("Output cost ($/1M tokens)", text: $outputCost, prompt: Text("e.g. 15.00"))
+                if provider == .openrouter {
+                    Text("Priced from OpenRouter's model listing; a model it does not price runs with no cost estimate and no price ceiling. Not measured, and no provider is pinned.")
+                        .font(.caption)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    TextField("Input cost ($/1M tokens)", text: $inputCost, prompt: Text("e.g. 3.00"))
+                    TextField("Output cost ($/1M tokens)", text: $outputCost, prompt: Text("e.g. 15.00"))
+                }
 
                 if let error = errorMessage {
                     Text(error)
@@ -177,9 +190,10 @@ struct AddModelView: View {
             provider: provider,
             supportsThinking: supportsThinking,
             returnsMd: false,
-            inputCostPer1M: Double(inputCost) ?? 0,
-            outputCostPer1M: Double(outputCost) ?? 0,
-            batchDiscount: 0.5
+            // An OpenRouter id's price is the listing's, read when it is offered (`OpenRouterListing.typed`).
+            inputCostPer1M: provider == .openrouter ? 0 : Double(inputCost) ?? 0,
+            outputCostPer1M: provider == .openrouter ? 0 : Double(outputCost) ?? 0,
+            batchDiscount: provider == .openrouter ? 1 : 0.5
         )
 
         store.add(model)

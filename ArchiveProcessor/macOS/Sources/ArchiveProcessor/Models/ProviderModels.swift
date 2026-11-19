@@ -26,8 +26,13 @@ enum LLMProvider: String, CaseIterable, Identifiable, Codable {
         case .mistral: builtIn = LLMModel.mistralModels
         case .openai: builtIn = LLMModel.openaiModels
         case .appleVision: builtIn = LLMModel.appleVisionModels
-        // No custom models: a custom id would have no pinned provider, and OpenRouter would route it anywhere.
-        case .openrouter: return LLMModel.openrouterModels
+        // W41.app-openrouter-unmeasured: the pinned routes, then every other image model OpenRouter lists and every id
+        // the user typed, unpinned and marked not measured (`OpenRouterListing`).
+        case .openrouter:
+            let listed = LLMModel.openrouterModels + OpenRouterListing.unmeasuredModels()
+            let ids = Set(listed.map(\.id))
+            return listed + OpenRouterListing.typedModels().filter { !ids.contains($0.id) }
+                .map { OpenRouterListing.typed($0) }
         }
         let custom = CustomModelStore.shared.models(for: self)
         return builtIn + custom
@@ -192,6 +197,10 @@ struct LLMModel: Identifiable, Hashable, Codable {
     let inputCostPer1M: Double
     let outputCostPer1M: Double
     let batchDiscount: Double
+    /// W41.app-openrouter-unmeasured: true for an OpenRouter model whose listing gives no price (a typed id), so its
+    /// costs are unknown rather than zero: no estimate and no `max_price`. Fixed when the model is offered, so the run
+    /// keeps what its estimate said. Appended (persisted snapshots decode without it).
+    var unpriced: Bool? = nil
 
     static let appleVisionModels: [LLMModel] = [
         LLMModel(
@@ -451,6 +460,9 @@ struct OpenRouterRoute: Sendable, Equatable {
     /// maker's own endpoint, as the bench's `ocr_cloud.py` read it; nil for an open-weight model. A maker serves its
     /// own weights, so no precision is pinned (`quantizations` is not sent).
     var maker: LLMModel? = nil
+    /// W41.app-openrouter-unmeasured: false for a model the bench never read (`unpinned(_:)`), which OpenRouter routes
+    /// to whichever upstream it picks.
+    var pinned = true
 
     enum Reasoning: Sendable, Equatable {
         /// Send no `reasoning` field (a non-reasoning instruct model).
@@ -568,6 +580,52 @@ struct OpenRouterRoute: Sendable, Equatable {
 
     static func forModel(_ id: String) -> OpenRouterRoute? { catalog.first { $0.model.id == id } }
 
+    /// W41.app-openrouter-unmeasured — the route a run of `model` takes: its pinned route with the ceiling at `model`'s
+    /// price, or, for a model the listing offers (`OpenRouterListing.unmeasuredModels`) or the user typed, the unpinned
+    /// route at that price; nil for any other id (a stale selection), which is never called.
+    static func route(for model: LLMModel) -> OpenRouterRoute? {
+        guard model.provider == .openrouter else { return nil }
+        if let pin = forModel(model.id) { return pin.ceiling(model) }
+        guard offered(model.id) else { return nil }
+        return unpinned(model)
+    }
+
+    /// Whether the app offers `id` unpinned: a priced image model in OpenRouter's listing, or an id the user typed.
+    static func offered(_ id: String) -> Bool {
+        OpenRouterListing.entry(id)?.priced == true
+            || OpenRouterListing.typedModels().contains { $0.id == id }
+    }
+
+    /// A model the bench never read, through OpenRouter with no provider pinned: OpenRouter picks the upstream and may
+    /// fall back to another, every request says `data_collection: "deny"`, and `max_price` is `model`'s price, the one
+    /// its estimate showed, unless it is unpriced. No reasoning field is sent unless the user's thinking level asks.
+    static func unpinned(_ model: LLMModel) -> OpenRouterRoute {
+        OpenRouterRoute(model: model, providerTag: "", precision: "", reasoning: .none, measured: "", pinned: false)
+    }
+
+    /// An unpinned model the listing gave no price for when it was offered (a typed id it does not list, or lists
+    /// without one): no estimate and no `max_price`. A priced model at $0 (a free one) is priced. Read from the model,
+    /// never the live listing, so the request's ceiling is what the run's estimate said.
+    static func isUnpriced(_ model: LLMModel) -> Bool {
+        model.provider == .openrouter && model.unpriced == true && forModel(model.id) == nil
+    }
+
+    /// Under the Settings model picker for an unpinned model.
+    static func unmeasuredNote(_ model: LLMModel) -> String {
+        let terms = "OpenRouter chooses which provider serves it and may fall back to another, so neither the precision "
+            + "nor whose terms apply is known; every request asks OpenRouter not to use a provider that may keep or "
+            + "train on the pages."
+        if isUnpriced(model) {
+            return "Not measured: the bench has never read pages with this model. OpenRouter's listing gives no price "
+                + "for it, so there is no cost estimate and no price ceiling. " + terms
+        }
+        let reasoning = model.supportsThinking
+            ? " Its reasoning tokens are billed as output; the estimate allows \(Int(CostEstimator.estimatedThinkingTokens(for: model))) a page." : ""
+        return "Not measured: the bench has never read pages with this model. At $\(price(model.inputCostPer1M)) in, "
+            + "$\(price(model.outputCostPer1M)) out per million tokens (OpenRouter's listing), with no batch discount; "
+            + "a provider that would charge more per token is not used." + reasoning + " " + terms
+    }
+
     /// This route with its price ceiling at `model`'s prices: the run's model, priced when its estimate was made
     /// (OpenRouter's listing once read, W42.int-s2, else the bench's), so `max_price` is the price the user saw, even
     /// if the listing is read again during the run. Everything else stays the catalog's.
@@ -578,13 +636,14 @@ struct OpenRouterRoute: Sendable, Equatable {
             model: LLMModel(id: m.id, displayName: m.displayName, provider: m.provider, supportsThinking: m.supportsThinking,
                             returnsMd: m.returnsMd, inputCostPer1M: model.inputCostPer1M,
                             outputCostPer1M: model.outputCostPer1M, batchDiscount: m.batchDiscount),
-            providerTag: providerTag, precision: precision, reasoning: reasoning, measured: measured, maker: maker)
+            providerTag: providerTag, precision: precision, reasoning: reasoning, measured: measured, maker: maker,
+            pinned: pinned)
     }
 
     /// This route sending `reasoning` instead (a maker's model at the user's thinking level, W41.app-openrouter-any).
     func with(reasoning: Reasoning) -> OpenRouterRoute {
         OpenRouterRoute(model: model, providerTag: providerTag, precision: precision, reasoning: reasoning,
-                        measured: measured, maker: maker)
+                        measured: measured, maker: maker, pinned: pinned)
     }
 
     /// Under the Settings model picker: where the model runs, so the user knows the price and the precision.

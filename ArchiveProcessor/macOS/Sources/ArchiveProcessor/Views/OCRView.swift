@@ -28,6 +28,8 @@ struct OCRView: View {
     /// Which keys / `claude` the segmentation approaches can use; read on appear and on a key change, never
     /// while rendering.
     @State private var segmentationRoutes = SegmentationRoutes.none
+    /// Re-renders the estimate once OpenRouter's prices and listing have been read (W41.app-openrouter-unmeasured).
+    @State private var openRouterListingRead = 0
     /// W46.training-optout-run: what Start says before it runs a way the collection's "must not train" switch hides.
     @State private var trainingWarning: String?
     @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.standard.rawValue
@@ -305,6 +307,12 @@ struct OCRView: View {
         gatewayInputCost >= 0 && gatewayOutputCost >= 0
     }
 
+    /// W41.app-openrouter-unmeasured: the run's model is an OpenRouter model the listing gives no price for.
+    private var openRouterUnpriced: Bool {
+        openRouterListingRead >= 0 && !useGateway && !useLocalAgent && !useAppleVision
+            && OpenRouterRoute.isUnpriced(selectedModel)
+    }
+
     /// The estimate's "Segmentation" line: $0 for manual, the approach's dollars by API key, or "your plan" when
     /// only the user's own `claude` can run it. Its window calls are in addition to OCR.
     @ViewBuilder private var segmentationCostLine: some View {
@@ -332,6 +340,16 @@ struct OCRView: View {
             reloadAPIKey()
             // Not before the Keychain explainer: each read can prompt, and the sheet says to click Always Allow.
             if keychainExplained { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
+            // W41.app-openrouter-unmeasured: with an OpenRouter key, read its prices and listing before an estimate
+            // that picks an OpenRouter model shows ("Read with this", page-kind routing, Re-OCR's ranking), so the
+            // estimate and the request's price ceiling are the listing's, not the guess before it.
+            if keychainExplained, selectedProvider == .openrouter
+                || !(KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? "").isEmpty {
+                Task {
+                    await OpenRouterListing.refreshAllIfStale()
+                    openRouterListingRead += 1
+                }
+            }
             processor.checkForPendingBatch()
             if !keychainExplained {
                 showKeychainSheet = true
@@ -707,6 +725,17 @@ struct OCRView: View {
                         }
                         .padding(4)
                     }
+                } else if openRouterUnpriced && !droppedFiles.isEmpty {
+                    GroupBox("Cost Estimate") {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("OpenRouter's listing gives no price for this model, so there is no cost estimate and no price ceiling.")
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                                .accessibilityIdentifier("ap.ocr.openRouterUnpriced")
+                            segmentationCostLine
+                        }
+                        .padding(4)
+                    }
                 } else if useGateway && !gatewayHasCosts && !droppedFiles.isEmpty {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
@@ -900,6 +929,8 @@ struct OCRView: View {
                         Text("These requests use your subscription allowance. No per-request dollar estimate is available.")
                     } else if useAppleVision {
                         Text("Vision reads the regions locally, with no image-reading charge. Any optional text-only judgement is estimated separately above.")
+                    } else if openRouterUnpriced {
+                        Text("OpenRouter lists no price for this model, so there is no dollar allowance; the request allowance still applies.")
                     } else if useGateway && !gatewayHasCosts {
                         Text("Gateway pricing is unknown. Enter model pricing to see a dollar allowance; the request allowance still applies.")
                     } else {

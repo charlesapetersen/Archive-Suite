@@ -316,15 +316,19 @@ extension OpenAICompatibleClient {
     /// Tokens added to max_tokens for a model that reasons: GLM-5.3 Flash averaged 153 at minimal (cheap-models.md).
     static let openRouterReasoningAllowance = 1024
 
-    /// A client for one of `OpenRouterRoute.catalog`'s models, or nil for a model the catalog lacks: an unpinned
-    /// OpenRouter call would read with weights and at a price the bench never measured, so there is none.
+    /// A client for one of `OpenRouterRoute.catalog`'s models, or for a model the listing offers or the user typed
+    /// (unpinned, W41.app-openrouter-unmeasured); nil for any other id, which is never called.
     /// `thinkingLevel`: a maker's thinking model reads at the user's High, as its direct client does
     /// (W41.app-openrouter-any); at Low (Process Files' default) or none, at the effort the bench sent, which is low or
-    /// below, so the measured figure is the setting sent. An open model keeps the bench's.
+    /// below, so the measured figure is the setting sent. An open model keeps the bench's. An unpinned model that
+    /// reasons reads at the user's level, and with none sends no reasoning field (the model's default).
     static func openRouter(model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel? = nil) -> OpenAICompatibleClient? {
-        guard var route = OpenRouterRoute.forModel(model.id)?.ceiling(model) else { return nil }
+        guard var route = OpenRouterRoute.route(for: model) else { return nil }
         if route.maker != nil, route.model.supportsThinking, thinkingLevel == .high {
             route = route.with(reasoning: .effort(ThinkingLevel.high.openAIReasoningEffort))
+        }
+        if !route.pinned, route.model.supportsThinking, let thinkingLevel {
+            route = route.with(reasoning: .effort(thinkingLevel.openAIReasoningEffort))
         }
         return OpenAICompatibleClient(baseURL: openRouterBaseURL, apiKey: apiKey, modelID: route.model.id,
                                       openRouterRoute: route)
@@ -380,7 +384,7 @@ extension OpenAICompatibleClient {
     static func pinnedOpenRouter(model: LLMModel, apiKey: String,
                                  thinkingLevel: ThinkingLevel? = nil) throws -> OpenAICompatibleClient {
         guard let client = openRouter(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel) else {
-            throw OCRError.networkError("\(model.id) has no pinned OpenRouter provider. Choose one of the listed OpenRouter models.")
+            throw OCRError.networkError("\(model.id) is not one of the OpenRouter models this app offers. Choose one of the listed OpenRouter models.")
         }
         return client
     }
@@ -391,18 +395,20 @@ extension OpenAICompatibleClient {
     func applyOpenRouterRoute(_ body: inout [String: Any]) {
         guard let route = openRouterRoute else { return }
         body["provider"] = Self.openRouterProviderField(route)
-        // OpenAI's endpoint takes no temperature (`ocr_cloud.py` drops it there).
-        if route.maker?.provider != .openai { body["temperature"] = 0 }
+        // OpenAI's endpoint takes no temperature (`ocr_cloud.py` drops it there); nor, unpinned, an OpenAI model's.
+        let openAI = route.maker?.provider == .openai || (!route.pinned && route.model.id.hasPrefix("openai/"))
+        if !openAI { body["temperature"] = 0 }
         if let reasoning = route.reasoning.body { body["reasoning"] = reasoning }
         // Excluded reasoning still counts against max_tokens: give a reasoning model room above the answer's
         // budget, or a short call (classification asks for 64) can come back empty. A maker's page read keeps the
         // bench's 8,192 with reasoning in it (`ocr_panel.py`); its short calls get the room too, and the user's High
         // gets the direct clients' high budget on top (`ThinkingLevel.budgetTokens`).
         guard case .effort(let effort) = route.reasoning, let limit = body["max_tokens"] as? Int else { return }
-        if route.maker == nil || limit < 8192 {
-            body["max_tokens"] = limit + Self.openRouterReasoningAllowance
-        } else if effort == ThinkingLevel.high.openAIReasoningEffort {
+        // An unpinned model gets the open models' room at Low and the makers' High budget at High.
+        if effort == ThinkingLevel.high.openAIReasoningEffort, route.maker != nil || !route.pinned, limit >= 8192 {
             body["max_tokens"] = limit + ThinkingLevel.high.budgetTokens(for: .documentOCR)
+        } else if route.maker == nil || limit < 8192 {
+            body["max_tokens"] = limit + Self.openRouterReasoningAllowance
         }
     }
 
@@ -411,6 +417,15 @@ extension OpenAICompatibleClient {
     /// the provider pinned and fallbacks off, such a call fails instead of reading.
     static func openRouterProviderField(_ route: OpenRouterRoute,
                                         denyDataCollection: Bool = OpenRouterDataPolicy.denies) -> [String: Any] {
+        // W41.app-openrouter-unmeasured: no provider pinned, so OpenRouter chooses and may fall back; it is always told
+        // not to use an upstream that may keep or train on the pages, and never to bill above the estimate's price.
+        guard route.pinned else {
+            var field: [String: Any] = ["data_collection": "deny"]
+            if !OpenRouterRoute.isUnpriced(route.model) {
+                field["max_price"] = ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]
+            }
+            return field
+        }
         var field: [String: Any] = [
             "order": [route.providerTag],
             "allow_fallbacks": false,

@@ -6,17 +6,32 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 - **Before OpenRouter's listing is read, a maker's price is a guess.** A Gemini or GPT model through OpenRouter is
   priced at its maker's own price plus a tenth (Gemini 3.8 Flash's listing on 2026-11-18) until
-  `OpenRouterPrices.refreshIfStale` has read its endpoint, which happens when the Settings note for an OpenRouter model
-  shows. That price is also the request's `max_price`, so if OpenRouter lists one of them higher, every page fails
-  (nothing is charged) until the note has shown once. A user who reaches the route from “Read with this”, Re-OCR's
-  ranking or page-kind routing may not have seen the note. Fix: read the listing when any of those picks an OpenRouter
-  model, before its estimate shows.
+  `OpenRouterPrices.refreshIfStale` has read its endpoint. Since W41.app-openrouter-unmeasured that is read when the
+  main window opens with an OpenRouter key (as well as when the Settings note shows), so before “Read with this”,
+  Re-OCR's ranking or page-kind routing can pick one; the read is asynchronous, so an estimate made in the first
+  seconds after launch, or while OpenRouter is unreachable, still uses the guess. That price is also the request's
+  `max_price`: if OpenRouter lists one higher, its pages fail (nothing is charged) until a read succeeds.
 - **The estimate counts the maker's thinking tokens at Low only.** At High, a maker's thinking model gets the direct
   clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
   Gemini 3.8 Flash and none for the others, as the direct routes' estimates do.
 - **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac.
-- **The app's Claude models and the unmeasured Gemini and GPT built-ins are not offered through OpenRouter**: the
-  bench read none of them, and their OpenRouter ids come with the listing (`W41.app-openrouter-unmeasured`).
+- **The app's Claude models and the unmeasured Gemini and GPT built-ins come through OpenRouter only as unmeasured
+  listing models** (W41.app-openrouter-unmeasured): by the listing's ids, unpinned, without their makers' handling
+  (Gemini's refusals and second reader, image-token counts) and not as a route-table row's OpenRouter route. Claude Sonnet 5.5's measured rows
+  become pinned maker routes in `W41.app-openrouter-claude`, which takes them out of the unmeasured list (it skips every
+  catalog id).
+
+## ⚠️ LIMITATION (W41.app-openrouter-unmeasured, 2026-11-18): what an unmeasured OpenRouter model does not do
+
+- **Its estimate is OpenRouter's generic one.** Image tokens are counted as for any OpenRouter model, reasoning as
+  1,024 tokens a page whatever the level (High may spend up to its 8,000-token budget more), and `max_price` caps
+  the price per token, not the number of tokens. A model the listing gives a per-image or per-request charge is not
+  listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge.
+- **A listed model that leaves the listing leaves the picker.** A selection that no longer resolves falls back to
+  the provider's first model (Gemini 3.8 Flash through OpenRouter), as a deleted custom model's does; the picker
+  and the estimate show the change, nothing warns. A run already going has no client for it, so its pages fail.
+- **No provider is pinned, so the precision and the upstream's terms are unknown**; `data_collection: "deny"` is
+  sent on every request, so an upstream that may keep or train on pages is refused.
 
 ## FIXED (W46.layout-partition-fix, 2026-11-17): the newspaper fill read like a whole page
 

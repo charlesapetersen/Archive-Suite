@@ -354,7 +354,10 @@ existing scratch, key-free, no-network execution remains unchanged.
   quantizations, `require_parameters`, OpenAI's no temperature and `detail: high`, the user's High), Gemini's refusals
   through OpenRouter read as `Recitation` and sent to the second reader, the listing's AI Studio row, the price and
   tokens of the maker, the sheet and Re-OCR rows and the key interview with only an OpenRouter key; the estimate against what the panel
-  paid, and the GLM segmentation approach (options.json figures, the window request, its error mapping). No key,
+  paid, the GLM segmentation approach (options.json figures, the window request, its error mapping), and (section 9,
+  W41.app-openrouter-unmeasured) the listing's image filter and prices, the unpinned request (`data_collection` deny,
+  `max_price` at the estimate's price, the user's reasoning level), a typed id priced or unpriced, and pricing fixed
+  when offered. No key,
   network, corpus, or spend; not in the health gate.
 - **`live-openrouter.sh`** — PAID (about $0.03): each catalog model reads two synthetic pages through the real
   Process Files pipeline (`ProcessFilesTestDriver`, `PROCESSFILES_PROVIDER=OpenRouter`); asserts success, the PDF

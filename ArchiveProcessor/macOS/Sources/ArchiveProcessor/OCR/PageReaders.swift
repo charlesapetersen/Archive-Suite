@@ -11,8 +11,8 @@ import VisionOCRKit
 /// vote are not page readings and keep their own request builders.
 enum PageReaders {
     /// The reader for one route. Backend precedence as before: the Local Agent CLI, then the gateway, then the direct
-    /// provider (Settings makes the first two exclusive; the order is defensive). Throws for an OpenRouter model with
-    /// no pinned upstream, as `pinnedOpenRouter` always has.
+    /// provider (Settings makes the first two exclusive; the order is defensive). Throws for an OpenRouter model the app does
+    /// not offer, as `pinnedOpenRouter` always has.
     static func reader(
         provider: LLMProvider, model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel?,
         gateway: GatewayConfig? = nil, localAgent: LocalAgentConfig? = nil,
@@ -52,7 +52,9 @@ enum PageReaders {
         case .openrouter:
             return Measured(try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey,
                                                                         thinkingLevel: thinkingLevel),
-                            route: OCRCascade.routeID(for: model), dollars: price, pricedModel: model)
+                            // An unpinned model the listing does not price costs an unknown amount, not nothing.
+                            route: OCRCascade.routeID(for: model), dollars: OpenRouterRoute.isUnpriced(model) ? nil : price,
+                            pricedModel: OpenRouterRoute.isUnpriced(model) ? nil : model)
         case .appleVision:
             return Measured(VisionClient(settings: visionSettings), dollars: nil)
         }

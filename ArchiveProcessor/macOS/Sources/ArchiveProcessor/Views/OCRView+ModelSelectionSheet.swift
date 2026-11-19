@@ -16,8 +16,12 @@ struct ModelSelectionSheet: View {
     private var allModels: [(provider: LLMProvider, model: LLMModel)] {
         // This comparison tool executes paid, provider-backed test calls. Apple Vision is selected from
         // Settings for normal Processing, but has neither an API key nor a comparable model-test request.
+        // OpenRouter's whole listing is not offered here (W41.app-openrouter-unmeasured): its pinned routes and the
+        // ids the user typed are.
         LLMProvider.allCases.filter { $0 != .appleVision }.flatMap { provider in
-            provider.models.map { (provider: provider, model: $0) }
+            provider.models.filter { m in provider != .openrouter || OpenRouterRoute.forModel(m.id) != nil
+                || OpenRouterListing.typedModels().contains { $0.id == m.id } }
+                .map { (provider: provider, model: $0) }
         }
     }
 

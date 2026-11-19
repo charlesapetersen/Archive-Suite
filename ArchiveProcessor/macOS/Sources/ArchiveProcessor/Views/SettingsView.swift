@@ -224,6 +224,12 @@ struct SettingsView: View {
             } else if useLocalAgent {
                 segmentationCostBlock
                 localAgentCostPane
+            } else if !useGateway, selectedProvider == .openrouter, openRouterPricesRead >= 0,
+                      OpenRouterRoute.isUnpriced(selectedModel) {
+                // W41.app-openrouter-unmeasured: a typed OpenRouter id the listing does not price, as an unpriced gateway.
+                Text("OpenRouter's listing gives no price for this model, so there is no cost estimate and no price ceiling.")
+                    .font(.caption).foregroundStyle(.primary)
+                Spacer()
             } else if let model = useGateway ? gatewayModel : selectedModel {
                 let est = CostEstimator.estimate(
                     fileCount: 1000, model: model, enableTagging: tagging,
@@ -465,14 +471,17 @@ struct SettingsView: View {
                         HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
                     }
                 }
-                if let route = OpenRouterRoute.forModel(selectedModel.id), selectedProvider == .openrouter {
-                    // `openRouterPricesRead` re-renders the note once OpenRouter's listing has been read (W42.int-s2).
-                    Text(openRouterPricesRead >= 0 ? route.settingsNote : "")
+                if selectedProvider == .openrouter {
+                    // `openRouterPricesRead` re-renders the note and the model list once OpenRouter's endpoint prices
+                    // (W42.int-s2) and its model listing (W41.app-openrouter-unmeasured) have been read.
+                    Text(openRouterPricesRead >= 0
+                         ? (OpenRouterRoute.forModel(selectedModel.id)?.settingsNote ?? OpenRouterRoute.unmeasuredNote(selectedModel))
+                         : "")
                         .font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ap.settings.openRouterRoute")
                         .task {
-                            await OpenRouterPrices.refreshIfStale()
+                            await OpenRouterListing.refreshAllIfStale()
                             openRouterPricesRead += 1
                         }
                 }
