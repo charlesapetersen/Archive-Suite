@@ -23,10 +23,13 @@ struct KeychainHelper {
     /// Saves (or updates) the key. Returns whether it was durably written — callers should surface a
     /// failure instead of showing "Saved", since a silently-dropped key causes later auth errors with
     /// no explanation (e.g. a locked keychain or an entitlement/access-group mismatch).
+    /// A key equal to the stored one is not written again: every write resets the item's partition list to this
+    /// build's signature, after which `/usr/bin/security` and the bench scripts are refused (W47.gateway-key-rewrites).
     @discardableResult
     static func save(account: String, password: String) -> Bool {
         if isHeadlessTestMode { return false }   // never write the real Keychain in a headless test
         guard let data = password.data(using: .utf8) else { return false }
+        if load(account: account) == password { return true }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

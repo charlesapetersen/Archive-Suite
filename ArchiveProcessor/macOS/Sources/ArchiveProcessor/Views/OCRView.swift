@@ -519,17 +519,10 @@ struct OCRView: View {
             if mixedPDF { resumePendingMixedPDF(readWithoutClusterText: true) }
             else { resumePendingRun(readWithoutClusterText: true) }
         })
-        .onChange(of: apiKey) { _, newKey in
-            guard !useAppleVision else { return }
-            // A local model's stand-in key (W41.app-local-models) is never saved over the gateway's real one.
-            if useGateway, gatewayLocalModel, newKey == LocalModelRoute.placeholderKey { return }
-            let account = useGateway ? "Gateway" : selectedProvider.rawValue
-            if newKey.isEmpty {
-                KeychainHelper.delete(account: account)
-            } else {
-                KeychainHelper.save(account: account, password: newKey)
-            }
-        }
+        // No `onChange(of: apiKey)` writes the Keychain here (W47.gateway-key-rewrites): nothing in this view edits
+        // the key, only `reloadAPIKey()` fills it from the Keychain, so such a handler wrote each key back at launch
+        // and at every route switch (resetting the item's partition list) and deleted it when a read came back empty.
+        // Keys are edited in Settings and the key wizard.
         .onChange(of: outputDirectory) { _, newDir in
             ModelSelectionStore.saveOutputDirectory(newDir)
         }
