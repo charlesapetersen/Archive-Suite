@@ -17,7 +17,8 @@ byte-identical vLLM rerun of the self-hosted students moved a box's pages exact 
 seg-kit-gate.md, seg-window-modality.md), so each pair also carries `tie_floor`: a tie unless the interval clears 0 and
 its near end clears the larger recorded rerun floor of the two routes. The cloud routes have no recorded rerun floor
 (an identical-window rerun was never scored for one), which counts as 0 here and is said on the card. The rule in force
-(`tie`, which the settings table reads) is unchanged until the owner answers. `seg11` counts, per differing pair, the
+(`tie`, which the settings table reads) stays: the owner kept the interval-only rule, the floor reported only
+(2026-11-18, W46.p16-seg-floor-apply). `seg11` counts, per differing pair, the
 discordant documents whose deciding gaps the owner never re-judged (SEG-11).
 
     python3 ops/autonomous/heavy-run.py run -- python3 seg_pair_ties.py   # -> segbench-results/seg-pair-ties.{json,md}
@@ -223,7 +224,7 @@ def main():
            "documents": len(docs), "rounds": ROUNDS, "seed": SEED, "routes": exact,
            "rule": "a tie when the paired 95% percentile interval of a minus b, resampling truth documents, holds 0",
            "rule_floor": "tie_floor: a tie unless the interval clears 0 and its near end clears the larger recorded "
-                         "rerun floor of the two routes (W46.p16-seg-tie-floor; not in force until the owner answers)",
+                         "rerun floor of the two routes (W46.p16-seg-tie-floor; reported only, owner 2026-11-18)",
            "rerun_floor": RERUN_FLOOR,
            "pairs": pairs}
     OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
@@ -247,7 +248,7 @@ def render(out) -> str:
          f"({out['rounds']:,} rounds, seed {out['seed']}). **A pair ties when its interval holds 0**; the settings "
          "solver then takes the cheaper route. This replaces the floor of twice the larger window-offset range "
          "(5.0 points, or 10.4 for a pair with g2; owner review of the pipeline doc, 2026-11-17).", "",
-         "**The rerun floor (W46.p16-seg-tie-floor, not in force until the owner answers).** The interval does not "
+         "**The rerun floor (W46.p16-seg-tie-floor, reported only: the owner kept the interval-only rule, 2026-11-18).** The interval does not "
          "cover a rerun. Byte-identical vLLM reruns of the self-hosted students moved a box's pages exact by 1.4 to "
          "3.2 points (SEG-10; the 2B on Stanton 75.3, 76.1 and 78.6%, seg-window-modality.md; seg-kit-gate.md "
          "§Reading). The column *with the floor* calls a pair different only when its interval clears 0 and its near "
@@ -317,7 +318,7 @@ def render(out) -> str:
     L += ["", (f"Neutralised, {len(flip)} of the {len(diff)} pairs would tie under the interval alone: "
                f"{'; '.join(flip)}." if flip else f"Neutralised, every one of the {len(diff)} pairs still clears 0.")
           + " These are the verdicts an owner look at those gaps could move; no truth is changed here.", ""]
-    L += ["## The picks the floor would move (not changed; the owner decides)", "",
+    L += ["## The picks the floor would move (not changed; the owner kept the interval-only rule, 2026-11-18)", "",
           "The settings solver's profile tests run on a scratch table that reads the floor column. Profiles that keep "
           "their pick: D3 (the Claude plan only: Claude), D4, D5 (a Claude plan and a Gemini key: Claude), B1-B4, C "
           "(the 2B already), and any profile with an OpenAI key, where ChatGPT or the mix still differs from the 2B.", "",

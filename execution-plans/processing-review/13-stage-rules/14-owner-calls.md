@@ -75,6 +75,10 @@ calls are section 1.
     asks with the figures and what the user would lose. Authority: the repo `CLAUDE.md`, "Withholding a feature for a
     quality floor". The withholdings already made are reviewed in `W47.withheld-review`.
 
+14. **The segmentation rerun floor (2026-11-18).** Two segmentation routes tie when the paired interval holds 0, as
+    before; the students' 3.2-point rerun floor (SEG-10) is reported beside it as `tie_floor` and does not decide a
+    pick, so the five picks it would move to the 2B stay as they are (W46.p16-seg-floor-apply; seg-pair-ties.md).
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.

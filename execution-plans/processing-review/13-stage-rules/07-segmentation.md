@@ -50,8 +50,9 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   recorded floor of its routes (3.2 for a student; none recorded for a cloud route, counted 0). With it 51 of 55 tie
   and only ChatGPT and the mix still differ from the 2B (+10.8 [+3.9, +18.4]); four profile picks would move to the 2B
   (D1 with a Gemini key on 16 GB, D1 with Gemini and OpenRouter keys, D1 with only g2 and the 2B, E with a Gemini
-  key from the 4B), and an Anthropic-key-only Mac from Claude, by the rule. **Not in force:** the table still reads
-  `tie` until the owner answers (`W46.p16-seg-floor-apply`, Daemon Report 2026-11-18). Six Stanton gaps no one
+  key from the 4B), and an Anthropic-key-only Mac from Claude, by the rule. **Not in force (owner, 2026-11-18):** the
+  interval-only rule stays and the floor is reported only, so the table reads `tie` and no pick moves
+  (`W46.p16-seg-floor-apply`). Six Stanton gaps no one
   re-judged decide discordant documents in the 16 pairs (SEG-11; seg-pair-ties.md). The offset ranges stay on the cards (Gemini 3.7 on g2 84.6-89.8%,
   seg-g2-offsets.md; on g1 86.8-89.2%, seg-boxes-score.md). In gap accuracy the paired sign test decides as before
   (seg-boxes-score.md Noise). Error counts differ by one or two within noise (options.md Reading).

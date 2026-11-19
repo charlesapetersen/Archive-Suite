@@ -2,7 +2,7 @@
 
 Offline from cached answers; $0, no model call or upload. Each route's pages in an exact document, no checking, on the two test boxes' 325 common-support document pages (142 truth documents, Stanton and RG165, window offset 0), at its own frozen rule and level. Every pair is compared page by page on the same windows; the 95% interval resamples the truth's documents (10,000 rounds, seed 46). **A pair ties when its interval holds 0**; the settings solver then takes the cheaper route. This replaces the floor of twice the larger window-offset range (5.0 points, or 10.4 for a pair with g2; owner review of the pipeline doc, 2026-11-17).
 
-**The rerun floor (W46.p16-seg-tie-floor, not in force until the owner answers).** The interval does not cover a rerun. Byte-identical vLLM reruns of the self-hosted students moved a box's pages exact by 1.4 to 3.2 points (SEG-10; the 2B on Stanton 75.3, 76.1 and 78.6%, seg-window-modality.md; seg-kit-gate.md §Reading). The column *with the floor* calls a pair different only when its interval clears 0 and its near end also clears the larger recorded floor of its two routes (seg-qwen3.5-2b-8bit 3.2, seg-qwen3.5-2b-bf16-cluster 3.2, seg-qwen3.5-4b-cluster 3.2, qwen3.5-27b-teacher 3.2 points; a cloud route has none recorded, so 0).
+**The rerun floor (W46.p16-seg-tie-floor, reported only: the owner kept the interval-only rule, 2026-11-18).** The interval does not cover a rerun. Byte-identical vLLM reruns of the self-hosted students moved a box's pages exact by 1.4 to 3.2 points (SEG-10; the 2B on Stanton 75.3, 76.1 and 78.6%, seg-window-modality.md; seg-kit-gate.md §Reading). The column *with the floor* calls a pair different only when its interval clears 0 and its near end also clears the larger recorded floor of its two routes (seg-qwen3.5-2b-8bit 3.2, seg-qwen3.5-2b-bf16-cluster 3.2, seg-qwen3.5-4b-cluster 3.2, qwen3.5-27b-teacher 3.2 points; a cloud route has none recorded, so 0).
 
 | route | exact pages | pages exact | rerun floor |
 |---|---:|---:|---:|
@@ -115,7 +115,7 @@ Truth was re-judged only where models disagreed with it: the 92 gaps the app's G
 
 Neutralised, 7 of the 16 pairs would tie under the interval alone: gemini3.7-flash-gateway over qwen3.5-27b-teacher; gemini3.7-flash-gateway over seg-qwen3.5-2b-8bit; gemini3.7-flash-gateway over seg-qwen3.5-2b-bf16-cluster; gemini3.8-flash-text over seg-qwen3.5-2b-8bit; gemini3.8-flash-text over seg-qwen3.5-2b-bf16-cluster; gemini3.8-flash over seg-qwen3.5-2b-8bit; gemini3.8-flash over seg-qwen3.5-2b-bf16-cluster. These are the verdicts an owner look at those gaps could move; no truth is changed here.
 
-## The picks the floor would move (not changed; the owner decides)
+## The picks the floor would move (not changed; the owner kept the interval-only rule, 2026-11-18)
 
 The settings solver's profile tests run on a scratch table that reads the floor column. Profiles that keep their pick: D3 (the Claude plan only: Claude), D4, D5 (a Claude plan and a Gemini key: Claude), B1-B4, C (the 2B already), and any profile with an OpenAI key, where ChatGPT or the mix still differs from the 2B.
 

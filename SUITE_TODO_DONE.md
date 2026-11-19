@@ -16722,3 +16722,10 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   PDFs, upright copies, quads, HEIC conversions and the re-fetched `licence-freed-sweep/src` (DocScanner 54f6063,
   DocGeoNet ead1d37 and their Drive weights, re-fetchable with gdown).
   <!-- /W46.p16-dewarp-floor -->
+- [x] **W46.p16-seg-floor-apply — put the segmentation rerun floor in force, if the owner says so [XS]** · §Document processing review — W46 (lane: segbench) (uses: light) — From W46.p16-seg-tie-floor (P16-1). Each pair in `seg-pair-ties.json` carries `tie_floor` (a tie unless the paired interval clears 0 and its near end clears the larger recorded rerun floor of its routes: 3.2 points for the 2B, 4B and teacher, SEG-10; none recorded for a cloud route). With it 51 of 55 pairs tie, and five picks move to the free 2B (seg-pair-ties.md §The picks the floor would move): D1 Gemini key on 16 GB, Gemini text 87.7% $1.68 → 2B 79.4% $0; D1 Gemini + OpenRouter, GLM → 2B; D1 g2 and the 2B only, g2 → 2B; E cluster with a Gemini key, 4B → cluster 2B; an Anthropic-key-only Mac, Claude → 2B (no test case). If the owner says yes: `settings_routes.py` `seg_pairs()` reads `tie_floor` as `tie`, regenerate the table, update the solver/sheet cases (13-profile-tests.md D1, E; the nine solver and six sheet checks that fail on that table), 07 §3, the prototype. If no: record that the floor stays reported only. A g2 identical-window rerun ($1.3 at list, after 1 Dec, gateway) would measure a cloud floor; no pick depends on it (every differing pair has a student on a side).
+  SHIPPED 2026-11-19: the owner answered (b), keep the interval-only rule (gate W46.p16-seg-floor-apply-owner-ok, 2026-11-18).
+  The floor stays reported only: `seg_pair_ties.py` labels `tie_floor` as reported only and the regenerated
+  seg-pair-ties.{json,md} say so (figures unchanged: 39 of 55 pairs tie, 51 with the floor); 07-segmentation.md §3 and
+  14-owner-calls.md call 14 record it. `settings_routes.py` still reads `tie`; no table, solver, sheet or prototype change.
+  No money spent. Bench cache: nothing written (the run reads cached answers only).
+  <!-- /W46.p16-seg-floor-apply -->

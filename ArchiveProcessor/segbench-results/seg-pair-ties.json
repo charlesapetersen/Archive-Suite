@@ -1,6 +1,6 @@
 {
  "tag": "W46.seg-truth-audit",
- "date": "2026-11-18",
+ "date": "2026-11-19",
  "set": "test-boxes",
  "pages": 325,
  "documents": 142,
@@ -53,7 +53,7 @@
   }
  },
  "rule": "a tie when the paired 95% percentile interval of a minus b, resampling truth documents, holds 0",
- "rule_floor": "tie_floor: a tie unless the interval clears 0 and its near end clears the larger recorded rerun floor of the two routes (W46.p16-seg-tie-floor; not in force until the owner answers)",
+ "rule_floor": "tie_floor: a tie unless the interval clears 0 and its near end clears the larger recorded rerun floor of the two routes (W46.p16-seg-tie-floor; reported only, owner 2026-11-18)",
  "rerun_floor": {
   "seg-qwen3.5-2b-8bit": 3.2,
   "seg-qwen3.5-2b-bf16-cluster": 3.2,
