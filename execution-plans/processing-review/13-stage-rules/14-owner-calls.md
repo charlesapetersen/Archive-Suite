@@ -80,6 +80,48 @@ calls are section 1.
     before; the students' 3.2-point rerun floor (SEG-10) is reported beside it as `tie_floor` and does not decide a
     pick, so the five picks it would move to the 2B stay as they are (W46.p16-seg-floor-apply; seg-pair-ties.md).
 
+15. **The features withheld before call 13 (2026-11-19, the withheld-review sheet; W47.withheld-calls).** The owner
+    answered all 24 entries of `../16-withheld-review.md`; the figures and files are there. These are now his calls,
+    and where one overlaps a session decision in section 2, this governs. Work filed: `SUITE_TODO.md` §"The withheld
+    features".
+    - **Released as measured (4).** The read-poorly flag for readers other than Apple Vision, with his note
+      "Shouldn't we also do this for other readers like Gemini?" (W47.wh-read-flag-readers: LightOnOCR's flag ships,
+      each other reader gets its own cut or a question). DocLayout-YOLO's newspaper-ocr route as a detector for
+      scanned newspapers (W47.wh-yolo-scans). Whole-page reading of newspapers for large readers
+      (W47.wh-whole-page-large). The readers that scored below what ships (Apple's on-device model, Azure, Textract,
+      Transkribus, the fifteen dominated routes): "Our findings are only based on our tests and our corpus. The user
+      may have reason to want to use a different model, based on their corpus and their own knowledge of model
+      capabilities." (W47.wh-readers-lost).
+    - **Released with a label (5).** ATRIUM as the mixed-page pre-flag, call 3 re-asked once it is built
+      (W47.wh-mixed-preflag). Trained segmentation models under the kit gate's minimums, labelled "small held-out
+      set" (W47.wh-kit-minimums). The image-grounded post-correction stage (W47.wh-post-correction). The Mac
+      Qwen3-VL 8B image pass for dating, labelled "no measured gain" (W47.wh-date-8b-image). Names on Macs too small
+      for the 8B and on pre-modern material, marked low confidence (W47.wh-names-small-mac).
+    - **An Advanced level.** On the 8B image pass: "We'll likely need to revise the Settings panel in Processor.
+      Things like this should be in an Advanced panel or similar. The whole panel likely needs to be broken out into
+      multiple panels and also into multiple levels depending on user sophistication." On small-Mac names: "Again
+      this should only go in Advanced settings or similar." Filed as W47.settings-levels, a design put to him before
+      it is built; the readers that lost, the 8B image pass and the low-confidence names wait for it.
+    - **Ask again after the named work (7).** DocRes cleaning on glare pages, "Put this in Nice to Have"
+      (W46.enh-small-reader-power). The magazine figure for the older prompts and the students (W47.wh-seg-magazine).
+      The 8,000-character entity prompt (W47.wh-ent-8k-paired). Routing by kind under the classifier's 0.8 floor
+      (W47.wh-kinds-floor). The phone's retake warning, "Keep this in Nice to Have." (W46.capture-warning). Item
+      fields off the remote gateway: "This should be tested not only with Vision but with other models that can run
+      on the Mac." (W47.wh-item-fields-mac). Cascade triggers other than failure, "Put this in Nice to Have"
+      (W47.wh-cascade-disagree); call 5 stands meanwhile.
+    - **Kept withheld (8), each now the owner's call.** The half-size retry when a cluster reader loops (351 of 1,573
+      looped pages answered, at 4.2-11.0 NES). Cleaning the image before reading (no method gained on any reader on
+      the 63 originals and the 96; Vision with SBB -6.4). Rotation without Apple Vision (Tesseract 62.7%, Qwen3-VL 8B
+      78.1% of turns; PP-LCNet alone flips 73 of 80 Hebrew turns). Layout regions off newspapers (-3.9 on the 96,
+      -15.3 on 16 hand pages, -10.8 on 80 registers). The other line layers (Orli a tie at -4.6; Vision's
+      document-request lines -10.8). A stamps and signatures layer (8 of 45 marks found, precision 42-53%);
+      W46.marks-detect-own stays behind nice-to-have. The segmentation options that did not help (split and feature
+      models 27.1% unchecked against the 2B's 79.4%; few-shot no gain at 1.43-2.01 times the tokens). The dating
+      options below the baseline (trained 2B and 4B 38.9% against 47.3%; typeface ranges 50 years wide; retrieval 27
+      of 122 against 52; enclosure 0 of 3; entity links 2 of 54).
+    - **His general note, "Look into it"**, answers the sheet's closing point: call 9 hides an estimate that fails the
+      evidence check until item 8.3 fixes the checker, and 8.3 shipped on 11 November (W47.wh-date-evidence-shown).
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.
