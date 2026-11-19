@@ -128,7 +128,8 @@ final class ZoteroExportTests: XCTestCase {
         XCTAssertEqual((item["author"] as? [[String: String]])?.compactMap { $0["literal"] }, ["A. Reporter", "B. Writer"])
         XCTAssertEqual((item["issued"] as? [String: Any])?["date-parts"] as? [[Int]], [[1946]],
                        "issued is the tags' date, never the printed issue date (FLD-6)")
-        XCTAssertEqual(note(item), ["Document kind: clipping", "Publication date: June 3, 1946", "File: c.pdf"])
+        XCTAssertEqual(note(item), ["Document kind: clipping", "Sender: Someone Else", "Publication date: June 3, 1946",
+                                    "File: c.pdf"], "a sender the byline does not name is kept")
     }
 
     func testUnclassifiedMaterialCarriesOnlyWhatItsTagsAndFoldersGive() {
@@ -156,6 +157,37 @@ final class ZoteroExportTests: XCTestCase {
         let item = ZoteroExport.item(ZoteroSource(fileName: "b", sidecar: side))
         XCTAssertEqual(item["type"] as? String, "document")
         XCTAssertEqual(item["genre"] as? String, "Newspaper Clipping")
+    }
+
+    func testDatePartsIssuedCannotCarryAreKept() {
+        XCTAssertEqual(note(ZoteroExport.item(ZoteroSource(fileName: "a", tags: tags(["3 March", "Day 12"])))),
+                       ["Month: March", "Day: 12", "File: a"])
+        let decade = ZoteroExport.item(ZoteroSource(fileName: "b", tags: tags(["1970s", "3 March"])))
+        XCTAssertEqual((decade["issued"] as? [String: Any])?["literal"] as? String, "1970s")
+        XCTAssertEqual(note(decade), ["Month: March", "File: b"])
+        let noMonth = ZoteroExport.item(ZoteroSource(fileName: "c", tags: tags(["1959", "Day 12"])))
+        XCTAssertEqual((noMonth["issued"] as? [String: Any])?["date-parts"] as? [[Int]], [[1959]])
+        XCTAssertEqual(note(noMonth), ["Day: 12", "File: c"])
+    }
+
+    func testFormatAndSendersAreKeptWhereTheTypeDoesNotTakeThem() {
+        var side = ZoteroSidecar()
+        side.format = "Postcard"
+        side.itemFields = PDFItemFields(documentKind: "other")
+        let other = ZoteroExport.item(ZoteroSource(fileName: "a", sidecar: side))
+        XCTAssertEqual(other["genre"] as? String, "Postcard")
+        XCTAssertEqual(note(other), ["File: a"])
+        side.itemFields = PDFItemFields(documentKind: "letter")
+        XCTAssertEqual(note(ZoteroExport.item(ZoteroSource(fileName: "b", sidecar: side))), ["Format: Postcard", "File: b"])
+        side.format = "Letter"
+        XCTAssertEqual(note(ZoteroExport.item(ZoteroSource(fileName: "c", sidecar: side))), ["File: c"])
+
+        var letter = ZoteroSidecar()
+        letter.authors = ["A. Reader", "J. Smith"]
+        let item = ZoteroExport.item(ZoteroSource(fileName: "d", itemFields: PDFItemFields(
+            documentKind: "newspaper article", byline: "J. Smith"), sidecar: letter))
+        XCTAssertEqual((item["author"] as? [[String: String]])?.compactMap { $0["literal"] }, ["J. Smith"])
+        XCTAssertEqual(note(item), ["Sender: A. Reader", "File: d"])
     }
 
     func testSentWithAndUndatedFiles() {

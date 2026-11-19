@@ -53,15 +53,18 @@ final class ZoteroExportReaderTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: inner)
 
         let refuse = "Save the Zotero export outside the archive folder."
-        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(root.appendingPathComponent("x.json"), rootPath: root.path), refuse)
-        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(inner.appendingPathComponent("0003.json"), rootPath: root.path),
+        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(root.appendingPathComponent("x.json"), protecting: [root]), refuse)
+        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(inner.appendingPathComponent("0003.json"), protecting: [root]),
                        refuse)
-        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(link.appendingPathComponent("x.json"), rootPath: root.path),
+        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(link.appendingPathComponent("x.json"), protecting: [root]),
                        refuse, "a link into the archive is the archive")
         XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(
-            URL(fileURLWithPath: root.path.uppercased()).appendingPathComponent("x.json"), rootPath: root.path), refuse)
-        XCTAssertNil(NavigationModel.zoteroDestinationRefusal(outside.appendingPathComponent("x.json"), rootPath: root.path))
-        XCTAssertNil(NavigationModel.zoteroDestinationRefusal(outside.appendingPathComponent("x.json"), rootPath: nil))
+            URL(fileURLWithPath: root.path.uppercased()).appendingPathComponent("x.json"), protecting: [root]), refuse)
+        XCTAssertNil(NavigationModel.zoteroDestinationRefusal(outside.appendingPathComponent("x.json"), protecting: [root]))
+        XCTAssertEqual(NavigationModel.zoteroDestinationRefusal(outside.appendingPathComponent("x.json"),
+                                                                protecting: [root, outside]), refuse,
+                       "a selected file's own folder is protected too")
+        XCTAssertNil(NavigationModel.zoteroDestinationRefusal(outside.appendingPathComponent("x.json"), protecting: []))
     }
 
     func testFileName() {

@@ -86,9 +86,9 @@ public enum ZoteroExport {
         case "journal article": return TypeMap(csl: "article-journal", publication: true)
         case "photograph": return TypeMap(csl: "graphic", genre: "Photograph", genreAsMedium: true)
         default:
-            // No kind read (material that predates the apps, or `other`): a Document, stating the tagging call's
+            // No kind read (material that predates the apps), or `other`: a Document, stating the tagging call's
             // format when there is one.
-            return TypeMap(csl: "document", genre: kind == nil ? format : nil, authorPlace: true)
+            return TypeMap(csl: "document", genre: format, authorPlace: true)
         }
     }
 
@@ -121,10 +121,18 @@ public enum ZoteroExport {
         if let title = fields.title { item["title"] = title }
         if let genre = map.genre { item[map.genreAsMedium ? "medium" : "genre"] = genre }
         if map.kindInExtra, let kind { extra.append("Document kind: \(kind)") }
+        // A format the type did not take as its genre, and that does not just repeat the kind, is kept.
+        if let format = side.format, map.genre != format, format.lowercased() != kind?.lowercased() {
+            extra.append("Format: \(format)")
+        }
 
         // People: a byline names the author of a published piece; otherwise the sender the entity call read.
-        let authors = fields.byline.map(splitList) ?? side.authors
+        let byline = fields.byline.map(splitList) ?? []
+        let authors = byline.isEmpty ? side.authors : byline
         if !authors.isEmpty { item["author"] = authors.map { ["literal": $0] } }
+        // A sender the byline does not name (a letter to the editor, say) is kept.
+        let senders = byline.isEmpty ? [] : side.authors.filter { s in !byline.contains { $0.lowercased() == s.lowercased() } }
+        if !senders.isEmpty { extra.append("Sender: \(senders.joined(separator: "; "))") }
         if !side.recipients.isEmpty {
             if map.recipient {
                 item["recipient"] = side.recipients.map { ["literal": $0] }
@@ -150,6 +158,9 @@ public enum ZoteroExport {
 
         if let tags = source.tags {
             if let issued = issued(tags) { item["issued"] = issued }
+            // A month or day `issued` cannot carry (no year, or a day with no month) is kept as written.
+            if let month = tags.month, tags.year == nil { extra.append("Month: \(month.name)") }
+            if let day = tags.day, tags.year == nil || tags.month == nil { extra.append("Day: \(day)") }
             if tags.dateUncertain, tags.year != nil || tags.decade != nil { extra.append("Date uncertain") }
             if let sent = tags.sentWith {
                 extra.append("Sent with: \(sent.wireValue)\(tags.sentWithUncertain ? " (uncertain)" : "")")

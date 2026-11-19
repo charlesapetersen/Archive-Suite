@@ -495,7 +495,7 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               (decorated: Int key columns, paths ranked only for full ties).
   ContainerCatalog.swift      W47.ct-reader-view: each listed file's container (box, folder, collection…) from the
                               container files, the nearest level map and standard names under the archive's main
-                              folder, resolved by ArchiveCore's ContainerResolver; the column cell, facet values and
+                              folder (read through ArchiveCore's ContainerLookup, which Notes shares), resolved by ArchiveCore's ContainerResolver; the column cell, facet values and
                               the Inspector's detail with each value's FieldStatus. Read only, built off main.
                               Its rows (with each facet's folded key) answer Advanced Search's Container rule
                               through RuleContext.containers; a rebuild whose values changed recounts the smart
@@ -550,6 +550,9 @@ Views/
   NavigationModel+Containers.swift  W47.ct-reader-view: one catalog build at a time off main, the level map offered
                               once per root after the settled build, File ▸ Container Levels…, Save writing only
                               `.archivesuite/container-levels.json` (ContainerFileStore.writeLevelMap) into its tree.
+  NavigationModel+Zotero.swift  W47.ct-zotero: Selection ▸ Export to Zotero… — one CSL-JSON file (ArchiveCore
+                              ZoteroExport) from the Container column's values, the tags, the page-2 header and the
+                              sidecar, read off main; saved where the user picks, never inside the archive folder.
   NavigationModel+ContainerEdits.swift  W47.ct-reader-edit: each edit read fresh, worked out and written off main
                               with the read's stamp (ContainerFileStore), one at a time; links inside the tree refused.
   ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value with its Edit menu,

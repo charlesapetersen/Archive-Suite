@@ -101,6 +101,9 @@ macOS/Sources/ArchiveNotes/
                                    `openItem` channel exactly once (W9.b5)
     ReaderRootStore.swift          @MainActor — GUID-keyed security-scoped bookmarks to Reader roots
                                    (grant / look-up / stop-scope); the only writer of readerRootBookmarks
+    SourceArchiveInfo.swift        W47.ct-zotero: a Reader source's archival location for its chip and its
+                                   CSL-JSON for Copy for Zotero (ArchiveCore ZoteroExport); the exact granted
+                                   path only, its own short scope, read off main
     ReaderLinkResolver.swift       THE archivereader:// resolve seam, in TWO stages (W23.m14): resolveExact
                                    is the walk-free main-actor stage (unknown root / containment refusal /
                                    exact hit, else .needsBasenameSearch) and `nonisolated static
@@ -291,6 +294,8 @@ macOS/Sources/ArchiveNotes/
                                    inside assets/ can't escape). Typed AssetResolution; `resolved`
                                    carries the canonical URL (W23.m3)
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
+                                   (W47.ct-zotero: a Reader source's chip adds its container line and Copy
+                                   for Zotero, through SourceArchiveInfo)
                                    (SourceAnchorBox ref wrapper, non-editable chip with Reveal button,
                                    TextKit 2 view provider); W4 seam: onRevealBlock callback; W7-S3:
                                    note-passage chips get a "Jump to Source" button (onJump) + prefer the

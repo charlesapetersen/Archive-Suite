@@ -294,8 +294,10 @@ a field or key this build does not know makes the document unreadable, so it is 
 
 ## Zotero (CSL-JSON)
 
-`ContainerCSL` maps a resolved record to CSL-JSON variables; `W47.ct-zotero` adds the item's own fields and writes
-the export. No citation is formatted.
+`ContainerCSL` maps a record's shown values (`ContainerDisplay`: title case, standard names) to CSL-JSON variables;
+`ZoteroExport` (ArchiveCore, `W47.ct-zotero`) adds the item's own fields and writes the export: Selection ▸ Export to
+Zotero… in the Reader (a file, saved outside the archive folder), Copy for Zotero on a Notes source block (the
+clipboard, for Zotero's File ▸ Import from Clipboard). No citation is formatted.
 
 - `archive` = repository; `archive-place` = place; `call-number` = collection number.
 - `archive_collection` = collection title, then `: ` and the subtitle when there is one.
@@ -304,3 +306,41 @@ the export. No citation is formatted.
   1959-1960".
 - `note` (Zotero imports it into Extra), one line each: `accession: <accession>`, `series: <series>, <series title>`.
 - An empty field is left out; nothing is invented.
+
+### The export (W47.ct-zotero)
+
+One item per document, `id` its file name (a repeat gets ` (2)`). Zotero 10's CSL-JSON importer keeps a variable only
+where the item's Zotero type has a field for it and imports no tags (measured on Zotero 10.0.9's own
+`itemFromCSLJSON`, `packages/ArchiveCore/Tools/zotero-import`), so a gathered value the type cannot hold is written
+into `note` as a line, never dropped.
+
+- **Sources.** The container as the apps show it; the date from the Finder tags; the item fields of the first text
+  page whose header has any (tag-format §2-page PDF "Item fields"), each one the header lacks from the sidecar's
+  `item_fields` when its status is `read`; the sender, recipient and their places from the Processor's sidecar
+  (`<name>.json` beside the PDF, else in its folder's `JSON Output`): the entity call's lists when present (an
+  `Unknown` placeholder is no name; a sending place only with `quoted` evidence), else `author_name`, `recipient_name`,
+  `author_location`; `recipient_location`, `publication_name` and `format` as written. Material that predates the apps
+  carries only its tags and folders.
+- **Type** by the item-field kind: `letter` → `personal_communication` (Letter); `telegram` → the same, genre
+  Telegram; `memo`, `report`, `speech` → `manuscript`, genre Memo / Report / Speech; `press release` → `document`, genre
+  Press release; `newspaper article` and `clipping` → `article-newspaper`; `magazine article` and `newsletter` →
+  `article-magazine`; `journal article` → `article-journal`; `photograph` → `graphic` (Artwork), `medium` Photograph.
+  With no kind, a `format` that names one exactly stands in; with none, or `other`, `document`, its genre the `format`
+  when there is one. A clipping's or newsletter's kind goes into `note` as `Document kind: <kind>`, and a `format` the
+  type did not take as its genre and that does not repeat the kind as `Format: <format>`.
+- **Title** = the item field's title; none is made up. **Author** = the byline's names (a list split at `; `), else the
+  sender; each a CSL `literal` name, never split into given and family. A sender the byline does not name is
+  `Sender: <names>` in `note`. **Recipient** = `recipient` on a Letter, else
+  the `note` line `Recipient: <names>`.
+- **Places.** The sending place is `publisher-place` (Zotero's Place) on Manuscript and Document; on every other type
+  the `note` line `Author place: <places>`. The recipient's place is always `Recipient place: <places>` in `note`.
+- **Publication** = `container-title` on the article types, else `Publication: <name>` in `note`. The printed issue
+  date is `Publication date: <date>` in `note`, never `issued` (FLD-6).
+- **`issued`** from the tags: `date-parts` to the precision they give, a decade as `literal` (`1970s`), and `circa`
+  when the date is speculative; `Date uncertain` in `note` when the tags say so. A month or day `issued` cannot carry
+  (no year, or a day with no month) is `Month: <name>` / `Day: <n>` in `note`. A covering letter's date is
+  `Sent with: <wire value>` in `note`, with ` (uncertain)` when its uncertain tag is set.
+- **Subjects** (the tags' subjects, less `OCR Poor` and `OCR Failed`) as `keyword` for other CSL tools and as
+  `Subjects: <a>; <b>` in `note`, which Zotero keeps.
+- **`note`** lines, in order: `archive_collection: …` and `archive-place: …` (CSL variables Zotero reads from Extra),
+  `accession: …`, `series: …`, then the lines above, and last `File: <file name>`. Notes adds the source link as `URL`.

@@ -198,7 +198,8 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
 13. `W47.item-fields-truth` — title, byline, publication name and date, document type and recipient place: a truth
     set extending W46's entity set with clippings and reports, and how well the current tagging fills them.
 14. `W47.item-fields-build` — a title for every document and the fields that proved reliable.
-15. `W47.ct-zotero` — source blocks, and the Zotero export with all gathered metadata.
+15. `W47.ct-zotero` — source blocks, and the Zotero export with all gathered metadata (shipped 2026-11-19; the export
+    is `SPEC/containers.md` §Zotero "The export").
 
 ## Item fields
 

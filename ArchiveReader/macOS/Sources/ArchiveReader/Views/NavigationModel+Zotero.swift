@@ -20,7 +20,7 @@ extension NavigationModel {
         panel.message = "Import the file in Zotero with File ▸ Import."
         panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
         guard panel.runModal() == .OK, let destination = panel.url else { return }
-        if let refusal = Self.zoteroDestinationRefusal(destination, rootPath: rootStore.discoveredPathPrefix) {
+        if let refusal = Self.zoteroDestinationRefusal(destination, protecting: zoteroProtectedFolders(files)) {
             statusMessage = refusal
             announce(refusal)
             return
@@ -30,11 +30,15 @@ extension NavigationModel {
                          container: Self.zoteroContainer(containerCatalog.rows[file.path]))
         }
         let urls = files.map(\.url)
+        // A file the catalog has not reached yet (a scan still settling) is read through the same lookup.
+        let tree = containerTree?.url
         statusMessage = "Exporting \(files.count) document\(files.count == 1 ? "" : "s") for Zotero…"
         Task { [weak self] in
             let written: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
+                let lookup = tree.map(ContainerLookup.init(treeRoot:))
                 let full = zip(sources, urls).map { source, url -> ZoteroSource in
                     var s = source
+                    if s.container.isEmpty, let lookup { s.container = lookup.shown(for: url).mapValues(\.text) }
                     s.itemFields = ZoteroSource.headerItemFields(pdf: url)
                     s.sidecar = ZoteroSidecar.read(pdf: url)
                     return s
@@ -62,17 +66,38 @@ extension NavigationModel {
         urls.count == 1 ? urls[0].deletingPathExtension().lastPathComponent + " (Zotero).json" : "Zotero export.json"
     }
 
-    /// Why the export may not be saved at `destination`: inside the archive folder, where the Reader writes nothing
-    /// but tags (a `.json` there could even take a sidecar's name). Nil when it may.
-    static func zoteroDestinationRefusal(_ destination: URL, rootPath: String?) -> String? {
-        guard let rootPath else { return nil }
+    /// The folders an export may not be saved in: the granted folder and its JPEG folder, the sibling of a main or JPEG
+    /// folder granted alone, and the folder of every selected file.
+    func zoteroProtectedFolders(_ files: [ArchiveFile]) -> [URL] {
+        var folders = files.map { $0.url.deletingLastPathComponent() }
+        if let granted = rootStore.root {
+            folders.append(granted)
+            let layout = ReaderArchiveLayout(grantedRoot: granted)
+            folders.append(layout.jpegRoot)
+            // The main or JPEG folder granted alone: its sibling (never the whole parent, which may be the home folder).
+            if layout.needsCommonParentGrant {
+                let parent = granted.deletingLastPathComponent()
+                folders.append(parent.appendingPathComponent(ReaderArchiveLayout.mainDirectoryName, isDirectory: true))
+                folders.append(parent.appendingPathComponent(ReaderArchiveLayout.jpegDirectoryName, isDirectory: true))
+            }
+        }
+        if let prefix = rootStore.discoveredPathPrefix { folders.append(URL(fileURLWithPath: prefix, isDirectory: true)) }
+        return folders
+    }
+
+    /// Why the export may not be saved at `destination`: in or under one of `protecting`, the archive's folders, where
+    /// the Reader writes nothing but tags (a `.json` there could even take a sidecar's name). Nil when it may.
+    static func zoteroDestinationRefusal(_ destination: URL, protecting: [URL]) -> String? {
         // The file does not exist yet, so its folder is the one resolved (a link to the archive is the archive).
-        let folder = destination.deletingLastPathComponent()
         // Compared case-folded: APFS is usually case-insensitive, and refusing one folder too many is safe.
-        let resolved = (CorpusWalker.discoveredPathPrefix(for: folder) ?? folder.standardizedFileURL.path).lowercased()
-        let root = (CorpusWalker.discoveredPathPrefix(for: URL(fileURLWithPath: rootPath, isDirectory: true))
-            ?? rootPath).lowercased()
-        let inside = resolved == root || ReaderArchiveLayout.isContained(path: resolved, underRootPath: root)
+        func resolved(_ url: URL) -> String {
+            (CorpusWalker.discoveredPathPrefix(for: url) ?? url.standardizedFileURL.path).lowercased()
+        }
+        let folder = resolved(destination.deletingLastPathComponent())
+        let inside = protecting.contains { protected in
+            let root = resolved(protected)
+            return folder == root || ReaderArchiveLayout.isContained(path: folder, underRootPath: root)
+        }
         return inside ? "Save the Zotero export outside the archive folder." : nil
     }
 
