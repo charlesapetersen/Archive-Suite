@@ -432,9 +432,6 @@ What remains: a box with many such pages has more gaps to check than the figures
   file's header Kinds are overwritten by a choice there; per-page pickers are open (queued: W49.proc-reocr-dialog).
 - **Opening the dialog reads the Keychain** for each provider (to know which readers are ready), which can bring back
   a Keychain prompt on an unseeded Mac (accepted: a one-time Keychain seed, kept by the stable signing certificate).
-- **Release notices:** the static PDFium also carries its bundled third-party code (FreeType, libjpeg-turbo,
-  OpenJPEG, lcms2, zlib, abseil and others); their notices and the verbatim Apache-2.0 text must join
-  `ThirdParty/PDFium-LICENSE.txt` before a DMG ships (queued: W49.proc-pdfium-notices).
 - **Not re-flagged:** a restore whose publication launch recovery had to finish, and an acceptance whose clear
   finished through its own reconciled retry, leave the flag off (the safe side) (accepted: off is the safe side).
 
