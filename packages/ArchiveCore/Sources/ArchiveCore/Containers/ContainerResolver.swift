@@ -62,8 +62,12 @@ public enum ContainerResolver {
     }
 
     /// What `fileName` inherits. `scopes[0]` is the file's own directory, then its parent, up to the root.
-    public static func resolve(fileName: String, scopes: [ContainerScope]) -> ResolvedContainer {
+    /// `fileFields` are the path values in the file's own name (`ContainerPatterns.fields(ofFileName:)`), the most
+    /// specific of the path values.
+    public static func resolve(fileName: String, scopes: [ContainerScope],
+                               fileFields: ContainerFieldSet = ContainerFieldSet()) -> ResolvedContainer {
         var candidates = runValues(liveRuns(at: fileName, in: scopes.first?.file?.runs ?? []))
+        for (field, value) in fileFields.values { candidates[field, default: []].append(value) }
         for scope in scopes {
             for (field, value) in scope.file?.directory.values ?? [:] { candidates[field, default: []].append(value) }
             for (field, value) in scope.pathFields.values { candidates[field, default: []].append(value) }

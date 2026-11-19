@@ -8,7 +8,7 @@ corpus figures and the owner's approval (2026-11-13, `W47.ct-design-ok`) are in
 `execution-plans/containers/00-plan.md`; the readers per field are measured in
 `ArchiveProcessor/segbench-results/ct-read.md`. This document is the contract every app keeps. The model is
 `packages/ArchiveCore/Sources/ArchiveCore/Containers/` (`W47.ct-spec`); the inference that fills it from markers,
-folder names and the level map is `W47.ct-infer`. When this file and the code disagree, fix one of them in the same
+folder names and the level map is `ContainerInference` and `ContainerPatterns` there (`W47.ct-infer`). When this file and the code disagree, fix one of them in the same
 commit.
 
 There is no production material yet (owner, 2026-08-01), so the shape may change outright. `schemaVersion` exists so
@@ -90,15 +90,19 @@ folder run with no fields). The user may start a run anywhere ("set for selectio
   where its own label read gave no number. `date` and `other` take the level of the run that holds them.
 - **Where a value is kept.** A value lasts as long as the run that holds it. So a label read stores each value in
   the run of its field's home level: a box label's collection title and series go into the collection run live at
-  that box (`W47.ct-infer` starts one when none is live or when the read differs from the live one), and carry
-  across boxes; its container and box title go into the box run. Only a box label starts or changes a collection
-  run. A folder label's box number is not stored: it is not a check on the box run (owner, 2026-11-13), and a folder
+  that box, and carry across boxes; its container and box title go into the box run. Only a box label starts or
+  changes a collection run. With none live it starts one at itself. A read agreeing with the live run
+  (`ContainerNames.key`) fills in the fields that run lacks, so a later box's accession reaches the earlier boxes of
+  the same collection. A read naming another title or collection number starts a new collection run with the read
+  alone; one differing only in another field (a new series or accession) starts one holding the live run's values
+  with the read over them, so the title and repository carry on. Where a differing value is the user's, nothing
+  changes and a warning says so. A folder label's box number is not stored: it is not a check on the box run (owner, 2026-11-13), and a folder
   run holding a container would outrank the box label's read.
 - **Directories.** The container file's `directory` block applies to every file in the directory and below. Path
   values (from the level map) apply the same way.
 - **Choosing a value.** For each field the candidates are, most specific first: the unmasked values of the live
-  runs, deepest run first; then the file's own directory's `directory` block, then its path values; then the
-  parent's, and so on up to the archive root. The candidate with the highest source wins, and among the same source
+  runs, deepest run first; then the path values in the file's own name (§Name patterns); then the file's own
+  directory's `directory` block, then its path values; then the parent's, and so on up to the archive root. The candidate with the highest source wins, and among the same source
   the most specific. A disagreement between candidates (the tree says Box 12, the label Box 13) is a warning shown
   by `W47.ct-infer`, never resolved silently. A box number lower than the one before is not a warning (27% of
   steps between box photos go down), nor is a folder label naming another box (Vision misreads it about one time in
@@ -170,9 +174,67 @@ container file. Reading is strict: a role this build does not know makes the map
 
 Role to field: `repository` → `repository`; `collection` → `collectionTitle` (a collection number in the name, such as
 `SC0122` or `Mss 1036`, goes to `collectionNumber`); `accession` → `accession`; `series` → `series`; `box` →
-`container`; `folder` → `folder`, the rest of the name `folderTitle`. Splitting names, the patterns that pre-fill the
-map (`Box 17`, `B17F8`, `Carton 9`, `f. 5`, `Series II`, `Accession 91006`, `RG 165`) and box or folder numbers in file
-names are `W47.ct-infer`'s.
+`container`; `folder` → `folder`, the rest of the name `folderTitle`. How a name splits is §Name patterns.
+
+**Pre-filling** (`ContainerLevelMap.prefilled`, `ct_read.py` `level_map`). Each depth takes the role that at least
+half its names suggest on their own, weighed once per file under them and counted by `ct_read.py`'s classes (a box
+and folder name apart from a box name, a tie to the greater class name); a depth whose names suggest none takes the
+role its neighbours imply: `ignore` below a box, folder or collection, `repository` above a collection, `collection`
+above a box, folder, series or accession or below a repository. A workflow folder (two digits and a space: "05 Final
+Tagging") becomes an `ignore` override, so it does not count as a depth. The user confirms or edits the map before
+it is written. On the Route B tree set (`ct_trees.json`, 36 trees) the map is right for every tree and every field
+matches (`ContainerInferenceTests`).
+
+## Name patterns (Route B)
+
+`ContainerPatterns`, the patterns `ct_read.py` scored (`segbench-results/ct-read.md` §Route B); a change here is
+scored there too. Names read underscores as spaces; numbers lose leading zeros ("Folder 08" is folder `8`) and a
+letter suffix is capitalised. Every value is a `path` value.
+
+| role | name | values |
+|---|---|---|
+| any box or folder | `B17F8`, `Box 10 - Folder 3`, `Bx 3 Fd 12`, `Box 2, Folder 4 - Reports` | container `Box 17`, folder, folder title after a dash or comma |
+| box | `Box 17`, `Carton 9`, `Folio 3`, `B82`, `box_017`, `Box 1-3`, `Box 3 - Subject file` | container as type and number or range, box title after a spaced dash, comma or colon |
+| folder | `Folder 8`, `F15`, `f. 5`, `ff. 1-20`, `Folder 08 - Correspondence` | folder number or range, folder title after it |
+| box, folder | a name with no number ("Oversize", "Correspondence 1950") | box or folder title |
+| series | `Series II, Manuscripts`, `Subseries 3`, `Entry 77` | series (`Series II`, Roman numerals in capitals), series title after it; otherwise the name |
+| accession | `Accession 91006`, `Accn 91006`, `2005 Accession` | the number or year; otherwise the name |
+| collection | `SC0122`, `Kristol papers, Mss 1036`, `SC0122 News Service`, `MC 1968 - Title`, `HUG(FP) 15.2` | collection number (`Mss`, `SC`, `RG`, `RU`, `R-MC`, `CBI`, `MC`, `M`, `HUG(FP)` and digits; before the title only unspaced or set off by a dash, comma or colon); the rest the title |
+| repository | the name | repository |
+
+A name suggests a role on its own (for pre-filling) by the same patterns, then "papers", "records", "collection",
+"files", "diaries" or "manuscripts" for a collection and "archives", "library", "institution", "institute",
+"society", "museum", "university", "college", "center" or "foundation" for a repository; a box name with a title
+after it is not taken for a box ("Box 3 - Smith Papers" suggests a collection, as in `ct_read.py`). A file name carrying
+both numbers (`Fromm, Box 2, Folder 4 - 0004.pdf`) gives the file a container and folder (`fields(ofFileName:)`).
+
+## Route A: markers into runs
+
+`ContainerInference.applyMarkers` turns one directory's box and folder photos, each with its item type (the `Box` /
+`Folder` tag, a root's colour setting for older material, or the page-2 Classification) and its label read, into
+runs in the directory's container file, by §Runs and the inheritance rule. A folder photo stores its folder, folder
+title, date and other marks, never a box number or collection field; a "No Folder" sheet (its text says "no
+folder") starts a folder run with no fields. A run already at that start keeps every user value; a re-read replaces
+the label values it reads and removes nothing, and applying the same reads twice changes nothing. A read never
+hides a user value: a photo inside a run the user set, of its own level or deeper, starts no run (it would end the
+user's run there), with a warning. A value one box's read filled into an earlier run stays there if a re-read
+changes it; the user corrects the run. The caller shows the result for the user to accept before anything is
+written.
+
+## Warnings
+
+`ContainerInference.applyMarkers` and `.warnings` give the warnings; they are shown, never acted on.
+
+- **Disagreement**: a file's candidates for a field name different values (`ContainerDisplay.disagreements`, so
+  wordings under one standard name agree). Consecutive files with the same fields in disagreement are one warning.
+- **A read against the user**: a label read names a different value from the user's on the run it falls in or
+  starts; the user's value stands.
+- **A photo inside the user's run**: a box or folder photo inside a run the user set, of its level or deeper; no run
+  is started there.
+- **A marker with no read**: a box or folder photo whose read gave nothing it stores ("No Folder" sheets excepted).
+- **A long unmarked run**: in a directory with runs, more than 60 files in a row with no run starting among them
+  (the owner's corpus: median 10 documents between markers, 90th percentile 56).
+- Not warnings (owner, 2026-11-13): a box number lower than the one before, and a folder label naming another box.
 
 ## Showing a value (`W47.ct-normalise`)
 

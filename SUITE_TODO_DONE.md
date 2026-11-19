@@ -16807,3 +16807,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   names) and W47.ct-processor-capture. SPEC/containers.md §Showing a value. No migration: nothing to migrate. No bench
   cache scratch.
   <!-- /W47.ct-normalise -->
+- [x] **W47.ct-infer — the inference in ArchiveCore, both routes [M]** · §Archival containers — W47 (owner, 2026-10-21) (lane: suite) (uses: build) (blocked-on: W47.ct-spec) — Route A carry-forward from markers (colour label, Box/Folder tag or classification), Route B from the level map and the name patterns in directory and file names, merging by field with user over label over path, and warnings for disagreements, reversals and long unmarked runs. Tests on scratch fixtures for both routes and the mixed case. detail: execution-plans/containers/00-plan.md **2026-11-10:** after W40.suite-item-types the Box/Folder marker is the item type, read from its tag or a root's colour setting, not the colour itself.
+  SHIPPED 2026-11-19. ArchiveCore `Containers/ContainerPatterns.swift` (Route B name patterns, the ones `ct_read.py`
+  scored: a directory name split into fields by its role, the role a name suggests on its own, box and folder numbers
+  in file names, "No Folder" sheets by their text) and `Containers/ContainerInference.swift`: `ContainerLevelMap.prefilled`
+  (ct_read.py `level_map`, same classes, majority and tie-break; workflow folders become `ignore` overrides),
+  `pathFields`/`scopes` for the resolver, `ContainerInference.applyMarkers` (Route A: box and folder photos into runs,
+  a box label's collection fields into the live collection run, filled in, carried over on a new series or
+  accession, or a new run for another collection; a folder label's box number never stored; user values never
+  overwritten or hidden: a photo inside a user's run of its level or deeper starts nothing) and
+  `ContainerInference.warnings` (disagreements through `ContainerDisplay.disagreements`, a read against the user, a
+  photo inside the user's run, a marker with no read, more than 60 files with no run starting). `ContainerResolver.resolve`
+  takes the file name's path values as the most specific path candidates. "Reversals" in the entry were dropped by the
+  owner on 2026-11-13 (27% of box steps go down), so there is no such warning. Tests: ContainerInferenceTests 15, on
+  the Route B tree set (`ct_trees.json`: all 36 maps and every field right, as in ct_read.py), Route A, the mixed case
+  and a scratch tree written and read back through `ContainerFileStore` (only `.archivesuite` written, photos
+  byte-identical); ArchiveCore green. Review (Opus) found a photo inside a user's run hiding the user's value from it
+  on, a series change dropping the collection title, a user's collection taking another collection's number, and
+  port drifts (Roman numerals read case-blind, "Box 1-3" taken as a title, Python's tie-break); all fixed with tests.
+  Limitation in the SPEC: a value one box's read filled into an earlier run stays if a re-read changes it. No app
+  uses it yet (W47.ct-reader-view, W47.ct-processor-capture). SPEC/containers.md §Name patterns, §Route A, §Warnings.
+  No migration: nothing to migrate. $0. No bench cache scratch.
+  <!-- /W47.ct-infer -->
