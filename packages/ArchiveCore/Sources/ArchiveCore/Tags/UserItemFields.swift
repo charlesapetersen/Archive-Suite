@@ -8,6 +8,10 @@ import Foundation
 // A value here is the user's: it is shown in place of the header's, as checked. An empty value says the file has no
 // such field, hiding the header's. Strict, as the level map: a key or field this build does not know makes the document
 // unreadable, so a writer leaves it alone rather than erase what a newer build put there.
+//
+// W47.ct-folder-date-reader: `dates` keeps, per file, the folder date the Reader gave it and the `Date evidence:` value
+// page 2 would carry (`FolderDateRecord`), trusted only while the file's tags still carry that date. No migration: the
+// key is new, and there is nothing written to migrate.
 
 public struct UserItemFields: Equatable, Sendable {
     public static let fileName = "item-fields.json"
@@ -15,16 +19,28 @@ public struct UserItemFields: Equatable, Sendable {
 
     /// File name (NFC) → field → the user's value; "" is "none".
     public private(set) var files: [String: [CheckableField: String]]
+    /// File name (NFC) → the folder date the Reader gave it (W47.ct-folder-date-reader).
+    public private(set) var dates: [String: FolderDateRecord] = [:]
     public var updatedAt: Date?
 
-    public init(files: [String: [CheckableField: String]] = [:], updatedAt: Date? = nil) {
+    public init(files: [String: [CheckableField: String]] = [:], dates: [String: FolderDateRecord] = [:],
+                updatedAt: Date? = nil) {
         var kept: [String: [CheckableField: String]] = [:]
         for (name, values) in files {
             let v = values.filter { CheckableField.itemFields.contains($0.key) }
             if !v.isEmpty { kept[Self.key(name), default: [:]].merge(v) { _, new in new } }
         }
         self.files = kept
+        for (name, record) in dates { self.dates[Self.key(name)] = record }
         self.updatedAt = updatedAt
+    }
+
+    /// The folder date the Reader gave the file named `fileName`, if it gave one.
+    public func dateRecord(for fileName: String) -> FolderDateRecord? { dates[Self.key(fileName)] }
+
+    /// Records the folder date the Reader gave `fileName`; nil takes the record away.
+    public mutating func setDateRecord(_ record: FolderDateRecord?, for fileName: String) {
+        dates[Self.key(fileName)] = record
     }
 
     /// A file name as it is keyed: composed (NFC), so a name read back from the file system in either form matches.
@@ -94,10 +110,10 @@ extension CheckableField {
 }
 
 extension UserItemFields: Codable {
-    private enum CodingKeys: String, CodingKey { case schemaVersion, files, updatedAt }
+    private enum CodingKeys: String, CodingKey { case schemaVersion, files, dates, updatedAt }
 
     public init(from decoder: Decoder) throws {
-        try decoder.refuseUnknownKeys(["schemaVersion", "files", "updatedAt"])
+        try decoder.refuseUnknownKeys(["schemaVersion", "files", "dates", "updatedAt"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let raw = try c.decode([String: [String: String]].self, forKey: .files)
         var files: [String: [CheckableField: String]] = [:]
@@ -115,7 +131,14 @@ extension UserItemFields: Codable {
             }
             files[Self.key(name)] = v
         }
-        self.init(files: files, updatedAt: try c.decodeIfPresent(Date.self, forKey: .updatedAt))
+        var dates: [String: FolderDateRecord] = [:]
+        for (name, record) in try c.decodeIfPresent([String: FolderDateRecord].self, forKey: .dates) ?? [:] {
+            guard dates[Self.key(name)] == nil else {
+                throw DecodingError.dataCorruptedError(forKey: .dates, in: c, debugDescription: "repeated file \(name)")
+            }
+            dates[Self.key(name)] = record
+        }
+        self.init(files: files, dates: dates, updatedAt: try c.decodeIfPresent(Date.self, forKey: .updatedAt))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -125,6 +148,7 @@ extension UserItemFields: Codable {
             Dictionary(uniqueKeysWithValues: values.compactMap { f, v in f.jsonKey.map { ($0, v) } })
         }
         try c.encode(raw, forKey: .files)
+        if !dates.isEmpty { try c.encode(dates, forKey: .dates) }
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
